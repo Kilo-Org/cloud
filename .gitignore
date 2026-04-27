@@ -66,6 +66,8 @@ yarn-error.log*
 /prototypes/
 .plan/
 .kilo/plans
+.superpowers/
+docs/superpowers/
 .kilo/node_modules
 .kilo/package.json
 .kilo/package-lock.json
@@ -96,6 +98,9 @@ supabase/.temp
 
 # husky generated hook shims
 .husky/_/
+
+# agent plans
+.opencode/plans/
 
 # misc
 TMP_CI_commit_msg.txt

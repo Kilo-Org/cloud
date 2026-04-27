@@ -8,6 +8,11 @@ vi.mock('../config-writer', () => ({
   writeBaseConfig: vi.fn(),
 }));
 
+vi.mock('../bootstrap', async importOriginal => {
+  const actual = await importOriginal<typeof import('../bootstrap')>();
+  return { ...actual, seedExecApprovalsDefaults: vi.fn() };
+});
+
 vi.mock('../atomic-write', () => ({
   atomicWrite: vi.fn(),
 }));
@@ -24,6 +29,7 @@ vi.mock('node:fs', () => {
 });
 
 import { backupConfigFile, writeBaseConfig } from '../config-writer';
+import { seedExecApprovalsDefaults } from '../bootstrap';
 import { atomicWrite } from '../atomic-write';
 import fs from 'node:fs';
 
@@ -32,6 +38,7 @@ const writeMock = vi.mocked(fs.writeFileSync);
 const existsMock = vi.mocked(fs.existsSync);
 const atomicWriteMock = vi.mocked(atomicWrite);
 const backupMock = vi.mocked(backupConfigFile);
+const seedExecMock = vi.mocked(seedExecApprovalsDefaults);
 
 function createMockSupervisor(): Supervisor {
   const state = 'running' as const;
@@ -284,6 +291,54 @@ describe('/_kilo/config/patch routes', () => {
       headers: authHeaders(),
     });
     expect(resp.status).toBe(500);
+  });
+
+  it('syncs exec-approvals.json before writing config when patch includes tools.exec', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    const existingConfig = { tools: { profile: 'full' }, gateway: { port: 3001 } };
+    readMock.mockReturnValue(JSON.stringify(existingConfig));
+
+    // Track call order: seedExecApprovalsDefaults must run before atomicWrite
+    const callOrder: string[] = [];
+    seedExecMock.mockImplementation(() => {
+      callOrder.push('seedExec');
+    });
+    atomicWriteMock.mockImplementation(() => {
+      callOrder.push('atomicWrite');
+    });
+
+    const resp = await app.request('/_kilo/config/patch', {
+      method: 'POST',
+      body: JSON.stringify({ tools: { exec: { security: 'full', ask: 'off' } } }),
+      headers: authHeaders(),
+    });
+
+    expect(resp.status).toBe(200);
+    expect(seedExecMock).toHaveBeenCalledOnce();
+    expect(seedExecMock).toHaveBeenCalledWith({
+      KILOCLAW_EXEC_SECURITY: 'full',
+      KILOCLAW_EXEC_ASK: 'off',
+    });
+    expect(callOrder).toEqual(['seedExec', 'atomicWrite']);
+  });
+
+  it('does not sync exec-approvals.json when patch has no tools.exec', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    const existingConfig = { tools: { profile: 'full' }, gateway: { port: 3001 } };
+    readMock.mockReturnValue(JSON.stringify(existingConfig));
+
+    const resp = await app.request('/_kilo/config/patch', {
+      method: 'POST',
+      body: JSON.stringify({ agents: { defaults: { model: { primary: 'test' } } } }),
+      headers: authHeaders(),
+    });
+
+    expect(resp.status).toBe(200);
+    expect(seedExecMock).not.toHaveBeenCalled();
   });
 });
 

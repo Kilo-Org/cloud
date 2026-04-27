@@ -244,6 +244,11 @@ function createFakeEnv() {
     KILOCLAW_AE: {
       writeDataPoint,
     } as unknown,
+    KILO_CHAT: {
+      destroySandboxData: vi
+        .fn()
+        .mockResolvedValue({ ok: true, conversationsDeleted: 0, failedConversations: [] }),
+    } as unknown,
   };
 }
 
@@ -528,6 +533,36 @@ describe('two-phase destroy', () => {
 
     // Both treated as success → full cleanup
     expect(storage._store.size).toBe(0);
+  });
+
+  it('calls KILO_CHAT.destroySandboxData during destroy', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage);
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.destroy();
+
+    expect((env.KILO_CHAT as { destroySandboxData: Mock }).destroySandboxData).toHaveBeenCalledWith(
+      'sandbox-1'
+    );
+  });
+
+  it('destroy succeeds even when KILO_CHAT.destroySandboxData throws', async () => {
+    const env = createFakeEnv();
+    (env.KILO_CHAT as { destroySandboxData: Mock }).destroySandboxData.mockRejectedValue(
+      new Error('kilo-chat unavailable')
+    );
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage);
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    // Should not throw — kilo-chat failure is non-fatal
+    await expect(instance.destroy()).resolves.toBeDefined();
   });
 
   it('alarm retries pending destroy to completion', async () => {

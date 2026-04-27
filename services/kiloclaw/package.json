@@ -22,6 +22,7 @@
   "dependencies": {
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",

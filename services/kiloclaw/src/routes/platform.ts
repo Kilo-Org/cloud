@@ -1917,21 +1917,39 @@ const MorningBriefingSetupSchema = z.object({
   timezone: z.string().min(1).optional(),
 });
 
-function isMorningBriefingWarmupError(err: unknown): boolean {
+type MorningBriefingWarmupRetryPolicy = {
+  includeTimeout: boolean;
+};
+
+function isMorningBriefingTimeoutError(err: unknown): boolean {
   const raw = err instanceof Error ? err.message : String(err);
   const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
-  return (
+  return normalized.includes('operation was aborted due to timeout');
+}
+
+function isMorningBriefingWarmupError(
+  err: unknown,
+  policy: MorningBriefingWarmupRetryPolicy = { includeTimeout: true }
+): boolean {
+  const raw = err instanceof Error ? err.message : String(err);
+  const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
+  if (
     normalized.includes('Gateway not running') ||
-    normalized.includes('Failed to reach gateway') ||
-    normalized.includes('operation was aborted due to timeout')
-  );
+    normalized.includes('Failed to reach gateway')
+  ) {
+    return true;
+  }
+  return policy.includeTimeout && isMorningBriefingTimeoutError(err);
 }
 
 async function sleep(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function withMorningBriefingWarmupRetry<T>(operation: () => Promise<T>): Promise<T> {
+async function withMorningBriefingWarmupRetry<T>(
+  operation: () => Promise<T>,
+  policy: MorningBriefingWarmupRetryPolicy = { includeTimeout: true }
+): Promise<T> {
   const delaysMs = [0, 750, 1500];
   let lastError: unknown = null;
 
@@ -1944,7 +1962,7 @@ async function withMorningBriefingWarmupRetry<T>(operation: () => Promise<T>): P
       return await operation();
     } catch (err) {
       lastError = err;
-      if (!isMorningBriefingWarmupError(err)) {
+      if (!isMorningBriefingWarmupError(err, policy)) {
         throw err;
       }
     }
@@ -1984,7 +2002,6 @@ platform.get('/morning-briefing/status', async c => {
       return c.json(
         {
           ok: true,
-          enabled: false,
           reconcileState: 'in_progress',
           error: 'Gateway warming up, retrying shortly.',
           code: 'gateway_warming_up',
@@ -2078,12 +2095,16 @@ platform.post('/morning-briefing/run', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withResolvedDORetry(
-      c.env,
-      result.data.userId,
-      iidResult.instanceId,
-      stub => stub.runMorningBriefing(),
-      'runMorningBriefing'
+    const response = await withMorningBriefingWarmupRetry(
+      () =>
+        withResolvedDORetry(
+          c.env,
+          result.data.userId,
+          iidResult.instanceId,
+          stub => stub.runMorningBriefing(),
+          'runMorningBriefing'
+        ),
+      { includeTimeout: false }
     );
     if (!response) {
       return jsonError(
@@ -2094,6 +2115,16 @@ platform.post('/morning-briefing/run', async c => {
     }
     return c.json(response, 200);
   } catch (err) {
+    if (isMorningBriefingWarmupError(err, { includeTimeout: false })) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    if (isMorningBriefingTimeoutError(err)) {
+      return jsonError(
+        'Morning Briefing run timed out while work may still be in progress. Check Last generated and Last delivery before retrying.',
+        504,
+        'morning_briefing_run_timeout'
+      );
+    }
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/run');
     return jsonError(message, status, code);
   }

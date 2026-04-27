@@ -3,6 +3,7 @@ import type { KiloClawApp } from './durable-objects/kiloclaw-app';
 import type { KiloClawRegistry } from './durable-objects/kiloclaw-registry';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import type { KiloClawBillingBinding } from './kiloclaw-billing-binding';
+import type { KiloChatBinding } from './kilo-chat-binding';
 
 /**
  * Environment bindings for the KiloClaw Worker
@@ -68,6 +69,12 @@ export type KiloClawEnv = {
   KILOCLAW_CHECKIN_URL?: string;
   REQUIRE_PROXY_TOKEN?: string;
 
+  /** Base URL of the kilo-chat worker for bot HTTP routes. */
+  KILOCHAT_BASE_URL?: string;
+
+  /** Service binding to the kilo-chat worker (RPC for destroySandboxData etc.). */
+  KILO_CHAT?: KiloChatBinding;
+
   // PostHog product telemetry
   NEXT_PUBLIC_POSTHOG_KEY?: string;
 
@@ -75,6 +82,15 @@ export type KiloClawEnv = {
   /** Override proactive API key refresh threshold (hours). Default: 72 (3 days). */
   PROACTIVE_REFRESH_THRESHOLD_HOURS?: string;
 };
+
+import type { z } from 'zod';
+import type { chatWebhookRpcSchema } from '@kilocode/kilo-chat';
+
+/**
+ * Payload for kilo-chat webhook delivery via service binding RPC.
+ * The shared schema lives in `@kilocode/kilo-chat/webhook-schemas`.
+ */
+export type ChatWebhookPayload = z.infer<typeof chatWebhookRpcSchema>;
 
 /**
  * Hono app environment type

@@ -25,13 +25,13 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana-oss:13.0.1
     container_name: grafana
     restart: unless-stopped
     profiles: ['grafana']
     environment:
       TERM: linux
-      GF_PLUGINS_PREINSTALL: grafana-clock-panel,grafana-polystat-panel,vertamedia-clickhouse-datasource
+      GF_PLUGINS_PREINSTALL: grafana-clock-panel,grafana-polystat-panel,vertamedia-clickhouse-datasource@3.4.11
       CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-e115e769bcdd4c3d66af59d3332cb394}
       CF_AE_TOKEN: ${CF_AE_TOKEN:-}
       GRAFANA_CLICKHOUSE_SECURE: ${GRAFANA_CLICKHOUSE_SECURE:-true}

@@ -92,6 +92,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Plugin shared-schemas sync check
+        run: bash scripts/sync-plugin-shared.sh --check
+
+      - name: Plugin openclaw peer-dep pin check
+        run: bash scripts/check-plugin-openclaw-pin.sh
+
       - name: Typecheck
         run: scripts/typecheck-all.sh
 

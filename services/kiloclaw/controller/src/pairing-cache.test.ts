@@ -539,6 +539,99 @@ describe('createPairingCache', () => {
     });
   });
 
+  describe('autoApproveGatewayClient', () => {
+    it('auto-approves pending gateway-client devices on refresh', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const readDevicePairingImpl = vi
+        .fn<ReadDevicePairingImpl>()
+        .mockResolvedValueOnce({
+          'req-1': {
+            requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            deviceId: 'dev1',
+            clientId: 'gateway-client',
+            role: 'operator',
+            ts: RECENT_TS,
+          },
+        })
+        // After approval, re-read returns empty
+        .mockResolvedValue({});
+
+      const cache = createPairingCache({
+        execImpl,
+        readConfigImpl: () => ({ channels: {} }),
+        readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
+        readDevicePairingImpl,
+        nowImpl: () => '2026-03-12T00:00:00.000Z',
+        nowMsImpl: () => NOW_MS,
+        autoApproveGatewayClient: true,
+      });
+
+      await cache.refreshDevicePairing();
+
+      expect(execImpl).toHaveBeenCalledWith(OPENCLAW_BIN, [
+        'devices',
+        'approve',
+        'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      ]);
+      expect(cache.getDevicePairing().requests).toEqual([]);
+    });
+
+    it('does not auto-approve non-gateway-client devices', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockResolvedValue({
+        'req-1': {
+          requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          deviceId: 'dev1',
+          clientId: 'some-other-client',
+          role: 'operator',
+          ts: RECENT_TS,
+        },
+      });
+
+      const cache = createPairingCache({
+        execImpl,
+        readConfigImpl: () => ({ channels: {} }),
+        readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
+        readDevicePairingImpl,
+        nowImpl: () => '2026-03-12T00:00:00.000Z',
+        nowMsImpl: () => NOW_MS,
+        autoApproveGatewayClient: true,
+      });
+
+      await cache.refreshDevicePairing();
+
+      expect(execImpl).not.toHaveBeenCalled();
+      expect(cache.getDevicePairing().requests).toHaveLength(1);
+    });
+
+    it('does not auto-approve when option is disabled', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockResolvedValue({
+        'req-1': {
+          requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          deviceId: 'dev1',
+          clientId: 'gateway-client',
+          role: 'operator',
+          ts: RECENT_TS,
+        },
+      });
+
+      const cache = createPairingCache({
+        execImpl,
+        readConfigImpl: () => ({ channels: {} }),
+        readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
+        readDevicePairingImpl,
+        nowImpl: () => '2026-03-12T00:00:00.000Z',
+        nowMsImpl: () => NOW_MS,
+        autoApproveGatewayClient: false,
+      });
+
+      await cache.refreshDevicePairing();
+
+      expect(execImpl).not.toHaveBeenCalled();
+    });
+  });
+
   describe('error handling', () => {
     it('returns last-known-good data on read failure after prior success', async () => {
       let callCount = 0;

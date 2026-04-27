@@ -2205,6 +2205,14 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
     const elapsed = Date.now() - new Date(activityTimestamp).getTime();
     if (Number.isNaN(elapsed) || elapsed < 0) continue;
 
+    // Stalled agents past the auto-idle threshold are owned by
+    // reconcileAgents (stalled → idle + unhook). Skip them here so the
+    // later GUPP force-stop action (stalled → stalled) doesn't overwrite
+    // the earlier auto-idle transition in the same reconcile pass.
+    // applyAction('transition_agent') ignores `from`, so action order
+    // decides the final state.
+    if (agent.status === 'stalled' && elapsed > STALLED_AUTO_IDLE_MS) continue;
+
     if (elapsed > GUPP_FORCE_STOP_MS) {
       actions.push({
         type: 'transition_agent',

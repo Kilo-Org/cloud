@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -37,6 +37,7 @@ import {
   findRepoRoot,
   startServiceInTmux,
   startInfra,
+  buildInfraDownArgs,
   readEnvValue,
   readEnvMtime,
   waitForEnvValueChange,
@@ -95,7 +96,8 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     process.exit(1);
   }
 
-  const envLocalExists = fs.existsSync(path.join(repoRoot, '.env.local'));
+  const envLocalPath = path.join(repoRoot, '.env.local');
+  const envLocalExists = fs.existsSync(envLocalPath);
   if (!envLocalExists) {
     console.warn('⚠ .env.local not found — worker secrets will use defaults.');
     console.warn('  To sync from Vercel: vercel env pull .env.local');
@@ -141,6 +143,21 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
     } catch {
       console.error('socat is not installed. Install it with: brew install socat');
       process.exit(1);
+    }
+  }
+
+  // --- Warn if grafana is enabled but CF_AE_TOKEN is not set ---
+  // Grafana boots fine without the token; only dashboard queries fail. Treat
+  // this as advisory so devs poking around the repo don't get blocked. Check
+  // .env.local in addition to the shell so the warning doesn't fire when the
+  // token is set in the file (docker compose picks it up via --env-file).
+  if (serviceNames.includes('grafana')) {
+    const tokenFromShell = process.env.CF_AE_TOKEN;
+    const tokenFromFile = envLocalExists ? readEnvValue(envLocalPath, 'CF_AE_TOKEN') : undefined;
+    if (!tokenFromShell && !tokenFromFile) {
+      console.warn('⚠ CF_AE_TOKEN not set — Grafana will boot but AE queries will fail.');
+      console.warn('  Create a CF user API token with "All accounts → Account Analytics: Read",');
+      console.warn('  then add CF_AE_TOKEN=<token> to .env.local. See dev/grafana/README.md.');
     }
   }
 
@@ -478,7 +495,8 @@ async function cmdStop(repoRoot: string): Promise<void> {
 
   console.log('Stopping Docker infrastructure…');
   try {
-    execSync('docker compose -f dev/docker-compose.yml down', { cwd: repoRoot, stdio: 'inherit' });
+    const [cmd, args] = buildInfraDownArgs();
+    execFileSync(cmd, args, { cwd: repoRoot, stdio: 'inherit' });
   } catch {
     // docker compose down may fail if nothing is running
   }

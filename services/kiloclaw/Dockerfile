@@ -55,7 +55,7 @@ RUN npm install -g pnpm
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g openclaw@2026.4.9 \
+RUN npm install -g openclaw@2026.4.15 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
     && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
@@ -202,8 +202,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-03-17-v65-remove-startup-script
-RUN echo "11"
+# Build cache bust: 2026-04-24-v66-openclaw-2026.4.15
+RUN echo "12"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

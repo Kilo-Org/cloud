@@ -56,6 +56,7 @@ const HEALTH_CHECK_EXCLUSIONS = new Set([
   // We don't control when this model may be retracted by OpenRouter.
   'openrouter/elephant-alpha',
   'openai/gpt-5.4',
+  'openai/gpt-5.5',
 ]);
 
 function emptyMetrics(): Omit<ModelHealthMetrics, 'monitored'> {

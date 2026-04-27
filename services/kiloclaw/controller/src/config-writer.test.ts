@@ -347,14 +347,14 @@ describe('generateBaseConfig', () => {
     expect(config.models).toBeUndefined();
   });
 
-  it('skips gateway-URL stale migration for org-scoped instances', () => {
+  it('keeps gateway provider for org-scoped instances but clears static models', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
           kilocode: {
             baseUrl: 'https://api.kilo.ai/api/gateway/',
             headers: { 'X-Custom': 'user-managed' },
-            models: [{ id: 'kept/model', name: 'Kept' }],
+            models: [{ id: 'kilo/auto', name: 'Kilo Auto' }],
           },
         },
       },
@@ -363,13 +363,12 @@ describe('generateBaseConfig', () => {
     const env = { ...minimalEnv(), KILOCODE_ORGANIZATION_ID: 'org_abc123' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
-    // Provider not nuked — user-managed settings preserved
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('user-managed');
     expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBe(
       'org_abc123'
     );
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('still removes openrouter stale provider for org-scoped instances', () => {
@@ -469,7 +468,7 @@ describe('generateBaseConfig', () => {
     expect(config.models).toBeUndefined();
   });
 
-  it('preserves existing kilocode config when adding org header', () => {
+  it('preserves existing kilocode baseUrl and headers when adding org header', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
@@ -490,7 +489,7 @@ describe('generateBaseConfig', () => {
     );
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('value');
     expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('removes stale org header when KILOCODE_ORGANIZATION_ID is no longer set', () => {

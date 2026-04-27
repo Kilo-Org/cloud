@@ -228,8 +228,9 @@ export function generateBaseConfig(
   // /api/openrouter/ URL or the production /api/gateway/ URL conflict with it.
   // For the production /api/gateway/ URL, skip removal when KILOCODE_ORGANIZATION_ID
   // is set: org-scoped instances need an explicit provider entry (with the production
-  // baseUrl) to carry the org header. The /api/openrouter/ cleanup always runs since
-  // that URL is unconditionally broken.
+  // baseUrl) to carry the org header. Its model list is cleared below so live gateway
+  // discovery still controls the catalog. The /api/openrouter/ cleanup always runs
+  // since that URL is unconditionally broken.
   if (config.models?.providers?.kilocode) {
     const staleBaseUrl: string = config.models.providers.kilocode.baseUrl || '';
     const isOpenrouterUrl = staleBaseUrl.includes('/api/openrouter/');
@@ -276,7 +277,9 @@ export function generateBaseConfig(
     config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
     config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
       env.KILOCODE_ORGANIZATION_ID;
-    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
+    // Empty array keeps the provider schema-valid while allowing OpenClaw to
+    // populate the full Kilo Gateway catalog through live model discovery.
+    config.models.providers.kilocode.models = [];
     console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
   } else {
     // Remove stale org header from previous boots (e.g., instance was transferred

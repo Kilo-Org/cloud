@@ -927,7 +927,7 @@ export const gastownRouter = router({
     .mutation(async ({ ctx, input }) => {
       await verifyTownOwnership(ctx.env, ctx, input.townId);
 
-      const result = await ctx.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+      const result = await ctx.env.AI.run('@cf/meta/llama-3.2-3b-instruct', {
         prompt: `You are a software project assistant. Given this task description, suggest a concise title (max 8 words) and 1-3 relevant labels from: [bug, feature, refactor, docs, test, chore, performance, security, ui, backend, infrastructure].\n\nTask description:\n${input.body}\n\nRespond with JSON only: { "title": "...", "labels": ["..."] }`,
         max_tokens: 100,
       });

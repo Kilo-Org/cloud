@@ -7,7 +7,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { EventServiceClient } from '@kilocode/event-service';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
 import { formatKiloChatError } from '@kilocode/kilo-chat';
-import type { BotPresence } from './BotStatus';
 import { ConversationList } from './ConversationList';
 import { useEventService, useInstanceContext } from '../hooks/useEventService';
 import {
@@ -21,12 +20,6 @@ import {
 } from '../hooks/useConversations';
 
 // ── Context for child pages ─────────────────────────────────────────
-export type BotContextUsage = {
-  contextTokens: number;
-  contextWindow: number;
-  updatedAt: number;
-};
-
 type KiloChatContextValue = {
   getToken: () => Promise<string>;
   currentUserId: string;
@@ -39,11 +32,9 @@ type KiloChatContextValue = {
   isInstanceLoading: boolean;
   eventService: EventServiceClient;
   kiloChatClient: KiloChatClient;
-  botPresence: (sandboxId: string) => BotPresence | undefined;
-  botContext: (conversationId: string) => BotContextUsage | undefined;
 };
 
-const KiloChatContext = createContext<KiloChatContextValue | null>(null);
+export const KiloChatContext = createContext<KiloChatContextValue | null>(null);
 
 export function useKiloChatContext() {
   const ctx = useContext(KiloChatContext);
@@ -79,64 +70,6 @@ export function KiloChatLayout({
 
   const { eventService, kiloChatClient } = useEventService(getToken);
   useInstanceContext(eventService, sandboxId);
-
-  // Bot presence + per-conversation context usage, driven by `bot.status` events.
-  // Stored as immutable Maps so the context value only changes when data changes;
-  // BotStatus owns its own staleness ticker, so no parent-level interval is needed.
-  const [presenceMap, setPresenceMap] = useState<Map<string, BotPresence>>(() => new Map());
-  const [contextMap, setContextMap] = useState<Map<string, BotContextUsage>>(() => new Map());
-
-  useEffect(() => {
-    const off = kiloChatClient.onBotStatus((_ctx, e) => {
-      setPresenceMap(prev => {
-        const existing = prev.get(e.sandboxId);
-        const model = e.model ?? null;
-        if (
-          existing &&
-          existing.online === e.online &&
-          existing.lastAt === e.at &&
-          existing.model === model
-        ) {
-          return prev;
-        }
-        const next = new Map(prev);
-        next.set(e.sandboxId, { online: e.online, lastAt: e.at, model });
-        return next;
-      });
-
-      if (
-        e.conversationId &&
-        typeof e.contextTokens === 'number' &&
-        typeof e.contextWindow === 'number' &&
-        e.contextWindow > 0
-      ) {
-        const conversationId = e.conversationId;
-        const contextTokens = e.contextTokens;
-        const contextWindow = e.contextWindow;
-        setContextMap(prev => {
-          const existing = prev.get(conversationId);
-          if (
-            existing &&
-            existing.contextTokens === contextTokens &&
-            existing.contextWindow === contextWindow &&
-            existing.updatedAt === e.at
-          ) {
-            return prev;
-          }
-          const next = new Map(prev);
-          next.set(conversationId, { contextTokens, contextWindow, updatedAt: e.at });
-          return next;
-        });
-      }
-    });
-    return off;
-  }, [kiloChatClient]);
-
-  const botPresence = useCallback((sandboxId: string) => presenceMap.get(sandboxId), [presenceMap]);
-  const botContext = useCallback(
-    (conversationId: string) => contextMap.get(conversationId),
-    [contextMap]
-  );
 
   const queryClient = useQueryClient();
   const params = useParams<{ conversationId?: string }>();
@@ -291,8 +224,6 @@ export function KiloChatLayout({
       isInstanceLoading,
       eventService,
       kiloChatClient,
-      botPresence,
-      botContext,
     }),
     [
       getToken,
@@ -306,8 +237,6 @@ export function KiloChatLayout({
       isInstanceLoading,
       eventService,
       kiloChatClient,
-      botPresence,
-      botContext,
     ]
   );
 

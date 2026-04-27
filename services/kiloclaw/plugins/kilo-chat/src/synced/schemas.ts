@@ -235,11 +235,38 @@ export const listMessagesQuerySchema = z.object({
 export const botStatusRequestSchema = z.object({
   online: z.boolean(),
   at: z.number(),
-  conversationId: ulidSchema.optional(),
-  model: z.string().nullish(),
-  provider: z.string().nullish(),
-  contextTokens: z.number().nullish(),
-  contextWindow: z.number().nullish(),
+});
+
+export const conversationStatusRequestSchema = z.object({
+  contextTokens: z.number(),
+  contextWindow: z.number(),
+  model: z.string().nullable(),
+  provider: z.string().nullable(),
+  at: z.number(),
+});
+
+export const botStatusRecordSchema = z.object({
+  online: z.boolean(),
+  at: z.number(),
+  updatedAt: z.number(),
+});
+
+export const conversationStatusRecordSchema = z.object({
+  conversationId: z.string(),
+  contextTokens: z.number(),
+  contextWindow: z.number(),
+  model: z.string().nullable(),
+  provider: z.string().nullable(),
+  at: z.number(),
+  updatedAt: z.number(),
+});
+
+export const getBotStatusResponseSchema = z.object({
+  status: botStatusRecordSchema.nullable(),
+});
+
+export const getConversationStatusResponseSchema = z.object({
+  status: conversationStatusRecordSchema.nullable(),
 });
 
 // Diagnostic-only body; reason is logged and dropped. `loose()` accepts extra keys.

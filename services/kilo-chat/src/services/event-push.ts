@@ -1,4 +1,9 @@
-import type { KiloChatEventName, KiloChatEventOf, BotStatusEvent } from '@kilocode/kilo-chat';
+import type {
+  KiloChatEventName,
+  KiloChatEventOf,
+  BotStatusRequest,
+  ConversationStatusRequest,
+} from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { lookupSandboxOwnerUserId } from './sandbox-ownership';
@@ -79,18 +84,89 @@ export async function pushInstanceEvent<N extends KiloChatEventName>(
 }
 
 /**
- * Resolves the sandbox owner and pushes a `bot.status` event to them on the
- * instance-level context. Returns `false` when no active owner exists.
+ * Resolves the sandbox owner, persists the heartbeat to `SandboxStatusDO`, and
+ * pushes a `bot.status` event to the owner on the instance-level context.
+ * Returns `ownerUserId: null` when no active owner exists. Note: this does not
+ * report whether the WS push reached an online client — use the event-service
+ * directly if that signal is required.
  */
-export async function pushBotStatusEvent(
+export async function pushBotStatus(
   env: Env,
   sandboxId: string,
-  payload: BotStatusEvent
-): Promise<{ delivered: boolean; ownerUserId: string | null }> {
+  body: BotStatusRequest
+): Promise<{ ownerUserId: string | null }> {
   const ownerUserId = await lookupSandboxOwnerUserId(env, sandboxId);
-  if (!ownerUserId) return { delivered: false, ownerUserId: null };
-  await pushInstanceEvent(env, sandboxId, [ownerUserId], 'bot.status', payload);
-  return { delivered: true, ownerUserId };
+  if (!ownerUserId) return { ownerUserId: null };
+
+  // Both legs swallow their own errors internally and always resolve; plain
+  // Promise.all is sufficient and will fail fast if that contract ever breaks.
+  await Promise.all([
+    persistBotStatus(env, sandboxId, body),
+    pushInstanceEvent(env, sandboxId, [ownerUserId], 'bot.status', { sandboxId, ...body }),
+  ]);
+  return { ownerUserId };
+}
+
+async function persistBotStatus(
+  env: Env,
+  sandboxId: string,
+  body: BotStatusRequest
+): Promise<void> {
+  try {
+    await withDORetry(
+      () => env.SANDBOX_STATUS_DO.get(env.SANDBOX_STATUS_DO.idFromName(sandboxId)),
+      stub => stub.putBotStatus(body),
+      'SandboxStatusDO.putBotStatus'
+    );
+  } catch (err) {
+    logger.error('persistBotStatus failed', { sandboxId, ...formatError(err) });
+  }
+}
+
+/**
+ * Resolves the sandbox owner, persists the post-turn snapshot to
+ * `SandboxStatusDO`, and pushes a `conversation.status` event to the owner on
+ * the conversation-scoped context. Returns `ownerUserId: null` when no active
+ * owner exists. Does not report WS delivery.
+ */
+export async function pushConversationStatus(
+  env: Env,
+  sandboxId: string,
+  conversationId: string,
+  body: ConversationStatusRequest
+): Promise<{ ownerUserId: string | null }> {
+  const ownerUserId = await lookupSandboxOwnerUserId(env, sandboxId);
+  if (!ownerUserId) return { ownerUserId: null };
+
+  await Promise.all([
+    persistConversationStatus(env, sandboxId, conversationId, body),
+    pushEventToHumanMembers(env, conversationId, sandboxId, [ownerUserId], 'conversation.status', {
+      conversationId,
+      ...body,
+    }),
+  ]);
+  return { ownerUserId };
+}
+
+async function persistConversationStatus(
+  env: Env,
+  sandboxId: string,
+  conversationId: string,
+  body: ConversationStatusRequest
+): Promise<void> {
+  try {
+    await withDORetry(
+      () => env.SANDBOX_STATUS_DO.get(env.SANDBOX_STATUS_DO.idFromName(sandboxId)),
+      stub => stub.putConversationStatus({ conversationId, ...body }),
+      'SandboxStatusDO.putConversationStatus'
+    );
+  } catch (err) {
+    logger.error('persistConversationStatus failed', {
+      sandboxId,
+      conversationId,
+      ...formatError(err),
+    });
+  }
 }
 
 /**

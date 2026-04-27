@@ -132,18 +132,21 @@ export async function dispatchInbound(
     };
 
     const sessionKey = ctxPayload.SessionKey ?? route.sessionKey;
-    const pushBotStatus = (online: boolean) => {
+    const pushConversationStatus = () => {
       try {
         const usage = readSessionUsage({ storePath, sessionKey });
         const ctxFields = toContextPayload(usage, selectedModel);
-        void client.sendBotStatus({
-          online,
-          at: Date.now(),
+        if (ctxFields.contextTokens == null || ctxFields.contextWindow == null) return;
+        void client.sendConversationStatus({
           conversationId: payload.conversationId,
-          ...ctxFields,
+          contextTokens: ctxFields.contextTokens,
+          contextWindow: ctxFields.contextWindow,
+          model: ctxFields.model,
+          provider: ctxFields.provider,
+          at: Date.now(),
         });
       } catch (err) {
-        console.warn('[kilo-chat] post-turn bot-status failed:', err);
+        console.warn('[kilo-chat] post-turn conversation-status failed:', err);
       }
     };
 
@@ -164,22 +167,12 @@ export async function dispatchInbound(
       },
     });
     await wiring.finalize();
-    pushBotStatus(true);
+    pushConversationStatus();
   } catch (err) {
     try {
       await wiring.finalize(err);
     } catch {
       // best-effort cleanup; do not let finalize errors mask the original dispatch error
-    }
-    // Best-effort refresh so the UI doesn't stall on the failed turn.
-    try {
-      void client.sendBotStatus({
-        online: true,
-        at: Date.now(),
-        conversationId: payload.conversationId,
-      });
-    } catch {
-      // swallow — sendBotStatus already swallows its own errors
     }
     throw err;
   }

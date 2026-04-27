@@ -17,6 +17,7 @@ import {
   handleActionDeliveryFailed,
 } from './handler';
 import { handleBotStatus } from '../services/bot-status';
+import { handleConversationStatus } from '../services/conversation-status';
 
 export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthContext }>): void {
   app.post('/bot/v1/sandboxes/:sandboxId/messages', handleCreateMessage);
@@ -38,6 +39,10 @@ export function registerBotRoutes(app: Hono<{ Bindings: Env; Variables: AuthCont
   app.get('/bot/v1/sandboxes/:sandboxId/conversations', handleListBotConversations);
   app.post('/bot/v1/sandboxes/:sandboxId/conversations', handleCreateBotConversation);
   app.post('/bot/v1/sandboxes/:sandboxId/bot-status', handleBotStatus);
+  app.post(
+    '/bot/v1/sandboxes/:sandboxId/conversations/:conversationId/conversation-status',
+    handleConversationStatus
+  );
   app.post(
     '/bot/v1/sandboxes/:sandboxId/conversations/:conversationId/messages/:messageId/delivery-failed',
     handleMessageDeliveryFailed

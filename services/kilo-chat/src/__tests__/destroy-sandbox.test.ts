@@ -60,6 +60,18 @@ describe('destroySandboxData', () => {
     const otherBot = `bot:kiloclaw:${OTHER_SANDBOX}`;
     await seedConversation('conv-keep', OTHER_SANDBOX, [USER_ID], otherBot);
 
+    // Seed bot + conversation status for doomed sandbox.
+    const statusStub = env.SANDBOX_STATUS_DO.get(env.SANDBOX_STATUS_DO.idFromName(SANDBOX_ID));
+    await statusStub.putBotStatus({ online: true, at: 1700000000000 });
+    await statusStub.putConversationStatus({
+      conversationId: 'conv-doomed-1',
+      contextTokens: 100,
+      contextWindow: 1000,
+      model: 'm',
+      provider: 'p',
+      at: 1700000000000,
+    });
+
     // Call the RPC method via the self-referencing service binding.
     // KILO_CHAT_SELF is only in miniflare config, not in the Env type, so cast.
     const worker = (env as unknown as Record<string, unknown>).KILO_CHAT_SELF as {
@@ -91,6 +103,10 @@ describe('destroySandboxData', () => {
     const kept = await getConvStub('conv-keep').getInfo();
     expect(kept).not.toBeNull();
     expect(kept!.id).toBe('conv-keep');
+
+    // Verify sandbox status rows are wiped.
+    expect(await statusStub.getBotStatus()).toBeNull();
+    expect(await statusStub.getConversationStatus('conv-doomed-1')).toBeNull();
   });
 
   it('returns zero when sandbox has no conversations', async () => {

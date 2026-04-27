@@ -1,5 +1,11 @@
 import { loadSessionStore, resolveSessionStoreEntry } from 'openclaw/plugin-sdk/config-runtime';
-import type { BotStatusParams } from './client.js';
+
+type ContextPayload = {
+  model: string | null;
+  provider: string | null;
+  contextTokens: number | null;
+  contextWindow: number | null;
+};
 
 type SessionEntryUsage = {
   totalTokens?: number;
@@ -31,7 +37,7 @@ export function readSessionUsage(params: {
 export function toContextPayload(
   usage: SessionEntryUsage | undefined,
   selected: ModelSelectedCapture | null
-): Pick<BotStatusParams, 'model' | 'provider' | 'contextTokens' | 'contextWindow'> {
+): ContextPayload {
   const freshTotal =
     usage && usage.totalTokensFresh !== false && typeof usage.totalTokens === 'number'
       ? usage.totalTokens

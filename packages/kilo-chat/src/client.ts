@@ -9,6 +9,8 @@ import {
   messageListResponseSchema,
   addReactionResponseSchema,
   okResponseSchema,
+  getBotStatusResponseSchema,
+  getConversationStatusResponseSchema,
   type listConversationsQuerySchema,
   type listMessagesQuerySchema,
   type deleteMessageQuerySchema,
@@ -46,6 +48,9 @@ import type {
   ConversationReadEvent,
   ConversationActivityEvent,
   BotStatusEvent,
+  ConversationStatusEvent,
+  GetBotStatusResponse,
+  GetConversationStatusResponse,
 } from './types';
 
 // Accept any response body for fire-and-forget endpoints. The server may
@@ -218,6 +223,18 @@ export class KiloChatClient {
     });
   }
 
+  async getBotStatus(sandboxId: string): Promise<GetBotStatusResponse> {
+    return this.httpRequest(`/v1/sandboxes/${sandboxId}/bot-status`, {
+      schema: getBotStatusResponseSchema,
+    });
+  }
+
+  async getConversationStatus(conversationId: string): Promise<GetConversationStatusResponse> {
+    return this.httpRequest(`/v1/conversations/${conversationId}/conversation-status`, {
+      schema: getConversationStatusResponseSchema,
+    });
+  }
+
   async listMessages(
     conversationId: string,
     opts?: z.input<typeof listMessagesQuerySchema>
@@ -303,6 +320,10 @@ export class KiloChatClient {
 
   onBotStatus(handler: (ctx: string, e: BotStatusEvent) => void): () => void {
     return this.on('bot.status', handler);
+  }
+
+  onConversationStatus(handler: (ctx: string, e: ConversationStatusEvent) => void): () => void {
+    return this.on('conversation.status', handler);
   }
 
   // ── Private HTTP helper ───────────────────────────────────────────────────

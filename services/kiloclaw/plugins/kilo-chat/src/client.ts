@@ -6,6 +6,7 @@ import {
   botListConversationsResponseSchema,
   botListMessagesResponseSchema,
   botStatusRequestSchema,
+  conversationStatusRequestSchema,
   createBotConversationRequestSchema,
   createConversationResponseSchema,
   createMessageRequestSchema,
@@ -73,6 +74,9 @@ export type CreateConversationParams = z.input<typeof createBotConversationReque
 export type CreateConversationResult = { conversationId: string };
 
 export type BotStatusParams = z.input<typeof botStatusRequestSchema>;
+export type ConversationStatusParams = { conversationId: string } & z.input<
+  typeof conversationStatusRequestSchema
+>;
 
 export type ReportMessageDeliveryFailedParams = {
   conversationId: string;
@@ -101,6 +105,10 @@ export type KiloChatClient = {
    * Fire-and-forget bot presence/context update. Never throws; errors are logged.
    */
   sendBotStatus(p: BotStatusParams): Promise<void>;
+  /**
+   * Fire-and-forget per-conversation post-turn snapshot. Never throws; errors are logged.
+   */
+  sendConversationStatus(p: ConversationStatusParams): Promise<void>;
   /**
    * Best-effort "message delivery failed" report. Never throws; errors are logged.
    */
@@ -383,6 +391,29 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     }
   }
 
+  async function sendConversationStatus(params: ConversationStatusParams): Promise<void> {
+    try {
+      const { conversationId, ...body } = params;
+      const response = await fetchImpl(
+        `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(conversationId)}/conversation-status`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        }
+      );
+      if (!response.ok) {
+        console.warn(
+          `[kilo-chat] conversation-status responded ${response.status}: ${await response.text().catch(() => '')}`
+        );
+      } else {
+        void response.body?.cancel();
+      }
+    } catch (err) {
+      console.warn('[kilo-chat] conversation-status request failed:', err);
+    }
+  }
+
   async function reportMessageDeliveryFailed(
     params: ReportMessageDeliveryFailedParams
   ): Promise<void> {
@@ -454,6 +485,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     listConversations,
     createConversation,
     sendBotStatus,
+    sendConversationStatus,
     reportMessageDeliveryFailed,
     reportActionDeliveryFailed,
   };

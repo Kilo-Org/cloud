@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 export type BotPresence = {
   online: boolean;
   lastAt: number;
-  model?: string | null;
 };
 
 export type BotDisplayState = 'online' | 'idle' | 'offline' | 'unknown';
@@ -39,12 +38,13 @@ const DOT_CLASS: Record<BotDisplayState, string> = {
 type BotStatusProps = {
   instanceStatus: string | null;
   presence?: BotPresence;
+  model?: string | null;
 };
 
-export function BotStatus({ instanceStatus, presence }: BotStatusProps) {
+export function BotStatus({ instanceStatus, presence, model }: BotStatusProps) {
   const now = useNowTicker(10_000);
   const display = computeBotDisplay({ instanceStatus, presence, now });
-  const tooltip = buildTooltip(display.state, presence, now);
+  const tooltip = buildTooltip(display.state, presence, now, model ?? null);
   return (
     <div className="flex items-center gap-1.5" title={tooltip}>
       <div className={`h-2 w-2 rounded-full ${DOT_CLASS[display.state]}`} />
@@ -69,12 +69,13 @@ export function useNowTicker(intervalMs: number): number {
 function buildTooltip(
   state: BotDisplayState,
   presence: BotPresence | undefined,
-  now: number
+  now: number,
+  model: string | null
 ): string {
   if (state === 'unknown' || !presence) return 'Bot status unknown';
   if (state === 'offline') return 'Bot is offline';
   const seconds = Math.max(0, Math.round((now - presence.lastAt) / 1000));
   const bits = [`Last heartbeat ${seconds}s ago`];
-  if (presence.model) bits.push(`model: ${presence.model}`);
+  if (model) bits.push(`model: ${model}`);
   return bits.join(' · ');
 }

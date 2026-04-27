@@ -28,6 +28,8 @@ import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
 import { BotStatus, computeBotDisplay, useNowTicker } from './BotStatus';
 import { ContextUsageRing } from './ContextUsageRing';
+import { useBotStatus } from '../hooks/useBotStatus';
+import { useConversationStatus } from '../hooks/useConversationStatus';
 import {
   KiloChatApiError,
   formatKiloChatError,
@@ -40,18 +42,11 @@ type MessageAreaProps = {
 };
 
 export function MessageArea({ conversationId }: MessageAreaProps) {
-  const {
-    currentUserId,
-    instanceStatus,
-    assistantName,
-    sandboxId,
-    eventService,
-    kiloChatClient,
-    botPresence,
-    botContext,
-  } = useKiloChatContext();
-  const presence = sandboxId ? botPresence(sandboxId) : undefined;
-  const ctxUsage = botContext(conversationId);
+  const { currentUserId, instanceStatus, assistantName, sandboxId, eventService, kiloChatClient } =
+    useKiloChatContext();
+  const botStatus = useBotStatus();
+  const presence = botStatus ? { online: botStatus.online, lastAt: botStatus.at } : undefined;
+  const ctxUsage = useConversationStatus(conversationId);
   const queryClient = useQueryClient();
 
   // Re-render every 10 s so the send-gate reacts to presence going stale
@@ -350,7 +345,11 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
               contextWindow={ctxUsage.contextWindow}
             />
           )}
-          <BotStatus instanceStatus={instanceStatus} presence={presence} />
+          <BotStatus
+            instanceStatus={instanceStatus}
+            presence={presence}
+            model={ctxUsage?.model ?? null}
+          />
         </div>
       </div>
 

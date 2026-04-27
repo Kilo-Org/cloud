@@ -30,6 +30,12 @@ import type {
   botListMessagesResponseSchema,
   botGetMembersResponseSchema,
   botConversationSummarySchema,
+  botStatusRequestSchema,
+  conversationStatusRequestSchema,
+  botStatusRecordSchema,
+  conversationStatusRecordSchema,
+  getBotStatusResponseSchema,
+  getConversationStatusResponseSchema,
 } from './schemas';
 import type {
   messageCreatedEventSchema,
@@ -47,6 +53,7 @@ import type {
   actionExecutedEventSchema,
   actionDeliveryFailedEventSchema,
   botStatusEventSchema,
+  conversationStatusEventSchema,
 } from './events';
 
 // ── Configuration ───────────────────────────────────────────────────
@@ -92,6 +99,7 @@ export type ConversationActivityEvent = z.infer<typeof conversationActivityEvent
 export type ActionExecutedEvent = z.infer<typeof actionExecutedEventSchema>;
 export type ActionDeliveryFailedEvent = z.infer<typeof actionDeliveryFailedEventSchema>;
 export type BotStatusEvent = z.infer<typeof botStatusEventSchema>;
+export type ConversationStatusEvent = z.infer<typeof conversationStatusEventSchema>;
 
 // ── API request/response types ──────────────────────────────────────
 export type CreateConversationRequest = z.infer<typeof createConversationRequestSchema>;
@@ -114,3 +122,11 @@ export type ConversationDetailResponse = z.infer<typeof conversationDetailRespon
 export type BotListConversationsResponse = z.infer<typeof botListConversationsResponseSchema>;
 export type BotListMessagesResponse = z.infer<typeof botListMessagesResponseSchema>;
 export type BotGetMembersResponse = z.infer<typeof botGetMembersResponseSchema>;
+
+// ── Bot/conversation status (persisted via SandboxStatusDO) ─────────
+export type BotStatusRequest = z.infer<typeof botStatusRequestSchema>;
+export type ConversationStatusRequest = z.infer<typeof conversationStatusRequestSchema>;
+export type BotStatusRecord = z.infer<typeof botStatusRecordSchema>;
+export type ConversationStatusRecord = z.infer<typeof conversationStatusRecordSchema>;
+export type GetBotStatusResponse = z.infer<typeof getBotStatusResponseSchema>;
+export type GetConversationStatusResponse = z.infer<typeof getConversationStatusResponseSchema>;

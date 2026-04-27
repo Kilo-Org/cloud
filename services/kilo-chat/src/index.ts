@@ -24,8 +24,10 @@ import {
   handleStopTyping,
 } from './routes/handler';
 import { registerBotRoutes } from './routes/bot-messages';
+import { registerSandboxReadRoutes } from './routes/sandbox-reads';
 export { MembershipDO } from './do/membership-do';
 export { ConversationDO } from './do/conversation-do';
+export { SandboxStatusDO } from './do/sandbox-status-do';
 
 const ALLOWED_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
 
@@ -68,6 +70,7 @@ app.get('/health', c => c.json({ ok: true }));
 
 app.use('/v1/*', authMiddleware);
 registerConversationRoutes(app);
+registerSandboxReadRoutes(app);
 
 // Messages
 app.post('/v1/messages', handleCreateMessage);
@@ -165,6 +168,13 @@ export class KiloChatService extends WorkerEntrypoint<Env> {
     // Final sweep: bulk-delete any remaining entries in the bot's MembershipDO.
     const botMembership = this.env.MEMBERSHIP_DO.get(this.env.MEMBERSHIP_DO.idFromName(botId));
     await botMembership.removeConversationsBySandbox(sandboxId);
+
+    // Wipe persisted bot + conversation status for this sandbox.
+    await withDORetry(
+      () => this.env.SANDBOX_STATUS_DO.get(this.env.SANDBOX_STATUS_DO.idFromName(sandboxId)),
+      stub => stub.destroy(),
+      'SandboxStatusDO.destroy'
+    );
 
     return {
       ok: failedConversations.length === 0,

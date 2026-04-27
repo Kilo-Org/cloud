@@ -21,12 +21,13 @@
     "bindings": [
       { "name": "CONVERSATION_DO", "class_name": "ConversationDO" },
       { "name": "MEMBERSHIP_DO", "class_name": "MembershipDO" },
+      { "name": "SANDBOX_STATUS_DO", "class_name": "SandboxStatusDO" },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["ConversationDO", "MembershipDO"],
+      "new_sqlite_classes": ["ConversationDO", "MembershipDO", "SandboxStatusDO"],
     },
   ],
 

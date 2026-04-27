@@ -2554,9 +2554,20 @@ export class TownDO extends DurableObject<Env> {
       // not otherwise call ensureContainerToken. Without this, a mayor that
       // has been waiting longer than the 8h token expiry would 401 on its
       // first GT tool call for the new prompt.
-      const townConfig = await this.getTownConfig();
-      const userId = townConfig.owner_user_id ?? townId;
-      await dispatch.ensureContainerToken(this.env, townId, userId);
+      //
+      // Best-effort: ensureContainerToken throws on non-2xx /refresh-token
+      // responses. We don't want a transient refresh failure (404/500) to
+      // drop the user's prompt — the stored envVar fallback and the next
+      // alarm tick will recover. Log and proceed to sendMessageToAgent.
+      try {
+        const townConfig = await this.getTownConfig();
+        const userId = townConfig.owner_user_id ?? townId;
+        await dispatch.ensureContainerToken(this.env, townId, userId);
+      } catch (err) {
+        logger.warn('sendMayorMessage: ensureContainerToken failed, proceeding with send', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
       const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, combinedMessage);
       if (sent) {
         // Transition waiting → working so the alarm runs at the active cadence

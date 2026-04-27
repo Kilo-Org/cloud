@@ -289,11 +289,18 @@ export function writeBotIdentityFile(
   > = defaultDeps
 ): void {
   deps.mkdirSync(path.dirname(IDENTITY_MD_DEST), { recursive: true });
-  atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
-    writeFileSync: deps.writeFileSync,
-    renameSync: deps.renameSync,
-    unlinkSync: deps.unlinkSync,
-  });
+
+  // Only seed IDENTITY.md on the initial boot. After that it's agent/user-owned
+  // content — we must not clobber edits on subsequent reboots. Bot-identity env
+  // var changes (KILOCLAW_BOT_NAME etc.) therefore only take effect on a fresh
+  // instance; existing instances keep whatever IDENTITY.md currently contains.
+  if (!deps.existsSync(IDENTITY_MD_DEST)) {
+    atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
+      writeFileSync: deps.writeFileSync,
+      renameSync: deps.renameSync,
+      unlinkSync: deps.unlinkSync,
+    });
+  }
 
   for (const legacyPath of LEGACY_BOT_IDENTITY_DESTS) {
     if (!deps.existsSync(legacyPath)) continue;

@@ -21,7 +21,7 @@ import {
   useRenameConversation,
   useMarkConversationRead,
 } from '../hooks/useConversations';
-import { useKiloChatContext } from './KiloChatLayout';
+import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';

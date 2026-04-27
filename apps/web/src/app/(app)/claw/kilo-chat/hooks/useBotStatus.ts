@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BotStatusRecord, KiloChatEventOf } from '@kilocode/kilo-chat';
-import { useKiloChatContext } from '../components/KiloChatLayout';
+import { useKiloChatContext } from '../components/kiloChatContext';
 
 const botKey = (sandboxId: string) => ['kilo-chat', 'bot-status', sandboxId] as const;
 

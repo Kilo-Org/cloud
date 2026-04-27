@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ConversationStatusRecord, KiloChatEventOf } from '@kilocode/kilo-chat';
-import { useKiloChatContext } from '../components/KiloChatLayout';
+import { useKiloChatContext } from '../components/kiloChatContext';
 
 const cvKey = (conversationId: string) =>
   ['kilo-chat', 'conversation-status', conversationId] as const;

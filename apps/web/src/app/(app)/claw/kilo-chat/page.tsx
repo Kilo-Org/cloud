@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MessagesSquare } from 'lucide-react';
-import { useKiloChatContext } from './components/KiloChatLayout';
+import { useKiloChatContext } from './components/kiloChatContext';
 
 export default function KiloChatIndexPage() {
   const router = useRouter();

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { MoreVertical } from 'lucide-react';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
 import { CONVERSATION_TITLE_MAX_CHARS } from '@kilocode/kilo-chat';
-import { useKiloChatContext } from './KiloChatLayout';
+import { useKiloChatContext } from './kiloChatContext';
 
 type ConversationItemProps = {
   conversation: ConversationListItem;

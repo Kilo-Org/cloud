@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { KiloChatApiError } from '@kilocode/kilo-chat';
-import { useKiloChatContext } from '../components/KiloChatLayout';
+import { useKiloChatContext } from '../components/kiloChatContext';
 import { useConversationDetail } from '../hooks/useConversations';
 import { MessageArea } from '../components/MessageArea';
 

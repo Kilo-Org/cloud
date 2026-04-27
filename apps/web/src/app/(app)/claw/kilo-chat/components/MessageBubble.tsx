@@ -9,7 +9,7 @@ import { EmojiPicker } from './EmojiPicker';
 import { ReactionPills } from './ReactionPills';
 import type { Message, ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
-import { useKiloChatContext } from './KiloChatLayout';
+import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
 
 const MemoizedMarkdown = memo(function MemoizedMarkdown({ content }: { content: string }) {

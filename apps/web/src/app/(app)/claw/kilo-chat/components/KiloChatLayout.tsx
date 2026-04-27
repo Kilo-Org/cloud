@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useCallback, createContext, useContext, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import type { EventServiceClient } from '@kilocode/event-service';
-import type { KiloChatClient } from '@kilocode/kilo-chat';
 import { formatKiloChatError } from '@kilocode/kilo-chat';
 import { ConversationList } from './ConversationList';
+import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
 import { useEventService, useInstanceContext } from '../hooks/useEventService';
 import {
   useConversations,
@@ -18,29 +17,6 @@ import {
   filterConversationPages,
   type ConversationListInfiniteData,
 } from '../hooks/useConversations';
-
-// ── Context for child pages ─────────────────────────────────────────
-type KiloChatContextValue = {
-  getToken: () => Promise<string>;
-  currentUserId: string;
-  instanceStatus: string | null;
-  leavingConversationId: string | null;
-  assistantName: string | null;
-  sandboxId: string | null;
-  basePath: string;
-  noInstanceRedirect: string;
-  isInstanceLoading: boolean;
-  eventService: EventServiceClient;
-  kiloChatClient: KiloChatClient;
-};
-
-export const KiloChatContext = createContext<KiloChatContextValue | null>(null);
-
-export function useKiloChatContext() {
-  const ctx = useContext(KiloChatContext);
-  if (!ctx) throw new Error('useKiloChatContext must be used within KiloChatLayout');
-  return ctx;
-}
 
 // ── Layout component ────────────────────────────────────────────────
 type KiloChatLayoutProps = {

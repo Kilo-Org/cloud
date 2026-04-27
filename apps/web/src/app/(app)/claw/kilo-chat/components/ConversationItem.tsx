@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { MoreVertical } from 'lucide-react';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
 import { CONVERSATION_TITLE_MAX_CHARS } from '@kilocode/kilo-chat';
+import { useKiloChatContext } from './KiloChatLayout';
 
 type ConversationItemProps = {
   conversation: ConversationListItem;
@@ -19,6 +20,7 @@ export function ConversationItem({
   onRename,
   onLeave,
 }: ConversationItemProps) {
+  const { basePath } = useKiloChatContext();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
@@ -110,7 +112,7 @@ export function ConversationItem({
     <div className={rowClassName}>
       {showLinkOverlay && (
         <Link
-          href={`/claw/kilo-chat/${conversation.conversationId}`}
+          href={`${basePath}/${conversation.conversationId}`}
           prefetch={false}
           aria-label={title}
           className="absolute inset-0 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"

@@ -178,23 +178,19 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   async enqueueMessageWebhook(msg: WebhookMessage, convContext: MemberContext): Promise<void> {
-    const next = this.webhookChain.then(
-      () => deliverToBot(this.env, msg, convContext),
-      () => deliverToBot(this.env, msg, convContext)
-    );
-    this.webhookChain = next;
-    this.ctx.waitUntil(next);
+    this.webhookChain = this.webhookChain
+      .catch(() => {})
+      .then(() => deliverToBot(this.env, msg, convContext));
+    this.ctx.waitUntil(this.webhookChain);
   }
 
   async enqueueActionExecutedWebhook(
     msg: z.infer<typeof actionExecutedWebhookSchema> & { targetBotId: string }
   ): Promise<void> {
-    const next = this.webhookChain.then(
-      () => deliverActionExecutedToBot(this.env, msg),
-      () => deliverActionExecutedToBot(this.env, msg)
-    );
-    this.webhookChain = next;
-    this.ctx.waitUntil(next);
+    this.webhookChain = this.webhookChain
+      .catch(() => {})
+      .then(() => deliverActionExecutedToBot(this.env, msg));
+    this.ctx.waitUntil(this.webhookChain);
   }
 
   notifyDeliveryFailed(messageId: string): void {

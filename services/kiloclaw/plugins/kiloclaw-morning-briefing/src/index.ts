@@ -4,13 +4,13 @@ import { Type } from '@sinclair/typebox';
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 import { buildBriefingMarkdown, offsetDateKey, resolveBriefingPath } from './briefing-utils';
 import {
-  DELIVERY_CHANNELS,
   type BriefingDeliveryResult,
   deliverBriefingToConfiguredChannels,
   formatDeliverySummary,
   logDeliveryOutcomeEvents,
   parseStoredDelivery,
 } from './delivery-utils';
+import { DELIVERY_CHANNELS } from './delivery-constants';
 import { CommandExecutionError, runCommand } from './command-utils';
 import {
   filterEnabledBriefingJobs,

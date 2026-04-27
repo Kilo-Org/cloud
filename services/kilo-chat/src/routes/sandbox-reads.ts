@@ -4,6 +4,7 @@ import { sandboxIdSchema, ulidSchema } from '@kilocode/kilo-chat';
 import { withDORetry } from '@kilocode/worker-utils';
 import { lookupSandboxOwnerUserId } from '../services/sandbox-ownership';
 import { extractSandboxId } from '../services/event-push';
+import { handleRequestBotStatus } from '../services/bot-status-request';
 
 type HonoCtx = Context<{ Bindings: Env; Variables: AuthContext }>;
 
@@ -55,5 +56,6 @@ export function registerSandboxReadRoutes(
   app: Hono<{ Bindings: Env; Variables: AuthContext }>
 ): void {
   app.get('/v1/sandboxes/:sandboxId/bot-status', handleGetBotStatus);
+  app.post('/v1/sandboxes/:sandboxId/request-bot-status', handleRequestBotStatus);
   app.get('/v1/conversations/:conversationId/conversation-status', handleGetConversationStatus);
 }

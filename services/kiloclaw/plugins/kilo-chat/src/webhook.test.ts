@@ -246,6 +246,14 @@ describe('createKiloChatWebhookHandler', () => {
     expect(getBody()).toContain('Invalid action payload');
   });
 
+  it('acks bot.status_request with 202 (handled in background)', async () => {
+    const body = JSON.stringify({ type: 'bot.status_request' });
+    const handler = createKiloChatWebhookHandler({ api: {} as never });
+    const { res, getStatus } = makeRes();
+    await handler(makeReq(body), res);
+    expect(getStatus()).toBe(202);
+  });
+
   it('accepts message.created type explicitly', async () => {
     // message.created with missing required message fields should 400 with
     // "Invalid payload" (not "Unknown webhook type").

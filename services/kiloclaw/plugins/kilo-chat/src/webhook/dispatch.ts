@@ -30,6 +30,18 @@ export async function handleActionExecuted(
   });
 }
 
+// Replies to kilo-chat's `bot.status_request` webhook. Reaching this handler
+// at all means the plugin is alive and reachable, so we publish `online: true`
+// with the current timestamp. Definitive offline signals (machine gone) are
+// detected upstream when the webhook fails to deliver.
+export async function handleBotStatusRequest(): Promise<void> {
+  const client = createKiloChatClient({
+    controllerBaseUrl: resolveControllerUrl(),
+    gatewayToken: resolveGatewayToken(),
+  });
+  await client.sendBotStatus({ online: true, at: Date.now() });
+}
+
 function readSessionStore(cfg: unknown): string | undefined {
   if (typeof cfg !== 'object' || cfg === null) return undefined;
   if (!('session' in cfg)) return undefined;

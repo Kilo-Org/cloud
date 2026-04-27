@@ -3,17 +3,17 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MessagesSquare } from 'lucide-react';
-import { useKiloClawStatus } from '@/hooks/useKiloClaw';
+import { useKiloChatContext } from './components/KiloChatLayout';
 
 export default function KiloChatIndexPage() {
   const router = useRouter();
-  const { data: status, isLoading } = useKiloClawStatus();
+  const { instanceStatus, isInstanceLoading, noInstanceRedirect } = useKiloChatContext();
 
   useEffect(() => {
-    if (!isLoading && !status?.status) {
-      router.replace('/claw/new');
+    if (!isInstanceLoading && !instanceStatus) {
+      router.replace(noInstanceRedirect);
     }
-  }, [isLoading, status?.status, router]);
+  }, [isInstanceLoading, instanceStatus, noInstanceRedirect, router]);
 
   return (
     <div className="flex h-full items-center justify-center">

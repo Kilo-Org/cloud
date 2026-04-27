@@ -8,7 +8,6 @@ import type { EventServiceClient } from '@kilocode/event-service';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
 import { formatKiloChatError } from '@kilocode/kilo-chat';
 import type { BotPresence } from './BotStatus';
-import { InstanceSwitcher } from './InstanceSwitcher';
 import { ConversationList } from './ConversationList';
 import { useEventService, useInstanceContext } from '../hooks/useEventService';
 import {
@@ -35,6 +34,9 @@ type KiloChatContextValue = {
   leavingConversationId: string | null;
   assistantName: string | null;
   sandboxId: string | null;
+  basePath: string;
+  noInstanceRedirect: string;
+  isInstanceLoading: boolean;
   eventService: EventServiceClient;
   kiloChatClient: KiloChatClient;
   botPresence: (sandboxId: string) => BotPresence | undefined;
@@ -53,7 +55,10 @@ export function useKiloChatContext() {
 type KiloChatLayoutProps = {
   getToken: () => Promise<string>;
   currentUserId: string;
-  instances: Array<{ sandboxId: string; label: string }>;
+  sandboxId: string | null;
+  basePath: string;
+  noInstanceRedirect: string;
+  isInstanceLoading: boolean;
   instanceStatus: string | null;
   assistantName: string | null;
   children: React.ReactNode;
@@ -62,26 +67,18 @@ type KiloChatLayoutProps = {
 export function KiloChatLayout({
   getToken,
   currentUserId,
-  instances,
+  sandboxId,
+  basePath,
+  noInstanceRedirect,
+  isInstanceLoading,
   instanceStatus,
   assistantName,
   children,
 }: KiloChatLayoutProps) {
   const router = useRouter();
-  const [selectedSandboxId, setSelectedSandboxId] = useState<string | null>(
-    instances[0]?.sandboxId ?? null
-  );
-
-  useEffect(() => {
-    if (instances.length === 0) return;
-    const stillValid = selectedSandboxId && instances.some(i => i.sandboxId === selectedSandboxId);
-    if (!stillValid) {
-      setSelectedSandboxId(instances[0].sandboxId);
-    }
-  }, [instances, selectedSandboxId]);
 
   const { eventService, kiloChatClient } = useEventService(getToken);
-  useInstanceContext(eventService, selectedSandboxId);
+  useInstanceContext(eventService, sandboxId);
 
   // Bot presence + per-conversation context usage, driven by `bot.status` events.
   // Stored as immutable Maps so the context value only changes when data changes;
@@ -146,7 +143,7 @@ export function KiloChatLayout({
   const [leavingConversationId, setLeavingConversationId] = useState<string | null>(null);
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useConversations(
     kiloChatClient,
-    selectedSandboxId
+    sandboxId
   );
 
   // Update conversation list cache in-place when activity events arrive.
@@ -252,7 +249,7 @@ export function KiloChatLayout({
         filterConversationPages(old, c => c.conversationId !== conversationId)
       );
       if (params?.conversationId === conversationId) {
-        router.push('/claw/kilo-chat');
+        router.push(basePath);
       }
       leaveConversation.mutate(conversationId, {
         onSettled: () => setLeavingConversationId(null),
@@ -265,21 +262,21 @@ export function KiloChatLayout({
         },
       });
     },
-    [leaveConversation.mutate, params?.conversationId, queryClient, router]
+    [leaveConversation.mutate, params?.conversationId, queryClient, router, basePath]
   );
 
   const handleNewConversation = useCallback(() => {
-    if (!selectedSandboxId) return;
+    if (!sandboxId) return;
     createConversation.mutate(
-      { sandboxId: selectedSandboxId },
+      { sandboxId },
       {
         onSuccess: res => {
-          router.push(`/claw/kilo-chat/${res.conversationId}`);
+          router.push(`${basePath}/${res.conversationId}`);
         },
         onError: err => toast.error(formatKiloChatError(err, 'Failed to create conversation')),
       }
     );
-  }, [selectedSandboxId, createConversation.mutate, router]);
+  }, [sandboxId, basePath, createConversation.mutate, router]);
 
   const contextValue = useMemo<KiloChatContextValue>(
     () => ({
@@ -288,7 +285,10 @@ export function KiloChatLayout({
       instanceStatus,
       leavingConversationId,
       assistantName,
-      sandboxId: selectedSandboxId,
+      sandboxId,
+      basePath,
+      noInstanceRedirect,
+      isInstanceLoading,
       eventService,
       kiloChatClient,
       botPresence,
@@ -300,7 +300,10 @@ export function KiloChatLayout({
       instanceStatus,
       leavingConversationId,
       assistantName,
-      selectedSandboxId,
+      sandboxId,
+      basePath,
+      noInstanceRedirect,
+      isInstanceLoading,
       eventService,
       kiloChatClient,
       botPresence,
@@ -313,11 +316,6 @@ export function KiloChatLayout({
       <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
         {/* Conversation sidebar */}
         <div className="border-border flex w-64 shrink-0 flex-col overflow-hidden border-r">
-          <InstanceSwitcher
-            instances={instances}
-            selectedId={selectedSandboxId}
-            onSelect={setSelectedSandboxId}
-          />
           <ConversationList
             conversations={data?.conversations ?? []}
             isLoading={isLoading}

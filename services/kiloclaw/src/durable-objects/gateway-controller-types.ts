@@ -1,4 +1,9 @@
 import { z, type ZodType } from 'zod';
+import {
+  DELIVERY_CHANNELS,
+  DELIVERY_REASONS,
+  DELIVERY_STATUSES,
+} from '../../plugins/kiloclaw-morning-briefing/src/delivery-constants';
 
 export type GatewayProcessStatus = {
   state: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed' | 'shutting_down';
@@ -103,15 +108,6 @@ const MorningBriefingSourceReadinessSchema = z.object({
   configured: z.boolean(),
   summary: z.string(),
 });
-
-const DELIVERY_CHANNELS = ['telegram', 'discord', 'slack'] as const;
-const DELIVERY_STATUSES = ['sent', 'skipped', 'failed'] as const;
-const DELIVERY_REASONS = [
-  'missing_target',
-  'ambiguous_target',
-  'send_failed',
-  'config_unavailable',
-] as const;
 
 const MorningBriefingDeliverySchema = z.object({
   channel: z.enum(DELIVERY_CHANNELS),

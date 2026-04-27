@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { usePostHog } from 'posthog-js/react';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
@@ -11,6 +12,7 @@ import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawInstanceOverview } from './ClawInstanceOverview';
 import { SettingsTab } from './SettingsTab';
+import { UpgradeKiloClawDialog } from './UpgradeKiloClawDialog';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,12 +29,14 @@ function ClawSettingsInner({
   organizationName?: string;
 }) {
   const { organizationId } = useClawContext();
+  const posthog = usePostHog();
 
   const personalMutations = useKiloClawMutations();
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
   const mutations = organizationId ? orgMutations : personalMutations;
 
   const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
+  const [confirmUpgrade, setConfirmUpgrade] = useState(false);
   const onSecretsChanged = useCallback((entryId: string) => {
     setDirtySecrets(prev => new Set([...prev, entryId]));
   }, []);
@@ -53,12 +57,21 @@ function ClawSettingsInner({
     });
   }, [mutations.restartMachine, onRedeploySuccess]);
 
-  const onUpgrade = useCallback(() => {
+  const onRequestUpgrade = useCallback(() => {
+    setConfirmUpgrade(true);
+  }, []);
+
+  const onConfirmUpgrade = useCallback(() => {
+    posthog?.capture('claw_redeploy_clicked', {
+      instance_status: status.status,
+      redeploy_mode: 'upgrade',
+    });
     mutations.restartMachine.mutate(
       { imageTag: 'latest' },
       {
         onSuccess: () => {
-          toast.success('Upgrading to latest image');
+          toast.success('Upgrading KiloClaw');
+          setConfirmUpgrade(false);
           onRedeploySuccess();
         },
         onError: err => {
@@ -66,23 +79,35 @@ function ClawSettingsInner({
         },
       }
     );
-  }, [mutations.restartMachine, onRedeploySuccess]);
-
-  const onRequestUpgrade = useCallback(() => {
-    onUpgrade();
-  }, [onUpgrade]);
+  }, [mutations.restartMachine, onRedeploySuccess, posthog, status.status]);
 
   return (
-    <SettingsTab
-      status={status}
-      mutations={mutations}
-      onSecretsChanged={onSecretsChanged}
-      dirtySecrets={dirtySecrets}
-      onRedeploy={onRedeploy}
-      onUpgrade={onUpgrade}
-      onRequestUpgrade={onRequestUpgrade}
-      organizationName={organizationName}
-    />
+    <>
+      <ClawInstanceOverview
+        status={status}
+        onRedeploySuccess={onRedeploySuccess}
+        onRequestUpgrade={onRequestUpgrade}
+      />
+      <SettingsTab
+        status={status}
+        mutations={mutations}
+        onSecretsChanged={onSecretsChanged}
+        dirtySecrets={dirtySecrets}
+        onRedeploy={onRedeploy}
+        onRequestUpgrade={onRequestUpgrade}
+        organizationName={organizationName}
+      />
+      <UpgradeKiloClawDialog
+        open={confirmUpgrade}
+        onOpenChange={open => {
+          if (mutations.restartMachine.isPending) return;
+          if (!open) posthog?.capture('claw_redeploy_cancelled');
+          setConfirmUpgrade(open);
+        }}
+        isPending={mutations.restartMachine.isPending}
+        onConfirm={onConfirmUpgrade}
+      />
+    </>
   );
 }
 
@@ -139,7 +164,6 @@ function ClawSettingsWithStatus({
   const settingsContent = (
     <div className="flex flex-col gap-6">
       <ClawConfigServiceBanner status={status} />
-      <ClawInstanceOverview status={status} />
       <ClawSettingsInner status={status} organizationName={organizationName} />
     </div>
   );

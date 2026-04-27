@@ -1,0 +1,42 @@
+{
+  "name": "@kiloclaw/kilo-chat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Kilo Chat channel plugin for OpenClaw",
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "setupEntry": "./dist/setup-entry.js",
+    "channel": {
+      "id": "kilo-chat",
+      "label": "Kilo Chat",
+      "blurb": "Kilo's hosted chat channel for OpenClaw instances.",
+      "markdownCapable": true
+    }
+  },
+  "scripts": {
+    "prepack": "npm run build",
+    "build": "esbuild src/index.ts src/setup-entry.ts --bundle --platform=node --format=esm --target=node22 --external:openclaw --external:openclaw/* --outdir=dist",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "openclaw": "2026.4.15"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.2",
+    "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.49",
+    "node-emoji": "^2.2.0",
+    "zod": "^4.3.6"
+  }
+}

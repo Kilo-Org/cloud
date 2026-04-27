@@ -583,6 +583,22 @@ describe('buildEnvVars', () => {
     expect(result.env.KILOCLAW_SECRET_CONFIG_PATHS).toBeUndefined();
   });
 
+  // ─── kilo-chat env passthrough ──────────────────────────────────────
+
+  it('forwards KILOCHAT_BASE_URL into plaintext env', async () => {
+    const env = createMockEnv({
+      KILOCHAT_BASE_URL: 'https://chat.kiloapps.io',
+    });
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+    expect(result.env.KILOCHAT_BASE_URL).toBe('https://chat.kiloapps.io');
+  });
+
+  it('omits KILOCHAT_BASE_URL when not provided', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+    expect(result.env.KILOCHAT_BASE_URL).toBeUndefined();
+  });
+
   // ─── Vector memory + dreaming ───────────────────────────────────────
 
   it('emits KILOCLAW_VECTOR_MEMORY_ENABLED only when vectorMemoryEnabled is truthy', async () => {

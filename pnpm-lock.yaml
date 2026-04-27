@@ -48,6 +48,9 @@ catalogs:
     jsonwebtoken:
       specifier: ^9.0.3
       version: 9.0.3
+    p-limit:
+      specifier: ^7.3.0
+      version: 7.3.0
     stream-chat:
       specifier: ^9.38.0
       version: 9.38.0
@@ -301,7 +304,7 @@ importers:
         version: 9.38.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       stream-chat-expo:
         specifier: ^8.13.7
-        version: 8.13.7(ca06b49660395c2e8a06a215cb1b2881)
+        version: 8.13.7(f3af0588b693ec71c0fc67ae0290618e)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -466,12 +469,24 @@ importers:
       '@chat-adapter/state-redis':
         specifier: ^4.20.1
         version: 4.20.1
+      '@emoji-mart/data':
+        specifier: ^1.2.1
+        version: 1.2.1
+      '@emoji-mart/react':
+        specifier: ^1.1.1
+        version: 1.1.1(emoji-mart@5.6.0)(react@19.2.4)
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/event-service':
+        specifier: workspace:*
+        version: link:../../packages/event-service
+      '@kilocode/kilo-chat':
+        specifier: workspace:*
+        version: link:../../packages/kilo-chat
       '@kilocode/kiloclaw-secret-catalog':
         specifier: workspace:*
         version: link:../../packages/kiloclaw-secret-catalog
@@ -670,6 +685,9 @@ importers:
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
+      emoji-mart:
+        specifier: ^5.6.0
+        version: 5.6.0
       event-source-polyfill:
         specifier: ^1.0.31
         version: 1.0.31
@@ -724,6 +742,9 @@ importers:
       openai:
         specifier: ^6.29.0
         version: 6.29.0(ws@8.19.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.3.6)
+      p-limit:
+        specifier: 'catalog:'
+        version: 7.3.0
       posthog-js:
         specifier: ^1.360.2
         version: 1.360.2
@@ -765,7 +786,7 @@ importers:
         version: 9.38.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       stream-chat-react:
         specifier: ^13.14.2
-        version: 13.14.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(stream-chat@9.38.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(typescript@5.9.3)
+        version: 13.14.2(@emoji-mart/data@1.2.1)(@emoji-mart/react@1.1.1(emoji-mart@5.6.0)(react@19.2.4))(@types/react@19.2.14)(emoji-mart@5.6.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(stream-chat@9.38.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(typescript@5.9.3)
       stripe:
         specifier: 'catalog:'
         version: 19.3.0(@types/node@24.12.0)
@@ -778,6 +799,9 @@ importers:
       tldts:
         specifier: ^7.0.28
         version: 7.0.28
+      ulid:
+        specifier: 3.0.1
+        version: 3.0.1
       uuid:
         specifier: 11.1.0
         version: 11.1.0
@@ -848,9 +872,6 @@ importers:
       madge:
         specifier: ^8.0.0
         version: 8.0.0(typescript@5.9.3)
-      p-limit:
-        specifier: ^7.3.0
-        version: 7.3.0
       postcss:
         specifier: ^8.5.8
         version: 8.5.8
@@ -918,6 +939,44 @@ importers:
       vitest:
         specifier: ~3.2.4
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/event-service:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
+    devDependencies:
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260319.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: ~3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/kilo-chat:
+    dependencies:
+      '@kilocode/event-service':
+        specifier: workspace:*
+        version: link:../event-service
+      ulid:
+        specifier: 3.0.1
+        version: 3.0.1
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
+    devDependencies:
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260319.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: ~3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
 
   packages/kiloclaw-secret-catalog:
     dependencies:
@@ -1479,6 +1538,43 @@ importers:
         specifier: 'catalog:'
         version: 4.73.0(@cloudflare/workers-types@4.20260313.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
+  services/event-service:
+    dependencies:
+      '@kilocode/event-service':
+        specifier: workspace:*
+        version: link:../../packages/event-service
+      '@kilocode/worker-utils':
+        specifier: workspace:*
+        version: link:../../packages/worker-utils
+      hono:
+        specifier: ^4.12.7
+        version: 4.12.8
+      workers-tagged-logger:
+        specifier: 'catalog:'
+        version: 1.0.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
+    devDependencies:
+      '@cloudflare/vitest-pool-workers':
+        specifier: ^0.12.21
+        version: 0.12.21(@cloudflare/workers-types@4.20260313.1)(@vitest/runner@4.1.0)(@vitest/snapshot@4.1.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@3.2.4)
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260319.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: ~3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+      wrangler:
+        specifier: 'catalog:'
+        version: 4.73.0(@cloudflare/workers-types@4.20260313.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+
   services/gastown:
     dependencies:
       '@cloudflare/containers':
@@ -1673,6 +1769,64 @@ importers:
         specifier: 'catalog:'
         version: 4.73.0(@cloudflare/workers-types@4.20260313.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
 
+  services/kilo-chat:
+    dependencies:
+      '@kilocode/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
+      '@kilocode/kilo-chat':
+        specifier: workspace:*
+        version: link:../../packages/kilo-chat
+      '@kilocode/worker-utils':
+        specifier: workspace:*
+        version: link:../../packages/worker-utils
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
+      hono:
+        specifier: ^4.12.7
+        version: 4.12.8
+      lru-cache:
+        specifier: ^11.2.7
+        version: 11.2.7
+      p-limit:
+        specifier: 'catalog:'
+        version: 7.3.0
+      ulid:
+        specifier: 3.0.1
+        version: 3.0.1
+      workers-tagged-logger:
+        specifier: 'catalog:'
+        version: 1.0.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
+    devDependencies:
+      '@cloudflare/vitest-pool-workers':
+        specifier: ^0.12.21
+        version: 0.12.21(@cloudflare/workers-types@4.20260313.1)(@vitest/runner@4.1.0)(@vitest/snapshot@4.1.0)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@3.2.4)
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260319.1
+      drizzle-kit:
+        specifier: 'catalog:'
+        version: 0.31.9
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: ~3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+      wrangler:
+        specifier: 'catalog:'
+        version: 4.73.0(@cloudflare/workers-types@4.20260313.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+
   services/kilo-ops:
     dependencies:
       '@cloudflare/containers':
@@ -1703,6 +1857,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/kilo-chat':
+        specifier: workspace:*
+        version: link:../../packages/kilo-chat
       '@kilocode/kiloclaw-secret-catalog':
         specifier: workspace:*
         version: link:../../packages/kiloclaw-secret-catalog
@@ -1711,7 +1868,7 @@ importers:
         version: link:../../packages/worker-utils
       '@northflank/js-client':
         specifier: ^0.9.3
-        version: 0.9.3
+        version: 0.9.4
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.1(@cloudflare/workers-types@4.20260313.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.11)(pg@8.20.0)
@@ -3300,6 +3457,15 @@ packages:
   '@emnapi/wasi-threads@1.2.0':
     resolution: {integrity: sha512-N10dEJNSsUx41Z6pZsXU8FjPjpBEplgH24sfkmITrBED1/U2Esum9F3lfLrMjKHHjmi557zQn7kR9R+XWXu5Rg==}
 
+  '@emoji-mart/data@1.2.1':
+    resolution: {integrity: sha512-no2pQMWiBy6gpBEiqGeU77/bFejDqUTRY7KX+0+iur13op3bqUsXdnwoZs6Xb1zbv0gAj5VvS1PWoUUckSr5Dw==}
+
+  '@emoji-mart/react@1.1.1':
+    resolution: {integrity: sha512-NMlFNeWgv1//uPsvLxvGQoIerPuVdXwK/EUek8OOkJ6wVOWPUizRBJU0hDqWZCOROVpfBgCemaC3m6jDOXi03g==}
+    peerDependencies:
+      emoji-mart: ^5.2
+      react: ^16.8 || ^17 || ^18
+
   '@emotion/is-prop-valid@1.4.0':
     resolution: {integrity: sha512-QgD4fyscGcbbKwJmqNvUMSE02OsHUa+lAWKdEUIJKgqe5IwRSKd7+KhibEWdaKwgjLj0DRSHA9biAIqGBk05lw==}
 
@@ -4359,8 +4525,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@northflank/js-client@0.9.3':
-    resolution: {integrity: sha512-2HaamEBmIOMypPhi51VmaFTNnKERJ8/YYCSVoBOUVlV7wTRy0IGrbLx3D0JnSgoA3QQ552I85HLUS9/P/NUBwQ==}
+  '@northflank/js-client@0.9.4':
+    resolution: {integrity: sha512-NtHSP+AD36v4JQbPm3He6/VMtSRIh/wvoKdqZwox2+znzK3AiJEB5oYD9gQj4cxXVhOEuT4l716oJh8IaAklVw==}
     engines: {node: '>=18.0.0'}
 
   '@octokit/auth-app@8.2.0':
@@ -9423,6 +9589,9 @@ packages:
   emittery@0.13.1:
     resolution: {integrity: sha512-DeWwawk6r5yR9jFgnDKYt4sLS0LmHJJi3ZOnb5/JdbYwj3nW+FxQnHIjhBKz8YLC7oRNPVM9NQ47I3CVx34eqQ==}
     engines: {node: '>=12'}
+
+  emoji-mart@5.6.0:
+    resolution: {integrity: sha512-eJp3QRe79pjwa+duv+n7+5YsNhRcMl812EcFVwrnRvYKoNPoQb5qxU8DG6Bgwji0akHdp6D4Ln6tYLG58MFSow==}
 
   emoji-regex@10.6.0:
     resolution: {integrity: sha512-toUI84YS5YmxW219erniWD0CIVOo46xGKColeNQRgOzDorgBi1v4D71/OFzgD9GO2UGKIv1C3Sp8DAn0+j5w7A==}
@@ -16682,6 +16851,13 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
+  '@emoji-mart/data@1.2.1': {}
+
+  '@emoji-mart/react@1.1.1(emoji-mart@5.6.0)(react@19.2.4)':
+    dependencies:
+      emoji-mart: 5.6.0
+      react: 19.2.4
+
   '@emotion/is-prop-valid@1.4.0':
     dependencies:
       '@emotion/memoize': 0.9.0
@@ -17953,7 +18129,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@northflank/js-client@0.9.3':
+  '@northflank/js-client@0.9.4':
     dependencies:
       bufferutil: 4.1.0
       lodash-es: 4.17.23
@@ -21991,7 +22167,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 2.0.0
-      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
 
   '@vitest/utils@3.2.4':
     dependencies:
@@ -23671,6 +23847,8 @@ snapshots:
       minimalistic-crypto-utils: 1.0.1
 
   emittery@0.13.1: {}
+
+  emoji-mart@5.6.0: {}
 
   emoji-regex@10.6.0: {}
 
@@ -29345,12 +29523,12 @@ snapshots:
 
   stream-buffers@2.2.0: {}
 
-  stream-chat-expo@8.13.7(ca06b49660395c2e8a06a215cb1b2881):
+  stream-chat-expo@8.13.7(f3af0588b693ec71c0fc67ae0290618e):
     dependencies:
       expo: 55.0.12(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@55.0.9)(bufferutil@4.1.0)(expo-router@55.0.11)(react-dom@19.2.4(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       expo-image-manipulator: 55.0.14(expo@55.0.12)
       mime: 4.1.0
-      stream-chat-react-native-core: 8.13.7(patch_hash=6fa2fe7a3ddb0ab3312ee1adc4e07d3fc9c46f7bc5bb861675bef4078808b8c0)(7fc602c903d0a1fdf12b0cea030ebc54)
+      stream-chat-react-native-core: 8.13.7(patch_hash=6fa2fe7a3ddb0ab3312ee1adc4e07d3fc9c46f7bc5bb861675bef4078808b8c0)(ab8a9f6f835746e18b11cebeae560e08)
     optionalDependencies:
       expo-audio: 55.0.12(expo-asset@55.0.13(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3))(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       expo-clipboard: 55.0.12(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
@@ -29379,7 +29557,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  stream-chat-react-native-core@8.13.7(patch_hash=6fa2fe7a3ddb0ab3312ee1adc4e07d3fc9c46f7bc5bb861675bef4078808b8c0)(7fc602c903d0a1fdf12b0cea030ebc54):
+  stream-chat-react-native-core@8.13.7(patch_hash=6fa2fe7a3ddb0ab3312ee1adc4e07d3fc9c46f7bc5bb861675bef4078808b8c0)(ab8a9f6f835746e18b11cebeae560e08):
     dependencies:
       '@gorhom/bottom-sheet': 5.1.8(patch_hash=c5eaae9a28f5662f32d66e0129609680309eddc44720d6a2b1e02bbc2b5dd11f)(@types/react@19.2.14)(react-native-gesture-handler@2.30.0(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0))(react-native-reanimated@4.2.1(react-native-worklets@0.7.2(@babel/core@7.29.0)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       '@react-native-community/netinfo': 11.5.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
@@ -29401,6 +29579,9 @@ snapshots:
       react-native-url-polyfill: 2.0.0(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))
       stream-chat: 9.38.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       use-sync-external-store: 1.6.0(react@19.2.0)
+    optionalDependencies:
+      '@emoji-mart/data': 1.2.1
+      emoji-mart: 5.6.0
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-native'
@@ -29410,7 +29591,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  stream-chat-react@13.14.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(stream-chat@9.38.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(typescript@5.9.3):
+  stream-chat-react@13.14.2(@emoji-mart/data@1.2.1)(@emoji-mart/react@1.1.1(emoji-mart@5.6.0)(react@19.2.4))(@types/react@19.2.14)(emoji-mart@5.6.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(stream-chat@9.38.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(typescript@5.9.3):
     dependencies:
       '@braintree/sanitize-url': 6.0.4
       '@floating-ui/react': 0.27.19(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -29443,7 +29624,10 @@ snapshots:
       unist-util-visit: 5.1.0
       use-sync-external-store: 1.6.0(react@19.2.4)
     optionalDependencies:
+      '@emoji-mart/data': 1.2.1
+      '@emoji-mart/react': 1.1.1(emoji-mart@5.6.0)(react@19.2.4)
       '@stream-io/transliterate': 1.5.5
+      emoji-mart: 5.6.0
     transitivePeerDependencies:
       - '@types/react'
       - supports-color

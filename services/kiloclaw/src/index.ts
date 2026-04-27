@@ -11,19 +11,27 @@
  * - Public routes: no auth (health check only)
  */
 
+import { WorkerEntrypoint } from 'cloudflare:workers';
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { getCookie, deleteCookie } from 'hono/cookie';
 
-import type { AppEnv, KiloClawEnv } from './types';
+import { chatWebhookRpcSchema } from '@kilocode/kilo-chat';
+import type { AppEnv, KiloClawEnv, ChatWebhookPayload } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform, controller } from './routes';
 import { handleSnapshotRestoreQueue } from './queue/snapshot-restore';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
-import { sandboxIdFromUserId } from './auth/sandbox-id';
+import { deriveGatewayToken } from './auth/gateway-token';
+import { sandboxIdFromUserId, userIdFromSandboxId } from './auth/sandbox-id';
 import { InstanceIdParam } from './schemas/instance-config';
-import { isValidInstanceId } from '@kilocode/worker-utils/instance-id';
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+  isValidInstanceId,
+} from '@kilocode/worker-utils/instance-id';
+import { withDORetry } from '@kilocode/worker-utils';
 import { registerVersionIfNeeded } from './lib/image-version';
 import { resolveDoKeyForUser } from './lib/instance-routing';
 import { startingUpPage } from './pages/starting-up';
@@ -228,7 +236,7 @@ async function deriveSandboxId(c: Context<AppEnv>, next: Next) {
 // App assembly
 // =============================================================================
 
-const app = new Hono<AppEnv>();
+export const app = new Hono<AppEnv>();
 let didLogGoogleBrokerConfig = false;
 
 // Global middleware (all routes)
@@ -294,8 +302,13 @@ app.all('/i/:instanceId/*', async c => {
     );
   }
 
-  const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(instanceId));
-  const status = await stub.getStatus();
+  const getInstanceStub = () =>
+    c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(instanceId));
+  const status = await withDORetry(
+    getInstanceStub,
+    stub => stub.getStatus(),
+    'KiloClawInstance.getStatus'
+  );
 
   // Non-existent instance (no userId stored) — return 404 to avoid
   // leaking existence info via 403 vs 404 distinction.
@@ -328,7 +341,11 @@ app.all('/i/:instanceId/*', async c => {
   const url = new URL(c.req.raw.url);
   const prefix = `/i/${instanceId}`;
   const strippedPath = url.pathname.slice(prefix.length) || '/';
-  const routingTarget = await stub.getRoutingTarget();
+  const routingTarget = await withDORetry(
+    getInstanceStub,
+    stub => stub.getRoutingTarget(),
+    'KiloClawInstance.getRoutingTarget'
+  );
   if (!routingTarget) {
     return c.json({ error: 'Instance not routable' }, 503);
   }
@@ -482,10 +499,11 @@ async function resolveRegistryEntry(c: Context<AppEnv>) {
 
   try {
     const registryKey = `user:${userId}`;
-    const registryStub = c.env.KILOCLAW_REGISTRY.get(
-      c.env.KILOCLAW_REGISTRY.idFromName(registryKey)
+    const entries = await withDORetry(
+      () => c.env.KILOCLAW_REGISTRY.get(c.env.KILOCLAW_REGISTRY.idFromName(registryKey)),
+      stub => stub.listInstances(registryKey),
+      'KiloClawRegistry.listInstances'
     );
-    const entries = await registryStub.listInstances(registryKey);
     if (entries.length === 0) return null;
 
     const entry = entries[0];
@@ -528,8 +546,14 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
   try {
     const resolved = await resolveRegistryEntry(c);
     if (!resolved) return false;
-    const { stub } = resolved;
-    const status = await stub.getStatus();
+    const { entry } = resolved;
+    const getStub = () =>
+      c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
+    const status = await withDORetry(
+      getStub,
+      stub => stub.getStatus(),
+      'KiloClawInstance.getStatus'
+    );
 
     if (status.status !== 'running') {
       return false;
@@ -537,9 +561,17 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
 
     // Machine dead despite running status -- restart
     console.log('[PROXY] Instance status is running but machine unreachable, restarting');
-    const { started } = await stub.start(userId, { reason: 'crash_recovery' });
+    const { started } = await withDORetry(
+      getStub,
+      stub => stub.start(userId, { reason: 'crash_recovery' }),
+      'KiloClawInstance.start'
+    );
     if (started) {
-      const freshStatus = await stub.getStatus();
+      const freshStatus = await withDORetry(
+        getStub,
+        stub => stub.getStatus(),
+        'KiloClawInstance.getStatus'
+      );
       writeEvent(c.env, {
         event: 'instance.crash_recovery_succeeded',
         delivery: 'http',
@@ -576,25 +608,28 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
  * Callers MUST use the returned sandboxId for gateway token derivation.
  */
 async function resolveInstance(c: Context<AppEnv>): Promise<{
-  stub: ReturnType<KiloClawEnv['KILOCLAW_INSTANCE']['get']> | null;
+  doKey: string | null;
   runtimeId: string | null;
   sandboxId: string | null;
   status: string | null;
 }> {
   const resolved = await resolveRegistryEntry(c);
-  if (!resolved) return { stub: null, runtimeId: null, sandboxId: null, status: null };
+  if (!resolved) return { doKey: null, runtimeId: null, sandboxId: null, status: null };
 
-  const s = await resolved.stub.getStatus();
+  const { entry } = resolved;
+  const getStub = () =>
+    c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
+  const s = await withDORetry(getStub, stub => stub.getStatus(), 'KiloClawInstance.getStatus');
 
   if (s.status === 'destroying')
-    return { stub: resolved.stub, runtimeId: null, sandboxId: null, status: 'destroying' };
+    return { doKey: entry.doKey, runtimeId: null, sandboxId: null, status: 'destroying' };
   if (s.status === 'restoring')
-    return { stub: resolved.stub, runtimeId: null, sandboxId: null, status: 'restoring' };
+    return { doKey: entry.doKey, runtimeId: null, sandboxId: null, status: 'restoring' };
   if (s.status === 'recovering')
-    return { stub: resolved.stub, runtimeId: null, sandboxId: null, status: 'recovering' };
+    return { doKey: entry.doKey, runtimeId: null, sandboxId: null, status: 'recovering' };
 
   return {
-    stub: resolved.stub,
+    doKey: entry.doKey,
     runtimeId: s.runtimeId,
     sandboxId: s.sandboxId,
     status: s.status,
@@ -618,10 +653,13 @@ app.all('*', async c => {
   if (activeInstanceId && isValidInstanceId(activeInstanceId)) {
     const userId = c.get('userId');
     if (userId) {
-      const stub = c.env.KILOCLAW_INSTANCE.get(
-        c.env.KILOCLAW_INSTANCE.idFromName(activeInstanceId)
+      const getCookieStub = () =>
+        c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(activeInstanceId));
+      const instanceStatus = await withDORetry(
+        getCookieStub,
+        stub => stub.getStatus(),
+        'KiloClawInstance.getStatus'
       );
-      const instanceStatus = await stub.getStatus();
 
       // Ownership mismatch — cookie is stale (e.g. from another user session).
       // Fall through to default personal resolution.
@@ -663,7 +701,11 @@ app.all('*', async c => {
           );
         }
 
-        const routingTarget = await stub.getRoutingTarget();
+        const routingTarget = await withDORetry(
+          getCookieStub,
+          stub => stub.getRoutingTarget(),
+          'KiloClawInstance.getRoutingTarget'
+        );
         if (!routingTarget) {
           return c.json(
             { error: 'Instance not routable' },
@@ -812,7 +854,7 @@ app.all('*', async c => {
     // Cookie invalid/stale — fall through to default personal resolution
   }
 
-  const { stub, runtimeId, sandboxId, status } = await resolveInstance(c);
+  const { doKey: resolvedDoKey, runtimeId, sandboxId, status } = await resolveInstance(c);
   if (status === 'destroying') {
     return c.json(
       { error: 'Instance is being destroyed', hint: 'This instance is being torn down.' },
@@ -850,7 +892,7 @@ app.all('*', async c => {
     return c.json({ error: 'Instance has no sandboxId' }, 500);
   }
 
-  if (!stub) {
+  if (!resolvedDoKey) {
     return c.json(
       { error: 'Instance not routable' },
       { status: 503, headers: { 'Retry-After': '5' } }
@@ -859,7 +901,13 @@ app.all('*', async c => {
 
   const request = c.req.raw;
   const url = new URL(request.url);
-  const routingTarget = await stub.getRoutingTarget();
+  const getResolvedStub = () =>
+    c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(resolvedDoKey));
+  const routingTarget = await withDORetry(
+    getResolvedStub,
+    stub => stub.getRoutingTarget(),
+    'KiloClawInstance.getRoutingTarget'
+  );
   if (!routingTarget) {
     return c.json({ error: 'Instance not routable' }, 503);
   }
@@ -906,7 +954,7 @@ app.all('*', async c => {
         const refreshedInstance = await resolveInstance(c);
         if (
           !refreshedInstance.runtimeId ||
-          !refreshedInstance.stub ||
+          !refreshedInstance.doKey ||
           !refreshedInstance.sandboxId
         ) {
           return c.json(
@@ -914,7 +962,14 @@ app.all('*', async c => {
             { status: 503, headers: { 'Retry-After': '5' } }
           );
         }
-        const refreshedRoutingTarget = await refreshedInstance.stub.getRoutingTarget();
+        const refreshedDoKey = refreshedInstance.doKey;
+        const getRefreshedStub = () =>
+          c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(refreshedDoKey));
+        const refreshedRoutingTarget = await withDORetry(
+          getRefreshedStub,
+          stub => stub.getRoutingTarget(),
+          'KiloClawInstance.getRoutingTarget'
+        );
         if (!refreshedRoutingTarget) {
           return c.json(
             { error: 'Instance not reachable after restart' },
@@ -1071,13 +1126,24 @@ app.all('*', async c => {
     if (recovered) {
       // Machine may have been recreated — refresh the instance routing header
       const refreshedInstance = await resolveInstance(c);
-      if (!refreshedInstance.runtimeId || !refreshedInstance.stub || !refreshedInstance.sandboxId) {
+      if (
+        !refreshedInstance.runtimeId ||
+        !refreshedInstance.doKey ||
+        !refreshedInstance.sandboxId
+      ) {
         return c.json(
           { error: 'Instance not reachable after restart' },
           { status: 503, headers: { 'Retry-After': '5' } }
         );
       }
-      const refreshedRoutingTarget = await refreshedInstance.stub.getRoutingTarget();
+      const refreshedHttpDoKey = refreshedInstance.doKey;
+      const getRefreshedHttpStub = () =>
+        c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(refreshedHttpDoKey));
+      const refreshedRoutingTarget = await withDORetry(
+        getRefreshedHttpStub,
+        stub => stub.getRoutingTarget(),
+        'KiloClawInstance.getRoutingTarget'
+      );
       if (!refreshedRoutingTarget) {
         return c.json(
           { error: 'Instance not reachable after restart' },
@@ -1125,10 +1191,10 @@ app.all('*', async c => {
   return httpResponse;
 });
 
-export default {
-  fetch(request: Request, env: KiloClawEnv, ctx: ExecutionContext) {
+export default class extends WorkerEntrypoint<KiloClawEnv> {
+  fetch(request: Request) {
     if (!didLogGoogleBrokerConfig) {
-      const missing = missingGoogleBrokerEnv(env);
+      const missing = missingGoogleBrokerEnv(this.env);
       if (missing.length > 0) {
         console.warn('[CONFIG] Google OAuth broker env incomplete:', missing.join(', '));
       } else {
@@ -1142,23 +1208,138 @@ export default {
     // is a provision(), the KV write races with resolveLatestVersion() —
     // provision may see the previous latest (or null) and fall back to
     // FLY_IMAGE_TAG, which is already correct for the new deploy. This is benign.
-    if (env.OPENCLAW_VERSION && env.FLY_IMAGE_TAG) {
-      ctx.waitUntil(
+    if (this.env.OPENCLAW_VERSION && this.env.FLY_IMAGE_TAG) {
+      this.ctx.waitUntil(
         registerVersionIfNeeded(
-          env.KV_CLAW_CACHE,
-          env.OPENCLAW_VERSION,
+          this.env.KV_CLAW_CACHE,
+          this.env.OPENCLAW_VERSION,
           'default', // variant hardcoded day 1
-          env.FLY_IMAGE_TAG,
-          env.FLY_IMAGE_DIGEST ?? null,
-          env.HYPERDRIVE?.connectionString
+          this.env.FLY_IMAGE_TAG,
+          this.env.FLY_IMAGE_DIGEST ?? null,
+          this.env.HYPERDRIVE?.connectionString
         )
       );
     }
 
-    return app.fetch(request, env, ctx);
-  },
+    return app.fetch(request, this.env, this.ctx);
+  }
 
-  async queue(batch: MessageBatch<SnapshotRestoreMessage>, env: KiloClawEnv): Promise<void> {
-    await handleSnapshotRestoreQueue(batch, env);
-  },
-};
+  async queue(batch: MessageBatch<SnapshotRestoreMessage>): Promise<void> {
+    await handleSnapshotRestoreQueue(batch, this.env);
+  }
+
+  /**
+   * RPC method called by kilo-chat service via service binding.
+   * Routes the webhook payload to the correct kiloclaw Fly machine
+   * based on the targetBotId (bot:kiloclaw:{sandboxId}).
+   *
+   * See resolveChatWebhookDoKey for the two supported sandboxId formats.
+   */
+  async deliverChatWebhook(payload: ChatWebhookPayload): Promise<void> {
+    const parsed = chatWebhookRpcSchema.parse(payload);
+    const botPrefix = 'bot:kiloclaw:';
+    if (!parsed.targetBotId.startsWith(botPrefix)) {
+      throw new Error(`Invalid targetBotId: ${parsed.targetBotId}`);
+    }
+    const sandboxId = parsed.targetBotId.slice(botPrefix.length);
+
+    const { doKey, label } = await this.resolveChatWebhookDoKey(sandboxId);
+    const getWebhookStub = () =>
+      this.env.KILOCLAW_INSTANCE.get(this.env.KILOCLAW_INSTANCE.idFromName(doKey));
+
+    const status = await withDORetry(
+      getWebhookStub,
+      stub => stub.getStatus(),
+      'KiloClawInstance.getStatus'
+    );
+    if (!status.sandboxId) {
+      throw new Error(`Instance for ${label} has no sandboxId`);
+    }
+
+    const routingTarget = await withDORetry(
+      getWebhookStub,
+      stub => stub.getRoutingTarget(),
+      'KiloClawInstance.getRoutingTarget'
+    );
+    if (!routingTarget) {
+      throw new Error(`No routing target for ${label}`);
+    }
+    const targetUrl = `${routingTarget.origin}/plugins/kilo-chat/webhook`;
+
+    if (!this.env.GATEWAY_TOKEN_SECRET) {
+      throw new Error('GATEWAY_TOKEN_SECRET not configured');
+    }
+
+    const forwardHeaders = await buildForwardHeaders({
+      requestHeaders: new Headers({ 'content-type': 'application/json' }),
+      sandboxId: status.sandboxId,
+      gatewayTokenSecret: this.env.GATEWAY_TOKEN_SECRET,
+      providerHeaders: routingTarget.headers,
+    });
+    forwardHeaders.set(
+      'authorization',
+      `Bearer ${await deriveGatewayToken(status.sandboxId, this.env.GATEWAY_TOKEN_SECRET)}`
+    );
+
+    // Forward the webhook payload (without targetBotId) to the controller
+    const { targetBotId: _, ...webhookPayload } = parsed;
+    const body = JSON.stringify(webhookPayload);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    let response: Response;
+    try {
+      response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: forwardHeaders,
+        body,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => '(could not read body)');
+      throw new Error(`Webhook forward failed: ${response.status} ${responseText}`);
+    }
+  }
+
+  /**
+   * Resolve a sandboxId to the KiloClawInstance DO key used for routing the
+   * webhook. Instance-keyed sandboxes (`ki_*`) map directly to their instanceId.
+   * Legacy base64url(userId) sandboxes walk registry → Postgres → userId as a
+   * last resort so webhooks for pre-instance-keyed tenants still land.
+   */
+  private async resolveChatWebhookDoKey(
+    sandboxId: string
+  ): Promise<{ doKey: string; label: string }> {
+    if (isInstanceKeyedSandboxId(sandboxId)) {
+      const instanceId = instanceIdFromSandboxId(sandboxId);
+      return { doKey: instanceId, label: `instance ${instanceId}` };
+    }
+
+    const userId = userIdFromSandboxId(sandboxId);
+    const label = `user ${userId}`;
+    try {
+      const registryKey = `user:${userId}`;
+      const entries = await withDORetry(
+        () => this.env.KILOCLAW_REGISTRY.get(this.env.KILOCLAW_REGISTRY.idFromName(registryKey)),
+        stub => stub.listInstances(registryKey),
+        'KiloClawRegistry.listInstances'
+      );
+      if (entries.length > 0) return { doKey: entries[0].doKey, label };
+      // Fall through to Postgres fallback.
+    } catch (err) {
+      console.error('[WEBHOOK] Registry lookup failed, falling back to Postgres:', err);
+    }
+
+    const pgDoKey = await resolveDoKeyForUser(this.env.HYPERDRIVE?.connectionString, userId).catch(
+      err => {
+        console.error('[WEBHOOK] Postgres fallback failed, using userId as doKey:', err);
+        return null;
+      }
+    );
+    return { doKey: pgDoKey ?? userId, label };
+  }
+}

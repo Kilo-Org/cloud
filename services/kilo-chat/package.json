@@ -1,0 +1,40 @@
+{
+  "name": "kilo-chat",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "test": "vitest",
+    "cf-typegen": "wrangler types",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/kilo-chat/src",
+    "db:generate:conversation": "drizzle-kit generate --config drizzle-conversation.config.ts",
+    "db:generate:membership": "drizzle-kit generate --config drizzle-membership.config.ts",
+    "db:generate:sandbox-status": "drizzle-kit generate --config drizzle-sandbox-status.config.ts",
+    "db:generate": "pnpm db:generate:conversation && pnpm db:generate:membership && pnpm db:generate:sandbox-status"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
+    "@types/node": "^25.5.0",
+    "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "~3.2.4",
+    "wrangler": "catalog:"
+  },
+  "dependencies": {
+    "@kilocode/db": "workspace:*",
+    "@kilocode/encryption": "workspace:*",
+    "@kilocode/kilo-chat": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "lru-cache": "^11.2.7",
+    "p-limit": "catalog:",
+    "ulid": "3.0.1",
+    "workers-tagged-logger": "catalog:",
+    "zod": "catalog:"
+  }
+}

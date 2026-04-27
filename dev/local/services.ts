@@ -139,6 +139,16 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'nextjs', 'kiloclaw'],
     dir: 'services/kiloclaw-billing',
   },
+  'event-service': {
+    group: 'kiloclaw',
+    dependsOn: [],
+    dir: 'services/event-service',
+  },
+  'kilo-chat': {
+    group: 'kiloclaw',
+    dependsOn: ['kiloclaw', 'event-service'],
+    dir: 'services/kilo-chat',
+  },
   // observability
   'cloudflare-o11y': {
     group: 'observability',
@@ -313,6 +323,7 @@ function buildServiceDefs(): ServiceDef[] {
     if (name === 'kiloclaw-tunnel') {
       const nextjsPort = 3000 + portOffset;
       const kiloclawPort = readWranglerPort(path.join(repoRoot, 'services/kiloclaw')) + portOffset;
+      const kiloChatPort = readWranglerPort(path.join(repoRoot, 'services/kilo-chat')) + portOffset;
       defs.push({
         name,
         type: 'process',
@@ -324,6 +335,7 @@ function buildServiceDefs(): ServiceDef[] {
           'dev/local/scripts/start-tunnel.ts',
           String(nextjsPort),
           String(kiloclawPort),
+          String(kiloChatPort),
         ],
         group: meta.group,
       });

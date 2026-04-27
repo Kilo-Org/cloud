@@ -1,6 +1,8 @@
 import http from 'node:http';
 import type { IncomingMessage } from 'node:http';
-import type { Duplex } from 'node:stream';
+import { Readable, type Duplex } from 'node:stream';
+import type { ReadableStream as NodeWebReadableStream } from 'node:stream/web';
+import { pipeline } from 'node:stream/promises';
 import type { Context } from 'hono';
 import { timingSafeTokenEqual } from './auth';
 import type { Supervisor } from './supervisor';
@@ -37,10 +39,39 @@ function hasValidProxyToken(
   return timingSafeTokenEqual(token, expectedToken);
 }
 
+function headersToOutgoing(headers: Headers): http.OutgoingHttpHeaders {
+  const out: http.OutgoingHttpHeaders = {};
+  headers.forEach((value, key) => {
+    const existing = out[key];
+    if (existing === undefined) {
+      out[key] = value;
+      return;
+    }
+    if (Array.isArray(existing)) {
+      existing.push(value);
+      return;
+    }
+    out[key] = [String(existing), value];
+  });
+  return out;
+}
+
+function incomingHeadersToResponseHeaders(headers: http.IncomingHttpHeaders): Headers {
+  const out = new Headers();
+  for (const [key, value] of Object.entries(headers)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const v of value) out.append(key, v);
+      continue;
+    }
+    out.append(key, String(value));
+  }
+  return out;
+}
+
 export function createHttpProxy(options: ProxyOptions) {
   const backendHost = options.backendHost ?? '127.0.0.1';
   const backendPort = options.backendPort ?? 3001;
-  const backendOrigin = `http://${backendHost}:${backendPort}`;
 
   return async (c: Context): Promise<Response> => {
     const token = c.req.header('x-kiloclaw-proxy-token');
@@ -62,34 +93,97 @@ export function createHttpProxy(options: ProxyOptions) {
     }
 
     const incomingUrl = new URL(c.req.url);
-    const backendUrl = new URL(`${incomingUrl.pathname}${incomingUrl.search}`, backendOrigin);
+    const method = c.req.method.toUpperCase();
 
     const headers = new Headers(c.req.raw.headers);
     headers.delete('x-kiloclaw-proxy-token');
     headers.set('host', `${backendHost}:${backendPort}`);
 
-    const method = c.req.method.toUpperCase();
-    const init: RequestInit & { duplex?: 'half' } = {
-      method,
-      headers,
-      redirect: 'manual',
-    };
-
-    if (method !== 'GET' && method !== 'HEAD') {
-      init.body = c.req.raw.body;
-      init.duplex = 'half';
-    }
-
-    try {
-      const resp = await fetch(backendUrl, init);
-      return new Response(resp.body, {
-        status: resp.status,
-        headers: resp.headers,
+    // Stream the request body through http.request + stream.pipeline so we
+    // never buffer uploads or large plugin payloads. Mirrors the WS-upgrade
+    // path's use of http.request for raw Node stream control.
+    return await new Promise<Response>(resolve => {
+      const upstreamReq = http.request({
+        hostname: backendHost,
+        port: backendPort,
+        path: `${incomingUrl.pathname}${incomingUrl.search}`,
+        method,
+        headers: headersToOutgoing(headers),
       });
-    } catch (error) {
-      console.error('[controller] HTTP proxy backend error:', error);
-      return c.json({ error: 'Bad Gateway' }, 502);
-    }
+
+      let settled = false;
+      const settle = (response: Response): void => {
+        if (settled) return;
+        settled = true;
+        resolve(response);
+      };
+      const fail = (error: unknown): void => {
+        console.error('[controller] HTTP proxy backend error:', error);
+        settle(
+          new Response(JSON.stringify({ error: 'Bad Gateway' }), {
+            status: 502,
+            headers: { 'content-type': 'application/json' },
+          })
+        );
+      };
+
+      upstreamReq.on('error', fail);
+
+      upstreamReq.on('response', (upstreamRes: IncomingMessage) => {
+        const responseHeaders = incomingHeadersToResponseHeaders(upstreamRes.headers);
+        const hasBody =
+          method !== 'HEAD' && upstreamRes.statusCode !== 204 && upstreamRes.statusCode !== 304;
+        if (!hasBody) {
+          upstreamRes.resume();
+          settle(
+            new Response(null, {
+              status: upstreamRes.statusCode ?? 502,
+              headers: responseHeaders,
+            })
+          );
+          return;
+        }
+        upstreamRes.on('error', err => {
+          console.error('[controller] HTTP proxy upstream response error:', err);
+        });
+        // Node's stream/web ReadableStream and the DOM lib's ReadableStream have
+        // drifted type shapes (ReadableStreamBYOBReader.readAtLeast etc.), but
+        // they are structurally interchangeable at runtime. Same cast is used
+        // for the inbound body in handleHttpRequest.
+        const body = Readable.toWeb(upstreamRes) satisfies NodeWebReadableStream;
+        settle(
+          new Response(body as unknown as ReadableStream<Uint8Array>, {
+            status: upstreamRes.statusCode ?? 502,
+            headers: responseHeaders,
+          })
+        );
+      });
+
+      if (method === 'GET' || method === 'HEAD') {
+        upstreamReq.end();
+        return;
+      }
+
+      const requestBody = c.req.raw.body;
+      if (!requestBody) {
+        upstreamReq.end();
+        return;
+      }
+
+      // The DOM lib's ReadableStream and Node's stream/web ReadableStream are
+      // structurally interchangeable; same cast symmetry as the response body.
+      const nodeBody = Readable.fromWeb(requestBody as unknown as NodeWebReadableStream);
+      pipeline(nodeBody, upstreamReq).catch(err => {
+        if (settled) {
+          // Response already dispatched; surface the error and tear down upstream
+          // so Hono's response writer propagates closure to the client.
+          console.error('[controller] HTTP proxy request body pipe error:', err);
+          upstreamReq.destroy();
+          return;
+        }
+        fail(err);
+      });
+    });
   };
 }
 

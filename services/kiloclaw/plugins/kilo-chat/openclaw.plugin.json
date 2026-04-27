@@ -1,0 +1,14 @@
+{
+  "id": "kilo-chat",
+  "name": "Kilo Chat",
+  "description": "Kilo Chat channel plugin",
+  "channels": ["kilo-chat"],
+  "channelEnvVars": {
+    "kilo-chat": []
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

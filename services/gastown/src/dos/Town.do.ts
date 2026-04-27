@@ -2549,6 +2549,14 @@ export class TownDO extends DurableObject<Env> {
     let sessionStatus: 'idle' | 'active' | 'starting';
 
     if (isAlive) {
+      // Refresh the container-scoped JWT before sending. The mayor makes GT
+      // tool calls using GASTOWN_CONTAINER_TOKEN, and sendMessageToAgent does
+      // not otherwise call ensureContainerToken. Without this, a mayor that
+      // has been waiting longer than the 8h token expiry would 401 on its
+      // first GT tool call for the new prompt.
+      const townConfig = await this.getTownConfig();
+      const userId = townConfig.owner_user_id ?? townId;
+      await dispatch.ensureContainerToken(this.env, townId, userId);
       const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, combinedMessage);
       if (sent) {
         // Transition waiting → working so the alarm runs at the active cadence
@@ -4106,17 +4114,16 @@ export class TownDO extends DurableObject<Env> {
    * requests that reset the container's sleepAfter timer (#1409).
    */
   private async refreshContainerToken(): Promise<void> {
-    // Skip if no active work AND no alive mayor — the container is sleeping
-    // and doesn't need a fresh token. The token will be refreshed when work
-    // is next dispatched (ensureContainerToken is called in
-    // startAgentInContainer at container-dispatch.ts:329).
-    // However, a waiting mayor IS alive in the container and needs a valid
-    // token for GT tool calls when the user sends the next message
-    // (sendMayorMessage → sendMessageToAgent does NOT call ensureContainerToken).
+    // Skip if no active work AND no actively-running mayor — the container is
+    // sleeping (or about to) and doesn't need a fresh token. The token will be
+    // refreshed when work is next dispatched (ensureContainerToken is called in
+    // startAgentInContainer at container-dispatch.ts) and on the warm-send path
+    // in _sendMayorMessage before sendMessageToAgent. 'waiting' is intentionally
+    // excluded: a user may leave a mayor in waiting indefinitely, and counting
+    // it as alive here would keep the container awake forever via hourly
+    // /refresh-token pings that reset sleepAfter (#1409).
     const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
-    const mayorAlive =
-      mayor &&
-      (mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting');
+    const mayorAlive = mayor && (mayor.status === 'working' || mayor.status === 'stalled');
     if (!this.hasActiveWork() && !mayorAlive) return;
 
     const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour

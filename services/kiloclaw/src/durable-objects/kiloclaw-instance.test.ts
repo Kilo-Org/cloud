@@ -219,10 +219,11 @@ function createFakeAppStub() {
   };
 }
 
-function createFakeEnv() {
+function createFakeEnv(opts: { includeNorthflank?: boolean } = {}) {
+  const { includeNorthflank = true } = opts;
   const appStub = createFakeAppStub();
   const writeDataPoint = vi.fn();
-  return {
+  const base = {
     FLY_API_TOKEN: 'test-token',
     FLY_APP_NAME: 'test-app',
     FLY_REGION: 'eu,us',
@@ -244,6 +245,18 @@ function createFakeEnv() {
     KILOCLAW_AE: {
       writeDataPoint,
     } as unknown,
+  };
+  if (!includeNorthflank) {
+    return base;
+  }
+  return {
+    ...base,
+    NF_API_TOKEN: 'nf-test-token',
+    NF_REGION: 'us-central',
+    NF_DEPLOYMENT_PLAN: 'nf-compute-10',
+    NF_EDGE_HEADER_NAME: 'X-KC-Edge',
+    NF_EDGE_HEADER_VALUE: 'edge-test-secret',
+    NF_IMAGE_PATH_TEMPLATE: 'registry.example.com/kiloclaw:{tag}',
   };
 }
 
@@ -382,6 +395,38 @@ async function seedDockerInstance(
     flyVolumeId: null,
     flyRegion: null,
     providerState: dockerProviderState(),
+    ...overrides,
+  });
+}
+
+function northflankProviderState(overrides: Record<string, unknown> = {}) {
+  return {
+    provider: 'northflank',
+    projectId: 'project-1',
+    projectName: 'kc-ki-test',
+    serviceId: 'service-1',
+    serviceName: 'kc-ki-test',
+    volumeId: 'volume-1',
+    volumeName: 'kc-ki-test',
+    secretId: 'secret-1',
+    secretName: 'kc-ki-test',
+    secretContentHash: null,
+    ingressHost: 'kc-ki-test.code.run',
+    region: 'us-central',
+    ...overrides,
+  };
+}
+
+async function seedNorthflankInstance(
+  storage: ReturnType<typeof createFakeStorage>,
+  overrides: Record<string, unknown> = {}
+) {
+  await seedProvisioned(storage, {
+    provider: 'northflank',
+    flyMachineId: null,
+    flyVolumeId: null,
+    flyRegion: null,
+    providerState: northflankProviderState(),
     ...overrides,
   });
 }
@@ -5152,7 +5197,7 @@ describe('controller-first pairing', () => {
     fetchSpy.mockRestore();
   });
 
-  it('channel approve returns redeploy-required when non-Fly controller route is unavailable', async () => {
+  it('channel approve returns controller-unavailable message when non-Fly controller route is missing', async () => {
     const { instance, storage } = createInstance();
     await seedDockerInstance(storage, { status: 'running' });
 
@@ -5706,6 +5751,149 @@ describe('controller-first pairing', () => {
 });
 
 // ============================================================================
+// Pairing + runDoctor on non-Fly providers
+// ============================================================================
+
+describe('non-Fly pairing + runDoctor behavior', () => {
+  it('listPairingRequests on Northflank returns empty when controller route is unavailable, does not fly-exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.listPairingRequests();
+
+    expect(result).toEqual({ requests: [] });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('approvePairingRequest on Northflank returns controller-unavailable message when controller route is missing', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('listDevicePairingRequests on Northflank returns empty when controller route is unavailable, does not fly-exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.listDevicePairingRequests();
+
+    expect(result).toEqual({ requests: [] });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('approveDevicePairingRequest on Northflank returns controller-unavailable message when controller route is missing', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.approveDevicePairingRequest(
+      '11111111-1111-4111-8111-111111111111'
+    );
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('runDoctor on Northflank returns not-yet-wired-up without invoking fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({
+      success: false,
+      output: 'Run doctor is not yet wired up for this instance',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+  });
+
+  it('runDoctor on docker-local returns not-yet-wired-up without invoking fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({
+      success: false,
+      output: 'Run doctor is not yet wired up for this instance',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+  });
+
+  it('runDoctor on Fly running instance still invokes fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: 'doctor ok',
+      stderr: '',
+    });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({ success: true, output: 'doctor ok' });
+    expect(flyClient.execCommand).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'acct-test' },
+      'machine-1',
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'doctor', '--fix', '--non-interactive'],
+      60
+    );
+  });
+
+  it('runDoctor on non-running instance returns Instance is not running regardless of provider', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'stopped' });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({ success: false, output: 'Instance is not running' });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
 // Kilo CLI run controller routing
 // ============================================================================
 
@@ -6180,7 +6368,11 @@ describe('provision: auto-start after fresh provision', () => {
   });
 
   it('does not leave the hot DO on a misconfigured provider after failed provision', async () => {
-    const { instance, storage, waitUntilPromises } = createInstance();
+    const envWithoutNorthflank = createFakeEnv({ includeNorthflank: false });
+    const { instance, storage, waitUntilPromises } = createInstance(
+      createFakeStorage(),
+      envWithoutNorthflank
+    );
 
     await expect(instance.provision('user-1', {}, { provider: 'northflank' })).rejects.toThrow(
       /^Provider northflank is not configured; missing /

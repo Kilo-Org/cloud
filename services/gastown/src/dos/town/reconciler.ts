@@ -2211,7 +2211,19 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
     // the earlier auto-idle transition in the same reconcile pass.
     // applyAction('transition_agent') ignores `from`, so action order
     // decides the final state.
-    if (agent.status === 'stalled' && elapsed > STALLED_AUTO_IDLE_MS) continue;
+    //
+    // Mirror reconcileAgents' auto-idle eligibility check against
+    // last_activity_at. If last_event_at is stale but heartbeats keep
+    // refreshing last_activity_at, reconcileAgents won't idle the row yet —
+    // skipping GUPP handling in that case would leave the row stuck stalled
+    // while the alarm keeps firing.
+    if (
+      agent.status === 'stalled' &&
+      agent.last_activity_at &&
+      Date.now() - new Date(agent.last_activity_at).getTime() > STALLED_AUTO_IDLE_MS
+    ) {
+      continue;
+    }
 
     if (elapsed > GUPP_FORCE_STOP_MS) {
       actions.push({

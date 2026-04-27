@@ -12,8 +12,8 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/gastown/container/src"
   },
   "dependencies": {
-    "@kilocode/plugin": "7.1.23",
-    "@kilocode/sdk": "7.1.23",
+    "@kilocode/plugin": "7.2.14",
+    "@kilocode/sdk": "7.2.14",
     "hono": "catalog:",
     "zod": "catalog:"
   },

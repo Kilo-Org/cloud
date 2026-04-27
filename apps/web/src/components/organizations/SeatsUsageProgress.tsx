@@ -68,8 +68,9 @@ export function SeatsUsageProgress({
       )}
       {!isTrial && showWarnings && isOverLimit && (
         <p className={`font-medium text-red-400 ${textSizeClasses[size]}`}>
-          You&apos;ve exceeded your seat limit by {usedSeats - totalSeats} seat
-          {usedSeats - totalSeats !== 1 ? 's' : ''}. Upgrade your plan immediately.
+          You&apos;re over your seat limit by {usedSeats - totalSeats} seat
+          {usedSeats - totalSeats !== 1 ? 's' : ''}. Please upgrade your plan soon to avoid
+          disruption.
         </p>
       )}
       {!isTrial && showWarnings && isAtLimit && !isOverLimit && (

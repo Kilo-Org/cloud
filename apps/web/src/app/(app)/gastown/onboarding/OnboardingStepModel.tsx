@@ -1,9 +1,16 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useOnboarding } from './OnboardingContext';
 import { PRESETS } from './onboarding.domain';
@@ -171,15 +178,11 @@ const ROLES = [
 
 function ModelRolePickers({
   models,
-  isCustom,
-  onUpdate,
   modelOptions,
   isLoadingModels,
   modelsError,
 }: {
   models: { mayor: string; refinery: string; polecat: string };
-  isCustom: boolean;
-  onUpdate: (models: { mayor?: string; refinery?: string; polecat?: string }) => void;
   modelOptions: ModelOption[];
   isLoadingModels: boolean;
   modelsError: string | undefined;
@@ -202,23 +205,107 @@ function ModelRolePickers({
               label=""
               models={modelOptions}
               value={models[key]}
-              onValueChange={value => onUpdate({ ...models, [key]: value })}
+              onValueChange={() => {}}
               isLoading={isLoadingModels}
               error={modelsError}
               placeholder="Select a model"
-              disabled={!isCustom}
-              className={cn(
-                'border-white/[0.08] bg-white/[0.03] text-sm text-white/85',
-                !isCustom && 'opacity-70'
-              )}
+              disabled
+              className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85 opacity-70"
             />
           </div>
         ))}
-        {!isCustom && (
-          <p className="text-center text-[10px] text-white/20">
-            Select &ldquo;Custom&rdquo; to change models
-          </p>
-        )}
+        <p className="text-center text-[10px] text-white/20">
+          Select &ldquo;Custom&rdquo; to change models
+        </p>
+      </div>
+    </motion.div>
+  );
+}
+
+function CustomModelPicker({
+  customDefault,
+  setCustomDefault,
+  customMayor,
+  setCustomMayor,
+  customRefinery,
+  setCustomRefinery,
+  customPolecat,
+  setCustomPolecat,
+  modelOptions,
+  isLoadingModels,
+}: {
+  customDefault: string;
+  setCustomDefault: (v: string) => void;
+  customMayor: string;
+  setCustomMayor: (v: string) => void;
+  customRefinery: string;
+  setCustomRefinery: (v: string) => void;
+  customPolecat: string;
+  setCustomPolecat: (v: string) => void;
+  modelOptions: ModelOption[];
+  isLoadingModels: boolean;
+}) {
+  const roleRows: [string, string, (v: string) => void][] = [
+    ['Mayor', customMayor, setCustomMayor],
+    ['Refinery', customRefinery, setCustomRefinery],
+    ['Polecat', customPolecat, setCustomPolecat],
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      transition={{ duration: 0.2 }}
+      className="mt-4 overflow-hidden"
+    >
+      <div className="space-y-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+        {/* Primary default model */}
+        <div>
+          <label className="mb-1 block text-xs text-white/50">Default Model</label>
+          <ModelCombobox
+            label=""
+            models={modelOptions}
+            value={customDefault}
+            onValueChange={setCustomDefault}
+            isLoading={isLoadingModels}
+            placeholder="Select a model"
+            className="border-white/[0.08] bg-white/[0.03] text-sm text-white/85"
+          />
+        </div>
+
+        {/* Per-role overrides — collapsible */}
+        <Accordion type="single" collapsible>
+          <AccordionItem value="roles" className="border-white/[0.06]">
+            <AccordionTrigger className="py-2 text-xs text-white/50 hover:text-white/70 hover:no-underline">
+              Override by role (optional)
+            </AccordionTrigger>
+            <AccordionContent className="space-y-2 pb-1 pt-1">
+              {roleRows.map(([label, value, setValue]) => (
+                <div key={label} className="flex items-center gap-2">
+                  <span className="w-16 shrink-0 text-xs text-white/40">{label}</span>
+                  <ModelCombobox
+                    label=""
+                    models={modelOptions}
+                    value={value}
+                    onValueChange={setValue}
+                    isLoading={isLoadingModels}
+                    placeholder="Use default"
+                    className="flex-1 border-white/[0.08] bg-white/[0.03] text-sm text-white/85"
+                  />
+                  {value && (
+                    <button
+                      type="button"
+                      onClick={() => setValue('')}
+                      className="shrink-0 text-white/30 hover:text-white/60"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </motion.div>
   );
@@ -226,6 +313,11 @@ function ModelRolePickers({
 
 export function OnboardingStepModel() {
   const { state, setModelPreset, setCustomModels } = useOnboarding();
+
+  const [customDefault, setCustomDefault] = useState(state.customModels.defaultModel ?? '');
+  const [customMayor, setCustomMayor] = useState(state.customModels.mayor ?? '');
+  const [customRefinery, setCustomRefinery] = useState(state.customModels.refinery ?? '');
+  const [customPolecat, setCustomPolecat] = useState(state.customModels.polecat ?? '');
 
   // Fetch available models for the Custom picker (no org context during onboarding)
   const {
@@ -239,15 +331,8 @@ export function OnboardingStepModel() {
     [modelsData]
   );
 
-  // Resolve current models for display: preset values or custom overrides
-  const currentModels = useMemo(() => {
-    if (state.modelPreset === 'custom') {
-      return {
-        mayor: state.customModels.mayor ?? 'kilo-auto/balanced',
-        refinery: state.customModels.refinery ?? 'kilo-auto/balanced',
-        polecat: state.customModels.polecat ?? 'kilo-auto/balanced',
-      };
-    }
+  // Resolve current models for display in the read-only preset role picker
+  const currentPresetModels = useMemo(() => {
     const preset = PRESETS.find(p => p.key === state.modelPreset);
     if (preset) return preset.models;
     return {
@@ -255,7 +340,7 @@ export function OnboardingStepModel() {
       refinery: 'kilo-auto/balanced',
       polecat: 'kilo-auto/balanced',
     };
-  }, [state.modelPreset, state.customModels]);
+  }, [state.modelPreset]);
 
   const isCustom = state.modelPreset === 'custom';
 
@@ -263,8 +348,45 @@ export function OnboardingStepModel() {
     setModelPreset(preset);
   }
 
-  function handleCustomUpdate(models: { mayor?: string; refinery?: string; polecat?: string }) {
-    setCustomModels(models);
+  // Sync custom model state up to context whenever any field changes
+  function handleSetCustomDefault(value: string) {
+    setCustomDefault(value);
+    setCustomModels({
+      defaultModel: value,
+      mayor: customMayor,
+      refinery: customRefinery,
+      polecat: customPolecat,
+    });
+  }
+
+  function handleSetCustomMayor(value: string) {
+    setCustomMayor(value);
+    setCustomModels({
+      defaultModel: customDefault,
+      mayor: value,
+      refinery: customRefinery,
+      polecat: customPolecat,
+    });
+  }
+
+  function handleSetCustomRefinery(value: string) {
+    setCustomRefinery(value);
+    setCustomModels({
+      defaultModel: customDefault,
+      mayor: customMayor,
+      refinery: value,
+      polecat: customPolecat,
+    });
+  }
+
+  function handleSetCustomPolecat(value: string) {
+    setCustomPolecat(value);
+    setCustomModels({
+      defaultModel: customDefault,
+      mayor: customMayor,
+      refinery: customRefinery,
+      polecat: value,
+    });
   }
 
   return (
@@ -292,15 +414,31 @@ export function OnboardingStepModel() {
           <CustomCard isSelected={isCustom} onSelect={() => handlePresetSelect('custom')} />
         </div>
 
-        {/* Always-visible model role pickers */}
-        <ModelRolePickers
-          models={currentModels}
-          isCustom={isCustom}
-          onUpdate={handleCustomUpdate}
-          modelOptions={modelOptions}
-          isLoadingModels={isLoadingModels}
-          modelsError={modelsError?.message}
-        />
+        {/* Preset model role pickers (read-only) — shown when a preset is active */}
+        {!isCustom && (
+          <ModelRolePickers
+            models={currentPresetModels}
+            modelOptions={modelOptions}
+            isLoadingModels={isLoadingModels}
+            modelsError={modelsError?.message}
+          />
+        )}
+
+        {/* Custom model picker — shown when custom is selected */}
+        {isCustom && (
+          <CustomModelPicker
+            customDefault={customDefault}
+            setCustomDefault={handleSetCustomDefault}
+            customMayor={customMayor}
+            setCustomMayor={handleSetCustomMayor}
+            customRefinery={customRefinery}
+            setCustomRefinery={handleSetCustomRefinery}
+            customPolecat={customPolecat}
+            setCustomPolecat={handleSetCustomPolecat}
+            modelOptions={modelOptions}
+            isLoadingModels={isLoadingModels}
+          />
+        )}
       </div>
     </div>
   );

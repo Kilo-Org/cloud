@@ -41,6 +41,12 @@ RUN apt-get update \
     && node --version \
     && npm --version
 
+# Route npm's git-backed deps (GitHub refs, ssh:// transitive deps like
+# baileys → libsignal-node) through https during the build so we don't need
+# an ssh client in the image. The final stage removes /etc/gitconfig so this
+# build-only config does not ship in the runtime image.
+RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.com/"
+
 # Install pnpm globally
 RUN npm install -g pnpm
 
@@ -49,7 +55,7 @@ RUN npm install -g pnpm
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g openclaw@2026.4.9 \
+RUN npm install -g openclaw@2026.4.15 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
     && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
@@ -62,6 +68,23 @@ RUN npm install -g openclaw@2026.4.9 \
     && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null; then echo "ERROR: old 5e3 value still present after patch" >&2; exit 1; fi \
     && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
     && openclaw --version
+
+# Bake bundled plugin runtime deps into the image so first boot is pure
+# startup — no npm install from `openclaw doctor` on shared-cpu Fly machines.
+# Each step writes to a temp file and is chained with && so failures break
+# the build (Debian's /bin/sh is dash, no pipefail). jq does the workspace:
+# filter so no pipe is needed between jq and sort.
+RUN cd /usr/local/lib/node_modules/openclaw \
+    && jq -r '((.dependencies // {}) + (.optionalDependencies // {})) | to_entries[] | select(.value | startswith("workspace:") | not) | "\(.key)@\(.value)"' \
+         dist/extensions/*/package.json > /tmp/bundled-plugin-specs.raw \
+    && sort -u /tmp/bundled-plugin-specs.raw > /tmp/bundled-plugin-specs.txt \
+    && test -s /tmp/bundled-plugin-specs.txt \
+    && xargs -a /tmp/bundled-plugin-specs.txt npm install \
+           --omit=dev --no-save --package-lock=false \
+           --ignore-scripts --legacy-peer-deps \
+           --no-fund --no-audit \
+    && rm -f /tmp/bundled-plugin-specs.raw /tmp/bundled-plugin-specs.txt \
+    && rm -rf /root/.npm
 
 # Install ClawHub CLI
 RUN npm install -g clawhub
@@ -77,7 +100,7 @@ RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-r
 RUN npm install -g @steipete/summarize@0.12.0
 
 # Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.1.13
+RUN npm install -g @kilocode/cli@7.2.22
 
 # Install Go (available at runtime for users to `go install` additional tools)
 ENV GO_VERSION=1.26.0
@@ -107,7 +130,7 @@ RUN GOBIN=/usr/local/bin go install github.com/steipete/gogcli/cmd/gog@v0.12.0 \
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh \
     && uv --version
 
-# ── Builder stage: package customizer plugin ───────────────────────────
+# ── Builder stage: package custom plugins ───────────────────────────
 # Build the vendored plugin tarball in an isolated stage so dev-time
 # dependencies do not inflate the runtime image layers.
 FROM runtime AS customizer-builder
@@ -119,6 +142,16 @@ RUN cd /tmp/kiloclaw-customizer \
     && mv "${PKG_TGZ}" /tmp/kiloclaw-customizer.tgz \
     && cd / \
     && rm -rf /tmp/kiloclaw-customizer /root/.npm
+
+FROM runtime AS morning-briefing-builder
+
+COPY plugins/kiloclaw-morning-briefing/ /tmp/kiloclaw-morning-briefing/
+RUN cd /tmp/kiloclaw-morning-briefing \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kiloclaw-morning-briefing.tgz \
+    && cd / \
+    && rm -rf /tmp/kiloclaw-morning-briefing /root/.npm
 
 # ── Builder stage: compile the controller with Bun ────────────────────
 # Bun is only needed to bundle the controller TypeScript into a single JS
@@ -149,9 +182,14 @@ RUN cd /tmp/controller-build \
 FROM runtime AS final
 
 # Install prebuilt customizer plugin package from builder stage.
+# Also drop /etc/gitconfig (set earlier for the build's ssh→https rewrite) so
+# it doesn't persist in the runtime image.
 COPY --from=customizer-builder /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-customizer.tgz
-RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz \
+COPY --from=morning-briefing-builder /tmp/kiloclaw-morning-briefing.tgz /tmp/kiloclaw-morning-briefing.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-morning-briefing.tgz \
     && rm -f /tmp/kiloclaw-customizer.tgz \
+    && rm -f /tmp/kiloclaw-morning-briefing.tgz \
+    && rm -f /etc/gitconfig \
     && rm -rf /root/.npm
 
 # Copy the compiled controller from the builder stage
@@ -164,8 +202,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-03-17-v65-remove-startup-script
-RUN echo "11"
+# Build cache bust: 2026-04-24-v66-openclaw-2026.4.15
+RUN echo "12"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

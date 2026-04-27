@@ -409,12 +409,34 @@ export class MayorGastownClient {
       status?: 'open' | 'in_progress' | 'in_review' | 'closed' | 'failed';
       priority?: 'low' | 'medium' | 'high' | 'critical';
       labels?: string[];
+      depends_on?: string[];
     }
   ): Promise<Bead> {
     return this.request<Bead>(this.mayorPath(`/rigs/${rigId}/beads/${beadId}`), {
       method: 'PATCH',
       body: JSON.stringify(input),
     });
+  }
+
+  async convoyAddBead(
+    convoyId: string,
+    beadId: string,
+    dependsOn?: string[]
+  ): Promise<{ total_beads: number }> {
+    return this.request<{ total_beads: number }>(this.mayorPath(`/convoys/${convoyId}/add-bead`), {
+      method: 'POST',
+      body: JSON.stringify({ bead_id: beadId, depends_on: dependsOn }),
+    });
+  }
+
+  async convoyRemoveBead(convoyId: string, beadId: string): Promise<{ total_beads: number }> {
+    return this.request<{ total_beads: number }>(
+      this.mayorPath(`/convoys/${convoyId}/remove-bead`),
+      {
+        method: 'POST',
+        body: JSON.stringify({ bead_id: beadId }),
+      }
+    );
   }
 
   async reassignBead(rigId: string, beadId: string, agentId: string): Promise<Bead> {
@@ -428,6 +450,27 @@ export class MayorGastownClient {
     await this.request<void>(this.mayorPath(`/rigs/${rigId}/beads/${beadId}`), {
       method: 'DELETE',
     });
+  }
+
+  async deleteBeads(rigId: string, beadIds: string[]): Promise<{ deleted: number }> {
+    return this.request<{ deleted: number }>(this.mayorPath(`/rigs/${rigId}/beads/bulk-delete`), {
+      method: 'POST',
+      body: JSON.stringify({ bead_ids: beadIds }),
+    });
+  }
+
+  async deleteBeadsByStatus(
+    rigId: string,
+    status: 'open' | 'in_progress' | 'in_review' | 'closed' | 'failed',
+    type?: string
+  ): Promise<{ deleted: number }> {
+    return this.request<{ deleted: number }>(
+      this.mayorPath(`/rigs/${rigId}/beads/delete-by-status`),
+      {
+        method: 'POST',
+        body: JSON.stringify({ status, ...(type ? { type } : {}) }),
+      }
+    );
   }
 
   async resetAgent(rigId: string, agentId: string): Promise<void> {

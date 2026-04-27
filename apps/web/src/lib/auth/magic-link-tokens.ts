@@ -85,12 +85,11 @@ export async function verifyAndConsumeMagicLinkToken(
 }
 
 export function getMagicLinkUrl(
-  { plaintext_token, email }: MagicLinkTokenWithPlaintext,
+  { plaintext_token }: MagicLinkTokenWithPlaintext,
   callbackUrl?: string
 ): string {
   const url = new URL(`${NEXTAUTH_URL}/auth/verify-magic-link`);
   url.searchParams.set('token', plaintext_token);
-  url.searchParams.set('email', email);
   if (callbackUrl) {
     url.searchParams.set('callbackUrl', callbackUrl);
   }

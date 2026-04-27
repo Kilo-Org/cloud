@@ -17,8 +17,6 @@ const LOG = '[patrol]';
 
 // ── Thresholds ──────────────────────────────────────────────────────
 
-/** First GUPP warning (existing behavior) */
-export const GUPP_WARN_MS = 30 * 60_000; // 30 min
 /** Escalate to mayor after second threshold */
 export const GUPP_ESCALATE_MS = 60 * 60_000; // 1h
 /** Force-stop agent after third threshold */

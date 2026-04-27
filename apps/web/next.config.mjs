@@ -27,6 +27,7 @@ const monorepoRoot = resolve(import.meta.dirname, '../..');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
 
   // Both values MUST be set to the monorepo root and kept in sync.
   // `vercel build` sets NEXT_PRIVATE_OUTPUT_TRACE_ROOT to the project dir (apps/web)
@@ -137,6 +138,26 @@ const nextConfig = {
           {
             key: 'Cross-Origin-Opener-Policy',
             value: 'same-origin',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '0',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'geolocation=(self), camera=(), microphone=()',
+          },
+          {
+            key: 'Cross-Origin-Resource-Policy',
+            value: 'same-origin',
+          },
+          {
+            key: 'Cross-Origin-Embedder-Policy-Report-Only',
+            value: 'require-corp',
           },
         ],
       },

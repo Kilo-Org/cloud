@@ -7,7 +7,7 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
-} from '@/lib/kilo-auto';
+} from '@/lib/ai-gateway/kilo-auto';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   claude_sonnet_clawsetup_model,
@@ -30,9 +30,8 @@ import { grok_code_fast_1_optimized_free_model } from '@/lib/ai-gateway/provider
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
-  'inclusionai/ling-2.6-flash:free',
+  'inclusionai/ling-2.6-1t:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
-  'tencent/hy3-preview:free',
   grok_code_fast_1_optimized_free_model.status === 'public'
     ? grok_code_fast_1_optimized_free_model.public_id
     : null,
@@ -47,7 +46,7 @@ export const preferredModels = [
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-  'openai/gpt-5.4',
+  'openai/gpt-5.5',
   'google/gemini-3.1-pro-preview',
   MINIMAX_CURRENT_MODEL_ID,
   qwen36_plus_model.public_id,

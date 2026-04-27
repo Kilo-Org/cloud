@@ -13,7 +13,7 @@ import type { SlackInstallation } from '@chat-adapter/slack';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/kilo-auto';
+import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 // Default model for Slack integrations - separate from the global platform default
@@ -43,6 +43,11 @@ export const SLACK_SCOPES = [
 ];
 
 const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
+
+type SlackUninstallOptions = {
+  deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
+  deleteChatSdkIdentityCache?: (teamId: string) => Promise<void>;
+};
 
 function getOwnershipConditions(owner: Owner) {
   return owner.type === 'user'
@@ -206,7 +211,7 @@ export async function upsertSlackInstallation({
 /**
  * Uninstall Slack integration for an owner
  */
-export async function uninstallApp(owner: Owner) {
+export async function uninstallApp(owner: Owner, options: SlackUninstallOptions = {}) {
   const integration = await getInstallation(owner);
 
   if (!integration || integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
@@ -224,6 +229,19 @@ export async function uninstallApp(owner: Owner) {
     } catch (error) {
       console.error('Failed to revoke Slack token:', error);
     }
+  }
+
+  const teamId = integration.platform_installation_id ?? integration.platform_account_id;
+  if (options.deleteChatSdkInstallation || options.deleteChatSdkIdentityCache) {
+    if (!teamId) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Slack installation is missing a team ID',
+      });
+    }
+
+    await options.deleteChatSdkInstallation?.(teamId);
+    await options.deleteChatSdkIdentityCache?.(teamId);
   }
 
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));

@@ -18,12 +18,14 @@ import { review_metadata, ReviewMetadataRecord } from '../../db/tables/review-me
 import { convoy_metadata, ConvoyMetadataRecord } from '../../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { agent_nudges } from '../../db/tables/agent-nudges.table';
+import { escalation_metadata } from '../../db/tables/escalation-metadata.table';
 import { query } from '../../util/query.util';
 import {
   GUPP_ESCALATE_MS,
   GUPP_FORCE_STOP_MS,
   AGENT_GC_RETENTION_MS,
   TRIAGE_LABEL_LIKE,
+  createTriageRequest,
 } from './patrol';
 import { MAX_DISPATCH_ATTEMPTS } from './scheduling';
 import * as reviewQueue from './review-queue';
@@ -44,6 +46,15 @@ const LOG = '[reconciler]';
 const CIRCUIT_BREAKER_FAILURE_THRESHOLD = 20;
 /** Window in minutes for counting dispatch failures. */
 const CIRCUIT_BREAKER_WINDOW_MINUTES = 30;
+
+/** Max landing MR creation attempts before failing the convoy (#2260). */
+const MAX_LANDING_MR_ATTEMPTS = 5;
+
+/** Base cooldown for landing MR retry: min(2^attempts * BASE, MAX) (#2260). */
+const LANDING_MR_COOLDOWN_BASE_MS = 30_000; // 30s
+
+/** Max cooldown for landing MR retry (#2260). */
+const LANDING_MR_COOLDOWN_MAX_MS = 30 * 60_000; // 30 min
 
 /**
  * Town-level dispatch circuit breaker. Counts beads with at least one
@@ -202,7 +213,11 @@ type ConvoyRow = z.infer<typeof ConvoyRow>;
  *
  * See reconciliation-spec.md §5.2.
  */
-export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
+export function applyEvent(
+  sql: SqlStorage,
+  event: TownEventRecord,
+  opts?: { townConfig?: TownConfig }
+): void {
   const payload = event.payload;
 
   switch (event.event_type) {
@@ -394,6 +409,27 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
       const hasFailingChecks = payload.has_failing_checks === true;
       const hasUncheckedRuns = payload.has_unchecked_runs === true;
 
+      // Consolidation: if there's already an open gt:pr-conflict bead for this MR,
+      // add has_feedback: true to it instead of creating a separate feedback bead.
+      // The agent resolving conflicts will then also address review feedback afterward.
+      const existingConflictBeadId = getExistingPrConflictBeadId(sql, mrBeadId);
+      if (existingConflictBeadId) {
+        query(
+          sql,
+          /* sql */ `
+            UPDATE ${beads}
+            SET ${beads.columns.metadata} = json_set(COALESCE(${beads.metadata}, '{}'), '$.has_feedback', 1),
+                ${beads.columns.updated_at} = ?
+            WHERE ${beads.bead_id} = ?
+          `,
+          [new Date().toISOString(), existingConflictBeadId]
+        );
+        console.log(
+          `${LOG} pr_feedback_detected: merged into existing conflict bead ${existingConflictBeadId} (mrBeadId=${mrBeadId})`
+        );
+        return;
+      }
+
       const feedbackBead = beadOps.createBead(sql, {
         type: 'issue',
         title: buildFeedbackBeadTitle(
@@ -423,6 +459,143 @@ export function applyEvent(sql: SqlStorage, event: TownEventRecord): void {
 
       // Feedback bead blocks the MR bead (same pattern as rework beads)
       beadOps.insertDependency(sql, mrBeadId, feedbackBead.bead_id, 'blocks');
+      return;
+    }
+
+    case 'pr_conflict_detected': {
+      const mrBeadId = typeof payload.mr_bead_id === 'string' ? payload.mr_bead_id : null;
+      if (!mrBeadId) {
+        console.warn(`${LOG} applyEvent: pr_conflict_detected missing mr_bead_id`);
+        return;
+      }
+
+      const mrBead = beadOps.getBead(sql, mrBeadId);
+      if (!mrBead || mrBead.status === 'closed' || mrBead.status === 'failed') return;
+
+      // Idempotent: check for an existing open gt:pr-conflict bead for this pr_url
+      if (hasExistingPrConflictBead(sql, mrBeadId)) return;
+
+      const prUrl = typeof payload.pr_url === 'string' ? payload.pr_url : '';
+      const branch = typeof payload.branch === 'string' ? payload.branch : '';
+      const sourceBead = typeof payload.source_bead_id === 'string' ? payload.source_bead_id : null;
+
+      // Read the target_branch from review_metadata
+      const rmRows = z
+        .object({ target_branch: z.string() })
+        .array()
+        .parse([
+          ...query(
+            sql,
+            /* sql */ `
+              SELECT ${review_metadata.columns.target_branch}
+              FROM ${review_metadata}
+              WHERE ${review_metadata.bead_id} = ?
+            `,
+            [mrBeadId]
+          ),
+        ]);
+      const targetBranch = rmRows[0]?.target_branch ?? '';
+
+      // Read auto_resolve_merge_conflicts using the same fallback chain as
+      // auto_resolve_pr_feedback: rig override → town config → default (true).
+      const rig = mrBead.rig_id ? getRig(sql, mrBead.rig_id) : null;
+      const effectiveConfig = opts?.townConfig
+        ? resolveRigConfig(opts.townConfig, rig?.config ?? null)
+        : { auto_resolve_merge_conflicts: rig?.config?.auto_resolve_merge_conflicts !== false };
+      const autoResolveConflicts = effectiveConfig.auto_resolve_merge_conflicts !== false;
+
+      if (autoResolveConflicts) {
+        // Consolidation: if there's already an open gt:pr-feedback bead for this MR,
+        // add has_conflicts: true to it instead of creating a separate conflict bead.
+        // The agent handling the feedback bead will resolve conflicts first, then
+        // address review comments.
+        const existingFeedbackBeadId = getExistingPrFeedbackBeadId(sql, mrBeadId);
+        if (existingFeedbackBeadId) {
+          query(
+            sql,
+            /* sql */ `
+              UPDATE ${beads}
+              SET ${beads.columns.metadata} = json_set(COALESCE(${beads.metadata}, '{}'), '$.has_conflicts', 1, '$.conflict_target_branch', ?),
+                  ${beads.columns.updated_at} = ?
+              WHERE ${beads.bead_id} = ?
+            `,
+            [targetBranch, new Date().toISOString(), existingFeedbackBeadId]
+          );
+          console.log(
+            `${LOG} pr_conflict_detected: merged into existing feedback bead ${existingFeedbackBeadId} (mrBeadId=${mrBeadId})`
+          );
+          return;
+        }
+
+        const conflictBead = beadOps.createBead(sql, {
+          type: 'issue',
+          title: `Resolve merge conflicts on PR: ${branch}`,
+          body: buildConflictResolutionPrompt(prUrl, branch, targetBranch),
+          rig_id: mrBead.rig_id ?? undefined,
+          parent_bead_id: mrBeadId,
+          labels: ['gt:pr-conflict'],
+          metadata: {
+            pr_url: prUrl,
+            branch,
+            target_branch: targetBranch,
+            mr_bead_id: mrBeadId,
+            source_bead_id: sourceBead,
+          },
+        });
+
+        // Conflict bead blocks the MR bead (same pattern as feedback beads)
+        beadOps.insertDependency(sql, mrBeadId, conflictBead.bead_id, 'blocks');
+      } else {
+        // auto_resolve_merge_conflicts disabled — route through the full
+        // escalation pipeline so escalation_metadata, triage request, and
+        // mayor notification are all created (same path as routeEscalation()).
+        const escalationBead = beadOps.createBead(sql, {
+          type: 'escalation',
+          title: `Merge conflict detected: ${branch}`,
+          body: `PR ${prUrl} (branch ${branch}) has merge conflicts that require manual resolution.`,
+          priority: 'high',
+          rig_id: mrBead.rig_id ?? undefined,
+          labels: ['gt:escalation', 'severity:high'],
+          metadata: {
+            pr_url: prUrl,
+            branch,
+            target_branch: targetBranch,
+            mr_bead_id: mrBeadId,
+            source_bead_id: sourceBead,
+            conflict: true,
+          },
+        });
+        query(
+          sql,
+          /* sql */ `
+            INSERT INTO ${escalation_metadata} (
+              ${escalation_metadata.columns.bead_id},
+              ${escalation_metadata.columns.severity},
+              ${escalation_metadata.columns.category},
+              ${escalation_metadata.columns.acknowledged},
+              ${escalation_metadata.columns.re_escalation_count},
+              ${escalation_metadata.columns.acknowledged_at}
+            ) VALUES (?, ?, ?, ?, ?, ?)
+          `,
+          [escalationBead.bead_id, 'high', 'merge_conflict', 0, 0, null]
+        );
+        createTriageRequest(sql, {
+          triageType: 'escalation',
+          agentBeadId: null,
+          title: `Escalation (high): Merge conflict on ${branch}`,
+          context: {
+            escalation_bead_id: escalationBead.bead_id,
+            severity: 'high',
+            rig_id: mrBead.rig_id,
+            category: 'merge_conflict',
+            pr_url: prUrl,
+            branch,
+            mr_bead_id: mrBeadId,
+          },
+          options: ['ESCALATE_TO_MAYOR', 'RESTART', 'CLOSE_BEAD', 'REASSIGN_BEAD'],
+          rigId: mrBead.rig_id ?? undefined,
+        });
+      }
       return;
     }
 
@@ -539,7 +712,7 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
       // Agent is working with fresh heartbeat but no hook — it's running
       // in the container but has no bead to work on (gt_done already ran,
       // or the hook was cleared by another code path). Set to idle so
-      // processReviewQueue / schedulePendingWork can use it.
+      // the reconciler can dispatch it to new work.
       actions.push({
         type: 'transition_agent',
         agent_id: agent.bead_id,
@@ -810,7 +983,7 @@ export function reconcileBeads(
     });
   }
 
-  // Rule 2: Idle agents with hooks need dispatch (schedulePendingWork equivalent)
+  // Rule 2: Idle agents with hooks need dispatch
   const idleHooked = AgentRow.array().parse([
     ...query(
       sql,
@@ -1302,9 +1475,14 @@ export function reconcileReviewQueue(
     }
 
     // Orphan cleanup: open MR beads without pr_url that aren't convoy
-    // review-and-merge beads. The polecat should have created the PR
-    // (merge_strategy=pr) but didn't — fail the MR and reopen the
-    // source bead so another polecat can retry.
+    // review-and-merge beads or system-created landing MR beads.
+    // The polecat should have created the PR (merge_strategy=pr) but
+    // didn't — fail the MR and reopen the source bead so another
+    // polecat can retry.
+    // Landing MR beads (created_by='system') are excluded because they
+    // are created by reconcileConvoys for review-then-land convoys and
+    // intentionally have no pr_url at creation — the refinery creates
+    // the PR when it picks up the landing MR.
     const orphanedMrs = z
       .object({ bead_id: z.string(), source_bead_id: z.string().nullable() })
       .array()
@@ -1324,6 +1502,7 @@ export function reconcileReviewQueue(
               AND b.${beads.columns.status} = 'open'
               AND b.${beads.columns.rig_id} = ?
               AND rm.${review_metadata.columns.pr_url} IS NULL
+              AND b.${beads.columns.created_by} != 'system'
               AND NOT EXISTS (
                 SELECT 1
                 FROM ${beads} parent
@@ -1386,21 +1565,25 @@ export function reconcileReviewQueue(
       ]);
 
     for (const { rig_id } of rigsWithOpenMrs) {
-      // When code_review=false, only dispatch the refinery for convoy
-      // review-and-merge MR beads (refinery does combined review+merge).
+      // When code_review=false, only dispatch the refinery for:
+      //  1. Convoy review-and-merge MR beads (refinery does combined review+merge)
+      //  2. System-created landing MR beads (review-then-land convoy finalization)
       // MR beads WITH a pr_url are handled by the fast-track → poll_pr.
       // MR beads WITHOUT a pr_url when merge_strategy=pr are orphaned
-      // (polecat should have created the PR) — Rule 2 handles them.
+      // (polecat should have created the PR) — orphan cleanup handles them.
       const refineryNeededFilter = rigCodeReview(rig_id)
         ? ''
         : /* sql */ `
-            AND EXISTS (
-              SELECT 1
-              FROM ${beads} outer_parent
-              JOIN ${convoy_metadata} cm
-                ON cm.${convoy_metadata.columns.bead_id} = outer_parent.${beads.columns.bead_id}
-              WHERE outer_parent.${beads.columns.bead_id} = ${beads.parent_bead_id}
-                AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+            AND (
+              EXISTS (
+                SELECT 1
+                FROM ${beads} outer_parent
+                JOIN ${convoy_metadata} cm
+                  ON cm.${convoy_metadata.columns.bead_id} = outer_parent.${beads.columns.bead_id}
+                WHERE outer_parent.${beads.columns.bead_id} = ${beads.parent_bead_id}
+                  AND cm.${convoy_metadata.columns.merge_mode} = 'review-and-merge'
+              )
+              OR ${beads.created_by} = 'system'
             )`;
 
       // Check if rig already has an in_progress MR that needs the refinery.
@@ -1723,14 +1906,19 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
     if (progressRows.length === 0) continue;
     const { closed_count, total_count } = progressRows[0];
 
-    // Update progress if stale
-    if (closed_count !== convoy.closed_beads) {
-      actions.push({
-        type: 'update_convoy_progress',
-        convoy_id: convoy.bead_id,
-        closed_beads: closed_count,
-      });
+    // Parse convoy metadata for landing MR tracking fields (#2260)
+    let parsedMeta: Record<string, unknown> = {};
+    try {
+      parsedMeta = JSON.parse(convoy.metadata) as Record<string, unknown>;
+    } catch {
+      /* ignore */
     }
+    const landingMrAttempts =
+      typeof parsedMeta.landing_mr_attempts === 'number' ? parsedMeta.landing_mr_attempts : 0;
+    const lastLandingMrAttemptAt =
+      typeof parsedMeta.last_landing_mr_attempt_at === 'string'
+        ? parsedMeta.last_landing_mr_attempt_at
+        : null;
 
     // Check for in-flight MR beads (open or in_progress) for tracked issue beads
     const inFlightMrCount = z
@@ -1759,31 +1947,36 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
     const hasInFlightReviews = (inFlightMrCount[0]?.cnt ?? 0) > 0;
 
     // Check if all beads done
-    if (closed_count >= total_count && total_count > 0 && !hasInFlightReviews) {
-      let parsedMeta: Record<string, unknown> = {};
-      try {
-        parsedMeta = JSON.parse(convoy.metadata) as Record<string, unknown>;
-      } catch {
-        /* ignore */
+    const allBeadsDone = closed_count >= total_count && total_count > 0 && !hasInFlightReviews;
+
+    // Update progress if stale (skip if we're failing/closing the convoy this tick)
+    if (closed_count !== convoy.closed_beads) {
+      actions.push({
+        type: 'update_convoy_progress',
+        convoy_id: convoy.bead_id,
+        closed_beads: closed_count,
+      });
+    }
+
+    if (!allBeadsDone) continue;
+
+    if (convoy.merge_mode === 'review-then-land' && convoy.feature_branch) {
+      if (!parsedMeta.ready_to_land) {
+        actions.push({
+          type: 'set_convoy_ready_to_land',
+          convoy_id: convoy.bead_id,
+        });
       }
 
-      if (convoy.merge_mode === 'review-then-land' && convoy.feature_branch) {
-        if (!parsedMeta.ready_to_land) {
-          actions.push({
-            type: 'set_convoy_ready_to_land',
-            convoy_id: convoy.bead_id,
-          });
-        }
-
-        if (parsedMeta.ready_to_land) {
-          // Check if a landing MR already exists (any status)
-          const landingMrs = z
-            .object({ status: z.string() })
-            .array()
-            .parse([
-              ...query(
-                sql,
-                /* sql */ `
+      if (parsedMeta.ready_to_land) {
+        // Check if a landing MR already exists (any status)
+        const landingMrs = z
+          .object({ status: z.string() })
+          .array()
+          .parse([
+            ...query(
+              sql,
+              /* sql */ `
                 SELECT mr.${beads.columns.status}
                 FROM ${bead_dependencies} bd
                 INNER JOIN ${beads} mr ON mr.${beads.columns.bead_id} = bd.${bead_dependencies.columns.bead_id}
@@ -1791,36 +1984,93 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
                   AND bd.${bead_dependencies.columns.dependency_type} = 'tracks'
                   AND mr.${beads.columns.type} = 'merge_request'
               `,
+              [convoy.bead_id]
+            ),
+          ]);
+
+        // If a landing MR was already merged (closed), close the convoy
+        const hasMergedLanding = landingMrs.some(mr => mr.status === 'closed');
+        if (hasMergedLanding) {
+          actions.push({
+            type: 'close_convoy',
+            convoy_id: convoy.bead_id,
+          });
+          continue;
+        }
+
+        // Fix 1 (#2260): If a landing MR is active (open or in_progress), wait — don't create another
+        const hasActiveLanding = landingMrs.some(
+          mr => mr.status === 'open' || mr.status === 'in_progress'
+        );
+        if (hasActiveLanding) continue;
+
+        // Fix 2 (#2260): If max landing MR attempts exceeded and no landing MR is
+        // active or merged, fail the convoy. Checked after landing MR status lookup
+        // so the final allowed attempt can still succeed.
+        if (landingMrAttempts >= MAX_LANDING_MR_ATTEMPTS) {
+          actions.push({
+            type: 'fail_convoy',
+            convoy_id: convoy.bead_id,
+            reason: `Landing MR creation failed after ${MAX_LANDING_MR_ATTEMPTS} attempts`,
+          });
+          continue;
+        }
+
+        // Fix 2 (#2260): Apply exponential cooldown between landing MR attempts
+        if (landingMrAttempts > 0 && lastLandingMrAttemptAt) {
+          const elapsed = Date.now() - new Date(lastLandingMrAttemptAt).getTime();
+          const cooldownMs = Math.min(
+            Math.pow(2, landingMrAttempts) * LANDING_MR_COOLDOWN_BASE_MS,
+            LANDING_MR_COOLDOWN_MAX_MS
+          );
+          if (elapsed < cooldownMs) continue;
+        }
+
+        // Fix 3 (#2260): Check that tracked beads have at least one MR with a PR URL.
+        // For review-then-land convoys using direct merge strategy, intermediate bead
+        // merges go straight into the feature branch without persisting a pr_url —
+        // skip this guard and always create the landing MR when all beads are closed.
+        const needsPrUrl = convoy.merge_mode !== 'review-then-land';
+        if (needsPrUrl) {
+          const convoyBeadsWithPr = z
+            .object({ cnt: z.number() })
+            .array()
+            .parse([
+              ...query(
+                sql,
+                /* sql */ `
+                  SELECT count(*) as cnt
+                  FROM ${bead_dependencies} track_dep
+                  INNER JOIN ${bead_dependencies} mr_dep
+                    ON mr_dep.${bead_dependencies.columns.depends_on_bead_id} = track_dep.${bead_dependencies.columns.bead_id}
+                  INNER JOIN ${review_metadata} rm
+                    ON rm.${review_metadata.columns.bead_id} = mr_dep.${bead_dependencies.columns.bead_id}
+                  WHERE track_dep.${bead_dependencies.columns.depends_on_bead_id} = ?
+                    AND track_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+                    AND mr_dep.${bead_dependencies.columns.dependency_type} = 'tracks'
+                    AND rm.${review_metadata.columns.pr_url} IS NOT NULL
+                `,
                 [convoy.bead_id]
               ),
             ]);
 
-          // If a landing MR was already merged (closed), close the convoy
-          const hasMergedLanding = landingMrs.some(mr => mr.status === 'closed');
-          if (hasMergedLanding) {
-            actions.push({
-              type: 'close_convoy',
-              convoy_id: convoy.bead_id,
-            });
+          if ((convoyBeadsWithPr[0]?.cnt ?? 0) === 0) {
+            console.warn(
+              `${LOG} convoy ${convoy.bead_id} has no beads with pr_url — skipping create_landing_mr`
+            );
             continue;
           }
+        }
 
-          // If a landing MR is active (open or in_progress), wait for it
-          const hasActiveLanding = landingMrs.some(
-            mr => mr.status === 'open' || mr.status === 'in_progress'
-          );
-          if (hasActiveLanding) continue;
-
-          // No landing MR exists yet — create one
-          {
-            // Need rig_id from one of the tracked beads
-            const rigRows = z
-              .object({ rig_id: z.string() })
-              .array()
-              .parse([
-                ...query(
-                  sql,
-                  /* sql */ `
+        // No landing MR exists yet and cooldown has passed — create one
+        {
+          const rigRows = z
+            .object({ rig_id: z.string() })
+            .array()
+            .parse([
+              ...query(
+                sql,
+                /* sql */ `
                   SELECT DISTINCT tracked.${beads.columns.rig_id} as rig_id
                   FROM ${bead_dependencies} bd
                   INNER JOIN ${beads} tracked ON tracked.${beads.columns.bead_id} = bd.${bead_dependencies.columns.bead_id}
@@ -1829,29 +2079,28 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
                     AND tracked.${beads.columns.rig_id} IS NOT NULL
                   LIMIT 1
                 `,
-                  [convoy.bead_id]
-                ),
-              ]);
+                [convoy.bead_id]
+              ),
+            ]);
 
-            if (rigRows.length > 0) {
-              const rig = getRig(sql, rigRows[0].rig_id);
-              actions.push({
-                type: 'create_landing_mr',
-                convoy_id: convoy.bead_id,
-                rig_id: rigRows[0].rig_id,
-                feature_branch: convoy.feature_branch,
-                target_branch: rig?.default_branch ?? 'main',
-              });
-            }
+          if (rigRows.length > 0) {
+            const rig = getRig(sql, rigRows[0].rig_id);
+            actions.push({
+              type: 'create_landing_mr',
+              convoy_id: convoy.bead_id,
+              rig_id: rigRows[0].rig_id,
+              feature_branch: convoy.feature_branch,
+              target_branch: rig?.default_branch ?? 'main',
+            });
           }
         }
-      } else {
-        // review-and-merge or no feature branch — auto-close
-        actions.push({
-          type: 'close_convoy',
-          convoy_id: convoy.bead_id,
-        });
       }
+    } else {
+      // review-and-merge or no feature branch — auto-close
+      actions.push({
+        type: 'close_convoy',
+        convoy_id: convoy.bead_id,
+      });
     }
   }
 
@@ -2094,24 +2343,62 @@ function hasRecentNudge(sql: SqlStorage, agentId: string, tier: string): boolean
   return rows.length > 0;
 }
 
+/** Check if an MR bead has a non-terminal conflict bead (gt:pr-conflict) blocking it. */
+function hasExistingPrConflictBead(sql: SqlStorage, mrBeadId: string): boolean {
+  return getExistingPrConflictBeadId(sql, mrBeadId) !== null;
+}
+
+/** Return the bead_id of a non-terminal conflict bead (gt:pr-conflict) blocking the MR, or null. */
+function getExistingPrConflictBeadId(sql: SqlStorage, mrBeadId: string): string | null {
+  const rows = z
+    .object({ bead_id: z.string() })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT fb.${beads.columns.bead_id}
+          FROM ${bead_dependencies} bd
+          INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
+          WHERE bd.${bead_dependencies.columns.bead_id} = ?
+            AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
+            AND fb.${beads.columns.labels} LIKE '%gt:pr-conflict%'
+            AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
+          LIMIT 1
+        `,
+        [mrBeadId]
+      ),
+    ]);
+  return rows.length > 0 ? rows[0].bead_id : null;
+}
+
 /** Check if an MR bead has a non-terminal feedback bead (gt:pr-feedback) blocking it. */
 function hasExistingPrFeedbackBead(sql: SqlStorage, mrBeadId: string): boolean {
-  const rows = [
-    ...query(
-      sql,
-      /* sql */ `
-        SELECT 1 FROM ${bead_dependencies} bd
-        INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
-        WHERE bd.${bead_dependencies.columns.bead_id} = ?
-          AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
-          AND fb.${beads.columns.labels} LIKE '%gt:pr-feedback%'
-          AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
-        LIMIT 1
-      `,
-      [mrBeadId]
-    ),
-  ];
-  return rows.length > 0;
+  return getExistingPrFeedbackBeadId(sql, mrBeadId) !== null;
+}
+
+/** Return the bead_id of a non-terminal feedback bead (gt:pr-feedback) blocking the MR, or null. */
+function getExistingPrFeedbackBeadId(sql: SqlStorage, mrBeadId: string): string | null {
+  const rows = z
+    .object({ bead_id: z.string() })
+    .array()
+    .parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT fb.${beads.columns.bead_id}
+          FROM ${bead_dependencies} bd
+          INNER JOIN ${beads} fb ON fb.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
+          WHERE bd.${bead_dependencies.columns.bead_id} = ?
+            AND bd.${bead_dependencies.columns.dependency_type} = 'blocks'
+            AND fb.${beads.columns.labels} LIKE '%gt:pr-feedback%'
+            AND fb.${beads.columns.status} NOT IN ('closed', 'failed')
+          LIMIT 1
+        `,
+        [mrBeadId]
+      ),
+    ]);
+  return rows.length > 0 ? rows[0].bead_id : null;
 }
 
 /** Build a human-readable title for the feedback bead. */
@@ -2192,6 +2479,49 @@ function buildFeedbackPrompt(
   return lines.join('\n');
 }
 
+/** Build the polecat prompt body for resolving merge conflicts on a PR branch. */
+function buildConflictResolutionPrompt(
+  prUrl: string,
+  branch: string,
+  targetBranch: string
+): string {
+  const lines: string[] = [];
+  lines.push(`You are resolving merge conflicts on branch \`${branch}\`.`);
+  lines.push(`The PR is: ${prUrl}`);
+  lines.push(`The target branch is: \`${targetBranch}\``);
+  lines.push('');
+  lines.push('## Steps');
+  lines.push('');
+  lines.push('1. Fetch the latest state of the remote:');
+  lines.push('   ```');
+  lines.push('   git fetch origin');
+  lines.push('   ```');
+  lines.push('');
+  lines.push(`2. Rebase your branch onto the target branch to incorporate its latest changes:`);
+  lines.push('   ```');
+  lines.push(`   git rebase origin/${targetBranch}`);
+  lines.push('   ```');
+  lines.push('');
+  lines.push('3. If there are conflicts during rebase, resolve them:');
+  lines.push(
+    '   - Edit the conflicting files to resolve the conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)'
+  );
+  lines.push('   - Stage the resolved files: `git add <file>`');
+  lines.push('   - Continue the rebase: `git rebase --continue`');
+  lines.push('   - Repeat until the rebase completes');
+  lines.push('');
+  lines.push('4. Push the rebased branch:');
+  lines.push('   ```');
+  lines.push(`   git push --force-with-lease origin ${branch}`);
+  lines.push('   ```');
+  lines.push('');
+  lines.push('5. Call `gt_done` once the push succeeds, passing both required arguments:');
+  lines.push(`   - \`pr_url\`: \`${prUrl}\``);
+  lines.push(`   - \`branch\`: \`${branch}\``);
+
+  return lines.join('\n');
+}
+
 // ════════════════════════════════════════════════════════════════════
 // Invariant checker — runs after action application to detect
 // violations of the system invariants from spec §6.
@@ -2236,7 +2566,9 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
   }
 
   // Invariant 5: Convoy beads should not be in unexpected states.
-  // Valid transient states: open, in_progress, in_review, closed.
+  // Valid states: open, in_progress, in_review, closed, failed.
+  // 'failed' is a terminal state set by FailConvoy when landing MR
+  // creation is exhausted.
   const badStateConvoys = z
     .object({ bead_id: z.string(), status: z.string() })
     .array()
@@ -2247,7 +2579,7 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
         SELECT ${beads.bead_id}, ${beads.status}
         FROM ${beads}
         WHERE ${beads.type} = 'convoy'
-          AND ${beads.status} NOT IN ('open', 'in_progress', 'in_review', 'closed')
+          AND ${beads.status} NOT IN ('open', 'in_progress', 'in_review', 'closed', 'failed')
       `,
         []
       ),

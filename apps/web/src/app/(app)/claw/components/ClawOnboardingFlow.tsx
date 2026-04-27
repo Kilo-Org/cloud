@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { Check, Sparkles, TriangleAlert, X } from 'lucide-react';
-import { KILO_AUTO_BALANCED_MODEL } from '@/lib/kilo-auto';
+import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';

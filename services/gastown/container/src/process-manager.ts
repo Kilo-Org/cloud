@@ -12,6 +12,11 @@ import * as fs from 'node:fs/promises';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
 import { buildKiloConfigContent } from './agent-runner';
+import {
+  getCurrentTownConfig,
+  getLastAppliedEnvVarKeys,
+  RESERVED_ENV_KEYS,
+} from './control-server';
 import { log } from './logger';
 
 const MANAGER_LOG = '[process-manager]';
@@ -69,6 +74,30 @@ export function getUptime(): number {
   return Date.now() - startTime;
 }
 
+export function getStartTime(): string {
+  return new Date(startTime).toISOString();
+}
+
+// Timestamp (ISO 8601) of the moment the first mayor agent in this container
+// reached 'running' status. Used by /health so the Town DO can compute
+// container-start-to-mayor-ready latency. Stays null until a mayor is up;
+// survives subsequent mayor exits since the window is measured against the
+// first mayor ready in the container's lifetime.
+let mayorReadyAt: string | null = null;
+
+export function getMayorReadyAt(): string | null {
+  return mayorReadyAt;
+}
+
+function markMayorReadyOnce(): void {
+  if (mayorReadyAt !== null) return;
+  mayorReadyAt = new Date().toISOString();
+  log.info('mayor.ready', {
+    containerUptimeMs: getUptime(),
+    mayorReadyAt,
+  });
+}
+
 async function hydrateDbFromSnapshot(
   agentId: string,
   apiUrl: string,
@@ -106,6 +135,108 @@ async function hydrateDbFromSnapshot(
   } catch (err) {
     console.warn(`${MANAGER_LOG} DB hydration failed for agent ${agentId}:`, err);
   }
+}
+
+async function deleteLocalDb(agentId: string): Promise<void> {
+  const dir = `/tmp/agent-home-${agentId}/.local/share/kilo`;
+  for (const suffix of ['kilo.db', 'kilo.db-wal', 'kilo.db-shm']) {
+    try {
+      await fs.unlink(`${dir}/${suffix}`);
+    } catch {
+      // File may not exist — that's fine.
+    }
+  }
+  console.log(`${MANAGER_LOG} Deleted local kilo.db for agent ${agentId}`);
+}
+
+async function deleteRemoteDbSnapshot(
+  agentId: string,
+  apiUrl: string,
+  token: string,
+  rigId: string,
+  townId: string
+): Promise<void> {
+  try {
+    const resp = await fetch(
+      `${apiUrl}/api/towns/${townId}/rigs/${rigId}/agents/${agentId}/db-snapshot`,
+      { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (resp.ok) {
+      console.log(`${MANAGER_LOG} Deleted remote DB snapshot for agent ${agentId}`);
+    } else {
+      console.warn(
+        `${MANAGER_LOG} Failed to delete remote DB snapshot for ${agentId}: ${resp.status}`
+      );
+    }
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} deleteRemoteDbSnapshot failed for ${agentId}:`, err);
+  }
+}
+
+/**
+ * Try session.create; if it fails (e.g. stale kilo.db from an older CLI
+ * version whose schema is incompatible), delete the local DB, tear down
+ * the SDK server, restart it fresh, and retry once.
+ */
+async function createSessionWithStaleDbFallback(
+  client: KiloClient,
+  workdir: string,
+  env: Record<string, string>,
+  agentId: string,
+  agent: ManagedAgent
+): Promise<string> {
+  const sessionResult = await client.session.create({ body: {} });
+  const rawSession: unknown = sessionResult.data ?? sessionResult;
+  const parsed = SessionResponse.safeParse(rawSession);
+  if (parsed.success) {
+    console.log(`${MANAGER_LOG} Created new session ${parsed.data.id}`);
+    return parsed.data.id;
+  }
+
+  // session.create failed — likely a stale kilo.db migration error.
+  const rawStr = JSON.stringify(rawSession).slice(0, 300);
+  console.warn(
+    `${MANAGER_LOG} session.create failed for ${agentId}, attempting stale DB recovery. Response: ${rawStr}`
+  );
+
+  // 1. Delete local kilo.db so the CLI starts with a fresh schema.
+  await deleteLocalDb(agentId);
+
+  // 2. Tear down the SDK server so ensureSDKServer creates a new one.
+  const instance = sdkInstances.get(workdir);
+  if (instance) {
+    instance.server.close();
+    sdkInstances.delete(workdir);
+  }
+
+  // 3. Delete the stale KV snapshot (fire-and-forget) so future container
+  //    restarts don't re-hydrate the broken DB.
+  const apiUrl = agent.gastownApiUrl;
+  const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+  if (apiUrl && token) {
+    void deleteRemoteDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
+  }
+
+  // 4. Restart SDK server and retry session.create.
+  const { client: freshClient, port } = await ensureSDKServer(workdir, env);
+  agent.serverPort = port;
+
+  const retryResult = await freshClient.session.create({ body: {} });
+  const retryRaw: unknown = retryResult.data ?? retryResult;
+  const retryParsed = SessionResponse.safeParse(retryRaw);
+  if (!retryParsed.success) {
+    console.error(
+      `${MANAGER_LOG} session.create still failing after DB reset:`,
+      JSON.stringify(retryRaw).slice(0, 200),
+      retryParsed.error.issues
+    );
+    throw new Error('SDK session.create failed even after stale DB recovery');
+  }
+
+  console.log(
+    `${MANAGER_LOG} Stale DB recovery succeeded for ${agentId}, new session ${retryParsed.data.id}`
+  );
+  return retryParsed.data.id;
 }
 
 async function saveDbSnapshot(
@@ -836,6 +967,7 @@ export async function startAgent(
 
   const { signal } = startupAbortController;
   let sessionCounted = false;
+  const t0 = Date.now();
   try {
     // 0. Hydrate agent DB from KV snapshot before starting the SDK server
     const apiUrl = agent.gastownApiUrl;
@@ -843,10 +975,23 @@ export async function startAgent(
     if (apiUrl && token) {
       await hydrateDbFromSnapshot(request.agentId, apiUrl, token, request.rigId, request.townId);
     }
+    const tDbDone = Date.now();
+    log.info('agent.startup_phase', {
+      agentId: request.agentId,
+      phase: 'db_hydrated',
+      elapsedMs: tDbDone - t0,
+    });
 
     // 1. Ensure SDK server is running for this workdir
     const { client, port } = await ensureSDKServer(workdir, env);
     agent.serverPort = port;
+    const tSdkDone = Date.now();
+    log.info('agent.startup_phase', {
+      agentId: request.agentId,
+      phase: 'sdk_ready',
+      elapsedMs: tSdkDone - t0,
+      phaseMs: tSdkDone - tDbDone,
+    });
 
     // Check if startup was cancelled while waiting for the SDK server
     if (signal.aborted) {
@@ -885,21 +1030,23 @@ export async function startAgent(
       }
     }
     if (!resumed) {
-      const sessionResult = await client.session.create({ body: {} });
-      const rawSession: unknown = sessionResult.data ?? sessionResult;
-      const parsed = SessionResponse.safeParse(rawSession);
-      if (!parsed.success) {
-        console.error(
-          `${MANAGER_LOG} SDK session.create returned unexpected shape:`,
-          JSON.stringify(rawSession).slice(0, 200),
-          parsed.error.issues
-        );
-        throw new Error('SDK session.create response missing required "id" field');
-      }
-      sessionId = parsed.data.id;
-      console.log(`${MANAGER_LOG} Created new session ${sessionId}`);
+      sessionId = await createSessionWithStaleDbFallback(
+        client,
+        workdir,
+        env,
+        request.agentId,
+        agent
+      );
     }
     agent.sessionId = sessionId;
+    const tSessionDone = Date.now();
+    log.info('agent.startup_phase', {
+      agentId: request.agentId,
+      phase: 'session_created',
+      elapsedMs: tSessionDone - t0,
+      phaseMs: tSessionDone - tSdkDone,
+      resumed,
+    });
 
     // Now check if startup was cancelled while creating the session.
     // agent.sessionId is already set, so the catch block will abort it.
@@ -917,6 +1064,9 @@ export async function startAgent(
     // despite being active — causing the drain to wait indefinitely.
     if (agent.status === 'starting') {
       agent.status = 'running';
+      if (request.role === 'mayor') {
+        markMayorReadyOnce();
+      }
     }
 
     // 4. Send the initial prompt
@@ -965,6 +1115,12 @@ export async function startAgent(
       name: request.name,
       sessionId,
       port,
+    });
+
+    log.info('agent.startup_complete', {
+      agentId: request.agentId,
+      totalMs: Date.now() - t0,
+      containerUptimeMs: getUptime(),
     });
 
     syncRegistry();
@@ -1264,6 +1420,35 @@ export async function updateAgentModel(
     if (live) hotSwapEnv[key] = live;
   }
 
+  // Overlay custom env_vars from the town config so hot-swap picks up
+  // values that were added/changed after the initial dispatch. Infra
+  // keys in LIVE_ENV_KEYS and RESERVED_ENV_KEYS always take precedence
+  // (LIVE_ENV_KEYS were already populated from process.env above;
+  // RESERVED_ENV_KEYS are runtime routing vars that must never be clobbered).
+  const freshConfig = getCurrentTownConfig();
+  const freshEnvVars = freshConfig?.env_vars;
+  const freshCustomKeySet = new Set<string>();
+  if (freshEnvVars !== null && typeof freshEnvVars === 'object' && !Array.isArray(freshEnvVars)) {
+    for (const [key, value] of Object.entries(freshEnvVars as Record<string, unknown>)) {
+      if (LIVE_ENV_KEYS.has(key)) continue;
+      if (RESERVED_ENV_KEYS.has(key)) continue;
+      freshCustomKeySet.add(key);
+      if (value !== undefined && value !== null) {
+        hotSwapEnv[key] = typeof value === 'string' ? value : JSON.stringify(value);
+      } else {
+        delete hotSwapEnv[key];
+      }
+    }
+  }
+  // Remove stale custom env vars — keys that were applied in a previous
+  // sync but are no longer in the town config. Without this, startupEnv
+  // keeps carrying deleted custom keys through every hot-swap.
+  for (const key of getLastAppliedEnvVarKeys()) {
+    if (!freshCustomKeySet.has(key) && !LIVE_ENV_KEYS.has(key)) {
+      delete hotSwapEnv[key];
+    }
+  }
+
   // Re-derive GH_TOKEN from live values using the same priority chain
   // as buildAgentEnv: GITHUB_CLI_PAT > GIT_TOKEN > GITHUB_TOKEN.
   // syncConfigToContainer updates these on process.env, but buildAgentEnv
@@ -1304,13 +1489,13 @@ export async function updateAgentModel(
       }
     }
     if (!resumedSession) {
-      const sessionResult = await client.session.create({ body: {} });
-      const rawSession: unknown = sessionResult.data ?? sessionResult;
-      const parsed = SessionResponse.safeParse(rawSession);
-      if (!parsed.success) {
-        throw new Error('SDK session.create response missing required "id" field');
-      }
-      newSessionId = parsed.data.id;
+      newSessionId = await createSessionWithStaleDbFallback(
+        client,
+        agent.workdir,
+        hotSwapEnv,
+        agentId,
+        agent
+      );
     }
     agent.sessionId = newSessionId;
 

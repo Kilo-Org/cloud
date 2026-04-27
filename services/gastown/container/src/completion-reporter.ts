@@ -1,8 +1,7 @@
 /**
- * Reports agent completion/failure back to the Rig DO via the Gastown
- * worker API. This closes the bead and unhooks the agent, preventing
- * the infinite retry loop where witnessPatrol resets the agent to idle
- * and schedulePendingWork re-dispatches it.
+ * Reports agent completion/failure back to the Gastown worker API.
+ * This closes the bead and unhooks the agent so the reconciler does not
+ * re-dispatch it.
  */
 
 import type { ManagedAgent } from './types';

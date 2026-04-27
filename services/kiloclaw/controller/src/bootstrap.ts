@@ -16,6 +16,8 @@ import { execFileSync as nodeExecFileSync } from 'node:child_process';
 import { generateBaseConfig, writeBaseConfig, writeMcporterConfig } from './config-writer';
 import type { ConfigWriterDeps } from './config-writer';
 import { atomicWrite } from './atomic-write';
+import { migrateKilocodeAuthProfilesToKeyRef } from './auth-profiles-migration';
+import type { AuthProfilesMigrationDeps } from './auth-profiles-migration';
 
 const CONFIG_DIR = '/root/.openclaw';
 const CONFIG_PATH = '/root/.openclaw/openclaw.json';
@@ -54,6 +56,7 @@ export type BootstrapDeps = {
   renameSync: (oldPath: string, newPath: string) => void;
   unlinkSync: (path: string) => void;
   readdirSync: (dir: string) => string[];
+  statSync: (p: string) => { isDirectory: () => boolean };
   execFileSync: (cmd: string, args: string[], opts?: ExecOpts) => string;
 };
 
@@ -68,6 +71,7 @@ const defaultDeps: BootstrapDeps = {
   renameSync: (oldPath, newPath) => fs.renameSync(oldPath, newPath),
   unlinkSync: p => fs.unlinkSync(p),
   readdirSync: dir => fs.readdirSync(dir),
+  statSync: p => fs.statSync(p),
   execFileSync: (cmd, args, opts) =>
     nodeExecFileSync(cmd, args, {
       encoding: 'utf8',
@@ -610,6 +614,20 @@ function toConfigWriterDeps(deps: BootstrapDeps): ConfigWriterDeps {
   };
 }
 
+/** Adapt BootstrapDeps to AuthProfilesMigrationDeps. */
+function toAuthProfilesMigrationDeps(deps: BootstrapDeps): AuthProfilesMigrationDeps {
+  return {
+    existsSync: deps.existsSync,
+    readdirSync: deps.readdirSync,
+    statSync: deps.statSync,
+    readFileSync: deps.readFileSync,
+    writeFileSync: deps.writeFileSync,
+    renameSync: deps.renameSync,
+    unlinkSync: deps.unlinkSync,
+    chmodSync: deps.chmodSync,
+  };
+}
+
 export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
   const configExists = deps.existsSync(CONFIG_PATH);
   const cwDeps = toConfigWriterDeps(deps);
@@ -650,6 +668,22 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     console.log('Configuration patched successfully');
 
     env.KILOCLAW_FRESH_INSTALL = 'false';
+  }
+
+  // Migrate any legacy plaintext kilocode keys in auth-profiles.json to
+  // env-backed keyRefs. No-op on fresh installs (onboard writes keyRefs
+  // directly thanks to --secret-input-mode ref) and on instances already
+  // migrated. Running unconditionally also covers the case where an older
+  // auth-profiles.json somehow reappears (e.g., legacy auth.json migration
+  // on first load).
+  const migrationReport = migrateKilocodeAuthProfilesToKeyRef(
+    CONFIG_DIR,
+    toAuthProfilesMigrationDeps(deps)
+  );
+  if (migrationReport.profilesMigrated > 0) {
+    console.log(
+      `[controller] auth-profiles migration: ${migrationReport.profilesMigrated} profile(s) across ${migrationReport.filesModified} file(s)`
+    );
   }
 
   writeBotIdentityFile(env, deps);
@@ -790,7 +824,7 @@ You can interact with the \`Linear\` MCP server using your \`mcporter\` skill.
 
 // Additional KiloClaw-mitigated OpenClaw audit findings beyond the
 // gateway.control_ui.insecure_auth one already documented in the base
-// TOOLS.md. Mirrors the list in apps/web/src/lib/security-advisor/
+// TOOLS.md. Mirrors the list in apps/web/src/lib/shell-security/
 // kiloclaw-mitigations.ts — the server-side /security-checkup path
 // suppresses these before grading, but when a user runs `openclaw doctor`
 // directly the findings still show and the agent needs the same context
@@ -816,7 +850,7 @@ When running \`openclaw doctor\` or \`openclaw security audit\`, the following f
 
 1. Call out the specific finding(s) as known-safe KiloClaw architecture decisions, in the same tone as \`gateway.control_ui.insecure_auth\` above.
 2. Explain WHY each is safe using the per-finding rationale above.
-3. Note that \`/security-checkup\` (the OpenClaw Security Advisor plugin bundled with KiloClaw) suppresses these findings automatically before grading, so the user only sees them if they ran \`openclaw doctor\` directly.
+3. Note that \`/security-checkup\` (the ShellSecurity plugin bundled with KiloClaw) suppresses these findings automatically before grading, so the user only sees them if they ran \`openclaw doctor\` directly.
 <!-- END:kiloclaw-mitigations -->`,
 };
 

@@ -9,6 +9,7 @@ import { buildPolecatSystemPrompt } from '../../prompts/polecat-system.prompt';
 import { buildMayorSystemPrompt } from '../../prompts/mayor-system.prompt';
 import type { TownConfig, RigOverrideConfig } from '../../types';
 import { buildContainerConfig, resolveModel, resolveSmallModel, resolveRigConfig } from './config';
+import { writeEvent } from '../../util/analytics.util';
 
 const TOWN_LOG = '[Town.do]';
 
@@ -378,7 +379,7 @@ export async function startAgentInContainer(
       platformIntegrationId?: string;
     }>;
   }
-): Promise<boolean> {
+): Promise<{ started: boolean; containerFetchMs: number }> {
   lastStartError = null;
   console.log(
     `${TOWN_LOG} startAgentInContainer: agentId=${params.agentId} role=${params.role} name=${params.agentName}`
@@ -402,7 +403,7 @@ export async function startAgentInContainer(
         `${TOWN_LOG} startAgentInContainer: ABORTING — failed to mint any auth token for agent ${params.agentId}. ` +
           'The agent would start without credentials and be unable to call back to the worker.'
       );
-      return false;
+      return { started: false, containerFetchMs: 0 };
     }
 
     // Build env vars from town config
@@ -454,6 +455,7 @@ export async function startAgentInContainer(
     const rigOverride = params.rigOverride ?? null;
     const effectiveConfig = resolveRigConfig(params.townConfig, rigOverride);
 
+    const fetchStart = Date.now();
     const response = await container.fetch('http://container/agents/start', {
       method: 'POST',
       signal: AbortSignal.timeout(60_000),
@@ -519,6 +521,7 @@ export async function startAgentInContainer(
       }),
     });
 
+    const durationMs = Date.now() - fetchStart;
     if (!response.ok) {
       const text = await response.text().catch(() => '(unreadable)');
       // "Already running" means a previous dispatch succeeded — the agent
@@ -528,7 +531,15 @@ export async function startAgentInContainer(
         console.log(
           `${TOWN_LOG} startAgentInContainer: agent ${params.agentId} already running — treating as success`
         );
-        return true;
+        writeEvent(env, {
+          event: 'container.agent_start_fetch',
+          townId: params.townId,
+          rigId: params.rigId,
+          agentId: params.agentId,
+          durationMs,
+          statusCode: response.status,
+        });
+        return { started: true, containerFetchMs: durationMs };
       }
       const errorMsg = `(${response.status}) ${text.slice(0, 300)}`;
       console.error(
@@ -536,13 +547,31 @@ export async function startAgentInContainer(
           `agent=${params.agentId} role=${params.role}: ${errorMsg}`
       );
       lastStartError = errorMsg;
+      writeEvent(env, {
+        event: 'container.agent_start_fetch',
+        townId: params.townId,
+        rigId: params.rigId,
+        agentId: params.agentId,
+        durationMs,
+        statusCode: response.status,
+        error: errorMsg,
+      });
+      return { started: false, containerFetchMs: durationMs };
     }
-    return response.ok;
+    writeEvent(env, {
+      event: 'container.agent_start_fetch',
+      townId: params.townId,
+      rigId: params.rigId,
+      agentId: params.agentId,
+      durationMs,
+      statusCode: response.status,
+    });
+    return { started: true, containerFetchMs: durationMs };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`${TOWN_LOG} startAgentInContainer: EXCEPTION for agent ${params.agentId}:`, err);
     lastStartError = `EXCEPTION: ${message.slice(0, 300)}`;
-    return false;
+    return { started: false, containerFetchMs: 0 };
   }
 }
 
@@ -647,12 +676,12 @@ export async function checkAgentContainerStatus(
       signal: AbortSignal.timeout(10_000),
     });
     // 404 means the container is running but has no record of this agent
-    // (e.g. after container eviction). Report as 'not_found' so
-    // witnessPatrol can immediately reset and redispatch the agent
+    // (e.g. after container eviction). Report as 'not_found' so the
+    // reconciler can immediately reset and redispatch the agent
     // instead of waiting for the 2-hour GUPP timeout.
     if (response.status === 404) return { status: 'not_found' };
     // Non-OK but not 404 — container is having issues but may still
-    // have the agent running. Return 'unknown' so witnessPatrol doesn't
+    // have the agent running. Return 'unknown' so the reconciler doesn't
     // falsely reset a working agent.
     if (!response.ok) return { status: 'unknown' };
     const data: unknown = await response.json();
@@ -668,7 +697,7 @@ export async function checkAgentContainerStatus(
     return { status: 'unknown' };
   } catch {
     // Timeout, network error, or container starting up — return
-    // 'unknown' so witnessPatrol doesn't falsely reset working agents.
+    // 'unknown' so the reconciler doesn't falsely reset working agents.
     // True zombies will be caught after repeated 'unknown' results
     // once the GIPP/heartbeat timeout expires.
     return { status: 'unknown' };

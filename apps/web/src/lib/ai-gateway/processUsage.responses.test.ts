@@ -26,6 +26,7 @@ describe('processResponsesApiUsage', () => {
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: 200,
   };
 
   test('correctly processes OpenRouter usage for a non-byok case', () => {

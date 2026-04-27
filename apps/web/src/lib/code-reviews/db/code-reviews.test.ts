@@ -129,4 +129,16 @@ describe('findPreviousCompletedReview', () => {
 
     expect(review?.terminalReason).toBe('billing');
   });
+
+  it('creates new reviews with agent_version set to v2', async () => {
+    const id = await createReview('sha-v2-default');
+
+    const [review] = await db
+      .select({ agentVersion: cloud_agent_code_reviews.agent_version })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, id))
+      .limit(1);
+
+    expect(review?.agentVersion).toBe('v2');
+  });
 });

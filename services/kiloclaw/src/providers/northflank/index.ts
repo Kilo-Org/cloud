@@ -63,7 +63,15 @@ function requireSandboxId(state: { sandboxId: string | null }): string {
 function northflankClientConfig(
   env: Parameters<typeof getNorthflankConfig>[0]
 ): NorthflankClientConfig {
-  return getNorthflankConfig(env);
+  const base = getNorthflankConfig(env);
+  // Always redact the edge-header secret: it's sent in request bodies
+  // (buildPortSecurity) under a non-sensitive key name (`value`), so
+  // redactUnknown's key-based heuristic does not catch it. Without this,
+  // Northflank 4xx/5xx responses that echo the submitted payload would
+  // leak the value into [northflank] api_request_failed logs and
+  // NorthflankApiError bodies.
+  const redactValues = [base.edgeHeaderValue].filter(value => value.length > 0);
+  return { ...base, redactValues };
 }
 
 async function getProvisioningNames(state: {

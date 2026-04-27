@@ -31,8 +31,6 @@ import {
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
 import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@/lib/utils.server';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
-import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -165,21 +163,9 @@ export const organizationReviewAgentRouter = createTRPCRouter({
    */
   getReviewConfig: organizationMemberProcedure
     .input(OrganizationIdInputSchema.extend({ platform: PlatformSchema }))
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const platform = input.platform ?? 'github';
-      // Resolve bot user for flag evaluation — same identity used at dispatch time
-      const [config, botUserId] = await Promise.all([
-        getAgentConfig(input.organizationId, 'code_review', platform),
-        getBotUserId(input.organizationId, 'code-review'),
-      ]);
-      const flagDistinctId = botUserId ?? ctx.user.id;
-      const [isCloudAgentNextFlagEnabled, isPrGateFlagEnabled] = await Promise.all([
-        isFeatureFlagEnabled('code-review-cloud-agent-next', flagDistinctId),
-        isFeatureFlagEnabled('code-review-pr-gate', flagDistinctId),
-      ]);
-      const isCloudAgentNextEnabled =
-        isCloudAgentNextFlagEnabled || process.env.NODE_ENV === 'development';
-      const isPrGateEnabled = isPrGateFlagEnabled || process.env.NODE_ENV === 'development';
+      const config = await getAgentConfig(input.organizationId, 'code_review', platform);
 
       if (!config) {
         // Return default configuration
@@ -195,8 +181,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           repositorySelectionMode: 'all' as const,
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
-          isCloudAgentNextEnabled,
-          isPrGateEnabled,
         };
       }
 
@@ -213,8 +197,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         repositorySelectionMode: cfg.repository_selection_mode || 'all',
         selectedRepositoryIds: cfg.selected_repository_ids || [],
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
-        isCloudAgentNextEnabled,
-        isPrGateEnabled,
       };
     }),
 

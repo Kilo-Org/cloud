@@ -171,7 +171,10 @@ export async function approvePairingRequest(
       '/_kilo/pairing/channels/approve',
       'POST',
       ControllerPairingApproveResponseSchema,
-      { channel, code }
+      { channel, code },
+      // TEMPORARY: 180s timeout — openclaw 2026.4.15 CLI startup is ~65s
+      // (jiti loader churn). Revert to default 30s once openclaw startup is fixed.
+      { timeoutMs: 180_000 }
     );
   } catch (error) {
     if (error instanceof GatewayControllerError && error.status === 400) {
@@ -354,7 +357,10 @@ export async function approveDevicePairingRequest(
       '/_kilo/pairing/devices/approve',
       'POST',
       ControllerPairingApproveResponseSchema,
-      { requestId }
+      { requestId },
+      // TEMPORARY: 180s timeout — openclaw 2026.4.15 CLI startup is ~65s
+      // (jiti loader churn). Revert to default 30s once openclaw startup is fixed.
+      { timeoutMs: 180_000 }
     );
   } catch (error) {
     if (error instanceof GatewayControllerError && error.status === 400) {

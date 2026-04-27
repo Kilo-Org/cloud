@@ -37,12 +37,7 @@ import type {
 } from '../prompts/generate-prompt';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { getCodeReviewById, findPreviousCompletedReview } from '../db/code-reviews';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
-import {
-  DEFAULT_CODE_REVIEW_MODEL,
-  DEFAULT_CODE_REVIEW_MODE,
-  FEATURE_FLAG_INCREMENTAL_REVIEW,
-} from '../core/constants';
+import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/constants';
 import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
@@ -319,54 +314,41 @@ export async function prepareReviewPayload(
     // continuation) are derived from the same review row to avoid mismatches.
     let previousHeadSha: string | null = null;
     let previousCloudAgentSessionId: string | undefined;
-    const incrementalEnabled = await isFeatureFlagEnabled(
-      FEATURE_FLAG_INCREMENTAL_REVIEW,
-      owner.userId
-    );
+    try {
+      const previousReview = await findPreviousCompletedReview(
+        review.repo_full_name,
+        review.pr_number,
+        existingReviewState?.headCommitSha ?? review.head_sha,
+        platform
+      );
+      previousHeadSha = previousReview?.head_sha ?? null;
+      previousCloudAgentSessionId = previousReview?.session_id ?? undefined;
 
-    logExceptInTest('[prepareReviewPayload] Incremental review flag evaluated', {
-      reviewId,
-      incrementalEnabled,
-      ownerId: owner.userId,
-    });
-
-    if (incrementalEnabled) {
-      try {
-        const previousReview = await findPreviousCompletedReview(
-          review.repo_full_name,
-          review.pr_number,
-          existingReviewState?.headCommitSha ?? review.head_sha,
-          platform
-        );
-        previousHeadSha = previousReview?.head_sha ?? null;
-        previousCloudAgentSessionId = previousReview?.session_id ?? undefined;
-
-        if (previousHeadSha) {
-          logExceptInTest(
-            '[prepareReviewPayload] Found previous completed review for incremental mode',
-            {
-              reviewId,
-              previousHeadSha: previousHeadSha.substring(0, 8),
-              currentHeadSha: review.head_sha.substring(0, 8),
-              previousCloudAgentSessionId,
-            }
-          );
-        } else {
-          logExceptInTest(
-            '[prepareReviewPayload] No previous completed review found, using full review',
-            { reviewId }
-          );
-        }
-      } catch (error) {
-        // Non-critical - fall back to full review
+      if (previousHeadSha) {
         logExceptInTest(
-          '[prepareReviewPayload] Failed to fetch previous review, falling back to full review:',
+          '[prepareReviewPayload] Found previous completed review for incremental mode',
           {
             reviewId,
-            error,
+            previousHeadSha: previousHeadSha.substring(0, 8),
+            currentHeadSha: review.head_sha.substring(0, 8),
+            previousCloudAgentSessionId,
           }
         );
+      } else {
+        logExceptInTest(
+          '[prepareReviewPayload] No previous completed review found, using full review',
+          { reviewId }
+        );
       }
+    } catch (error) {
+      // Non-critical - fall back to full review
+      logExceptInTest(
+        '[prepareReviewPayload] Failed to fetch previous review, falling back to full review:',
+        {
+          reviewId,
+          error,
+        }
+      );
     }
 
     // 5. Generate auth token for cloud agent with bot identifier
@@ -402,12 +384,7 @@ export async function prepareReviewPayload(
     // GitHub: uses githubRepo (owner/repo format) + githubToken
     // GitLab: uses gitUrl (full HTTPS URL) + gitToken
     const variant = config.thinking_effort ?? undefined;
-    // Defense-in-depth: only send gateThreshold to the agent when the PR gate flag is enabled.
-    // This prevents a stale non-'off' config from activating gating after the flag is turned off.
-    const isPrGateEnabled =
-      process.env.NODE_ENV === 'development' ||
-      (await isFeatureFlagEnabled('code-review-pr-gate', owner.userId));
-    const gateThreshold = isPrGateEnabled ? (config.gate_threshold ?? 'off') : 'off';
+    const gateThreshold = config.gate_threshold ?? 'off';
     const sessionInput: SessionInput =
       platform === PLATFORM.GITLAB
         ? {

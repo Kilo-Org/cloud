@@ -20,7 +20,7 @@ const TC_LOG = '[TownContainer.do]';
  */
 export class TownContainerDO extends Container<Env> {
   defaultPort = 8080;
-  sleepAfter = '30m';
+  sleepAfter = '10m';
 
   // Container env vars. Includes infra URLs and any tokens stored via setEnvVar().
   // The Container base class reads this when booting the container.

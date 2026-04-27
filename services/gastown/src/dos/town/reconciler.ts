@@ -117,6 +117,13 @@ const ORPHANED_PR_REVIEW_TIMEOUT_MS = 30 * 60_000; // 30 min
  * to avoid racing with the idle-timer → agentCompleted → reconciler flow. */
 const STALE_IN_PROGRESS_TIMEOUT_MS = 5 * 60_000; // 5 min
 
+/** Time in 'stalled' before auto-transitioning to idle.
+ * Today, stalled agents are only cleared via container_status: exited|not_found
+ * events. If the container crashed hard or /status keeps returning
+ * running/unknown, the stalled row persists indefinitely. This time-based
+ * cleanup closes the loop. */
+const STALLED_AUTO_IDLE_MS = 2.5 * 60 * 60_000; // 2h 30min
+
 // ── Helper: staleness check ─────────────────────────────────────────
 
 function staleMs(timestamp: string | null, thresholdMs: number): boolean {
@@ -721,6 +728,52 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
         to: 'idle',
         reason: 'working agent has no hook (gt_done already completed)',
       });
+    }
+  }
+
+  // Stalled agents that have been stuck past STALLED_AUTO_IDLE_MS —
+  // transition to idle and unhook. Without this, a stalled row persists
+  // indefinitely if its container crashed hard or its /status keeps
+  // returning running/unknown (so the container_status → exited|not_found
+  // cleanup path never fires). Skip during drain to match working-agent
+  // handling above.
+  if (!opts?.draining) {
+    const longStalledAgents = AgentRow.array().parse([
+      ...query(
+        sql,
+        /* sql */ `
+          SELECT ${agent_metadata.bead_id}, ${agent_metadata.role},
+                 ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
+                 ${agent_metadata.dispatch_attempts},
+                 ${agent_metadata.last_activity_at},
+                 b.${beads.columns.rig_id}
+          FROM ${agent_metadata}
+          LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
+          WHERE ${agent_metadata.status} = 'stalled'
+        `,
+        []
+      ),
+    ]);
+
+    for (const agent of longStalledAgents) {
+      if (!agent.last_activity_at) continue;
+      const stalledMs = Date.now() - new Date(agent.last_activity_at).getTime();
+      if (stalledMs <= STALLED_AUTO_IDLE_MS) continue;
+
+      actions.push({
+        type: 'transition_agent',
+        agent_id: agent.bead_id,
+        from: 'stalled',
+        to: 'idle',
+        reason: 'stalled_timeout (exceeded 2h 30min)',
+      });
+      if (agent.current_hook_bead_id) {
+        actions.push({
+          type: 'unhook_agent',
+          agent_id: agent.bead_id,
+          reason: 'stalled_timeout (exceeded 2h 30min)',
+        });
+      }
     }
   }
 
@@ -2151,6 +2204,26 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
 
     const elapsed = Date.now() - new Date(activityTimestamp).getTime();
     if (Number.isNaN(elapsed) || elapsed < 0) continue;
+
+    // Stalled agents past the auto-idle threshold are owned by
+    // reconcileAgents (stalled → idle + unhook). Skip them here so the
+    // later GUPP force-stop action (stalled → stalled) doesn't overwrite
+    // the earlier auto-idle transition in the same reconcile pass.
+    // applyAction('transition_agent') ignores `from`, so action order
+    // decides the final state.
+    //
+    // Mirror reconcileAgents' auto-idle eligibility check against
+    // last_activity_at. If last_event_at is stale but heartbeats keep
+    // refreshing last_activity_at, reconcileAgents won't idle the row yet —
+    // skipping GUPP handling in that case would leave the row stuck stalled
+    // while the alarm keeps firing.
+    if (
+      agent.status === 'stalled' &&
+      agent.last_activity_at &&
+      Date.now() - new Date(agent.last_activity_at).getTime() > STALLED_AUTO_IDLE_MS
+    ) {
+      continue;
+    }
 
     if (elapsed > GUPP_FORCE_STOP_MS) {
       actions.push({

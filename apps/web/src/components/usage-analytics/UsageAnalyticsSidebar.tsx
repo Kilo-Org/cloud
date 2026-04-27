@@ -132,8 +132,8 @@ export function UsageAnalyticsSidebar({
   // page and only when the caller has permission to see all org users.
   const showViewAsSelector = isOrgContext && canViewAllOrgUsers;
   const entireOrgLabel = effectiveOrganizationName
-    ? `Entire ${effectiveOrganizationName}`
-    : 'Entire Organization';
+    ? `${effectiveOrganizationName}`
+    : 'Organization';
 
   const groupByOptions: (Dimension | 'none')[] = useMemo(() => {
     const opts: (Dimension | 'none')[] = [
@@ -164,13 +164,13 @@ export function UsageAnalyticsSidebar({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={PERSONAL_VIEW_PERSONAL_ONLY}>Personal Only</SelectItem>
-                <SelectItem value={PERSONAL_VIEW_ALL_USAGE}>All Usage</SelectItem>
+                <SelectItem value={PERSONAL_VIEW_PERSONAL_ONLY}>Personal</SelectItem>
                 {organizations.map(o => (
                   <SelectItem key={o.organizationId} value={o.organizationId}>
                     {o.organizationName}
                   </SelectItem>
                 ))}
+                <SelectItem value={PERSONAL_VIEW_ALL_USAGE}>All Usage</SelectItem>
               </SelectContent>
             </Select>
           </Section>
@@ -205,7 +205,7 @@ export function UsageAnalyticsSidebar({
           </Select>
         </Section>
 
-        <Section title="Trends chart">
+        <Section title="View">
           <div className="flex flex-col gap-2">
             <LabeledRow label="Metric">
               <Select value={chartMetric} onValueChange={v => onChartMetricChange(v as MetricKey)}>

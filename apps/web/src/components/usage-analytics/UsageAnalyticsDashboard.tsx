@@ -8,7 +8,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { UsageTableBase, type UsageTableColumn } from '@/components/usage/UsageTableBase';
 import { UsageWarning } from '@/components/usage/UsageWarning';
 import { SetPageTitle } from '@/components/SetPageTitle';
-import { formatIsoDateString_UsaDateOnlyFormat, formatLargeNumber } from '@/lib/utils';
+import {
+  formatIsoDateString_UsaDateOnlyFormat,
+  formatIsoDateTime_UsaDateHourFormat,
+  formatIsoHourString_UsaHourFormat,
+  formatLargeNumber,
+} from '@/lib/utils';
 import { SlidersHorizontal } from 'lucide-react';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { SummarySection } from './SummarySection';
@@ -97,7 +102,7 @@ export function UsageAnalyticsDashboard({
   title,
 }: UsageAnalyticsDashboardProps) {
   const trpc = useTRPC();
-  const [period, setPeriod] = useState<PeriodOption>('7d');
+  const [period, setPeriod] = useState<PeriodOption>('today');
   const [chartMetric, setChartMetric] = useState<MetricKey>('cost');
   const [filters, setFilters] = useState<UsageFilters>(EMPTY_FILTERS);
   const [groupBy, setGroupBy] = useState<Dimension | 'none'>('none');
@@ -320,6 +325,18 @@ export function UsageAnalyticsDashboard({
   const clearAllFilters = useCallback((): void => setFilters(EMPTY_FILTERS), []);
 
   const tableColumns: UsageTableColumn[] = useMemo(() => {
+    const renderDatetime = (value: unknown): string => {
+      const v = value as string;
+      if (granularity !== 'hour') return formatIsoDateString_UsaDateOnlyFormat(v);
+      // Invariant: `defaultGranularityForPeriod` only returns `'hour'` for
+      // `'today' | 'yesterday' | '7d'`. If a new hourly period is ever added
+      // (e.g. `'48h'`) decide here whether it wants hour-only or date+hour
+      // rather than silently falling through to the "Past Week" branch.
+      if (period === 'today' || period === 'yesterday') {
+        return formatIsoHourString_UsaHourFormat(v);
+      }
+      return formatIsoDateTime_UsaDateHourFormat(v);
+    };
     const cols: UsageTableColumn[] = [
       {
         key: 'datetime',
@@ -331,7 +348,7 @@ export function UsageAnalyticsDashboard({
               : granularity === 'month'
                 ? 'Month'
                 : 'Date',
-        render: value => formatIsoDateString_UsaDateOnlyFormat(value as string),
+        render: renderDatetime,
         sortAccessor: row => (row.datetime as string) ?? '',
       },
       ...tableGroupBy.map(
@@ -381,7 +398,7 @@ export function UsageAnalyticsDashboard({
       },
     ];
     return cols;
-  }, [granularity, tableGroupBy, labelForDimensionValue]);
+  }, [granularity, period, tableGroupBy, labelForDimensionValue]);
 
   const tableRows = useMemo(() => {
     return (tableData?.rows ?? []).map((row, idx) => ({
@@ -520,6 +537,7 @@ export function UsageAnalyticsDashboard({
                   seriesLabelFor={
                     splitByDimension ? v => labelForDimensionValue(splitByDimension, v) : undefined
                   }
+                  period={period}
                 />
               </CardContent>
             </Card>

@@ -1,7 +1,17 @@
 'use client';
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { colorForIndex } from './colors';
 import { formatDollarsFromMicrodollars, formatMetric } from './format';
 import { formatLargeNumber } from '@/lib/utils';
 import type { Dimension, UsageBreakdown } from './types';
@@ -20,9 +30,9 @@ type BarDatum = {
   label: string;
   value: number;
   percentage: number;
+  color: string;
 };
 
-const BAR_COLOR = '#3b82f6';
 const ROW_HEIGHT = 36;
 const MIN_HEIGHT = 180;
 const MAX_HEIGHT = 420;
@@ -49,11 +59,12 @@ export function BreakdownBarChart({
   const items = useMemo<BarDatum[]>(() => {
     const list = data?.breakdown ?? [];
     if (list.length === 0) return [];
-    return list.map(item => ({
+    return list.map((item, i) => ({
       key: item.key,
       label: labelFor ? labelFor(item.key) : item.label || item.key || '(unknown)',
       value: item.value,
       percentage: item.percentage,
+      color: colorForIndex(i),
     }));
   }, [data, labelFor]);
 
@@ -125,12 +136,11 @@ export function BreakdownBarChart({
                     ];
                   }}
                 />
-                <Bar
-                  dataKey="value"
-                  fill={BAR_COLOR}
-                  radius={[0, 4, 4, 0]}
-                  isAnimationActive={false}
-                />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                  {items.map(item => (
+                    <Cell key={item.key} fill={item.color} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

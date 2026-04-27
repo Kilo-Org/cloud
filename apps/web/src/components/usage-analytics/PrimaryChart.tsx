@@ -10,25 +10,12 @@ import {
   YAxis,
 } from 'recharts';
 import { isDateOnlyString } from '@/lib/utils';
+import { OTHER_COLOR, colorForIndex as paletteColorForIndex } from './colors';
 import { formatMetric } from './format';
-import { METRIC_LABELS, type MetricKey, type UsageTimeseries } from './types';
-
-const PALETTE = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#6366f1',
-  '#84cc16',
-];
+import { METRIC_LABELS, type MetricKey, type PeriodOption, type UsageTimeseries } from './types';
 
 const TOP_SERIES = 10;
 const OTHER_KEY = '__other__';
-const OTHER_COLOR = '#6b7280';
 
 type PrimaryChartProps = {
   metric: MetricKey;
@@ -37,6 +24,12 @@ type PrimaryChartProps = {
   splitByLabel?: string;
   /** Optional transform applied to series keys when labeling (legend + tooltip). */
   seriesLabelFor?: (key: string) => string;
+  /**
+   * Selected period. When `'today'` or `'yesterday'` (single UTC day with
+   * hourly buckets) the X-axis ticks render as hour-of-day in the viewer's
+   * local zone instead of `"MMM d"` date labels.
+   */
+  period: PeriodOption;
 };
 
 export function PrimaryChart({
@@ -45,6 +38,7 @@ export function PrimaryChart({
   loading,
   splitByLabel,
   seriesLabelFor,
+  period,
 }: PrimaryChartProps) {
   const { chartData, seriesKeys, otherCount } = useMemo(() => {
     const series = data?.timeseries ?? [];
@@ -92,6 +86,16 @@ export function PrimaryChart({
   const xFormatter = (v: string) => {
     const d = new Date(v);
     if (Number.isNaN(d.getTime())) return v;
+    // Today/Yesterday span a single UTC day and bucket strings are full ISO
+    // timestamps. Show hour-of-day in the viewer's **local** zone — this is
+    // intentionally different from the UTC-aligned rollup boundaries (see
+    // `periodToDateRange` in hooks.ts) because viewers expect "Today" ticks
+    // to match their wall clock. Half-hour-offset zones (e.g. IST) will see
+    // non-integer-looking ticks like `12:30 AM`, which Recharts `minTickGap`
+    // still spaces cleanly.
+    if (period === 'today' || period === 'yesterday') {
+      return d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+    }
     const options: Intl.DateTimeFormatOptions = {
       month: 'short',
       day: 'numeric',
@@ -107,7 +111,7 @@ export function PrimaryChart({
   };
 
   const colorForIndex = (i: number, key: string) =>
-    key === OTHER_KEY ? OTHER_COLOR : PALETTE[i % PALETTE.length];
+    key === OTHER_KEY ? OTHER_COLOR : paletteColorForIndex(i);
 
   const hasSplit = seriesKeys.length > 1;
 

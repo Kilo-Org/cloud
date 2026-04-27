@@ -3,23 +3,10 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { cn } from '@/lib/utils';
+import { OTHER_COLOR, PALETTE } from './colors';
 import { formatDollarsFromMicrodollars } from './format';
 import type { Dimension, UsageBreakdown } from './types';
 
-const PALETTE = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#6366f1',
-  '#84cc16',
-];
-
-const OTHER_COLOR = '#6b7280';
 const TOP_N = 8;
 
 type BreakdownPieChartProps = {

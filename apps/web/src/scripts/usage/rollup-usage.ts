@@ -17,7 +17,9 @@
  *   --from <YYYY-MM-DD>   Start date (inclusive).
  *   --to <YYYY-MM-DD>     End date (inclusive).
  *   --yesterday           Process only yesterday (UTC).
- *   --all-time            Process from earliest usage to yesterday (UTC).
+ *   --all-time            Process from earliest usage through today (UTC).
+ *                         Today is included so the "today" period on the Usage
+ *                         Analytics page renders its current partial rollup.
  *   --cleanup             Delete rows beyond retention policy.
  *   --dry-run             Print plan; do not write.
  */
@@ -78,6 +80,12 @@ function yesterdayIso(): string {
   return yesterday.toISOString().slice(0, 10);
 }
 
+function todayIso(): string {
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return today.toISOString().slice(0, 10);
+}
+
 function validateDateIso(s: string, label: string): void {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     throw new Error(`${label} must be YYYY-MM-DD, got: ${s}`);
@@ -109,7 +117,7 @@ export async function run(...argv: string[]): Promise<void> {
       return;
     }
     fromIso = earliest.slice(0, 10);
-    toIso = yesterdayIso();
+    toIso = todayIso();
   } else if (args.yesterday) {
     fromIso = yesterdayIso();
     toIso = fromIso;

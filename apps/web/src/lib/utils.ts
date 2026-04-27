@@ -115,6 +115,33 @@ export function formatIsoDateString_UsaDateOnlyFormat(dateString: string | Date 
   return date.toLocaleDateString('en-US', formatOptions);
 }
 
+/**
+ * Formats a full ISO datetime string as a locale hour only, e.g. "10 AM".
+ * Used for hourly usage buckets within a single day (Today / Yesterday).
+ * Full ISO timestamps are interpreted in the viewer's local time zone — do
+ * not pass date-only strings.
+ */
+export function formatIsoHourString_UsaHourFormat(dateString: string | Date | null): string {
+  if (!dateString) return '—';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+}
+
+/**
+ * Formats a full ISO datetime string as "MMM d, h a", e.g. "Apr 24, 10 AM".
+ * Used when hourly usage buckets span multiple days (Past Week with hourly
+ * granularity).
+ */
+export function formatIsoDateTime_UsaDateHourFormat(dateString: string | Date | null): string {
+  if (!dateString) return '—';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '—';
+  const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const hourPart = date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+  return `${datePart}, ${hourPart}`;
+}
+
 export function formatIsoDateTime_IsoOrderNoSeconds(dateString: string | Date | null): string {
   if (!dateString) return '—';
   const date = new Date(dateString);

@@ -1393,13 +1393,13 @@
           "type": "vertamedia-clickhouse-datasource",
           "uid": "${DS_KILOCLAW}"
         },
-        "definition": "SELECT blob6 FROM kiloclaw_controller_telemetry WHERE $timeFilter AND blob6 != '' GROUP BY blob6 ORDER BY blob6",
+        "definition": "SELECT blob6 FROM kiloclaw_controller_telemetry WHERE blob6 != '' GROUP BY blob6 ORDER BY blob6",
         "includeAll": true,
         "label": "Supervisor State",
         "multi": true,
         "name": "supervisorState",
         "options": [],
-        "query": "SELECT blob6 FROM kiloclaw_controller_telemetry WHERE $timeFilter AND blob6 != '' GROUP BY blob6 ORDER BY blob6",
+        "query": "SELECT blob6 FROM kiloclaw_controller_telemetry WHERE blob6 != '' GROUP BY blob6 ORDER BY blob6",
         "refresh": 2,
         "sort": 1,
         "type": "query"
@@ -1415,13 +1415,13 @@
           "type": "vertamedia-clickhouse-datasource",
           "uid": "${DS_KILOCLAW}"
         },
-        "definition": "SELECT blob7 FROM kiloclaw_controller_telemetry WHERE $timeFilter AND blob7 != '' GROUP BY blob7 ORDER BY blob7",
+        "definition": "SELECT blob7 FROM kiloclaw_controller_telemetry WHERE blob7 != '' GROUP BY blob7 ORDER BY blob7",
         "includeAll": true,
         "label": "Fly Region",
         "multi": true,
         "name": "flyRegion",
         "options": [],
-        "query": "SELECT blob7 FROM kiloclaw_controller_telemetry WHERE $timeFilter AND blob7 != '' GROUP BY blob7 ORDER BY blob7",
+        "query": "SELECT blob7 FROM kiloclaw_controller_telemetry WHERE blob7 != '' GROUP BY blob7 ORDER BY blob7",
         "refresh": 2,
         "sort": 1,
         "type": "query"
@@ -1437,13 +1437,13 @@
           "type": "vertamedia-clickhouse-datasource",
           "uid": "${DS_KILOCLAW}"
         },
-        "definition": "SELECT blob2 FROM kiloclaw_controller_telemetry WHERE $timeFilter AND blob2 != '' GROUP BY blob2 ORDER BY blob2",
+        "definition": "SELECT blob2 FROM kiloclaw_controller_telemetry WHERE blob2 != '' GROUP BY blob2 ORDER BY blob2",
         "includeAll": true,
         "label": "Controller Version",
         "multi": true,
         "name": "controllerVersion",
         "options": [],
-        "query": "SELECT blob2 FROM kiloclaw_controller_telemetry WHERE $timeFilter AND blob2 != '' GROUP BY blob2 ORDER BY blob2",
+        "query": "SELECT blob2 FROM kiloclaw_controller_telemetry WHERE blob2 != '' GROUP BY blob2 ORDER BY blob2",
         "refresh": 2,
         "sort": 1,
         "type": "query"

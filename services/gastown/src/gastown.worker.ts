@@ -1043,6 +1043,7 @@ app.use(
     endpoint: '/trpc',
     createContext: (_opts: unknown, c: Context<GastownEnv>) => ({
       env: c.env,
+      executionCtx: c.executionCtx,
       userId: c.get('kiloUserId') ?? '',
       isAdmin: c.get('kiloIsAdmin') ?? false,
       apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,

@@ -2399,6 +2399,79 @@ export class TownDO extends DurableObject<Env> {
     return { bead, agent: hookedAgent };
   }
 
+  /**
+   * Create an open bead with the given labels, without arming the reconciler alarm.
+   * The caller is responsible for including `gt:held` in the labels if the bead
+   * should not be dispatched immediately.
+   */
+  async createHeldBead(input: {
+    rigId: string;
+    title: string;
+    body?: string;
+    labels?: string[];
+  }): Promise<Bead> {
+    const bead = beadOps.createBead(this.sql, {
+      type: 'issue',
+      title: input.title,
+      body: input.body,
+      rig_id: input.rigId,
+      labels: input.labels,
+    });
+
+    events.insertEvent(this.sql, 'bead_created', {
+      bead_id: bead.bead_id,
+      payload: { bead_type: 'issue', rig_id: input.rigId, has_blockers: false },
+    });
+
+    return bead;
+  }
+
+  /**
+   * Notify the mayor about a newly created held bead.
+   * The mayor can then explore the codebase, plan, decompose into a convoy, or start it.
+   */
+  async notifyMayorOfNewBead(
+    beadId: string,
+    rigId: string,
+    title: string,
+    body?: string
+  ): Promise<void> {
+    const message = [
+      `A user just created a new bead in rig ${rigId}:`,
+      `ID: ${beadId}`,
+      `Title: "${title}"`,
+      body ? `Description: ${body.slice(0, 500)}${body.length > 500 ? '...' : ''}` : '',
+      ``,
+      `The bead is currently held (tagged gt:held) and will not be dispatched until started.`,
+      `Would you like to explore the codebase and flesh out a detailed plan, decompose it into a staged convoy, or start it immediately?`,
+      `Your chat reply is already visible to the user — no extra tool call is needed to surface your response.`,
+      `To start the bead immediately, remove the gt:held label via gt_bead_update.`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    await this.sendMayorMessage(message);
+  }
+
+  /**
+   * Remove the `gt:held` label from a bead and arm the reconciler alarm so the
+   * bead is picked up on the next tick.
+   *
+   * @param rigId - The rig the caller has verified ownership of. The bead must
+   *   belong to this rig to prevent cross-rig label removal within the same town.
+   */
+  async startHeldBead(beadId: string, rigId: string): Promise<Bead> {
+    const bead = beadOps.getBead(this.sql, beadId);
+    if (!bead) throw new Error(`Bead ${beadId} not found`);
+    if (bead.rig_id !== rigId) {
+      throw new Error(`Bead ${beadId} does not belong to rig ${rigId}`);
+    }
+
+    const updatedLabels = (bead.labels ?? []).filter(l => l !== patrol.HELD_LABEL);
+    const updated = beadOps.updateBeadFields(this.sql, beadId, { labels: updatedLabels }, 'system');
+    await this.escalateToActiveCadence();
+    return updated;
+  }
+
   /** Build the rig list for mayor agent startup (browse worktree setup on fresh containers). */
   private async rigListForMayor(): Promise<
     Array<{

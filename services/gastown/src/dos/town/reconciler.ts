@@ -25,6 +25,7 @@ import {
   GUPP_FORCE_STOP_MS,
   AGENT_GC_RETENTION_MS,
   TRIAGE_LABEL_LIKE,
+  HELD_LABEL_LIKE,
   createTriageRequest,
 } from './patrol';
 import { MAX_DISPATCH_ATTEMPTS } from './scheduling';
@@ -880,6 +881,7 @@ export function reconcileBeads(
           AND b.${beads.columns.assignee_agent_bead_id} IS NULL
           AND b.${beads.columns.rig_id} IS NOT NULL
           AND b.${beads.columns.labels} NOT LIKE ?
+          AND b.${beads.columns.labels} NOT LIKE ?
           AND NOT EXISTS (
             SELECT 1 FROM ${bead_dependencies} bd
             INNER JOIN ${beads} blocker ON blocker.${beads.columns.bead_id} = bd.${bead_dependencies.columns.depends_on_bead_id}
@@ -895,7 +897,7 @@ export function reconcileBeads(
               AND cm.${convoy_metadata.columns.staged} = 1
           )
       `,
-      [TRIAGE_LABEL_LIKE]
+      [TRIAGE_LABEL_LIKE, HELD_LABEL_LIKE]
     ),
   ]);
 

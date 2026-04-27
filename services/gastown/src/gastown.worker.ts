@@ -122,6 +122,12 @@ import {
   handleMayorConvoyAddBead,
   handleMayorConvoyRemoveBead,
 } from './handlers/mayor-tools.handler';
+import {
+  handleWastelandBrowse,
+  handleWastelandClaim,
+  handleWastelandPost,
+  handleWastelandDone,
+} from './handlers/wasteland-tools.handler';
 import { mayorAuthMiddleware } from './middleware/mayor-auth.middleware';
 import { townAuthMiddleware } from './middleware/town-auth.middleware';
 import { orgAuthMiddleware } from './middleware/org-auth.middleware';
@@ -314,6 +320,14 @@ app.post('/debug/towns/:townId/graceful-stop', async c => {
   const containerStub = getTownContainerStub(c.env, townId);
   await containerStub.stop();
   return c.json({ stopped: true });
+});
+
+app.get('/debug/towns/:townId/wasteland', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  // eslint-disable-next-line @typescript-eslint/await-thenable -- DO RPC returns promise at runtime
+  const connection = await town.getWastelandConnection();
+  return c.json({ connection });
 });
 
 app.get('/debug/towns/:townId/config', async c => {
@@ -1029,6 +1043,55 @@ app.post('/api/mayor/:townId/tools/convoys/:convoyId/add-bead', c =>
 app.post('/api/mayor/:townId/tools/convoys/:convoyId/remove-bead', c =>
   instrumented(c, 'POST /api/mayor/:townId/tools/convoys/:convoyId/remove-bead', () =>
     handleMayorConvoyRemoveBead(c, c.req.param())
+  )
+);
+
+// ── Wasteland Tools ──────────────────────────────────────────────────────
+// Mayor tools for interacting with hosted Wastelands. The wasteland is
+// auto-resolved from the town's connection — mayor never supplies it.
+// Auth is handled by the `/api/mayor/:townId/tools/*` wildcard middleware.
+app.get('/api/mayor/:townId/tools/wasteland/browse', c =>
+  instrumented(c, 'GET /api/mayor/:townId/tools/wasteland/browse', () =>
+    handleWastelandBrowse(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/claim', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/claim', () =>
+    handleWastelandClaim(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/post', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/post', () =>
+    handleWastelandPost(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/done', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/done', () =>
+    handleWastelandDone(c, c.req.param())
+  )
+);
+
+// Legacy routes — accepted for backward compatibility with older mayor
+// container plugins that still supply a wasteland_id in the URL. The
+// path param is ignored; the wasteland is always resolved from the town.
+app.get('/api/mayor/:townId/tools/wasteland/:legacyWastelandId/browse', c =>
+  instrumented(c, 'GET /api/mayor/:townId/tools/wasteland/:legacyWastelandId/browse', () =>
+    handleWastelandBrowse(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/:legacyWastelandId/claim', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/:legacyWastelandId/claim', () =>
+    handleWastelandClaim(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/:legacyWastelandId/post', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/:legacyWastelandId/post', () =>
+    handleWastelandPost(c, c.req.param())
+  )
+);
+app.post('/api/mayor/:townId/tools/wasteland/:legacyWastelandId/done', c =>
+  instrumented(c, 'POST /api/mayor/:townId/tools/wasteland/:legacyWastelandId/done', () =>
+    handleWastelandDone(c, c.req.param())
   )
 );
 // ── tRPC ────────────────────────────────────────────────────────────────

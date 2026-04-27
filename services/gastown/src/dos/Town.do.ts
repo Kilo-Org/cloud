@@ -31,6 +31,7 @@ import * as scheduling from './town/scheduling';
 import * as events from './town/events';
 import * as scm from './town/town-scm';
 import * as reconciler from './town/reconciler';
+import * as wasteland from './town/wasteland';
 import { applyAction } from './town/actions';
 import type { Action, ApplyActionContext } from './town/actions';
 import { buildPolecatSystemPrompt } from '../prompts/polecat-system.prompt';
@@ -606,6 +607,9 @@ export class TownDO extends DurableObject<Env> {
       query(this.sql, idx, []);
     }
 
+    // Wasteland connections
+    wasteland.initWastelandTables(this.sql);
+
     // Reconciler event log
     events.initTownEventsTable(this.sql);
 
@@ -919,6 +923,26 @@ export class TownDO extends DurableObject<Env> {
   async updateRigConfig(rigId: string, config: RigOverrideConfig): Promise<rigs.RigRecord | null> {
     rigs.updateRigConfig(this.sql, rigId, config);
     return rigs.getRig(this.sql, rigId);
+  }
+
+  // ── Wasteland Connection ─────────────────────────────────────────────
+
+  async connectWasteland(input: {
+    connectionId: string;
+    wastelandId: string;
+    upstream: string;
+    rigHandle: string;
+    dolthubOrg: string;
+  }): Promise<wasteland.WastelandConnectionRecord> {
+    return wasteland.connectWasteland(this.sql, input);
+  }
+
+  async disconnectWasteland(wastelandId: string): Promise<void> {
+    wasteland.disconnectWasteland(this.sql, wastelandId);
+  }
+
+  async getWastelandConnection(): Promise<wasteland.WastelandConnectionRecord | null> {
+    return wasteland.getWastelandConnection(this.sql);
   }
 
   // ── Rig Config (KV, per-rig — configuration needed for container dispatch) ──

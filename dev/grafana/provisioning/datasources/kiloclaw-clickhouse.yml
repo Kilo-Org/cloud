@@ -19,6 +19,9 @@ datasources:
       secure: ${GRAFANA_CLICKHOUSE_SECURE}
       username: ''
       defaultDatabase: default
+      # tlsSkipVerify must be false in any non-local environment — we point at
+      # api.cloudflare.com over public TLS. The env var exists only so local
+      # dev can override against a self-signed proxy if ever needed.
       tlsSkipVerify: ${GRAFANA_CLICKHOUSE_SKIP_TLS_VERIFY}
       dialTimeout: 10
       httpHeaderName1: Authorization
@@ -26,4 +29,3 @@ datasources:
       validateSql: false
     secureJsonData:
       httpHeaderValue1: Bearer ${CF_AE_TOKEN}
-      xHeaderKey: Bearer ${CF_AE_TOKEN}

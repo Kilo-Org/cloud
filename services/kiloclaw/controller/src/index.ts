@@ -34,6 +34,7 @@ import {
   registerKiloChatListConversationsRoute,
   registerKiloChatCreateConversationRoute,
   registerKiloChatBotStatusRoute,
+  registerKiloChatConversationStatusRoute,
   registerKiloChatMessageDeliveryFailedRoute,
   registerKiloChatActionDeliveryFailedRoute,
 } from './routes/kilo-chat';
@@ -420,6 +421,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     registerKiloChatListConversationsRoute(honoApp, kiloChatOpts);
     registerKiloChatCreateConversationRoute(honoApp, kiloChatOpts);
     registerKiloChatBotStatusRoute(honoApp, kiloChatOpts);
+    registerKiloChatConversationStatusRoute(honoApp, kiloChatOpts);
     registerKiloChatMessageDeliveryFailedRoute(honoApp, kiloChatOpts);
     registerKiloChatActionDeliveryFailedRoute(honoApp, kiloChatOpts);
   } else {

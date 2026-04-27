@@ -332,6 +332,20 @@ export function registerKiloChatBotStatusRoute(app: Hono, options: KiloChatRoute
   );
 }
 
+export function registerKiloChatConversationStatusRoute(
+  app: Hono,
+  options: KiloChatRouteOptions
+): void {
+  app.post('/_kilo/kilo-chat/conversations/:conversationId/conversation-status', c =>
+    relayRoute(c, options, {
+      method: 'POST',
+      upstreamSuffix: ctx =>
+        `/conversations/${encodeURIComponent(routeParam(ctx, 'conversationId'))}/conversation-status`,
+      body: { kind: 'forward', limit: MAX_SMALL_BODY_BYTES },
+    })
+  );
+}
+
 export function registerKiloChatCreateConversationRoute(
   app: Hono,
   options: KiloChatRouteOptions

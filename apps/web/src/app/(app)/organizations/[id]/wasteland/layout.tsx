@@ -14,18 +14,16 @@ import { isWastelandEnabled } from '@/lib/wasteland/feature-flags';
  * `isWastelandEnabled` returns true for kilo admins and in non-production
  * environments; in production it checks the `wasteland-access` PostHog
  * flag for the current user.
+ *
+ * Do NOT hard-code a `callbackPath` on the sign-in URL — the layout
+ * wraps many descendant routes, and a literal callback here would send
+ * users back to the parent list after sign-in regardless of which
+ * page they originally requested. Passing the default lets
+ * `appendCallbackPath` read `x-pathname` from headers and preserve the
+ * actual destination.
  */
-export default async function OrgWastelandGateLayout({
-  params,
-  children,
-}: {
-  params: Promise<{ id: string }>;
-  children: React.ReactNode;
-}) {
-  const { id } = await params;
-  const user = await getUserFromAuthOrRedirect(
-    `/users/sign_in?callbackPath=/organizations/${id}/wasteland`
-  );
+export default async function OrgWastelandGateLayout({ children }: { children: React.ReactNode }) {
+  const user = await getUserFromAuthOrRedirect();
   if (!(await isWastelandEnabled(user.id, { isAdmin: user.is_admin }))) {
     return notFound();
   }

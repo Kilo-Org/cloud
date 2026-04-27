@@ -1649,6 +1649,7 @@ export const wastelandRouter = router({
       }
       const scratchBranch = `trust-${input.rigHandle}-${crypto.randomUUID().slice(0, 8)}`;
       let orphanedPullId: string | null = null;
+      let mergeConfirmed = false;
       try {
         // Step 1: commit the trust-level change on a scratch branch.
         // `rigHandle` is validated by Zod to match /^[a-zA-Z0-9_-]+$/ and
@@ -1668,13 +1669,28 @@ export const wastelandRouter = router({
           toBranch: 'main',
         });
         orphanedPullId = pull.pullId;
-        // Step 3: merge the PR. DoltHub's merge is async (202 ACCEPTED +
-        // polled job), but we don't need to wait here — the PR is in the
-        // merge queue and the admin UI reflects the change once the poll
-        // completes on the client side via invalidation. Clear
-        // `orphanedPullId` on success so the `finally` block doesn't try
-        // to close an already-merged PR.
-        await doltApi.mergePull(upstream, token, orphanedPullId);
+        // Step 3: enqueue the merge. DoltHub's merge is asynchronous — it
+        // returns 202 with an `operation_name` that we have to poll.
+        const merge = await doltApi.mergePull(upstream, token, orphanedPullId);
+        // Step 4: wait for the merge worker to finish before cleaning up
+        // the source branch. Deleting the branch while the worker is
+        // still reading it aborts the merge and leaves `main` unchanged.
+        if (merge.operationName) {
+          const result = await doltApi.waitForMergeCompletion(
+            upstream,
+            token,
+            orphanedPullId,
+            merge.operationName
+          );
+          if (!result.success) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Merge job completed but DoltHub reported failure for pull ${orphanedPullId}`,
+            });
+          }
+        }
+        // Merge landed on `main`. Safe to clean up in `finally` now.
+        mergeConfirmed = true;
         orphanedPullId = null;
         meterEvent(ctx.env, {
           event: 'billing.api_operation',
@@ -1692,20 +1708,27 @@ export const wastelandRouter = router({
         }
         throw err;
       } finally {
-        // Clean up: if we opened a PR that didn't merge (orphanedPullId
-        // is still set), close it so it doesn't hang around on the
-        // upstream forever. Delete the scratch branch unconditionally so
-        // dead branches don't accumulate. Both are best-effort — failures
-        // here don't fail the overall operation.
+        // Cleanup rules:
+        //   1. If `orphanedPullId` is still set, the merge didn't confirm
+        //      — close the PR so it doesn't hang around forever.
+        //   2. Only delete the scratch branch once the merge has CONFIRMED
+        //      on `main` (mergeConfirmed=true). Deleting while the merge
+        //      worker is still reading the branch aborts the job and
+        //      leaves `main` unchanged. If the merge failed or timed out,
+        //      leave the branch so an operator can inspect / retry.
+        // Both cleanups are best-effort — failures here don't fail the
+        // overall operation.
         if (orphanedPullId) {
           await doltApi.closePull(upstream, token, orphanedPullId).catch(() => {
             // Ignore — the caller's error path likely already handled this.
           });
         }
-        await doltApi.deleteBranch(upstream, token, scratchBranch).catch(() => {
-          // Branch may already be gone (merge deletes source branch on
-          // some DoltHub configurations) or never created on failure.
-        });
+        if (mergeConfirmed) {
+          await doltApi.deleteBranch(upstream, token, scratchBranch).catch(() => {
+            // Branch may already be gone (merge deletes source branch on
+            // some DoltHub configurations).
+          });
+        }
       }
     }),
 });

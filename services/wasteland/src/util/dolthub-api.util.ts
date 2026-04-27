@@ -226,6 +226,10 @@ export async function createPull(
 const MergeResponse = z
   .object({
     state: z.string().optional(),
+    // DoltHub's async-merge contract: POST returns an operation_name that
+    // the caller polls via GET /pulls/{id}/merge?operationName=... until
+    // `done: true`. See docs/products/dolthub/api/database.md.
+    operation_name: z.string().optional(),
   })
   .passthrough();
 
@@ -233,7 +237,7 @@ export async function mergePull(
   upstream: string,
   token: string,
   pullId: string
-): Promise<{ state: string }> {
+): Promise<{ state: string; operationName: string | null }> {
   const { owner, db } = parseUpstream(upstream);
   const { status, data } = await doltFetch(`/${owner}/${db}/pulls/${pullId}/merge`, token, {
     method: 'POST',
@@ -246,7 +250,70 @@ export async function mergePull(
     );
   }
   const parsed = MergeResponse.safeParse(data);
-  return { state: parsed.success && parsed.data.state ? parsed.data.state : 'merging' };
+  return {
+    state: parsed.success && parsed.data.state ? parsed.data.state : 'merging',
+    operationName: parsed.success ? (parsed.data.operation_name ?? null) : null,
+  };
+}
+
+// DoltHub's merge-status poll response. `done: true` means the job has
+// finished (either committed the merge, or errored — check `res_details`).
+const MergeOperationStatus = z
+  .object({
+    done: z.boolean().default(false),
+    res_details: z
+      .object({
+        query_execution_status: z.string().optional(),
+        query_execution_message: z.string().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+/**
+ * Poll `GET /pulls/{id}/merge?operationName=...` until the merge operation
+ * completes or `timeoutMs` elapses. Required before cleaning up the source
+ * branch of an auto-merge flow — deleting the branch while the async merge
+ * worker is still reading it can abort the merge silently and leave the
+ * target branch unchanged.
+ *
+ * Resolves with `{ done: true, success: boolean }`:
+ *   - `success=true` means the merge committed to the target branch.
+ *   - `success=false` means the job finished but DoltHub reported a
+ *     query-level failure (e.g. a conflict) — inspect res_details.
+ * Rejects with `DoltHubApiError` on a timeout or a transport error.
+ */
+export async function waitForMergeCompletion(
+  upstream: string,
+  token: string,
+  pullId: string,
+  operationName: string,
+  opts: { timeoutMs?: number; pollIntervalMs?: number } = {}
+): Promise<{ done: true; success: boolean }> {
+  const { owner, db } = parseUpstream(upstream);
+  const timeoutMs = opts.timeoutMs ?? 30_000;
+  const pollIntervalMs = opts.pollIntervalMs ?? 1_000;
+  const deadline = Date.now() + timeoutMs;
+  const path = `/${owner}/${db}/pulls/${pullId}/merge?operationName=${encodeURIComponent(operationName)}`;
+
+  while (Date.now() < deadline) {
+    const { status, data } = await doltFetch(path, token);
+    if (status >= 400) {
+      throw new DoltHubApiError(`Poll merge ${pullId} failed (${status})`, status);
+    }
+    const parsed = MergeOperationStatus.safeParse(data);
+    if (parsed.success && parsed.data.done) {
+      const qStatus = parsed.data.res_details?.query_execution_status;
+      // DoltHub uses "Success" for healthy completion; anything else means
+      // the merge job finished but didn't land on the target branch.
+      const success = !qStatus || qStatus === 'Success';
+      return { done: true, success };
+    }
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+  }
+
+  throw new DoltHubApiError(`Timed out waiting for merge ${pullId} after ${timeoutMs}ms`, 504);
 }
 
 // ── Close PR (no merge) ────────────────────────────────────────────────

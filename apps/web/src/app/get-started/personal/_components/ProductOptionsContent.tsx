@@ -4,7 +4,6 @@ import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ArrowRight, Check, Cloud, Download, Users } from 'lucide-react';
-import { motion } from 'motion/react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
@@ -33,52 +32,54 @@ function CardRow({ card }: { card: RowCard }) {
   const iconTone = card.iconTone ?? 'brand';
 
   return (
-    <motion.div whileHover={{ y: -2 }} transition={{ type: 'spring', stiffness: 300, damping: 25 }}>
-      <Link
-        href={card.ctaHref}
+    <Link
+      href={card.ctaHref}
+      className={cn(
+        'group/row flex items-center gap-4 rounded-2xl p-4 ring-1 ring-inset outline-none ease-out-strong',
+        'transition-[transform,background-color,box-shadow] duration-200',
+        'motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.985]',
+        'focus-visible:ring-2 focus-visible:ring-brand-primary/60',
+        isPrimary
+          ? 'ring-brand-primary/40 bg-brand-primary/[0.04] hover:ring-brand-primary/70 hover:bg-brand-primary/[0.07] shadow-[0_0_40px_-12px] shadow-brand-primary/20 hover:shadow-brand-primary/40'
+          : 'ring-border bg-card/60 hover:ring-brand-primary/60 hover:bg-card/80'
+      )}
+    >
+      <div
         className={cn(
-          'group/row flex items-center gap-4 rounded-2xl p-4 ring-1 transition-all duration-300 ring-inset',
-          isPrimary
-            ? 'ring-brand-primary/40 bg-brand-primary/[0.04] hover:ring-brand-primary/70 hover:bg-brand-primary/[0.07] shadow-[0_0_40px_-12px] shadow-brand-primary/20'
-            : 'ring-border bg-card/60 hover:ring-brand-primary/60 hover:bg-card/80'
+          'ease-out-strong flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ring-1 transition-transform duration-200',
+          'motion-safe:group-hover/row:scale-105',
+          iconTone === 'brand'
+            ? 'bg-brand-primary/10 text-brand-primary ring-brand-primary/20'
+            : 'bg-muted/60 text-muted-foreground ring-border'
         )}
       >
-        <div
-          className={cn(
-            'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 transition-transform duration-300 group-hover/row:scale-105',
-            iconTone === 'brand'
-              ? 'bg-brand-primary/10 text-brand-primary ring-brand-primary/20'
-              : 'bg-muted/60 text-muted-foreground ring-border'
-          )}
-        >
-          {card.icon}
-        </div>
+        {card.icon}
+      </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h2 className="truncate text-base font-bold text-white">{card.title}</h2>
-            {card.badge ? (
-              <span className="bg-brand-primary/15 text-brand-primary ring-brand-primary/30 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold tracking-[0.1em] uppercase ring-1">
-                {card.badge}
-              </span>
-            ) : null}
-          </div>
-          <p className="text-muted-foreground mt-0.5 truncate text-sm">{card.description}</p>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h2 className="truncate text-base font-bold text-white">{card.title}</h2>
+          {card.badge ? (
+            <span className="bg-brand-primary/15 text-brand-primary ring-brand-primary/30 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold tracking-[0.1em] uppercase ring-1">
+              {card.badge}
+            </span>
+          ) : null}
         </div>
+        <p className="text-muted-foreground mt-0.5 text-sm">{card.description}</p>
+      </div>
 
-        <span
-          className={cn(
-            'flex shrink-0 items-center gap-1.5 rounded-xl text-sm font-bold transition-colors',
-            isPrimary
-              ? 'bg-brand-primary text-black group-hover/row:bg-brand-primary/90 px-5 py-2.5'
-              : 'border-border text-white group-hover/row:border-brand-primary/60 border px-4 py-2'
-          )}
-        >
-          {card.ctaLabel}
-          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover/row:translate-x-0.5" />
-        </span>
-      </Link>
-    </motion.div>
+      <span
+        className={cn(
+          'ease-out-strong flex shrink-0 items-center gap-1.5 rounded-xl text-sm font-bold transition-colors duration-150',
+          isPrimary
+            ? 'bg-brand-primary text-black group-hover/row:bg-brand-primary/90 px-5 py-2.5'
+            : 'border-border text-white group-hover/row:border-brand-primary/60 border px-4 py-2'
+        )}
+      >
+        {card.ctaLabel}
+        <ArrowRight className="ease-out-strong h-3.5 w-3.5 transition-transform duration-150 motion-safe:group-hover/row:translate-x-1" />
+      </span>
+    </Link>
   );
 }
 
@@ -92,7 +93,7 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
     {
       key: 'install',
       title: 'Install Kilo',
-      description: 'VS Code, JetBrains, Cursor, or CLI',
+      description: 'Code with AI in VS Code, JetBrains, or CLI.',
       icon: <Download className="h-5 w-5" />,
       ctaLabel: 'Install',
       ctaHref: '/welcome',
@@ -100,8 +101,8 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
     },
     {
       key: 'cloud',
-      title: 'Cloud sessions',
-      description: 'Run agents against your repo — no local machine',
+      title: 'Kilo Cloud',
+      description: 'Run agents against your repo from any browser.',
       icon: <Cloud className="h-5 w-5" />,
       ctaLabel: 'Connect repo',
       ctaHref: cloudHref,
@@ -110,9 +111,9 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
     {
       key: 'kiloclaw',
       title: 'KiloClaw',
-      description: 'Your own AI coding agent, hosted in the cloud',
+      description: 'An always-on agent for Telegram, Slack, and more.',
       icon: <KiloCrabIcon className="h-6 w-6" />,
-      ctaLabel: 'Try',
+      ctaLabel: 'Get started',
       ctaHref: kiloclawHref,
       variant: 'outline',
       badge: 'New',
@@ -126,7 +127,7 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
           <Link
             href="/"
             aria-label="Kilo home"
-            className="inline-flex items-center gap-3 outline-none"
+            className="ease-out-strong inline-flex items-center gap-3 rounded-md outline-none transition-transform duration-150 motion-safe:active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-primary/60"
           >
             <span className="bg-brand-primary flex h-10 w-10 items-center justify-center rounded-md text-black">
               <svg viewBox="0 0 32 32" className="h-8 w-8" fill="currentColor" aria-hidden="true">
@@ -147,15 +148,15 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
             <span className="text-brand-primary block">No subscription</span>
           </h1>
           <p className="text-muted-foreground max-w-xl text-lg leading-[1.55] text-balance">
-            Use Kilo in your editor, terminal, or browser. Bring your own API key, use free models,
-            or pay as you go.
+            Use Kilo in your editor, terminal, or cloud. Bring your own API key, use free models, or
+            pay as you go.
           </p>
 
           <ul className="space-y-2 pt-2">
             {[
               {
                 lead: '500+ models.',
-                detail: 'OpenRouter, Anthropic, OpenAI, local, and more.',
+                detail: 'OpenRouter, Anthropic, OpenAI, or local models.',
               },
               {
                 lead: 'Everywhere you code.',
@@ -163,7 +164,7 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
               },
               {
                 lead: 'Sessions follow you.',
-                detail: 'Start on mobile, finish in your IDE.',
+                detail: 'Start in your IDE, finish on your phone.',
               },
               {
                 lead: 'Open source.',
@@ -213,7 +214,10 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
           {!isAuthenticated ? (
             <p className="text-muted-foreground pt-1 text-center text-xs">
               Already have an account?{' '}
-              <Link href={signInHref} className="text-brand-primary font-semibold hover:underline">
+              <Link
+                href={signInHref}
+                className="text-brand-primary rounded font-semibold outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
+              >
                 Sign in
               </Link>
             </p>

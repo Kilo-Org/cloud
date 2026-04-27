@@ -10,10 +10,7 @@ export { UserSessionDO } from './do/user-session-do';
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use(
-  '/connect/*',
-  cors({ origin: ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'] })
-);
+app.use('/connect/*', cors({ origin: ['https://kilo.ai', 'https://app.kilo.ai'] }));
 
 // ── Structured logging context ──────────────────────────────────────────
 app.use('*', useWorkersLogger('event-service') as unknown as MiddlewareHandler);

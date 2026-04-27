@@ -816,4 +816,46 @@ describe('usageAnalytics router', () => {
       expect(breakdown.totalValue).toBe(800);
     });
   });
+
+  describe('granularity=week', () => {
+    it('emits week bucket as a bare YYYY-MM-DD date string', async () => {
+      // Regression: the bucket expression used to cast `date_trunc('week', …)`
+      // to `::text` directly, yielding a timestamp-format string that bypassed
+      // the client's `isDateOnlyString` detection and shifted the week start
+      // to the viewer's local timezone. The fix casts through `::date` so the
+      // bucket is `YYYY-MM-DD`, which the client then formats with `UTC`.
+      const today = await getTodayIsoDate();
+      const oneHourAgo = await dateAt(1);
+
+      await insertUsageWithOverrides({
+        kilo_user_id: orgMember.id,
+        organization_id: testOrg.id,
+        cost: 42,
+        input_tokens: 10,
+        output_tokens: 5,
+        created_at: oneHourAgo,
+        model: 'gpt-4',
+      });
+
+      await processDay(today);
+
+      const caller = await createCallerForUser(orgMember.id);
+      const now = new Date();
+      const startDate = new Date(now);
+      startDate.setUTCDate(startDate.getUTCDate() - 7);
+
+      const result = await caller.usageAnalytics.getTimeseries({
+        startDate: startDate.toISOString(),
+        endDate: now.toISOString(),
+        granularity: 'week',
+        organizationId: testOrg.id,
+        metric: 'cost',
+      });
+
+      expect(result.timeseries.length).toBeGreaterThan(0);
+      for (const point of result.timeseries) {
+        expect(point.datetime).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      }
+    });
+  });
 });

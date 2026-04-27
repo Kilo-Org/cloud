@@ -88,7 +88,11 @@ async function computeWideRollup(
   endIso: string
 ): Promise<WideRollupRow[]> {
   const timeBucket = getTimeBucketSql(granularity);
-  const result = await readDb.execute<WideRollupRow>(sql`
+  // Reads from the primary DB (not the read replica) so the SELECT and the
+  // subsequent DELETE+INSERT in `processDay`/`processMonth` observe the same
+  // snapshot. Running against a lagging replica would silently omit recent
+  // rows from the rollup until the next reprocess.
+  const result = await db.execute<WideRollupRow>(sql`
     SELECT
       ${sql.raw(timeBucket)} AS time_bucket,
       mu.kilo_user_id,
@@ -130,7 +134,8 @@ async function computeTotalsRollup(
   endIso: string
 ): Promise<TotalsRollupRow[]> {
   const timeBucket = getTimeBucketSql(granularity);
-  const result = await readDb.execute<TotalsRollupRow>(sql`
+  // See `computeWideRollup` — primary DB for read/write consistency.
+  const result = await db.execute<TotalsRollupRow>(sql`
     SELECT
       ${sql.raw(timeBucket)} AS time_bucket,
       mu.kilo_user_id,
@@ -381,10 +386,18 @@ export async function cleanupRetention(): Promise<{
   daily: number;
   dailyTotals: number;
 }> {
-  const hourlyCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const hourlyDays = ROLLUP_RETENTION_DAYS.hourly;
+  const dailyDays = ROLLUP_RETENTION_DAYS.daily;
+  if (hourlyDays === null || dailyDays === null) {
+    throw new Error(
+      'cleanupRetention expects finite retention for hourly and daily tiers; update this function if the policy changes.'
+    );
+  }
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const hourlyCutoff = new Date(Date.now() - hourlyDays * MS_PER_DAY).toISOString();
 
-  // Daily cutoff: 90 days ago as a DATE
-  const dailyCutoffDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  // Daily cutoff as a DATE (the `day` column is DATE)
+  const dailyCutoffDate = new Date(Date.now() - dailyDays * MS_PER_DAY);
   const dailyCutoff = dailyCutoffDate.toISOString().slice(0, 10);
 
   const hourly = await db

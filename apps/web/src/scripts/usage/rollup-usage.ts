@@ -95,6 +95,29 @@ function validateDateIso(s: string, label: string): void {
 export async function run(...argv: string[]): Promise<void> {
   const args = parseArgs(argv);
 
+  const hasFrom = !!args.from;
+  const hasTo = !!args.to;
+  if (hasFrom !== hasTo) {
+    throw new Error('--from and --to must be supplied together.');
+  }
+  const hasRange = hasFrom && hasTo;
+
+  // Exactly one mode must be selected — otherwise precedence is surprising
+  // (e.g. `--cleanup` silently wins over `--from/--to`).
+  const modeFlagsSet = [args.cleanup, args.yesterday, args.allTime, hasRange].filter(
+    Boolean
+  ).length;
+  if (modeFlagsSet === 0) {
+    throw new Error(
+      'Must specify exactly one of: --yesterday | --all-time | --cleanup | --from <date> --to <date>.'
+    );
+  }
+  if (modeFlagsSet > 1) {
+    throw new Error(
+      'Flags --cleanup / --yesterday / --all-time / --from+--to are mutually exclusive.'
+    );
+  }
+
   if (args.cleanup) {
     if (args.dryRun) {
       console.log('[dry-run] Would delete rows beyond retention window.');
@@ -127,9 +150,8 @@ export async function run(...argv: string[]): Promise<void> {
     fromIso = args.from;
     toIso = args.to;
   } else {
-    throw new Error(
-      'Must specify --yesterday, --all-time, --cleanup, or --from <date> --to <date>.'
-    );
+    // Unreachable: the guards above ensure one of the branches applies.
+    throw new Error('Internal: no range resolved after flag validation.');
   }
 
   console.log(

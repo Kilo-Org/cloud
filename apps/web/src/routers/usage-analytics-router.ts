@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { and, desc, eq, gte, inArray, isNull, lt, notInArray, sql } from 'drizzle-orm';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import { readDb } from '@/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
@@ -135,16 +135,13 @@ function hasDimensionFilters(filters: UsageAnalyticsFilters): boolean {
 // Authorization
 // ---------------------------------------------------------------------------
 
-async function ensureScopeAccess(
-  userId: string,
-  filters: UsageAnalyticsFilters,
-  ctxUser: { id: string; is_admin: boolean }
-): Promise<void> {
+async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilters): Promise<void> {
+  const userId = ctx.user.id;
   if (filters.organizationId) {
     const requiredRoles =
       filters.viewAs === 'org-wide' ? (['owner', 'billing_manager'] as const) : undefined;
     await ensureOrganizationAccess(
-      { user: ctxUser } as Parameters<typeof ensureOrganizationAccess>[0],
+      ctx,
       filters.organizationId,
       requiredRoles ? [...requiredRoles] : undefined
     );
@@ -303,7 +300,12 @@ function bucketExprForEffectiveGranularity(
 ) {
   const timeCol = getTimeColumn(tier, table);
   if (granularity === 'hour') return sql<string>`${timeCol}::text`;
-  if (granularity === 'week') return sql<string>`date_trunc('week', ${timeCol})::text`;
+  // Cast through ::date before ::text so the serialized bucket is
+  // `YYYY-MM-DD` (which `isDateOnlyString` detects on the client and formats
+  // with `timeZone: 'UTC'`). Without the explicit date cast, `date_trunc`
+  // returns a timestamp and the client would format the week start in the
+  // viewer's local zone, shifting the day for negative-UTC viewers.
+  if (granularity === 'week') return sql<string>`date_trunc('week', ${timeCol})::date::text`;
   // 'day' and 'month' both match the column directly
   return sql<string>`${timeCol}::text`;
 }
@@ -511,6 +513,28 @@ function ratioSafe(numerator: number, denominator: number): number {
   return numerator / denominator;
 }
 
+/**
+ * Convert an aggregate value (often returned as a bigint string by pg) to a
+ * JS number. Postgres `SUM(bigint)` returns `numeric`; pg delivers it as a
+ * string. `Number(...)` of a string larger than 2^53 silently loses precision.
+ *
+ * We log and return 0 for non-finite inputs (`undefined`, `null`, malformed
+ * strings) to match the prior `Number(x) || 0` behavior. Values above
+ * `MAX_SAFE_INTEGER` are logged as a warning but still returned so the UI
+ * does not crash — precision loss here would mean an organization aggregated
+ * over 9e15 microdollars ($9B+) in the window, well beyond realistic scale.
+ */
+function toSafeNumber(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  if (Math.abs(n) > Number.MAX_SAFE_INTEGER) {
+    console.warn(
+      `usage-analytics: aggregate ${String(value)} exceeds Number.MAX_SAFE_INTEGER; precision lost.`
+    );
+  }
+  return n;
+}
+
 // ---------------------------------------------------------------------------
 // Timeseries
 // ---------------------------------------------------------------------------
@@ -638,10 +662,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(UsageAnalyticsFiltersSchema)
     .output(SummaryOutputSchema)
     .query(async ({ input, ctx }): Promise<SummaryOutput> => {
-      await ensureScopeAccess(ctx.user.id, input, {
-        id: ctx.user.id,
-        is_admin: ctx.user.is_admin,
-      });
+      await ensureScopeAccess(ctx, input);
 
       const meta = resolveTier(input.granularity, input.startDate);
       const useWide = hasDimensionFilters(input);
@@ -699,20 +720,20 @@ export const usageAnalyticsRouter = createTRPCRouter({
         distinctUsers: 0,
       };
 
-      const costMicrodollars = Number(r.costMicrodollars);
-      const requestCount = Number(r.requestCount);
-      const inputTokens = Number(r.inputTokens);
-      const outputTokens = Number(r.outputTokens);
-      const cacheWriteTokens = Number(r.cacheWriteTokens);
-      const cacheHitTokens = Number(r.cacheHitTokens);
-      const errorCount = Number(r.errorCount);
-      const cancelledCount = Number(r.cancelledCount);
-      const freeRequestCount = Number(r.freeRequestCount);
-      const byokRequestCount = Number(r.byokRequestCount);
-      const totalLatencyMs = Number(r.totalLatencyMs);
-      const totalGenerationTimeMs = Number(r.totalGenerationTimeMs);
-      const latencyCount = Number(r.latencyCount);
-      const distinctUsers = Number(r.distinctUsers);
+      const costMicrodollars = toSafeNumber(r.costMicrodollars);
+      const requestCount = toSafeNumber(r.requestCount);
+      const inputTokens = toSafeNumber(r.inputTokens);
+      const outputTokens = toSafeNumber(r.outputTokens);
+      const cacheWriteTokens = toSafeNumber(r.cacheWriteTokens);
+      const cacheHitTokens = toSafeNumber(r.cacheHitTokens);
+      const errorCount = toSafeNumber(r.errorCount);
+      const cancelledCount = toSafeNumber(r.cancelledCount);
+      const freeRequestCount = toSafeNumber(r.freeRequestCount);
+      const byokRequestCount = toSafeNumber(r.byokRequestCount);
+      const totalLatencyMs = toSafeNumber(r.totalLatencyMs);
+      const totalGenerationTimeMs = toSafeNumber(r.totalGenerationTimeMs);
+      const latencyCount = toSafeNumber(r.latencyCount);
+      const distinctUsers = toSafeNumber(r.distinctUsers);
 
       return {
         costMicrodollars,
@@ -744,10 +765,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(TimeseriesInputSchema)
     .output(TimeseriesOutputSchema)
     .query(async ({ input, ctx }) => {
-      await ensureScopeAccess(ctx.user.id, input, {
-        id: ctx.user.id,
-        is_admin: ctx.user.is_admin,
-      });
+      await ensureScopeAccess(ctx, input);
 
       const meta = resolveTier(input.granularity, input.startDate);
       const needsWide = !!input.splitBy || hasDimensionFilters(input);
@@ -823,7 +841,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       return {
         timeseries: rows.map(r => ({
           datetime: r.bucket,
-          value: Number(r.value) || 0,
+          value: toSafeNumber(r.value),
           label: r.label ?? undefined,
         })),
         effectiveGranularity: meta.effectiveGranularity,
@@ -835,10 +853,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(BreakdownInputSchema)
     .output(BreakdownOutputSchema)
     .query(async ({ input, ctx }) => {
-      await ensureScopeAccess(ctx.user.id, input, {
-        id: ctx.user.id,
-        is_admin: ctx.user.is_admin,
-      });
+      await ensureScopeAccess(ctx, input);
 
       const meta = resolveTier(input.granularity, input.startDate);
       const table = getWideTable(meta.tier);
@@ -869,7 +884,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             .limit(input.limit)
       );
 
-      const values = rows.map(r => ({ key: r.key ?? '', value: Number(r.value) || 0 }));
+      const values = rows.map(r => ({ key: r.key ?? '', value: toSafeNumber(r.value) }));
       const totalValue = values.reduce((s, r) => s + r.value, 0);
 
       return {
@@ -888,10 +903,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(TableInputSchema)
     .output(TableOutputSchema)
     .query(async ({ input, ctx }) => {
-      await ensureScopeAccess(ctx.user.id, input, {
-        id: ctx.user.id,
-        is_admin: ctx.user.is_admin,
-      });
+      await ensureScopeAccess(ctx, input);
 
       const meta = resolveTier(input.granularity, input.startDate);
       const table = getWideTable(meta.tier);
@@ -986,13 +998,13 @@ export const usageAnalyticsRouter = createTRPCRouter({
           return {
             datetime: r.datetime,
             dimensions,
-            costMicrodollars: Number(r.costMicrodollars) || 0,
-            requestCount: Number(r.requestCount) || 0,
-            inputTokens: Number(r.inputTokens) || 0,
-            outputTokens: Number(r.outputTokens) || 0,
-            cacheWriteTokens: Number(r.cacheWriteTokens) || 0,
-            cacheHitTokens: Number(r.cacheHitTokens) || 0,
-            errorCount: Number(r.errorCount) || 0,
+            costMicrodollars: toSafeNumber(r.costMicrodollars),
+            requestCount: toSafeNumber(r.requestCount),
+            inputTokens: toSafeNumber(r.inputTokens),
+            outputTokens: toSafeNumber(r.outputTokens),
+            cacheWriteTokens: toSafeNumber(r.cacheWriteTokens),
+            cacheHitTokens: toSafeNumber(r.cacheHitTokens),
+            errorCount: toSafeNumber(r.errorCount),
           };
         }),
         effectiveGranularity: meta.effectiveGranularity,
@@ -1014,10 +1026,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(UserListInputSchema)
     .output(UserListOutputSchema)
     .query(async ({ input, ctx }) => {
-      const role = await ensureOrganizationAccess(
-        { user: { ...ctx.user } } as Parameters<typeof ensureOrganizationAccess>[0],
-        input.organizationId
-      );
+      const role = await ensureOrganizationAccess(ctx, input.organizationId);
 
       const canSeeAllMembers = role === 'owner' || role === 'billing_manager';
       const allowedIds = canSeeAllMembers

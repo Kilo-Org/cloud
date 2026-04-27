@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { skipToken, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { Dimension, Granularity, MetricKey, PeriodOption } from './types';
 
@@ -199,11 +199,13 @@ export function useUsageTable(
 export function useResolveOrgUsers(organizationId: string | null, userIds: string[]) {
   const trpc = useTRPC();
   const dedupedIds = useMemo(() => Array.from(new Set(userIds)).sort(), [userIds]);
-  return useQuery({
-    ...trpc.usageAnalytics.resolveOrgUsers.queryOptions({
-      organizationId: organizationId ?? '00000000-0000-0000-0000-000000000000',
-      userIds: dedupedIds,
-    }),
-    enabled: !!organizationId && dedupedIds.length > 0,
-  });
+  // Pass the real input only when we have a legitimate org scope and a
+  // non-empty id list. Using `skipToken` (instead of a placeholder UUID +
+  // `enabled: false`) guarantees the server never receives a sentinel id
+  // even if future call sites drop the `enabled` gate.
+  return useQuery(
+    trpc.usageAnalytics.resolveOrgUsers.queryOptions(
+      organizationId && dedupedIds.length > 0 ? { organizationId, userIds: dedupedIds } : skipToken
+    )
+  );
 }

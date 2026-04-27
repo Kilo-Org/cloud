@@ -268,6 +268,8 @@ function fetchInputUrl(input: Parameters<typeof fetch>[0]): string {
   return input.url;
 }
 
+const backgroundWaitUntilPromises: Promise<unknown>[] = [];
+
 function createInstance(
   storage = createFakeStorage(),
   env = createFakeEnv()
@@ -281,6 +283,7 @@ function createInstance(
     storage,
     waitUntil: (p: Promise<unknown>) => {
       waitUntilPromises.push(p);
+      backgroundWaitUntilPromises.push(p);
     },
   } as unknown;
   const instance = new KiloClawInstance(
@@ -428,7 +431,9 @@ beforeEach(() => {
   );
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await Promise.allSettled(backgroundWaitUntilPromises.splice(0));
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -459,6 +464,21 @@ describe('two-phase destroy', () => {
     // Storage fully cleared
     expect(storage._store.size).toBe(0);
     expect(storage._getAlarm()).toBeNull();
+  });
+
+  it('labels destroy analytics with the destroy reason', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage);
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.destroy({ reason: 'manual_user_request' });
+
+    const destroyEvents = analyticsEventsByName(env, 'instance.destroy_started');
+    expect(destroyEvents).toHaveLength(1);
+    expect(destroyEvents[0]?.blobs).toEqual(expect.arrayContaining(['manual_user_request']));
   });
 
   it('keeps pendingDestroyMachineId when machine delete fails', async () => {
@@ -1656,8 +1676,13 @@ describe('status guards', () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { status: 'destroying' });
 
-    await instance.stop();
+    const result = await instance.stop();
 
+    expect(result).toMatchObject({
+      stopped: false,
+      previousStatus: 'destroying',
+      currentStatus: 'destroying',
+    });
     // Status unchanged
     expect(storage._store.get('status')).toBe('destroying');
     expect(flyClient.stopMachineAndWait).not.toHaveBeenCalled();
@@ -4656,15 +4681,26 @@ describe('stop: error propagation', () => {
   });
 
   it('succeeds when Fly stop completes normally', async () => {
-    const { instance, storage } = createInstance();
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(createFakeStorage(), env);
     await seedRunning(storage);
 
     (flyClient.stopMachineAndWait as Mock).mockResolvedValue(undefined);
 
-    await instance.stop();
+    const result = await instance.stop({ reason: 'trial_inactivity' });
 
+    expect(result).toMatchObject({
+      stopped: true,
+      previousStatus: 'running',
+      currentStatus: 'stopped',
+    });
+    expect(typeof result.stoppedAt).toBe('number');
     expect(storage._store.get('status')).toBe('stopped');
     expect(storage._store.get('lastStoppedAt')).toBeDefined();
+
+    const stoppedEvents = analyticsEventsByName(env, 'instance.stopped');
+    expect(stoppedEvents).toHaveLength(1);
+    expect(stoppedEvents[0]?.blobs).toEqual(expect.arrayContaining(['trial_inactivity']));
   });
 
   it('throws with status 404 when instance was never provisioned', async () => {
@@ -5978,7 +6014,8 @@ describe('provision: auto-start after fresh provision', () => {
   });
 
   it('calls start() on fresh provision and ends in running state', async () => {
-    const { instance, storage, waitUntilPromises } = createInstance();
+    const env = createFakeEnv();
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
 
     (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
       id: 'vol-1',
@@ -5994,6 +6031,7 @@ describe('provision: auto-start after fresh provision', () => {
     // provision() returns before start() runs: waitUntil defers the promise,
     // so status must be 'starting' here — not 'running'.
     expect(storage._store.get('status')).toBe('starting');
+    expect(storage._store.get('pendingStartReason')).toBe('initial_provision');
 
     // Await background tasks to let start() complete
     await Promise.all(waitUntilPromises);
@@ -6001,6 +6039,11 @@ describe('provision: auto-start after fresh provision', () => {
     expect(flyClient.createMachine).toHaveBeenCalled();
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('flyMachineId')).toBe('machine-1');
+    expect(storage._store.get('pendingStartReason')).toBeNull();
+
+    const startEvents = analyticsEventsByName(env, 'instance.started');
+    expect(startEvents).toHaveLength(1);
+    expect(startEvents[0]?.blobs).toEqual(expect.arrayContaining(['initial_provision']));
   });
 
   it('wires capacity eviction callback during initial volume provisioning', async () => {
@@ -6159,6 +6202,32 @@ describe('provision: auto-start after fresh provision', () => {
 
     expect(storage._store.get('provider')).toBe('fly');
     expect(storage._store.get('status')).toBe('running');
+  });
+});
+
+describe('startAsync start-reason attribution', () => {
+  it('persists the start reason until the async start completes', async () => {
+    const env = createFakeEnv();
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { status: 'stopped', flyMachineId: 'machine-1' });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({ state: 'failed', config: {} });
+    (flyClient.updateMachine as Mock).mockResolvedValue({});
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+
+    await instance.startAsync('user-1', { reason: 'snapshot_restore' });
+
+    expect(storage._store.get('pendingStartReason')).toBe('snapshot_restore');
+
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('pendingStartReason')).toBeNull();
+
+    const startEvents = analyticsEventsByName(env, 'instance.started');
+    expect(startEvents).toHaveLength(1);
+    expect(startEvents[0]?.blobs).toEqual(expect.arrayContaining(['snapshot_restore']));
   });
 });
 
@@ -6540,6 +6609,7 @@ describe('auto-destroy stale provisioned instances', () => {
   });
 
   function createInstanceWithPostgres(markImpl: () => Promise<void> = () => Promise.resolve()): {
+    env: ReturnType<typeof createFakeEnv>;
     instance: KiloClawInstance;
     storage: ReturnType<typeof createFakeStorage>;
     markDestroyed: Mock;
@@ -6555,12 +6625,12 @@ describe('auto-destroy stale provisioned instances', () => {
     (db.markInstanceDestroyed as Mock).mockImplementation(markDestroyed);
 
     const { instance, storage } = createInstance(undefined, env);
-    return { instance, storage, markDestroyed };
+    return { env, instance, storage, markDestroyed };
   }
 
   it('auto-destroys provisioned instance older than threshold with no machine', async () => {
     const staleTime = Date.now() - STALE_PROVISION_THRESHOLD_MS - 60_000; // 1 min past threshold
-    const { instance, storage, markDestroyed } = createInstanceWithPostgres();
+    const { env, instance, storage, markDestroyed } = createInstanceWithPostgres();
     await seedProvisioned(storage, {
       provisionedAt: staleTime,
       flyMachineId: null,
@@ -6578,6 +6648,10 @@ describe('auto-destroy stale provisioned instances', () => {
     expect(flyClient.listMachines).toHaveBeenCalled();
     // Volume reconciliation should not have run (destroyed before that)
     expect(flyClient.getVolume).not.toHaveBeenCalled();
+
+    const destroyEvents = analyticsEventsByName(env, 'instance.destroy_started');
+    expect(destroyEvents).toHaveLength(1);
+    expect(destroyEvents[0]?.blobs).toEqual(expect.arrayContaining(['stale_provision_cleanup']));
   });
 
   it('does not auto-destroy if provisionedAt is within threshold', async () => {
@@ -8455,9 +8529,10 @@ describe('updateBotIdentity', () => {
         }),
       })
     );
-    expect(calls).toEqual(['put:true', 'fetch', 'put:false']);
+    expect(calls[0]).toBe('put:true');
+    expect(calls[calls.length - 1]).toBe('put:false');
+    expect(calls.filter(call => call === 'fetch').length).toBeGreaterThanOrEqual(1);
     expect(storage._store.get('botIdentityApplyPending')).toBe(false);
-    vi.unstubAllGlobals();
   });
 
   it('sets botIdentityApplyPending while status=starting and does not call the gateway', async () => {

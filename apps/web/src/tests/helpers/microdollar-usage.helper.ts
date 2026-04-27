@@ -31,6 +31,7 @@ function defineDefaultUsageStats(): MicrodollarUsageStats {
     generation_time: null,
     streamed: null,
     cancelled: null,
+    status_code: 200,
   };
 }
 
@@ -63,6 +64,7 @@ function defineDefaultContextInfo(): UsageContextInfo {
     session_id: null,
     mode: null,
     auto_model: null,
+    ttfb_ms: null,
   };
 }
 
@@ -117,6 +119,7 @@ export function createMockUsageContext(
     session_id: null,
     mode: null,
     auto_model: null,
+    ttfb_ms: null,
   };
 }
 

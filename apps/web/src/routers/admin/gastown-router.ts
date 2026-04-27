@@ -755,6 +755,40 @@ export const adminGastownRouter = createTRPCRouter({
       );
     }),
 
+  bulkDeleteBeads: adminProcedure
+    .input(z.object({ townId: z.string().uuid(), beadIds: z.array(z.string().uuid()) }))
+    .output(z.object({ deleted: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const result = await gastownTrpcMutate(
+        ctx.user,
+        'gastown.adminBulkDeleteBeads',
+        { townId: input.townId, beadIds: input.beadIds },
+        z.object({ deleted: z.number() })
+      );
+      return result ?? { deleted: 0 };
+    }),
+
+  deleteBeadsByStatus: adminProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']),
+        type: z
+          .enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent'])
+          .optional(),
+      })
+    )
+    .output(z.object({ deleted: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const result = await gastownTrpcMutate(
+        ctx.user,
+        'gastown.adminDeleteBeadsByStatus',
+        { townId: input.townId, status: input.status, type: input.type },
+        z.object({ deleted: z.number() })
+      );
+      return result ?? { deleted: 0 };
+    }),
+
   /** Force-retry a stalled review queue entry. Not yet implemented on the worker. */
   forceRetryReview: adminProcedure
     .input(z.object({ townId: z.string().uuid(), entryId: z.string().uuid() }))

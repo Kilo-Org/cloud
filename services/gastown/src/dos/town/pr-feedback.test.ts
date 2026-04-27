@@ -16,10 +16,16 @@ describe('TownConfigSchema refinery extensions', () => {
     expect(config.refinery?.code_review).toBe(false);
   });
 
-  it('defaults auto_resolve_pr_feedback to false', () => {
+  // Schema-level defaults are deliberately conservative — parsing an empty
+  // object returns undefined/false/null for the keys whose "new town" values
+  // moved into seedNewTownConfig(). This protects existing persisted configs
+  // from silently flipping behavior when they're re-loaded after a deploy.
+  it('does NOT inject refinery defaults when parsing an empty object', () => {
     const config = TownConfigSchema.parse({});
     expect(config.refinery).toBeUndefined();
+  });
 
+  it('defaults auto_resolve_pr_feedback to false when refinery: {} is supplied', () => {
     const configWithRefinery = TownConfigSchema.parse({ refinery: {} });
     expect(configWithRefinery.refinery?.auto_resolve_pr_feedback).toBe(false);
   });

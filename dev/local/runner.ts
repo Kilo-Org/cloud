@@ -1,8 +1,8 @@
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
-import { getService } from './services';
+import { getService, getInfraProfile, getAllInfraProfiles } from './services';
 import {
   createWindow,
   sendKeys,
@@ -110,10 +110,18 @@ export function startServiceInTmux(sessionName: string, serviceName: string): vo
   const svc = getService(serviceName);
   const winIndex = createWindow(sessionName, serviceName);
   if (svc.type === 'infra') {
+    // Profile-gated services need --profile on every compose subcommand,
+    // including `logs`. Without it, Compose v2 filters the service out of
+    // the graph and the tmux pane is silent or errors. Shell-quote the
+    // profile and service names — they are safe identifiers today but the
+    // quoting keeps the command robust if a future maintainer adds a name
+    // containing whitespace or metacharacters.
+    const profile = getInfraProfile(serviceName);
+    const profileArg = profile ? `--profile ${shellQuote(profile)} ` : '';
     sendKeys(
       sessionName,
       serviceName,
-      `docker compose -f dev/docker-compose.yml logs -f ${serviceName}`
+      `docker compose ${profileArg}-f dev/docker-compose.yml logs -f ${shellQuote(serviceName)}`
     );
   } else {
     sendKeys(sessionName, serviceName, buildStartCommand(serviceName));
@@ -279,13 +287,50 @@ export function restartServiceInTmux(sessionName: string, serviceName: string): 
 // Infrastructure
 // ---------------------------------------------------------------------------
 
+/**
+ * Build `docker compose down` argv with `--profile` flags for every known
+ * infra profile so profile-gated services (e.g. grafana) are torn down
+ * alongside the default set. Compose v2's `down` behaviour with
+ * profile-gated services has varied across versions; passing the flags
+ * explicitly makes the teardown symmetric with startInfra and avoids
+ * surprises. Returned as an argv array for execFileSync — keeps the
+ * shell out of the loop entirely, matching startInfra.
+ */
+export function buildInfraDownArgs(): [string, string[]] {
+  const profileArgs = getAllInfraProfiles().flatMap(p => ['--profile', p]);
+  return ['docker', ['compose', ...profileArgs, '-f', 'dev/docker-compose.yml', 'down']];
+}
+
 export async function startInfra(repoRoot: string, serviceNames: string[]): Promise<void> {
   const infraServices = serviceNames.filter(name => getService(name).type === 'infra');
   if (infraServices.length === 0) return;
-  execSync('docker compose -f dev/docker-compose.yml up -d', { cwd: repoRoot, stdio: 'inherit' });
+
+  const profiles = new Set<string>();
+  for (const name of infraServices) {
+    const profile = getInfraProfile(name);
+    if (profile) profiles.add(profile);
+  }
+  const profileArgs = [...profiles].flatMap(p => [`--profile`, p]);
+
+  // Pass --env-file so docker compose substitution sees secrets like
+  // CF_AE_TOKEN without polluting the runner's process.env or exposing
+  // every .env.local value to sibling child processes.
+  const envFileArg = fs.existsSync(path.join(repoRoot, '.env.local'))
+    ? ['--env-file', '.env.local']
+    : [];
+
+  const args = ['compose', ...envFileArg, '-f', 'dev/docker-compose.yml'];
+  args.push(...profileArgs, 'up', '-d');
+  execFileSync('docker', args, { cwd: repoRoot, stdio: 'inherit' });
+
   for (const name of infraServices) {
     const svc = getService(name);
-    const maxWait = name === 'postgres' ? 30_000 : 15_000;
+    // Grafana is slow on first boot because it downloads plugins; postgres
+    // periodically needs a longer window as well. Everything else is quick.
+    // waitForPort warns and returns on timeout rather than throwing — a slow
+    // plugin download will not block the session; Grafana appears in the
+    // sidebar once the port opens on a subsequent probe.
+    const maxWait = name === 'postgres' || name === 'grafana' ? 30_000 : 15_000;
     await waitForPort(svc.port, name, maxWait);
   }
 }
@@ -301,8 +346,14 @@ export function readEnvValue(filePath: string, key: string): string | undefined 
   } catch {
     return undefined;
   }
-  const match = new RegExp(`^${key}=(.*)$`, 'm').exec(content);
-  return match ? match[1] : undefined;
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`^${escapedKey}=(.*)$`, 'm').exec(content);
+  if (!match) return undefined;
+  // Strip matching surrounding quotes so KEY="" and KEY='' read as empty
+  // strings rather than two-character strings containing the quotes.
+  // Returns "" (not undefined) for explicitly-empty values so callers can
+  // distinguish "key absent from file" from "key present but empty".
+  return match[1].replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
 }
 
 export function readEnvMtime(filePath: string): number | undefined {

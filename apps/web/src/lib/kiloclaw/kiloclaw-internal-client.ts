@@ -1,5 +1,10 @@
 import 'server-only';
 
+import type {
+  KiloclawDestroyReason,
+  KiloclawStartReason,
+  KiloclawStopReason,
+} from '@kilocode/worker-utils';
 import { KILOCLAW_API_URL, KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
 import type {
   ImageVersionEntry,
@@ -32,6 +37,9 @@ import type {
   GatewayReadyResponse,
   ControllerVersionResponse,
   OpenclawConfigResponse,
+  MorningBriefingStatusResponse,
+  MorningBriefingActionResponse,
+  MorningBriefingReadResponse,
   GoogleCredentialsInput,
   GoogleCredentialsResponse,
   GoogleOAuthConnectionInput,
@@ -153,50 +161,78 @@ export class KiloClawInternalClient {
   async start(
     userId: string,
     instanceId?: string,
-    options?: { skipCooldown?: boolean }
-  ): Promise<{ ok: true }> {
+    options?: { skipCooldown?: boolean; reason?: KiloclawStartReason }
+  ): Promise<{
+    ok: true;
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/start${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, ...options }),
+        body: JSON.stringify({
+          userId,
+          ...(options?.skipCooldown ? { skipCooldown: true } : {}),
+          ...(options?.reason ? { reason: options.reason } : {}),
+        }),
       },
       { userId }
     );
   }
 
-  async startAsync(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async startAsync(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawStartReason }
+  ): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/start-async${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
   }
 
-  async stop(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async stop(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawStopReason }
+  ): Promise<{
+    ok: true;
+    stopped: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    stoppedAt: number | null;
+  }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/stop${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
   }
 
-  async destroy(userId: string, instanceId?: string): Promise<{ ok: true }> {
+  async destroy(
+    userId: string,
+    instanceId?: string,
+    options?: { reason?: KiloclawDestroyReason }
+  ): Promise<{ ok: true }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
     return this.request(
       `/api/platform/destroy${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, ...(options?.reason ? { reason: options.reason } : {}) }),
       },
       { userId }
     );
@@ -237,6 +273,77 @@ export class KiloClawInternalClient {
         method: 'POST',
         body: JSON.stringify({ userId, message, instanceId }),
       },
+      { userId }
+    );
+  }
+
+  async getMorningBriefingStatus(
+    userId: string,
+    instanceId?: string
+  ): Promise<MorningBriefingStatusResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(`/api/platform/morning-briefing/status?${params.toString()}`, undefined, {
+      userId,
+    });
+  }
+
+  async enableMorningBriefing(
+    userId: string,
+    input?: { cron?: string; timezone?: string },
+    instanceId?: string
+  ): Promise<MorningBriefingActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/enable${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...input }),
+      },
+      { userId }
+    );
+  }
+
+  async disableMorningBriefing(
+    userId: string,
+    instanceId?: string
+  ): Promise<MorningBriefingActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/disable${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async runMorningBriefing(
+    userId: string,
+    instanceId?: string
+  ): Promise<MorningBriefingActionResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/morning-briefing/run${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      },
+      { userId }
+    );
+  }
+
+  async readMorningBriefing(
+    userId: string,
+    day: 'today' | 'yesterday',
+    instanceId?: string
+  ): Promise<MorningBriefingReadResponse> {
+    const params = new URLSearchParams({ userId });
+    if (instanceId) params.set('instanceId', instanceId);
+    return this.request(
+      `/api/platform/morning-briefing/read/${day}?${params.toString()}`,
+      undefined,
       { userId }
     );
   }

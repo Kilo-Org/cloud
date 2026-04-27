@@ -12,7 +12,11 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
 
 import { db } from '@/lib/drizzle';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { autoResumeIfSuspended, completeAutoResumeIfReady } from './instance-lifecycle';
+import {
+  autoResumeIfSuspended,
+  clearTrialInactivityStopAfterStart,
+  completeAutoResumeIfReady,
+} from './instance-lifecycle';
 
 const selectResultsQueue: unknown[][] = [];
 const updateSetCalls: Array<Record<string, unknown>> = [];
@@ -62,9 +66,15 @@ describe('instance lifecycle async resume', () => {
 
     mockDb.select.mockReset();
     mockDb.select.mockImplementation(() => ({
-      from: jest.fn(() => ({
-        where: jest.fn(() => createSelectResult(selectResultsQueue.shift() ?? [])),
-      })),
+      from: jest.fn(() => {
+        const whereResult = createSelectResult(selectResultsQueue.shift() ?? []);
+        return {
+          leftJoin: jest.fn(() => ({
+            where: jest.fn(() => whereResult),
+          })),
+          where: jest.fn(() => whereResult),
+        };
+      }),
     }));
 
     mockDb.update.mockReset();
@@ -132,7 +142,9 @@ describe('instance lifecycle async resume', () => {
 
     await autoResumeIfSuspended('user-1', instanceId);
 
-    expect(startAsyncMock).toHaveBeenCalledWith('user-1', instanceId);
+    expect(startAsyncMock).toHaveBeenCalledWith('user-1', instanceId, {
+      reason: 'interrupted_auto_resume',
+    });
     expect(updateSetCalls).toHaveLength(1);
     expect(updateSetCalls[0]).toEqual(
       expect.objectContaining({
@@ -282,5 +294,106 @@ describe('instance lifecycle async resume', () => {
     expect(mockDb.transaction).not.toHaveBeenCalled();
     expect(txUpdateSetCalls).toHaveLength(0);
     expect(deleteWhereCalls).toHaveLength(0);
+  });
+});
+
+describe('clearTrialInactivityStopAfterStart', () => {
+  beforeEach(() => {
+    selectResultsQueue.length = 0;
+    updateSetCalls.length = 0;
+    txUpdateSetCalls.length = 0;
+    txInsertValues.length = 0;
+    deleteWhereCalls.length = 0;
+    startAsyncMock.mockReset();
+    jest.mocked(KiloClawInternalClient).mockImplementation(
+      () =>
+        ({
+          startAsync: startAsyncMock,
+        }) as never
+    );
+
+    mockDb.select.mockReset();
+    mockDb.select.mockImplementation(() => ({
+      from: jest.fn(() => {
+        const whereResult = createSelectResult(selectResultsQueue.shift() ?? []);
+        return {
+          leftJoin: jest.fn(() => ({
+            where: jest.fn(() => whereResult),
+          })),
+          where: jest.fn(() => whereResult),
+        };
+      }),
+    }));
+
+    mockDb.update.mockReset();
+    mockDb.update.mockImplementation(() => ({
+      set: jest.fn((values: Record<string, unknown>) => {
+        updateSetCalls.push(values);
+        const whereResult = createWhereResult([{}]);
+        return {
+          where: jest.fn(() => whereResult),
+        };
+      }),
+    }));
+  });
+
+  it('clears the inactivity marker for a current personal trial subscription', async () => {
+    const instanceId = '22222222-2222-4222-8222-222222222222';
+    selectResultsQueue.push([
+      {
+        subscription: {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          plan: 'trial',
+          status: 'trialing',
+        },
+        instance: {
+          id: instanceId,
+          userId: 'user-1',
+          sandboxId: 'ki_22222222222242228222222222222222',
+          name: null,
+          destroyedAt: null,
+          organizationId: null,
+        },
+      },
+    ]);
+
+    const result = await clearTrialInactivityStopAfterStart({
+      kiloUserId: 'user-1',
+      instanceId,
+    });
+
+    expect(result).toBe(true);
+    expect(updateSetCalls).toContainEqual({ inactive_trial_stopped_at: null });
+  });
+
+  it('does not clear the inactivity marker for non-trial subscriptions', async () => {
+    const instanceId = '33333333-3333-4333-8333-333333333333';
+    selectResultsQueue.push([
+      {
+        subscription: {
+          user_id: 'user-1',
+          instance_id: instanceId,
+          plan: 'standard',
+          status: 'active',
+        },
+        instance: {
+          id: instanceId,
+          userId: 'user-1',
+          sandboxId: 'ki_33333333333343338333333333333333',
+          name: null,
+          destroyedAt: null,
+          organizationId: null,
+        },
+      },
+    ]);
+
+    const result = await clearTrialInactivityStopAfterStart({
+      kiloUserId: 'user-1',
+      instanceId,
+    });
+
+    expect(result).toBe(false);
+    expect(updateSetCalls).toHaveLength(0);
   });
 });

@@ -232,6 +232,7 @@ export function registerConfigRoutes(
         renameSync: () => undefined,
         unlinkSync: () => undefined,
         readdirSync: () => [],
+        statSync: () => ({ isDirectory: () => false }),
         execFileSync: () => '',
       });
 

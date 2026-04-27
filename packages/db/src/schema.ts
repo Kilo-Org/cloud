@@ -265,6 +265,7 @@ export const kilocode_users = pgTable(
     blocked_at: timestamp({ withTimezone: true, mode: 'string' }),
     blocked_by_kilo_user_id: text(),
     api_token_pepper: text(),
+    web_session_pepper: text(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     is_bot: boolean().default(false).notNull(),
 
@@ -899,6 +900,7 @@ export const api_request_log = pgTable(
     status_code: integer(),
     request: jsonb(),
     response: text(),
+    error: jsonb(),
   },
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
@@ -3765,6 +3767,7 @@ export const kiloclaw_instances = pgTable(
     organization_id: uuid().references(() => organizations.id),
     name: text(),
     inbound_email_enabled: boolean().default(true).notNull(),
+    inactive_trial_stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
   },

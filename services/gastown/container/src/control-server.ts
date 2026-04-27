@@ -9,12 +9,15 @@ import {
   activeAgentCount,
   activeServerCount,
   getUptime,
+  getStartTime,
+  getMayorReadyAt,
   stopAll,
   drainAll,
   isDraining,
   getAgentEvents,
   registerEventSink,
 } from './process-manager';
+import { log } from './logger';
 import { startHeartbeat, stopHeartbeat, notifyContainerReady } from './heartbeat';
 import { pushContext as pushDashboardContext } from './dashboard-context';
 import { mergeBranch, setupRigBrowseWorktree } from './git-manager';
@@ -43,9 +46,41 @@ const TownConfigHeader = z.record(z.string(), z.unknown());
 // Used as a fallback by code that runs outside a request context (e.g. background tasks).
 let lastKnownTownConfig: Record<string, unknown> | null = null;
 
+// Track which custom env var keys were applied last sync so removed keys can be cleared.
+let lastAppliedEnvVarKeys = new Set<string>();
+
+// Env keys managed by the control plane that custom env_vars must never override.
+// If a custom key collides with a reserved key, the infra value wins and the
+// custom value is silently ignored — matching the !(key in env) guard in buildAgentEnv.
+export const RESERVED_ENV_KEYS = new Set([
+  'KILOCODE_TOKEN',
+  'GIT_TOKEN',
+  'GITHUB_TOKEN',
+  'GITLAB_TOKEN',
+  'GITLAB_INSTANCE_URL',
+  'GITHUB_CLI_PAT',
+  'GH_TOKEN',
+  'GASTOWN_GIT_AUTHOR_NAME',
+  'GASTOWN_GIT_AUTHOR_EMAIL',
+  'GASTOWN_DISABLE_AI_COAUTHOR',
+  'GASTOWN_ORGANIZATION_ID',
+  'GASTOWN_CONTAINER_TOKEN',
+  'GASTOWN_SESSION_TOKEN',
+  'GASTOWN_API_URL',
+  // Runtime routing vars read by pending-nudge routes and plugin clients —
+  // must never be overwritten by user-supplied env_vars.
+  'GASTOWN_TOWN_ID',
+  'GASTOWN_RIG_ID',
+]);
+
 /** Get the latest town config delivered via X-Town-Config header. */
 export function getCurrentTownConfig(): Record<string, unknown> | null {
   return lastKnownTownConfig;
+}
+
+/** Get the set of custom env var keys applied in the last sync. */
+export function getLastAppliedEnvVarKeys(): Set<string> {
+  return lastAppliedEnvVarKeys;
 }
 
 /**
@@ -102,6 +137,27 @@ function syncTownConfigToProcessEnv(): void {
   } else {
     delete process.env.GASTOWN_ORGANIZATION_ID;
   }
+
+  // Apply custom env_vars from the town config. Reserved infra keys are
+  // skipped so the control-plane values always take precedence — matching the
+  // !(key in env) guard in buildAgentEnv.
+  const rawEnvVars = cfg.env_vars;
+  const customEnvVars: Record<string, string> =
+    rawEnvVars !== null && typeof rawEnvVars === 'object' && !Array.isArray(rawEnvVars)
+      ? (rawEnvVars as Record<string, string>)
+      : {};
+  const newCustomKeys = new Set(Object.keys(customEnvVars));
+  // Remove keys that were present in the previous sync but are gone now.
+  // Skip reserved keys — deleting those would wipe a control-plane value.
+  for (const key of lastAppliedEnvVarKeys) {
+    if (!newCustomKeys.has(key) && !RESERVED_ENV_KEYS.has(key)) delete process.env[key];
+  }
+  // Apply current custom env vars, skipping reserved keys.
+  for (const [key, value] of Object.entries(customEnvVars)) {
+    if (RESERVED_ENV_KEYS.has(key)) continue;
+    process.env[key] = String(value);
+  }
+  lastAppliedEnvVarKeys = newCustomKeys;
 }
 
 export const app = new Hono();
@@ -165,6 +221,8 @@ app.get('/health', c => {
     servers: activeServerCount(),
     uptime: getUptime(),
     draining: isDraining() || undefined,
+    startedAt: getStartTime(),
+    mayorReadyAt: getMayorReadyAt() ?? undefined,
   };
   return c.json(response);
 });
@@ -471,9 +529,9 @@ app.post('/repos/setup', async c => {
 
 // POST /git/merge
 // Deterministic merge of a polecat branch into the target branch.
-// Called by the Rig DO's processReviewQueue → startMergeInContainer.
-// Runs the merge synchronously and reports the result back to the Rig DO
-// via a callback to the completeReview endpoint.
+// Called by the TownDO's startMergeInContainer.
+// Runs the merge synchronously and reports the result back via a callback
+// to the completeReview endpoint.
 app.post('/git/merge', async c => {
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = MergeRequest.safeParse(body);
@@ -539,7 +597,7 @@ app.post('/git/merge', async c => {
     }
   };
 
-  // Fire and forget — the Rig DO will time out stuck entries via recoverStuckReviews
+  // Fire and forget — the TownDO will time out stuck entries via its alarm loop
   doMerge().catch(err => {
     console.error(`Merge failed for entry ${req.entryId}:`, err);
   });
@@ -685,6 +743,15 @@ app.post('/agents/:agentId/pty', async c => {
         console.log(
           `[control-server] Reusing existing PTY session ${running.id} for agent ${agentId}`
         );
+        const reuseAgent = getAgentStatus(agentId);
+        if (reuseAgent) {
+          log.info('agent.pty_connected', {
+            agentId,
+            containerUptimeMs: getUptime(),
+            agentUptimeMs: Date.now() - new Date(reuseAgent.startedAt).getTime(),
+            reused: true,
+          });
+        }
         return c.json(running);
       }
     }
@@ -737,6 +804,14 @@ app.post('/agents/:agentId/pty', async c => {
   console.log(
     `[control-server] Created new PTY session for agent ${agentId}: ${data.slice(0, 200)}`
   );
+  if (createResp.ok) {
+    log.info('agent.pty_connected', {
+      agentId,
+      containerUptimeMs: getUptime(),
+      agentUptimeMs: Date.now() - new Date(agent.startedAt).getTime(),
+      reused: false,
+    });
+  }
   return new Response(data, {
     status: createResp.status,
     headers: { 'Content-Type': 'application/json' },

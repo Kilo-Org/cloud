@@ -27,7 +27,11 @@ import {
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { flattenError, z } from 'zod';
-import { withDORetry } from '@kilocode/worker-utils';
+import {
+  KiloclawStartReasonSchema,
+  KiloclawStopReasonSchema,
+  withDORetry,
+} from '@kilocode/worker-utils';
 import { readBillingCorrelationHeaders } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 import {
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
@@ -976,7 +980,7 @@ platform.post('/provision', async c => {
         c.env,
         userId,
         provisionedInstanceId,
-        stub => stub.destroy(),
+        stub => stub.destroy({ reason: 'bootstrap_cleanup_failure' }),
         'destroy'
       ).catch(destroyErr => {
         console.error(
@@ -1907,6 +1911,234 @@ platform.patch('/openclaw-config', async c => {
   }
 });
 
+const MorningBriefingSetupSchema = z.object({
+  userId: z.string().min(1),
+  cron: z.string().min(1).optional(),
+  timezone: z.string().min(1).optional(),
+});
+
+function isMorningBriefingWarmupError(err: unknown): boolean {
+  const raw = err instanceof Error ? err.message : String(err);
+  const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
+  return (
+    normalized.includes('Gateway not running') ||
+    normalized.includes('Failed to reach gateway') ||
+    normalized.includes('operation was aborted due to timeout')
+  );
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function withMorningBriefingWarmupRetry<T>(operation: () => Promise<T>): Promise<T> {
+  const delaysMs = [0, 750, 1500];
+  let lastError: unknown = null;
+
+  for (const delayMs of delaysMs) {
+    if (delayMs > 0) {
+      await sleep(delayMs);
+    }
+
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      if (!isMorningBriefingWarmupError(err)) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Gateway warming up');
+}
+
+// GET /api/platform/morning-briefing/status?userId=...
+platform.get('/morning-briefing/status', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const result = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getMorningBriefingStatus(),
+      'getMorningBriefingStatus'
+    );
+    if (!result) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(result, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return c.json(
+        {
+          ok: true,
+          enabled: false,
+          reconcileState: 'in_progress',
+          error: 'Gateway warming up, retrying shortly.',
+          code: 'gateway_warming_up',
+          retryAfterSec: 2,
+        },
+        200
+      );
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/status');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/enable
+platform.post('/morning-briefing/enable', async c => {
+  const result = await parseBody(c, MorningBriefingSetupSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, cron, timezone } = result.data;
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.enableMorningBriefing({ cron, timezone }),
+        'enableMorningBriefing'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/enable');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/disable
+platform.post('/morning-briefing/disable', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withMorningBriefingWarmupRetry(() =>
+      withResolvedDORetry(
+        c.env,
+        result.data.userId,
+        iidResult.instanceId,
+        stub => stub.disableMorningBriefing(),
+        'disableMorningBriefing'
+      )
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    if (isMorningBriefingWarmupError(err)) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/disable');
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/morning-briefing/run
+platform.post('/morning-briefing/run', async c => {
+  const result = await parseBody(c, UserIdRequestSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub => stub.runMorningBriefing(),
+      'runMorningBriefing'
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/run');
+    return jsonError(message, status, code);
+  }
+});
+
+// GET /api/platform/morning-briefing/read/{today|yesterday}?userId=...
+platform.get('/morning-briefing/read/:day', async c => {
+  const userId = setValidatedQueryUserId(c);
+  if (!userId) {
+    return c.json({ error: 'userId query parameter is required' }, 400);
+  }
+
+  const day = c.req.param('day');
+  if (day !== 'today' && day !== 'yesterday') {
+    return c.json({ error: 'day must be today or yesterday' }, 400);
+  }
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.readMorningBriefing(day),
+      'readMorningBriefing'
+    );
+    if (!response) {
+      return jsonError(
+        'Morning Briefing unavailable (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+    return c.json(response, 200);
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      `morning-briefing/read/${day}`
+    );
+    return jsonError(message, status, code);
+  }
+});
+
 // GET /api/platform/files/tree?userId=...
 platform.get('/files/tree', async c => {
   const userId = setValidatedQueryUserId(c);
@@ -2189,6 +2421,7 @@ platform.post('/kilo-cli-run/cancel', async c => {
 // POST /api/platform/start
 const StartRequestSchema = UserIdRequestSchema.extend({
   skipCooldown: z.boolean().optional(),
+  reason: KiloclawStartReasonSchema.optional(),
 });
 
 async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
@@ -2202,39 +2435,55 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
 
   try {
     const route = mode === 'async' ? '/api/platform/start-async' : '/api/platform/start';
-    const eventBase =
-      mode === 'async' ? 'instance.async_start_requested' : 'instance.manual_start_succeeded';
-    const options = result.data.skipCooldown ? { skipCooldown: true } : undefined;
+    const startOptions =
+      result.data.skipCooldown || result.data.reason
+        ? {
+            ...(result.data.skipCooldown ? { skipCooldown: true } : {}),
+            ...(result.data.reason ? { reason: result.data.reason } : {}),
+          }
+        : undefined;
+    const asyncStartOptions = result.data.reason ? { reason: result.data.reason } : undefined;
 
     if (mode === 'async') {
       await withResolvedDORetry(
         c.env,
         result.data.userId,
         instanceId,
-        stub => stub.startAsync(result.data.userId),
+        stub => stub.startAsync(result.data.userId, asyncStartOptions),
         'startAsync'
       );
-    } else {
-      const { started } = await withResolvedDORetry(
-        c.env,
-        result.data.userId,
-        instanceId,
-        stub => stub.start(result.data.userId, options),
-        'start'
-      );
-      if (!started) {
-        return c.json({ ok: true });
-      }
+
+      writeEvent(c.env, {
+        event: 'instance.async_start_requested',
+        delivery: 'http',
+        route,
+        userId: result.data.userId,
+        label: result.data.reason,
+        durationMs: performance.now() - startedAt,
+      });
+      return c.json({ ok: true });
     }
 
-    writeEvent(c.env, {
-      event: eventBase,
-      delivery: 'http',
-      route,
-      userId: result.data.userId,
-      durationMs: performance.now() - startedAt,
-    });
-    return c.json({ ok: true });
+    const startResult = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      instanceId,
+      stub => stub.start(result.data.userId, startOptions),
+      'start'
+    );
+
+    if (startResult.currentStatus === 'running') {
+      writeEvent(c.env, {
+        event: 'instance.manual_start_succeeded',
+        delivery: 'http',
+        route,
+        userId: result.data.userId,
+        label: result.data.reason,
+        durationMs: performance.now() - startedAt,
+      });
+    }
+
+    return c.json({ ok: true, ...startResult });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'start');
     writeEvent(c.env, {
@@ -2243,6 +2492,7 @@ async function handleStartRequest(c: Context<AppEnv>, mode: 'sync' | 'async') {
       delivery: 'http',
       route: mode === 'async' ? '/api/platform/start-async' : '/api/platform/start',
       userId: result.data.userId,
+      label: result.data.reason,
       error: message,
       durationMs: performance.now() - startedAt,
     });
@@ -2321,9 +2571,13 @@ platform.post('/cleanup-recovery-previous-volume', async c => {
   }
 });
 
+const StopRequestSchema = UserIdRequestSchema.extend({
+  reason: KiloclawStopReasonSchema.optional(),
+});
+
 // POST /api/platform/stop
 platform.post('/stop', async c => {
-  const result = await parseBody(c, UserIdRequestSchema);
+  const result = await parseBody(c, StopRequestSchema);
   if ('error' in result) return result.error;
 
   const iidResult = parseInstanceIdQuery(c);
@@ -2331,8 +2585,15 @@ platform.post('/stop', async c => {
   const { instanceId } = iidResult;
 
   try {
-    await withResolvedDORetry(c.env, result.data.userId, instanceId, stub => stub.stop(), 'stop');
-    return c.json({ ok: true });
+    const stopOptions = result.data.reason ? { reason: result.data.reason } : undefined;
+    const stopResult = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      instanceId,
+      stub => stub.stop(stopOptions),
+      'stop'
+    );
+    return c.json({ ok: true, ...stopResult });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'stop');
     return jsonError(message, status);
@@ -2369,7 +2630,14 @@ platform.post('/destroy', async c => {
   }
 
   try {
-    await withResolvedDORetry(c.env, userId, instanceId, stub => stub.destroy(), 'destroy');
+    const destroyOptions = result.data.reason ? { reason: result.data.reason } : undefined;
+    await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.destroy(destroyOptions),
+      'destroy'
+    );
 
     // Remove the instance from the registry (best-effort).
     // When instanceId is provided, destroy by instanceId directly.

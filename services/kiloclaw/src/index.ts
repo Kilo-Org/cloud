@@ -537,7 +537,7 @@ async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
 
     // Machine dead despite running status -- restart
     console.log('[PROXY] Instance status is running but machine unreachable, restarting');
-    const { started } = await stub.start(userId);
+    const { started } = await stub.start(userId, { reason: 'crash_recovery' });
     if (started) {
       const freshStatus = await stub.getStatus();
       writeEvent(c.env, {

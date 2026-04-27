@@ -1,0 +1,17 @@
+{
+  "id": "kiloclaw-morning-briefing",
+  "name": "KiloClawMorningBriefing",
+  "description": "Daily Morning Briefing plugin for KiloClaw-hosted OpenClaw",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "defaultCron": {
+        "type": "string"
+      },
+      "defaultTimezone": {
+        "type": "string"
+      }
+    }
+  }
+}

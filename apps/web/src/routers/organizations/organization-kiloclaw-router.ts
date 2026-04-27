@@ -511,7 +511,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
   start: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const client = new KiloClawInternalClient();
-    const result = await client.start(ctx.user.id, workerInstanceId(instance));
+    const result = await client.start(ctx.user.id, workerInstanceId(instance), {
+      reason: 'manual_user_request',
+    });
     PostHogClient().capture({
       distinctId: ctx.user.google_user_email,
       event: 'claw_org_instance_started',
@@ -523,7 +525,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
   stop: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const client = new KiloClawInternalClient();
-    return client.stop(ctx.user.id, workerInstanceId(instance));
+    return client.stop(ctx.user.id, workerInstanceId(instance), {
+      reason: 'manual_user_request',
+    });
   }),
 
   destroy: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
@@ -532,7 +536,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     let result: Awaited<ReturnType<KiloClawInternalClient['destroy']>>;
     try {
-      result = await client.destroy(ctx.user.id, workerInstanceId(instance));
+      result = await client.destroy(ctx.user.id, workerInstanceId(instance), {
+        reason: 'manual_user_request',
+      });
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);
@@ -1146,6 +1152,57 @@ export const organizationKiloclawRouter = createTRPCRouter({
         }
         throw err;
       }
+    }),
+
+  getMorningBriefingStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
+    const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+    const client = new KiloClawInternalClient();
+    return client.getMorningBriefingStatus(ctx.user.id, workerInstanceId(instance));
+  }),
+
+  enableMorningBriefing: organizationMemberMutationProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid(),
+        cron: z.string().min(1).optional(),
+        timezone: z.string().min(1).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.enableMorningBriefing(
+        ctx.user.id,
+        {
+          cron: input.cron,
+          timezone: input.timezone,
+        },
+        workerInstanceId(instance)
+      );
+    }),
+
+  disableMorningBriefing: organizationMemberMutationProcedure
+    .input(z.object({ organizationId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.disableMorningBriefing(ctx.user.id, workerInstanceId(instance));
+    }),
+
+  runMorningBriefing: organizationMemberMutationProcedure
+    .input(z.object({ organizationId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.runMorningBriefing(ctx.user.id, workerInstanceId(instance));
+    }),
+
+  readMorningBriefing: organizationMemberProcedure
+    .input(z.object({ organizationId: z.uuid(), day: z.enum(['today', 'yesterday']) }))
+    .query(async ({ ctx, input }) => {
+      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+      const client = new KiloClawInternalClient();
+      return client.readMorningBriefing(ctx.user.id, input.day, workerInstanceId(instance));
     }),
 
   // ── Google integration ────────────────────────────────────────

@@ -24,8 +24,8 @@ export function ResetAPITokenDialog() {
   const resetAPIKeyMutation = useMutation(
     trpc.user.resetAPIKey.mutationOptions({
       onSuccess: () => {
-        toast.success('API token reset successfully. Redirecting to sign-in page...');
-        router.push('/users/sign_in');
+        toast.success('API token reset successfully. Refreshing token...');
+        router.refresh();
       },
     })
   );
@@ -35,22 +35,21 @@ export function ResetAPITokenDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive">
           <RotateCcw className="mr-2 h-4 w-4" />
-          Reset Token and Sign Out
+          Reset API Token
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-orange-600">
             <AlertTriangle className="h-5 w-5" />
-            Reset all API tokens and sign out everywhere.
+            Reset all API tokens?
           </DialogTitle>
           <DialogDescription className="text-muted-foreground pt-3">
             <strong className="text-foreground">This action cannot be undone.</strong>
             <br />
             <br />
-            Resetting your API token will invalidate all existing tokens. You will also be signed
-            out of all sessions. If you procees, you will need to sign in again and then re-open in
-            VS Code and/or other Kilo Code extensions.
+            Resetting your API token will invalidate all existing CLI, VS Code, JetBrains, and other
+            API tokens. Browser sessions will stay signed in.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
@@ -69,7 +68,7 @@ export function ResetAPITokenDialog() {
             onClick={() => resetAPIKeyMutation.mutate()}
             disabled={resetAPIKeyMutation.isPending}
           >
-            {resetAPIKeyMutation.isPending ? 'Resetting...' : 'Reset API Token and Sign Out'}
+            {resetAPIKeyMutation.isPending ? 'Resetting...' : 'Reset API Token'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -90,7 +90,7 @@ export async function handleSnapshotRestoreQueue(
 
       // Step 1: Stop the machine if running
       try {
-        await stub.stop();
+        await stub.stop({ reason: 'snapshot_restore' });
       } catch (err) {
         // stop() no-ops for non-running statuses, but may throw for unprovisioned
         console.warn('[queue] Stop during restore (non-fatal):', err);
@@ -142,7 +142,7 @@ export async function handleSnapshotRestoreQueue(
 
       // Step 5: Start the machine with the restored volume (creates a fresh machine)
       try {
-        await stub.start(userId);
+        await stub.start(userId, { reason: 'snapshot_restore' });
         console.log(`[queue] Machine started after restore for user=${userId}`);
       } catch (startErr) {
         // Restore succeeded even if start fails — the volume is swapped.

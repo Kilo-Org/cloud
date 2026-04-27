@@ -30,6 +30,11 @@ import {
 import type { FlyVolume, FlyVolumeSnapshot } from '../../fly/types';
 import * as fly from '../../fly/client';
 import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '../../auth/sandbox-id';
+import type {
+  KiloclawDestroyReason,
+  KiloclawStartReason,
+  KiloclawStopReason,
+} from '@kilocode/worker-utils';
 import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
@@ -247,16 +252,27 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
   }
 
+  private async clearPendingStartReason(): Promise<void> {
+    if (this.s.pendingStartReason === null) {
+      return;
+    }
+
+    this.s.pendingStartReason = null;
+    await this.persist({ pendingStartReason: null });
+  }
+
   private async markStartFailedFromProvider(message: string): Promise<void> {
     const now = Date.now();
     this.s.status = 'stopped';
     this.s.startingAt = null;
+    this.s.pendingStartReason = null;
     this.s.lastStoppedAt = now;
     this.s.lastStartErrorMessage = message;
     this.s.lastStartErrorAt = now;
     await this.persist({
       status: 'stopped',
       startingAt: null,
+      pendingStartReason: null,
       lastStoppedAt: now,
       lastStartErrorMessage: message,
       lastStartErrorAt: now,
@@ -285,10 +301,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async markNonFlyRunningFromProvider(reason: 'start' | 'runtime'): Promise<void> {
     const startingAt = this.s.startingAt;
+    const startReason = reason === 'start' ? this.s.pendingStartReason : null;
     this.s.status = 'running';
     this.s.startingAt = null;
     this.s.restartingAt = null;
     this.s.restartUpdateSent = false;
+    this.s.pendingStartReason = reason === 'start' ? null : this.s.pendingStartReason;
     if (this.s.lastStartedAt === null) {
       this.s.lastStartedAt = Date.now();
     }
@@ -302,6 +320,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       startingAt: null,
       restartingAt: null,
       restartUpdateSent: false,
+      ...(reason === 'start' ? { pendingStartReason: null } : {}),
       lastStartedAt: this.s.lastStartedAt,
       healthCheckFailCount: 0,
       lastStartErrorMessage: null,
@@ -314,6 +333,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.emitEvent({
         event: 'instance.started',
         status: 'running',
+        label: startReason ?? undefined,
         durationMs: startingAt ? Date.now() - startingAt : undefined,
       });
     }
@@ -797,7 +817,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     if (isNew) {
-      await this.startAsync(userId);
+      await this.startAsync(userId, { reason: 'initial_provision' });
     }
 
     this.emitEvent({
@@ -1673,14 +1693,24 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   async start(
     userId?: string,
-    options?: { skipCooldown?: boolean }
-  ): Promise<{ started: boolean }> {
+    options?: { skipCooldown?: boolean; reason?: KiloclawStartReason }
+  ): Promise<{
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     // Guard against concurrent start() calls — two overlapping invocations
     // (e.g. startAsync via waitUntil + a direct RPC start) can both see
     // flyMachineId as null and each create a Fly machine, orphaning one.
     if (this.startInProgress) {
       doWarn(this.s, 'start: already in progress, skipping duplicate call');
-      return { started: false };
+      return {
+        started: false,
+        previousStatus: this.s.status,
+        currentStatus: this.s.status,
+        startedAt: this.s.lastStartedAt,
+      };
     }
     this.startInProgress = true;
 
@@ -1693,9 +1723,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async _startInner(
     userId?: string,
-    options?: { skipCooldown?: boolean }
-  ): Promise<{ started: boolean }> {
+    options?: { skipCooldown?: boolean; reason?: KiloclawStartReason }
+  ): Promise<{
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }> {
     await this.loadState();
+    const previousStatus = this.s.status;
+    const startReason = options?.reason ?? this.s.pendingStartReason;
 
     if (this.s.status === 'destroying') {
       throw new Error('Cannot start: instance is being destroyed');
@@ -1816,8 +1853,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
               createReconcileContext(this.s, this.env, 'start')
             );
             console.log('[DO] Machine already running, mount verified');
+            await this.clearPendingStartReason();
             await this.scheduleAlarm();
-            return { started: false };
+            return {
+              started: false,
+              previousStatus,
+              currentStatus: this.s.status,
+              startedAt: this.s.lastStartedAt,
+            };
           }
           console.log(
             '[DO] Status is running but machine state is:',
@@ -1909,12 +1952,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const currentStatus = await this.ctx.storage.get('status');
     if (!currentStatus || currentStatus === 'destroying') {
       doWarn(this.s, 'start: instance was destroyed while starting, aborting');
-      return { started: false };
+      if (currentStatus === 'destroying') {
+        await this.clearPendingStartReason();
+      } else {
+        this.s.pendingStartReason = null;
+      }
+      return {
+        started: false,
+        previousStatus,
+        currentStatus: typeof currentStatus === 'string' ? currentStatus : this.s.status,
+        startedAt: this.s.lastStartedAt,
+      };
     }
 
     const startingAt = this.s.startingAt;
     this.s.status = 'running';
     this.s.startingAt = null;
+    this.s.pendingStartReason = null;
     this.s.lastStartedAt = Date.now();
     this.s.healthCheckFailCount = 0;
     this.s.lastStartErrorMessage = null;
@@ -1922,6 +1976,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.persist({
       status: 'running',
       startingAt: null,
+      pendingStartReason: null,
       lastStartedAt: this.s.lastStartedAt,
       healthCheckFailCount: 0,
       flyMachineId: this.s.flyMachineId,
@@ -1935,11 +1990,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.emitEvent({
       event: 'instance.started',
       status: 'running',
+      label: startReason ?? undefined,
       durationMs: startingAt ? Date.now() - startingAt : undefined,
     });
 
     await this.scheduleAlarm();
-    return { started: true };
+    return {
+      started: true,
+      previousStatus,
+      currentStatus: this.s.status,
+      startedAt: this.s.lastStartedAt,
+    };
   }
 
   /**
@@ -1948,7 +2009,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Used by provision() so the RPC call returns quickly instead of waiting for
    * the full runtime startup sequence.
    */
-  async startAsync(userId?: string): Promise<void> {
+  async startAsync(userId?: string, options?: { reason?: KiloclawStartReason }): Promise<void> {
     await this.loadState();
 
     if (this.s.status === 'destroying') {
@@ -1965,13 +2026,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     // Record startingAt so reconcileStarting() can time out after STARTING_TIMEOUT_MS.
     this.s.status = 'starting';
     this.s.startingAt = Date.now();
-    await this.persist({ status: 'starting', startingAt: this.s.startingAt });
+    this.s.pendingStartReason = options?.reason ?? null;
+    await this.persist({
+      status: 'starting',
+      startingAt: this.s.startingAt,
+      pendingStartReason: this.s.pendingStartReason,
+    });
     await this.scheduleAlarm();
 
     // Run the actual start in the background; the reconcile alarm will
     // pick up the result and transition to 'running' (or fall back on error).
     this.ctx.waitUntil(
-      this.start(userId).catch(async err => {
+      this.start(userId, { reason: options?.reason }).catch(async err => {
         doError(this.s, 'startAsync: background start failed', {
           error: toLoggable(err),
         });
@@ -2041,12 +2107,18 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     );
   }
 
-  async stop(): Promise<void> {
+  async stop(options?: { reason?: KiloclawStopReason }): Promise<{
+    stopped: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    stoppedAt: number | null;
+  }> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.sandboxId) {
       throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
     }
+    const previousStatus = this.s.status;
     if (
       this.s.status === 'stopped' ||
       this.s.status === 'provisioned' ||
@@ -2057,7 +2129,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.status === 'restoring'
     ) {
       console.log('[DO] Instance not running (status:', this.s.status, '), no-op');
-      return;
+      return {
+        stopped: false,
+        previousStatus,
+        currentStatus: this.s.status,
+        stoppedAt: this.s.lastStoppedAt,
+      };
     }
 
     const machineUptimeMs = this.s.lastStartedAt ? Date.now() - this.s.lastStartedAt : 0;
@@ -2090,13 +2167,21 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.emitEvent({
       event: 'instance.stopped',
       status: 'stopped',
+      label: options?.reason,
       value: machineUptimeMs,
     });
 
     await this.scheduleAlarm();
+
+    return {
+      stopped: true,
+      previousStatus,
+      currentStatus: this.s.status,
+      stoppedAt: this.s.lastStoppedAt,
+    };
   }
 
-  async destroy(): Promise<DestroyResult> {
+  async destroy(options?: { reason?: KiloclawDestroyReason }): Promise<DestroyResult> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.sandboxId) {
@@ -2126,6 +2211,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.emitEvent({
       event: 'instance.destroy_started',
       status: 'destroying',
+      label: options?.reason,
       value: machineUptimeMs,
     });
 
@@ -2993,6 +3079,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return gateway.importOpenclawWorkspace(this.s, this.env, files);
   }
 
+  async getMorningBriefingStatus() {
+    await this.loadState();
+    return gateway.getMorningBriefingStatus(this.s, this.env);
+  }
+
+  async enableMorningBriefing(input: { cron?: string; timezone?: string }) {
+    await this.loadState();
+    return gateway.enableMorningBriefing(this.s, this.env, input);
+  }
+
+  async disableMorningBriefing() {
+    await this.loadState();
+    return gateway.disableMorningBriefing(this.s, this.env);
+  }
+
+  async runMorningBriefing() {
+    await this.loadState();
+    return gateway.runMorningBriefing(this.s, this.env);
+  }
+
+  async readMorningBriefing(day: 'today' | 'yesterday') {
+    await this.loadState();
+    return gateway.readMorningBriefing(this.s, this.env, day);
+  }
+
   // ── Restart machine (user-facing) ──────────────────────────────────
 
   async restartMachine(options?: {
@@ -3339,7 +3450,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         this.s,
         this.env,
         'alarm',
-        () => this.destroy().then(() => undefined),
+        () => this.destroy({ reason: 'stale_provision_cleanup' }).then(() => undefined),
         (userId, sandboxId) =>
           markDestroyedInPostgresHelper(this.env, this.ctx, this.s, userId, sandboxId)
       );

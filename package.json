@@ -26,6 +26,7 @@
     "dev:status": "tsx dev/local/cli.ts status",
     "dev:restart": "tsx dev/local/cli.ts restart",
     "dev:env": "tsx dev/local/cli.ts env",
+    "dev:seed": "tsx dev/seed/index.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
     "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts"
   },
@@ -44,6 +45,7 @@
   },
   "pnpm": {
     "overrides": {
+      "@sentry/cli": "^3.3.4",
       "mdast-util-to-hast": "^13.2.1",
       "storybook": "^9.1.17",
       "next": "^16.1.6",

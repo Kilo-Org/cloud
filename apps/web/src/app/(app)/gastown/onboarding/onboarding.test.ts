@@ -194,6 +194,7 @@ describe('presetToConfig', () => {
 
   test('returns custom config with provided models', () => {
     const config = presetToConfig('custom', {
+      defaultModel: 'openai/gpt-4.1',
       mayor: 'openai/gpt-4.1',
       refinery: 'anthropic/claude-opus-4',
       polecat: 'openai/gpt-4.1-mini',
@@ -216,9 +217,22 @@ describe('presetToConfig', () => {
     });
   });
 
-  test('uses kilo-auto/balanced for partially-specified custom models', () => {
-    const config = presetToConfig('custom', { mayor: 'openai/gpt-4.1' });
+  test('uses defaultModel as fallback for unset role overrides', () => {
+    const config = presetToConfig('custom', {
+      defaultModel: 'openai/gpt-4.1',
+      mayor: 'openai/gpt-4.1',
+    });
     expect(config.default_model).toBe('openai/gpt-4.1');
+    expect(config.role_models).toEqual({
+      mayor: 'openai/gpt-4.1',
+      refinery: 'openai/gpt-4.1',
+      polecat: 'openai/gpt-4.1',
+    });
+  });
+
+  test('uses kilo-auto/balanced for default_model when no defaultModel specified', () => {
+    const config = presetToConfig('custom', { mayor: 'openai/gpt-4.1' });
+    expect(config.default_model).toBe('kilo-auto/balanced');
     expect(config.role_models).toEqual({
       mayor: 'openai/gpt-4.1',
       refinery: 'kilo-auto/balanced',

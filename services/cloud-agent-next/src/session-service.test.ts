@@ -1770,18 +1770,21 @@ describe('SessionService', () => {
 
       // 1 repo check + 1 restore script + 3 setup commands = 5
       expect(fakeSession.exec).toHaveBeenCalledTimes(5);
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(3, 'npm install', {
-        cwd: `/workspace/org/user/sessions/${sessionId}`,
-        timeout: 120000,
-      });
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(4, 'npm run build', {
-        cwd: `/workspace/org/user/sessions/${sessionId}`,
-        timeout: 120000,
-      });
-      expect(fakeSession.exec).toHaveBeenNthCalledWith(5, 'npm test', {
-        cwd: `/workspace/org/user/sessions/${sessionId}`,
-        timeout: 120000,
-      });
+      expect(fakeSession.exec).toHaveBeenNthCalledWith(
+        3,
+        'npm install',
+        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` })
+      );
+      expect(fakeSession.exec).toHaveBeenNthCalledWith(
+        4,
+        'npm run build',
+        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` })
+      );
+      expect(fakeSession.exec).toHaveBeenNthCalledWith(
+        5,
+        'npm test',
+        expect.objectContaining({ cwd: `/workspace/org/user/sessions/${sessionId}` })
+      );
     });
 
     it('should throw immediately when command fails during initiate (fail-fast)', async () => {
@@ -1841,46 +1844,6 @@ describe('SessionService', () => {
       expect(fakeSession.exec).toHaveBeenCalledTimes(3);
     });
 
-    it('should run commands with 2-minute timeout', async () => {
-      const fakeSession = {
-        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-        deleteFile: vi.fn().mockResolvedValue(undefined),
-      };
-      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
-      const sandbox = {
-        createSession: sandboxCreateSession,
-        mkdir: vi.fn().mockResolvedValue(undefined),
-        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
-        writeFile: vi.fn().mockResolvedValue(undefined),
-      } as unknown as SandboxInstance;
-      const sessionId: SessionId = 'agent_timeout_test';
-      mockedSetupWorkspace.mockResolvedValue({
-        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
-        sessionHome: `/home/${sessionId}`,
-      });
-
-      const service = new SessionService();
-      await service.initiate({
-        sandbox,
-        sandboxId: 'org__user',
-        orgId: 'org',
-        userId: 'user',
-        sessionId,
-        kilocodeToken: 'token',
-        kilocodeModel: 'test-model',
-        githubRepo: 'acme/repo',
-        env: mockEnv,
-        setupCommands: ['long-running-command'],
-      });
-
-      expect(fakeSession.exec).toHaveBeenCalledWith('long-running-command', {
-        cwd: `/workspace/org/user/sessions/${sessionId}`,
-        timeout: 120000, // 2 minutes in milliseconds
-      });
-    });
-
     it('should execute commands in workspace directory', async () => {
       const fakeSession = {
         exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
@@ -1916,14 +1879,14 @@ describe('SessionService', () => {
         setupCommands: ['pwd', 'ls -la'],
       });
 
-      expect(fakeSession.exec).toHaveBeenCalledWith('pwd', {
-        cwd: workspacePath,
-        timeout: 120000,
-      });
-      expect(fakeSession.exec).toHaveBeenCalledWith('ls -la', {
-        cwd: workspacePath,
-        timeout: 120000,
-      });
+      expect(fakeSession.exec).toHaveBeenCalledWith(
+        'pwd',
+        expect.objectContaining({ cwd: workspacePath })
+      );
+      expect(fakeSession.exec).toHaveBeenCalledWith(
+        'ls -la',
+        expect.objectContaining({ cwd: workspacePath })
+      );
     });
 
     it('should handle empty setupCommands array gracefully', async () => {

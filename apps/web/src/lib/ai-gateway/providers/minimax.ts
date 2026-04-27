@@ -7,7 +7,7 @@ export const minimax_m25_free_model: KiloExclusiveModel = {
     'MiniMax-M2.5 is a SOTA large language model designed for real-world productivity. Trained in a diverse range of complex real-world digital working environments, M2.5 builds upon the coding expertise of M2.1 to extend into general office work, reaching fluency in generating and operating Word, Excel, and Powerpoint files, context switching between diverse software environments, and working across different agent and human teams. Scoring 80.2% on SWE-Bench Verified, 51.3% on Multi-SWE-Bench, and 76.3% on BrowseComp, M2.5 is also more token efficient than previous generations, having been trained to optimize its actions and output through planning.',
   context_length: 204800,
   max_completion_tokens: 131072,
-  status: 'hidden', // usable through kilo-auto/free
+  status: 'disabled',
   flags: ['reasoning'],
   gateway: 'openrouter',
   internal_id: 'minimax/minimax-m2.5',

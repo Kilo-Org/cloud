@@ -17,7 +17,12 @@ export function isValidCallbackPath(path: string): boolean {
     path.startsWith('/welcome/landing') ||
     path.startsWith('/organizations/') ||
     path.startsWith('/cloud') ||
-    path.startsWith('/integrations/')
+    path.startsWith('/integrations/') ||
+    // Admin-managed URL bonus campaigns. Stricter shape enforcement
+    // (slug format, prefix-match guard) happens in
+    // `isCreditCampaignCallback`; this check only decides whether the
+    // sign-in redirect is allowed to preserve the path.
+    path.startsWith('/c/')
   ) {
     return true;
   }

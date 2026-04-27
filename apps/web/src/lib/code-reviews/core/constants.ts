@@ -17,13 +17,6 @@ export const DEFAULT_CODE_REVIEW_MODEL = 'anthropic/claude-sonnet-4.6';
 export const DEFAULT_CODE_REVIEW_MODE = 'code' as const;
 
 // ============================================================================
-// Feature Flags
-// ============================================================================
-
-/** PostHog flag that gates incremental (diff-only) reviews on follow-up pushes */
-export const FEATURE_FLAG_INCREMENTAL_REVIEW = 'code-review-incremental';
-
-// ============================================================================
 // Pagination
 // ============================================================================
 

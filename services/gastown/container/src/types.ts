@@ -164,6 +164,11 @@ export type HealthResponse = {
   servers: number;
   uptime: number;
   draining?: boolean;
+  startedAt?: string;
+  /** ISO 8601 timestamp of the first mayor agent reaching 'running' status
+   *  in this container's lifetime. Used by the worker to measure container
+   *  cold-start → mayor-session-ready latency. */
+  mayorReadyAt?: string;
 };
 
 // ── Kilo serve instance ─────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { KiloclawDestroyReasonSchema, KiloclawStartReasonSchema } from '@kilocode/worker-utils';
 import {
   ALL_SECRET_FIELD_KEYS,
   isValidCustomSecretKey,
@@ -255,6 +256,7 @@ export const UserIdRequestSchema = z.object({
 
 export const DestroyRequestSchema = z.object({
   userId: z.string().min(1),
+  reason: KiloclawDestroyReasonSchema.optional(),
 });
 
 /**
@@ -312,6 +314,7 @@ export const PersistedStateSchema = z.object({
   restartingAt: z.number().nullable().default(null),
   recoveryStartedAt: z.number().nullable().default(null),
   restartUpdateSent: z.boolean().default(false),
+  pendingStartReason: KiloclawStartReasonSchema.nullable().default(null),
   lastStartedAt: z.number().nullable().default(null),
   lastStoppedAt: z.number().nullable().default(null),
   // Fly.io app/machine/volume identifiers
@@ -365,10 +368,20 @@ export const PersistedStateSchema = z.object({
   // null = use defaults (security: 'allowlist', ask: 'on-miss').
   execSecurity: z.string().nullable().default(null),
   execAsk: z.string().nullable().default(null),
+  // Set when updateExecPreset patched DO state but the gateway write was skipped
+  // or failed (e.g. status !== 'running'). Cleared when flushed on start or via
+  // alarm retry. See flushPendingConfigToGateway.
+  execPresetApplyPending: z.boolean().default(false),
   botName: z.string().nullable().default(null),
   botNature: z.string().nullable().default(null),
   botVibe: z.string().nullable().default(null),
   botEmoji: z.string().nullable().default(null),
+  // Set when updateBotIdentity patched DO state but the gateway write was
+  // skipped or failed. Cleared when flushed on start or via alarm retry.
+  botIdentityApplyPending: z.boolean().default(false),
+  // Set when additive channel updates were persisted but the running gateway
+  // config patch was skipped or failed. Removals intentionally do not set this.
+  channelsApplyPending: z.boolean().default(false),
   // Snapshot restore: tracks the volume before the most recent restore for admin revert path.
   previousVolumeId: z.string().nullable().default(null),
   // Snapshot restore: timestamp set at enqueue time. Used by alarm for stuck-restore detection

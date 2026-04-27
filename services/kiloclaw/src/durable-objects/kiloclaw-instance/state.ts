@@ -272,6 +272,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.restartingAt = d.restartingAt;
     s.recoveryStartedAt = d.recoveryStartedAt;
     s.restartUpdateSent = d.restartUpdateSent;
+    s.pendingStartReason = d.pendingStartReason;
     s.lastStartedAt = d.lastStartedAt;
     s.lastStoppedAt = d.lastStoppedAt;
     s.flyAppName = d.flyAppName;
@@ -317,10 +318,13 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.gmailPushOidcEmail = d.gmailPushOidcEmail;
     s.execSecurity = d.execSecurity;
     s.execAsk = d.execAsk;
+    s.execPresetApplyPending = d.execPresetApplyPending;
     s.botName = d.botName;
     s.botNature = d.botNature;
     s.botVibe = d.botVibe;
     s.botEmoji = d.botEmoji;
+    s.botIdentityApplyPending = d.botIdentityApplyPending;
+    s.channelsApplyPending = d.channelsApplyPending;
     s.previousVolumeId = d.previousVolumeId;
     s.restoreStartedAt = d.restoreStartedAt;
     s.preRestoreStatus = d.preRestoreStatus;
@@ -379,6 +383,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.restartingAt = null;
   s.recoveryStartedAt = null;
   s.restartUpdateSent = false;
+  s.pendingStartReason = null;
   s.lastStartedAt = null;
   s.lastStoppedAt = null;
   s.flyAppName = null;
@@ -415,10 +420,13 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.gmailPushOidcEmail = null;
   s.execSecurity = null;
   s.execAsk = null;
+  s.execPresetApplyPending = false;
   s.botName = null;
   s.botNature = null;
   s.botVibe = null;
   s.botEmoji = null;
+  s.botIdentityApplyPending = false;
+  s.channelsApplyPending = false;
   s.previousVolumeId = null;
   s.restoreStartedAt = null;
   s.preRestoreStatus = null;
@@ -468,6 +476,7 @@ export function createMutableState(): InstanceMutableState {
     restartingAt: null,
     recoveryStartedAt: null,
     restartUpdateSent: false,
+    pendingStartReason: null,
     lastStartedAt: null,
     lastStoppedAt: null,
     flyAppName: null,
@@ -504,10 +513,13 @@ export function createMutableState(): InstanceMutableState {
     gmailPushOidcEmail: null,
     execSecurity: null,
     execAsk: null,
+    execPresetApplyPending: false,
     botName: null,
     botNature: null,
     botVibe: null,
     botEmoji: null,
+    botIdentityApplyPending: false,
+    channelsApplyPending: false,
     previousVolumeId: null,
     restoreStartedAt: null,
     preRestoreStatus: null,

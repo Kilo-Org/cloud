@@ -24,6 +24,7 @@ type KiloClawClientMock = {
   KiloClawInternalClient: AnyMock;
   __getStatusMock: AnyMock;
   __destroyMock: AnyMock;
+  __startMock: AnyMock;
 };
 
 jest.mock('@/lib/stripe-client', () => {
@@ -77,9 +78,11 @@ jest.mock('@/lib/config.server', () => {
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
   const getStatusMock = jest.fn();
   const destroyMock = jest.fn();
+  const startMock = jest.fn();
   return {
     KiloClawInternalClient: jest.fn().mockImplementation(() => ({
       getStatus: getStatusMock,
+      start: startMock,
       destroy: destroyMock,
     })),
     KiloClawApiError: class KiloClawApiError extends Error {
@@ -93,6 +96,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
     },
     __getStatusMock: getStatusMock,
     __destroyMock: destroyMock,
+    __startMock: startMock,
   };
 });
 
@@ -101,8 +105,16 @@ let createCaller: (ctx: { user: Awaited<ReturnType<typeof insertTestUser>> }) =>
   validateWeatherLocation: (input: { location: string }) => Promise<{
     location: string;
     currentWeatherText: string;
+    status: 'validated' | 'service_unavailable';
   }>;
   cycleInboundEmailAddress: () => Promise<{ inboundEmailAddress: string }>;
+  start: () => Promise<{
+    ok: true;
+    started: boolean;
+    previousStatus: string | null;
+    currentStatus: string | null;
+    startedAt: number | null;
+  }>;
   destroy: () => Promise<{ ok: true }>;
 };
 const kiloclawClientMock = jest.requireMock<KiloClawClientMock>(
@@ -117,6 +129,9 @@ beforeAll(async () => {
 function wttrFormat3Response(text: string, status = 200): Response {
   return new Response(text, { status, headers: { 'Content-Type': 'text/plain' } });
 }
+
+const WTTR_SERVICE_UNAVAILABLE_MESSAGE =
+  "wttr.in is down right now. We'll store your location as entered.";
 
 function wttrLocationResponse(params: {
   areaName: string;
@@ -186,6 +201,7 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     expect(result).toEqual({
       location: 'Amsterdam, The Netherlands',
       currentWeatherText: '☁️   +7°C',
+      status: 'validated',
     });
   });
 
@@ -217,6 +233,7 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     expect(result).toEqual({
       location: 'Groningen, The Netherlands',
       currentWeatherText: '☀️   +9°C',
+      status: 'validated',
     });
   });
 
@@ -232,19 +249,21 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     );
   });
 
-  it('rejects malformed wttr format=3 responses', async () => {
+  it('stores the typed location when wttr returns a malformed service response', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-malformed-test-${Math.random()}@example.com`,
     });
     fetchSpy.mockResolvedValue(wttrFormat3Response('☁️   +7°C'));
     const caller = createCaller({ user });
 
-    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).rejects.toThrow(
-      'Weather location could not be found.'
-    );
+    await expect(caller.validateWeatherLocation({ location: ' Amsterdam ' })).resolves.toEqual({
+      location: 'Amsterdam',
+      currentWeatherText: WTTR_SERVICE_UNAVAILABLE_MESSAGE,
+      status: 'service_unavailable',
+    });
   });
 
-  it('returns a timeout error when wttr validation times out', async () => {
+  it('stores the typed location when wttr validation times out', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-timeout-test-${Math.random()}@example.com`,
     });
@@ -252,20 +271,50 @@ describe('kiloclawRouter validateWeatherLocation', () => {
     fetchSpy.mockRejectedValue(timeoutError);
     const caller = createCaller({ user });
 
-    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).rejects.toThrow(
-      'Weather location validation timed out.'
-    );
+    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).resolves.toEqual({
+      location: 'Amsterdam',
+      currentWeatherText: WTTR_SERVICE_UNAVAILABLE_MESSAGE,
+      status: 'service_unavailable',
+    });
   });
 
-  it('returns an unavailable error when wttr validation fails upstream', async () => {
+  it('stores the typed location when wttr validation fails upstream', async () => {
     const user = await insertTestUser({
       google_user_email: `kiloclaw-weather-upstream-test-${Math.random()}@example.com`,
     });
     fetchSpy.mockRejectedValue(new Error('network down'));
     const caller = createCaller({ user });
 
-    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).rejects.toThrow(
-      'Weather location validation is unavailable.'
+    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).resolves.toEqual({
+      location: 'Amsterdam',
+      currentWeatherText: WTTR_SERVICE_UNAVAILABLE_MESSAGE,
+      status: 'service_unavailable',
+    });
+  });
+
+  it('stores the typed location when wttr returns a service error', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-service-error-test-${Math.random()}@example.com`,
+    });
+    fetchSpy.mockResolvedValue(wttrFormat3Response('Bad Gateway', 502));
+    const caller = createCaller({ user });
+
+    await expect(caller.validateWeatherLocation({ location: 'Amsterdam' })).resolves.toEqual({
+      location: 'Amsterdam',
+      currentWeatherText: WTTR_SERVICE_UNAVAILABLE_MESSAGE,
+      status: 'service_unavailable',
+    });
+  });
+
+  it('rejects non-service wttr errors as unknown locations', async () => {
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-weather-not-found-status-test-${Math.random()}@example.com`,
+    });
+    fetchSpy.mockResolvedValue(wttrFormat3Response('Not Found', 404));
+    const caller = createCaller({ user });
+
+    await expect(caller.validateWeatherLocation({ location: 'not-a-real-place' })).rejects.toThrow(
+      'Weather location could not be found.'
     );
   });
 });
@@ -275,6 +324,7 @@ describe('kiloclawRouter getStatus', () => {
     await cleanupDbForTest();
     kiloclawClientMock.KiloClawInternalClient.mockClear();
     kiloclawClientMock.__getStatusMock.mockReset();
+    kiloclawClientMock.__startMock.mockReset();
     kiloclawClientMock.__destroyMock.mockReset();
   });
 
@@ -350,6 +400,111 @@ describe('kiloclawRouter getStatus', () => {
   });
 });
 
+describe('kiloclawRouter start', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    kiloclawClientMock.KiloClawInternalClient.mockClear();
+    kiloclawClientMock.__startMock.mockReset();
+  });
+
+  it('clears the inactivity marker after a successful personal trial start', async () => {
+    kiloclawClientMock.__startMock.mockResolvedValue({
+      ok: true,
+      started: true,
+      previousStatus: 'stopped',
+      currentStatus: 'running',
+      startedAt: 1_776_885_000_000,
+    });
+
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-start-test-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+      inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z',
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'trialing',
+      trial_ends_at: '2026-12-31T23:59:59.000Z',
+    });
+
+    const caller = createCaller({ user });
+    const result = await caller.start();
+
+    expect(result).toEqual({
+      ok: true,
+      started: true,
+      previousStatus: 'stopped',
+      currentStatus: 'running',
+      startedAt: 1_776_885_000_000,
+    });
+    expect(kiloclawClientMock.__startMock).toHaveBeenCalledWith(user.id, instanceId, {
+      reason: 'manual_user_request',
+    });
+
+    const [updatedInstance] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instanceId))
+      .limit(1);
+    expect(updatedInstance?.inactive_trial_stopped_at).toBeNull();
+  });
+
+  it('does not clear the inactivity marker when start is a no-op', async () => {
+    kiloclawClientMock.__startMock.mockResolvedValue({
+      ok: true,
+      started: false,
+      previousStatus: 'stopped',
+      currentStatus: 'stopped',
+      startedAt: null,
+    });
+
+    const user = await insertTestUser({
+      google_user_email: `kiloclaw-start-noop-test-${Math.random()}@example.com`,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: user.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+      inactive_trial_stopped_at: '2026-04-20T12:00:00.000Z',
+    });
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instanceId,
+      plan: 'trial',
+      status: 'trialing',
+      trial_ends_at: '2026-12-31T23:59:59.000Z',
+    });
+
+    const caller = createCaller({ user });
+    const result = await caller.start();
+
+    expect(result).toEqual({
+      ok: true,
+      started: false,
+      previousStatus: 'stopped',
+      currentStatus: 'stopped',
+      startedAt: null,
+    });
+
+    const [updatedInstance] = await db
+      .select()
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, instanceId))
+      .limit(1);
+    expect(new Date(String(updatedInstance?.inactive_trial_stopped_at)).toISOString()).toBe(
+      '2026-04-20T12:00:00.000Z'
+    );
+  });
+});
+
 describe('kiloclawRouter destroy', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
@@ -387,6 +542,9 @@ describe('kiloclawRouter destroy', () => {
     const result = await caller.destroy();
 
     expect(result).toEqual({ ok: true });
+    expect(kiloclawClientMock.__destroyMock).toHaveBeenCalledWith(user.id, instanceId, {
+      reason: 'manual_user_request',
+    });
 
     const [subscription] = await db
       .select()

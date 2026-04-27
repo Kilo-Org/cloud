@@ -1,0 +1,113 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kilo-ops",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-02-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "placement": { "mode": "smart" },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true,
+    },
+    "traces": {
+      "enabled": true,
+      "persist": true,
+      "head_sampling_rate": 1,
+    },
+  },
+  "upload_source_maps": true,
+  "routes": [
+    {
+      "pattern": "ops.kiloapps.io/*",
+      "zone_name": "kiloapps.io",
+    },
+  ],
+  "workers_dev": false,
+
+  "containers": [
+    {
+      "class_name": "GrafanaContainer",
+      "image": "./container/Dockerfile",
+      "max_instances": 10,
+      "instance_type": "standard-2",
+      "name": "kilo-ops",
+    },
+  ],
+
+  "durable_objects": {
+    "bindings": [{ "name": "GRAFANA_CONTAINER", "class_name": "GrafanaContainer" }],
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["GrafanaContainer"],
+    },
+  ],
+
+  "vars": {
+    "ENVIRONMENT": "production",
+    "CF_ACCESS_TEAM": "engineering-e11",
+    "CF_ACCESS_AUD": "ff0440ec2c45e7188331f1430ddf35d2b11fa408ca9b3a58068b80816a0e1d80",
+    "CF_CLICKHOUSE_URL": "https://api.cloudflare.com/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/analytics_engine/sql",
+    "CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+    "GF_SERVER_ROOT_URL": "https://ops.kiloapps.io/",
+  },
+
+  "secrets_store_secrets": [
+    {
+      "binding": "CF_ANALYTICS_API_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "O11Y_CF_AE_API_TOKEN",
+    },
+    {
+      "binding": "GF_SECRET_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "GF_SECRET_KEY",
+    },
+  ],
+
+  "dev": {
+    "port": 8780,
+  },
+  "env": {
+    "dev": {
+      "vars": {
+        "ENVIRONMENT": "development",
+        "CF_ACCESS_TEAM": "engineering-e11",
+        "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
+        "CF_CLICKHOUSE_URL": "https://api.cloudflare.com/client/v4/accounts/e115e769bcdd4c3d66af59d3332cb394/analytics_engine/sql",
+        "CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "GRAFANA_CONTAINER", "class_name": "GrafanaContainer" }],
+      },
+      "containers": [
+        {
+          "class_name": "GrafanaContainer",
+          "image": "./container/Dockerfile",
+          "max_instances": 10,
+          "instance_type": "standard-2",
+          "name": "kilo-ops",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "CF_ANALYTICS_API_KEY",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "O11Y_CF_AE_API_TOKEN",
+        },
+        {
+          "binding": "GF_SECRET_KEY",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "GF_SECRET_KEY",
+        },
+      ],
+    },
+  },
+}

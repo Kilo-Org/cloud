@@ -1,0 +1,1 @@
+ALTER TABLE "kiloclaw_instances" ADD COLUMN "inactive_trial_stopped_at" timestamp with time zone;

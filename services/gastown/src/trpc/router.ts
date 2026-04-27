@@ -650,14 +650,24 @@ export const gastownRouter = router({
     .input(
       z.object({
         rigId: z.string().uuid(),
-        beadId: z.string().uuid(),
+        beadId: z.union([z.string().uuid(), z.array(z.string().uuid())]),
         townId: z.string().uuid().optional(),
       })
     )
+    .output(z.object({ deleted: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
-      await townStub.deleteBead(input.beadId);
+      const ids = Array.isArray(input.beadId) ? input.beadId : [input.beadId];
+      // Pass input.rigId so the DO filters to beads that actually belong
+      // to this rig — prevents cross-rig deletion when the caller has only
+      // authorized one rig.
+      if (ids.length === 1) {
+        const deleted = await townStub.deleteBead(ids[0], input.rigId);
+        return { deleted: deleted ? 1 : 0 };
+      }
+      const count = await townStub.deleteBeads(ids, input.rigId);
+      return { deleted: count };
     }),
 
   updateBead: gastownProcedure
@@ -675,6 +685,7 @@ export const gastownRouter = router({
           metadata: z.record(z.string(), z.unknown()).optional(),
           rig_id: z.string().min(1).nullable().optional(),
           parent_bead_id: z.string().min(1).nullable().optional(),
+          depends_on: z.array(z.string().uuid()).optional(),
         })
         .refine(
           data =>
@@ -685,7 +696,8 @@ export const gastownRouter = router({
             data.labels !== undefined ||
             data.metadata !== undefined ||
             data.rig_id !== undefined ||
-            data.parent_bead_id !== undefined,
+            data.parent_bead_id !== undefined ||
+            data.depends_on !== undefined,
           { message: 'At least one field to update must be provided' }
         )
     )
@@ -705,6 +717,56 @@ export const gastownRouter = router({
 
       const { rigId: _rigId, beadId, townId: _townId, ...fields } = input;
       return townStub.updateBead(beadId, fields, ctx.userId);
+    }),
+
+  convoyAddBead: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        convoyId: z.string().uuid(),
+        beadId: z.string().uuid(),
+        depends_on: z.array(z.string().uuid()).optional(),
+      })
+    )
+    .output(z.object({ total_beads: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.convoyAddBead(input.convoyId, input.beadId, input.depends_on);
+    }),
+
+  convoyRemoveBead: gastownProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        convoyId: z.string().uuid(),
+        beadId: z.string().uuid(),
+      })
+    )
+    .output(z.object({ total_beads: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      return townStub.convoyRemoveBead(input.convoyId, input.beadId);
+    }),
+
+  deleteBeadsByStatus: gastownProcedure
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']),
+        type: z
+          .enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent'])
+          .optional(),
+        townId: z.string().uuid().optional(),
+      })
+    )
+    .output(z.object({ deleted: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      const count = await townStub.deleteBeadsByStatus(input.status, input.type, rig.id);
+      return { deleted: count };
     }),
 
   // ── Agents ──────────────────────────────────────────────────────────
@@ -1590,6 +1652,37 @@ export const gastownRouter = router({
     .query(async ({ ctx, input }) => {
       const townStub = getTownDOStub(ctx.env, input.townId);
       return townStub.getBeadAsync(input.beadId);
+    }),
+
+  adminBulkDeleteBeads: adminProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        beadIds: z.array(z.string().uuid()),
+      })
+    )
+    .output(z.object({ deleted: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      const count = await townStub.deleteBeads(input.beadIds);
+      return { deleted: count };
+    }),
+
+  adminDeleteBeadsByStatus: adminProcedure
+    .input(
+      z.object({
+        townId: z.string().uuid(),
+        status: z.enum(['open', 'in_progress', 'in_review', 'closed', 'failed']),
+        type: z
+          .enum(['issue', 'message', 'escalation', 'merge_request', 'convoy', 'molecule', 'agent'])
+          .optional(),
+      })
+    )
+    .output(z.object({ deleted: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const townStub = getTownDOStub(ctx.env, input.townId);
+      const count = await townStub.deleteBeadsByStatus(input.status, input.type);
+      return { deleted: count };
     }),
 
   // DEBUG: raw agent_metadata dump — remove after debugging

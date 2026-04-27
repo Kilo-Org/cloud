@@ -76,7 +76,26 @@ describe('POST /start-async', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(startAsync).toHaveBeenCalledWith('user-1');
+    expect(startAsync).toHaveBeenCalledWith('user-1', undefined);
+  });
+
+  it('passes an optional start reason through to the DO async path', async () => {
+    const { env, startAsync } = makeEnv();
+    const { path, init } = postJson(
+      '/start-async?instanceId=11111111-1111-4111-8111-111111111111',
+      {
+        userId: 'user-1',
+        reason: 'interrupted_auto_resume',
+      }
+    );
+
+    const response = await platform.request(path, init, env);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(startAsync).toHaveBeenCalledWith('user-1', {
+      reason: 'interrupted_auto_resume',
+    });
   });
 
   it('logs billing-correlated async start requests with propagated context', async () => {

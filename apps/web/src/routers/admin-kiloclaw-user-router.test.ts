@@ -13,6 +13,21 @@ import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import type { User } from '@kilocode/db/schema';
 import { client as stripeMock } from '@/lib/stripe-client';
 
+const mockKiloclawStart = jest.fn();
+const startedResponse = {
+  ok: true,
+  started: true,
+  previousStatus: 'stopped',
+  currentStatus: 'running',
+  startedAt: 1_776_885_000_000,
+};
+
+jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
+  KiloClawInternalClient: jest.fn().mockImplementation(() => ({
+    start: mockKiloclawStart,
+  })),
+}));
+
 let adminUser: User;
 let targetUser: User;
 
@@ -24,6 +39,8 @@ function expectSameInstant(actual: string | null | undefined, expected: string) 
 
 beforeEach(async () => {
   await cleanupDbForTest();
+  mockKiloclawStart.mockReset();
+  mockKiloclawStart.mockResolvedValue(startedResponse);
   jest.spyOn(stripeMock.subscriptions, 'retrieve').mockResolvedValue({ schedule: null } as never);
   jest.spyOn(stripeMock.subscriptions, 'update').mockResolvedValue({} as never);
   jest.spyOn(stripeMock.subscriptions, 'cancel').mockResolvedValue({} as never);
@@ -999,6 +1016,99 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
         action: 'reactivated',
         reason: 'admin_reset_trial',
       })
+    );
+  });
+
+  it('clears the inactivity marker after a trial reset starts the personal instance', async () => {
+    const newTrialEndsAt = '2026-04-01T23:59:59.000Z';
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: targetUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        inactive_trial_stopped_at: '2026-03-20T12:00:00.000Z',
+      })
+      .returning();
+
+    const [sub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        instance_id: instance.id,
+        plan: 'trial',
+        status: 'canceled',
+        trial_started_at: '2026-03-08T12:00:00.000Z',
+        trial_ends_at: '2026-03-15T23:59:59.000Z',
+        suspended_at: '2026-03-16T00:00:00.000Z',
+        destruction_deadline: '2026-03-23T00:00:00.000Z',
+      })
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.updateKiloClawTrialEndAt({
+      userId: targetUser.id,
+      subscriptionId: sub.id,
+      trial_ends_at: newTrialEndsAt,
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(mockKiloclawStart).toHaveBeenCalledWith(targetUser.id, instance.id, {
+      reason: 'admin_request',
+    });
+
+    const updatedInstance = await db.query.kiloclaw_instances.findFirst({
+      where: eq(kiloclaw_instances.id, instance.id),
+    });
+    expect(updatedInstance?.inactive_trial_stopped_at).toBeNull();
+  });
+
+  it('does not clear the inactivity marker when a trial reset start is a no-op', async () => {
+    mockKiloclawStart.mockResolvedValueOnce({
+      ok: true,
+      started: false,
+      previousStatus: 'stopped',
+      currentStatus: 'stopped',
+      startedAt: null,
+    });
+
+    const newTrialEndsAt = '2026-04-01T23:59:59.000Z';
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: targetUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+        inactive_trial_stopped_at: '2026-03-20T12:00:00.000Z',
+      })
+      .returning();
+
+    const [sub] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: targetUser.id,
+        instance_id: instance.id,
+        plan: 'trial',
+        status: 'canceled',
+        trial_started_at: '2026-03-08T12:00:00.000Z',
+        trial_ends_at: '2026-03-15T23:59:59.000Z',
+        suspended_at: '2026-03-16T00:00:00.000Z',
+        destruction_deadline: '2026-03-23T00:00:00.000Z',
+      })
+      .returning();
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.users.updateKiloClawTrialEndAt({
+      userId: targetUser.id,
+      subscriptionId: sub.id,
+      trial_ends_at: newTrialEndsAt,
+    });
+
+    expect(result).toEqual({ success: true });
+
+    const updatedInstance = await db.query.kiloclaw_instances.findFirst({
+      where: eq(kiloclaw_instances.id, instance.id),
+    });
+    expect(new Date(String(updatedInstance?.inactive_trial_stopped_at)).toISOString()).toBe(
+      '2026-03-20T12:00:00.000Z'
     );
   });
 });

@@ -4,7 +4,13 @@ import { db } from '@/lib/drizzle';
 import { api_request_log } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count } from 'drizzle-orm';
 import archiver from 'archiver';
-import { PassThrough } from 'node:stream';
+import { Readable } from 'node:stream';
+
+// Downloading all logs for a heavy user can take a while. Without a raised
+// maxDuration the Vercel function was killed mid-stream, producing a ZIP
+// without a central directory record. macOS Archive Utility then refused to
+// extract it ("Error 79 - Inappropriate file type or format").
+export const maxDuration = 300;
 
 const BATCH_SIZE = 100;
 
@@ -99,10 +105,7 @@ export async function GET(request: NextRequest) {
     return jsonError('No records found for the given criteria', 404);
   }
 
-  const passthrough = new PassThrough();
   const archive = archiver('zip', { zlib: { level: 6 } });
-
-  archive.pipe(passthrough);
 
   // Fetch and archive rows in batches using cursor-based pagination to
   // avoid loading the entire result set into memory at once.
@@ -137,29 +140,33 @@ export async function GET(request: NextRequest) {
 
       cursor = rows[rows.length - 1].id;
 
-      // Wait for the passthrough stream to drain before fetching the next
-      // batch so we don't buffer unbounded data in memory.
-      await new Promise<void>(resolve => {
-        if (passthrough.writableNeedDrain) {
-          passthrough.once('drain', resolve);
-        } else {
-          resolve();
-        }
-      });
+      // Yield between batches while the archive's readable buffer is above
+      // its high-water mark, so we don't buffer unbounded data in memory.
+      // Polling via setImmediate rather than waiting on a single 'drain'
+      // event: archiver's internal queue pauses once it's out of entries, so
+      // after we stop appending its writable side may never go back above
+      // HWM and 'drain' would never fire again - listening for it would
+      // deadlock the stream.
+      const hwm = archive.readableHighWaterMark ?? 16 * 1024;
+      while (archive.readableLength > hwm) {
+        await new Promise<void>(resolve => setImmediate(resolve));
+      }
     }
 
     await archive.finalize();
   };
 
-  void appendRows().catch(error => passthrough.destroy(error));
+  void appendRows().catch(error => archive.destroy(error));
 
-  const webStream = new ReadableStream({
-    start(controller) {
-      passthrough.on('data', (chunk: Buffer) => controller.enqueue(chunk));
-      passthrough.on('end', () => controller.close());
-      passthrough.on('error', err => controller.error(err));
-    },
-  });
+  // Readable.toWeb propagates end, errors and backpressure correctly, unlike
+  // a hand-rolled PassThrough -> ReadableStream bridge which eagerly pushed
+  // chunks into the controller with no pull() and could drop bytes on a slow
+  // or cancelled consumer - causing truncated ZIPs that macOS Archive Utility
+  // refuses to extract.
+  // Readable.toWeb returns the node-types flavoured ReadableStream, which is
+  // structurally identical to the DOM lib ReadableStream accepted by Response
+  // but TypeScript treats them as distinct - hence the cast.
+  const webStream = Readable.toWeb(archive) as unknown as ReadableStream<Uint8Array>;
 
   const sanitize = (s: string) => s.replaceAll('/', '-').replaceAll(':', '-');
   const safeUserId = sanitize(userId);

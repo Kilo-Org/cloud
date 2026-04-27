@@ -180,6 +180,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     generation_time: null,
     streamed: true,
     cancelled: null,
+    status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
@@ -216,6 +217,7 @@ export function parseMessagesMicrodollarUsageFromString(
     generation_time: null,
     streamed: false,
     cancelled: null,
+    status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);

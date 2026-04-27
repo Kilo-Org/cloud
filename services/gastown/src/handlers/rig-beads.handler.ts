@@ -170,6 +170,7 @@ export async function handleDeleteBead(
   const town = getTownDOStub(c.env, townId);
   const bead = await town.getBeadAsync(params.beadId);
   if (!bead || bead.rig_id !== params.rigId) return c.json(resError('Bead not found'), 404);
-  await town.deleteBead(params.beadId);
+  // Pass rigId as a defense-in-depth rig check in the DO delete path.
+  await town.deleteBead(params.beadId, params.rigId);
   return c.json(resSuccess({ deleted: true }));
 }

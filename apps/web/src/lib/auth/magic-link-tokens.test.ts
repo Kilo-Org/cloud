@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { createMagicLinkToken, verifyAndConsumeMagicLinkToken } from './magic-link-tokens';
+import {
+  createMagicLinkToken,
+  getMagicLinkUrl,
+  verifyAndConsumeMagicLinkToken,
+} from './magic-link-tokens';
 import { db } from '@/lib/drizzle';
 import { sql } from 'drizzle-orm';
 
@@ -50,6 +54,18 @@ describe('Magic Link Tokens', () => {
 
       expect(token1.plaintext_token).not.toBe(token2.plaintext_token);
       expect(token1.token_hash).not.toBe(token2.token_hash);
+    });
+  });
+
+  describe('getMagicLinkUrl', () => {
+    it('does not include email addresses in magic link URLs', async () => {
+      const token = await createMagicLinkToken(testEmail);
+      const url = new URL(getMagicLinkUrl(token));
+
+      expect(url.pathname).toBe('/auth/verify-magic-link');
+      expect(url.searchParams.get('token')).toBe(token.plaintext_token);
+      expect(url.searchParams.has('email')).toBe(false);
+      expect(url.toString()).not.toContain(encodeURIComponent(testEmail));
     });
   });
 

@@ -11,6 +11,7 @@ packages:
 catalog:
   '@cloudflare/workers-types': ^4.20260313.1
   '@octokit/auth-app': ^8.2.0
+  '@sentry/cli': ^3.3.4
   '@tanstack/react-query': ^5.90.21
   '@trpc/client': ^11.13.0
   '@trpc/server': ^11.13.0

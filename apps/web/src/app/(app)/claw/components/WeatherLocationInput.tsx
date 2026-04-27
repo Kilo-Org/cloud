@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 export type WeatherLocationSource = 'browser' | 'text' | 'skip';
 
@@ -39,13 +40,16 @@ export const WeatherLocationInput = forwardRef<
   const trpc = useTRPC();
   const validateLocation = useMutation(trpc.kiloclaw.validateWeatherLocation.mutationOptions());
   const [locationInput, setLocationInput] = useState('');
-  const [currentWeatherText, setCurrentWeatherText] = useState<string | null>(null);
+  const [locationFeedback, setLocationFeedback] = useState<{
+    message: string;
+    status: 'validated' | 'service_unavailable';
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const inputPending = disabled || validateLocation.isPending || isLocating;
 
   function clearSelection() {
-    setCurrentWeatherText(null);
+    setLocationFeedback(null);
     onSelectionChange(null);
   }
 
@@ -63,7 +67,7 @@ export const WeatherLocationInput = forwardRef<
       const result = await validateLocation.mutateAsync({ location });
       const selection = { location: result.location, source } satisfies WeatherLocationSelection;
       setLocationInput(result.location);
-      setCurrentWeatherText(result.currentWeatherText);
+      setLocationFeedback({ message: result.currentWeatherText, status: result.status });
       setError(null);
       onSelectionChange(selection);
       return selection;
@@ -187,9 +191,16 @@ export const WeatherLocationInput = forwardRef<
           </div>
         </form>
 
-        {currentWeatherText ? (
-          <p className="animate-in fade-in slide-in-from-top-1 text-muted-foreground pointer-events-none absolute top-full right-0 left-0 z-10 mt-1.5 px-1 text-sm duration-300">
-            {currentWeatherText}
+        {locationFeedback ? (
+          <p
+            className={cn(
+              'animate-in fade-in slide-in-from-top-1 pointer-events-none absolute top-full right-0 left-0 z-10 mt-1.5 px-1 text-sm duration-300',
+              locationFeedback.status === 'service_unavailable'
+                ? 'text-amber-700 dark:text-amber-400'
+                : 'text-muted-foreground'
+            )}
+          >
+            {locationFeedback.message}
           </p>
         ) : null}
         {error ? <p className="mt-1.5 px-1 text-sm text-red-600">{error}</p> : null}

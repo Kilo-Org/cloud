@@ -15,6 +15,7 @@ export {
 } from './kiloclaw-subscription-change-log';
 export {
   collapseOrphanPersonalSubscriptionsOnDestroy,
+  FundedRowDemotionRefusedError,
   markInstanceDestroyedWithPersonalSubscriptionCollapse,
   PersonalSubscriptionDestroyConflictError,
   type DestroyedInstanceRow,

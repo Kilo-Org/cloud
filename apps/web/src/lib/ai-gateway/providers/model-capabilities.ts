@@ -1,5 +1,5 @@
 import 'server-only';
-import { AUTO_MODELS } from '@/lib/kilo-auto';
+import { AUTO_MODELS } from '@/lib/ai-gateway/kilo-auto';
 import { db } from '@/lib/drizzle';
 import { modelStats } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';

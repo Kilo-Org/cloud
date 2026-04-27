@@ -15,7 +15,7 @@ import {
   getOpenCodeSettings,
   getVersionedModelSettings,
 } from '@/lib/ai-gateway/providers/model-settings';
-import { AUTO_MODELS } from '@/lib/kilo-auto';
+import { AUTO_MODELS } from '@/lib/ai-gateway/kilo-auto';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';

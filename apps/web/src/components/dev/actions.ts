@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { findUserById, softDeleteUser } from '@/lib/user';
 import { deleteStripeCustomer } from '@/lib/stripe-client';
 import { captureException } from '@sentry/nextjs';
+import { revokeWebSessions } from '@/lib/web-session-revocation';
 
 export async function nuke(kiloUserId: string) {
   try {
@@ -12,6 +13,7 @@ export async function nuke(kiloUserId: string) {
       throw new Error(`User not found: ${kiloUserId}`);
     }
 
+    await revokeWebSessions(kiloUserId);
     await softDeleteUser(kiloUserId);
     await deleteStripeCustomer(user.stripe_customer_id);
   } catch (error) {

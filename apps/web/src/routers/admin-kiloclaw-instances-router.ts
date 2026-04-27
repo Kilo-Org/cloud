@@ -28,6 +28,7 @@ import {
   listKiloClawAdminAuditLogs,
 } from '@/lib/kiloclaw/admin-audit-log';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
+import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import type {
   PlatformDebugStatusResponse,
   VolumeSnapshot,
@@ -64,7 +65,9 @@ const ListInstancesSchema = z.object({
   sortBy: z.enum(['created_at', 'destroyed_at']).default('created_at'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional(),
-  status: z.enum(['all', 'active', 'suspended', 'destroyed']).default('all'),
+  status: z
+    .enum(['all', 'active', 'inactive_trial_stopped', 'suspended', 'destroyed'])
+    .default('all'),
 });
 
 const DetectOrphansSchema = z.object({
@@ -277,6 +280,29 @@ function assertInstanceBelongsToUser(
   }
 }
 
+export type AdminKiloclawLifecycleState =
+  | 'active'
+  | 'inactive_trial_stopped'
+  | 'suspended'
+  | 'destroyed';
+
+function getAdminKiloclawLifecycleState(input: {
+  destroyed_at: string | null;
+  suspended_at: string | null;
+  inactive_trial_stopped_at: string | null;
+}): AdminKiloclawLifecycleState {
+  if (input.destroyed_at !== null) {
+    return 'destroyed';
+  }
+  if (input.suspended_at !== null) {
+    return 'suspended';
+  }
+  if (input.inactive_trial_stopped_at !== null) {
+    return 'inactive_trial_stopped';
+  }
+  return 'active';
+}
+
 export type AdminKiloclawInstance = {
   id: string;
   user_id: string;
@@ -285,6 +311,8 @@ export type AdminKiloclawInstance = {
   created_at: string;
   destroyed_at: string | null;
   inbound_email_enabled: boolean;
+  inactive_trial_stopped_at: string | null;
+  lifecycle_state: AdminKiloclawLifecycleState;
   suspended_at: string | null;
   user_email: string | null;
   subscription_id: string | null;
@@ -328,6 +356,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       created_at: result.instance.created_at,
       destroyed_at: result.instance.destroyed_at,
       inbound_email_enabled: result.instance.inbound_email_enabled,
+      inactive_trial_stopped_at: result.instance.inactive_trial_stopped_at,
+      lifecycle_state: getAdminKiloclawLifecycleState({
+        destroyed_at: result.instance.destroyed_at,
+        suspended_at: result.suspended_at ?? null,
+        inactive_trial_stopped_at: result.instance.inactive_trial_stopped_at,
+      }),
       suspended_at: result.suspended_at ?? null,
       user_email: result.user_email,
       subscription_id: result.subscription_id ?? null,
@@ -446,6 +480,11 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     if (status === 'active') {
       conditions.push(isNull(kiloclaw_instances.destroyed_at));
       conditions.push(isNull(kiloclaw_subscriptions.suspended_at));
+      conditions.push(isNull(kiloclaw_instances.inactive_trial_stopped_at));
+    } else if (status === 'inactive_trial_stopped') {
+      conditions.push(isNull(kiloclaw_instances.destroyed_at));
+      conditions.push(isNull(kiloclaw_subscriptions.suspended_at));
+      conditions.push(isNotNull(kiloclaw_instances.inactive_trial_stopped_at));
     } else if (status === 'suspended') {
       conditions.push(isNull(kiloclaw_instances.destroyed_at));
       conditions.push(isNotNull(kiloclaw_subscriptions.suspended_at));
@@ -498,6 +537,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       created_at: row.instance.created_at,
       destroyed_at: row.instance.destroyed_at,
       inbound_email_enabled: row.instance.inbound_email_enabled,
+      inactive_trial_stopped_at: row.instance.inactive_trial_stopped_at,
+      lifecycle_state: getAdminKiloclawLifecycleState({
+        destroyed_at: row.instance.destroyed_at,
+        suspended_at: row.suspended_at ?? null,
+        inactive_trial_stopped_at: row.instance.inactive_trial_stopped_at,
+      }),
       suspended_at: row.suspended_at ?? null,
       user_email: row.user_email,
       subscription_id: row.subscription_id ?? null,
@@ -522,7 +567,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const [overview] = await db
       .select({
         total_instances: sql<number>`COUNT(*)::int`,
-        active_instances: sql<number>`COUNT(CASE WHEN ${kiloclaw_instances.destroyed_at} IS NULL AND ${kiloclaw_subscriptions.suspended_at} IS NULL THEN 1 END)::int`,
+        active_instances: sql<number>`COUNT(CASE WHEN ${kiloclaw_instances.destroyed_at} IS NULL AND ${kiloclaw_subscriptions.suspended_at} IS NULL AND ${kiloclaw_instances.inactive_trial_stopped_at} IS NULL THEN 1 END)::int`,
+        inactive_trial_stopped_instances: sql<number>`COUNT(CASE WHEN ${kiloclaw_instances.destroyed_at} IS NULL AND ${kiloclaw_subscriptions.suspended_at} IS NULL AND ${kiloclaw_instances.inactive_trial_stopped_at} IS NOT NULL THEN 1 END)::int`,
         suspended_instances: sql<number>`COUNT(CASE WHEN ${kiloclaw_instances.destroyed_at} IS NULL AND ${kiloclaw_subscriptions.suspended_at} IS NOT NULL THEN 1 END)::int`,
         destroyed_instances: sql<number>`COUNT(CASE WHEN ${kiloclaw_instances.destroyed_at} IS NOT NULL THEN 1 END)::int`,
         unique_users: sql<number>`COUNT(DISTINCT ${kiloclaw_instances.user_id})::int`,
@@ -610,6 +656,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       overview: {
         totalInstances: overview?.total_instances ?? 0,
         activeInstances: overview?.active_instances ?? 0,
+        inactiveTrialStoppedInstances: overview?.inactive_trial_stopped_instances ?? 0,
         suspendedInstances: overview?.suspended_instances ?? 0,
         destroyedInstances: overview?.destroyed_instances ?? 0,
         uniqueUsers: overview?.unique_users ?? 0,
@@ -1057,7 +1104,21 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await resolveInstance(input.userId, input.instanceId);
       const client = new KiloClawInternalClient();
-      return await client.start(input.userId, workerInstanceId(instance), { skipCooldown: true });
+      const result = await client.start(input.userId, workerInstanceId(instance), {
+        skipCooldown: true,
+        reason: 'admin_request',
+      });
+      if (instance && result.currentStatus === 'running') {
+        try {
+          await clearTrialInactivityStopAfterStart({
+            kiloUserId: input.userId,
+            instanceId: instance.id,
+          });
+        } catch (error) {
+          console.error('Failed to clear trial inactivity stop marker after admin start:', error);
+        }
+      }
+      return result;
     } catch (err) {
       console.error('Failed to start machine for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -1118,7 +1179,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     try {
       const instance = await resolveInstance(input.userId, input.instanceId);
       const client = new KiloClawInternalClient();
-      return await client.stop(input.userId, workerInstanceId(instance));
+      return await client.stop(input.userId, workerInstanceId(instance), {
+        reason: 'admin_request',
+      });
     } catch (err) {
       console.error('Failed to stop machine for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
@@ -1358,7 +1421,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
     const client = new KiloClawInternalClient();
     try {
-      await client.destroy(instance.user_id, workerInstanceId(instance));
+      await client.destroy(instance.user_id, workerInstanceId(instance), {
+        reason: 'admin_request',
+      });
     } catch (error) {
       if (destroyedRow) {
         await restoreDestroyedInstance(destroyedRow.id);
@@ -1474,7 +1539,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     for (const instance of activeInstances) {
       const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
       try {
-        await client.destroy(instance.user_id, workerInstanceId(instance));
+        await client.destroy(instance.user_id, workerInstanceId(instance), {
+          reason: 'admin_request',
+        });
         destroyed++;
       } catch (err) {
         if (destroyedRow) {

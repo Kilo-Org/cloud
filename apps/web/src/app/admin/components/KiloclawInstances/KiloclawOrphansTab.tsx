@@ -38,7 +38,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { formatRelativeTime } from './shared';
+import { EventLabelCell, formatRelativeTime } from './shared';
 
 type OrphanRow = {
   id: string;
@@ -111,6 +111,7 @@ function TroubleshootingEventsDialog({
                     <TableHead>Event</TableHead>
                     <TableHead>Delivery</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Attribution / Label</TableHead>
                     <TableHead>Error</TableHead>
                     <TableHead>Region</TableHead>
                   </TableRow>
@@ -124,6 +125,9 @@ function TroubleshootingEventsDialog({
                       <TableCell className="font-mono text-xs">{row.event}</TableCell>
                       <TableCell className="text-xs">{row.delivery || '—'}</TableCell>
                       <TableCell className="text-xs">{row.status || '—'}</TableCell>
+                      <TableCell className="min-w-[180px]">
+                        <EventLabelCell event={row.event} label={row.label} />
+                      </TableCell>
                       <TableCell className="max-w-[280px] text-xs break-words">
                         {row.error || '—'}
                       </TableCell>

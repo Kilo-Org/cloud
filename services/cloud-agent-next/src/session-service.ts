@@ -33,7 +33,7 @@ import { withDORetry } from './utils/do-retry.js';
 import { mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import type { EncryptedSecrets } from './router/schemas.js';
 
-const SETUP_COMMAND_TIMEOUT_SECONDS = 120; // 2 minutes
+const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const SANDBOX_RETRY_DEFAULTS = {
   maxAttempts: 3,
   baseBackoffMs: 100,

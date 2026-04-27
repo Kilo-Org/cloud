@@ -106,6 +106,16 @@ export function useOrgControllerVersion(organizationId: string, enabled: boolean
   );
 }
 
+export function useOrgMorningBriefingStatus(organizationId: string, enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.kiloclaw.getMorningBriefingStatus.queryOptions(
+      { organizationId },
+      { enabled, refetchInterval: enabled ? 30_000 : false }
+    )
+  );
+}
+
 export function useOrgKiloClawServiceDegraded(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(
@@ -368,6 +378,18 @@ export function useOrgKiloClawMutations(
       },
     })
   );
+  const rawImportOpenclawWorkspace = useMutation(
+    trpc.organizations.kiloclaw.importOpenclawWorkspace.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.fileTree.queryKey(),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.readFile.queryKey(),
+        });
+      },
+    })
+  );
   const rawPatchExecPreset = useMutation(
     trpc.organizations.kiloclaw.patchExecPreset.mutationOptions({ onSuccess: invalidateStatus })
   );
@@ -411,6 +433,45 @@ export function useOrgKiloClawMutations(
   const rawCancelKiloCliRun = useMutation(
     trpc.organizations.kiloclaw.cancelKiloCliRun.mutationOptions({ onSuccess: invalidateStatus })
   );
+  const rawEnableMorningBriefing = useMutation(
+    trpc.organizations.kiloclaw.enableMorningBriefing.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
+  const rawDisableMorningBriefing = useMutation(
+    trpc.organizations.kiloclaw.disableMorningBriefing.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+      },
+    })
+  );
+  const rawRunMorningBriefing = useMutation(
+    trpc.organizations.kiloclaw.runMorningBriefing.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({
+            organizationId,
+          }),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.readMorningBriefing.queryKey({
+            organizationId,
+            day: 'today',
+          }),
+        });
+      },
+    })
+  );
 
   const mutations = {
     start: bindVoid(rawStart),
@@ -432,12 +493,16 @@ export function useOrgKiloClawMutations(
     setMyPin: bind(rawSetMyPin),
     removeMyPin: bindVoid(rawRemoveMyPin),
     writeFile: bind(rawWriteFile),
+    importOpenclawWorkspace: bind(rawImportOpenclawWorkspace),
     patchExecPreset: bind(rawPatchExecPreset),
     patchWebSearchConfig: bind(rawPatchWebSearchConfig),
     patchBotIdentity: bind(rawPatchBotIdentity),
     patchOpenclawConfig: bind(rawPatchOpenclawConfig),
     disconnectGoogle: bindVoid(rawDisconnectGoogle),
     setGmailNotifications: bind(rawSetGmailNotifications),
+    enableMorningBriefing: bind(rawEnableMorningBriefing),
+    disableMorningBriefing: bindVoid(rawDisableMorningBriefing),
+    runMorningBriefing: bindVoid(rawRunMorningBriefing),
     startKiloCliRun: bind(rawStartKiloCliRun),
     cancelKiloCliRun: bind(rawCancelKiloCliRun),
     rename: bind(rawRename),

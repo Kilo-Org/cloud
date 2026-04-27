@@ -33,6 +33,7 @@ import { adminAIAttributionRouter } from '@/routers/admin-ai-attribution-router'
 import { ossSponsorshipRouter } from '@/routers/admin/oss-sponsorship-router';
 import { contributorChampionsRouter } from '@/routers/admin/contributor-champions-router';
 import { bulkUserCreditsRouter } from '@/routers/admin/bulk-user-credits-router';
+import { creditCampaignsRouter } from '@/routers/admin/credit-campaigns-router';
 import { emailTestingRouter } from '@/routers/admin/email-testing-router';
 import { adminGastownRouter } from '@/routers/admin/gastown-router';
 import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router';
@@ -40,12 +41,13 @@ import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
-import { adminSecurityAdvisorContentRouter } from '@/routers/admin/security-advisor-content-router';
+import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
+import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
@@ -55,6 +57,7 @@ import { TRPCError } from '@trpc/server';
 import { assertNoError, successResult } from '@/lib/maybe-result';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
+import { revokeWebSessions } from '@/lib/web-session-revocation';
 import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
@@ -417,6 +420,12 @@ export const adminRouter = createTRPCRouter({
         .update(kilocode_users)
         .set({ api_token_pepper: crypto.randomUUID() })
         .where(eq(kilocode_users.id, input.userId));
+
+      return successResult();
+    }),
+
+    signOutBrowserSessions: adminProcedure.input(ResetAPIKeySchema).mutation(async ({ input }) => {
+      await revokeWebSessions(input.userId);
 
       return successResult();
     }),
@@ -966,6 +975,7 @@ export const adminRouter = createTRPCRouter({
             .where(
               and(
                 eq(kiloclaw_instances.user_id, input.userId),
+                isNull(kiloclaw_instances.organization_id),
                 isNull(kiloclaw_instances.destroyed_at)
               )
             )
@@ -974,7 +984,19 @@ export const adminRouter = createTRPCRouter({
           if (activeInstance) {
             try {
               const client = new KiloClawInternalClient();
-              await client.start(input.userId, workerInstanceId(activeInstance));
+              const startResult = await client.start(
+                input.userId,
+                workerInstanceId(activeInstance),
+                {
+                  reason: 'admin_request',
+                }
+              );
+              if (startResult.currentStatus === 'running') {
+                await clearTrialInactivityStopAfterStart({
+                  kiloUserId: input.userId,
+                  instanceId: activeInstance.id,
+                });
+              }
             } catch {
               // Best effort — instance will be startable by the user from the dashboard
             }
@@ -1922,6 +1944,7 @@ export const adminRouter = createTRPCRouter({
   ossSponsorship: ossSponsorshipRouter,
   contributorChampions: contributorChampionsRouter,
   bulkUserCredits: bulkUserCreditsRouter,
+  creditCampaigns: creditCampaignsRouter,
   emailTesting: emailTestingRouter,
   botRequests: adminBotRequestsRouter,
   gastown: adminGastownRouter,
@@ -1930,6 +1953,10 @@ export const adminRouter = createTRPCRouter({
   gatewayConfig: adminGatewayConfigRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   bulkBlock: adminBulkBlockRouter,
-  securityAdvisorContent: adminSecurityAdvisorContentRouter,
+  // Key kept as `securityAdvisorContent` for tRPC client compatibility —
+  // admin UI consumers reference `trpc.admin.securityAdvisorContent.*`.
+  // Backing router renamed to `adminShellSecurityContentRouter` as part of
+  // the shell-security rebrand; the key/symbol asymmetry is intentional.
+  securityAdvisorContent: adminShellSecurityContentRouter,
   freeModelUsage: adminFreeModelUsageRouter,
 });

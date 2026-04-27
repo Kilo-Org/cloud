@@ -197,7 +197,15 @@ export async function saveFingerprints(
   return { kilo_free_tier_allowed };
 }
 
-export type SignupSource = 'openclaw-security-advisor' | null;
+/**
+ * Structured signup attribution. Discriminated union so each source can
+ * carry its own payload (openclaw has none today; credit-campaign carries
+ * the slug needed for DB lookup).
+ */
+export type SignupSource =
+  | { kind: 'openclaw-security-advisor' }
+  | { kind: 'credit-campaign'; slug: string }
+  | null;
 
 /**
  * Handles signup promotion logic: grants credits for users who pass
@@ -228,7 +236,7 @@ export async function handleSignupPromotion(
     });
   }
 
-  if (signupSource === 'openclaw-security-advisor') {
+  if (signupSource?.kind === 'openclaw-security-advisor') {
     try {
       await grantCreditForCategory(user, {
         credit_category: 'openclaw-security-advisor-signup-bonus',
@@ -242,6 +250,17 @@ export async function handleSignupPromotion(
         },
         extra: { userId: user.id, email: user.google_user_email, signupSource },
       });
+    }
+  }
+
+  if (signupSource?.kind === 'credit-campaign') {
+    const { grantCreditCampaignBonus } = await import('@/lib/credit-campaigns');
+    const result = await grantCreditCampaignBonus(user, signupSource.slug);
+    if (!result.granted && result.reason === 'error') {
+      // Internal error from the grant path already captured via Sentry
+      // inside grantCreditCampaignBonus. Eligibility-fail reasons
+      // (not-found, inactive, ended, capped) are expected business
+      // states, not errors — no extra reporting.
     }
   }
 }

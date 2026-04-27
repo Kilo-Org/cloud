@@ -1,4 +1,5 @@
 import { resolvePullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
+import { shouldSkipSynchronizeForMergeCommit } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-handler';
 
 describe('resolvePullRequestCheckoutRef', () => {
   it('uses head.ref for same-repo PRs', () => {
@@ -61,5 +62,66 @@ describe('resolvePullRequestCheckoutRef', () => {
       isForkPr: false,
       headRepoFullName: null,
     });
+  });
+});
+
+describe('shouldSkipSynchronizeForMergeCommit', () => {
+  const baseArgs = {
+    installationId: 'inst-1',
+    headOwner: 'acme',
+    headRepoName: 'widgets',
+    headSha: 'deadbeef',
+    appType: 'standard' as const,
+  };
+
+  it('returns false for non-synchronize actions without calling the check', async () => {
+    for (const action of ['opened', 'reopened', 'ready_for_review']) {
+      let called = false;
+      const result = await shouldSkipSynchronizeForMergeCommit({
+        ...baseArgs,
+        action,
+        isMergeCommitFn: async () => {
+          called = true;
+          return true;
+        },
+      });
+
+      expect(result).toBe(false);
+      expect(called).toBe(false);
+    }
+  });
+
+  it('returns true when synchronize head is a merge commit', async () => {
+    const result = await shouldSkipSynchronizeForMergeCommit({
+      ...baseArgs,
+      action: 'synchronize',
+      isMergeCommitFn: async () => true,
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('returns false when synchronize head is not a merge commit', async () => {
+    const result = await shouldSkipSynchronizeForMergeCommit({
+      ...baseArgs,
+      action: 'synchronize',
+      isMergeCommitFn: async () => false,
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it('passes the expected arguments to the check function', async () => {
+    const calls: Array<[string, string, string, string, string]> = [];
+    await shouldSkipSynchronizeForMergeCommit({
+      ...baseArgs,
+      action: 'synchronize',
+      isMergeCommitFn: async (installationId, owner, repo, sha, appType) => {
+        calls.push([installationId, owner, repo, sha, appType]);
+        return false;
+      },
+    });
+
+    expect(calls).toEqual([['inst-1', 'acme', 'widgets', 'deadbeef', 'standard']]);
   });
 });

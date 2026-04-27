@@ -1,7 +1,10 @@
-import { db } from '@/lib/drizzle';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { modelsByProvider, organizations } from '@kilocode/db/schema';
-import { desc, eq } from 'drizzle-orm';
+import { formatDirectByokModelId } from '@/lib/ai-gateway/providers/direct-byok';
+import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
+import { db } from '@/lib/drizzle';
+import { byok_api_keys, custom_llm2, modelsByProvider, organizations } from '@kilocode/db/schema';
+import { CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
+import { and, desc, eq, isNotNull } from 'drizzle-orm';
 
 const isApply = process.argv.includes('--apply');
 
@@ -42,6 +45,32 @@ export async function run() {
   const orgs = await db.query.organizations.findMany({
     where: eq(organizations.plan, 'enterprise'),
   });
+  const customRows = await db.select().from(custom_llm2);
+  const byokRows = await db
+    .select({
+      organizationId: byok_api_keys.organization_id,
+      providerId: byok_api_keys.provider_id,
+    })
+    .from(byok_api_keys)
+    .where(and(eq(byok_api_keys.is_enabled, true), isNotNull(byok_api_keys.organization_id)));
+  const customIdsByOrg = new Map<string, string[]>();
+  const byokIdsByOrg = new Map<string, string[]>();
+  for (const row of customRows) {
+    const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
+    if (!parsed.success) continue;
+    for (const org of parsed.data.organization_ids) {
+      customIdsByOrg.set(org, [...(customIdsByOrg.get(org) ?? []), row.public_id]);
+    }
+  }
+  for (const row of byokRows) {
+    if (!row.organizationId) continue;
+    const provider = DIRECT_BYOK_PROVIDERS.find(provider => provider.id === row.providerId);
+    if (!provider) continue;
+    byokIdsByOrg.set(row.organizationId, [
+      ...(byokIdsByOrg.get(row.organizationId) ?? []),
+      ...provider.models.map(model => formatDirectByokModelId(provider, model)),
+    ]);
+  }
 
   let changed = 0;
   for (const org of orgs) {
@@ -49,9 +78,13 @@ export async function run() {
 
     const deniedModels = new Set(org.settings.model_deny_list?.map(normalizeModelId) ?? []);
     const deniedProviders = new Set(org.settings.provider_deny_list ?? []);
+    const customIds = customIdsByOrg.get(org.id) ?? [];
+    const byokIds = byokIdsByOrg.get(org.id) ?? [];
     const settings = {
       ...org.settings,
-      model_allow_list: modelIds.filter(model => !deniedModels.has(model)),
+      model_allow_list: unique(
+        modelIds.concat(customIds, byokIds).map(model => normalizeModelId(model))
+      ).filter(model => !deniedModels.has(model)),
       provider_allow_list: providerSlugs.filter(provider => !deniedProviders.has(provider)),
     };
 

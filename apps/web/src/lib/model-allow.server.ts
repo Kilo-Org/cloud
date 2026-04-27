@@ -53,22 +53,39 @@ export function createAllowPredicateFromAllowList(
   const providerAllowSet = providerAllowList ? new Set(providerAllowList) : undefined;
   return async (modelId: string): Promise<boolean> => {
     const normalizedModelId = normalizeModelId(modelId);
-    if (modelAllowSet && !modelAllowSet.has(normalizedModelId)) {
+    const modelAllowed = modelAllowSet?.has(normalizedModelId) ?? false;
+    if (modelAllowSet && !modelAllowed) {
       return false;
     }
     if (!providerAllowSet) {
       return true;
     }
     const providerSlugs = await providerLookup(normalizedModelId);
+    if (modelAllowed && providerSlugs.size === 0) return true;
     if (providerSlugs.size === 0) return false;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));
   };
+}
+
+function legacyDenyListsActive(restrictions: ModelRestrictions): boolean {
+  return (
+    restrictions.modelAllowList === undefined &&
+    restrictions.providerAllowList === undefined &&
+    (restrictions.modelDenyList.length > 0 || restrictions.providerDenyList.length > 0)
+  );
 }
 
 export function createAllowPredicateFromRestrictions(
   restrictions: ModelRestrictions,
   providerLookup: ProviderLookup = getProviderSlugsForModel
 ): ProviderAwareAllowPredicate {
+  if (legacyDenyListsActive(restrictions)) {
+    return createAllowPredicateFromDenyList(
+      restrictions.modelDenyList,
+      restrictions.providerDenyList,
+      providerLookup
+    );
+  }
   if (restrictions.modelAllowList !== undefined || restrictions.providerAllowList !== undefined) {
     return createAllowPredicateFromAllowList(
       restrictions.modelAllowList,

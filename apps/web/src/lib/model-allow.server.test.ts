@@ -48,6 +48,16 @@ describe('model allow predicates', () => {
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(true);
   });
 
+  test('explicitly listed model without provider metadata is allowed', async () => {
+    const isAllowed = createAllowPredicateFromAllowList(
+      ['custom/tenant-model'],
+      ['openai'],
+      lookup({})
+    );
+
+    await expect(isAllowed('custom/tenant-model')).resolves.toBe(true);
+  });
+
   test('allow lists take precedence over legacy deny lists', async () => {
     const isAllowed = createAllowPredicateFromRestrictions({
       modelAllowList: ['openai/gpt-4o'],
@@ -56,5 +66,14 @@ describe('model allow predicates', () => {
     });
 
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(true);
+  });
+
+  test('legacy deny lists are used only when no allow list exists', async () => {
+    const isAllowed = createAllowPredicateFromRestrictions({
+      modelDenyList: ['openai/gpt-4o'],
+      providerDenyList: [],
+    });
+
+    await expect(isAllowed('openai/gpt-4o')).resolves.toBe(false);
   });
 });

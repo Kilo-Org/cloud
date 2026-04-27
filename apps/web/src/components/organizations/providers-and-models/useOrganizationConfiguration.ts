@@ -11,8 +11,8 @@ import type { OpenRouterProvider } from '@/lib/organizations/organization-types'
 export type ConfigurationData = {
   allModelsAllowed: boolean;
   allProvidersEnabled: boolean;
-  displayModelDenyList: string[];
-  displayProviderDenyList: string[];
+  displayModelAllowList: string[];
+  displayProviderAllowList: string[];
   getProviderNames: (slugs: string[]) => string[];
   getModelNames: (modelIds: string[]) => string[];
 };
@@ -35,11 +35,11 @@ export function useOrganizationConfiguration(organizationId: string) {
   }
 
   const settings = organizationData.settings;
-  const modelDenyList = settings?.model_deny_list ?? [];
-  const providerDenyList = settings?.provider_deny_list ?? [];
+  const modelAllowList = settings?.model_allow_list;
+  const providerAllowList = settings?.provider_allow_list;
 
-  const allModelsAllowed = modelDenyList.length === 0;
-  const allProvidersEnabled = providerDenyList.length === 0;
+  const allModelsAllowed = modelAllowList === undefined;
+  const allProvidersEnabled = providerAllowList === undefined;
 
   // Get provider names for display
   const getProviderNames = (slugs: string[]) => {
@@ -58,8 +58,8 @@ export function useOrganizationConfiguration(organizationId: string) {
   const configurationData: ConfigurationData = {
     allModelsAllowed,
     allProvidersEnabled,
-    displayModelDenyList: modelDenyList,
-    displayProviderDenyList: providerDenyList,
+    displayModelAllowList: modelAllowList ?? [],
+    displayProviderAllowList: providerAllowList ?? [],
     getProviderNames,
     getModelNames,
   };

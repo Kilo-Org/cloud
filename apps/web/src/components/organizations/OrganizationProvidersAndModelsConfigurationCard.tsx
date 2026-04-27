@@ -24,31 +24,35 @@ type ProviderForSummaryCard = {
   slug: string;
   models: Array<{
     slug: string;
-    endpoint?: unknown;
+    endpoint?: unknown | null;
   }>;
 };
 
 export function computeProviderSelectionsForSummaryCard(params: {
   openRouterProviders: ProviderForSummaryCard[];
-  providerDenyList: string[];
-  modelDenyList: string[];
+  providerAllowList: string[] | undefined;
+  modelAllowList: string[] | undefined;
 }): ProviderSelection[] | null {
-  const { openRouterProviders, providerDenyList, modelDenyList } = params;
-  // If both deny lists are empty, there are no restrictions
-  if (providerDenyList.length === 0 && modelDenyList.length === 0) {
+  const { openRouterProviders, providerAllowList, modelAllowList } = params;
+  if (providerAllowList === undefined && modelAllowList === undefined) {
     return null;
   }
 
-  const providerDenySet = new Set(providerDenyList);
-  const modelDenySet = new Set(modelDenyList.map(id => normalizeModelId(id)));
+  const providerAllowSet = providerAllowList ? new Set(providerAllowList) : null;
+  const modelAllowSet = modelAllowList
+    ? new Set(modelAllowList.map(id => normalizeModelId(id)))
+    : null;
 
   const selections: ProviderSelection[] = [];
 
   for (const provider of openRouterProviders) {
-    if (providerDenySet.has(provider.slug)) continue;
+    if (providerAllowSet && !providerAllowSet.has(provider.slug)) continue;
 
     const availableModels = provider.models
-      .filter(model => model.endpoint && !modelDenySet.has(normalizeModelId(model.slug)))
+      .filter(
+        model =>
+          model.endpoint && (!modelAllowSet || modelAllowSet.has(normalizeModelId(model.slug)))
+      )
       .map(model => model.slug);
 
     if (availableModels.length > 0) {
@@ -59,7 +63,7 @@ export function computeProviderSelectionsForSummaryCard(params: {
     }
   }
 
-  // Empty array means restrictions exist but nothing survived — distinct from null ("no restrictions")
+  // Empty array means configured selections exist but nothing survived the current snapshot.
   return selections.length > 0 ? selections : [];
 }
 
@@ -80,13 +84,28 @@ export function OrganizationProvidersAndModelsConfigurationCard({
     }
 
     const settings = organizationData.settings;
-    const providerDenyList = settings?.provider_deny_list ?? [];
-    const modelDenyList = settings?.model_deny_list ?? [];
+    const deniedModels = new Set(settings?.model_deny_list?.map(id => normalizeModelId(id)) ?? []);
+    const providerAllowList =
+      settings?.provider_allow_list ??
+      (settings?.provider_deny_list
+        ? openRouterProviders
+            .filter(provider => !settings.provider_deny_list?.includes(provider.slug))
+            .map(provider => provider.slug)
+        : undefined);
+    const modelAllowList =
+      settings?.model_allow_list ??
+      (settings?.model_deny_list
+        ? openRouterProviders.flatMap(provider =>
+            provider.models
+              .filter(model => model.endpoint && !deniedModels.has(normalizeModelId(model.slug)))
+              .map(model => normalizeModelId(model.slug))
+          )
+        : undefined);
 
     return computeProviderSelectionsForSummaryCard({
       openRouterProviders,
-      providerDenyList,
-      modelDenyList,
+      providerAllowList,
+      modelAllowList,
     });
   }, [configurationData, organizationData, openRouterProviders]);
 

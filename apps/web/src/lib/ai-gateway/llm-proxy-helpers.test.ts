@@ -7,12 +7,12 @@ import {
 } from './llm-proxy-helpers';
 
 describe('checkOrganizationModelRestrictions', () => {
-  describe('enterprise plan - model deny list restrictions', () => {
-    it('should allow model when it is not in the deny list on enterprise plan', () => {
+  describe('enterprise plan - model allow list restrictions', () => {
+    it('should allow model when it is in the allow list on enterprise plan', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          model_deny_list: ['openai/gpt-4'],
+          model_allow_list: ['anthropic/claude-3-opus'],
         },
         organizationPlan: 'enterprise',
       });
@@ -20,11 +20,11 @@ describe('checkOrganizationModelRestrictions', () => {
       expect(result.error).toBeNull();
     });
 
-    it('should block model when it is in the deny list on enterprise plan', () => {
+    it('should block model when it is absent from the allow list on enterprise plan', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          model_deny_list: ['anthropic/claude-3-opus'],
+          model_allow_list: ['openai/gpt-4'],
         },
         organizationPlan: 'enterprise',
       });
@@ -33,19 +33,19 @@ describe('checkOrganizationModelRestrictions', () => {
       expect(result.error?.status).toBe(404);
     });
 
-    it('should allow any model when deny list is empty on enterprise plan', () => {
+    it('should block all models when allow list is empty on enterprise plan', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          model_deny_list: [],
+          model_allow_list: [],
         },
         organizationPlan: 'enterprise',
       });
 
-      expect(result.error).toBeNull();
+      expect(result.error).not.toBeNull();
     });
 
-    it('should allow any model when deny list is undefined on enterprise plan', () => {
+    it('should allow any model when allow list is undefined on enterprise plan', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {},
@@ -55,9 +55,9 @@ describe('checkOrganizationModelRestrictions', () => {
       expect(result.error).toBeNull();
     });
 
-    it('should block multiple denied models on enterprise plan', () => {
+    it('should allow multiple listed models on enterprise plan', () => {
       const settings = {
-        model_deny_list: ['anthropic/claude-3-opus', 'openai/gpt-3.5-turbo'],
+        model_allow_list: ['anthropic/claude-3-opus', 'openai/gpt-3.5-turbo'],
       };
 
       expect(
@@ -66,7 +66,7 @@ describe('checkOrganizationModelRestrictions', () => {
           settings,
           organizationPlan: 'enterprise',
         }).error
-      ).not.toBeNull();
+      ).toBeNull();
 
       expect(
         checkOrganizationModelRestrictions({
@@ -74,7 +74,7 @@ describe('checkOrganizationModelRestrictions', () => {
           settings,
           organizationPlan: 'enterprise',
         }).error
-      ).not.toBeNull();
+      ).toBeNull();
 
       expect(
         checkOrganizationModelRestrictions({
@@ -82,16 +82,16 @@ describe('checkOrganizationModelRestrictions', () => {
           settings,
           organizationPlan: 'enterprise',
         }).error
-      ).toBeNull();
+      ).not.toBeNull();
     });
   });
 
-  describe('teams plan - model deny list should NOT apply', () => {
-    it('should allow any model on teams plan even with model_deny_list set', () => {
+  describe('teams plan - model allow list should NOT apply', () => {
+    it('should allow any model on teams plan even with model_allow_list set', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          model_deny_list: ['anthropic/claude-3-opus'],
+          model_allow_list: [],
         },
         organizationPlan: 'teams',
       });
@@ -105,7 +105,7 @@ describe('checkOrganizationModelRestrictions', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          model_deny_list: ['anthropic/claude-3-opus'],
+          model_allow_list: [],
         },
         // No organizationPlan - individual user
       });
@@ -114,25 +114,25 @@ describe('checkOrganizationModelRestrictions', () => {
     });
   });
 
-  describe('provider deny list - applies to enterprise plans', () => {
-    it('should return provider config with ignored providers for enterprise plan', () => {
+  describe('provider allow list - applies to enterprise plans', () => {
+    it('should return provider config with only providers for enterprise plan', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_deny_list: ['openai'],
+          provider_allow_list: ['openai'],
         },
         organizationPlan: 'enterprise',
       });
 
       expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ ignore: ['openai'] });
+      expect(result.providerConfig).toEqual({ only: ['openai'] });
     });
 
-    it('should not return providerConfig for teams plan with provider_deny_list', () => {
+    it('should not return providerConfig for teams plan with provider_allow_list', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_deny_list: ['openai'],
+          provider_allow_list: ['openai'],
         },
         organizationPlan: 'teams',
       });
@@ -141,17 +141,17 @@ describe('checkOrganizationModelRestrictions', () => {
       expect(result.providerConfig).toBeUndefined();
     });
 
-    it('should not return providerConfig when provider_deny_list is empty', () => {
+    it('should return providerConfig when provider_allow_list is empty', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_deny_list: [],
+          provider_allow_list: [],
         },
         organizationPlan: 'enterprise',
       });
 
       expect(result.error).toBeNull();
-      expect(result.providerConfig).toBeUndefined();
+      expect(result.providerConfig).toEqual({ only: [] });
     });
   });
 
@@ -182,18 +182,18 @@ describe('checkOrganizationModelRestrictions', () => {
       expect(result.providerConfig).toEqual({ data_collection: 'deny' });
     });
 
-    it('should combine provider_deny_list and data_collection in provider config', () => {
+    it('should combine provider_allow_list and data_collection in provider config', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',
         settings: {
-          provider_deny_list: ['openai'],
+          provider_allow_list: ['openai'],
           data_collection: 'deny',
         },
         organizationPlan: 'enterprise',
       });
 
       expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ ignore: ['openai'], data_collection: 'deny' });
+      expect(result.providerConfig).toEqual({ only: ['openai'], data_collection: 'deny' });
     });
   });
 

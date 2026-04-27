@@ -16,6 +16,10 @@ export function sortUniqueStrings(values: ReadonlyArray<string>): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
+export function uniqueStrings(values: ReadonlyArray<string>): string[] {
+  return [...new Set(values)];
+}
+
 export function stringListsEqual(a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
@@ -26,6 +30,35 @@ export function stringListsEqual(a: ReadonlyArray<string>, b: ReadonlyArray<stri
 
 export function canonicalizeDenyList(raw: ReadonlyArray<string>): string[] {
   return sortUniqueStrings(raw.map(entry => normalizeModelId(entry)));
+}
+
+export function canonicalizeModelAllowList(raw: ReadonlyArray<string> | undefined): string[] {
+  if (!raw) return [];
+  return sortUniqueStrings(raw.map(entry => normalizeModelId(entry)));
+}
+
+export function canonicalizeProviderAllowList(raw: ReadonlyArray<string> | undefined): string[] {
+  if (!raw) return [];
+  return sortUniqueStrings(raw);
+}
+
+export function deriveModelAllowListFromLegacyDenyList(
+  modelDenyList: ReadonlyArray<string> | undefined,
+  openRouterModels: ReadonlyArray<OpenRouterModelSlugSnapshot>
+): string[] {
+  const denied = new Set(canonicalizeDenyList(modelDenyList ?? []));
+  const allowed = openRouterModels
+    .map(model => normalizeModelId(model.slug))
+    .filter(model => !denied.has(model));
+  return sortUniqueStrings(allowed);
+}
+
+export function deriveProviderAllowListFromLegacyDenyList(
+  providerDenyList: ReadonlyArray<string> | undefined,
+  allProviderSlugsWithEndpoints: ReadonlyArray<string>
+): string[] {
+  const denied = new Set(providerDenyList ?? []);
+  return sortUniqueStrings(allProviderSlugsWithEndpoints.filter(slug => !denied.has(slug)));
 }
 
 export function buildModelProvidersIndex(
@@ -57,54 +90,59 @@ export function computeAllProviderSlugsWithEndpoints(
 }
 
 export function computeEnabledProviderSlugs(
-  draftProviderDenyList: ReadonlyArray<string>,
+  draftProviderAllowList: ReadonlyArray<string>,
   allProviderSlugsWithEndpoints: ReadonlyArray<string>
 ): Set<string> {
-  const denySet = new Set(draftProviderDenyList);
-  return new Set(allProviderSlugsWithEndpoints.filter(slug => !denySet.has(slug)));
+  const known = new Set(allProviderSlugsWithEndpoints);
+  return new Set(draftProviderAllowList.filter(slug => known.has(slug)));
 }
 
 export function computeAllowedModelIds(
-  draftModelDenyList: ReadonlyArray<string>,
+  draftModelAllowList: ReadonlyArray<string>,
   openRouterModels: ReadonlyArray<OpenRouterModelSlugSnapshot>
 ): Set<string> {
-  const denySet = new Set(draftModelDenyList);
-  const allowed = new Set<string>();
+  const known = new Set(openRouterModels.map(model => normalizeModelId(model.slug)));
+  const allowed = new Set(draftModelAllowList.filter(model => known.has(model)));
+  return allowed;
+}
+
+export function computeAllModelIds(
+  openRouterModels: ReadonlyArray<OpenRouterModelSlugSnapshot>
+): string[] {
+  const ids: string[] = [];
   for (const model of openRouterModels) {
     const normalizedModelId = normalizeModelId(model.slug);
-    if (!denySet.has(normalizedModelId)) {
-      allowed.add(normalizedModelId);
-    }
+    ids.push(normalizedModelId);
   }
-  return allowed;
+  return sortUniqueStrings(ids);
 }
 
 export function toggleProviderEnabled(params: {
   providerSlug: string;
   nextEnabled: boolean;
-  draftProviderDenyList: ReadonlyArray<string>;
+  draftProviderAllowList: ReadonlyArray<string>;
 }): string[] {
-  const { providerSlug, nextEnabled, draftProviderDenyList } = params;
-  const denySet = new Set(draftProviderDenyList);
+  const { providerSlug, nextEnabled, draftProviderAllowList } = params;
+  const allowed = new Set(draftProviderAllowList);
   if (nextEnabled) {
-    denySet.delete(providerSlug);
-  } else {
-    denySet.add(providerSlug);
+    allowed.add(providerSlug);
+    return sortUniqueStrings([...allowed]);
   }
-  return sortUniqueStrings([...denySet]);
+  allowed.delete(providerSlug);
+  return sortUniqueStrings([...allowed]);
 }
 
 export function toggleModelAllowed(params: {
   modelId: string;
   nextAllowed: boolean;
-  draftModelDenyList: ReadonlyArray<string>;
+  draftModelAllowList: ReadonlyArray<string>;
 }): string[] {
-  const { modelId, nextAllowed, draftModelDenyList } = params;
-  const denySet = new Set(draftModelDenyList);
+  const { modelId, nextAllowed, draftModelAllowList } = params;
+  const allowed = new Set(draftModelAllowList);
   if (nextAllowed) {
-    denySet.delete(modelId);
-  } else {
-    denySet.add(modelId);
+    allowed.add(modelId);
+    return sortUniqueStrings([...allowed]);
   }
-  return sortUniqueStrings([...denySet]);
+  allowed.delete(modelId);
+  return sortUniqueStrings([...allowed]);
 }

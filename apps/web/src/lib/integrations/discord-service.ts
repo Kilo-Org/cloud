@@ -10,7 +10,10 @@ import { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN } from '@/l
 import { APP_URL } from '@/lib/constants';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
-import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
+import {
+  createAllowPredicateFromRestrictions,
+  hasActiveModelRestrictions,
+} from '@/lib/model-allow.server';
 import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
@@ -365,9 +368,9 @@ export async function updateModel(
   if (owner.type === 'org') {
     const organization = await getOrganizationById(owner.id);
     if (organization) {
-      const { modelDenyList, providerDenyList } = getEffectiveModelRestrictions(organization);
-      if (modelDenyList.length > 0 || providerDenyList.length > 0) {
-        const isAllowed = createAllowPredicateFromDenyList(modelDenyList, providerDenyList);
+      const restrictions = getEffectiveModelRestrictions(organization);
+      if (hasActiveModelRestrictions(restrictions)) {
+        const isAllowed = createAllowPredicateFromRestrictions(restrictions);
         if (!(await isAllowed(modelSlug))) {
           return { success: false, error: 'Model is not allowed by organization policy' };
         }

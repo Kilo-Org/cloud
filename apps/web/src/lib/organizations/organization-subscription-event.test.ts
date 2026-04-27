@@ -1476,7 +1476,7 @@ describe('Organization plan type updates from subscription', () => {
   });
 });
 
-describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
+describe('L3: Enterprise-to-Teams plan transition preserves allow lists', () => {
   let testUser: User;
   let testOrganization: Organization;
 
@@ -1485,17 +1485,17 @@ describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
     testOrganization = await createOrganization('Test Organization', testUser.id);
   });
 
-  test('should preserve model deny lists when transitioning enterprise → teams → enterprise', async () => {
+  test('should preserve model allow lists when transitioning enterprise → teams → enterprise', async () => {
     const baseTime = Math.floor(Date.now() / 1000);
 
-    // Set org to enterprise plan with model/provider deny lists
+    // Set org to enterprise plan with model/provider allow lists
     await db
       .update(organizations)
       .set({
         plan: 'enterprise',
         settings: {
-          model_deny_list: ['gpt-4', 'claude-3-opus'],
-          provider_deny_list: ['openai'],
+          model_allow_list: ['gpt-4', 'claude-3-opus'],
+          provider_allow_list: ['openai'],
         },
       })
       .where(eq(organizations.id, testOrganization.id));
@@ -1535,7 +1535,7 @@ describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
 
     await handleSubscriptionEvent(teamsSubscription, 'test-l3-to-teams');
 
-    // Verify plan is teams AND deny lists are preserved
+    // Verify plan is teams AND allow lists are preserved
     let updatedOrg = await db
       .select()
       .from(organizations)
@@ -1543,8 +1543,8 @@ describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
       .then(rows => rows[0]);
 
     expect(updatedOrg.plan).toBe('teams');
-    expect(updatedOrg.settings.model_deny_list).toEqual(['gpt-4', 'claude-3-opus']);
-    expect(updatedOrg.settings.provider_deny_list).toEqual(['openai']);
+    expect(updatedOrg.settings.model_allow_list).toEqual(['gpt-4', 'claude-3-opus']);
+    expect(updatedOrg.settings.provider_allow_list).toEqual(['openai']);
 
     // Process a subscription event that transitions back to 'enterprise'
     const enterpriseSubscription = createMockSubscription({
@@ -1570,7 +1570,7 @@ describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
 
     await handleSubscriptionEvent(enterpriseSubscription, 'test-l3-back-to-enterprise');
 
-    // Verify plan is enterprise AND deny lists are still preserved
+    // Verify plan is enterprise AND allow lists are still preserved
     updatedOrg = await db
       .select()
       .from(organizations)
@@ -1578,8 +1578,8 @@ describe('L3: Enterprise-to-Teams plan transition preserves deny lists', () => {
       .then(rows => rows[0]);
 
     expect(updatedOrg.plan).toBe('enterprise');
-    expect(updatedOrg.settings.model_deny_list).toEqual(['gpt-4', 'claude-3-opus']);
-    expect(updatedOrg.settings.provider_deny_list).toEqual(['openai']);
+    expect(updatedOrg.settings.model_allow_list).toEqual(['gpt-4', 'claude-3-opus']);
+    expect(updatedOrg.settings.provider_allow_list).toEqual(['openai']);
   });
 });
 

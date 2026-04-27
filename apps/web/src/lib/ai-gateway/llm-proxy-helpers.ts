@@ -356,25 +356,37 @@ export function checkOrganizationModelRestrictions(params: {
 
   const normalizedModelId = normalizeModelId(params.modelId);
 
-  // Model deny list restrictions only apply to Enterprise plans
-  // Teams plans should allow all models by default
+  // Model/provider access restrictions only apply to Enterprise plans.
   if (params.organizationPlan === 'enterprise') {
+    const modelAllowList = params.settings.model_allow_list;
+    if (
+      modelAllowList &&
+      !modelAllowList.some(entry => normalizeModelId(entry) === normalizedModelId)
+    ) {
+      return { error: modelNotAllowedResponse() };
+    }
+
     const modelDenyList = params.settings.model_deny_list;
     if (
-      modelDenyList &&
-      modelDenyList.some(entry => normalizeModelId(entry) === normalizedModelId)
+      !modelAllowList &&
+      modelDenyList?.some(entry => normalizeModelId(entry) === normalizedModelId)
     ) {
       return { error: modelNotAllowedResponse() };
     }
   }
 
+  const providerAllowList = params.settings.provider_allow_list;
   const providerDenyList = params.settings.provider_deny_list;
   const dataCollection = params.settings.data_collection;
 
   const providerConfig: OpenRouterProviderConfig = {};
 
-  if (params.organizationPlan === 'enterprise' && providerDenyList && providerDenyList.length > 0) {
-    providerConfig.ignore = providerDenyList;
+  if (params.organizationPlan === 'enterprise') {
+    if (providerAllowList !== undefined) {
+      providerConfig.only = providerAllowList;
+    } else if (providerDenyList && providerDenyList.length > 0) {
+      providerConfig.ignore = providerDenyList;
+    }
   }
 
   // Setting this only if it's set as an override on the organization settings

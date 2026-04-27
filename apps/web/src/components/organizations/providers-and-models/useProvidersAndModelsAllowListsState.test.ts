@@ -11,8 +11,8 @@ describe('providersAndModelsAllowListsReducer', () => {
 
     state = providersAndModelsAllowListsReducer(state, {
       type: 'INIT_FROM_SERVER',
-      modelDenyList: ['openai/gpt-4.1'],
-      providerDenyList: [],
+      modelAllowList: ['openai/gpt-4.1', 'anthropic/claude-3-opus'],
+      providerAllowList: ['openai'],
     });
 
     if (state.status !== 'ready') {
@@ -31,8 +31,8 @@ describe('providersAndModelsAllowListsReducer', () => {
       throw new Error('expected ready state');
     }
 
-    expect(state.draftModelDenyList).toEqual(state.initialModelDenyList);
-    expect(state.draftProviderDenyList).toEqual(state.initialProviderDenyList);
+    expect(state.draftModelAllowList).toEqual(state.initialModelAllowList);
+    expect(state.draftProviderAllowList).toEqual(state.initialProviderAllowList);
   });
 
   test('init -> toggle -> mark saved marks clean (draft becomes initial)', () => {
@@ -40,8 +40,8 @@ describe('providersAndModelsAllowListsReducer', () => {
 
     state = providersAndModelsAllowListsReducer(state, {
       type: 'INIT_FROM_SERVER',
-      modelDenyList: [],
-      providerDenyList: [],
+      modelAllowList: ['openai/gpt-4.1'],
+      providerAllowList: ['openai'],
     });
 
     if (state.status !== 'ready') {
@@ -60,7 +60,7 @@ describe('providersAndModelsAllowListsReducer', () => {
       throw new Error('expected ready state');
     }
 
-    expect(state.initialProviderDenyList).toEqual(state.draftProviderDenyList);
-    expect(state.initialModelDenyList).toEqual(state.draftModelDenyList);
+    expect(state.initialProviderAllowList).toEqual(state.draftProviderAllowList);
+    expect(state.initialModelAllowList).toEqual(state.draftModelAllowList);
   });
 });

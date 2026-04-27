@@ -126,14 +126,13 @@ export function BreakdownBarChart({
                     borderRadius: 6,
                     fontSize: 12,
                   }}
+                  itemStyle={{ color: 'rgba(255, 255, 255, 0.9)' }}
+                  labelStyle={{ color: 'rgba(255, 255, 255, 0.9)' }}
                   cursor={{ fill: 'rgba(255, 255, 255, 0.04)' }}
                   formatter={(value, _name, item) => {
                     const raw = Number(value);
                     const pct = (item?.payload as BarDatum | undefined)?.percentage ?? 0;
-                    return [
-                      `${formatBarValue(metric, raw)} (${pct.toFixed(1)}%)`,
-                      (item?.payload as BarDatum | undefined)?.label ?? '',
-                    ];
+                    return [`${formatBarValue(metric, raw)} (${pct.toFixed(1)}%)`];
                   }}
                 />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={false}>

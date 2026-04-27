@@ -307,8 +307,31 @@ function buildSecretPayload(
   };
 }
 
-async function hashBootstrapEnv(bootstrapEnv: Record<string, string>): Promise<string> {
-  const canonical = JSON.stringify(bootstrapEnv, Object.keys(bootstrapEnv).sort());
+async function hashSecretState(
+  serviceId: string,
+  bootstrapEnv: Record<string, string>
+): Promise<string> {
+  // Hash includes serviceId because buildSecretPayload restricts the secret
+  // to that specific service via nfObjects. If the service is recreated
+  // (e.g. deleted and recovered by name with a new Northflank-generated ID),
+  // the restriction target must be rewritten even when bootstrapEnv is
+  // unchanged — otherwise the secret stays pinned to the dead service and
+  // the new deployment can't read KILOCLAW_ENV_KEY at boot.
+  const canonical = JSON.stringify(
+    { serviceId, bootstrapEnv },
+    // Sort all nested keys deterministically.
+    (_key, value: unknown) => {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return Object.keys(value as Record<string, unknown>)
+          .sort()
+          .reduce<Record<string, unknown>>((acc, k) => {
+            acc[k] = (value as Record<string, unknown>)[k];
+            return acc;
+          }, {});
+      }
+      return value;
+    }
+  );
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
   return Array.from(new Uint8Array(digest))
     .map(byte => byte.toString(16).padStart(2, '0'))
@@ -322,6 +345,24 @@ type EnsureSecretResult = {
   skipped: boolean;
 };
 
+// Bootstrap values (currently KILOCLAW_ENV_KEY) are plaintext in the secret
+// payload. Northflank's redactUnknown catches the outer `secrets` key on echoed
+// request bodies, but any code path that returns a non-JSON error body or
+// echoes the variables under a non-sensitive key would still leak the key
+// value. Belt-and-suspenders: thread the values into config.redactValues for
+// secret API calls so redactText strips them unconditionally.
+function withBootstrapRedaction(
+  base: NorthflankClientConfig,
+  bootstrapEnv: Record<string, string>
+): NorthflankClientConfig {
+  const bootstrapValues = Object.values(bootstrapEnv).filter(value => value.length > 0);
+  if (bootstrapValues.length === 0) return base;
+  return {
+    ...base,
+    redactValues: [...(base.redactValues ?? []), ...bootstrapValues],
+  };
+}
+
 async function ensureSecret(
   config: NorthflankClientConfig,
   projectId: string,
@@ -330,7 +371,7 @@ async function ensureSecret(
   names: NorthflankProvisioningNames,
   runtimeSpec: RuntimeSpec
 ): Promise<EnsureSecretResult> {
-  const contentHash = await hashBootstrapEnv(runtimeSpec.bootstrapEnv);
+  const contentHash = await hashSecretState(serviceId, runtimeSpec.bootstrapEnv);
 
   if (
     providerState.secretId &&
@@ -339,7 +380,7 @@ async function ensureSecret(
   ) {
     logNorthflank('ensure_secret_unchanged', {
       description:
-        'Restricted secret contents match persisted hash; skipping write to avoid Northflank redeploy',
+        'Restricted secret contents and service target match persisted hash; skipping write to avoid Northflank redeploy',
       apiOperation: 'PATCH /projects/{projectId}/secrets/{secretId}',
       projectId,
       serviceId,
@@ -355,10 +396,16 @@ async function ensureSecret(
   }
 
   const payload = buildSecretPayload(serviceId, names.secretName, runtimeSpec.bootstrapEnv);
+  const secretConfig = withBootstrapRedaction(config, runtimeSpec.bootstrapEnv);
 
   if (providerState.secretId) {
     try {
-      const secret = await putProjectSecret(config, projectId, providerState.secretId, payload);
+      const secret = await putProjectSecret(
+        secretConfig,
+        projectId,
+        providerState.secretId,
+        payload
+      );
       return {
         secretId: secret.id,
         secretName: secret.name || names.secretName,
@@ -371,7 +418,7 @@ async function ensureSecret(
   }
 
   try {
-    const created = await createProjectSecret(config, projectId, payload);
+    const created = await createProjectSecret(secretConfig, projectId, payload);
     return {
       secretId: created.id,
       secretName: created.name || names.secretName,
@@ -380,9 +427,9 @@ async function ensureSecret(
     };
   } catch (err) {
     if (!isNorthflankConflict(err)) throw err;
-    const recovered = await findProjectSecretByName(config, projectId, names.secretName);
+    const recovered = await findProjectSecretByName(secretConfig, projectId, names.secretName);
     if (recovered) {
-      const updated = await putProjectSecret(config, projectId, recovered.id, payload);
+      const updated = await putProjectSecret(secretConfig, projectId, recovered.id, payload);
       return {
         secretId: updated.id,
         secretName: updated.name || names.secretName,

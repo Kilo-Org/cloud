@@ -55,7 +55,13 @@ const NorthflankSecretDetailsSchema = z.object({ id: z.string(), name: z.string(
 const ProjectResponseSchema = z.object({ data: NorthflankProjectSchema });
 const ProjectListResponseSchema = z.object({
   data: z.object({ projects: z.array(NorthflankProjectSchema) }).passthrough(),
-  pagination: z.object({ hasNextPage: z.boolean().optional() }).passthrough().optional(),
+  pagination: z
+    .object({
+      hasNextPage: z.boolean().optional(),
+      cursor: z.string().optional(),
+    })
+    .passthrough()
+    .optional(),
 });
 const VolumeResponseSchema = z.object({ data: NorthflankVolumeSchema });
 const VolumeListResponseSchema = z.object({ data: z.array(NorthflankVolumeSchema) });
@@ -305,15 +311,32 @@ export async function findProjectByName(
   config: NorthflankClientConfig,
   name: string
 ): Promise<NorthflankProject | null> {
-  const response = await requestJson(
-    config,
-    '/projects',
-    undefined,
-    ProjectListResponseSchema,
-    [200],
-    'findProjectByName'
-  );
-  return response.data.projects.find(project => project.name === name) ?? null;
+  // Page through all projects in the team. Per-team project count can grow
+  // beyond one page once multiple KiloClaw instances (one project each) are
+  // in use, so a first-page-only lookup would silently miss existing
+  // projects and the caller would then try to re-create them — hitting a
+  // 409 conflict whose recovery also does a first-page lookup.
+  const PER_PAGE = 100; // Northflank API max
+  const MAX_PAGES = 50; // hard safety bound; covers 5000 projects per team
+  let cursor: string | undefined;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const params = new URLSearchParams({ per_page: String(PER_PAGE) });
+    if (cursor) params.set('cursor', cursor);
+    const response = await requestJson(
+      config,
+      `/projects?${params.toString()}`,
+      undefined,
+      ProjectListResponseSchema,
+      [200],
+      'findProjectByName'
+    );
+    const match = response.data.projects.find(project => project.name === name);
+    if (match) return match;
+    const pagination = response.pagination;
+    if (!pagination?.hasNextPage || !pagination.cursor) return null;
+    cursor = pagination.cursor;
+  }
+  return null;
 }
 
 export async function getProject(

@@ -24,8 +24,22 @@ type OnProviderResultArg = {
 };
 type OnProviderResultFn = (arg: OnProviderResultArg) => Promise<void>;
 
-async function computeBootstrapEnvHash(bootstrapEnv: Record<string, string>): Promise<string> {
-  const canonical = JSON.stringify(bootstrapEnv, Object.keys(bootstrapEnv).sort());
+async function computeSecretStateHash(
+  serviceId: string,
+  bootstrapEnv: Record<string, string>
+): Promise<string> {
+  // Must match hashSecretState in src/providers/northflank/index.ts.
+  const canonical = JSON.stringify({ serviceId, bootstrapEnv }, (_key, value: unknown) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return Object.keys(value as Record<string, unknown>)
+        .sort()
+        .reduce<Record<string, unknown>>((acc, k) => {
+          acc[k] = (value as Record<string, unknown>)[k];
+          return acc;
+        }, {});
+    }
+    return value;
+  });
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
   return Array.from(new Uint8Array(digest))
     .map(byte => byte.toString(16).padStart(2, '0'))
@@ -221,6 +235,13 @@ describe('northflankProviderAdapter', () => {
         secrets: { variables: runtimeSpec.bootstrapEnv },
       })
     );
+    // Bootstrap env values (KILOCLAW_ENV_KEY) must be added to redactValues
+    // for the secret API call so that a Northflank echo/error does not leak
+    // the plaintext key into [northflank] api_request_failed logs.
+    const secretCallConfig = vi.mocked(createProjectSecret).mock.calls[0]?.[0];
+    expect(secretCallConfig?.redactValues).toEqual(
+      expect.arrayContaining(Object.values(runtimeSpec.bootstrapEnv))
+    );
     const patchPayload = vi.mocked(patchDeploymentService).mock.calls[0]?.[3];
     if (!patchPayload?.deployment) throw new Error('expected deployment patch payload');
     expect(patchPayload.deployment.instances).toBe(1);
@@ -268,7 +289,7 @@ describe('northflankProviderAdapter', () => {
   });
 
   it('skips writing the restricted secret on restart when bootstrap env is unchanged', async () => {
-    const matchingHash = await computeBootstrapEnvHash(runtimeSpec.bootstrapEnv);
+    const matchingHash = await computeSecretStateHash('service-1', runtimeSpec.bootstrapEnv);
     vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
     vi.mocked(waitForDeploymentCompleted).mockResolvedValue({
       id: 'service-1',
@@ -339,11 +360,55 @@ describe('northflankProviderAdapter', () => {
     });
 
     expect(putProjectSecret).toHaveBeenCalledTimes(1);
-    const expectedHash = await computeBootstrapEnvHash(runtimeSpec.bootstrapEnv);
+    const expectedHash = await computeSecretStateHash('service-1', runtimeSpec.bootstrapEnv);
     const persistedHashes = onProviderResult.mock.calls
       .map(call => call[0]?.providerState)
       .map(state => (state?.provider === 'northflank' ? state.secretContentHash : undefined));
     expect(persistedHashes).toContain(expectedHash);
+  });
+
+  it('rewrites the restricted secret on restart when the service ID changed even if bootstrap env did not', async () => {
+    // Scenario: the previous service was deleted and recovered by name
+    // with a new Northflank-generated ID. bootstrapEnv is unchanged from
+    // the prior start, but the secret's nfObjects restriction must be
+    // rewritten so the new service can still read KILOCLAW_ENV_KEY.
+    const priorHash = await computeSecretStateHash('service-OLD', runtimeSpec.bootstrapEnv);
+    vi.mocked(putProjectSecret).mockResolvedValue({ id: 'secret-1', name: 'kc-ki-123' });
+    vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+    vi.mocked(waitForDeploymentCompleted).mockResolvedValue({
+      id: 'service-1',
+      name: 'kc-ki-123',
+      ports: [{ name: 'p01', dns: 'kc-ki-123.code.run' }],
+    });
+    const onProviderResult = vi.fn<OnProviderResultFn>();
+
+    await northflankProviderAdapter.restartRuntime({
+      env: env as never,
+      state: {
+        sandboxId: 'ki_123',
+        providerState: {
+          provider: 'northflank',
+          projectId: 'project-1',
+          projectName: 'kc-ki-123',
+          serviceId: 'service-1',
+          serviceName: 'kc-ki-123',
+          volumeId: 'volume-1',
+          volumeName: 'kc-ki-123',
+          secretId: 'secret-1',
+          secretName: 'kc-ki-123',
+          secretContentHash: priorHash,
+          ingressHost: 'kc-ki-123.code.run',
+          region: 'us-central',
+        },
+      } as never,
+      runtimeSpec,
+      onProviderResult,
+    });
+
+    expect(putProjectSecret).toHaveBeenCalledTimes(1);
+    // The PATCH body must restrict the secret to the NEW service ID.
+    const patchCall = vi.mocked(putProjectSecret).mock.calls[0];
+    expect(patchCall?.[3].restrictions?.nfObjects).toEqual([{ id: 'service-1', type: 'service' }]);
   });
 
   it('verifies persisted volumes without recreating active missing storage', async () => {

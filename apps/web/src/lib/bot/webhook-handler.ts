@@ -1,7 +1,7 @@
 import 'server-only';
 import { after } from 'next/server';
 import { bot } from '@/lib/bot';
-import { runWithBotWebhookContext } from '@/lib/bot/webhook-context';
+import { markSlackInstallationRequiresReinstall } from '@/lib/integrations/slack-service';
 
 type Platform = keyof typeof bot.webhooks;
 
@@ -46,6 +46,15 @@ function getSlackTeamIdFromBody(body: string, contentType: string): string | und
   }
 }
 
+async function handleSlackWebhookError(error: unknown, teamId: string | undefined): Promise<void> {
+  if (!teamId) return;
+  try {
+    await markSlackInstallationRequiresReinstall(teamId, error);
+  } catch (markError) {
+    console.error('[Webhook] Failed to mark Slack installation as requires_reinstall:', markError);
+  }
+}
+
 export async function handleWebhook(platform: string, request: Request): Promise<Response> {
   const handler = bot.webhooks[platform as Platform];
   if (!handler) {
@@ -59,9 +68,20 @@ export async function handleWebhook(platform: string, request: Request): Promise
       ? getSlackTeamIdFromBody(body, request.headers.get('content-type') ?? '')
       : undefined;
 
-  return runWithBotWebhookContext({ slackTeamId }, () => {
-    return handler(clonedRequest, {
-      waitUntil: task => after(() => task),
+  try {
+    return await handler(clonedRequest, {
+      waitUntil: task =>
+        after(async () => {
+          try {
+            await task;
+          } catch (error) {
+            await handleSlackWebhookError(error, slackTeamId);
+            throw error;
+          }
+        }),
     });
-  });
+  } catch (error) {
+    await handleSlackWebhookError(error, slackTeamId);
+    throw error;
+  }
 }

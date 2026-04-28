@@ -214,40 +214,6 @@ export async function markSlackInstallationRequiresReinstall(
   return { ...scopeInfo, missingScopes, integrationId: integration.id };
 }
 
-export async function postSlackReinstallNoticeByTeamId({
-  teamId,
-  channelId,
-  threadTs,
-  missingScopes,
-}: {
-  teamId: string;
-  channelId: string;
-  threadTs?: string;
-  missingScopes: string[];
-}): Promise<SlackPostMessageResponse> {
-  if (missingScopes.includes('chat:write')) {
-    return { ok: false, error: 'missing_chat_write_scope' };
-  }
-
-  const integration = await getInstallationByTeamId(teamId);
-  if (!integration) return { ok: false, error: 'No Slack installation found' };
-
-  const metadata = readSlackMetadata(integration.metadata);
-  if (!metadata.access_token) return { ok: false, error: 'No access token found' };
-
-  const reinstallPath = integration.owned_by_organization_id
-    ? `/organizations/${integration.owned_by_organization_id}/integrations/slack`
-    : '/integrations/slack';
-  const reinstallUrl = new URL(reinstallPath, APP_URL).toString();
-  const scopeText = missingScopes.length > 0 ? ` Missing scopes: ${missingScopes.join(', ')}` : '';
-
-  return postSlackMessageByAccessToken(metadata.access_token, {
-    channel: channelId,
-    thread_ts: threadTs,
-    text: `Kilo needs updated Slack permissions (${scopeText}) for some features. Please reinstall the Kilo Slack app: ${reinstallUrl}. A Slack workspace admin may need to approve the reinstall.`,
-  });
-}
-
 function getOwnershipConditions(owner: Owner) {
   return owner.type === 'user'
     ? [

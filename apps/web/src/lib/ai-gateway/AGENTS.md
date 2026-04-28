@@ -1,7 +1,5 @@
 # AI Gateway
 
-See also the handbook: [Adding models](https://github.com/Kilo-Org/handbook/blob/main/content/engineering/adding-models.md) and [EAP Program](https://github.com/Kilo-Org/handbook/blob/main/content/engineering/eap-program.md).
-
 ## Organization model/provider policies
 
 Custom LLM models ([`custom-llm/`](./custom-llm)) and direct BYOK models ([`providers/direct-byok/`](./providers/direct-byok)) must not be passed through `checkOrganizationModelRestrictions`. Enabling either already requires explicit admin action, so enforcing the organization's model/provider allow/deny lists on them is unnecessary and counterproductive.

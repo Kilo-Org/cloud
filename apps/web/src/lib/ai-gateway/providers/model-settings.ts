@@ -4,6 +4,7 @@ import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrok4Model, isXaiModel } from '@/lib/ai-gateway/providers/xai';
 import { isZaiModel } from '@/lib/ai-gateway/providers/zai';
 import type {

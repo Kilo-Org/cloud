@@ -272,6 +272,9 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
         execute: async args => {
           let resolvedCloudAgentSessionId: string | undefined;
           let resolvedKiloSessionId: string | undefined;
+
+          await params.thread.startTyping('Spawning Cloud Agent session...');
+
           const currentStep = getNextBotCallbackStep({
             completedStepCount,
             completedStepsInCurrentRun: collectedSteps.length,

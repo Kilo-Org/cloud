@@ -1,4 +1,4 @@
-import { Chat, emoji, type ActionEvent, type Message, type Thread } from 'chat';
+import { Chat, type ActionEvent, type Message, type Thread } from 'chat';
 import { createSlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
@@ -8,6 +8,7 @@ import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
 import { processMessage } from '@/lib/bot/run';
 import { createChatState } from '@/lib/bot/state';
+import { updateSlackAssistantSuggestions } from '@/lib/bot/assistant-prompts';
 import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET } from '@/lib/config.server';
 
 function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
@@ -62,10 +63,9 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
       modelUsed: undefined,
     });
 
-    const received = thread.createSentMessageFromMessage(message);
-    await received.addReaction(emoji.eyes);
+    chatBot.registerSingleton();
 
-    await chatBot.registerSingleton();
+    await thread.startTyping('Thinking...');
 
     try {
       await processMessage({ thread, message, platformIntegration, user, botRequestId });
@@ -95,6 +95,30 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
     } catch (error) {
       // Not critical — the ephemeral message will disappear on its own eventually
       console.warn('[Bot] Failed to delete link-account ephemeral:', error);
+    }
+  });
+
+  chatBot.onAssistantThreadStarted(async event => {
+    try {
+      await updateSlackAssistantSuggestions(slackAdapter, event);
+    } catch (error) {
+      console.error('[Bot] Failed to set Slack assistant suggestions:', error);
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'assistant-thread-started' },
+        extra: { userId: event.userId, channelId: event.channelId },
+      });
+    }
+  });
+
+  chatBot.onAssistantContextChanged(async event => {
+    try {
+      await updateSlackAssistantSuggestions(slackAdapter, event);
+    } catch (error) {
+      console.error('[Bot] Failed to update Slack assistant suggestions:', error);
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'assistant-context-changed' },
+        extra: { userId: event.userId, channelId: event.channelId },
+      });
     }
   });
 

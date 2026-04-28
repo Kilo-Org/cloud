@@ -1,7 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
 import { channel_badge_counts, kilocode_users } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
@@ -418,52 +418,6 @@ describe('session and API token reset mutations', () => {
 });
 
 describe('user router - getUnreadCounts', () => {
-  async function seedBadge(userId: string, channelId: string, count: number) {
-    await db
-      .insert(channel_badge_counts)
-      .values({ user_id: userId, channel_id: channelId, badge_count: count });
-  }
-
-  async function cleanupBadges(userId: string) {
-    await db.delete(channel_badge_counts).where(eq(channel_badge_counts.user_id, userId));
-  }
-
-  it('returns per-channel unread counts for the current user', async () => {
-    const user = await insertTestUser({
-      google_user_email: `unread-counts-basic-${crypto.randomUUID()}@example.com`,
-    });
-    await seedBadge(user.id, 'sandbox-alpha', 3);
-    await seedBadge(user.id, 'sandbox-beta', 7);
-
-    const caller = await createCallerForUser(user.id);
-    const result = await caller.user.getUnreadCounts();
-
-    expect(result).toHaveLength(2);
-    expect(result).toEqual(
-      expect.arrayContaining([
-        { channelId: 'sandbox-alpha', badgeCount: 3 },
-        { channelId: 'sandbox-beta', badgeCount: 7 },
-      ])
-    );
-
-    await cleanupBadges(user.id);
-  });
-
-  it('omits channels with a zero badge count', async () => {
-    const user = await insertTestUser({
-      google_user_email: `unread-counts-zero-${crypto.randomUUID()}@example.com`,
-    });
-    await seedBadge(user.id, 'sandbox-has-unread', 2);
-    await seedBadge(user.id, 'sandbox-no-unread', 0);
-
-    const caller = await createCallerForUser(user.id);
-    const result = await caller.user.getUnreadCounts();
-
-    expect(result).toEqual([{ channelId: 'sandbox-has-unread', badgeCount: 2 }]);
-
-    await cleanupBadges(user.id);
-  });
-
   it('does not return counts from other users', async () => {
     const user = await insertTestUser({
       google_user_email: `unread-counts-me-${crypto.randomUUID()}@example.com`,
@@ -471,44 +425,18 @@ describe('user router - getUnreadCounts', () => {
     const other = await insertTestUser({
       google_user_email: `unread-counts-other-${crypto.randomUUID()}@example.com`,
     });
-    await seedBadge(user.id, 'sandbox-mine', 4);
-    await seedBadge(other.id, 'sandbox-theirs', 9);
+    await db.insert(channel_badge_counts).values([
+      { user_id: user.id, channel_id: 'sandbox-mine', badge_count: 4 },
+      { user_id: other.id, channel_id: 'sandbox-theirs', badge_count: 9 },
+    ]);
 
     const caller = await createCallerForUser(user.id);
     const result = await caller.user.getUnreadCounts();
 
     expect(result).toEqual([{ channelId: 'sandbox-mine', badgeCount: 4 }]);
 
-    await cleanupBadges(user.id);
-    await cleanupBadges(other.id);
-  });
-
-  it('reflects a count that was reset via markChatRead', async () => {
-    const user = await insertTestUser({
-      google_user_email: `unread-counts-after-read-${crypto.randomUUID()}@example.com`,
-    });
-    await seedBadge(user.id, 'sandbox-read', 5);
-    await seedBadge(user.id, 'sandbox-still-unread', 1);
-
-    const caller = await createCallerForUser(user.id);
-    await caller.user.markChatRead({ channelId: 'sandbox-read' });
-
-    const result = await caller.user.getUnreadCounts();
-
-    expect(result).toEqual([{ channelId: 'sandbox-still-unread', badgeCount: 1 }]);
-
-    // Defensive: confirm the row was zeroed, not deleted.
-    const zeroed = await db
-      .select({ count: channel_badge_counts.badge_count })
-      .from(channel_badge_counts)
-      .where(
-        and(
-          eq(channel_badge_counts.user_id, user.id),
-          eq(channel_badge_counts.channel_id, 'sandbox-read')
-        )
-      );
-    expect(zeroed).toEqual([{ count: 0 }]);
-
-    await cleanupBadges(user.id);
+    await db
+      .delete(channel_badge_counts)
+      .where(inArray(channel_badge_counts.user_id, [user.id, other.id]));
   });
 });

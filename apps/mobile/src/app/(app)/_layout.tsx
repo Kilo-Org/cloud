@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 
-import { KiloChatProvider } from '@/components/kilo-chat/KiloChatProvider';
+import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function AppLayout() {

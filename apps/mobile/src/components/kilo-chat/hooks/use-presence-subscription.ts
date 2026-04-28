@@ -4,7 +4,7 @@ import { presenceContextForConversation } from '@kilocode/notifications';
 import { useFocusEffect } from 'expo-router';
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { useKiloChat } from '../KiloChatProvider';
+import { useKiloChat } from '../kilo-chat-provider';
 
 export function usePresenceSubscription(conversationId: string) {
   const { eventService } = useKiloChat();

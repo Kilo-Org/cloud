@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { useKiloChat } from '../KiloChatProvider';
+import { useKiloChat } from '../kilo-chat-provider';
 
 export function useEventSubscription(sandboxId: string, conversationId: string) {
   const { eventService } = useKiloChat();

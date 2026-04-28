@@ -5,7 +5,8 @@ import { useTRPC } from '@/lib/trpc';
 
 type Cached = { token: string; expiresAt: number };
 
-const SAFETY_MARGIN_MS = 60_000; // refetch 60s before expiry
+// Refetch 60s before expiry
+const SAFETY_MARGIN_MS = 60_000;
 
 export function useKiloChatToken() {
   const trpc = useTRPC();

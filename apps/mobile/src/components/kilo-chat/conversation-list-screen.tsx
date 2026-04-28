@@ -6,9 +6,9 @@ import { toast } from 'sonner-native';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 
-import { useConversations } from './hooks/useConversations';
-import { useInstanceEventSubscription } from './hooks/useInstanceEventSubscription';
-import { useKiloChatClient } from './hooks/useKiloChatClient';
+import { useConversations } from './hooks/use-conversations';
+import { useInstanceEventSubscription } from './hooks/use-instance-event-subscription';
+import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { EmptyConversationList } from './empty-conversation-list';
 
 type ConversationListScreenProps = {

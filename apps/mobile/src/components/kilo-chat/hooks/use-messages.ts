@@ -1,23 +1,28 @@
-import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import type { InfiniteData } from '@tanstack/react-query';
-import type {
-  Message,
-  ReactionSummary,
-  CreateMessageRequest,
-  EditMessageRequest,
-  MessageCreatedEvent,
-  MessageUpdatedEvent,
-  MessageDeletedEvent,
-  MessageDeliveryFailedEvent,
-  ActionDeliveryFailedEvent,
-  ReactionAddedEvent,
-  ReactionRemovedEvent,
-  ExecApprovalDecision,
+/* eslint-disable max-lines */
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
+import {
+  type ActionDeliveryFailedEvent,
+  type CreateMessageRequest,
+  type EditMessageRequest,
+  type ExecApprovalDecision,
+  type Message,
+  type MessageCreatedEvent,
+  type MessageDeletedEvent,
+  type MessageDeliveryFailedEvent,
+  type MessageUpdatedEvent,
+  type ReactionAddedEvent,
+  type ReactionRemovedEvent,
+  type ReactionSummary,
 } from '@kilocode/kilo-chat';
 import { useEffect } from 'react';
 import { toast } from 'sonner-native';
 
-import { useKiloChatClient } from './useKiloChatClient';
+import { useKiloChatClient } from './use-kilo-chat-client';
 
 const PAGE_SIZE = 50;
 
@@ -28,7 +33,9 @@ function applyReactionAdded(
 ): ReactionSummary[] {
   const existing = reactions.find(r => r.emoji === emoji);
   if (existing) {
-    if (existing.memberIds.includes(memberId)) return reactions;
+    if (existing.memberIds.includes(memberId)) {
+      return reactions;
+    }
     return reactions.map(r =>
       r.emoji === emoji ? { ...r, count: r.count + 1, memberIds: [...r.memberIds, memberId] } : r
     );
@@ -43,7 +50,9 @@ function applyReactionRemoved(
 ): ReactionSummary[] {
   return reactions
     .map(r => {
-      if (r.emoji !== emoji) return r;
+      if (r.emoji !== emoji) {
+        return r;
+      }
       const memberIds = r.memberIds.filter(id => id !== memberId);
       return { ...r, count: memberIds.length, memberIds };
     })
@@ -61,16 +70,10 @@ function restoreMessageInCache(
   snapshot: Message
 ): void {
   queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-    if (!old) return old;
-    let replaced = false;
-    const pages = old.pages.map(page =>
-      page.map(msg => {
-        if (msg.id !== snapshot.id) return msg;
-        replaced = true;
-        return snapshot;
-      })
-    );
-    if (!replaced) return old;
+    if (!old) {
+      return old;
+    }
+    const pages = old.pages.map(page => page.map(msg => (msg.id !== snapshot.id ? msg : snapshot)));
     return { ...old, pages };
   });
 }
@@ -86,7 +89,9 @@ function removeMessageFromCache(
   messageId: string
 ): void {
   queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-    if (!old) return old;
+    if (!old) {
+      return old;
+    }
     return {
       ...old,
       pages: old.pages.map(page => page.filter(msg => msg.id !== messageId)),
@@ -100,10 +105,14 @@ function findMessageInCache(
   messageId: string
 ): Message | undefined {
   const data = queryClient.getQueryData<InfiniteData<Message[]>>(queryKey);
-  if (!data) return undefined;
+  if (!data) {
+    return undefined;
+  }
   for (const page of data.pages) {
     const match = page.find(msg => msg.id === messageId);
-    if (match) return match;
+    if (match) {
+      return match;
+    }
   }
   return undefined;
 }
@@ -113,17 +122,23 @@ export function useMessages(conversationId: string | null) {
   return useInfiniteQuery({
     queryKey: ['kilo-chat', 'messages', conversationId],
     queryFn: async ({ pageParam }) => {
-      return client.listMessages(conversationId ?? '', { before: pageParam, limit: PAGE_SIZE });
+      const result = await client.listMessages(conversationId ?? '', {
+        before: pageParam,
+        limit: PAGE_SIZE,
+      });
+      return result;
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: lastPage => {
-      if (lastPage.length < PAGE_SIZE) return undefined;
-      return lastPage[lastPage.length - 1]?.id;
+      if (lastPage.length < PAGE_SIZE) {
+        return undefined;
+      }
+      return lastPage.at(-1)?.id;
     },
-    enabled: !!conversationId,
+    enabled: Boolean(conversationId),
     select: data => ({
       ...data,
-      messages: data.pages.flatMap(p => p).reverse(),
+      messages: data.pages.flat().toReversed(),
     }),
   });
 }
@@ -134,10 +149,15 @@ export function useSendMessage(conversationId: string | null, currentUserId: str
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (req: SendMessageVariables) => client.sendMessage(req),
+    mutationFn: async (req: SendMessageVariables) => {
+      const result = await client.sendMessage(req);
+      return result;
+    },
     onMutate: async (variables: SendMessageVariables) => {
-      if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
+      if (!conversationId) {
+        return { queryKey, pendingId: '' };
+      }
       await queryClient.cancelQueries({ queryKey });
       const pendingId = `pending-${variables.clientId}`;
       const optimisticMessage: Message = {
@@ -152,17 +172,20 @@ export function useSendMessage(conversationId: string | null, currentUserId: str
         reactions: [],
       };
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         const firstPage = old.pages[0] ?? [];
         return { ...old, pages: [[optimisticMessage, ...firstPage], ...old.pages.slice(1)] };
       });
       return { queryKey, pendingId };
     },
     onSuccess: (response, _variables, context) => {
-      if (!context) return;
       const { queryKey, pendingId } = context;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -172,7 +195,9 @@ export function useSendMessage(conversationId: string | null, currentUserId: str
       });
     },
     onError: (_err, _variables, context) => {
-      if (!context) return;
+      if (!context) {
+        return;
+      }
       removeMessageFromCache(queryClient, context.queryKey, context.pendingId);
     },
   });
@@ -182,15 +207,21 @@ export function useEditMessage(conversationId: string | null) {
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ messageId, ...req }: EditMessageRequest & { messageId: string }) =>
-      client.editMessage(messageId, req),
+    mutationFn: async ({ messageId, ...req }: EditMessageRequest & { messageId: string }) => {
+      const result = await client.editMessage(messageId, req);
+      return result;
+    },
     onMutate: async variables => {
-      if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
+      if (!conversationId) {
+        return { queryKey, snapshot: undefined };
+      }
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -205,7 +236,9 @@ export function useEditMessage(conversationId: string | null) {
       return { queryKey, snapshot };
     },
     onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
+      if (!context?.snapshot) {
+        return;
+      }
       restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
@@ -215,20 +248,26 @@ export function useDeleteMessage(conversationId: string | null) {
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       messageId,
       conversationId: cid,
     }: {
       messageId: string;
       conversationId: string;
-    }) => client.deleteMessage(messageId, { conversationId: cid }),
+    }) => {
+      await client.deleteMessage(messageId, { conversationId: cid });
+    },
     onMutate: async variables => {
-      if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
+      if (!conversationId) {
+        return { queryKey, snapshot: undefined };
+      }
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -239,7 +278,9 @@ export function useDeleteMessage(conversationId: string | null) {
       return { queryKey, snapshot };
     },
     onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
+      if (!context?.snapshot) {
+        return;
+      }
       restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
@@ -249,15 +290,24 @@ export function useAddReaction(conversationId: string | null, currentUserId: str
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
-      client.addReaction(messageId, { conversationId: conversationId ?? '', emoji }),
+    mutationFn: async ({ messageId, emoji }: { messageId: string; emoji: string }) => {
+      const result = await client.addReaction(messageId, {
+        conversationId: conversationId ?? '',
+        emoji,
+      });
+      return result;
+    },
     onMutate: async variables => {
-      if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
+      if (!conversationId) {
+        return { queryKey, snapshot: undefined };
+      }
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -275,7 +325,9 @@ export function useAddReaction(conversationId: string | null, currentUserId: str
       return { queryKey, snapshot };
     },
     onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
+      if (!context?.snapshot) {
+        return;
+      }
       restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
@@ -285,15 +337,20 @@ export function useRemoveReaction(conversationId: string | null, currentUserId: 
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
-      client.removeReaction(messageId, { conversationId: conversationId ?? '', emoji }),
+    mutationFn: async ({ messageId, emoji }: { messageId: string; emoji: string }) => {
+      await client.removeReaction(messageId, { conversationId: conversationId ?? '', emoji });
+    },
     onMutate: async variables => {
-      if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
+      if (!conversationId) {
+        return { queryKey, snapshot: undefined };
+      }
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -311,7 +368,9 @@ export function useRemoveReaction(conversationId: string | null, currentUserId: 
       return { queryKey, snapshot };
     },
     onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
+      if (!context?.snapshot) {
+        return;
+      }
       restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
@@ -321,7 +380,7 @@ export function useExecuteAction(conversationId: string | null, currentUserId: s
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       messageId,
       groupId,
       value,
@@ -329,25 +388,41 @@ export function useExecuteAction(conversationId: string | null, currentUserId: s
       messageId: string;
       groupId: string;
       value: ExecApprovalDecision;
-    }) => client.executeAction(conversationId ?? '', messageId, { groupId, value }),
+    }) => {
+      const result = await client.executeAction(conversationId ?? '', messageId, {
+        groupId,
+        value,
+      });
+      return result;
+    },
     onMutate: async variables => {
-      if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];
+      if (!conversationId) {
+        return { queryKey, snapshot: undefined };
+      }
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       // Optimistically mark the action as resolved
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
             page.map(msg => {
-              if (msg.id !== variables.messageId) return msg;
+              if (msg.id !== variables.messageId) {
+                return msg;
+              }
               return {
                 ...msg,
                 content: msg.content.map(block => {
-                  if (block.type !== 'actions') return block;
-                  if (block.groupId !== variables.groupId) return block;
+                  if (block.type !== 'actions') {
+                    return block;
+                  }
+                  if (block.groupId !== variables.groupId) {
+                    return block;
+                  }
                   return {
                     ...block,
                     resolved: {
@@ -365,7 +440,9 @@ export function useExecuteAction(conversationId: string | null, currentUserId: s
       return { queryKey, snapshot };
     },
     onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
+      if (!context?.snapshot) {
+        return;
+      }
       restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
@@ -396,12 +473,16 @@ export function useMessageCacheUpdater(
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!conversationId || !sandboxId) return;
+    if (!conversationId || !sandboxId) {
+      return undefined;
+    }
     const queryKey = ['kilo-chat', 'messages', conversationId];
     const expectedContext = `/kiloclaw/${sandboxId}/${conversationId}`;
 
     const onCreated = (ctx: string, e: MessageCreatedEvent) => {
-      if (ctx !== expectedContext) return;
+      if (ctx !== expectedContext) {
+        return;
+      }
       if (!e.senderId.startsWith('bot:')) {
         onHumanMessageCreated?.(ctx, e.senderId);
       }
@@ -417,10 +498,14 @@ export function useMessageCacheUpdater(
         reactions: [],
       };
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         // Skip if this messageId already exists
         for (const page of old.pages) {
-          if (page.some(msg => msg.id === e.messageId)) return old;
+          if (page.some(msg => msg.id === e.messageId)) {
+            return old;
+          }
         }
         // Replace the matching pending optimistic message if clientId correlates
         if (e.clientId) {
@@ -440,9 +525,13 @@ export function useMessageCacheUpdater(
     };
 
     const onUpdated = (ctx: string, e: MessageUpdatedEvent) => {
-      if (ctx !== expectedContext) return;
+      if (ctx !== expectedContext) {
+        return;
+      }
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -461,9 +550,13 @@ export function useMessageCacheUpdater(
     };
 
     const onDeleted = (ctx: string, e: MessageDeletedEvent) => {
-      if (ctx !== expectedContext) return;
+      if (ctx !== expectedContext) {
+        return;
+      }
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -474,9 +567,13 @@ export function useMessageCacheUpdater(
     };
 
     const onDeliveryFailed = (ctx: string, e: MessageDeliveryFailedEvent) => {
-      if (ctx !== expectedContext) return;
+      if (ctx !== expectedContext) {
+        return;
+      }
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -487,19 +584,29 @@ export function useMessageCacheUpdater(
     };
 
     const onActionFailed = (ctx: string, e: ActionDeliveryFailedEvent) => {
-      if (ctx !== expectedContext) return;
+      if (ctx !== expectedContext) {
+        return;
+      }
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
             page.map(msg => {
-              if (msg.id !== e.messageId) return msg;
+              if (msg.id !== e.messageId) {
+                return msg;
+              }
               return {
                 ...msg,
                 content: msg.content.map(block => {
-                  if (block.type !== 'actions') return block;
-                  if (block.groupId !== e.groupId) return block;
+                  if (block.type !== 'actions') {
+                    return block;
+                  }
+                  if (block.groupId !== e.groupId) {
+                    return block;
+                  }
                   return { ...block, resolved: undefined };
                 }),
               };
@@ -511,9 +618,13 @@ export function useMessageCacheUpdater(
     };
 
     const onReactionAdded = (ctx: string, e: ReactionAddedEvent) => {
-      if (ctx !== expectedContext) return;
+      if (ctx !== expectedContext) {
+        return;
+      }
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -528,9 +639,13 @@ export function useMessageCacheUpdater(
     };
 
     const onReactionRemoved = (ctx: string, e: ReactionRemovedEvent) => {
-      if (ctx !== expectedContext) return;
+      if (ctx !== expectedContext) {
+        return;
+      }
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
-        if (!old) return old;
+        if (!old) {
+          return old;
+        }
         return {
           ...old,
           pages: old.pages.map(page =>
@@ -557,7 +672,9 @@ export function useMessageCacheUpdater(
       client.onReactionRemoved(onReactionRemoved),
     ];
     return () => {
-      for (const off of offs) off();
+      for (const off of offs) {
+        off();
+      }
     };
   }, [client, sandboxId, conversationId, queryClient, onHumanMessageCreated]);
 }

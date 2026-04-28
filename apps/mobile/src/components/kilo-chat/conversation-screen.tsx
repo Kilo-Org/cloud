@@ -6,10 +6,10 @@ import { toast } from 'sonner-native';
 import { formatKiloChatError } from '@kilocode/kilo-chat';
 import { setActiveChatConversation } from '@/lib/notifications';
 
-import { useEventSubscription } from './hooks/useEventSubscription';
-import { usePresenceSubscription } from './hooks/usePresenceSubscription';
-import { useMarkRead } from './hooks/useMarkRead';
-import { useSendMessage } from './hooks/useMessages';
+import { useEventSubscription } from './hooks/use-event-subscription';
+import { usePresenceSubscription } from './hooks/use-presence-subscription';
+import { useMarkRead } from './hooks/use-mark-read';
+import { useSendMessage } from './hooks/use-messages';
 import { useCurrentUserId } from './hooks/use-current-user-id';
 import { ConversationHeader } from './conversation-header';
 import { MessageList } from './message-list';

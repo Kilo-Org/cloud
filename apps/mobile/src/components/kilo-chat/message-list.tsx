@@ -13,7 +13,7 @@ import {
   useMessageCacheUpdater,
   useMessages,
   useRemoveReaction,
-} from './hooks/useMessages';
+} from './hooks/use-messages';
 import { useCurrentUserId } from './hooks/use-current-user-id';
 import { MessageBubble } from './message-bubble';
 

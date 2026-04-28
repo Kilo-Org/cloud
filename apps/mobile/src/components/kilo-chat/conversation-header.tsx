@@ -2,7 +2,7 @@ import { ActivityIndicator, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 
-import { useConversationDetail } from './hooks/useConversations';
+import { useConversationDetail } from './hooks/use-conversations';
 
 type ConversationHeaderProps = {
   conversationId: string;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { useKiloChatToken } from './useKiloChatToken';
+import { useKiloChatToken } from './use-kilo-chat-token';
 
 /**
  * Decodes the kilo-chat JWT to extract the current user's ID (kiloUserId).

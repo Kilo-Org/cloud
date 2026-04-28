@@ -1,8 +1,13 @@
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import type { InfiniteData } from '@tanstack/react-query';
-import type { CreateConversationRequest, ConversationListResponse } from '@kilocode/kilo-chat';
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { type ConversationListResponse, type CreateConversationRequest } from '@kilocode/kilo-chat';
 
-import { useKiloChatClient } from './useKiloChatClient';
+import { useKiloChatClient } from './use-kilo-chat-client';
 
 const CONVERSATIONS_PAGE_SIZE = 50;
 
@@ -10,15 +15,17 @@ export function useConversations(sandboxId: string | null) {
   const client = useKiloChatClient();
   return useInfiniteQuery({
     queryKey: ['kilo-chat', 'conversations', sandboxId],
-    queryFn: ({ pageParam }) =>
-      client.listConversations({
+    queryFn: async ({ pageParam }) => {
+      const result = await client.listConversations({
         sandboxId: sandboxId ?? undefined,
         limit: CONVERSATIONS_PAGE_SIZE,
         cursor: pageParam ?? undefined,
-      }),
+      });
+      return result;
+    },
     initialPageParam: null as string | null,
     getNextPageParam: lastPage => lastPage.nextCursor,
-    enabled: !!sandboxId,
+    enabled: Boolean(sandboxId),
     select: data => ({
       ...data,
       conversations: data.pages.flatMap(p => p.conversations),
@@ -30,8 +37,11 @@ export function useConversationDetail(conversationId: string | null) {
   const client = useKiloChatClient();
   return useQuery({
     queryKey: ['kilo-chat', 'conversation', conversationId],
-    queryFn: () => client.getConversation(conversationId ?? ''),
-    enabled: !!conversationId,
+    queryFn: async () => {
+      const result = await client.getConversation(conversationId ?? '');
+      return result;
+    },
+    enabled: Boolean(conversationId),
   });
 }
 
@@ -39,7 +49,10 @@ export function useCreateConversation() {
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (req: CreateConversationRequest) => client.createConversation(req),
+    mutationFn: async (req: CreateConversationRequest) => {
+      const result = await client.createConversation(req);
+      return result;
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
     },
@@ -50,8 +63,10 @@ export function useRenameConversation() {
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ conversationId, title }: { conversationId: string; title: string }) =>
-      client.renameConversation(conversationId, { title }),
+    mutationFn: async ({ conversationId, title }: { conversationId: string; title: string }) => {
+      const result = await client.renameConversation(conversationId, { title });
+      return result;
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
     },
@@ -62,7 +77,9 @@ export function useLeaveConversation() {
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (conversationId: string) => client.leaveConversation(conversationId),
+    mutationFn: async (conversationId: string) => {
+      await client.leaveConversation(conversationId);
+    },
     onSuccess: (_data, conversationId) => {
       queryClient.removeQueries({ queryKey: ['kilo-chat', 'conversation', conversationId] });
       queryClient.removeQueries({ queryKey: ['kilo-chat', 'messages', conversationId] });
@@ -79,7 +96,9 @@ export function updateConversationPages(
     c: ConversationListResponse['conversations'][number]
   ) => ConversationListResponse['conversations'][number]
 ): ConversationListInfiniteData | undefined {
-  if (!data) return data;
+  if (!data) {
+    return data;
+  }
   return {
     ...data,
     pages: data.pages.map(page => ({
@@ -93,7 +112,9 @@ export function filterConversationPages(
   data: ConversationListInfiniteData | undefined,
   predicate: (c: ConversationListResponse['conversations'][number]) => boolean
 ): ConversationListInfiniteData | undefined {
-  if (!data) return data;
+  if (!data) {
+    return data;
+  }
   return {
     ...data,
     pages: data.pages.map(page => ({
@@ -107,7 +128,9 @@ export function useMarkConversationRead() {
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (conversationId: string) => client.markConversationRead(conversationId),
+    mutationFn: async (conversationId: string) => {
+      await client.markConversationRead(conversationId);
+    },
     onMutate: conversationId => {
       // Optimistically set lastReadAt = now in all cached conversation lists
       const now = Date.now();

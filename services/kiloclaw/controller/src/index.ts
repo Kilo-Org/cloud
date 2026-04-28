@@ -551,18 +551,25 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     // KILOCLAW_PAIRING_REPAIR_2026_04_28: run before gateway startup so stale
     // internal gateway-client pairing state cannot recreate the native approval
     // handler's scope-upgrade loop on boot.
-    const repairResult = repairInternalGatewayClientPairingState();
-    if (repairResult.status === 'warning') {
-      console.warn(
-        `[pairing-repair] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair warning: ${repairResult.warnings.join('; ')}`
-      );
-    } else if (repairResult.status === 'repaired') {
-      console.log(
-        `[pairing-repair] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair applied paired=${repairResult.pairedDevicesRepaired} pendingRemoved=${repairResult.pendingRequestsRemoved} tokenScopesUpdated=${repairResult.operatorTokenScopesUpdated}`
-      );
-    } else {
-      console.log(
-        `[pairing-repair] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair not needed`
+    try {
+      const repairResult = repairInternalGatewayClientPairingState();
+      if (repairResult.status === 'warning') {
+        console.warn(
+          `[pairing-repair] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair warning: ${repairResult.warnings.join('; ')}`
+        );
+      } else if (repairResult.status === 'repaired') {
+        console.log(
+          `[pairing-repair] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair applied paired=${repairResult.pairedDevicesRepaired} pendingRemoved=${repairResult.pendingRequestsRemoved} tokenScopesUpdated=${repairResult.operatorTokenScopesUpdated}`
+        );
+      } else {
+        console.log(
+          `[pairing-repair] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair not needed`
+        );
+      }
+    } catch (err) {
+      console.error(
+        `[pairing-repair] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair failed:`,
+        err
       );
     }
   }

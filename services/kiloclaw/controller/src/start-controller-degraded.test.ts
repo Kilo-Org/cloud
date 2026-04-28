@@ -260,6 +260,37 @@ describe('startController degraded behavior', () => {
     expect(callOrder).toEqual(['repair', 'start']);
   });
 
+  it('continues starting the gateway when internal gateway-client repair throws', async () => {
+    const repairInternalGatewayClientPairingState = vi.fn(() => {
+      throw new Error('disk full');
+    });
+    const supervisorStart = vi.fn(async () => undefined);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { startController } = await loadStartControllerWithMocks({
+      bootstrapCritical: async () => undefined,
+      bootstrapNonCritical: async () => ({ ok: true }),
+      supervisorStart,
+      repairInternalGatewayClientPairingState,
+    });
+
+    const env = {
+      OPENCLAW_GATEWAY_TOKEN: 'test-token',
+      KILOCLAW_HOOKS_TOKEN: 'test-hooks-token',
+      KILOCLAW_GATEWAY_ARGS: '["--port","3001"]',
+      AUTO_APPROVE_DEVICES: 'true',
+    } as unknown as NodeJS.ProcessEnv;
+
+    await startController(env);
+
+    expect(repairInternalGatewayClientPairingState).toHaveBeenCalledOnce();
+    expect(supervisorStart).toHaveBeenCalledOnce();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('internal gateway-client repair failed'),
+      expect.any(Error)
+    );
+    errorSpy.mockRestore();
+  });
+
   it('skips internal gateway-client startup repair when auto-approval is disabled', async () => {
     const repairInternalGatewayClientPairingState = vi.fn();
     const supervisorStart = vi.fn(async () => undefined);

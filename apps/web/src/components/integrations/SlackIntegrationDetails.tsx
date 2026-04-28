@@ -43,8 +43,10 @@ export function SlackIntegrationDetails({
     refetch,
   } = useQuery(trpc.slack.getInstallation.queryOptions(input));
 
-  // Get OAuth URL for installation
-  const { data: oauthUrlData } = useQuery(trpc.slack.getOAuthUrl.queryOptions(input));
+  // Get OAuth URL only when the user clicks Connect so the signed state is fresh.
+  const { refetch: refetchOAuthUrl, isFetching: isFetchingOAuthUrl } = useQuery(
+    trpc.slack.getOAuthUrl.queryOptions(input, { enabled: false })
+  );
 
   // Fetch models for the model selector
   const { data: openRouterModels, isLoading: isLoadingModels } =
@@ -108,9 +110,14 @@ export function SlackIntegrationDetails({
     }
   }, [success, error]);
 
-  const handleInstall = () => {
-    if (oauthUrlData?.url) {
-      window.location.href = oauthUrlData.url;
+  const handleInstall = async () => {
+    const result = await refetchOAuthUrl();
+    if (result.data?.url) {
+      window.location.href = result.data.url;
+    } else if (result.error) {
+      toast.error('Failed to start Slack connection', {
+        description: result.error.message,
+      });
     }
   };
 
@@ -363,9 +370,14 @@ export function SlackIntegrationDetails({
                 </ul>
               </div>
 
-              <Button onClick={handleInstall} size="lg" className="w-full">
+              <Button
+                onClick={handleInstall}
+                size="lg"
+                className="w-full"
+                disabled={isFetchingOAuthUrl}
+              >
                 <MessageSquare className="mr-2 h-4 w-4" />
-                Connect Slack
+                {isFetchingOAuthUrl ? 'Loading...' : 'Connect Slack'}
               </Button>
             </>
           )}

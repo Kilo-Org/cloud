@@ -16,16 +16,18 @@ type SlackConnectStepProps = {
 export function SlackConnectStep({ workspace, onBack }: SlackConnectStepProps) {
   const trpc = useTRPC();
 
-  // Get OAuth URL based on workspace type
-  const { data: oauthUrlData, isLoading: isLoadingOAuthUrl } = useQuery(
+  // Get OAuth URL only when the user clicks Connect so the signed state is fresh.
+  const { refetch: refetchOAuthUrl, isFetching: isFetchingOAuthUrl } = useQuery(
     trpc.slack.getOAuthUrl.queryOptions(
-      workspace.type === 'org' ? { organizationId: workspace.id } : undefined
+      workspace.type === 'org' ? { organizationId: workspace.id } : undefined,
+      { enabled: false }
     )
   );
 
-  const handleConnectSlack = () => {
-    if (oauthUrlData?.url) {
-      window.location.href = oauthUrlData.url;
+  const handleConnectSlack = async () => {
+    const result = await refetchOAuthUrl();
+    if (result.data?.url) {
+      window.location.href = result.data.url;
     }
   };
 
@@ -104,10 +106,10 @@ export function SlackConnectStep({ workspace, onBack }: SlackConnectStepProps) {
             onClick={handleConnectSlack}
             size="lg"
             className="w-full bg-[#4A154B] text-white hover:bg-[#3a1039]"
-            disabled={isLoadingOAuthUrl || !oauthUrlData?.url}
+            disabled={isFetchingOAuthUrl}
           >
             <MessageSquare className="mr-2 h-5 w-5" />
-            {isLoadingOAuthUrl ? 'Loading...' : 'Connect Slack'}
+            {isFetchingOAuthUrl ? 'Loading...' : 'Connect Slack'}
           </Button>
 
           <p className="text-muted-foreground text-center text-xs">

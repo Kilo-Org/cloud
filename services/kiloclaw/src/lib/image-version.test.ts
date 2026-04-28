@@ -35,6 +35,8 @@ function makeEntry(overrides: Partial<ImageVersionEntry> = {}): ImageVersionEntr
     imageTag: 'dev-123456',
     imageDigest: null,
     publishedAt: '2026-02-22T18:00:00Z',
+    rolloutPercent: 0,
+    isLatest: false,
     ...overrides,
   };
 }
@@ -69,66 +71,49 @@ describe('resolveLatestVersion', () => {
 describe('registerVersionIfNeeded', () => {
   beforeEach(() => suppressConsole());
 
-  it('writes both versioned and latest keys on first registration', async () => {
+  it('writes versioned key + per-tag key, but NOT :latest (markImageAsLatest owns that)', async () => {
     const kv = createJsonKV();
 
     const result = await registerVersionIfNeeded(kv, '2026.2.9', 'default', 'dev-123');
     expect(result).toBe(true);
 
-    // Check both KV keys were written
     const versioned = kv._store.get(imageVersionKey('2026.2.9', 'default'));
+    const tagged = kv._store.get('image-version-tag:dev-123');
     const latest = kv._store.get(imageVersionLatestKey('default'));
+
     expect(versioned).toBeDefined();
-    expect(latest).toBeDefined();
+    expect(tagged).toBeDefined();
+    // Latest is NOT auto-written anymore — it's owned by markImageAsLatest.
+    expect(latest).toBeUndefined();
 
-    const parsedVersioned = JSON.parse(versioned!) as Record<string, unknown>;
-    expect(parsedVersioned.openclawVersion).toBe('2026.2.9');
-    expect(parsedVersioned.variant).toBe('default');
-    expect(parsedVersioned.imageTag).toBe('dev-123');
-    expect(parsedVersioned.imageDigest).toBeNull();
-
-    // Both keys should have identical content
-    expect(versioned).toBe(latest);
+    const parsed = JSON.parse(tagged!) as Record<string, unknown>;
+    expect(parsed.openclawVersion).toBe('2026.2.9');
+    expect(parsed.imageTag).toBe('dev-123');
+    expect(parsed.imageDigest).toBeNull();
+    expect(parsed.rolloutPercent).toBe(0);
+    expect(parsed.isLatest).toBe(false);
   });
 
-  it('no-ops when version and tag already match', async () => {
+  it('no-ops when the per-tag entry already exists', async () => {
     const kv = createJsonKV();
-
-    // First registration
     await registerVersionIfNeeded(kv, '2026.2.9', 'default', 'dev-123');
-
-    // Second registration with same values
     const result = await registerVersionIfNeeded(kv, '2026.2.9', 'default', 'dev-123');
     expect(result).toBe(false);
   });
 
-  it('overwrites when version changes', async () => {
-    const kv = createJsonKV();
-
-    await registerVersionIfNeeded(kv, '2026.2.9', 'default', 'dev-123');
-    const result = await registerVersionIfNeeded(kv, '2026.2.10', 'default', 'dev-456');
-    expect(result).toBe(true);
-
-    const latest = JSON.parse(kv._store.get(imageVersionLatestKey('default'))!) as Record<
-      string,
-      unknown
-    >;
-    expect(latest.openclawVersion).toBe('2026.2.10');
-    expect(latest.imageTag).toBe('dev-456');
-  });
-
-  it('overwrites when same version but different tag (rebuild)', async () => {
+  it('writes a new entry when the tag is different (rebuild of same openclaw version)', async () => {
     const kv = createJsonKV();
 
     await registerVersionIfNeeded(kv, '2026.2.9', 'default', 'dev-123');
     const result = await registerVersionIfNeeded(kv, '2026.2.9', 'default', 'dev-456');
     expect(result).toBe(true);
 
-    const latest = JSON.parse(kv._store.get(imageVersionLatestKey('default'))!) as Record<
+    const taggedNew = JSON.parse(kv._store.get('image-version-tag:dev-456')!) as Record<
       string,
       unknown
     >;
-    expect(latest.imageTag).toBe('dev-456');
+    expect(taggedNew.imageTag).toBe('dev-456');
+    expect(taggedNew.rolloutPercent).toBe(0);
   });
 
   it('stores imageDigest when provided', async () => {
@@ -136,10 +121,10 @@ describe('registerVersionIfNeeded', () => {
 
     await registerVersionIfNeeded(kv, '2026.2.9', 'default', 'dev-123', 'sha256:abc');
 
-    const latest = JSON.parse(kv._store.get(imageVersionLatestKey('default'))!) as Record<
+    const tagged = JSON.parse(kv._store.get('image-version-tag:dev-123')!) as Record<
       string,
       unknown
     >;
-    expect(latest.imageDigest).toBe('sha256:abc');
+    expect(tagged.imageDigest).toBe('sha256:abc');
   });
 });

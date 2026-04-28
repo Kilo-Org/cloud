@@ -27,6 +27,7 @@ import {
   kiloclaw_instances,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
+  kilocode_users,
   cloud_agent_webhook_triggers,
   credit_transactions,
   organizations,
@@ -2259,9 +2260,36 @@ export const kiloclawRouter = createTRPCRouter({
     return fetchKiloClawServiceDegraded();
   }),
 
-  latestVersion: baseProcedure.query(async () => {
+  latestVersion: baseProcedure.query(async ({ ctx }) => {
+    // Pass instance context (for the bucket math) plus the per-user early-access
+    // flag (which applies regardless of which instance the user is looking at —
+    // personal or org). The kiloclaw service's selector handles the "already on
+    // it" check via tag comparison; we just pipe the inputs through.
+    const [instance] = await db
+      .select({ id: kiloclaw_instances.id })
+      .from(kiloclaw_instances)
+      .where(
+        and(
+          eq(kiloclaw_instances.user_id, ctx.user.id),
+          isNull(kiloclaw_instances.organization_id),
+          isNull(kiloclaw_instances.destroyed_at)
+        )
+      )
+      .limit(1);
+
+    const [user] = await db
+      .select({ early_access: kilocode_users.kiloclaw_early_access })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, ctx.user.id))
+      .limit(1);
+
     const client = new KiloClawInternalClient();
-    return client.getLatestVersion();
+    if (!instance) return client.getLatestVersion();
+
+    return client.getLatestVersion({
+      instanceId: instance.id,
+      autoEnroll: user?.early_access ?? false,
+    });
   }),
 
   validateWeatherLocation: baseProcedure

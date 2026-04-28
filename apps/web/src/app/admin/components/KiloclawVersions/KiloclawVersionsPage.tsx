@@ -40,7 +40,19 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { Loader2, AlertTriangle, ChevronsUpDown, X } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import {
+  Loader2,
+  AlertTriangle,
+  ChevronsUpDown,
+  X,
+  Rocket,
+  Anchor,
+  CheckCircle2,
+  Square,
+  Plus,
+  Minus,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -53,6 +65,287 @@ function StatusBadge({ status }: { status: string }) {
     default:
       return <Badge variant="outline">{status}</Badge>;
   }
+}
+
+type CatalogRow = {
+  id: string;
+  image_tag: string;
+  openclaw_version: string;
+  variant: string;
+  status: string;
+  rollout_percent: number;
+  is_latest: boolean;
+  published_at: string;
+};
+
+/**
+ * Top-of-page hero showing the variant's release state at a glance:
+ *  - which image is currently :latest
+ *  - whether a rollout is in flight, and at what percent
+ *  - inline controls to adjust the rollout (slider, +10/-10, promote, stop)
+ *
+ * The table below becomes pure reference data; ops doesn't need to scan rows
+ * to figure out current state — it's right here.
+ */
+function RolloutStatusPanel({
+  latest,
+  candidate,
+  onSetPercent,
+  onPromoteCandidate,
+}: {
+  latest: CatalogRow | null;
+  candidate: CatalogRow | null;
+  onSetPercent: (imageTag: string, percent: number) => Promise<unknown>;
+  onPromoteCandidate: (imageTag: string) => Promise<unknown>;
+}) {
+  const [optimisticPercent, setOptimisticPercent] = useState<number | null>(null);
+  const displayPercent = optimisticPercent ?? candidate?.rollout_percent ?? 0;
+
+  /**
+   * Commit a percent change with edge-case affordances:
+   *  - Drop to 0 → undo toast (easy to recover from an accidental drag).
+   *  - Reach 100 → offer to promote to :latest in one step (since at 100%
+   *    every instance is already in cohort — promotion is the natural next
+   *    move and ends the rollout).
+   */
+  const commitPercent = async (imageTag: string, next: number, previous: number) => {
+    setOptimisticPercent(next);
+    try {
+      await onSetPercent(imageTag, next);
+      if (next === 0 && previous > 0) {
+        toast(`Rollout of ${imageTag.slice(0, 24)}… stopped`, {
+          description: `Was at ${previous}%. Click Undo to restore.`,
+          duration: 12_000,
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              void onSetPercent(imageTag, previous);
+            },
+          },
+        });
+      }
+      if (next === 100 && previous < 100) {
+        const ok = window.confirm(
+          `Reached 100% — every instance now qualifies for ${imageTag}. ` +
+            `Promote it to :latest now? This replaces the current :latest. ` +
+            `New instances and unpinned upgrades will go to this image, ` +
+            `and the rollout will close.\n\nClick Cancel to keep observing at 100% without promoting.`
+        );
+        if (ok) {
+          await onPromoteCandidate(imageTag);
+        }
+      }
+    } finally {
+      setOptimisticPercent(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Rocket className="h-4 w-4" /> Rollout Status — variant{' '}
+          <code className="text-xs">{latest?.variant ?? candidate?.variant ?? 'default'}</code>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {/* :latest row */}
+        <div className="flex items-center gap-3 rounded-md border-l-4 border-blue-600 bg-blue-950/20 px-3 py-2">
+          <Anchor className="h-4 w-4 text-blue-500" />
+          <div className="flex-1">
+            <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
+              Current :latest
+            </div>
+            {latest ? (
+              <div className="flex items-center gap-2 text-sm">
+                <code className="text-xs">{latest.image_tag}</code>
+                <span className="text-muted-foreground">· OpenClaw {latest.openclaw_version}</span>
+                <span className="text-muted-foreground">
+                  · {formatDistanceToNow(new Date(latest.published_at), { addSuffix: true })}
+                </span>
+              </div>
+            ) : (
+              <div className="text-muted-foreground text-sm italic">
+                No image marked as :latest. Promote one below.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Candidate row (or empty state) */}
+        {candidate ? (
+          <div className="flex flex-col gap-3 rounded-md border-l-4 border-purple-600 bg-purple-950/20 px-3 py-3">
+            <div className="flex items-start gap-3">
+              <Rocket className="mt-0.5 h-4 w-4 text-purple-400" />
+              <div className="flex-1">
+                <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
+                  Rolling out
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <code className="text-xs">{candidate.image_tag}</code>
+                  <span className="text-muted-foreground">
+                    · OpenClaw {candidate.openclaw_version}
+                  </span>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => {
+                  void commitPercent(candidate.image_tag, 0, candidate.rollout_percent);
+                }}
+              >
+                <Square className="mr-1 h-3 w-3 fill-current" /> Stop
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 bg-blue-600 text-xs hover:bg-blue-700"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Promote ${candidate.image_tag} to :latest? This replaces the current :latest. New instances and unpinned upgrades will go to this image.`
+                    )
+                  ) {
+                    void onPromoteCandidate(candidate.image_tag);
+                  }
+                }}
+              >
+                <CheckCircle2 className="mr-1 h-3 w-3" /> Promote to :latest
+              </Button>
+            </div>
+
+            {/* Slider + percent */}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => {
+                  const next = Math.max(0, candidate.rollout_percent - 10);
+                  void commitPercent(candidate.image_tag, next, candidate.rollout_percent);
+                }}
+                disabled={displayPercent === 0}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <div className="flex-1">
+                <Slider
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={[displayPercent]}
+                  onValueChange={value => setOptimisticPercent(value[0] ?? 0)}
+                  onValueCommit={value => {
+                    const next = value[0] ?? 0;
+                    void commitPercent(candidate.image_tag, next, candidate.rollout_percent);
+                  }}
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => {
+                  const next = Math.min(100, candidate.rollout_percent + 10);
+                  void commitPercent(candidate.image_tag, next, candidate.rollout_percent);
+                }}
+                disabled={displayPercent === 100}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+              <span className="w-12 text-right text-sm font-semibold tabular-nums">
+                {displayPercent}%
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="text-muted-foreground rounded-md border border-dashed px-3 py-3 text-sm">
+            <Rocket className="mr-2 inline h-3 w-3" />
+            No rollout in flight. Click <strong>Start rollout</strong> on any available image below
+            to stage it as a candidate.
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Starts a rollout on a row that isn't currently the candidate. If a candidate
+ * already exists for the variant, the popover shows a confirmation message —
+ * the parent's `onStart` handler clears the existing candidate first, then
+ * sets the new one.
+ */
+function StartRolloutButton({
+  imageTag,
+  existingCandidate,
+  onStart,
+}: {
+  imageTag: string;
+  existingCandidate: { image_tag: string; rollout_percent: number } | null;
+  onStart: (percent: number) => Promise<unknown>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState('20');
+  const [saving, setSaving] = useState(false);
+
+  const parsed = Number.parseInt(value, 10);
+  const valid = Number.isInteger(parsed) && parsed > 0 && parsed <= 100;
+  const replacing = existingCandidate !== null && existingCandidate.image_tag !== imageTag;
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={next => {
+        if (!next && !saving) setValue('20');
+        setOpen(next);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+          Start rollout
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px]" align="end">
+        <div className="flex flex-col gap-2">
+          {replacing && (
+            <p className="text-xs text-yellow-500">
+              This will stop the current candidate (
+              <code>{existingCandidate.image_tag.slice(0, 18)}…</code> at{' '}
+              {existingCandidate.rollout_percent}%) and start a new rollout on this image.
+            </p>
+          )}
+          <label className="text-muted-foreground text-xs">Initial rollout percent (1-100)</label>
+          <Input
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            disabled={saving}
+            autoFocus
+          />
+          <Button
+            size="sm"
+            disabled={!valid || saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onStart(parsed);
+                setOpen(false);
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            {saving ? 'Starting…' : `Start at ${valid ? `${parsed}%` : ''}`}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function VersionsTab() {
@@ -70,8 +363,6 @@ export function VersionsTab() {
     })
   );
 
-  const { data: latestTag } = useQuery(trpc.admin.kiloclawVersions.getLatestTag.queryOptions());
-
   const { mutateAsync: updateStatus } = useMutation(
     trpc.admin.kiloclawVersions.updateVersionStatus.mutationOptions({
       onSuccess: () => {
@@ -85,6 +376,45 @@ export function VersionsTab() {
       },
     })
   );
+
+  const { mutateAsync: setRolloutPercent } = useMutation(
+    trpc.admin.kiloclawVersions.setRolloutPercent.mutationOptions({
+      onSuccess: result => {
+        toast.success(`Rollout updated: ${result.imageTag} → ${result.rolloutPercent}%`);
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawVersions.listVersions.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to update rollout: ${err.message}`);
+      },
+    })
+  );
+
+  const { mutateAsync: markLatest } = useMutation(
+    trpc.admin.kiloclawVersions.markLatest.mutationOptions({
+      onSuccess: result => {
+        toast.success(`Marked ${result.imageTag} as :latest`);
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawVersions.listVersions.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawVersions.getLatestTag.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to mark as latest: ${err.message}`);
+      },
+    })
+  );
+
+  // Top-of-page state — the hero panel and per-row affordances both depend on
+  // these. With at most one :latest and at most one candidate per variant in
+  // the steady state, finding the first matching row is sufficient.
+  const currentLatest = data?.items.find(v => v.is_latest && v.status === 'available') ?? null;
+  const currentCandidate =
+    data?.items.find(v => !v.is_latest && v.status === 'available' && v.rollout_percent > 0) ??
+    null;
 
   const { mutateAsync: syncCatalog, isPending: isSyncing } = useMutation(
     trpc.admin.kiloclawVersions.syncCatalog.mutationOptions({
@@ -104,6 +434,19 @@ export function VersionsTab() {
 
   return (
     <div className="flex flex-col gap-y-4">
+      {/* Hero: at-a-glance state of the variant */}
+      <RolloutStatusPanel
+        latest={currentLatest}
+        candidate={currentCandidate}
+        onSetPercent={async (imageTag, percent) => {
+          await setRolloutPercent({ imageTag, percent });
+        }}
+        onPromoteCandidate={async imageTag => {
+          await markLatest({ imageTag });
+        }}
+      />
+
+      {/* Filter + sync controls */}
       <div className="flex items-center gap-2">
         <Select
           value={statusFilter}
@@ -128,17 +471,18 @@ export function VersionsTab() {
         </Button>
       </div>
 
-      <div className="rounded-lg border">
+      {/* Reference catalog table — :latest and candidate rows are accent-bordered */}
+      <div className="overflow-hidden rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>OpenClaw Version</TableHead>
-              <TableHead>Variant</TableHead>
+              <TableHead className="w-[1px]"></TableHead>
+              <TableHead>OpenClaw</TableHead>
               <TableHead>Image Tag</TableHead>
               <TableHead>Digest</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>State</TableHead>
               <TableHead>Published</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -155,57 +499,129 @@ export function VersionsTab() {
                 </TableCell>
               </TableRow>
             ) : (
-              data?.items.map(version => (
-                <TableRow key={version.id}>
-                  <TableCell className="font-medium">{version.openclaw_version}</TableCell>
-                  <TableCell>{version.variant}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
+              data?.items.map(version => {
+                const isLatest = version.is_latest;
+                const isCandidate =
+                  !isLatest && version.status === 'available' && version.rollout_percent > 0;
+                const isAvailable = version.status === 'available';
+                const isDisabled = version.status === 'disabled';
+                const accent = isLatest
+                  ? 'border-l-4 border-l-blue-600'
+                  : isCandidate
+                    ? 'border-l-4 border-l-purple-600'
+                    : 'border-l-4 border-l-transparent';
+                return (
+                  <TableRow key={version.id} className={accent}>
+                    {/* Spacer for the accent bar */}
+                    <TableCell className="p-0"></TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span>{version.openclaw_version}</span>
+                        <span className="text-muted-foreground text-[10px]">{version.variant}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       <code className="text-xs">
-                        {version.image_tag.length > 20
-                          ? `${version.image_tag.slice(0, 20)}…`
+                        {version.image_tag.length > 24
+                          ? `${version.image_tag.slice(0, 24)}…`
                           : version.image_tag}
                       </code>
-                      {latestTag === version.image_tag && (
-                        <Badge className="bg-blue-600 px-1.5 py-0 text-[10px] text-white">
-                          latest
+                    </TableCell>
+                    <TableCell>
+                      <code
+                        className="text-muted-foreground text-xs"
+                        title={version.image_digest ?? undefined}
+                      >
+                        {version.image_digest ? version.image_digest.slice(7, 19) : '—'}
+                      </code>
+                    </TableCell>
+                    <TableCell>
+                      {isDisabled ? (
+                        <StatusBadge status="disabled" />
+                      ) : isLatest ? (
+                        <Badge className="bg-blue-600 text-white">
+                          <Anchor className="mr-1 h-3 w-3" /> :latest
+                        </Badge>
+                      ) : isCandidate ? (
+                        <Badge className="bg-purple-600 text-white">
+                          <Rocket className="mr-1 h-3 w-3" /> candidate · {version.rollout_percent}%
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          available
                         </Badge>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <code className="text-xs" title={version.image_digest ?? undefined}>
-                      {version.image_digest ? `${version.image_digest.slice(0, 19)}` : '—'}
-                    </code>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={version.status} />
-                  </TableCell>
-                  <TableCell>
-                    <span title={new Date(version.published_at).toLocaleString()}>
-                      {formatDistanceToNow(new Date(version.published_at), { addSuffix: true })}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={version.status}
-                      onValueChange={newStatus => {
-                        if (newStatus === 'available' || newStatus === 'disabled') {
-                          void updateStatus({ imageTag: version.image_tag, status: newStatus });
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="w-[130px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="disabled">Disabled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      <span title={new Date(version.published_at).toLocaleString()}>
+                        {formatDistanceToNow(new Date(version.published_at), { addSuffix: true })}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        {isAvailable && !isLatest && !isCandidate && (
+                          <StartRolloutButton
+                            imageTag={version.image_tag}
+                            existingCandidate={currentCandidate}
+                            onStart={async percent => {
+                              if (
+                                currentCandidate &&
+                                currentCandidate.image_tag !== version.image_tag
+                              ) {
+                                await setRolloutPercent({
+                                  imageTag: currentCandidate.image_tag,
+                                  percent: 0,
+                                });
+                              }
+                              await setRolloutPercent({
+                                imageTag: version.image_tag,
+                                percent,
+                              });
+                            }}
+                          />
+                        )}
+                        {isAvailable && !isLatest && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `Mark ${version.image_tag} as :latest? This replaces the current :latest and clears any rollout percent on this image.`
+                                )
+                              ) {
+                                void markLatest({ imageTag: version.image_tag });
+                              }
+                            }}
+                          >
+                            Make :latest
+                          </Button>
+                        )}
+                        <Select
+                          value={version.status}
+                          onValueChange={newStatus => {
+                            if (newStatus === 'available' || newStatus === 'disabled') {
+                              void updateStatus({
+                                imageTag: version.image_tag,
+                                status: newStatus,
+                              });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-7 w-[110px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="available">Available</SelectItem>
+                            <SelectItem value="disabled">Disabled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

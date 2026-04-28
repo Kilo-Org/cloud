@@ -37,11 +37,14 @@ export async function resolveLatestVersion(
 }
 
 /**
- * Register a version in KV and Postgres catalog if not already current.
+ * Register a version in KV and Postgres catalog if not already known.
  *
- * - Checks KV latest pointer first — no-ops if version+tag already match.
- * - KV: writes versioned key + latest pointer.
+ * - Checks the per-tag KV entry first — no-ops if the tag is already registered.
+ * - KV: writes versioned key + tag lookup key. Does NOT write the :latest pointer
+ *   (that's now controlled by the per-image rollout_percent slider).
  * - Postgres: upserts to kiloclaw_image_catalog via Hyperdrive (best-effort).
+ *   New rows land with rollout_percent=0 (not exposed). Ops uses the admin
+ *   Versions page to slide a new image up.
  * - KV tag index: maintained for enumeration.
  *
  * Called via ctx.waitUntil() on every request; KV check ensures writes
@@ -55,16 +58,12 @@ export async function registerVersionIfNeeded(
   imageDigest: string | null = null,
   hyperdriveConnectionString?: string
 ): Promise<boolean> {
-  // Check if latest already matches — avoid unnecessary writes
-  const existing = await kv.get(imageVersionLatestKey(variant), 'json');
+  // Already registered? Skip.
+  const existing = await kv.get(imageVersionTagKey(imageTag), 'json');
   if (existing) {
     const parsed = ImageVersionEntrySchema.safeParse(existing);
-    if (
-      parsed.success &&
-      parsed.data.openclawVersion === openclawVersion &&
-      parsed.data.imageTag === imageTag
-    ) {
-      return false; // Already current in KV — nothing to do
+    if (parsed.success && parsed.data.imageTag === imageTag) {
+      return false;
     }
   }
 
@@ -75,13 +74,18 @@ export async function registerVersionIfNeeded(
     imageTag,
     imageDigest,
     publishedAt,
+    // Newly published images are not exposed to instances by default. Ops
+    // promotes them via the admin Versions page (Make Latest, or Set Rollout %).
+    rolloutPercent: 0,
+    isLatest: false,
   };
 
-  // Write to KV: versioned key + latest pointer + tag lookup key
+  // Write to KV: versioned key + tag lookup key. NOTE: we deliberately do
+  // NOT write image-version:latest:<variant> here — that pointer is owned
+  // by the per-image rollout_percent flow now (see lib/version-rollout.ts).
   const serialized = JSON.stringify(entry);
   await Promise.all([
     kv.put(imageVersionKey(openclawVersion, variant), serialized),
-    kv.put(imageVersionLatestKey(variant), serialized),
     kv.put(imageVersionTagKey(imageTag), serialized),
   ]);
 

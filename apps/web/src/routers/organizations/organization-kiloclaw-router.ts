@@ -23,6 +23,7 @@ import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   kiloclaw_cli_runs,
+  kilocode_users,
 } from '@kilocode/db/schema';
 import { and, eq, desc, sql } from 'drizzle-orm';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
@@ -290,9 +291,21 @@ export const organizationKiloclawRouter = createTRPCRouter({
     }
   }),
 
-  latestVersion: organizationMemberProcedure.query(async () => {
+  latestVersion: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const client = new KiloClawInternalClient();
-    return client.getLatestVersion();
+    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+    if (!instance) return client.getLatestVersion();
+    // Per-user early-access opt-in lives on kilocode_users; the org instance
+    // inherits it (every instance the user owns sees the same flag).
+    const [user] = await db
+      .select({ early_access: kilocode_users.kiloclaw_early_access })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, ctx.user.id))
+      .limit(1);
+    return client.getLatestVersion({
+      instanceId: instance.id,
+      autoEnroll: user?.early_access ?? false,
+    });
   }),
 
   // ── Instance status ───────────────────────────────────────────

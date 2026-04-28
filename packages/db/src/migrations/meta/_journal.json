@@ -743,6 +743,20 @@
       "when": 1777032309451,
       "tag": "0105_married_harry_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1777329378540,
+      "tag": "0106_daily_anthem",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1777390826147,
+      "tag": "0107_bouncy_micromacro",
+      "breakpoints": true
     }
   ]
 }

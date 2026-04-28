@@ -317,6 +317,11 @@ export type AdminKiloclawInstance = {
   user_email: string | null;
   subscription_id: string | null;
   subscription_status: KiloClawSubscriptionStatus | null;
+  /**
+   * The owning user's `kiloclaw_early_access` flag. Sourced from
+   * `kilocode_users` (per user, applies across all of their instances).
+   */
+  user_kiloclaw_early_access: boolean;
 };
 
 export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
@@ -331,6 +336,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .select({
         instance: kiloclaw_instances,
         user_email: kilocode_users.google_user_email,
+        user_kiloclaw_early_access: kilocode_users.kiloclaw_early_access,
         suspended_at: kiloclaw_subscriptions.suspended_at,
         subscription_id: kiloclaw_subscriptions.id,
         subscription_status: kiloclaw_subscriptions.status,
@@ -366,6 +372,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       user_email: result.user_email,
       subscription_id: result.subscription_id ?? null,
       subscription_status: result.subscription_status ?? null,
+      user_kiloclaw_early_access: result.user_kiloclaw_early_access ?? false,
     };
 
     const inboundEmailAddress = await getInboundEmailAddressForInstance(instance.id);
@@ -501,6 +508,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .select({
         instance: kiloclaw_instances,
         user_email: kilocode_users.google_user_email,
+        user_kiloclaw_early_access: kilocode_users.kiloclaw_early_access,
         suspended_at: kiloclaw_subscriptions.suspended_at,
         subscription_id: kiloclaw_subscriptions.id,
         subscription_status: kiloclaw_subscriptions.status,
@@ -547,6 +555,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       user_email: row.user_email,
       subscription_id: row.subscription_id ?? null,
       subscription_status: row.subscription_status ?? null,
+      user_kiloclaw_early_access: row.user_kiloclaw_early_access ?? false,
     }));
 
     return {
@@ -1876,5 +1885,24 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
 
       return { success: true };
+    }),
+
+  setEarlyAccess: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        value: z.boolean(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const client = new KiloClawInternalClient();
+      try {
+        return await client.setUserKiloclawEarlyAccess(input.userId, input.value);
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 404) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
+        throw err;
+      }
     }),
 });

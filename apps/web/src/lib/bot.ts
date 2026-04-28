@@ -10,6 +10,12 @@ import { findUserById } from '@/lib/user';
 import { processMessage } from '@/lib/bot/run';
 import { createChatState } from '@/lib/bot/state';
 import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET } from '@/lib/config.server';
+import {
+  getSlackMissingScopeErrorInfo,
+  markSlackInstallationRequiresReinstall,
+  postSlackReinstallNoticeByTeamId,
+} from '@/lib/integrations/slack-service';
+import { getBotWebhookContext } from '@/lib/bot/webhook-context';
 
 const SLACK_ASSISTANT_SUGGESTED_PROMPTS = [
   {
@@ -31,6 +37,58 @@ const SLACK_ASSISTANT_SUGGESTED_PROMPTS = [
 ] as const;
 
 const ASSISTANT_PROMPTS_TITLE = 'Try asking Kilo Bot';
+
+async function captureSlackBotError({
+  error,
+  op,
+  userId,
+  channelId,
+  teamId,
+  threadTs,
+}: {
+  error: unknown;
+  op: 'assistant-thread-started' | 'app-home-opened';
+  userId: string;
+  channelId: string;
+  teamId?: string;
+  threadTs?: string;
+}) {
+  const resolvedTeamId = teamId ?? getBotWebhookContext().slackTeamId;
+  const missingScopeInfo = getSlackMissingScopeErrorInfo(error);
+  const markedScopeInfo = resolvedTeamId
+    ? await markSlackInstallationRequiresReinstall(resolvedTeamId, error)
+    : null;
+
+  captureException(error, {
+    tags: {
+      component: 'kilo-bot',
+      op,
+      ...(missingScopeInfo ? { slack_error: missingScopeInfo.error } : {}),
+    },
+    extra: {
+      userId,
+      channelId,
+      teamId: resolvedTeamId,
+      missingScopes: markedScopeInfo?.missingScopes ?? missingScopeInfo?.missingScopes,
+      providedScopes: markedScopeInfo?.providedScopes ?? missingScopeInfo?.providedScopes,
+      platformIntegrationId: markedScopeInfo?.integrationId,
+    },
+  });
+
+  const missingScopes = markedScopeInfo?.missingScopes ?? missingScopeInfo?.missingScopes ?? [];
+  if (!resolvedTeamId || missingScopes.length === 0 || missingScopes.includes('chat:write')) return;
+
+  const noticeResult = await postSlackReinstallNoticeByTeamId({
+    teamId: resolvedTeamId,
+    channelId,
+    threadTs,
+    missingScopes,
+  });
+
+  if (!noticeResult.ok) {
+    console.warn('[Bot] Failed to post Slack reinstall notice:', noticeResult.error);
+  }
+}
 
 export function buildSlackAppHomeView() {
   return {
@@ -215,9 +273,13 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
       );
     } catch (error) {
       console.error('[Bot] Failed to set suggested prompts:', error);
-      captureException(error, {
-        tags: { component: 'kilo-bot', op: 'assistant-thread-started' },
-        extra: { userId: event.userId, channelId: event.channelId },
+      await captureSlackBotError({
+        error,
+        op: 'assistant-thread-started',
+        userId: event.userId,
+        channelId: event.channelId,
+        teamId: event.context.teamId,
+        threadTs: event.threadTs,
       });
     }
   });
@@ -229,9 +291,11 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
       await event.adapter.publishHomeView(event.userId, buildSlackAppHomeView());
     } catch (error) {
       console.error('[Bot] Failed to publish Slack App Home:', error);
-      captureException(error, {
-        tags: { component: 'kilo-bot', op: 'app-home-opened' },
-        extra: { userId: event.userId, channelId: event.channelId },
+      await captureSlackBotError({
+        error,
+        op: 'app-home-opened',
+        userId: event.userId,
+        channelId: event.channelId,
       });
     }
   });

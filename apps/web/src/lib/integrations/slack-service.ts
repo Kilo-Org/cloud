@@ -44,11 +44,211 @@ export const SLACK_SCOPES = [
 ];
 
 const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
+const SLACK_PLATFORM_ERROR_CODE = 'slack_webapi_platform_error';
+
+export type SlackIntegrationMetadata = {
+  access_token?: string;
+  bot_user_id?: string;
+  model_slug?: string;
+  incoming_webhook?: { channel: string; channelId: string; url: string };
+  requires_reinstall?: boolean;
+  missing_scopes?: string[];
+  last_scope_error_at?: string;
+  last_scope_error_code?: string;
+};
+
+export type SlackMissingScopeErrorInfo = {
+  error: 'missing_scope';
+  missingScopes: string[];
+  providedScopes: string[];
+  integrationId: string | null;
+};
 
 type SlackUninstallOptions = {
   deleteChatSdkInstallation?: (teamId: string) => Promise<void>;
   deleteChatSdkIdentityCache?: (teamId: string) => Promise<void>;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+export function readSlackMetadata(metadata: unknown): SlackIntegrationMetadata {
+  if (!isRecord(metadata)) return {};
+
+  const result: SlackIntegrationMetadata = {};
+
+  if (typeof metadata.access_token === 'string') result.access_token = metadata.access_token;
+  if (typeof metadata.bot_user_id === 'string') result.bot_user_id = metadata.bot_user_id;
+  if (typeof metadata.model_slug === 'string') result.model_slug = metadata.model_slug;
+  if (metadata.requires_reinstall === true) result.requires_reinstall = true;
+  if (typeof metadata.last_scope_error_at === 'string') {
+    result.last_scope_error_at = metadata.last_scope_error_at;
+  }
+  if (typeof metadata.last_scope_error_code === 'string') {
+    result.last_scope_error_code = metadata.last_scope_error_code;
+  }
+  if (Array.isArray(metadata.missing_scopes)) {
+    result.missing_scopes = metadata.missing_scopes.filter(scope => typeof scope === 'string');
+  }
+  if (isRecord(metadata.incoming_webhook)) {
+    const webhook = metadata.incoming_webhook;
+    if (
+      typeof webhook.channel === 'string' &&
+      typeof webhook.channelId === 'string' &&
+      typeof webhook.url === 'string'
+    ) {
+      result.incoming_webhook = {
+        channel: webhook.channel,
+        channelId: webhook.channelId,
+        url: webhook.url,
+      };
+    }
+  }
+
+  return result;
+}
+
+export function parseSlackScopes(value: unknown): string[] {
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map(scope => scope.trim())
+      .filter(Boolean);
+  }
+  if (Array.isArray(value)) return value.filter(scope => typeof scope === 'string');
+  return [];
+}
+
+function uniqueScopes(scopes: string[]): string[] {
+  return [...new Set(scopes)];
+}
+
+export function getSlackPlatformError(error: unknown) {
+  if (!isRecord(error)) return null;
+  if (error.code !== SLACK_PLATFORM_ERROR_CODE) return null;
+  if (!isRecord(error.data)) return null;
+  if (typeof error.data.error !== 'string') return null;
+
+  return {
+    error: error.data.error,
+    needed: error.data.needed,
+    provided: error.data.provided,
+  };
+}
+
+export function getSlackMissingScopeErrorInfo(
+  error: unknown
+): Omit<SlackMissingScopeErrorInfo, 'integrationId'> | null {
+  const platformError = getSlackPlatformError(error);
+  if (platformError?.error !== 'missing_scope') return null;
+
+  return {
+    error: 'missing_scope',
+    missingScopes: parseSlackScopes(platformError.needed),
+    providedScopes: parseSlackScopes(platformError.provided),
+  };
+}
+
+export function isSlackMissingScopeError(error: unknown): boolean {
+  return getSlackMissingScopeErrorInfo(error) !== null;
+}
+
+function clearSlackReinstallRequiredMetadata(metadata: Record<string, unknown>) {
+  const next = { ...metadata };
+  delete next.requires_reinstall;
+  delete next.missing_scopes;
+  delete next.last_scope_error_at;
+  delete next.last_scope_error_code;
+  return next;
+}
+
+export function getSlackReinstallState(integration: PlatformIntegration) {
+  const metadata = readSlackMetadata(integration.metadata);
+  const storedScopes = integration.scopes ?? [];
+  const missingConfiguredScopes = SLACK_SCOPES.filter(scope => !storedScopes.includes(scope));
+  const missingScopes = uniqueScopes([
+    ...(metadata.missing_scopes ?? []),
+    ...missingConfiguredScopes,
+  ]);
+  const requiresReinstall =
+    metadata.requires_reinstall === true || missingConfiguredScopes.length > 0;
+
+  return {
+    requiresReinstall,
+    missingScopes,
+    missingConfiguredScopes,
+    lastScopeErrorAt: metadata.last_scope_error_at ?? null,
+  };
+}
+
+export async function markSlackInstallationRequiresReinstall(
+  teamId: string,
+  error: unknown
+): Promise<SlackMissingScopeErrorInfo | null> {
+  const scopeInfo = getSlackMissingScopeErrorInfo(error);
+  if (!scopeInfo) return null;
+
+  const integration = await getInstallationByTeamId(teamId);
+  if (!integration) return { ...scopeInfo, integrationId: null };
+
+  const existingMetadata = isRecord(integration.metadata) ? integration.metadata : {};
+  const metadata = readSlackMetadata(integration.metadata);
+  const missingScopes = uniqueScopes([
+    ...(metadata.missing_scopes ?? []),
+    ...scopeInfo.missingScopes,
+  ]);
+
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: {
+        ...existingMetadata,
+        requires_reinstall: true,
+        missing_scopes: missingScopes,
+        last_scope_error_at: new Date().toISOString(),
+        last_scope_error_code: scopeInfo.error,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integration.id));
+
+  return { ...scopeInfo, missingScopes, integrationId: integration.id };
+}
+
+export async function postSlackReinstallNoticeByTeamId({
+  teamId,
+  channelId,
+  threadTs,
+  missingScopes,
+}: {
+  teamId: string;
+  channelId: string;
+  threadTs?: string;
+  missingScopes: string[];
+}): Promise<SlackPostMessageResponse> {
+  if (missingScopes.includes('chat:write')) {
+    return { ok: false, error: 'missing_chat_write_scope' };
+  }
+
+  const integration = await getInstallationByTeamId(teamId);
+  if (!integration) return { ok: false, error: 'No Slack installation found' };
+
+  const metadata = readSlackMetadata(integration.metadata);
+  if (!metadata.access_token) return { ok: false, error: 'No access token found' };
+
+  const reinstallPath = integration.owned_by_organization_id
+    ? `/organizations/${integration.owned_by_organization_id}/integrations/slack/reinstall`
+    : '/integrations/slack/reinstall';
+  const reinstallUrl = new URL(reinstallPath, APP_URL).toString();
+  const scopeText = missingScopes.length > 0 ? ` Missing scopes: ${missingScopes.join(', ')}.` : '';
+
+  return postSlackMessageByAccessToken(metadata.access_token, {
+    channel: channelId,
+    thread_ts: threadTs,
+    text: `Kilo needs updated Slack permissions (${scopeText}) for some features. Please reinstall the Kilo Slack app: ${reinstallUrl}. A Slack workspace admin may need to approve the reinstall.`,
+  });
+}
 
 function getOwnershipConditions(owner: Owner) {
   return owner.type === 'user'
@@ -170,17 +370,27 @@ export async function upsertSlackInstallation({
     access_token: installation.botToken,
     bot_user_id: installation.botUserId,
     model_slug: defaultModel,
-  };
+  } satisfies SlackIntegrationMetadata;
 
   if (existing) {
+    const existingMetadata = isRecord(existing.metadata) ? existing.metadata : {};
+    const existingSlackMetadata = readSlackMetadata(existing.metadata);
+    const nextMetadata = clearSlackReinstallRequiredMetadata({
+      ...existingMetadata,
+      access_token: installation.botToken,
+      bot_user_id: installation.botUserId,
+      model_slug: existingSlackMetadata.model_slug ?? defaultModel,
+    }) satisfies SlackIntegrationMetadata;
+
     const [updated] = await db
       .update(platform_integrations)
       .set({
+        platform_installation_id: teamId,
         platform_account_id: teamId,
         platform_account_login: teamName,
         scopes: SLACK_SCOPES,
         integration_status: INTEGRATION_STATUS.ACTIVE,
-        metadata,
+        metadata: nextMetadata,
         updated_at: new Date().toISOString(),
       })
       .where(eq(platform_integrations.id, existing.id))
@@ -223,7 +433,7 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   }
 
   // Revoke the token if we have one
-  const metadata = integration.metadata as { access_token?: string } | null;
+  const metadata = readSlackMetadata(integration.metadata);
   if (metadata?.access_token) {
     try {
       await revokeSlackToken(metadata.access_token);
@@ -280,7 +490,7 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
     return { success: false, error: 'No Slack installation found' };
   }
 
-  const metadata = integration.metadata as { access_token?: string } | null;
+  const metadata = readSlackMetadata(integration.metadata);
 
   if (!metadata?.access_token) {
     return { success: false, error: 'No access token found' };
@@ -314,11 +524,7 @@ export async function sendTestMessage(
     return { success: false, error: 'No Slack installation found' };
   }
 
-  const metadata = integration.metadata as {
-    access_token?: string;
-    model_slug?: string;
-    incoming_webhook?: { channel: string; channelId: string; url: string };
-  } | null;
+  const metadata = readSlackMetadata(integration.metadata);
 
   if (!metadata?.access_token) {
     return { success: false, error: 'No access token found' };
@@ -421,7 +627,7 @@ export async function sendMessage(
     return { success: false, error: 'No Slack installation found' };
   }
 
-  const metadata = integration.metadata as { access_token?: string } | null;
+  const metadata = readSlackMetadata(integration.metadata);
 
   if (!metadata?.access_token) {
     return { success: false, error: 'No access token found' };
@@ -473,7 +679,7 @@ export async function updateModel(
     }
   }
 
-  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
+  const existingMetadata = isRecord(integration.metadata) ? integration.metadata : {};
 
   await db
     .update(platform_integrations)
@@ -499,7 +705,7 @@ export async function getModel(owner: Owner): Promise<string | null> {
     return null;
   }
 
-  const metadata = integration.metadata as { model_slug?: string } | null;
+  const metadata = readSlackMetadata(integration.metadata);
   return metadata?.model_slug || null;
 }
 
@@ -528,7 +734,7 @@ export type SlackPostMessageResponse = {
 export function getAccessTokenFromInstallation(
   integration: PlatformIntegration
 ): string | undefined {
-  const metadata = integration.metadata as { access_token?: string } | null;
+  const metadata = readSlackMetadata(integration.metadata);
   return metadata?.access_token;
 }
 

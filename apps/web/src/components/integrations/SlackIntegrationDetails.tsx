@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   CheckCircle2,
   XCircle,
@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Send,
   Trash2,
+  TriangleAlert,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
@@ -20,17 +21,20 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { IS_DEVELOPMENT } from '@/lib/constants';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import Link from 'next/link';
 
 type SlackIntegrationDetailsProps = {
   organizationId?: string;
   success?: boolean;
   error?: string;
+  mode?: 'manage' | 'reinstall';
 };
 
 export function SlackIntegrationDetails({
   organizationId,
   success,
   error,
+  mode = 'manage',
 }: SlackIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -238,9 +242,28 @@ export function SlackIntegrationDetails({
 
   const isInstalled = installationData?.installed;
   const installation = installationData?.installation;
+  const isReinstallMode = mode === 'reinstall';
+  const isStartingOAuth = isStartingSlackConnection || isFetchingOAuthUrl;
+  const slackIntegrationPath = organizationId
+    ? `/organizations/${organizationId}/integrations/slack`
+    : '/integrations/slack';
+  const reinstallButtonText = isStartingOAuth ? 'Loading...' : 'Reinstall Slack';
+  const connectButtonText = isStartingOAuth ? 'Loading...' : 'Connect Slack';
 
   return (
     <div className="space-y-6">
+      {isReinstallMode && (
+        <Alert variant="warning">
+          <TriangleAlert />
+          <AlertTitle>Slack permissions need to be refreshed</AlertTitle>
+          <AlertDescription>
+            Reinstall Kilo&apos;s Slack app to grant the latest permissions. Existing Kilo settings
+            for this workspace, including the selected model, will be preserved. A Slack workspace
+            admin may need to approve the reinstall.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Installation Status Card */}
       <Card>
         <CardHeader>
@@ -255,10 +278,17 @@ export function SlackIntegrationDetails({
               </CardDescription>
             </div>
             {isInstalled ? (
-              <Badge variant="default" className="flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                Connected
-              </Badge>
+              installation?.requiresReinstall ? (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <TriangleAlert className="h-3 w-3" />
+                  Needs Reinstall
+                </Badge>
+              ) : (
+                <Badge variant="default" className="flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Connected
+                </Badge>
+              )
             ) : (
               <Badge variant="secondary" className="flex items-center gap-1">
                 <XCircle className="h-3 w-3" />
@@ -270,6 +300,22 @@ export function SlackIntegrationDetails({
         <CardContent className="space-y-4">
           {isInstalled && installation ? (
             <>
+              {installation.requiresReinstall && !isReinstallMode && (
+                <Alert variant="warning">
+                  <TriangleAlert />
+                  <AlertTitle>Reinstall Slack to restore all bot features</AlertTitle>
+                  <AlertDescription>
+                    Kilo tried to use Slack permissions this workspace has not granted yet.
+                    Reinstall the Slack app to refresh its scopes.
+                    {installation.missingScopes.length > 0 && (
+                      <span className="mt-2 block">
+                        Missing scopes: {installation.missingScopes.join(', ')}
+                      </span>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Installation Details */}
               <div className="space-y-3 rounded-lg border p-4">
                 <div className="flex items-center justify-between">
@@ -313,6 +359,10 @@ export function SlackIntegrationDetails({
 
               {/* Actions */}
               <div className="flex flex-wrap gap-3">
+                <Button onClick={handleInstall} disabled={isStartingOAuth}>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  {reinstallButtonText}
+                </Button>
                 <Button
                   variant="outline"
                   onClick={handleTestConnection}
@@ -358,13 +408,21 @@ export function SlackIntegrationDetails({
                   </Button>
                 )}
               </div>
+
+              {isReinstallMode && (
+                <Button variant="ghost" asChild>
+                  <Link href={slackIntegrationPath}>Back to Slack integration settings</Link>
+                </Button>
+              )}
             </>
           ) : (
             <>
               {/* Not Connected State */}
               <Alert>
                 <AlertDescription>
-                  Connect Slack to talk with Kilo directly from your workspace.
+                  {isReinstallMode
+                    ? 'Slack is not connected yet. Connect Slack to grant Kilo the latest permissions.'
+                    : 'Connect Slack to talk with Kilo directly from your workspace.'}
                 </AlertDescription>
               </Alert>
 
@@ -379,11 +437,17 @@ export function SlackIntegrationDetails({
                 onClick={handleInstall}
                 size="lg"
                 className="w-full"
-                disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+                disabled={isStartingOAuth}
               >
                 <MessageSquare className="mr-2 h-4 w-4" />
-                {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Connect Slack'}
+                {isReinstallMode ? reinstallButtonText : connectButtonText}
               </Button>
+
+              {isReinstallMode && (
+                <Button variant="ghost" asChild className="w-full">
+                  <Link href={slackIntegrationPath}>Back to Slack integration settings</Link>
+                </Button>
+              )}
             </>
           )}
         </CardContent>

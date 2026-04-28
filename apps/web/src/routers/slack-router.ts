@@ -47,16 +47,21 @@ export const slackRouter = createTRPCRouter({
     }
 
     const isInstalled = integration.integration_status === 'active';
-    const metadata = integration.metadata as { model_slug?: string } | null;
+    const metadata = slackService.readSlackMetadata(integration.metadata);
+    const reinstallState = slackService.getSlackReinstallState(integration);
 
     return {
       installed: isInstalled,
+      needsReinstall: reinstallState.requiresReinstall,
       installation: {
         teamId: integration.platform_account_id,
         teamName: integration.platform_account_login,
         scopes: integration.scopes,
         installedAt: integration.installed_at,
         modelSlug: metadata?.model_slug || null,
+        requiresReinstall: reinstallState.requiresReinstall,
+        missingScopes: reinstallState.missingScopes,
+        lastScopeErrorAt: reinstallState.lastScopeErrorAt,
       },
     };
   }),

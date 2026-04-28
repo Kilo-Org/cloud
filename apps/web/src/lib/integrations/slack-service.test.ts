@@ -3,6 +3,9 @@ process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 
 const mockLimit = jest.fn();
 const mockDeleteWhere = jest.fn();
+const mockUpdateSet = jest.fn();
+const mockUpdateWhere = jest.fn();
+const mockUpdateReturning = jest.fn();
 const mockAuthRevoke = jest.fn();
 
 jest.mock('@/lib/drizzle', () => ({
@@ -17,6 +20,9 @@ jest.mock('@/lib/drizzle', () => ({
     delete: jest.fn(() => ({
       where: mockDeleteWhere,
     })),
+    update: jest.fn(() => ({
+      set: mockUpdateSet,
+    })),
   },
 }));
 
@@ -29,7 +35,13 @@ jest.mock('@slack/web-api', () => ({
 }));
 
 import type { Owner } from '@/lib/integrations/core/types';
-import { uninstallApp } from './slack-service';
+import {
+  getSlackMissingScopeErrorInfo,
+  isSlackMissingScopeError,
+  markSlackInstallationRequiresReinstall,
+  uninstallApp,
+  upsertSlackInstallation,
+} from './slack-service';
 
 const owner = { type: 'user', id: 'user-1' } satisfies Owner;
 
@@ -44,13 +56,30 @@ function buildSlackIntegration(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function buildSlackMissingScopeError() {
+  return Object.assign(new Error('An API error occurred: missing_scope'), {
+    code: 'slack_webapi_platform_error',
+    data: {
+      ok: false,
+      error: 'missing_scope',
+      needed: 'assistant:write,views:write',
+      provided: 'chat:write',
+    },
+  });
+}
+
 describe('slack-service uninstallApp', () => {
   beforeEach(() => {
     mockLimit.mockReset();
     mockDeleteWhere.mockReset();
+    mockUpdateSet.mockReset();
+    mockUpdateWhere.mockReset();
+    mockUpdateReturning.mockReset();
     mockAuthRevoke.mockReset();
     mockAuthRevoke.mockResolvedValue({ ok: true });
     mockDeleteWhere.mockResolvedValue(undefined);
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
   });
 
   it('deletes Chat SDK Slack state before removing the platform integration row', async () => {
@@ -113,5 +142,134 @@ describe('slack-service uninstallApp', () => {
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T456');
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('slack-service reinstall metadata', () => {
+  beforeEach(() => {
+    mockLimit.mockReset();
+    mockDeleteWhere.mockReset();
+    mockUpdateSet.mockReset();
+    mockUpdateWhere.mockReset();
+    mockUpdateReturning.mockReset();
+    mockAuthRevoke.mockReset();
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
+  });
+
+  it('detects Slack missing_scope platform errors', () => {
+    const error = buildSlackMissingScopeError();
+
+    expect(isSlackMissingScopeError(error)).toBe(true);
+    expect(getSlackMissingScopeErrorInfo(error)).toEqual({
+      error: 'missing_scope',
+      missingScopes: ['assistant:write', 'views:write'],
+      providedScopes: ['chat:write'],
+    });
+    expect(
+      getSlackMissingScopeErrorInfo(
+        Object.assign(new Error('An API error occurred: missing_scope'), {
+          code: 'slack_webapi_platform_error',
+          data: { ok: false, error: 'missing_scope' },
+        })
+      )
+    ).toEqual({
+      error: 'missing_scope',
+      missingScopes: [],
+      providedScopes: [],
+    });
+    expect(isSlackMissingScopeError(new Error('different error'))).toBe(false);
+  });
+
+  it('marks an installation as requiring reinstall for missing scopes', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({
+        metadata: {
+          access_token: 'xoxb-token',
+          model_slug: 'anthropic/claude-sonnet-4.5',
+          missing_scopes: ['assistant:write'],
+        },
+      }),
+    ]);
+
+    await expect(
+      markSlackInstallationRequiresReinstall('T123', buildSlackMissingScopeError())
+    ).resolves.toMatchObject({
+      error: 'missing_scope',
+      integrationId: 'integration-1',
+      missingScopes: ['assistant:write', 'views:write'],
+      providedScopes: ['chat:write'],
+    });
+
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          access_token: 'xoxb-token',
+          model_slug: 'anthropic/claude-sonnet-4.5',
+          requires_reinstall: true,
+          missing_scopes: ['assistant:write', 'views:write'],
+          last_scope_error_code: 'missing_scope',
+        }),
+      })
+    );
+  });
+
+  it('does not mark reinstall for non-missing-scope errors', async () => {
+    await expect(
+      markSlackInstallationRequiresReinstall('T123', new Error('ratelimited'))
+    ).resolves.toBe(null);
+
+    expect(mockLimit).not.toHaveBeenCalled();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it('preserves the selected model and clears reinstall flags during reinstall', async () => {
+    const updatedIntegration = buildSlackIntegration({
+      metadata: {
+        access_token: 'new-token',
+        bot_user_id: 'BNEW',
+        model_slug: 'anthropic/claude-sonnet-4.5',
+      },
+    });
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({
+        metadata: {
+          access_token: 'old-token',
+          bot_user_id: 'BOLD',
+          model_slug: 'anthropic/claude-sonnet-4.5',
+          requires_reinstall: true,
+          missing_scopes: ['assistant:write'],
+          last_scope_error_at: '2026-04-28T12:00:00.000Z',
+          last_scope_error_code: 'missing_scope',
+        },
+      }),
+    ]);
+    mockUpdateReturning.mockResolvedValue([updatedIntegration]);
+
+    await expect(
+      upsertSlackInstallation({
+        owner,
+        teamId: 'T123',
+        installation: {
+          botToken: 'new-token',
+          botUserId: 'BNEW',
+          teamName: 'Kilo Test',
+        },
+      })
+    ).resolves.toBe(updatedIntegration);
+
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform_installation_id: 'T123',
+        platform_account_id: 'T123',
+        platform_account_login: 'Kilo Test',
+        integration_status: 'active',
+        metadata: {
+          access_token: 'new-token',
+          bot_user_id: 'BNEW',
+          model_slug: 'anthropic/claude-sonnet-4.5',
+        },
+      })
+    );
   });
 });

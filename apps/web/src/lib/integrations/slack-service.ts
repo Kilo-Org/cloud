@@ -33,14 +33,12 @@ export const SLACK_SCOPES = [
   'groups:read',
   'im:history',
   'im:read',
-  'im:write',
   'mpim:history',
   'mpim:read',
   'reactions:read',
   'reactions:write',
   'team:read',
   'users:read',
-  'users:read.email',
 ];
 
 const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;

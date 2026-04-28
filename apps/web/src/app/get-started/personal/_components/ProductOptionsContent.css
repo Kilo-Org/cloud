@@ -1,0 +1,76 @@
+/*
+ * Animations used exclusively by the /get-started landing page.
+ * Kept co-located with ProductOptionsContent.tsx rather than living in
+ * globals.css because nothing else on the site uses them.
+ *
+ * References the --ease-out-strong token defined in app/globals.css.
+ */
+
+/* Staggered entrance. Each element sets its own animation-delay inline
+   so the hero + card columns can be choreographed together. */
+@keyframes kilo-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kilo-fade-up {
+  animation: kilo-fade-up 0.42s var(--ease-out-strong) backwards;
+}
+
+/* Looping sheen sweep across a container. The sweep itself takes 18% of
+   the cycle (~1s of the 5.5s total); the remaining 82% holds off-screen
+   so the effect is noticeable but never fatiguing. */
+@keyframes kilo-sheen-loop {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  18% {
+    transform: translateX(240%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(240%) skewX(-18deg);
+  }
+}
+
+.kilo-sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.kilo-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%) skewX(-18deg);
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+/* Sweep plays when both classes are present. The delay reads from a CSS
+   custom property on the element so the first sweep can be timed to fire
+   after the badge's card has entered. */
+.kilo-sheen.kilo-sheen-play::after {
+  animation: kilo-sheen-loop 5.5s var(--ease-out-strong) var(--kilo-sheen-delay, 0ms) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kilo-fade-up {
+    animation: none;
+  }
+  .kilo-sheen::after {
+    display: none;
+  }
+}

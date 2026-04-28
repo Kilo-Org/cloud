@@ -4,6 +4,14 @@ import { desc, eq } from 'drizzle-orm';
 
 const isApply = process.argv.includes('--apply');
 
+export function getProviderAllowListFromDenyList(params: {
+  providerSlugs: string[];
+  providerDenyList: string[] | undefined;
+}) {
+  const deniedProviders = new Set(params.providerDenyList ?? []);
+  return params.providerSlugs.filter(provider => !deniedProviders.has(provider));
+}
+
 function hasProviderPolicy(settings: typeof organizations.$inferSelect.settings) {
   return settings.provider_policy_mode === 'allow' && settings.provider_allow_list !== undefined;
 }
@@ -36,11 +44,13 @@ export async function run() {
   for (const org of orgs) {
     if (hasProviderPolicy(org.settings) || !hasProviderDenyList(org.settings)) continue;
 
-    const deniedProviders = new Set(org.settings.provider_deny_list ?? []);
     const settings = {
       ...org.settings,
       provider_policy_mode: 'allow' as const,
-      provider_allow_list: providerSlugs.filter(provider => !deniedProviders.has(provider)),
+      provider_allow_list: getProviderAllowListFromDenyList({
+        providerSlugs,
+        providerDenyList: org.settings.provider_deny_list,
+      }),
     };
 
     changed++;

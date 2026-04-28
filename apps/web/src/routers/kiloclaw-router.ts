@@ -27,7 +27,6 @@ import {
   kiloclaw_instances,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
-  kilocode_users,
   cloud_agent_webhook_triggers,
   credit_transactions,
   organizations,

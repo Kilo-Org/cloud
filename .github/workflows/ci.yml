@@ -46,6 +46,8 @@ jobs:
         with:
           filters: |
             kilocode_backend:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/deploy-production.yml'
               - 'apps/web/src/**'
               - 'apps/web/package.json'
               - 'apps/web/tsconfig.json'

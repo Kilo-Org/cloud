@@ -56,11 +56,6 @@
 
   "secrets_store_secrets": [
     {
-      "binding": "STREAM_CHAT_API_SECRET",
-      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-      "secret_name": "STREAM_CHAT_API_SECRET",
-    },
-    {
       "binding": "EXPO_ACCESS_TOKEN",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "EXPO_ACCESS_TOKEN",

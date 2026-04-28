@@ -116,7 +116,7 @@ describe('selectImageVersionForInstance', () => {
     }
   });
 
-  it('falls through to :latest when instance is already on the candidate', async () => {
+  it('returns null (no upgrade) when instance is already on the active candidate', async () => {
     const kv = createJsonKV();
     await kv.put(imageVersionLatestKey('default'), JSON.stringify(entry('img-stable', 0, true)));
     await kv.put(imageVersionCandidateKey('default'), JSON.stringify(entry('img-candidate', 100)));
@@ -127,9 +127,24 @@ describe('selectImageVersionForInstance', () => {
       instanceId: 'instance-1',
       currentImageTag: 'img-candidate',
     });
-    // The candidate is skipped (already on it). The latest pointer differs
-    // from the current tag, so the resolver returns it. Asserting the exact
-    // value catches a regression where the function returns null instead.
+    // Critical: must NOT fall through to :latest — that would downgrade an
+    // instance that's already running the staged candidate. Sticky-on-candidate
+    // is the documented behavior; admin must explicitly disable the tag to
+    // displace.
+    expect(result).toBeNull();
+  });
+
+  it('returns :latest when no candidate is in flight and instance is on something older', async () => {
+    const kv = createJsonKV();
+    await kv.put(imageVersionLatestKey('default'), JSON.stringify(entry('img-stable', 0, true)));
+    // No candidate pointer set.
+
+    const result = await selectImageVersionForInstance({
+      kv,
+      variant: 'default',
+      instanceId: 'instance-1',
+      currentImageTag: 'img-old',
+    });
     expect(result?.imageTag).toBe('img-stable');
   });
 

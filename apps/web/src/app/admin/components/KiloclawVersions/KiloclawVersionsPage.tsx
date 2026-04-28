@@ -416,6 +416,19 @@ export function VersionsTab() {
     data?.items.find(v => !v.is_latest && v.status === 'available' && v.rollout_percent > 0) ??
     null;
 
+  // Newly published images sit dormant until ops promotes them. Surface a
+  // reminder when there are available rows newer than :latest at 0% rollout
+  // — these are typically post-deploy images waiting for someone to either
+  // mark them :latest or start a rollout.
+  const latestPublishedAt = currentLatest ? new Date(currentLatest.published_at).getTime() : 0;
+  const unpromotedImages = (data?.items ?? []).filter(
+    v =>
+      v.status === 'available' &&
+      !v.is_latest &&
+      v.rollout_percent === 0 &&
+      new Date(v.published_at).getTime() > latestPublishedAt
+  );
+
   const { mutateAsync: syncCatalog, isPending: isSyncing } = useMutation(
     trpc.admin.kiloclawVersions.syncCatalog.mutationOptions({
       onSuccess: result => {
@@ -445,6 +458,34 @@ export function VersionsTab() {
           await markLatest({ imageTag });
         }}
       />
+
+      {/* Reminder when newly-published images are sitting dormant. */}
+      {unpromotedImages.length > 0 && (
+        <div className="flex items-start gap-3 rounded-md border border-amber-700/50 bg-amber-950/20 px-3 py-2.5 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <div className="flex-1">
+            <div className="font-medium text-amber-400">
+              {unpromotedImages.length} newly published image
+              {unpromotedImages.length === 1 ? '' : 's'} waiting for promotion
+            </div>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Publishing no longer auto-promotes to <code>:latest</code>. New images land at 0% and
+              aren't exposed to instances until you either click <strong>Make :latest</strong> or{' '}
+              <strong>Start rollout</strong> in the table below.
+            </p>
+            {unpromotedImages.length <= 3 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {unpromotedImages.map(v => (
+                  <code key={v.id} className="bg-amber-900/30 rounded px-1.5 py-0.5 text-[10px]">
+                    {v.image_tag.slice(0, 24)}
+                    {v.image_tag.length > 24 ? '…' : ''}
+                  </code>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Filter + sync controls */}
       <div className="flex items-center gap-2">

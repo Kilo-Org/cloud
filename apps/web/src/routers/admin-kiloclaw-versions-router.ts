@@ -131,6 +131,15 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
         try {
           await client.disableImageAndClearRollout(input.imageTag, ctx.user.id);
         } catch (err) {
+          if (err instanceof KiloClawApiError && err.statusCode === 404) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: `Image not found: ${input.imageTag}`,
+            });
+          }
+          if (err instanceof KiloClawApiError && err.statusCode === 400) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+          }
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to disable image',

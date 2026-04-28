@@ -205,6 +205,14 @@ function EarlyAccessSection({
   const queryClient = useQueryClient();
   const [optimistic, setOptimistic] = useState(initialValue);
 
+  // Keep the toggle in sync if the parent's data refreshes out-of-band (e.g.,
+  // another admin toggles the same flag, or React Query cache invalidates).
+  // useState's initializer only runs on mount; without this we'd render stale
+  // state after a refetch.
+  useEffect(() => {
+    setOptimistic(initialValue);
+  }, [initialValue]);
+
   const { mutateAsync, isPending } = useMutation(
     trpc.admin.kiloclawInstances.setEarlyAccess.mutationOptions({
       onSuccess: result => {

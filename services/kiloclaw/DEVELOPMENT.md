@@ -344,6 +344,34 @@ The image is large, so pushes are slow. After pushing, restart the worker
 dashboard. A restart is sufficient to pick up the new image — you only need to
 destroy and re-provision if the volume or Fly app config changed.
 
+### Promoting a published image (required step)
+
+> **Publishing no longer auto-promotes to `:latest`.** A newly published image
+> is registered in the catalog at `rollout_percent = 0` and `is_latest = false`.
+> Until you promote it, it is **not served to any instance**.
+
+After pushing/publishing a new image, choose one of:
+
+1. **Full immediate rollout (typical for hotfixes):** open
+   `/admin/kiloclaw?tab=versions`, find your row, click **Make :latest**.
+   Confirms with a dialog, then atomically demotes the previous `:latest`
+   and your image becomes the new baseline. Every new instance and unpinned
+   upgrade picks it up.
+
+2. **Staged rollout (typical for risky changes):** open the same page, click
+   **Start rollout** on your row, enter an initial percent (e.g. `20`).
+   Instances whose deterministic SHA-256 bucket falls below the percent will
+   be offered the upgrade. Slide higher over time as confidence grows. When
+   the slider hits `100`, a modal asks if you want to promote to `:latest` —
+   confirm to close the rollout.
+
+If neither happens, the image sits dormant. The Versions admin page surfaces
+a yellow warning at the top listing any unpromoted images newer than the
+current `:latest`, so it's hard to miss.
+
+`POST /api/platform/publish-image-version` returns a `promotionHint` field
+in its JSON response that says the same thing — useful for CI log output.
+
 ### When do I need to push a new image?
 
 The Docker image bundles the **Node controller** (`controller/src/`) and

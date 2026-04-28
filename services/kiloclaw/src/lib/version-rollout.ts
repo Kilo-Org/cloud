@@ -71,7 +71,15 @@ export async function selectImageVersionForInstance(
     readPointer(opts.kv, imageVersionLatestKey(opts.variant)),
   ]);
 
-  if (candidate && candidate.imageTag !== opts.currentImageTag) {
+  // Track whether the candidate path was skipped because the instance is
+  // already on the candidate. If so, we must NOT fall through to :latest —
+  // that would silently downgrade an instance whose admin slid the rollout
+  // back below its bucket. Sticky-on-candidate is the documented behavior;
+  // moving an instance off the candidate requires an explicit admin action
+  // (disable the candidate's tag), which clears the KV pointer.
+  const alreadyOnCandidate = candidate !== null && candidate.imageTag === opts.currentImageTag;
+
+  if (candidate && !alreadyOnCandidate) {
     if (opts.autoEnroll) {
       return candidate;
     }
@@ -81,6 +89,10 @@ export async function selectImageVersionForInstance(
         return candidate;
       }
     }
+  }
+
+  if (alreadyOnCandidate) {
+    return null;
   }
 
   if (latest && latest.imageTag !== opts.currentImageTag) {
@@ -178,27 +190,30 @@ export async function markImageAsLatest(opts: {
   if (target.status !== 'available')
     throw new Error(`Image is disabled and cannot be marked :latest: ${opts.imageTag}`);
 
-  // Atomic clear-then-set within a single SQL transaction is preferable, but
-  // the KV refresh below makes the operation idempotent — even if these two
-  // statements interleave with another mark call, refreshPointersForVariant
-  // will reconcile to whichever row ends up with is_latest=true.
-  await db
-    .update(kiloclaw_image_catalog)
-    .set({ is_latest: false, updated_at: sql`NOW()` })
-    .where(
-      and(
-        eq(kiloclaw_image_catalog.variant, target.variant),
-        ne(kiloclaw_image_catalog.image_tag, opts.imageTag),
-        eq(kiloclaw_image_catalog.is_latest, true)
-      )
-    );
+  // Clear-then-set inside a transaction so there's never a window where no
+  // row has is_latest=true for the variant. Without the TX, a concurrent
+  // refreshPointersForVariant (e.g. another admin's setRolloutPercent) could
+  // see "no :latest" and clear the KV pointer.
+  const row = await db.transaction(async tx => {
+    await tx
+      .update(kiloclaw_image_catalog)
+      .set({ is_latest: false, updated_at: sql`NOW()` })
+      .where(
+        and(
+          eq(kiloclaw_image_catalog.variant, target.variant),
+          ne(kiloclaw_image_catalog.image_tag, opts.imageTag),
+          eq(kiloclaw_image_catalog.is_latest, true)
+        )
+      );
 
-  const [row] = await db
-    .update(kiloclaw_image_catalog)
-    .set({ is_latest: true, rollout_percent: 0, updated_at: sql`NOW()` })
-    .where(eq(kiloclaw_image_catalog.image_tag, opts.imageTag))
-    .returning();
-  if (!row) throw new Error(`Image not found: ${opts.imageTag}`);
+    const [updated] = await tx
+      .update(kiloclaw_image_catalog)
+      .set({ is_latest: true, rollout_percent: 0, updated_at: sql`NOW()` })
+      .where(eq(kiloclaw_image_catalog.image_tag, opts.imageTag))
+      .returning();
+    if (!updated) throw new Error(`Image not found: ${opts.imageTag}`);
+    return updated;
+  });
 
   await mirrorTagEntryToKv(opts.kv, row);
   await refreshPointersForVariant(opts.kv, opts.hyperdriveConnectionString, row.variant);

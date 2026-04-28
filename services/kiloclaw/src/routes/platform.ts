@@ -3654,7 +3654,20 @@ platform.post('/publish-image-version', async c => {
     '→',
     imageTag
   );
-  return c.json({ ok: true, ...parsed.data }, 201);
+  return c.json(
+    {
+      ok: true,
+      ...parsed.data,
+      // Surfaced in CI logs / curl output so devs aren't surprised when their
+      // newly-pushed image isn't immediately picked up by instances.
+      promotionHint:
+        'Image registered at rollout_percent=0 and is_latest=false. It will not be served to ' +
+        'any instance until ops promotes it. Open /admin/kiloclaw?tab=versions and either ' +
+        'click "Make :latest" (full immediate rollout) or "Start rollout" with a percent ' +
+        '(staged rollout).',
+    },
+    201
+  );
 });
 
 // ---------------------------------------------------------------------------

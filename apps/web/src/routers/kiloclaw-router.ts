@@ -27,6 +27,7 @@ import {
   kiloclaw_instances,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
+  kilocode_users,
   cloud_agent_webhook_triggers,
   credit_transactions,
   organizations,
@@ -3300,6 +3301,38 @@ export const kiloclawRouter = createTRPCRouter({
           totalPages: Math.ceil(totalCount / limit),
         },
       };
+    }),
+
+  /**
+   * Read the signed in user's `kiloclaw_early_access` flag. When true, the
+   * rollout selector force includes the user's instances in any in flight
+   * candidate, regardless of bucket. Pin overrides still win per instance.
+   */
+  myEarlyAccess: baseProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({ early_access: kilocode_users.kiloclaw_early_access })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, ctx.user.id))
+      .limit(1);
+    return row?.early_access ?? false;
+  }),
+
+  /**
+   * Toggle the signed in user's own `kiloclaw_early_access` flag.
+   * Self serve counterpart of admin.kiloclawInstances.setEarlyAccess.
+   */
+  setMyEarlyAccess: clawAccessProcedure
+    .input(z.object({ value: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await db
+        .update(kilocode_users)
+        .set({ kiloclaw_early_access: input.value })
+        .where(eq(kilocode_users.id, ctx.user.id))
+        .returning({ id: kilocode_users.id });
+      if (result.length === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+      }
+      return { earlyAccess: input.value };
     }),
 
   getMyPin: baseProcedure.query(async ({ ctx }) => {

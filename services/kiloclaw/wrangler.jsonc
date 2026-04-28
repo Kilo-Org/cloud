@@ -114,6 +114,12 @@
     "FLY_ORG_SLUG": "kilo-679", // Org for creating per-user Fly apps
     "FLY_IMAGE_TAG": "latest",
     "FLY_REGION": "eu,us",
+    "NF_TEAM_ID": "kilo-prod",
+    "NF_REGION": "us-central",
+    "NF_DEPLOYMENT_PLAN": "nf-compute-200",
+    "NF_EDGE_HEADER_NAME": "x-kiloclaw-northflank-edge-prod",
+    "NF_IMAGE_PATH_TEMPLATE": "ghcr.io/kilo-org/kiloclaw:{tag}",
+    "NF_IMAGE_CREDENTIALS_ID": "kiloclaw",
     "BACKEND_API_URL": "https://app.kilo.ai",
     "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
     "KILOCLAW_CHECKIN_URL": "https://claw.kilosessions.ai/api/controller/checkin",
@@ -128,6 +134,7 @@
   },
   // Secrets (set via wrangler secret put):
   // FLY_API_TOKEN,
+  // NF_API_TOKEN, NF_EDGE_HEADER_VALUE,
   // NEXTAUTH_SECRET, INTERNAL_API_SECRET, GATEWAY_TOKEN_SECRET,
   // AGENT_ENV_VARS_PRIVATE_KEY
 }

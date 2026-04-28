@@ -53,6 +53,22 @@ export type KiloClawEnv = {
   FLY_IMAGE_TAG?: string;
   FLY_IMAGE_DIGEST?: string;
   OPENCLAW_VERSION?: string;
+
+  // Northflank configuration
+  NF_API_TOKEN?: string;
+  NF_API_BASE?: string;
+  NF_TEAM_ID?: string;
+  NF_REGION?: string;
+  NF_DEPLOYMENT_PLAN?: string;
+  NF_STORAGE_CLASS_NAME?: string;
+  NF_STORAGE_ACCESS_MODE?: string;
+  NF_VOLUME_SIZE_MB?: string;
+  NF_EPHEMERAL_STORAGE_MB?: string;
+  NF_EDGE_HEADER_NAME?: string;
+  NF_EDGE_HEADER_VALUE?: string;
+  NF_IMAGE_PATH_TEMPLATE?: string;
+  NF_IMAGE_CREDENTIALS_ID?: string;
+
   DOCKER_LOCAL_API_BASE?: string;
   DOCKER_LOCAL_IMAGE?: string;
   DOCKER_LOCAL_PORT_RANGE?: string;

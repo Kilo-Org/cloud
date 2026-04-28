@@ -3,7 +3,7 @@ import { ProviderIdSchema, type ProviderId } from '../schemas/instance-config';
 import { rolloutBucket } from '../lib/rollout-bucket';
 
 export const PROVIDER_ROLLOUT_KV_KEY = 'provider-rollout';
-export const NORTHFLANK_ROLLOUT_AVAILABLE = false;
+export const NORTHFLANK_ROLLOUT_AVAILABLE = true;
 
 const NorthflankRolloutSchema = z.object({
   personalTrafficPercent: z.number().int().min(0).max(100),

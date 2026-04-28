@@ -28,7 +28,7 @@ type KiloClawChatProps = {
   organizationId?: string | null;
 };
 
-type UnreadCountsData = { instanceId: string; badgeCount: number }[];
+type UnreadCountsData = { channelId: string; badgeCount: number }[];
 
 export function KiloClawChat({
   instanceId,
@@ -50,7 +50,7 @@ export function KiloClawChat({
         await queryClient.cancelQueries({ queryKey: unreadCountsKey });
         const previous = queryClient.getQueryData<UnreadCountsData>(unreadCountsKey);
         queryClient.setQueryData<UnreadCountsData>(unreadCountsKey, old =>
-          (old ?? []).filter(row => row.instanceId !== channelId)
+          (old ?? []).filter(row => row.channelId !== channelId)
         );
         return { previous };
       },

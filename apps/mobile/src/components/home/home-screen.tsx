@@ -30,7 +30,7 @@ export function HomeScreen() {
     isPending: instancesPending,
     isError: instancesError,
   } = useAllKiloClawInstances();
-  const { byInstance: unreadByInstance } = useUnreadCounts();
+  const { byChannel: unreadByChannel } = useUnreadCounts();
   const {
     storedSessions,
     activeSessions,
@@ -79,7 +79,7 @@ export function HomeScreen() {
             {renderKiloClawSlot({
               instances: instances ?? [],
               instancesError,
-              unreadByInstance,
+              unreadByChannel,
             })}
 
             {renderSessionsOrPromo({
@@ -99,7 +99,7 @@ export function HomeScreen() {
 function renderKiloClawSlot(params: {
   instances: ClawInstance[];
   instancesError: boolean;
-  unreadByInstance: Map<string, number>;
+  unreadByChannel: Map<string, number>;
 }) {
   if (params.instances.length > 0) {
     return (
@@ -110,7 +110,7 @@ function renderKiloClawSlot(params: {
             <KiloClawCard
               key={instance.sandboxId}
               instance={instance}
-              unreadCount={params.unreadByInstance.get(instance.sandboxId) ?? 0}
+              unreadCount={params.unreadByChannel.get(instance.sandboxId) ?? 0}
             />
           ))}
         </View>

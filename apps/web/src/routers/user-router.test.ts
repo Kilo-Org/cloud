@@ -441,8 +441,8 @@ describe('user router - getUnreadCounts', () => {
     expect(result).toHaveLength(2);
     expect(result).toEqual(
       expect.arrayContaining([
-        { instanceId: 'sandbox-alpha', badgeCount: 3 },
-        { instanceId: 'sandbox-beta', badgeCount: 7 },
+        { channelId: 'sandbox-alpha', badgeCount: 3 },
+        { channelId: 'sandbox-beta', badgeCount: 7 },
       ])
     );
 
@@ -459,7 +459,7 @@ describe('user router - getUnreadCounts', () => {
     const caller = await createCallerForUser(user.id);
     const result = await caller.user.getUnreadCounts();
 
-    expect(result).toEqual([{ instanceId: 'sandbox-has-unread', badgeCount: 2 }]);
+    expect(result).toEqual([{ channelId: 'sandbox-has-unread', badgeCount: 2 }]);
 
     await cleanupBadges(user.id);
   });
@@ -477,7 +477,7 @@ describe('user router - getUnreadCounts', () => {
     const caller = await createCallerForUser(user.id);
     const result = await caller.user.getUnreadCounts();
 
-    expect(result).toEqual([{ instanceId: 'sandbox-mine', badgeCount: 4 }]);
+    expect(result).toEqual([{ channelId: 'sandbox-mine', badgeCount: 4 }]);
 
     await cleanupBadges(user.id);
     await cleanupBadges(other.id);
@@ -495,7 +495,7 @@ describe('user router - getUnreadCounts', () => {
 
     const result = await caller.user.getUnreadCounts();
 
-    expect(result).toEqual([{ instanceId: 'sandbox-still-unread', badgeCount: 1 }]);
+    expect(result).toEqual([{ channelId: 'sandbox-still-unread', badgeCount: 1 }]);
 
     // Defensive: confirm the row was zeroed, not deleted.
     const zeroed = await db

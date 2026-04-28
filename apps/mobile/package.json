@@ -75,7 +75,8 @@
     "stream-chat": "catalog:",
     "stream-chat-expo": "^8.13.7",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss": "^4.2.2"
+    "tailwindcss": "^4.2.2",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@sentry/cli": "catalog:",

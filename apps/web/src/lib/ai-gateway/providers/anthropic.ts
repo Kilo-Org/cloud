@@ -1,13 +1,14 @@
+import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { normalizeToolCallIds } from '@/lib/ai-gateway/tool-calling';
 
 export function isAnthropicModel(requestedModel: string) {
-  return requestedModel.startsWith('anthropic/');
+  return modelStartsWith(requestedModel, 'anthropic/');
 }
 
 export function isHaikuModel(requestedModel: string) {
-  return requestedModel.startsWith('anthropic/claude-haiku');
+  return modelStartsWith(requestedModel, 'anthropic/claude-haiku');
 }
 
 function appendAnthropicBetaHeader(extraHeaders: Record<string, string>, betaFlag: string) {

@@ -46,7 +46,7 @@ export const preferredModels = [
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-  'openai/gpt-5.4',
+  'openai/gpt-5.5',
   'google/gemini-3.1-pro-preview',
   MINIMAX_CURRENT_MODEL_ID,
   qwen36_plus_model.public_id,

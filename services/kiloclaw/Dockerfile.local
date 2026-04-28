@@ -30,7 +30,7 @@ RUN apt-get update \
     && curl -fsSL https://downloads.1password.com/linux/keys/1password.asc \
        | gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg \
     && apt-get update \
-    && apt-get install -y --no-install-recommends gh 1password-cli=2.33.0-1 \
+    && apt-get install -y --no-install-recommends gh 1password-cli \
     && apt-get purge -y xz-utils \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
@@ -146,6 +146,18 @@ RUN cd /tmp/kiloclaw-customizer \
     && cd / \
     && rm -rf /tmp/kiloclaw-customizer /root/.npm
 
+# Build kilo-chat plugin tarball in isolated stage so dev dependencies
+# are not persisted in the runtime image.
+FROM runtime AS kilo-chat-builder
+
+COPY plugins/kilo-chat/ /tmp/kilo-chat/
+RUN cd /tmp/kilo-chat \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kilo-chat.tgz \
+    && cd / \
+    && rm -rf /tmp/kilo-chat /root/.npm
+
 FROM runtime AS morning-briefing-builder
 
 COPY plugins/kiloclaw-morning-briefing/ /tmp/kiloclaw-morning-briefing/
@@ -163,4 +175,10 @@ COPY --from=morning-briefing-builder /tmp/kiloclaw-morning-briefing.tgz /tmp/kil
 RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw-morning-briefing.tgz \
     && rm -f /tmp/kiloclaw-customizer.tgz \
     && rm -f /tmp/kiloclaw-morning-briefing.tgz \
+    && rm -rf /root/.npm
+
+# Install prebuilt kilo-chat plugin package from builder stage.
+COPY --from=kilo-chat-builder /tmp/kilo-chat.tgz /tmp/kilo-chat.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kilo-chat.tgz \
+    && rm -f /tmp/kilo-chat.tgz \
     && rm -rf /root/.npm

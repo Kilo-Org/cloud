@@ -67,6 +67,11 @@ RUN npm install -g openclaw@2026.4.15 \
     && if [ "$AFTER" -ne 1 ]; then echo "ERROR: sed patch failed - expected 1 occurrence of 60e3, found $AFTER" >&2; exit 1; fi \
     && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null; then echo "ERROR: old 5e3 value still present after patch" >&2; exit 1; fi \
     && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
+    && CT_FILE=$(find "$OC_DIST" -name 'channel-target-*.js' | head -1) \
+    && if [ -z "$CT_FILE" ]; then echo "ERROR: channel-target-*.js not found in openclaw dist" >&2; exit 1; fi \
+    && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
+    && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
+    && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
     && openclaw --version
 
 # Bake bundled plugin runtime deps into the image so first boot is pure
@@ -143,6 +148,19 @@ RUN cd /tmp/kiloclaw-customizer \
     && cd / \
     && rm -rf /tmp/kiloclaw-customizer /root/.npm
 
+# ── Builder stage: package kilo-chat plugin ────────────────────────────
+# Build the vendored plugin tarball in an isolated stage so dev-time
+# dependencies do not inflate the runtime image layers.
+FROM runtime AS kilo-chat-builder
+
+COPY plugins/kilo-chat/ /tmp/kilo-chat/
+RUN cd /tmp/kilo-chat \
+    && npm install --include=dev --legacy-peer-deps --no-fund --no-audit \
+    && PKG_TGZ="$(npm pack --silent)" \
+    && mv "${PKG_TGZ}" /tmp/kilo-chat.tgz \
+    && cd / \
+    && rm -rf /tmp/kilo-chat /root/.npm
+
 FROM runtime AS morning-briefing-builder
 
 COPY plugins/kiloclaw-morning-briefing/ /tmp/kiloclaw-morning-briefing/
@@ -192,6 +210,12 @@ RUN npm install -g --legacy-peer-deps /tmp/kiloclaw-customizer.tgz /tmp/kiloclaw
     && rm -f /etc/gitconfig \
     && rm -rf /root/.npm
 
+# Install prebuilt kilo-chat plugin package from builder stage.
+COPY --from=kilo-chat-builder /tmp/kilo-chat.tgz /tmp/kilo-chat.tgz
+RUN npm install -g --legacy-peer-deps /tmp/kilo-chat.tgz \
+    && rm -f /tmp/kilo-chat.tgz \
+    && rm -rf /root/.npm
+
 # Copy the compiled controller from the builder stage
 COPY --from=controller-builder /usr/local/bin/kiloclaw-controller.js /usr/local/bin/kiloclaw-controller.js
 
@@ -202,7 +226,7 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-04-24-v66-openclaw-2026.4.15
+# Build cache bust: 2026-04-24-v66-openclaw-2026.4.15-add-kilo-chat-plugin
 RUN echo "12"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js

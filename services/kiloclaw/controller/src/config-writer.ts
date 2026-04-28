@@ -144,6 +144,7 @@ export type ConfigWriterDeps = {
   renameSync: (oldPath: string, newPath: string) => void;
   chmodSync: (path: string, mode: number) => void;
   copyFileSync: (src: string, dest: string) => void;
+  mkdirSync: (path: string, opts?: { recursive?: boolean }) => void;
   readdirSync: (dir: string) => string[];
   unlinkSync: (path: string) => void;
   existsSync: (path: string) => boolean;
@@ -156,6 +157,7 @@ const defaultDeps: ConfigWriterDeps = {
   renameSync: (oldPath, newPath) => fs.renameSync(oldPath, newPath),
   chmodSync: (p, mode) => fs.chmodSync(p, mode),
   copyFileSync: (src, dest) => fs.copyFileSync(src, dest),
+  mkdirSync: (p, opts) => fs.mkdirSync(p, opts),
   readdirSync: dir => fs.readdirSync(dir),
   unlinkSync: p => fs.unlinkSync(p),
   existsSync: p => fs.existsSync(p),
@@ -228,8 +230,9 @@ export function generateBaseConfig(
   // /api/openrouter/ URL or the production /api/gateway/ URL conflict with it.
   // For the production /api/gateway/ URL, skip removal when KILOCODE_ORGANIZATION_ID
   // is set: org-scoped instances need an explicit provider entry (with the production
-  // baseUrl) to carry the org header. The /api/openrouter/ cleanup always runs since
-  // that URL is unconditionally broken.
+  // baseUrl) to carry the org header. Its model list is cleared below so live gateway
+  // discovery still controls the catalog. The /api/openrouter/ cleanup always runs
+  // since that URL is unconditionally broken.
   if (config.models?.providers?.kilocode) {
     const staleBaseUrl: string = config.models.providers.kilocode.baseUrl || '';
     const isOpenrouterUrl = staleBaseUrl.includes('/api/openrouter/');
@@ -276,7 +279,9 @@ export function generateBaseConfig(
     config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
     config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
       env.KILOCODE_ORGANIZATION_ID;
-    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
+    // Empty array keeps the provider schema-valid while allowing OpenClaw to
+    // populate the full Kilo Gateway catalog through live model discovery.
+    config.models.providers.kilocode.models = [];
     console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
   } else {
     // Remove stale org header from previous boots (e.g., instance was transferred
@@ -499,6 +504,35 @@ export function generateBaseConfig(
     config.plugins.entries[scEntry].enabled = true;
   }
 
+  // Session — default DM scope to per-channel-peer so each channel+peer
+  // combination gets its own session. OpenClaw's onboard sets this for new
+  // instances, but legacy instances may not have it.
+  config.session = config.session ?? {};
+  config.session.dmScope = config.session.dmScope ?? 'per-channel-peer';
+
+  // Kilo Chat — always enabled. The plugin's outbound path reaches
+  // kilo-chat via controller proxy → kilo-chat Worker directly.
+  config.channels['kilo-chat'] = config.channels['kilo-chat'] ?? {};
+  config.channels['kilo-chat'].enabled = true;
+  // Load-bearing: _configured is the marker key for OpenClaw's
+  // hasMeaningfulChannelConfig gate — without a non-`enabled` key the
+  // plugin loads in setup-runtime mode instead of full.
+  config.channels['kilo-chat']._configured = true;
+
+  config.plugins = config.plugins ?? {};
+  config.plugins.load = config.plugins.load ?? {};
+  config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
+    ? config.plugins.load.paths
+    : [];
+  const kiloChatPluginPath = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
+  if (!(config.plugins.load.paths as string[]).includes(kiloChatPluginPath)) {
+    (config.plugins.load.paths as string[]).push(kiloChatPluginPath);
+  }
+
+  config.plugins.entries = config.plugins.entries ?? {};
+  config.plugins.entries['kilo-chat'] = config.plugins.entries['kilo-chat'] ?? {};
+  config.plugins.entries['kilo-chat'].enabled = true;
+
   // Webhook hooks configuration for controller-mediated inbound events.
   // hooks.token stays local to the machine; external Workers authenticate to
   // controller endpoints with the gateway token instead.
@@ -720,7 +754,7 @@ export function writeMcporterConfig(
 
   const dir = path.dirname(configPath);
   if (!deps.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+    deps.mkdirSync(dir, { recursive: true });
   }
 
   deps.writeFileSync(configPath, JSON.stringify(existing, null, 2));

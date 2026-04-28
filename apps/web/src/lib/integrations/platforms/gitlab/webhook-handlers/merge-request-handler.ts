@@ -16,6 +16,7 @@ import {
   createCodeReview,
   findExistingReview,
   findActiveReviewsForPR,
+  updateReviewHeadShaAndCheckRun,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -32,7 +33,6 @@ import {
   getValidGitLabToken,
 } from '@/lib/integrations/gitlab-service';
 import { APP_URL } from '@/lib/constants';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 
 /**
  * Handles merge request events that trigger code review
@@ -155,7 +155,48 @@ export async function handleMergeRequestCodeReview(
       return NextResponse.json({ message: 'No head commit found' }, { status: 400 });
     }
 
-    // 4. Cancel any existing reviews for this MR (different SHA)
+    // 4. Skip merge commits on update (e.g. merging base branch into feature branch).
+    // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
+    // a merge commit introduces no new feature work and should not supersede the existing review.
+    if (
+      await shouldSkipUpdateForMergeCommit({
+        action: mr.action,
+        check: async () => {
+          const integrationForCheck = await getIntegrationById(integration.id);
+          if (!integrationForCheck) return false;
+          const checkMetadata = integrationForCheck.metadata as {
+            gitlab_instance_url?: string;
+          } | null;
+          const checkInstanceUrl = checkMetadata?.gitlab_instance_url || 'https://gitlab.com';
+          const accessToken = await getValidGitLabToken(integrationForCheck);
+          return isMergeCommit(accessToken, mr.source_project_id, headSha, checkInstanceUrl);
+        },
+      })
+    ) {
+      logExceptInTest('Skipping merge commit:', {
+        mr_iid: mr.iid,
+        project: project.path_with_namespace,
+        head_sha: headSha,
+      });
+
+      // The preserved review is still pinned to the prior commit's status,
+      // so any required 'kilo/code-review' gate would stay stuck on that
+      // SHA while MR branch protection evaluates the new HEAD. Repoint the
+      // review at the merge-commit SHA and drop a fresh pending status so
+      // the eventual completion callback writes its final state to the
+      // commit GitLab actually evaluates.
+      await migrateInFlightReviewsToMergeCommitHead({
+        integrationId: integration.id,
+        projectId: project.id,
+        repoFullName: project.path_with_namespace,
+        mrIid: mr.iid,
+        newHeadSha: headSha,
+      });
+
+      return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
+    }
+
+    // 5. Cancel any existing reviews for this MR (different SHA)
     // This prevents spam when user pushes multiple commits quickly
     const oldReviewIds = await findActiveReviewsForPR(project.path_with_namespace, mr.iid, headSha);
 
@@ -175,40 +216,7 @@ export async function handleMergeRequestCodeReview(
       );
     }
 
-    // 4b. Skip merge commits on update (e.g. merging base branch into feature branch)
-    // Placed after step 4 so old reviews are still cancelled before we bail out.
-    if (mr.action === GITLAB_ACTION.UPDATE) {
-      try {
-        const integrationForCheck = await getIntegrationById(integration.id);
-        if (integrationForCheck) {
-          const checkMetadata = integrationForCheck.metadata as {
-            gitlab_instance_url?: string;
-          } | null;
-          const checkInstanceUrl = checkMetadata?.gitlab_instance_url || 'https://gitlab.com';
-          const accessToken = await getValidGitLabToken(integrationForCheck);
-
-          const mergeCommit = await isMergeCommit(
-            accessToken,
-            mr.source_project_id,
-            headSha,
-            checkInstanceUrl
-          );
-          if (mergeCommit) {
-            logExceptInTest('Skipping merge commit:', {
-              mr_iid: mr.iid,
-              project: project.path_with_namespace,
-              head_sha: headSha,
-            });
-            return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
-          }
-        }
-      } catch (error) {
-        // Fail-open: if we can't check, proceed with the review
-        logExceptInTest('Failed to check for merge commit, proceeding with review:', error);
-      }
-    }
-
-    // 5. Check for duplicate review (same project, MR, SHA)
+    // 6. Check for duplicate review (same project, MR, SHA)
     const existingReview = await findExistingReview(project.path_with_namespace, mr.iid, headSha);
 
     if (existingReview) {
@@ -225,10 +233,10 @@ export async function handleMergeRequestCodeReview(
       );
     }
 
-    // 6. Resolve checkout ref (fork MRs use refs/merge-requests/<iid>/head)
+    // 7. Resolve checkout ref (fork MRs use refs/merge-requests/<iid>/head)
     const { checkoutRef } = resolveMergeRequestCheckoutRef(payload);
 
-    // 7. Create review record (session_id will be updated async)
+    // 8. Create review record (session_id will be updated async)
     const reviewId = await createCodeReview({
       owner,
       platformIntegrationId: integration.id,
@@ -246,7 +254,7 @@ export async function handleMergeRequestCodeReview(
 
     logExceptInTest(`Created code review ${reviewId} for ${project.path_with_namespace}!${mr.iid}`);
 
-    // 8. Get or create Project Access Token (PrAT) for bot identity
+    // 9. Get or create Project Access Token (PrAT) for bot identity
     // This is also used later in prepare-review-payload.ts for the actual review
     const fullIntegration = await getIntegrationById(integration.id);
     const metadata = fullIntegration?.metadata as {
@@ -254,11 +262,7 @@ export async function handleMergeRequestCodeReview(
     } | null;
     const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
 
-    // 9. Post 👀 reaction and set commit status (using PrAT for bot identity)
-    const isPrGateEnabled =
-      process.env.NODE_ENV === 'development' ||
-      (await isFeatureFlagEnabled('code-review-pr-gate', owner.userId));
-
+    // 10. Post 👀 reaction and set commit status (using PrAT for bot identity)
     if (fullIntegration) {
       try {
         const pratToken = await getOrCreateProjectAccessToken(fullIntegration, project.id);
@@ -266,28 +270,25 @@ export async function handleMergeRequestCodeReview(
           projectId: project.id,
         });
 
-        // Set commit status to 'pending' so the MR shows a pending Kilo check (only when PR gate is enabled)
-        if (isPrGateEnabled) {
-          try {
-            const detailsUrl = `${APP_URL}/code-reviews/${reviewId}`;
-            await setCommitStatus(
-              pratToken,
-              project.id,
-              headSha,
-              'pending',
-              {
-                targetUrl: detailsUrl,
-                description: 'Kilo Code Review queued',
-              },
-              instanceUrl
-            );
-            logExceptInTest(
-              `Set commit status 'pending' on ${project.path_with_namespace}!${mr.iid}`
-            );
-          } catch (statusError) {
-            // Non-blocking — review still proceeds if commit status fails
-            logExceptInTest('Failed to set commit status:', statusError);
-          }
+        try {
+          const detailsUrl = `${APP_URL}/code-reviews/${reviewId}`;
+          await setCommitStatus(
+            pratToken,
+            project.id,
+            headSha,
+            'pending',
+            {
+              targetUrl: detailsUrl,
+              description: 'Kilo Code Review queued',
+            },
+            instanceUrl
+          );
+          logExceptInTest(
+            `Set commit status 'pending' on ${project.path_with_namespace}!${mr.iid}`
+          );
+        } catch (statusError) {
+          // Non-blocking — review still proceeds if commit status fails
+          logExceptInTest('Failed to set commit status:', statusError);
         }
 
         await addReactionToMR(pratToken, project.id, mr.iid, 'eyes', instanceUrl);
@@ -302,7 +303,7 @@ export async function handleMergeRequestCodeReview(
       }
     }
 
-    // 10. Try to dispatch pending reviews (including this new one)
+    // 11. Try to dispatch pending reviews (including this new one)
     // Review is created with status='pending' and dispatch will pick it up if slots available
     try {
       const dispatchResult = await tryDispatchPendingReviews(owner);
@@ -327,7 +328,7 @@ export async function handleMergeRequestCodeReview(
       // Don't throw - review record created as pending, will be picked up later
     }
 
-    // 11. Return 202 Accepted (always succeeds, review queued as pending)
+    // 12. Return 202 Accepted (always succeeds, review queued as pending)
     return NextResponse.json(
       {
         message: 'Code review queued',
@@ -352,6 +353,91 @@ export async function handleMergeRequestCodeReview(
       },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Decides whether a merge_request webhook should bail out because its head
+ * commit is a merge commit (e.g. produced by clicking "Rebase" → merge, or a
+ * manual `git merge main` pushed to the source branch). Only applies to
+ * update events.
+ *
+ * The caller passes a `check` closure so this helper doesn't have to know how
+ * to resolve the GitLab integration / access token. Fail-open: if `check`
+ * throws, we return false so the review still proceeds.
+ */
+export async function shouldSkipUpdateForMergeCommit(args: {
+  action: string | undefined;
+  check: () => Promise<boolean>;
+}): Promise<boolean> {
+  if (args.action !== GITLAB_ACTION.UPDATE) return false;
+  try {
+    return await args.check();
+  } catch (error) {
+    logExceptInTest('Failed to check for merge commit, proceeding with review:', error);
+    return false;
+  }
+}
+
+/**
+ * When a merge-commit update arrives and we bail out to preserve the
+ * in-flight review, the review row still points at the previous SHA, so
+ * the completion callback would post its final GitLab commit status on
+ * the abandoned commit. Repoint the review at the merge-commit SHA and
+ * drop a fresh pending status on it. Best-effort: any failure is logged
+ * but does not fail the webhook.
+ */
+async function migrateInFlightReviewsToMergeCommitHead(args: {
+  integrationId: string;
+  projectId: number;
+  repoFullName: string;
+  mrIid: number;
+  newHeadSha: string;
+}) {
+  try {
+    const activeReviewIds = await findActiveReviewsForPR(
+      args.repoFullName,
+      args.mrIid,
+      args.newHeadSha
+    );
+    if (activeReviewIds.length === 0) return;
+
+    const fullIntegration = await getIntegrationById(args.integrationId);
+    if (!fullIntegration) return;
+    const metadata = fullIntegration.metadata as { gitlab_instance_url?: string } | null;
+    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+
+    // In practice an MR has at most one active review; migrate the first.
+    const [reviewId] = activeReviewIds;
+
+    // Update the DB row first. If this fails we never touched the new SHA,
+    // so there's nothing to clean up. If it succeeds but setCommitStatus
+    // fails below, the eventual completion callback will still target the
+    // correct (new) SHA — we just miss the transient pending badge.
+    await updateReviewHeadShaAndCheckRun(reviewId, args.newHeadSha, null);
+
+    try {
+      const pratToken = await getOrCreateProjectAccessToken(fullIntegration, args.projectId);
+      const detailsUrl = `${APP_URL}/code-reviews/${reviewId}`;
+      await setCommitStatus(
+        pratToken,
+        args.projectId,
+        args.newHeadSha,
+        'pending',
+        {
+          targetUrl: detailsUrl,
+          description: 'Kilo Code Review continuing from previous commit',
+        },
+        instanceUrl
+      );
+      logExceptInTest(
+        `Migrated review ${reviewId} to merge-commit head ${args.newHeadSha} and set pending status`
+      );
+    } catch (statusError) {
+      logExceptInTest('Failed to set pending status on merge-commit head:', statusError);
+    }
+  } catch (migrateError) {
+    logExceptInTest('Failed to migrate in-flight review onto merge commit head:', migrateError);
   }
 }
 

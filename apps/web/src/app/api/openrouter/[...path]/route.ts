@@ -530,7 +530,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     originalModelIdLowerCased,
     requestBodyParsed,
     extraHeaders,
-    userByok
+    userByok,
+    fraudHeaders
   );
 
   const response = await openRouterRequest({

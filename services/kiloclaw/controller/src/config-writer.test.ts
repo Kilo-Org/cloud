@@ -46,6 +46,7 @@ function fakeDeps(existingConfig?: string) {
         copied.push({ src, dest });
         dirEntries = [...dirEntries, dest.split('/').pop() ?? dest];
       }),
+      mkdirSync: vi.fn(),
       readdirSync: vi.fn(() => dirEntries),
       unlinkSync: vi.fn((filePath: string) => {
         unlinked.push(filePath);
@@ -347,14 +348,14 @@ describe('generateBaseConfig', () => {
     expect(config.models).toBeUndefined();
   });
 
-  it('skips gateway-URL stale migration for org-scoped instances', () => {
+  it('keeps gateway provider for org-scoped instances but clears static models', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
           kilocode: {
             baseUrl: 'https://api.kilo.ai/api/gateway/',
             headers: { 'X-Custom': 'user-managed' },
-            models: [{ id: 'kept/model', name: 'Kept' }],
+            models: [{ id: 'kilo/auto', name: 'Kilo Auto' }],
           },
         },
       },
@@ -363,13 +364,12 @@ describe('generateBaseConfig', () => {
     const env = { ...minimalEnv(), KILOCODE_ORGANIZATION_ID: 'org_abc123' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
-    // Provider not nuked — user-managed settings preserved
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('user-managed');
     expect(config.models.providers.kilocode.headers['X-KiloCode-OrganizationId']).toBe(
       'org_abc123'
     );
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('still removes openrouter stale provider for org-scoped instances', () => {
@@ -469,7 +469,7 @@ describe('generateBaseConfig', () => {
     expect(config.models).toBeUndefined();
   });
 
-  it('preserves existing kilocode config when adding org header', () => {
+  it('preserves existing kilocode baseUrl and headers when adding org header', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
@@ -490,7 +490,7 @@ describe('generateBaseConfig', () => {
     );
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('value');
     expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('removes stale org header when KILOCODE_ORGANIZATION_ID is no longer set', () => {
@@ -822,6 +822,43 @@ describe('generateBaseConfig', () => {
       const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
       expect(config.channels.streamchat).toBeUndefined();
     }
+  });
+
+  // ─── Kilo Chat ───────────────────────────────────────────────────────────
+
+  it('always configures kilo-chat channel and plugin', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.channels['kilo-chat'].enabled).toBe(true);
+    // _configured provides the non-`enabled` key required by OpenClaw's
+    // hasMeaningfulChannelConfig gate (see comment in config-writer.ts).
+    expect(config.channels['kilo-chat']._configured).toBe(true);
+    expect(config.channels['kilo-chat']).not.toHaveProperty('reactionLevel');
+    expect(config.plugins.load.paths).toContain('/usr/local/lib/node_modules/@kiloclaw/kilo-chat');
+    expect(config.plugins.entries['kilo-chat'].enabled).toBe(true);
+  });
+
+  // ─── Session ─────────────────────────────────────────────────────────────
+
+  it('defaults session.dmScope to per-channel-peer', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.session.dmScope).toBe('per-channel-peer');
+  });
+
+  it('preserves existing session.dmScope', () => {
+    const existing = JSON.stringify({
+      gateway: { port: 3001, mode: 'local' },
+      agents: { defaults: { model: { primary: 'kilocode/anthropic/claude-opus-4.6' } } },
+      session: { dmScope: 'per-peer' },
+      plugins: { entries: { telegram: { enabled: false }, discord: { enabled: false } } },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.session.dmScope).toBe('per-peer');
   });
 
   it('does not duplicate the plugin path on repeated generateBaseConfig calls', () => {
@@ -1555,6 +1592,7 @@ function mcporterFakeDeps(existingMcporterConfig?: string) {
       renameSync: vi.fn(),
       chmodSync: vi.fn(),
       copyFileSync: vi.fn(),
+      mkdirSync: vi.fn(),
       readdirSync: vi.fn(() => []),
       unlinkSync: vi.fn(),
       existsSync: vi.fn((filePath: string) => {

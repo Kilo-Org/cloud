@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { render, Box, Text, useInput, useApp, useStdout } from 'ink';
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import * as path from 'node:path';
 import {
   getService,
@@ -20,6 +20,7 @@ import {
   restartServiceInTmux,
   showServiceInTmux,
   showGroupInTmux,
+  buildInfraDownArgs,
   readEnvValue,
   readEnvMtime,
   waitForEnvValueChange,
@@ -143,7 +144,8 @@ function doShowGroup(
 
 function doCleanup(): void {
   try {
-    execSync('docker compose -f dev/docker-compose.yml down', { stdio: 'ignore' });
+    const [cmd, args] = buildInfraDownArgs();
+    execFileSync(cmd, args, { stdio: 'ignore' });
   } catch {
     // ignore
   }

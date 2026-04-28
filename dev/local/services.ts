@@ -139,6 +139,16 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'nextjs', 'kiloclaw'],
     dir: 'services/kiloclaw-billing',
   },
+  'event-service': {
+    group: 'kiloclaw',
+    dependsOn: [],
+    dir: 'services/event-service',
+  },
+  'kilo-chat': {
+    group: 'kiloclaw',
+    dependsOn: ['kiloclaw', 'event-service'],
+    dir: 'services/kilo-chat',
+  },
   // observability
   'cloudflare-o11y': {
     group: 'observability',
@@ -150,6 +160,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/ai-attribution',
   },
+  grafana: { group: 'observability', dependsOn: [] },
   // storybook
   storybook: { group: 'storybook', dependsOn: [] },
   // gastown
@@ -249,7 +260,19 @@ function readWranglerPort(dir: string): number {
 // Build service definitions from serviceMeta + wrangler.jsonc
 // ---------------------------------------------------------------------------
 
-const INFRA_PORTS: Record<string, number> = { postgres: 5432, redis: 6379 };
+const INFRA_PORTS: Record<string, number> = { postgres: 5432, redis: 6379, grafana: 4000 };
+
+// Docker Compose profile that gates each infra service, if any. Services not
+// listed here are part of the default profile and start with a plain `up -d`.
+const INFRA_PROFILES: Record<string, string> = { grafana: 'grafana' };
+
+export function getInfraProfile(serviceName: string): string | undefined {
+  return INFRA_PROFILES[serviceName];
+}
+
+export function getAllInfraProfiles(): string[] {
+  return [...new Set(Object.values(INFRA_PROFILES))];
+}
 
 function buildServiceDefs(): ServiceDef[] {
   const repoRoot = path.resolve(import.meta.dirname, '../..');
@@ -300,6 +323,7 @@ function buildServiceDefs(): ServiceDef[] {
     if (name === 'kiloclaw-tunnel') {
       const nextjsPort = 3000 + portOffset;
       const kiloclawPort = readWranglerPort(path.join(repoRoot, 'services/kiloclaw')) + portOffset;
+      const kiloChatPort = readWranglerPort(path.join(repoRoot, 'services/kilo-chat')) + portOffset;
       defs.push({
         name,
         type: 'process',
@@ -311,6 +335,7 @@ function buildServiceDefs(): ServiceDef[] {
           'dev/local/scripts/start-tunnel.ts',
           String(nextjsPort),
           String(kiloclawPort),
+          String(kiloChatPort),
         ],
         group: meta.group,
       });

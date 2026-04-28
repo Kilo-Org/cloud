@@ -54,6 +54,7 @@ import { getOpenclawVersion } from './openclaw-version';
 import { startCheckin } from './checkin';
 import { collectProductTelemetry } from './product-telemetry';
 import { GoogleOAuthTokenProvider } from './google-oauth-token-provider';
+import { repairInternalGatewayClientPairingState } from './device-pairing-repair.js';
 
 export type RuntimeConfig = {
   port: number;
@@ -541,6 +542,21 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     installGogShim();
   } catch (err) {
     console.error('[gog] Failed to install shim:', err);
+  }
+
+  if (env.AUTO_APPROVE_DEVICES === 'true') {
+    const repairResult = repairInternalGatewayClientPairingState();
+    if (repairResult.status === 'warning') {
+      console.warn(
+        `[pairing-repair] internal gateway-client repair warning: ${repairResult.warnings.join('; ')}`
+      );
+    } else if (repairResult.status === 'repaired') {
+      console.log(
+        `[pairing-repair] internal gateway-client repair applied paired=${repairResult.pairedDevicesRepaired} pendingRemoved=${repairResult.pendingRequestsRemoved} tokenScopesUpdated=${repairResult.operatorTokenScopesUpdated}`
+      );
+    } else {
+      console.log('[pairing-repair] internal gateway-client repair not needed');
+    }
   }
 
   // ── Phase 7: Start gateway ──────────────────────────────────────────

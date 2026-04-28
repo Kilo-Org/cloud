@@ -3,6 +3,10 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import {
+  repairInternalGatewayClientPairingState,
+  type DevicePairingRepairResult,
+} from './device-pairing-repair.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -18,8 +22,10 @@ export type DevicePairingRequest = {
   requestId: string;
   deviceId: string;
   role?: string;
+  scopes?: string[];
   platform?: string;
   clientId?: string;
+  clientMode?: string;
   ts?: number;
 };
 
@@ -48,6 +54,9 @@ type ExecImpl = (command: string, args: string[]) => Promise<{ stdout: string; s
 
 export type ReadChannelPairingImpl = (channel: string) => Promise<unknown>;
 export type ReadDevicePairingImpl = () => Promise<unknown>;
+export type RepairInternalGatewayClientPairingImpl = () =>
+  | DevicePairingRepairResult
+  | Promise<DevicePairingRepairResult>;
 
 type PairingCacheOptions = {
   execImpl?: ExecImpl;
@@ -55,6 +64,7 @@ type PairingCacheOptions = {
   nowImpl?: () => string;
   readChannelPairingImpl?: ReadChannelPairingImpl;
   readDevicePairingImpl?: ReadDevicePairingImpl;
+  repairInternalGatewayClientPairingImpl?: RepairInternalGatewayClientPairingImpl;
   nowMsImpl?: () => number;
   /** Auto-approve pending device pairings from the gateway's own exec client. */
   autoApproveGatewayClient?: boolean;
@@ -156,8 +166,10 @@ const devicePendingEntrySchema = z.object({
   requestId: z.string(),
   deviceId: z.string(),
   role: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
   platform: z.string().optional(),
   clientId: z.string().optional(),
+  clientMode: z.string().optional(),
   ts: z.number().optional(),
 });
 
@@ -184,6 +196,13 @@ function collectValidEntries<T extends z.ZodTypeAny>(
 function isUnexpiredDeviceRequest(req: DevicePairingRequest, nowMs: number): boolean {
   if (req.ts === undefined) return true;
   return nowMs - req.ts <= DEVICE_PAIRING_TTL_MS;
+}
+
+function isInternalGatewayClientBackendRequest(req: DevicePairingRequest): boolean {
+  return (
+    req.clientId === 'gateway-client' &&
+    (req.clientMode === undefined || req.clientMode === 'backend')
+  );
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -218,6 +237,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       const filePath = resolveDevicePendingPath();
       return JSON.parse(await fs.promises.readFile(filePath, 'utf8')) as unknown;
     },
+    repairInternalGatewayClientPairingImpl = repairInternalGatewayClientPairingState,
     nowMsImpl = () => Date.now(),
     autoApproveGatewayClient = false,
   } = options ?? {};
@@ -292,7 +312,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
         allRequests.push(...result.value);
         anySuccess = true;
       } else {
-        const err = result.reason;
+        const err: unknown = result.reason;
         const msg = errorMessage(err);
         const priorRequests = channelCache.requests.filter(r => r.channel === channels[i]);
         if (priorRequests.length > 0) {
@@ -326,7 +346,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
     return true;
   };
 
-  const refreshDevicePairingInternal = async (): Promise<boolean> => {
+  const refreshDevicePairingInternal = async (allowAutoRepair = true): Promise<boolean> => {
     if (stopped) return false;
     const gen = ++deviceGeneration;
     try {
@@ -356,19 +376,28 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       }
       console.log(`[pairing-cache] devices: read ok, ${requests.length} pending`);
 
-      if (autoApproveGatewayClient) {
-        const gatewayRequests = requests.filter(r => r.clientId === 'gateway-client');
-        for (const req of gatewayRequests) {
-          console.log(`[pairing-cache] auto-approving gateway-client device ${req.requestId}`);
-          try {
-            await execImpl(OPENCLAW_BIN, ['devices', 'approve', req.requestId]);
-          } catch (err) {
-            console.error(`[pairing-cache] auto-approve failed for ${req.requestId}:`, err);
-          }
-        }
+      if (autoApproveGatewayClient && allowAutoRepair) {
+        const gatewayRequests = requests.filter(isInternalGatewayClientBackendRequest);
         if (gatewayRequests.length > 0) {
-          // Re-read after approvals so the cache reflects the updated state.
-          await refreshDevicePairingInternal();
+          console.log(
+            `[pairing-cache] repairing ${gatewayRequests.length} internal gateway-client device request(s)`
+          );
+          try {
+            const repairResult = await repairInternalGatewayClientPairingImpl();
+            if (repairResult.status === 'warning') {
+              console.warn(
+                `[pairing-cache] internal gateway-client repair warning: ${repairResult.warnings.join('; ')}`
+              );
+            } else if (repairResult.status === 'repaired') {
+              console.log(
+                `[pairing-cache] internal gateway-client repair applied paired=${repairResult.pairedDevicesRepaired} pendingRemoved=${repairResult.pendingRequestsRemoved} tokenScopesUpdated=${repairResult.operatorTokenScopesUpdated}`
+              );
+            }
+          } catch (err) {
+            console.error('[pairing-cache] internal gateway-client repair failed:', err);
+          }
+          // Re-read once after repair so the cache reflects the updated state without recursion.
+          await refreshDevicePairingInternal(false);
         }
       }
 

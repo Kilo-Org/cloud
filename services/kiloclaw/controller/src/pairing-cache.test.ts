@@ -8,6 +8,7 @@ import {
   FAILURE_RETRY_MAX_MS,
   type ReadChannelPairingImpl,
   type ReadDevicePairingImpl,
+  type RepairInternalGatewayClientPairingImpl,
 } from './pairing-cache';
 
 type ExecImpl = (command: string, args: string[]) => Promise<{ stdout: string; stderr: string }>;
@@ -22,6 +23,7 @@ function createTestHarness(overrides?: {
   readConfigImpl?: () => unknown;
   readChannelPairingImpl?: ReadChannelPairingImpl;
   readDevicePairingImpl?: ReadDevicePairingImpl;
+  repairInternalGatewayClientPairingImpl?: RepairInternalGatewayClientPairingImpl;
 }) {
   const execImpl = overrides?.execImpl ?? vi.fn<ExecImpl>();
   const readConfigImpl =
@@ -45,6 +47,7 @@ function createTestHarness(overrides?: {
     readConfigImpl,
     readChannelPairingImpl,
     readDevicePairingImpl,
+    repairInternalGatewayClientPairingImpl: overrides?.repairInternalGatewayClientPairingImpl,
     nowImpl,
     nowMsImpl,
   });
@@ -391,6 +394,8 @@ describe('createPairingCache', () => {
           clientId: 'c1',
           ts: RECENT_TS,
           publicKey: 'SHOULD_BE_STRIPPED',
+          clientMode: 'backend',
+          scopes: ['operator.approvals'],
         },
       });
 
@@ -403,8 +408,10 @@ describe('createPairingCache', () => {
         requestId: 'r1',
         deviceId: 'd1',
         role: 'operator',
+        scopes: ['operator.approvals'],
         platform: 'ios',
         clientId: 'c1',
+        clientMode: 'backend',
         ts: RECENT_TS,
       });
       expect(result.lastUpdated).toBe('2026-03-12T00:00:00.000Z');
@@ -540,8 +547,17 @@ describe('createPairingCache', () => {
   });
 
   describe('autoApproveGatewayClient', () => {
-    it('auto-approves pending gateway-client devices on refresh', async () => {
+    it('repairs pending backend gateway-client devices locally on refresh', async () => {
       const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const repairInternalGatewayClientPairingImpl = vi
+        .fn<RepairInternalGatewayClientPairingImpl>()
+        .mockResolvedValue({
+          status: 'repaired',
+          pairedDevicesRepaired: 1,
+          pendingRequestsRemoved: 1,
+          operatorTokenScopesUpdated: true,
+          warnings: [],
+        });
       const readDevicePairingImpl = vi
         .fn<ReadDevicePairingImpl>()
         .mockResolvedValueOnce({
@@ -549,11 +565,13 @@ describe('createPairingCache', () => {
             requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             deviceId: 'dev1',
             clientId: 'gateway-client',
+            clientMode: 'backend',
             role: 'operator',
+            scopes: ['operator.approvals'],
             ts: RECENT_TS,
           },
         })
-        // After approval, re-read returns empty
+        // After local repair, re-read returns empty.
         .mockResolvedValue({});
 
       const cache = createPairingCache({
@@ -561,6 +579,7 @@ describe('createPairingCache', () => {
         readConfigImpl: () => ({ channels: {} }),
         readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
         readDevicePairingImpl,
+        repairInternalGatewayClientPairingImpl,
         nowImpl: () => '2026-03-12T00:00:00.000Z',
         nowMsImpl: () => NOW_MS,
         autoApproveGatewayClient: true,
@@ -568,16 +587,57 @@ describe('createPairingCache', () => {
 
       await cache.refreshDevicePairing();
 
-      expect(execImpl).toHaveBeenCalledWith(OPENCLAW_BIN, [
-        'devices',
-        'approve',
-        'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      ]);
+      expect(execImpl).not.toHaveBeenCalled();
+      expect(repairInternalGatewayClientPairingImpl).toHaveBeenCalledOnce();
+      expect(readDevicePairingImpl).toHaveBeenCalledTimes(2);
       expect(cache.getDevicePairing().requests).toEqual([]);
+    });
+
+    it('does not recursively refresh if local gateway-client repair leaves a request pending', async () => {
+      const repairInternalGatewayClientPairingImpl = vi
+        .fn<RepairInternalGatewayClientPairingImpl>()
+        .mockResolvedValue({
+          status: 'noop',
+          pairedDevicesRepaired: 0,
+          pendingRequestsRemoved: 0,
+          operatorTokenScopesUpdated: false,
+          warnings: [],
+        });
+      const request = {
+        requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        deviceId: 'dev1',
+        clientId: 'gateway-client',
+        clientMode: 'backend',
+        role: 'operator',
+        scopes: ['operator.approvals'],
+        ts: RECENT_TS,
+      };
+      const readDevicePairingImpl = vi
+        .fn<ReadDevicePairingImpl>()
+        .mockResolvedValue({ 'req-1': request });
+
+      const cache = createPairingCache({
+        execImpl: vi.fn<ExecImpl>(),
+        readConfigImpl: () => ({ channels: {} }),
+        readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
+        readDevicePairingImpl,
+        repairInternalGatewayClientPairingImpl,
+        nowImpl: () => '2026-03-12T00:00:00.000Z',
+        nowMsImpl: () => NOW_MS,
+        autoApproveGatewayClient: true,
+      });
+
+      await cache.refreshDevicePairing();
+
+      expect(repairInternalGatewayClientPairingImpl).toHaveBeenCalledOnce();
+      expect(readDevicePairingImpl).toHaveBeenCalledTimes(2);
+      expect(cache.getDevicePairing().requests).toEqual([request]);
     });
 
     it('does not auto-approve non-gateway-client devices', async () => {
       const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const repairInternalGatewayClientPairingImpl =
+        vi.fn<RepairInternalGatewayClientPairingImpl>();
       const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockResolvedValue({
         'req-1': {
           requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -593,6 +653,7 @@ describe('createPairingCache', () => {
         readConfigImpl: () => ({ channels: {} }),
         readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
         readDevicePairingImpl,
+        repairInternalGatewayClientPairingImpl,
         nowImpl: () => '2026-03-12T00:00:00.000Z',
         nowMsImpl: () => NOW_MS,
         autoApproveGatewayClient: true,
@@ -601,6 +662,39 @@ describe('createPairingCache', () => {
       await cache.refreshDevicePairing();
 
       expect(execImpl).not.toHaveBeenCalled();
+      expect(repairInternalGatewayClientPairingImpl).not.toHaveBeenCalled();
+      expect(cache.getDevicePairing().requests).toHaveLength(1);
+    });
+
+    it('does not repair gateway-client requests with a non-backend mode', async () => {
+      const repairInternalGatewayClientPairingImpl =
+        vi.fn<RepairInternalGatewayClientPairingImpl>();
+      const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockResolvedValue({
+        'req-1': {
+          requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          deviceId: 'dev1',
+          clientId: 'gateway-client',
+          clientMode: 'webchat',
+          role: 'operator',
+          scopes: ['operator.approvals'],
+          ts: RECENT_TS,
+        },
+      });
+
+      const cache = createPairingCache({
+        execImpl: vi.fn<ExecImpl>(),
+        readConfigImpl: () => ({ channels: {} }),
+        readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
+        readDevicePairingImpl,
+        repairInternalGatewayClientPairingImpl,
+        nowImpl: () => '2026-03-12T00:00:00.000Z',
+        nowMsImpl: () => NOW_MS,
+        autoApproveGatewayClient: true,
+      });
+
+      await cache.refreshDevicePairing();
+
+      expect(repairInternalGatewayClientPairingImpl).not.toHaveBeenCalled();
       expect(cache.getDevicePairing().requests).toHaveLength(1);
     });
 

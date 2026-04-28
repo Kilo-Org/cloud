@@ -55,23 +55,24 @@ RUN npm install -g pnpm
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g openclaw@2026.4.15 \
+RUN npm install -g openclaw@2026.4.26 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
-    && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
-    && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
+    && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' -exec grep -l 'DISCOVERY_TIMEOUT_MS = 5e3' {} \; | wc -l | tr -d ' ') \
+    && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: no provider-models-*.js with DISCOVERY_TIMEOUT_MS = 5e3 found in openclaw dist" >&2; exit 1; fi \
     && BEFORE=$(grep -h 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null | wc -l | tr -d ' ') \
-    && if [ "$BEFORE" -ne 1 ]; then echo "ERROR: expected exactly 1 occurrence of DISCOVERY_TIMEOUT_MS = 5e3, found $BEFORE - openclaw may have changed" >&2; exit 1; fi \
-    && PM_FILE=$(grep -l 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null | head -1) \
-    && sed -i 's/DISCOVERY_TIMEOUT_MS = 5e3/DISCOVERY_TIMEOUT_MS = 60e3/' "$PM_FILE" \
+    && if [ "$BEFORE" -eq 0 ]; then echo "ERROR: DISCOVERY_TIMEOUT_MS = 5e3 not found - openclaw may have changed" >&2; exit 1; fi \
+    && grep -l 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null \
+       | xargs sed -i 's/DISCOVERY_TIMEOUT_MS = 5e3/DISCOVERY_TIMEOUT_MS = 60e3/g' \
     && AFTER=$(grep -h 'DISCOVERY_TIMEOUT_MS = 60e3' "$OC_DIST"/provider-models-*.js 2>/dev/null | wc -l | tr -d ' ') \
-    && if [ "$AFTER" -ne 1 ]; then echo "ERROR: sed patch failed - expected 1 occurrence of 60e3, found $AFTER" >&2; exit 1; fi \
+    && if [ "$AFTER" -ne "$BEFORE" ]; then echo "ERROR: sed patch failed - expected $BEFORE occurrence(s) of 60e3, found $AFTER" >&2; exit 1; fi \
     && if grep -q 'DISCOVERY_TIMEOUT_MS = 5e3' "$OC_DIST"/provider-models-*.js 2>/dev/null; then echo "ERROR: old 5e3 value still present after patch" >&2; exit 1; fi \
-    && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $(basename "$PM_FILE")" \
+    && echo "OK: patched DISCOVERY_TIMEOUT_MS 5e3 -> 60e3 in $FOUND_FILES provider model file(s)" \
     && CT_FILE=$(find "$OC_DIST" -name 'channel-target-*.js' | head -1) \
     && if [ -z "$CT_FILE" ]; then echo "ERROR: channel-target-*.js not found in openclaw dist" >&2; exit 1; fi \
     && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
     && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
     && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
+    && test "$(openclaw --version)" = "2026.4.26" \
     && openclaw --version
 
 # Bake bundled plugin runtime deps into the image so first boot is pure

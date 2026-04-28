@@ -75,6 +75,8 @@ async function dispatch(
 async function loadStartControllerWithMocks(options: {
   bootstrapCritical: () => Promise<void>;
   bootstrapNonCritical: () => Promise<{ ok: true } | { ok: false; phase: string; error: string }>;
+  supervisorStart?: () => Promise<void>;
+  repairInternalGatewayClientPairingState?: () => unknown;
 }) {
   vi.resetModules();
 
@@ -103,7 +105,7 @@ async function loadStartControllerWithMocks(options: {
   vi.doMock('./supervisor', () => ({
     createSupervisor: () => ({
       getState: () => 'stopped',
-      start: async () => undefined,
+      start: options.supervisorStart ?? (async () => undefined),
       shutdown: async () => undefined,
       getStats: () => ({
         state: 'stopped',
@@ -111,6 +113,18 @@ async function loadStartControllerWithMocks(options: {
       }),
       signalUsr1: () => false,
     }),
+  }));
+
+  vi.doMock('./device-pairing-repair.js', () => ({
+    repairInternalGatewayClientPairingState:
+      options.repairInternalGatewayClientPairingState ??
+      (() => ({
+        status: 'noop',
+        pairedDevicesRepaired: 0,
+        pendingRequestsRemoved: 0,
+        operatorTokenScopesUpdated: false,
+        warnings: [],
+      })),
   }));
 
   vi.doMock('./pairing-cache', () => ({
@@ -207,5 +221,63 @@ describe('startController degraded behavior', () => {
     });
     expect(filesTree.status).toBe(503);
     expect(JSON.parse(filesTree.body)).toEqual({ error: 'Service starting', state: 'degraded' });
+  });
+
+  it('repairs internal gateway-client pairing before starting the gateway when auto-approval is enabled', async () => {
+    const callOrder: string[] = [];
+    const repairInternalGatewayClientPairingState = vi.fn(() => {
+      callOrder.push('repair');
+      return {
+        status: 'repaired',
+        pairedDevicesRepaired: 1,
+        pendingRequestsRemoved: 1,
+        operatorTokenScopesUpdated: true,
+        warnings: [],
+      };
+    });
+    const supervisorStart = vi.fn(async () => {
+      callOrder.push('start');
+    });
+    const { startController } = await loadStartControllerWithMocks({
+      bootstrapCritical: async () => undefined,
+      bootstrapNonCritical: async () => ({ ok: true }),
+      supervisorStart,
+      repairInternalGatewayClientPairingState,
+    });
+
+    const env = {
+      OPENCLAW_GATEWAY_TOKEN: 'test-token',
+      KILOCLAW_HOOKS_TOKEN: 'test-hooks-token',
+      KILOCLAW_GATEWAY_ARGS: '["--port","3001"]',
+      AUTO_APPROVE_DEVICES: 'true',
+    } as unknown as NodeJS.ProcessEnv;
+
+    await startController(env);
+
+    expect(repairInternalGatewayClientPairingState).toHaveBeenCalledOnce();
+    expect(supervisorStart).toHaveBeenCalledOnce();
+    expect(callOrder).toEqual(['repair', 'start']);
+  });
+
+  it('skips internal gateway-client startup repair when auto-approval is disabled', async () => {
+    const repairInternalGatewayClientPairingState = vi.fn();
+    const supervisorStart = vi.fn(async () => undefined);
+    const { startController } = await loadStartControllerWithMocks({
+      bootstrapCritical: async () => undefined,
+      bootstrapNonCritical: async () => ({ ok: true }),
+      supervisorStart,
+      repairInternalGatewayClientPairingState,
+    });
+
+    const env = {
+      OPENCLAW_GATEWAY_TOKEN: 'test-token',
+      KILOCLAW_HOOKS_TOKEN: 'test-hooks-token',
+      KILOCLAW_GATEWAY_ARGS: '["--port","3001"]',
+    } as unknown as NodeJS.ProcessEnv;
+
+    await startController(env);
+
+    expect(repairInternalGatewayClientPairingState).not.toHaveBeenCalled();
+    expect(supervisorStart).toHaveBeenCalledOnce();
   });
 });

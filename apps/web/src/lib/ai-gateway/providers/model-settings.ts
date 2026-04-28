@@ -1,6 +1,7 @@
 import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
 import { isGemini3Model, isGeminiModel, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
+import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
@@ -56,7 +57,7 @@ export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
 } as const;
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
-  if (model.startsWith('anthropic/claude-opus-4.7')) {
+  if (modelStartsWith(model, 'anthropic/claude-opus-4.7')) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
@@ -66,7 +67,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
     };
   }
-  if (model.startsWith('anthropic/')) {
+  if (modelStartsWith(model, 'anthropic/')) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },

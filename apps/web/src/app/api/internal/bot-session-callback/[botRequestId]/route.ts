@@ -202,7 +202,7 @@ async function startTyping({
   const slackAdapter = bot.getAdapter('slack');
 
   await slackAdapter.withBotToken(botToken, async () => {
-    await slackAdapter.startTyping(threadId);
+    await slackAdapter.startTyping(threadId, 'Processing Cloud Agent result...');
   });
 }
 
@@ -259,7 +259,7 @@ async function continueBotAgentAfterCallback(params: {
   }
 
   await bot.initialize();
-  await bot.registerSingleton();
+  bot.registerSingleton();
   const slackAdapter = bot.getAdapter('slack');
   const botToken = await getSlackBotToken(params.requestRow.platform_integration_id);
   if (!botToken) {

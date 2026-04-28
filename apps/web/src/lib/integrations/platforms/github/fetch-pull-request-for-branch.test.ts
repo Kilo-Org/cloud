@@ -42,11 +42,7 @@ function okResponse(data: ListResponse['data']): ListResponse {
   return { data };
 }
 
-function httpError(
-  status: number,
-  headers: Record<string, string> = {},
-  message?: string
-) {
+function httpError(status: number, headers: Record<string, string> = {}, message?: string) {
   return Object.assign(new Error(message ?? `HTTP ${status}`), {
     status,
     response: { headers },
@@ -252,11 +248,7 @@ describe('fetchPullRequestForBranch', () => {
     // GitHub returns 403 when an installation lacks the required permission
     // (e.g. pull request read access). We must NOT wrap this as a rate limit,
     // or callers will incorrectly tell users to retry.
-    const permissionError = httpError(
-      403,
-      {},
-      'Resource not accessible by integration'
-    );
+    const permissionError = httpError(403, {}, 'Resource not accessible by integration');
     mockPullsList.mockRejectedValueOnce(permissionError);
 
     await expect(fetchPullRequestForBranch(params)).rejects.toBe(permissionError);

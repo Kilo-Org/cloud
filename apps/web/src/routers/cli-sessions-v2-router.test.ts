@@ -4,12 +4,18 @@ import { db } from '@/lib/drizzle';
 import {
   cloud_agent_webhook_triggers,
   cli_sessions_v2,
+  cli_session_pull_requests,
   agent_environment_profiles,
   organizations,
   organization_memberships,
+  platform_integrations,
 } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
+import {
+  fetchPullRequestForBranch,
+  GitHubRateLimitError,
+} from '@/lib/integrations/platforms/github/adapter';
 
 jest.mock('@/lib/config.server', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
@@ -18,6 +24,19 @@ jest.mock('@/lib/config.server', () => {
     SESSION_INGEST_WORKER_URL: 'https://test-ingest.example.com',
   };
 });
+
+// The cloud-agent-next client is called from getWithRuntimeState whenever the
+// session has a cloud_agent_session_id. Our refresh-PR tests don't set one, so
+// this mock is only a safety net (never exercised in the new tests).
+jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+  createCloudAgentNextClient: jest.fn(() => ({
+    getSession: jest.fn().mockResolvedValue(null),
+  })),
+}));
+
+const mockFetchPullRequestForBranch = fetchPullRequestForBranch as jest.MockedFunction<
+  typeof fetchPullRequestForBranch
+>;
 
 let regularUser: User;
 let otherUser: User;
@@ -282,6 +301,230 @@ describe('cli-sessions-v2-router', () => {
           trigger_id: 'non-existent-trigger',
         })
       ).rejects.toThrow('Trigger not found');
+    });
+  });
+
+  describe('getWithRuntimeState — associatedPr', () => {
+    const sessionId = 'ses_test_assoc_pr_get_1';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent-web',
+        git_url: 'https://github.com/acme/widgets',
+        git_branch: 'main',
+      });
+    });
+
+    afterEach(async () => {
+      await db
+        .delete(cli_session_pull_requests)
+        .where(eq(cli_session_pull_requests.session_id, sessionId));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns associatedPr=null when no row exists in the side table', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId });
+
+      expect(result.associatedPr).toBeNull();
+    });
+
+    it('includes associatedPr when a row exists in the side table', async () => {
+      await db.insert(cli_session_pull_requests).values({
+        session_id: sessionId,
+        pr_url: 'https://github.com/acme/widgets/pull/42',
+        pr_number: 42,
+        pr_state: 'open',
+        pr_title: 'Add login page',
+        pr_head_sha: 'abc123',
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId });
+
+      expect(result.associatedPr).toMatchObject({
+        url: 'https://github.com/acme/widgets/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Add login page',
+        headSha: 'abc123',
+      });
+      expect(typeof result.associatedPr?.lastSyncedAt).toBe('string');
+      expect(() => new Date(result.associatedPr!.lastSyncedAt).toISOString()).not.toThrow();
+    });
+  });
+
+  describe('refreshAssociatedPullRequest', () => {
+    const sessionId = 'ses_test_assoc_pr_refresh_1';
+    let integrationId: string;
+
+    beforeEach(async () => {
+      mockFetchPullRequestForBranch.mockReset();
+      mockFetchPullRequestForBranch.mockResolvedValue(null);
+
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: regularUser.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '98765',
+          github_app_type: 'standard',
+        })
+        .returning({ id: platform_integrations.id });
+      integrationId = integration.id;
+
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent-web',
+        git_url: 'https://github.com/acme/widgets',
+        git_branch: 'feature/login',
+      });
+    });
+
+    afterEach(async () => {
+      await db
+        .delete(cli_session_pull_requests)
+        .where(eq(cli_session_pull_requests.session_id, sessionId));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
+    });
+
+    it('upserts the PR row when GitHub returns a pull request', async () => {
+      mockFetchPullRequestForBranch.mockResolvedValue({
+        number: 42,
+        htmlUrl: 'https://github.com/acme/widgets/pull/42',
+        state: 'open',
+        title: 'Add login page',
+        headSha: 'abc123',
+        updatedAt: '2026-04-20T10:00:00Z',
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toMatchObject({
+        url: 'https://github.com/acme/widgets/pull/42',
+        number: 42,
+        state: 'open',
+        title: 'Add login page',
+        headSha: 'abc123',
+      });
+
+      const [stored] = await db
+        .select()
+        .from(cli_session_pull_requests)
+        .where(eq(cli_session_pull_requests.session_id, sessionId))
+        .limit(1);
+      expect(stored?.pr_number).toBe(42);
+      expect(stored?.pr_state).toBe('open');
+      expect(stored?.pr_head_sha).toBe('abc123');
+    });
+
+    it('deletes the PR row when GitHub reports no associated pull request', async () => {
+      // Seed an existing row that we expect to be deleted.
+      await db.insert(cli_session_pull_requests).values({
+        session_id: sessionId,
+        pr_url: 'https://github.com/acme/widgets/pull/7',
+        pr_number: 7,
+        pr_state: 'open',
+        pr_title: 'Old PR',
+        pr_head_sha: 'oldsha',
+        // Force last_synced_at far in the past so the 10s throttle doesn't kick in.
+        pr_last_synced_at: new Date(Date.now() - 60_000).toISOString(),
+      });
+
+      mockFetchPullRequestForBranch.mockResolvedValue(null);
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toBeNull();
+      const remaining = await db
+        .select()
+        .from(cli_session_pull_requests)
+        .where(eq(cli_session_pull_requests.session_id, sessionId));
+      expect(remaining).toHaveLength(0);
+    });
+
+    it('short-circuits and does not call GitHub when last sync is within 10 seconds', async () => {
+      await db.insert(cli_session_pull_requests).values({
+        session_id: sessionId,
+        pr_url: 'https://github.com/acme/widgets/pull/7',
+        pr_number: 7,
+        pr_state: 'open',
+        pr_title: 'Recent PR',
+        pr_head_sha: 'recentsha',
+        pr_last_synced_at: new Date().toISOString(),
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toMatchObject({
+        number: 7,
+        title: 'Recent PR',
+        headSha: 'recentsha',
+      });
+      expect(mockFetchPullRequestForBranch).not.toHaveBeenCalled();
+    });
+
+    it('throws NOT_FOUND when the session belongs to a different user', async () => {
+      const caller = await createCallerForUser(otherUser.id);
+
+      await expect(
+        caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
+      ).rejects.toThrow('Session not found');
+      expect(mockFetchPullRequestForBranch).not.toHaveBeenCalled();
+    });
+
+    it('surfaces rate-limit errors as TOO_MANY_REQUESTS', async () => {
+      const resetAt = new Date('2030-01-01T00:00:00Z');
+      mockFetchPullRequestForBranch.mockRejectedValue(new GitHubRateLimitError(resetAt));
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
+      ).rejects.toMatchObject({
+        code: 'TOO_MANY_REQUESTS',
+      });
+    });
+
+    it('throws BAD_REQUEST when the session has no git_url/git_branch', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ git_url: null, git_branch: null })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockFetchPullRequestForBranch).not.toHaveBeenCalled();
+    });
+
+    it('throws BAD_REQUEST when the session git_url is not a GitHub URL', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ git_url: 'https://gitlab.com/acme/widgets' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(mockFetchPullRequestForBranch).not.toHaveBeenCalled();
     });
   });
 });

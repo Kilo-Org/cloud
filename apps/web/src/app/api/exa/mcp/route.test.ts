@@ -639,5 +639,27 @@ describe('POST /api/exa/mcp', () => {
       const body = (await response.json()) as { error: string };
       expect(body.error).toContain('Invalid JSON');
     });
+
+    it.each([
+      ['null', 'null'],
+      ['a primitive', '42'],
+      ['an array', '[1,2,3]'],
+    ])('returns 400 when body is %s (not a JSON-RPC object)', async (_desc, rawBody) => {
+      setUserAuth();
+
+      const request = new Request('http://localhost:3000/api/exa/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: rawBody,
+      });
+
+      const { POST } = await import('./route');
+      const response = await POST(request as never);
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toContain('JSON-RPC object');
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
   });
 });

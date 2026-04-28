@@ -155,12 +155,16 @@ export async function POST(request: NextRequest) {
   });
   if (authFailedResponse) return authFailedResponse;
 
-  let rpcRequest: JsonRpcRequest;
+  let parsed: unknown;
   try {
-    rpcRequest = (await request.json()) as JsonRpcRequest;
+    parsed = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return NextResponse.json({ error: 'Request body must be a JSON-RPC object' }, { status: 400 });
+  }
+  const rpcRequest = parsed as JsonRpcRequest;
 
   const { id, method, params } = rpcRequest;
   const isNotification = id === undefined || id === null;

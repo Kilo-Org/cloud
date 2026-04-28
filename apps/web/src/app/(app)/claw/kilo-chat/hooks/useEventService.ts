@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { EventServiceClient } from '@kilocode/event-service';
 import { KiloChatClient } from '@kilocode/kilo-chat';
+import { presenceContextForConversation } from '@kilocode/notifications';
 import { KILO_CHAT_URL, EVENT_SERVICE_URL } from '@/lib/constants';
 import { clearKiloChatToken } from '../token';
 
@@ -67,4 +68,33 @@ export function useConversationContext(
     eventService.subscribe([context]);
     return () => eventService.unsubscribe([context]);
   }, [eventService, sandboxId, conversationId]);
+}
+
+/**
+ * Subscribes to the presence context for the given conversation
+ * (`/presence/kiloclaw/chat/{conversationId}`), but only while the tab/window
+ * is visible. Unsubscribes when the document becomes hidden and re-subscribes
+ * when it becomes visible again.
+ */
+export function useConversationPresence(eventService: EventServiceClient, conversationId: string) {
+  useEffect(() => {
+    const ctx = presenceContextForConversation(conversationId);
+    let subscribed = false;
+    const reconcile = () => {
+      const shouldSub = !document.hidden;
+      if (shouldSub && !subscribed) {
+        eventService.subscribe([ctx]);
+        subscribed = true;
+      } else if (!shouldSub && subscribed) {
+        eventService.unsubscribe([ctx]);
+        subscribed = false;
+      }
+    };
+    reconcile();
+    document.addEventListener('visibilitychange', reconcile);
+    return () => {
+      document.removeEventListener('visibilitychange', reconcile);
+      if (subscribed) eventService.unsubscribe([ctx]);
+    };
+  }, [conversationId, eventService]);
 }

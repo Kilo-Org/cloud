@@ -7,4 +7,6 @@ export const ENV_KEYS = {
   sessionIngestWsUrl: 'SESSION_INGEST_WS_URL',
   appsFlyerDevKey: 'APPSFLYER_DEV_KEY',
   appsFlyerAppId: 'APPSFLYER_APP_ID',
+  eventServiceWsUrl: 'EVENT_SERVICE_WS_URL',
+  kiloChatUrl: 'KILO_CHAT_URL',
 };

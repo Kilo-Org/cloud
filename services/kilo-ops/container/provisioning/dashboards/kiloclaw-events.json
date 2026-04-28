@@ -1263,8 +1263,8 @@
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
-          "query": "SELECT count() AS stops FROM kiloclaw_events WHERE timestamp >= now() - interval '7' day AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity'",
-          "rawSql": "SELECT count() AS stops FROM kiloclaw_events WHERE timestamp >= now() - interval '7' day AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity'",
+          "query": "SELECT SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity'",
+          "rawSql": "SELECT SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity'",
           "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
@@ -1274,7 +1274,7 @@
           "useWindowFuncForMacros": true
         }
       ],
-      "title": "Trial Inactivity Stops (7d)",
+      "title": "Trial Inactivity Stops",
       "type": "stat"
     },
     {
@@ -1335,7 +1335,7 @@
         "x": 0,
         "y": 54
       },
-      "description": "Trial inactivity stops bucketed by Grafana's automatic interval over the same fixed 7-day lookback.",
+      "description": "Sample-corrected trial inactivity stops bucketed by Grafana's automatic interval in the selected dashboard time range.",
       "id": 18,
       "options": {
         "legend": {
@@ -1365,8 +1365,8 @@
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
-          "query": "SELECT $timeSeries AS t, 'stops' AS label, count() AS stops FROM kiloclaw_events WHERE timestamp >= now() - interval '7' day AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' GROUP BY t ORDER BY t",
-          "rawSql": "SELECT $timeSeries AS t, 'stops' AS label, count() AS stops FROM kiloclaw_events WHERE timestamp >= now() - interval '7' day AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' GROUP BY t ORDER BY t",
+          "query": "SELECT $timeSeries AS t, 'stops' AS label, SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'stops' AS label, SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' GROUP BY t ORDER BY t",
           "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
@@ -1413,7 +1413,7 @@
         "x": 6,
         "y": 50
       },
-      "description": "Recent instance.stopped DO events with label trial_inactivity over a fixed 7-day lookback. double2 is machine uptime before stop.",
+      "description": "Recent instance.stopped DO events with label trial_inactivity in the selected dashboard time range. double2 is machine uptime before stop. Limited to 100 rows.",
       "id": 17,
       "options": {
         "cellHeight": "sm",
@@ -1439,8 +1439,8 @@
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
-          "query": "SELECT timestamp, blob2 AS user_id, blob15 AS instance_id, blob6 AS fly_app_name, blob7 AS fly_machine_id, blob8 AS sandbox_id, blob9 AS status, blob13 AS stop_reason, double2 AS machine_uptime_ms FROM kiloclaw_events WHERE timestamp >= now() - interval '7' day AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' ORDER BY timestamp DESC",
-          "rawSql": "SELECT timestamp, blob2 AS user_id, blob15 AS instance_id, blob6 AS fly_app_name, blob7 AS fly_machine_id, blob8 AS sandbox_id, blob9 AS status, blob13 AS stop_reason, double2 AS machine_uptime_ms FROM kiloclaw_events WHERE timestamp >= now() - interval '7' day AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' ORDER BY timestamp DESC",
+          "query": "SELECT timestamp, blob2 AS user_id, blob15 AS instance_id, blob6 AS fly_app_name, blob7 AS fly_machine_id, blob8 AS sandbox_id, blob9 AS status, blob13 AS stop_reason, double2 AS machine_uptime_ms FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' ORDER BY timestamp DESC LIMIT 100",
+          "rawSql": "SELECT timestamp, blob2 AS user_id, blob15 AS instance_id, blob6 AS fly_app_name, blob7 AS fly_machine_id, blob8 AS sandbox_id, blob9 AS status, blob13 AS stop_reason, double2 AS machine_uptime_ms FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' ORDER BY timestamp DESC LIMIT 100",
           "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
@@ -1450,7 +1450,7 @@
           "useWindowFuncForMacros": true
         }
       ],
-      "title": "Recent Trial Inactivity Stops (7d)",
+      "title": "Recent Trial Inactivity Stops",
       "type": "table"
     },
     {

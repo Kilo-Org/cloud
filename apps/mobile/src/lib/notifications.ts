@@ -3,6 +3,8 @@ import * as Notifications from 'expo-notifications';
 import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
 
+import { pushDataSchema } from '@kilocode/notifications';
+
 function getProjectId(): string {
   const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
   const projectId = eas?.projectId;
@@ -12,19 +14,17 @@ function getProjectId(): string {
   return projectId;
 }
 
-// Tracks which chat instance screen is currently focused.
+// Tracks which kilo-chat conversation is currently focused.
 // Read by the foreground notification handler to suppress notifications
-// when the user is already viewing that chat.
+// when the user is already viewing that conversation.
 // A module-level variable (not React state) because the notification handler
 // is registered once and must always read the latest value without stale closures.
-let activeChatInstanceId: string | null = null;
+type ActiveChat = { sandboxId: string; conversationId: string } | null;
+let activeChat: ActiveChat = null;
 
-export function setActiveChatInstance(instanceId: string | null) {
-  activeChatInstanceId = instanceId;
+export function setActiveChatConversation(c: ActiveChat) {
+  activeChat = c;
 }
-
-// Keep in sync with data field in services/notifications/src/dos/NotificationChannelDO.ts
-export type NotificationData = { type: 'chat'; instanceId: string };
 
 const shown = {
   shouldShowAlert: true,
@@ -46,10 +46,9 @@ export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous
     handleNotification: async notification => {
-      const data = notification.request.content.data as NotificationData | undefined;
+      const parsed = pushDataSchema.safeParse(notification.request.content.data);
 
-      // Suppress only if the user is already viewing this exact chat
-      if (data?.type === 'chat' && data.instanceId === activeChatInstanceId) {
+      if (parsed.success && activeChat?.conversationId === parsed.data.conversationId) {
         return suppressed;
       }
 
@@ -70,10 +69,10 @@ export function getPendingNotificationLink(): string | null {
 
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-    const data = response.notification.request.content.data as NotificationData | undefined;
+    const parsed = pushDataSchema.safeParse(response.notification.request.content.data);
 
-    if (data?.type === 'chat') {
-      const path = `/(app)/chat/${data.instanceId}`;
+    if (parsed.success) {
+      const path = `/(app)/chat/${parsed.data.sandboxId}/${parsed.data.conversationId}`;
       // If the router is ready (has segments), navigate immediately.
       // Otherwise store as pending for consumption after auth completes.
       try {
@@ -93,9 +92,9 @@ export function checkInitialNotification(): void {
   if (!response) {
     return;
   }
-  const data = response.notification.request.content.data as NotificationData | undefined;
-  if (data?.type === 'chat') {
-    pendingNotificationLink = `/(app)/chat/${data.instanceId}`;
+  const parsed = pushDataSchema.safeParse(response.notification.request.content.data);
+  if (parsed.success) {
+    pendingNotificationLink = `/(app)/chat/${parsed.data.sandboxId}/${parsed.data.conversationId}`;
   }
 }
 
@@ -140,19 +139,4 @@ export async function getNotificationPermissionStatus(): Promise<
 
 export function getPlatform(): 'ios' | 'android' {
   return Platform.OS as 'ios' | 'android';
-}
-
-// Tracks which kilo-chat conversation is currently focused.
-// Read by the foreground notification handler to suppress notifications
-// when the user is already viewing that conversation.
-// Will be fully implemented in T24.
-type ActiveChatConversation = { sandboxId: string; conversationId: string } | null;
-let activeChatConversation: ActiveChatConversation = null;
-
-export function setActiveChatConversation(c: ActiveChatConversation) {
-  activeChatConversation = c;
-}
-
-export function getActiveChatConversation(): ActiveChatConversation {
-  return activeChatConversation;
 }

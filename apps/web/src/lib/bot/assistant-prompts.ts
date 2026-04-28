@@ -18,8 +18,8 @@ type SlackAssistantAdapter = {
 
 export const SLACK_ASSISTANT_SUGGESTED_PROMPTS = [
   {
-    title: 'Start coding task',
-    message: 'Help me implement a code change in my repository.',
+    title: 'Fix an issue in my codebase',
+    message: 'Please ask me for the link to an issue that I want you to fix.',
   },
   {
     title: 'Fix a bug',
@@ -27,7 +27,7 @@ export const SLACK_ASSISTANT_SUGGESTED_PROMPTS = [
   },
   {
     title: 'Review code',
-    message: 'Review the recent changes and point out bugs or risks.',
+    message: 'Please ask me for a PR that you should review',
   },
   {
     title: 'Explain Kilo Bot',
@@ -42,8 +42,6 @@ export async function updateSlackAssistantSuggestions(
   event: AssistantEventCoordinates
 ): Promise<void> {
   await Promise.all([
-    adapter.setAssistantTitle(event.channelId, event.threadTs, 'Kilo Bot'),
-    adapter.setAssistantStatus(event.channelId, event.threadTs, 'Ready to help'),
     adapter.setSuggestedPrompts(
       event.channelId,
       event.threadTs,

@@ -13,8 +13,7 @@ import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET } from '@/li
 
 function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
   const chatBot = new Chat({
-    // TODO(remon): Update names before going live
-    userName: process.env.NODE_ENV === 'production' ? 'Pound' : 'Sjors Bot',
+    userName: process.env.NODE_ENV === 'production' ? 'Kilo' : 'Henk',
     adapters: {
       slack: slackAdapter,
     },
@@ -105,18 +104,6 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
       console.error('[Bot] Failed to set Slack assistant suggestions:', error);
       captureException(error, {
         tags: { component: 'kilo-bot', op: 'assistant-thread-started' },
-        extra: { userId: event.userId, channelId: event.channelId },
-      });
-    }
-  });
-
-  chatBot.onAssistantContextChanged(async event => {
-    try {
-      await updateSlackAssistantSuggestions(slackAdapter, event);
-    } catch (error) {
-      console.error('[Bot] Failed to update Slack assistant suggestions:', error);
-      captureException(error, {
-        tags: { component: 'kilo-bot', op: 'assistant-context-changed' },
         extra: { userId: event.userId, channelId: event.channelId },
       });
     }

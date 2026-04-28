@@ -1,5 +1,5 @@
 {
-  "id": "76fc0c0d-b42d-4b3a-a9e2-570e46ba0565",
+  "id": "ec49ba08-673e-479f-a8a2-490c71ad9186",
   "prevId": "f9fd2e78-846d-49b9-923e-90da6e9c6d63",
   "version": "7",
   "dialect": "postgresql",
@@ -9476,8 +9476,8 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_kiloclaw_image_catalog_is_latest": {
-          "name": "IDX_kiloclaw_image_catalog_is_latest",
+        "UQ_kiloclaw_image_catalog_one_latest_per_variant": {
+          "name": "UQ_kiloclaw_image_catalog_one_latest_per_variant",
           "columns": [
             {
               "expression": "variant",
@@ -9486,8 +9486,24 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "where": "\"kiloclaw_image_catalog\".\"is_latest\" = true",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_kiloclaw_image_catalog_one_candidate_per_variant": {
+          "name": "UQ_kiloclaw_image_catalog_one_candidate_per_variant",
+          "columns": [
+            {
+              "expression": "variant",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"kiloclaw_image_catalog\".\"is_latest\" = false AND \"kiloclaw_image_catalog\".\"rollout_percent\" > 0 AND \"kiloclaw_image_catalog\".\"status\" = 'available'",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -9685,13 +9701,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "auto_enroll_in_rollouts": {
-          "name": "auto_enroll_in_rollouts",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {
@@ -10581,6 +10590,13 @@
         },
         "is_bot": {
           "name": "is_bot",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "kiloclaw_early_access": {
+          "name": "kiloclaw_early_access",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,

@@ -747,22 +747,8 @@
     {
       "idx": 106,
       "version": "7",
-      "when": 1777329378540,
-      "tag": "0106_daily_anthem",
-      "breakpoints": true
-    },
-    {
-      "idx": 107,
-      "version": "7",
-      "when": 1777390826147,
-      "tag": "0107_bouncy_micromacro",
-      "breakpoints": true
-    },
-    {
-      "idx": 108,
-      "version": "7",
-      "when": 1777409500403,
-      "tag": "0108_salty_proteus",
+      "when": 1777411448037,
+      "tag": "0106_petite_william_stryker",
       "breakpoints": true
     }
   ]

@@ -50,6 +50,10 @@
     ],
   },
 
+  "services": [
+    { "binding": "EVENT_SERVICE", "service": "event-service" },
+  ],
+
   "secrets_store_secrets": [
     {
       "binding": "STREAM_CHAT_API_SECRET",

@@ -25,7 +25,7 @@ export const GATEWAY_METADATA_REDIS_KEYS = {
 } as const;
 
 export const directByokModelsRedisKey = (providerId: string) =>
-  redisKey(`ai-gateway.metadata:direct-byok-models:${providerId}`);
+  redisKey(`ai-gateway.metadata.direct-byok-models:${providerId}`);
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 

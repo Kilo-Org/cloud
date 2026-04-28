@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { OpenCodeVariantSchema } from '@kilocode/db';
+import { OpenCodeVariantSchema } from '@kilocode/db/schema-types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
 import type { CustomLlmProvider } from '@kilocode/db';

@@ -124,14 +124,19 @@ async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
     const prior = previousById.get(raw.id);
     const name = raw.name ?? prior?.name ?? raw.id;
     const description = prior?.description ?? (await generateDescription(raw.id, name));
+    const context_length =
+      raw.context_length ?? prior?.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
+    const max_completion_tokens = Math.min(
+      raw.max_completion_tokens ?? prior?.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
+      context_length
+    );
     models.push({
       id: raw.id,
       name,
       description,
       flags: prior?.flags ?? [],
-      context_length: raw.context_length ?? prior?.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS,
-      max_completion_tokens:
-        raw.max_completion_tokens ?? prior?.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
+      context_length,
+      max_completion_tokens,
       variants: prior?.variants ?? null,
     });
   }

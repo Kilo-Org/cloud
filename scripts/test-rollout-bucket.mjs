@@ -34,9 +34,14 @@ function loadEnvFromFile(path) {
   return out;
 }
 
+// Hardcoded localhost — this script targets the local kiloclaw worker only.
+// Keeping the URL as a constant (rather than env-derived) avoids a CodeQL
+// SSRF flag on the fetch below: the outbound request destination is no longer
+// derived from file data.
+const BASE_URL = 'http://localhost:8795';
+
 const envPath = resolve(process.cwd(), '.env.local');
 const env = { ...loadEnvFromFile(envPath), ...process.env };
-const baseUrl = env.KILOCLAW_API_URL ?? 'http://localhost:8795';
 const secret = env.KILOCLAW_INTERNAL_API_SECRET;
 if (!secret) {
   console.error('KILOCLAW_INTERNAL_API_SECRET not found in .env.local or env');
@@ -50,7 +55,8 @@ async function bucketFor(imageTag, instanceId) {
 }
 
 async function probe(instanceId) {
-  const url = `${baseUrl}/api/platform/versions/latest?instanceId=${instanceId}&currentImageTag=dev-old`;
+  // URL parts are URL-encoded; the host is hardcoded to BASE_URL above.
+  const url = `${BASE_URL}/api/platform/versions/latest?instanceId=${encodeURIComponent(instanceId)}&currentImageTag=dev-old`;
   const res = await fetch(url, { headers: { 'x-internal-api-key': secret } });
   if (!res.ok) return `ERROR ${res.status}: ${await res.text()}`;
   const body = await res.json();

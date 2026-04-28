@@ -34,7 +34,7 @@ describe('ImageVariantSchema', () => {
 });
 
 describe('ImageVersionEntrySchema', () => {
-  it('parses a valid entry', () => {
+  it('parses a valid entry and applies rolloutPercent / isLatest defaults', () => {
     const entry = {
       openclawVersion: '2026.2.9',
       variant: 'default',
@@ -42,7 +42,12 @@ describe('ImageVersionEntrySchema', () => {
       imageDigest: null,
       publishedAt: '2026-02-22T18:00:00Z',
     };
-    expect(ImageVersionEntrySchema.parse(entry)).toEqual(entry);
+    // rolloutPercent and isLatest both default to 0 / false when omitted.
+    expect(ImageVersionEntrySchema.parse(entry)).toEqual({
+      ...entry,
+      rolloutPercent: 0,
+      isLatest: false,
+    });
   });
 
   it('accepts imageDigest as a string', () => {
@@ -53,7 +58,11 @@ describe('ImageVersionEntrySchema', () => {
       imageDigest: 'sha256:abc123',
       publishedAt: '2026-02-22T18:00:00Z',
     };
-    expect(ImageVersionEntrySchema.parse(entry)).toEqual(entry);
+    expect(ImageVersionEntrySchema.parse(entry)).toEqual({
+      ...entry,
+      rolloutPercent: 0,
+      isLatest: false,
+    });
   });
 
   it('rejects invalid variant', () => {

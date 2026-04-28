@@ -65,6 +65,21 @@ vi.mock('../lib/image-version', async () => {
   };
 });
 
+// -- Mock version-rollout (the DO now uses selectImageVersionForInstance for
+//    rollout-aware "latest" resolution; see lib/version-rollout.ts) --
+vi.mock('../lib/version-rollout', async () => {
+  const actual = await vi.importActual('../lib/version-rollout');
+  return {
+    ...actual,
+    selectImageVersionForInstance: vi.fn().mockResolvedValue(null),
+  };
+});
+
+// -- Mock user-flags (early-access lookup, called from DO provision/restart) --
+vi.mock('../lib/user-flags', () => ({
+  lookupKiloclawEarlyAccess: vi.fn().mockResolvedValue(false),
+}));
+
 // -- Mock db --
 vi.mock('../db', () => ({
   getWorkerDb: vi.fn(() => ({})),
@@ -133,6 +148,7 @@ import * as db from '../db';
 import * as gatewayEnv from '../gateway/env';
 import * as regions from './regions';
 import { resolveLatestVersion } from '../lib/image-version';
+import { selectImageVersionForInstance } from '../lib/version-rollout';
 import { setupDefaultStreamChatChannel } from '../stream-chat/client';
 import { verifyKiloToken } from '@kilocode/worker-utils';
 import {
@@ -7102,7 +7118,7 @@ describe('restartMachine image tag override', () => {
     expect(storage._store.get('trackedImageTag')).toBe('old-tag-123');
   });
 
-  it('fetches latest from KV when imageTag is "latest"', async () => {
+  it('resolves the rollout selector when imageTag is "latest"', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, {
       trackedImageTag: 'old-tag',
@@ -7110,33 +7126,35 @@ describe('restartMachine image tag override', () => {
       imageVariant: 'default',
     });
 
-    (resolveLatestVersion as Mock).mockResolvedValueOnce({
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
       openclawVersion: '2.0.0',
       variant: 'default',
       imageTag: 'new-tag-from-kv',
       imageDigest: null,
       publishedAt: new Date().toISOString(),
+      rolloutPercent: 0,
+      isLatest: true,
     });
 
     const result = await instance.restartMachine({ imageTag: 'latest' });
 
     expect(result.success).toBe(true);
-    expect(resolveLatestVersion).toHaveBeenCalledOnce();
+    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
     expect(storage._store.get('trackedImageTag')).toBe('new-tag-from-kv');
     expect(storage._store.get('openclawVersion')).toBe('2.0.0');
     expect(storage._store.get('imageVariant')).toBe('default');
   });
 
-  it('falls back gracefully when "latest" but KV is empty', async () => {
+  it('falls back gracefully when "latest" but selector returns null', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { trackedImageTag: 'old-tag' });
 
-    (resolveLatestVersion as Mock).mockResolvedValueOnce(null);
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce(null);
 
     const result = await instance.restartMachine({ imageTag: 'latest' });
 
     expect(result.success).toBe(true);
-    expect(resolveLatestVersion).toHaveBeenCalledOnce();
+    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
     // trackedImageTag unchanged — resolveImageTag will use existing value
     expect(storage._store.get('trackedImageTag')).toBe('old-tag');
   });

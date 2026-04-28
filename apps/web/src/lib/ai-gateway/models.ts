@@ -29,7 +29,7 @@ import {
   grok_code_fast_1_optimized_free_model,
   isGrok4Model,
 } from '@/lib/ai-gateway/providers/xai';
-import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic';
+import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;

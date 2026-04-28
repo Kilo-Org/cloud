@@ -1,4 +1,4 @@
-import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic';
+import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
@@ -37,7 +37,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
     };
   }
-  if (modelStartsWith(model, 'anthropic/')) {
+  if (isAnthropicModel(model)) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },

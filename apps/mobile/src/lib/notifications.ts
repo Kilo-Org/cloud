@@ -141,3 +141,18 @@ export async function getNotificationPermissionStatus(): Promise<
 export function getPlatform(): 'ios' | 'android' {
   return Platform.OS as 'ios' | 'android';
 }
+
+// Tracks which kilo-chat conversation is currently focused.
+// Read by the foreground notification handler to suppress notifications
+// when the user is already viewing that conversation.
+// Will be fully implemented in T24.
+type ActiveChatConversation = { sandboxId: string; conversationId: string } | null;
+let activeChatConversation: ActiveChatConversation = null;
+
+export function setActiveChatConversation(c: ActiveChatConversation) {
+  activeChatConversation = c;
+}
+
+export function getActiveChatConversation(): ActiveChatConversation {
+  return activeChatConversation;
+}

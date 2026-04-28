@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/notifications": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "expo-server-sdk": "^6.1.0",

@@ -98,9 +98,7 @@ describe('dispatchPushCore', () => {
 
   it('returns no_tokens when user has no push tokens', async () => {
     const deps = makeDeps({
-      db: makeDbMock([]) as unknown as ReturnType<
-        typeof import('@kilocode/db/client').getWorkerDb
-      >,
+      db: makeDbMock([]) as unknown as ReturnType<typeof import('@kilocode/db/client').getWorkerDb>,
     });
 
     const out = await dispatchPushCore(baseInput, deps);
@@ -126,7 +124,10 @@ describe('dispatchPushCore', () => {
     const db = makeDbMock([{ token: 'tok-a' }, { token: 'tok-b' }], 5);
     const sendPush = vi
       .fn()
-      .mockResolvedValue({ ticketTokenPairs: [{ ticketId: 'tid-1', token: 'tok-a' }], staleTokens: [] });
+      .mockResolvedValue({
+        ticketTokenPairs: [{ ticketId: 'tid-1', token: 'tok-a' }],
+        staleTokens: [],
+      });
     const storage = makeStorage();
     const deps = makeDeps({
       db: db as unknown as ReturnType<typeof import('@kilocode/db/client').getWorkerDb>,

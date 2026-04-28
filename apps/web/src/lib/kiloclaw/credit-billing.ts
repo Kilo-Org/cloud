@@ -12,10 +12,13 @@ import {
 import {
   credit_transactions,
   kilocode_users,
+  kiloclaw_email_log,
   kiloclaw_instances,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
+import { captureException } from '@sentry/nextjs';
 import { processTopUp } from '@/lib/credits';
+import { sendKiloClawSubscriptionStartedEmail } from '@/lib/email';
 import {
   autoResumeIfSuspended,
   clearTrialInactivityStopAfterTrialTransition,
@@ -642,6 +645,17 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     });
   }
 
+  if (resolvedInstanceId && amountMicrodollars > 0) {
+    await maybeSendKiloClawSubscriptionStartedEmail({
+      userId,
+      instanceId: resolvedInstanceId,
+      plan,
+      amountCents: Math.round(amountMicrodollars / 10_000),
+      periodStart,
+      periodEnd,
+    });
+  }
+
   logInfo('Credit settlement completed', {
     user_id: userId,
     plan,
@@ -651,6 +665,90 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   });
 
   return true;
+}
+
+export const KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE = 'kiloclaw_subscription_started';
+
+function formatBillingPeriod(periodStart: string, periodEnd: string): string {
+  const start = format(new Date(periodStart), 'MMM d, yyyy');
+  const end = format(new Date(periodEnd), 'MMM d, yyyy');
+  return `${start} – ${end}`;
+}
+
+function planDisplayName(plan: 'commit' | 'standard'): string {
+  return plan === 'commit' ? 'KiloClaw Commit' : 'KiloClaw Standard';
+}
+
+// Idempotency: insert-before-send on `kiloclaw_email_log` guarded by the
+// unique index (user_id, instance_id, email_type). Only the first paid period
+// inserts a row; renewals (which would attempt the same row) are skipped.
+async function maybeSendKiloClawSubscriptionStartedEmail(params: {
+  userId: string;
+  instanceId: string;
+  plan: 'commit' | 'standard';
+  amountCents: number;
+  periodStart: string;
+  periodEnd: string;
+}): Promise<void> {
+  const { userId, instanceId, plan, amountCents, periodStart, periodEnd } = params;
+  try {
+    const insertResult = await db
+      .insert(kiloclaw_email_log)
+      .values({
+        user_id: userId,
+        instance_id: instanceId,
+        email_type: KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+      })
+      .onConflictDoNothing();
+
+    if ((insertResult.rowCount ?? 0) === 0) {
+      // Not the first paid period — renewal, nothing to send.
+      return;
+    }
+
+    const [user] = await db
+      .select({ email: kilocode_users.google_user_email })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId))
+      .limit(1);
+
+    if (!user) {
+      logWarning('KiloClaw subscription-started email: user not found', {
+        user_id: userId,
+        instance_id: instanceId,
+      });
+      return;
+    }
+
+    await sendKiloClawSubscriptionStartedEmail({
+      to: user.email,
+      planName: planDisplayName(plan),
+      priceCents: amountCents,
+      billingPeriod: formatBillingPeriod(periodStart, periodEnd),
+      nextBillingDate: new Date(periodEnd),
+    });
+  } catch (error) {
+    // Never fail the settlement flow because of an email error.
+    captureException(error, {
+      tags: { source: 'kiloclaw_subscription_started_email' },
+      extra: { user_id: userId, instance_id: instanceId, plan },
+    });
+    // Best-effort rollback so a retry can re-attempt — mirrors the pattern in
+    // apps/web/src/app/api/internal/kiloclaw/instance-ready/route.ts.
+    try {
+      await db
+        .delete(kiloclaw_email_log)
+        .where(
+          and(
+            eq(kiloclaw_email_log.user_id, userId),
+            eq(kiloclaw_email_log.instance_id, instanceId),
+            eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
+          )
+        );
+    } catch {
+      // Leave the marker in place; we prefer missing one email over duplicate sends.
+    }
+  }
 }
 
 /**

@@ -4,10 +4,14 @@ import type { User } from '@kilocode/db/schema';
 import { kilocode_users } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { sql, eq } from 'drizzle-orm';
+import { captureException } from '@sentry/nextjs';
+import Stripe from 'stripe';
 import { after } from 'next/server';
 import { processFirstTopupBonus } from '@/lib/firstTopupBonus';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
+import { sendCreditsTopUpEmail } from '@/lib/email';
+import { client as stripeClient } from '@/lib/stripe-client';
 
 export type StripeConfig = { type: 'stripe'; stripe_payment_id: string };
 
@@ -111,10 +115,81 @@ export async function processTopUp(
       });
     }
 
+    await sendTopUpConfirmationEmail({
+      user,
+      amountInCents,
+      stripeChargeOrInvoiceId: config.stripe_payment_id,
+      isAutoTopUp,
+    });
+
     if (!IS_IN_AUTOMATED_TEST) await delay(10000);
   };
 
   if (IS_IN_AUTOMATED_TEST) await processPostTopUpFreeStuff();
   else after(processPostTopUpFreeStuff);
   return true;
+}
+
+// Idempotency: this function runs at most once per successful top-up because
+// `processTopUp` is guarded by a unique constraint on
+// `credit_transactions.stripe_payment_id` and only invokes its post-processing
+// block on the row that actually inserted. Any later webhook retry for the
+// same Stripe payment returns early with `false` before reaching here.
+async function sendTopUpConfirmationEmail(params: {
+  user: User;
+  amountInCents: number;
+  stripeChargeOrInvoiceId: string;
+  isAutoTopUp: boolean;
+}): Promise<void> {
+  const { user, amountInCents, stripeChargeOrInvoiceId, isAutoTopUp } = params;
+  try {
+    const receiptUrl = await resolveStripeReceiptUrl(stripeChargeOrInvoiceId);
+    await sendCreditsTopUpEmail({
+      to: user.google_user_email,
+      variant: isAutoTopUp ? 'auto' : 'manual',
+      amountCents: amountInCents,
+      creditsCents: amountInCents,
+      purchaseDate: new Date(),
+      receiptUrl,
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'credits_topup_email' },
+      extra: { kilo_user_id: user.id, stripeChargeOrInvoiceId, isAutoTopUp },
+    });
+  }
+}
+
+async function resolveStripeReceiptUrl(stripeChargeOrInvoiceId: string): Promise<string | null> {
+  // Skip outbound Stripe calls in automated tests — they are expensive,
+  // flake-prone, and unnecessary for exercising the email path.
+  if (IS_IN_AUTOMATED_TEST) return null;
+
+  // Stripe charge IDs start with `ch_`; invoice IDs start with `in_`.
+  // Payment intent IDs (`pi_`) are used for organization top-ups.
+  try {
+    if (stripeChargeOrInvoiceId.startsWith('ch_')) {
+      const charge = await stripeClient.charges.retrieve(stripeChargeOrInvoiceId);
+      return charge.receipt_url ?? null;
+    }
+    if (stripeChargeOrInvoiceId.startsWith('in_')) {
+      const invoice = await stripeClient.invoices.retrieve(stripeChargeOrInvoiceId);
+      return invoice.hosted_invoice_url ?? null;
+    }
+    if (stripeChargeOrInvoiceId.startsWith('pi_')) {
+      const pi = await stripeClient.paymentIntents.retrieve(stripeChargeOrInvoiceId, {
+        expand: ['latest_charge'],
+      });
+      const latestCharge = pi.latest_charge;
+      if (latestCharge && typeof latestCharge !== 'string') {
+        return latestCharge.receipt_url ?? null;
+      }
+      return null;
+    }
+    return null;
+  } catch (error) {
+    // Receipt URLs are a nice-to-have — never fail the email flow.
+    if (error instanceof Stripe.errors.StripeError) return null;
+    return null;
+  }
 }

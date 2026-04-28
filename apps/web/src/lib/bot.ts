@@ -118,21 +118,21 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
   });
 
   chatBot.onAssistantThreadStarted(async event => {
-    if (event.adapter instanceof SlackAdapter) {
-      try {
-        await event.adapter.setSuggestedPrompts(
-          event.channelId,
-          event.threadTs,
-          [...SLACK_ASSISTANT_SUGGESTED_PROMPTS],
-          ASSISTANT_PROMPTS_TITLE
-        );
-      } catch (error) {
-        console.error('[Bot] Failed to set suggested prompts:', error);
-        captureException(error, {
-          tags: { component: 'kilo-bot', op: 'assistant-thread-started' },
-          extra: { userId: event.userId, channelId: event.channelId },
-        });
-      }
+    if (!(event.adapter instanceof SlackAdapter)) return;
+
+    try {
+      await event.adapter.setSuggestedPrompts(
+        event.channelId,
+        event.threadTs,
+        [...SLACK_ASSISTANT_SUGGESTED_PROMPTS],
+        ASSISTANT_PROMPTS_TITLE
+      );
+    } catch (error) {
+      console.error('[Bot] Failed to set suggested prompts:', error);
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'assistant-thread-started' },
+        extra: { userId: event.userId, channelId: event.channelId },
+      });
     }
   });
 

@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { channel_badge_counts, kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
+import { badge_counts, kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, sql, sum } from 'drizzle-orm';
 import type { Event } from 'stream-chat';
 
@@ -20,12 +20,133 @@ type PendingMessage = {
   updatedAt: string; // ISO timestamp from Stream Chat payload
 };
 
+export type DispatchPushInput = {
+  userId: string;
+  presenceContext: string;
+  idempotencyKey: string;
+  badge: { badgeBucket: string; delta: number } | null;
+  push: {
+    title: string;
+    body: string;
+    data: Record<string, unknown>;
+    sound?: 'default' | null;
+    priority?: 'default' | 'high';
+  };
+};
+
+export type DispatchPushOutcome =
+  | { kind: 'delivered'; tokenCount: number }
+  | { kind: 'suppressed_presence' }
+  | { kind: 'no_tokens' }
+  | { kind: 'duplicate' }
+  | { kind: 'failed'; error: string };
+
+/** Dependencies injected into `dispatchPushCore` to make it unit-testable. */
+export type DispatchPushDeps = {
+  storage: DurableObjectStorage;
+  isUserInContext: (userId: string, context: string) => Promise<boolean>;
+  getAccessToken: () => Promise<string>;
+  sendPush: typeof sendPushNotifications;
+  db: ReturnType<typeof getWorkerDb>;
+  sendToQueue: (msg: ReceiptCheckMessage) => Promise<void>;
+};
+
+/**
+ * Pure implementation of the dispatchPush logic with injected dependencies.
+ * Exported so it can be unit-tested without standing up a Durable Object.
+ */
+export async function dispatchPushCore(
+  input: DispatchPushInput,
+  deps: DispatchPushDeps
+): Promise<DispatchPushOutcome> {
+  const idemKey = `idem:${input.idempotencyKey}`;
+  const existing = await deps.storage.get<number>(idemKey);
+  if (existing !== undefined) return { kind: 'duplicate' };
+
+  const inContext = await deps.isUserInContext(input.userId, input.presenceContext);
+  if (inContext) return { kind: 'suppressed_presence' };
+
+  const tokens = await deps.db
+    .select({ token: user_push_tokens.token })
+    .from(user_push_tokens)
+    .where(eq(user_push_tokens.user_id, input.userId));
+
+  if (tokens.length === 0) return { kind: 'no_tokens' };
+
+  let badgeTotal: number | undefined;
+  if (input.badge !== null) {
+    await deps.db
+      .insert(badge_counts)
+      .values({
+        user_id: input.userId,
+        badge_bucket: input.badge.badgeBucket,
+        badge_count: input.badge.delta,
+      })
+      .onConflictDoUpdate({
+        target: [badge_counts.user_id, badge_counts.badge_bucket],
+        set: { badge_count: sql`${badge_counts.badge_count} + ${input.badge.delta}` },
+      });
+
+    const [totals] = await deps.db
+      .select({ total: sum(badge_counts.badge_count) })
+      .from(badge_counts)
+      .where(eq(badge_counts.user_id, input.userId));
+
+    badgeTotal = Number(totals?.total ?? 0);
+  }
+
+  const expoMessages: ExpoPushMessage[] = tokens.map(({ token }) => ({
+    to: token,
+    title: input.push.title,
+    body: input.push.body,
+    data: input.push.data,
+    sound: input.push.sound ?? undefined,
+    priority: input.push.priority ?? 'default',
+    ...(badgeTotal !== undefined ? { badge: badgeTotal } : {}),
+  }));
+
+  try {
+    const accessToken = await deps.getAccessToken();
+    const { ticketTokenPairs, staleTokens } = await deps.sendPush(expoMessages, accessToken);
+
+    if (staleTokens.length > 0) {
+      await deps.db.delete(user_push_tokens).where(inArray(user_push_tokens.token, staleTokens));
+    }
+
+    if (ticketTokenPairs.length > 0) {
+      await deps.sendToQueue({ ticketTokenPairs });
+    }
+
+    await deps.storage.put(idemKey, Date.now());
+
+    return { kind: 'delivered', tokenCount: tokens.length };
+  } catch (err) {
+    return { kind: 'failed', error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 const DEDUP_PREFIX = 'dedup:';
 const MSG_PREFIX = 'msg:';
 const DEDUP_TTL_MS = 60 * 60 * 1000; // 1 hour
 const DEBOUNCE_MS = 10_000; // 10 seconds
 
 export class NotificationChannelDO extends DurableObject<Env> {
+  /**
+   * Mechanical primitive: presence check → token lookup → badge math → Expo send → idempotency.
+   * Callers construct the input and delegate here; this method owns no domain logic.
+   */
+  async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    return dispatchPushCore(input, {
+      storage: this.ctx.storage,
+      isUserInContext: (userId, context) => this.env.EVENT_SERVICE.isUserInContext(userId, context),
+      getAccessToken: () => this.env.EXPO_ACCESS_TOKEN.get(),
+      sendPush: sendPushNotifications,
+      db,
+      sendToQueue: msg => this.env.RECEIPTS_QUEUE.send(msg, { delaySeconds: 900 }),
+    });
+  }
+
   async processWebhook(payload: Event, webhookId: string): Promise<Response> {
     // Webhook-level dedup (prevents reprocessing the same delivery)
     const existing = await this.ctx.storage.get<number>(`${DEDUP_PREFIX}${webhookId}`);
@@ -135,58 +256,22 @@ export class NotificationChannelDO extends DurableObject<Env> {
       return;
     }
 
-    // Increment the badge count for this channel and return the new total across all channels.
-    // Done before the token guard so unread state is always persisted even if the user
-    // temporarily has no registered push tokens (e.g. between reinstalls).
-    // Uses UPSERT so the row is created on first notification for this channel.
-    await db
-      .insert(channel_badge_counts)
-      .values({ user_id: instance.user_id, channel_id: sandboxId, badge_count: 1 })
-      .onConflictDoUpdate({
-        target: [channel_badge_counts.user_id, channel_badge_counts.channel_id],
-        set: { badge_count: sql`${channel_badge_counts.badge_count} + 1` },
-      });
-
-    const [totals] = await db
-      .select({ total: sum(channel_badge_counts.badge_count) })
-      .from(channel_badge_counts)
-      .where(eq(channel_badge_counts.user_id, instance.user_id));
-
-    const badgeCount = Number(totals?.total ?? 0);
-
-    const tokens = await db
-      .select({ token: user_push_tokens.token })
-      .from(user_push_tokens)
-      .where(eq(user_push_tokens.user_id, instance.user_id));
-
-    if (tokens.length === 0) {
-      return;
-    }
-
     const truncatedMessage = msg.text.length > 100 ? msg.text.slice(0, 97) + '...' : msg.text;
 
-    const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
-      to: token,
-      title: instance.name ?? 'KiloClaw',
-      body: truncatedMessage,
-      // Keep in sync with NotificationData in apps/mobile/src/lib/notifications.ts
-      data: { type: 'chat', instanceId: sandboxId },
-      badge: badgeCount,
-      sound: 'default' as const,
-      priority: 'high' as const,
-    }));
-
-    const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
-    const { ticketTokenPairs, staleTokens } = await sendPushNotifications(messages, accessToken);
-
-    if (staleTokens.length > 0) {
-      await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, staleTokens));
-    }
-
-    if (ticketTokenPairs.length > 0) {
-      const receiptMsg: ReceiptCheckMessage = { ticketTokenPairs };
-      await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
-    }
+    await this.dispatchPush({
+      userId: instance.user_id,
+      presenceContext: `/kiloclaw/${sandboxId}`,
+      idempotencyKey: `stream:${msg.messageId}`,
+      badge: { badgeBucket: sandboxId, delta: 1 },
+      push: {
+        title: instance.name ?? 'KiloClaw',
+        body: truncatedMessage,
+        // Keep in sync with NotificationData in apps/mobile/src/lib/notifications.ts
+        data: { type: 'chat', instanceId: sandboxId },
+        sound: 'default',
+        priority: 'high',
+      },
+    });
   }
 
   private async markWebhookSeen(webhookId: string): Promise<void> {

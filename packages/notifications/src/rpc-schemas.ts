@@ -12,19 +12,11 @@ export const sendPushForConversationInputSchema = z.object({
   messageId: z.string(),
 });
 
-export type SendPushForConversationInput = z.infer<
-  typeof sendPushForConversationInputSchema
->;
+export type SendPushForConversationInput = z.infer<typeof sendPushForConversationInputSchema>;
 
 export const perRecipientResultSchema = z.object({
   userId: z.string(),
-  outcome: z.enum([
-    'delivered',
-    'suppressed_presence',
-    'no_tokens',
-    'duplicate',
-    'failed',
-  ]),
+  outcome: z.enum(['delivered', 'suppressed_presence', 'no_tokens', 'duplicate', 'failed']),
 });
 
 export type PerRecipientResult = z.infer<typeof perRecipientResultSchema>;
@@ -33,6 +25,4 @@ export const sendPushForConversationOutputSchema = z.object({
   perRecipient: z.array(perRecipientResultSchema),
 });
 
-export type SendPushForConversationOutput = z.infer<
-  typeof sendPushForConversationOutputSchema
->;
+export type SendPushForConversationOutput = z.infer<typeof sendPushForConversationOutputSchema>;

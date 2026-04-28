@@ -8,6 +8,7 @@
  */
 
 import type { ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
+import { contentBlocksToText } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import {
@@ -15,6 +16,7 @@ import {
   pushEventToHumanMembers,
   pushInstanceEvent,
 } from './event-push';
+import { fetchSandboxLabel } from './sandbox-lookup';
 import type { ConversationInfo } from '../do/conversation-do';
 
 export type DeferCtx = { waitUntil: (p: Promise<unknown>) => void };
@@ -82,6 +84,7 @@ export async function createMessageFor(
 
   const fanOut = postCommitFanOut(
     env,
+    ctx,
     info,
     callerId,
     conversationId,
@@ -98,6 +101,7 @@ export async function createMessageFor(
 
 async function postCommitFanOut(
   env: Env,
+  ctx: DeferCtx,
   info: ConversationInfo,
   callerId: string,
   conversationId: string,
@@ -303,6 +307,31 @@ async function postCommitFanOut(
       );
     }
     await Promise.allSettled(instanceEvents);
+  }
+
+  // ── Block E: Push notifications to human recipients ─────────────────
+  if (sandboxId && env.NOTIFICATIONS) {
+    const senderUserId = isSenderHuman ? callerId : null;
+    const recipientUserIds = humanMemberIds.filter(id => id !== callerId);
+    if (recipientUserIds.length > 0) {
+      ctx.waitUntil(
+        (async () => {
+          const sandboxLabel = await fetchSandboxLabel(env, sandboxId);
+          const conversationTitle = info.title ?? autoTitle ?? 'Untitled';
+          const title = `${sandboxLabel} · ${conversationTitle}`;
+          const bodyPreview = contentBlocksToText(content).slice(0, 200);
+          await env.NOTIFICATIONS.sendPushForConversation({
+            conversationId,
+            sandboxId,
+            senderUserId,
+            recipientUserIds,
+            title,
+            bodyPreview,
+            messageId,
+          });
+        })().catch(err => logger.error('sendPushForConversation failed', { err: String(err) }))
+      );
+    }
   }
 }
 

@@ -20,6 +20,7 @@ export default defineWorkersConfig({
           serviceBindings: {
             KILOCLAW: 'kiloclaw-stub',
             EVENT_SERVICE: 'event-service-stub',
+            NOTIFICATIONS: 'notifications-stub',
             KILO_CHAT_SELF: kCurrentWorker as unknown as string,
           },
           workers: [
@@ -55,6 +56,32 @@ export default defineWorkersConfig({
                   }
                   async pushEvent(userId, context, event, payload) {
                     return false;
+                  }
+                }
+              `,
+            },
+            {
+              name: 'notifications-stub',
+              modules: true,
+              script: `
+                import { WorkerEntrypoint } from 'cloudflare:workers';
+                const recorded = [];
+                let shouldFail = false;
+                export default class NotificationsStub extends WorkerEntrypoint {
+                  async sendPushForConversation(input) {
+                    if (shouldFail) throw new Error('sendPushForConversation simulated failure');
+                    recorded.push(input);
+                    return { perRecipient: [] };
+                  }
+                  async __recordedCalls() {
+                    return recorded.slice();
+                  }
+                  async __clearCalls() {
+                    recorded.length = 0;
+                    shouldFail = false;
+                  }
+                  async __setShouldFail(val) {
+                    shouldFail = val;
                   }
                 }
               `,

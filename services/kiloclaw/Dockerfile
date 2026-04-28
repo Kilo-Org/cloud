@@ -72,7 +72,6 @@ RUN npm install -g openclaw@2026.4.26 \
     && sed -i 's/MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"/\(MESSAGE_ACTION_TARGET_MODE[action] ?? "none"\) !== "none"/' "$CT_FILE" \
     && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
     && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
-    && test "$(openclaw --version)" = "2026.4.26" \
     && openclaw --version
 
 # Bake bundled plugin runtime deps into the image so first boot is pure

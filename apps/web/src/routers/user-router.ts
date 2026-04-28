@@ -22,7 +22,7 @@ import {
   user_push_tokens,
   channel_badge_counts,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, inArray, sql, gte, sum } from 'drizzle-orm';
+import { eq, and, isNull, inArray, sql, gt, gte, sum } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
@@ -748,4 +748,27 @@ export const userRouter = createTRPCRouter({
 
       return { badgeCount: Number(totals?.total ?? 0) };
     }),
+
+  // Per-instance unread counts for showing badges on the mobile dashboard.
+  // channel_id is the sandbox_id of a kiloclaw instance (see NotificationChannelDO);
+  // returned as `instanceId` since that's how the mobile client identifies instances.
+  // Destroyed instances are filtered implicitly on the client — the dashboard only
+  // renders cards for instances returned by `listAllInstances`, which already
+  // excludes destroyed ones.
+  getUnreadCounts: baseProcedure.query(async ({ ctx }) => {
+    const rows = await readDb
+      .select({
+        channelId: channel_badge_counts.channel_id,
+        badgeCount: channel_badge_counts.badge_count,
+      })
+      .from(channel_badge_counts)
+      .where(
+        and(eq(channel_badge_counts.user_id, ctx.user.id), gt(channel_badge_counts.badge_count, 0))
+      );
+
+    return rows.map(row => ({
+      instanceId: row.channelId,
+      badgeCount: row.badgeCount,
+    }));
+  }),
 });

@@ -15,14 +15,19 @@ type KiloClawCardProps = {
     organizationName: string | null;
     status: string | null;
   };
+  unreadCount?: number;
 };
+
+function formatUnreadCount(count: number): string {
+  return count > 99 ? '99+' : String(count);
+}
 
 function formatMessagePreview(message: { text: string; senderName: string }): string {
   const text = message.text.length > 0 ? message.text : 'New message';
   return message.senderName.length > 0 ? `${message.senderName}: ${text}` : text;
 }
 
-export function KiloClawCard({ instance }: Readonly<KiloClawCardProps>) {
+export function KiloClawCard({ instance, unreadCount = 0 }: Readonly<KiloClawCardProps>) {
   const router = useRouter();
   const colors = useThemeColors();
 
@@ -38,6 +43,11 @@ export function KiloClawCard({ instance }: Readonly<KiloClawCardProps>) {
     ? `${statusLabel} · ${instance.organizationName}`
     : statusLabel;
 
+  const hasUnread = unreadCount > 0;
+  const accessibilityLabel = hasUnread
+    ? `Open ${displayName}, ${unreadCount} unread ${unreadCount === 1 ? 'message' : 'messages'}`
+    : `Open ${displayName}`;
+
   const handlePress = () => {
     router.push(`/(app)/chat/${instance.sandboxId}` as Href);
   };
@@ -46,7 +56,7 @@ export function KiloClawCard({ instance }: Readonly<KiloClawCardProps>) {
     <Pressable
       onPress={handlePress}
       className="mx-4 rounded-xl border border-border bg-card p-4 active:opacity-80"
-      accessibilityLabel={`Open ${displayName}`}
+      accessibilityLabel={accessibilityLabel}
     >
       <View className="flex-row items-center gap-3">
         <View className="h-10 w-10 items-center justify-center rounded-full bg-muted">
@@ -73,6 +83,13 @@ export function KiloClawCard({ instance }: Readonly<KiloClawCardProps>) {
             </Text>
           </View>
         </View>
+        {hasUnread ? (
+          <View className="min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5">
+            <Text className="text-xs font-semibold leading-none text-white">
+              {formatUnreadCount(unreadCount)}
+            </Text>
+          </View>
+        ) : null}
         <ChevronRight size={18} color={colors.mutedForeground} />
       </View>
 

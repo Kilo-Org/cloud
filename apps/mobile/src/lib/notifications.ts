@@ -26,6 +26,21 @@ export function setActiveChatInstance(instanceId: string | null) {
 // Keep in sync with data field in services/notifications/src/dos/NotificationChannelDO.ts
 export type NotificationData = { type: 'chat'; instanceId: string };
 
+// Runtime-validates that an arbitrary notification `data` payload matches the
+// shape we care about. Use this instead of `as NotificationData` when reading
+// from the OS-provided notification content, since push producers can evolve
+// independently of the app.
+export function parseNotificationData(data: unknown): NotificationData | null {
+  if (typeof data !== 'object' || data === null) {
+    return null;
+  }
+  const { type, instanceId } = data as { type?: unknown; instanceId?: unknown };
+  if (type === 'chat' && typeof instanceId === 'string' && instanceId.length > 0) {
+    return { type: 'chat', instanceId };
+  }
+  return null;
+}
+
 const shown = {
   shouldShowAlert: true,
   shouldPlaySound: true,

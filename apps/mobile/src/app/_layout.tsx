@@ -25,6 +25,7 @@ import {
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
+import { useUnreadCountsInvalidation } from '@/lib/hooks/use-unread-counts-invalidation';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
@@ -69,6 +70,8 @@ function RootLayoutNav() {
   const { updateRequired, isChecking: updateChecking } = useForceUpdate();
   const segments = useSegments();
   const router = useRouter();
+
+  useUnreadCountsInvalidation();
 
   const isLoading = authLoading || updateChecking;
   const inAuthGroup = segments[0] === '(auth)';

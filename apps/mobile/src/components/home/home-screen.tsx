@@ -15,6 +15,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
+import { useUnreadCounts } from '@/lib/hooks/use-unread-counts';
 import { useOrganization } from '@/lib/organization-context';
 
 type ClawInstance = NonNullable<ReturnType<typeof useAllKiloClawInstances>['data']>[number];
@@ -29,6 +30,7 @@ export function HomeScreen() {
     isPending: instancesPending,
     isError: instancesError,
   } = useAllKiloClawInstances();
+  const { byInstance: unreadByInstance } = useUnreadCounts();
   const {
     storedSessions,
     activeSessions,
@@ -74,7 +76,11 @@ export function HomeScreen() {
           </Animated.View>
         ) : (
           <Animated.View entering={FadeIn.duration(200)} className="gap-6">
-            {renderKiloClawSlot({ instances: instances ?? [], instancesError })}
+            {renderKiloClawSlot({
+              instances: instances ?? [],
+              instancesError,
+              unreadByInstance,
+            })}
 
             {renderSessionsOrPromo({
               hasAnySession,
@@ -90,14 +96,22 @@ export function HomeScreen() {
   );
 }
 
-function renderKiloClawSlot(params: { instances: ClawInstance[]; instancesError: boolean }) {
+function renderKiloClawSlot(params: {
+  instances: ClawInstance[];
+  instancesError: boolean;
+  unreadByInstance: Map<string, number>;
+}) {
   if (params.instances.length > 0) {
     return (
       <View className="gap-2">
         <SectionHeader label="KiloClaw" />
         <View className="gap-3">
           {params.instances.map(instance => (
-            <KiloClawCard key={instance.sandboxId} instance={instance} />
+            <KiloClawCard
+              key={instance.sandboxId}
+              instance={instance}
+              unreadCount={params.unreadByInstance.get(instance.sandboxId) ?? 0}
+            />
           ))}
         </View>
       </View>

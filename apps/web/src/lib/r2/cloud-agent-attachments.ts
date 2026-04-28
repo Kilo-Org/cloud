@@ -1,7 +1,9 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { APP_BUILDER_IMAGE_MAX_SIZE_BYTES } from '@/lib/app-builder/constants';
 import {
   CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION,
+  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
   CLOUD_AGENT_IMAGE_PRESIGNED_URL_EXPIRY_SECONDS,
 } from '@/lib/cloud-agent/constants';
 import type { CloudAgentImageAllowedType } from '@/lib/cloud-agent/constants';
@@ -11,6 +13,30 @@ type Service = 'app-builder' | 'cloud-agent';
 
 function getExtensionFromContentType(contentType: CloudAgentImageAllowedType): string {
   return CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION[contentType];
+}
+
+function getMaxSizeBytes(service: Service): number {
+  return service === 'app-builder'
+    ? APP_BUILDER_IMAGE_MAX_SIZE_BYTES
+    : CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES;
+}
+
+export function assertImageAttachmentSize({
+  service,
+  contentLength,
+  name,
+}: {
+  service: Service;
+  contentLength: number;
+  name?: string;
+}): void {
+  const maxSizeBytes = getMaxSizeBytes(service);
+
+  if (contentLength <= maxSizeBytes) return;
+
+  throw new Error(
+    `Image ${name ?? 'attachment'} exceeds ${maxSizeBytes / (1024 * 1024)}MB limit (${(contentLength / (1024 * 1024)).toFixed(1)}MB)`
+  );
 }
 
 export type GetImageAttachmentPathParams = {
@@ -59,6 +85,7 @@ export type GenerateImageUploadUrlResult = {
 
 export type UploadImageAttachmentParams = GetImageAttachmentPathParams & {
   body: Uint8Array;
+  name?: string;
 };
 
 export type UploadImageAttachmentResult = GetImageAttachmentPathResult;
@@ -103,6 +130,7 @@ export async function uploadImageAttachment({
   imageId,
   contentType,
   body,
+  name,
 }: UploadImageAttachmentParams): Promise<UploadImageAttachmentResult> {
   const { filename, key } = getImageAttachmentPath({
     service,
@@ -110,6 +138,12 @@ export async function uploadImageAttachment({
     messageUuid,
     imageId,
     contentType,
+  });
+
+  assertImageAttachmentSize({
+    service,
+    contentLength: body.byteLength,
+    name: name ?? filename,
   });
 
   await r2Client.send(
@@ -135,12 +169,18 @@ export async function generateImageUploadUrl({
   contentType,
   contentLength,
 }: GenerateImageUploadUrlParams): Promise<GenerateImageUploadUrlResult> {
-  const { key } = getImageAttachmentPath({
+  const { filename, key } = getImageAttachmentPath({
     service,
     userId,
     messageUuid,
     imageId,
     contentType,
+  });
+
+  assertImageAttachmentSize({
+    service,
+    contentLength,
+    name: filename,
   });
 
   const command = getImageAttachmentPutObjectCommand({

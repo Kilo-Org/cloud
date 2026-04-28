@@ -1,11 +1,10 @@
 import {
   CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
   CLOUD_AGENT_IMAGE_MAX_COUNT,
-  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
   type CloudAgentImageAllowedType,
 } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
-import { uploadImageAttachment } from '@/lib/r2/cloud-agent-attachments';
+import { assertImageAttachmentSize, uploadImageAttachment } from '@/lib/r2/cloud-agent-attachments';
 import { captureException } from '@sentry/nextjs';
 import type { Attachment, Message } from 'chat';
 import { randomUUID } from 'crypto';
@@ -52,22 +51,15 @@ export async function extractAndUploadImages(
     try {
       const imageId = randomUUID();
 
-      if (
-        typeof attachment.size === 'number' &&
-        attachment.size > CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES
-      ) {
-        throw new Error(
-          `Image ${attachment.name ?? imageId} exceeds ${CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(attachment.size / (1024 * 1024)).toFixed(1)}MB)`
-        );
+      if (typeof attachment.size === 'number') {
+        assertImageAttachmentSize({
+          service: 'cloud-agent',
+          contentLength: attachment.size,
+          name: attachment.name ?? imageId,
+        });
       }
 
       const data = await attachment.fetchData();
-
-      if (data.byteLength > CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES) {
-        throw new Error(
-          `Image ${attachment.name ?? imageId} exceeds ${CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(data.byteLength / (1024 * 1024)).toFixed(1)}MB)`
-        );
-      }
 
       const { filename } = await uploadImageAttachment({
         service: 'cloud-agent',
@@ -76,6 +68,7 @@ export async function extractAndUploadImages(
         imageId,
         contentType: attachment.mimeType,
         body: data,
+        name: attachment.name,
       });
 
       filenames.push(filename);

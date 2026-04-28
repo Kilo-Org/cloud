@@ -1384,6 +1384,68 @@ describe('POST /google/migrate-legacy', () => {
     );
   });
 
+  it('handles empty scopes and capabilities when inserting a new legacy row', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const execute = vi.fn().mockResolvedValue(undefined);
+    mockGetWorkerDb.mockReturnValue({ execute });
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValueOnce(null).mockResolvedValueOnce(
+      makeGoogleConnection(encryptionKey, {
+        credential_profile: 'legacy',
+        account_email: 'legacy@example.com',
+        account_subject: 'legacy-subject',
+        oauth_client_id: 'legacy-client-id',
+        oauth_client_secret_encrypted: encryptWithSymmetricKey(
+          'legacy-client-secret',
+          encryptionKey
+        ),
+        refresh_token_encrypted: encryptWithSymmetricKey('legacy-refresh-token', encryptionKey),
+        grants_by_source: {},
+        capabilities: [],
+        scopes: [],
+        status: 'active',
+      })
+    );
+
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: [],
+          capabilities: [],
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ migrated: true, profile: 'legacy' });
+    expect(execute).toHaveBeenCalledTimes(1);
+
+    const instanceStub = getInstanceStub(env);
+    expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'active',
+        scopes: [],
+        capabilities: [],
+      })
+    );
+  });
+
   it('does not clobber concurrent kilo_owned row when migration insert conflicts', async () => {
     const encryptionKey = Buffer.alloc(32, 7).toString('base64');
     const execute = vi.fn().mockResolvedValue(undefined);

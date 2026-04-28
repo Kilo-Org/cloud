@@ -1,6 +1,9 @@
 import { PRIMARY_DEFAULT_MODEL, preferredModels } from '@/lib/ai-gateway/models';
 import { getOrganizationById } from '@/lib/organizations/organizations';
-import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
+import {
+  createAllowPredicateFromRestrictions,
+  hasActiveModelRestrictions,
+} from '@/lib/model-allow.server';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 /**
@@ -16,14 +19,14 @@ export async function getDefaultAllowedModel(
     return globalDefault;
   }
 
-  const { modelDenyList, providerDenyList } = getEffectiveModelRestrictions(organization);
+  const restrictions = getEffectiveModelRestrictions(organization);
 
   // If no restrictions, use global default
-  if (modelDenyList.length === 0 && providerDenyList.length === 0) {
+  if (!hasActiveModelRestrictions(restrictions)) {
     return globalDefault;
   }
 
-  const isAllowed = createAllowPredicateFromDenyList(modelDenyList, providerDenyList);
+  const isAllowed = createAllowPredicateFromRestrictions(restrictions);
 
   // Check if the organization's default model is allowed
   const orgDefaultModel = organization.settings?.default_model;
@@ -43,9 +46,6 @@ export async function getDefaultAllowedModel(
   }
 
   // All models were blocked; fall back to global default
-  console.warn(
-    '[SlackBot] No allowed model found; deny list blocks all preferred models:',
-    modelDenyList
-  );
+  console.warn('[SlackBot] No allowed model found; org policy blocks all preferred models');
   return globalDefault;
 }

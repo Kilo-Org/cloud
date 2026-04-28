@@ -12,11 +12,8 @@ import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/prov
 import { applyXaiModelSettings, isXaiModel } from '@/lib/ai-gateway/providers/xai';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
-import {
-  applyAnthropicModelSettings,
-  isAnthropicModel,
-  isHaikuModel,
-} from '@/lib/ai-gateway/providers/anthropic';
+import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
+import { isAnthropicModel, isHaikuModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   getBYOKforOrganization,
   getBYOKforUser,

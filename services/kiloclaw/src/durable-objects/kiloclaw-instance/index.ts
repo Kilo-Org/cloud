@@ -2022,6 +2022,26 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('Cannot start: instance is restarting');
     }
 
+    // Duplicate-provision guard: if another recent startAsync call is still
+    // in flight we must not schedule a second background start(). The
+    // startInProgress flag in start() only protects against *concurrent*
+    // re-entry — two startAsyncs that fire their waitUntils back-to-back
+    // can still run start() sequentially after the first finishes,
+    // producing a redundant provider.startRuntime (e.g. a second Northflank
+    // deployment PATCH). reconcileStarting takes over when startingAt goes
+    // stale past STARTING_TIMEOUT_MS, so a stale starting state falls
+    // through to a fresh attempt.
+    if (this.s.status === 'starting' && this.s.startingAt !== null) {
+      const startAge = Date.now() - this.s.startingAt;
+      if (startAge < STARTING_TIMEOUT_MS) {
+        doWarn(this.s, 'startAsync: already starting within fresh window, skipping duplicate', {
+          startingAt: this.s.startingAt,
+          ageMs: startAge,
+        });
+        return;
+      }
+    }
+
     // Mark as starting so the UI can show a polling state immediately.
     // Record startingAt so reconcileStarting() can time out after STARTING_TIMEOUT_MS.
     this.s.status = 'starting';

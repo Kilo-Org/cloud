@@ -21,6 +21,10 @@ export function isXaiModel(requestedModel: string) {
   return requestedModel.startsWith('x-ai/');
 }
 
+export function isGrok4Model(model: string) {
+  return model.startsWith('x-ai/grok-4');
+}
+
 export function applyXaiModelSettings(
   requestToMutate: GatewayRequest,
   extraHeaders: Record<string, string>

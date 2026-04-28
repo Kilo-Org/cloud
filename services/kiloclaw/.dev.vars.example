@@ -43,6 +43,27 @@ DOCKER_LOCAL_API_BASE=http://127.0.0.1:23750
 DOCKER_LOCAL_IMAGE=kiloclaw:local
 DOCKER_LOCAL_PORT_RANGE=45000-45999
 
+# Northflank provider (used when KILOCLAW_DEFAULT_PROVIDER=northflank or when
+# the runtime provider rollout KV config routes this user to Northflank).
+# NF_API_TOKEN and NF_EDGE_HEADER_VALUE are always secrets; in prod they live
+# in the Workers dashboard (wrangler secret put). For local dev, add them to
+# .env.local and the dev-start script will sync them into .dev.vars.
+# @from NF_API_TOKEN
+NF_API_TOKEN=
+NF_API_BASE=https://api.northflank.com/v1
+NF_TEAM_ID=kilo-dev
+NF_REGION=us-central
+NF_DEPLOYMENT_PLAN=nf-compute-200
+NF_STORAGE_CLASS_NAME=nf-multi-rw
+NF_STORAGE_ACCESS_MODE=ReadWriteMany
+NF_VOLUME_SIZE_MB=10240
+NF_EPHEMERAL_STORAGE_MB=10240
+NF_EDGE_HEADER_NAME=x-kiloclaw-northflank-edge-dev
+# @from NF_EDGE_HEADER_VALUE
+NF_EDGE_HEADER_VALUE=dev-local-northflank-edge-secret
+NF_IMAGE_PATH_TEMPLATE=ghcr.io/kilo-org/kiloclaw:{tag}
+NF_IMAGE_CREDENTIALS_ID=
+
 # Auto-populated by dev-start from `fly auth whoami`.
 # Tags Fly machines with developer identity for cleanup.
 # @exec fly auth whoami

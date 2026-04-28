@@ -13,8 +13,10 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
-import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
+import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
+import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 /**
  * Allowlist of organization IDs that are allowed to modify experimental settings
@@ -25,9 +27,9 @@ const PRIVILEGED_ORGANIZATION_IDS = [
 ] as const;
 
 /**
- * Creates a human-readable diff message for deny list changes
+ * Creates a human-readable diff message for model/provider access changes
  */
-function createDenyListsDiffMessage(
+function createAccessListsDiffMessage(
   oldSettings: OrganizationSettings | undefined,
   newSettings: OrganizationSettings
 ): string {
@@ -42,29 +44,29 @@ function createDenyListsDiffMessage(
     const removed = [...oldModels].filter(model => !newModels.has(model));
 
     if (added.length > 0) {
-      changes.push(`Added to model deny list: ${added.join(', ')}`);
+      changes.push(`Denied models: ${added.join(', ')}`);
     }
     if (removed.length > 0) {
-      changes.push(`Removed from model deny list: ${removed.join(', ')}`);
+      changes.push(`Allowed models: ${removed.join(', ')}`);
     }
   }
 
-  if (old.provider_deny_list !== newSettings.provider_deny_list) {
-    const oldProviders = new Set(old.provider_deny_list || []);
-    const newProviders = new Set(newSettings.provider_deny_list || []);
+  if (old.provider_allow_list !== newSettings.provider_allow_list) {
+    const oldProviders = new Set(old.provider_allow_list || []);
+    const newProviders = new Set(newSettings.provider_allow_list || []);
 
     const added = [...newProviders].filter(provider => !oldProviders.has(provider));
     const removed = [...oldProviders].filter(provider => !newProviders.has(provider));
 
     if (added.length > 0) {
-      changes.push(`Added to provider deny list: ${added.join(', ')}`);
+      changes.push(`Allowed providers: ${added.join(', ')}`);
     }
     if (removed.length > 0) {
-      changes.push(`Removed from provider deny list: ${removed.join(', ')}`);
+      changes.push(`Disallowed providers: ${removed.join(', ')}`);
     }
   }
 
-  return changes.length > 0 ? changes.join('; ') : 'Updated deny lists';
+  return changes.length > 0 ? changes.join('; ') : 'Updated access lists';
 }
 
 /**
@@ -89,10 +91,20 @@ function createDefaultModelDiffMessage(
   return 'Updated default model';
 }
 
-const UpdateDenyListsInputSchema = OrganizationIdInputSchema.extend({
+const UpdateAllowListsInputSchema = OrganizationIdInputSchema.extend({
+  provider_allow_list: z.array(z.string()).optional(),
+  provider_policy_mode: z.literal('allow').optional(),
   model_deny_list: z.array(z.string()).optional(),
   provider_deny_list: z.array(z.string()).optional(),
 });
+
+function dedupeModels(values: string[]): string[] {
+  return [...new Set(values.map(value => normalizeModelId(value)))];
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
 
 const UpdateDefaultModelInputSchema = OrganizationIdInputSchema.extend({
   default_model: z.string().or(z.null()),
@@ -153,10 +165,16 @@ export const organizationsSettingsRouter = createTRPCRouter({
     }),
 
   updateAllowLists: organizationBillingMutationProcedure
-    .input(UpdateDenyListsInputSchema)
+    .input(UpdateAllowListsInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
-      const { organizationId, model_deny_list, provider_deny_list } = input;
+      const {
+        organizationId,
+        provider_allow_list,
+        provider_policy_mode,
+        model_deny_list,
+        provider_deny_list,
+      } = input;
 
       const existingOrg = await getOrganizationById(organizationId);
       if (!existingOrg) {
@@ -180,30 +198,40 @@ export const organizationsSettingsRouter = createTRPCRouter({
         ...currentSettings,
       };
 
-      if (model_deny_list !== undefined) {
-        settingsUpdate.model_deny_list = [...new Set(model_deny_list)]; // Deduplicate slugs
+      if (provider_allow_list !== undefined) {
+        settingsUpdate.provider_allow_list = dedupeStrings(provider_allow_list);
       }
-      if (provider_deny_list !== undefined) {
-        settingsUpdate.provider_deny_list = [...new Set(provider_deny_list)]; // Deduplicate slugs
+      if (provider_policy_mode !== undefined) {
+        settingsUpdate.provider_policy_mode = provider_policy_mode;
       }
 
-      // Check if default_model needs to be cleared when deny lists change
+      if (model_deny_list !== undefined) {
+        settingsUpdate.model_deny_list = dedupeModels(model_deny_list);
+      }
+      if (provider_allow_list === undefined && provider_deny_list !== undefined) {
+        settingsUpdate.provider_deny_list = dedupeStrings(provider_deny_list);
+      }
+
+      // Check if default_model needs to be cleared when access lists change
       if (
-        (model_deny_list !== undefined || provider_deny_list !== undefined) &&
+        (provider_allow_list !== undefined ||
+          provider_policy_mode !== undefined ||
+          model_deny_list !== undefined ||
+          provider_deny_list !== undefined) &&
         currentSettings.default_model
       ) {
-        const effectiveModelDenyList = settingsUpdate.model_deny_list ?? [];
-        const effectiveProviderDenyList = settingsUpdate.provider_deny_list ?? [];
-        if (effectiveModelDenyList.length > 0 || effectiveProviderDenyList.length > 0) {
-          const isAllowed = createAllowPredicateFromDenyList(
-            effectiveModelDenyList,
-            effectiveProviderDenyList
-          );
+        const isAllowed = createAllowPredicateFromRestrictions({
+          providerAllowList:
+            settingsUpdate.provider_policy_mode === 'allow'
+              ? settingsUpdate.provider_allow_list
+              : undefined,
+          modelDenyList: settingsUpdate.model_deny_list ?? [],
+          providerDenyList: settingsUpdate.provider_deny_list ?? [],
+        });
 
-          if (!(await isAllowed(currentSettings.default_model))) {
-            // Clear default_model if it's no longer allowed
-            settingsUpdate.default_model = undefined;
-          }
+        if (!(await isAllowed(currentSettings.default_model))) {
+          // Clear default_model if it's no longer allowed
+          settingsUpdate.default_model = undefined;
         }
       }
 
@@ -214,7 +242,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         actor_email: ctx.user.google_user_email,
         actor_id: ctx.user.id,
         actor_name: ctx.user.google_user_name,
-        message: createDenyListsDiffMessage(existingOrg.settings, updatedSettings),
+        message: createAccessListsDiffMessage(existingOrg.settings, updatedSettings),
         organization_id: organizationId,
       });
 
@@ -245,24 +273,15 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Validate default_model against existing model_deny_list and provider_deny_list
-      const existingDeniedModels = existingOrg.settings?.model_deny_list;
-      const existingDeniedProviders = existingOrg.settings?.provider_deny_list;
-      if (
-        (existingDeniedModels && existingDeniedModels.length > 0) ||
-        (existingDeniedProviders && existingDeniedProviders.length > 0)
-      ) {
-        const isAllowed = createAllowPredicateFromDenyList(
-          existingDeniedModels,
-          existingDeniedProviders
-        );
+      const isAllowed = createAllowPredicateFromRestrictions(
+        getEffectiveModelRestrictions(existingOrg)
+      );
 
-        if (default_model && !(await isAllowed(default_model))) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Default model '${default_model}' is not in the organization's allowed models list`,
-          });
-        }
+      if (default_model && !(await isAllowed(default_model))) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Default model '${default_model}' is not in the organization's allowed models list`,
+        });
       }
 
       // Merge with existing settings

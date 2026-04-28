@@ -27,6 +27,10 @@ const DeviceRequestsSchema = z.object({
   requests: ControllerDevicePairingResponseSchema.shape.requests,
 });
 
+// Pairing KV cache is Fly-only today. Non-Fly providers (docker-local,
+// Northflank) return null here and hit the controller directly every call.
+// Switching to a provider-neutral key (sandboxId:runtimeId) is tracked as a
+// follow-up; not worth the one-time Fly cache-miss blip in this change.
 function makeCacheKey(prefix: string, state: InstanceMutableState): string | null {
   const { flyAppName, flyMachineId } = state;
   if (!flyAppName || !flyMachineId) return null;
@@ -78,6 +82,14 @@ export async function listPairingRequests(
       throw error;
     }
     // Controller predates this route — fall through to KV cache / fly exec
+  }
+
+  if (state.provider !== 'fly') {
+    doWarn(state, 'pairing controller route unavailable on non-fly provider', {
+      provider: state.provider,
+      operation: 'listPairingRequests',
+    });
+    return { requests: [] };
   }
 
   const { flyMachineId } = state;
@@ -189,6 +201,17 @@ export async function approvePairingRequest(
     // Controller predates this route — fall through to fly exec
   }
 
+  if (state.provider !== 'fly') {
+    doWarn(state, 'pairing controller route unavailable on non-fly provider', {
+      provider: state.provider,
+      operation: 'approvePairingRequest',
+    });
+    return {
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    };
+  }
+
   const { flyMachineId } = state;
   if (!flyMachineId) {
     return {
@@ -269,6 +292,14 @@ export async function listDevicePairingRequests(
       throw error;
     }
     // Controller predates this route — fall through to KV cache / fly exec
+  }
+
+  if (state.provider !== 'fly') {
+    doWarn(state, 'pairing controller route unavailable on non-fly provider', {
+      provider: state.provider,
+      operation: 'listDevicePairingRequests',
+    });
+    return { requests: [] };
   }
 
   const { flyMachineId } = state;
@@ -375,6 +406,17 @@ export async function approveDevicePairingRequest(
     // Controller predates this route — fall through to fly exec
   }
 
+  if (state.provider !== 'fly') {
+    doWarn(state, 'pairing controller route unavailable on non-fly provider', {
+      provider: state.provider,
+      operation: 'approveDevicePairingRequest',
+    });
+    return {
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    };
+  }
+
   const { flyMachineId } = state;
   if (!flyMachineId) {
     return {
@@ -420,13 +462,32 @@ export async function approveDevicePairingRequest(
 
 /**
  * Run `openclaw doctor --fix --non-interactive` on the machine.
+ *
+ * Currently Fly-only: the doctor command is invoked via the Fly Machines exec
+ * API, which has no HTTP equivalent on other providers (Northflank's exec is
+ * WebSocket-only and Node-only; see .kilo/plans for the investigation). Until
+ * a controller-side /_kilo/doctor route ships, non-Fly providers return a
+ * clear "not yet wired up" response rather than pretending the instance is
+ * down.
  */
 export async function runDoctor(
   state: InstanceMutableState,
   env: KiloClawEnv
 ): Promise<{ success: boolean; output: string }> {
+  if (state.status !== 'running' || !getRuntimeId(state)) {
+    return { success: false, output: 'Instance is not running' };
+  }
+
+  if (state.provider !== 'fly') {
+    // TODO: add controller POST /_kilo/doctor so this works on every provider.
+    return {
+      success: false,
+      output: 'Run doctor is not yet wired up for this instance',
+    };
+  }
+
   const { flyMachineId } = state;
-  if (state.status !== 'running' || !flyMachineId) {
+  if (!flyMachineId) {
     return { success: false, output: 'Instance is not running' };
   }
 

@@ -209,7 +209,11 @@ function upsertEnvValue(filePath: string, key: string, value: string): void {
 
   const regex = new RegExp(`^${escapeRegex(key)}=.*$`, 'm');
   if (regex.test(content)) {
-    fs.writeFileSync(filePath, content.replace(regex, line), 'utf-8');
+    fs.writeFileSync(
+      filePath,
+      content.replace(regex, () => line),
+      'utf-8'
+    );
     return;
   }
 
@@ -323,7 +327,8 @@ function applyPlan(plan: EnvSyncPlan, repoRoot: string): void {
       for (const kc of change.keyChanges) {
         const regex = new RegExp(`^${escapeRegex(kc.key)}=.*$`, 'm');
         if (regex.test(content)) {
-          content = content.replace(regex, `${kc.key}=${formatValue(kc.newValue)}`);
+          const line = `${kc.key}=${formatValue(kc.newValue)}`;
+          content = content.replace(regex, () => line);
         } else {
           appendLines.push(`${kc.key}=${formatValue(kc.newValue)}`);
         }
@@ -351,15 +356,16 @@ function applyPlan(plan: EnvSyncPlan, repoRoot: string): void {
       let content = existingContent;
       for (const change of plan.envDevLocalChanges) {
         const regex = new RegExp(`^${escapeRegex(change.key)}=.*$`, 'm');
+        const line = `${change.key}=${formatValue(change.newValue)}`;
         if (regex.test(content)) {
-          content = content.replace(regex, `${change.key}=${change.newValue}`);
+          content = content.replace(regex, () => line);
         } else {
-          content = content.trimEnd() + `\n${change.key}=${change.newValue}\n`;
+          content = content.trimEnd() + `\n${line}\n`;
         }
       }
       fs.writeFileSync(envDevLocalPath, content, 'utf-8');
     } else {
-      const lines = plan.envDevLocalChanges.map(c => `${c.key}=${c.newValue}`);
+      const lines = plan.envDevLocalChanges.map(c => `${c.key}=${formatValue(c.newValue)}`);
       fs.writeFileSync(envDevLocalPath, lines.join('\n') + '\n', 'utf-8');
     }
   }

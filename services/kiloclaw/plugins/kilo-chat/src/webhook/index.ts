@@ -17,7 +17,7 @@ import {
   parseActionExecutedPayload,
   parseInboundPayload,
 } from './schemas.js';
-import { dispatchInbound, handleActionExecuted } from './dispatch.js';
+import { dispatchInbound, handleActionExecuted, handleBotStatusRequest } from './dispatch.js';
 
 export type KiloChatWebhookDeps = {
   api: OpenClawPluginApi;
@@ -55,6 +55,14 @@ export function createKiloChatWebhookHandler(deps: KiloChatWebhookDeps) {
     // resolution can easily exceed that on a cold machine. If we awaited
     // completion before responding, the client would mark the message
     // "delivery failed" even when the bot actually processed it.
+    if (type === 'bot.status_request') {
+      ackAccepted(res);
+      void handleBotStatusRequest().catch(err => {
+        console.error('[kilo-chat] bot.status_request failed:', err);
+      });
+      return true;
+    }
+
     if (type === 'action.executed') {
       const actionPayload = parseActionExecutedPayload(parsed);
       if (!actionPayload) {

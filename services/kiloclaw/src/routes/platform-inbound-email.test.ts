@@ -101,6 +101,7 @@ describe('POST /inbound-email', () => {
       sandboxId: SANDBOX_ID,
       orgId: null,
       inboundEmailEnabled: true,
+      provider: 'fly',
     });
   });
 
@@ -230,6 +231,7 @@ describe('POST /inbound-email', () => {
       sandboxId: SANDBOX_ID,
       orgId: null,
       inboundEmailEnabled: false,
+      provider: 'fly',
     });
     const { env } = makeEnv();
 
@@ -289,6 +291,7 @@ describe('POST /inbound-email', () => {
       sandboxId: SANDBOX_ID,
       orgId: '22222222-2222-4222-8222-222222222222',
       inboundEmailEnabled: true,
+      provider: 'fly',
     });
     const { env, resolveDoKey } = makeEnv();
 

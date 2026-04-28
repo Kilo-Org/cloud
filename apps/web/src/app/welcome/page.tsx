@@ -18,6 +18,8 @@ export default async function WelcomePage({ searchParams }: AppPageProps) {
   const params = await searchParams;
 
   const { ideName, logoSrc, editor } = getExtensionUrl(params, await cookies());
+  const targetParam = params?.target;
+  const installTarget = targetParam === 'cli' ? 'cli' : undefined;
   // Only check credits if user is authenticated
   const hasCredits = user ? user.total_microdollars_acquired > 0 : false;
 
@@ -33,6 +35,7 @@ export default async function WelcomePage({ searchParams }: AppPageProps) {
           hasCredits={hasCredits}
           editor={editor}
           isAuthenticated={!!user}
+          installTarget={installTarget}
         />
         <div className="text-muted-foreground flex items-center justify-center text-xs">
           © {new Date().getFullYear()} Kilo Code

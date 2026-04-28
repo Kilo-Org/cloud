@@ -1,5 +1,5 @@
 import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
-import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic';
+import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type {
   MessageWithReasoning,
   OpenRouterChatCompletionRequest,

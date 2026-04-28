@@ -85,6 +85,7 @@ import {
   CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX,
   CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES,
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
+  CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
 
 type Repository = {
@@ -588,8 +589,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   // ---------------------------------------------------------------------------
   // Submit
   // ---------------------------------------------------------------------------
+  const isPromptTooLong = prompt.length > CLOUD_AGENT_PROMPT_MAX_LENGTH;
+
   const isFormValid =
     prompt.trim().length > 0 &&
+    !isPromptTooLong &&
     model.length > 0 &&
     !isPreparing &&
     !hasInsufficientBalance &&
@@ -843,7 +847,19 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             disabled={isPreparing}
+            maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
           />
+          {prompt.length >= CLOUD_AGENT_PROMPT_MAX_LENGTH * 0.9 && (
+            <p
+              className={cn(
+                'px-4 pb-1 text-xs',
+                isPromptTooLong ? 'text-red-400' : 'text-muted-foreground'
+              )}
+            >
+              {prompt.length.toLocaleString()} / {CLOUD_AGENT_PROMPT_MAX_LENGTH.toLocaleString()}{' '}
+              characters
+            </p>
+          )}
           {imageUpload.images.length > 0 && (
             <div className="px-4 pb-1">
               <ImagePreviewStrip

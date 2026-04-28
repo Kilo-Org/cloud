@@ -50,6 +50,17 @@ function buildAutoModels(): OpenRouterModel[] {
   }));
 }
 
+function formatName(model: OpenRouterModel, preferredIndex: number) {
+  const promptPrice = Number.parseFloat(model.pricing.prompt);
+  const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00003;
+  if (isExpensive) return model.name + ' ($$$$)';
+  if (model.name.endsWith(')')) return model.name;
+  const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
+  const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
+  if (isNew) return model.name + ' (new)';
+  return model.name;
+}
+
 function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const enhancedModels = models
@@ -65,20 +76,9 @@ function enhancedModelList(models: OpenRouterModel[]) {
     .concat(autoModels)
     .map((model: OpenRouterModel) => {
       const preferredIndex = preferredModels.indexOf(model.id);
-      const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
-      const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
-      const promptPrice = Number.parseFloat(model.pricing.prompt);
-      const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00003;
-      const skipSuffix = model.name.endsWith(')');
       return {
         ...model,
-        name: isExpensive
-          ? model.name + ' ($$$$)'
-          : skipSuffix
-            ? model.name
-            : isNew
-              ? model.name + ' (new)'
-              : model.name,
+        name: formatName(model, preferredIndex),
         preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
         isFree: isFreeModel(model.id),
         opencode: model.opencode ?? getOpenCodeSettings(model.id),

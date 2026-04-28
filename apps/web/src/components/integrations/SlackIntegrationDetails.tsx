@@ -21,20 +21,17 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { IS_DEVELOPMENT } from '@/lib/constants';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
-import Link from 'next/link';
 
 type SlackIntegrationDetailsProps = {
   organizationId?: string;
   success?: boolean;
   error?: string;
-  mode?: 'manage' | 'reinstall';
 };
 
 export function SlackIntegrationDetails({
   organizationId,
   success,
   error,
-  mode = 'manage',
 }: SlackIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -242,28 +239,12 @@ export function SlackIntegrationDetails({
 
   const isInstalled = installationData?.installed;
   const installation = installationData?.installation;
-  const isReinstallMode = mode === 'reinstall';
   const isStartingOAuth = isStartingSlackConnection || isFetchingOAuthUrl;
-  const slackIntegrationPath = organizationId
-    ? `/organizations/${organizationId}/integrations/slack`
-    : '/integrations/slack';
   const reinstallButtonText = isStartingOAuth ? 'Loading...' : 'Reinstall Slack';
   const connectButtonText = isStartingOAuth ? 'Loading...' : 'Connect Slack';
 
   return (
     <div className="space-y-6">
-      {isReinstallMode && (
-        <Alert variant="warning">
-          <TriangleAlert />
-          <AlertTitle>Slack permissions need to be refreshed</AlertTitle>
-          <AlertDescription>
-            Reinstall Kilo&apos;s Slack app to grant the latest permissions. Existing Kilo settings
-            for this workspace, including the selected model, will be preserved. A Slack workspace
-            admin may need to approve the reinstall.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Installation Status Card */}
       <Card>
         <CardHeader>
@@ -300,7 +281,7 @@ export function SlackIntegrationDetails({
         <CardContent className="space-y-4">
           {isInstalled && installation ? (
             <>
-              {installation.requiresReinstall && !isReinstallMode && (
+              {installation.requiresReinstall && (
                 <Alert variant="warning">
                   <TriangleAlert />
                   <AlertTitle>Reinstall Slack to restore all bot features</AlertTitle>
@@ -408,21 +389,13 @@ export function SlackIntegrationDetails({
                   </Button>
                 )}
               </div>
-
-              {isReinstallMode && (
-                <Button variant="ghost" asChild>
-                  <Link href={slackIntegrationPath}>Back to Slack integration settings</Link>
-                </Button>
-              )}
             </>
           ) : (
             <>
               {/* Not Connected State */}
               <Alert>
                 <AlertDescription>
-                  {isReinstallMode
-                    ? 'Slack is not connected yet. Connect Slack to grant Kilo the latest permissions.'
-                    : 'Connect Slack to talk with Kilo directly from your workspace.'}
+                  Connect Slack to talk with Kilo directly from your workspace.
                 </AlertDescription>
               </Alert>
 
@@ -440,14 +413,8 @@ export function SlackIntegrationDetails({
                 disabled={isStartingOAuth}
               >
                 <MessageSquare className="mr-2 h-4 w-4" />
-                {isReinstallMode ? reinstallButtonText : connectButtonText}
+                {connectButtonText}
               </Button>
-
-              {isReinstallMode && (
-                <Button variant="ghost" asChild className="w-full">
-                  <Link href={slackIntegrationPath}>Back to Slack integration settings</Link>
-                </Button>
-              )}
             </>
           )}
         </CardContent>

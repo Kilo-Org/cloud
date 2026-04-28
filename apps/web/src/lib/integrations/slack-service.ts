@@ -236,8 +236,8 @@ export async function postSlackReinstallNoticeByTeamId({
   if (!metadata.access_token) return { ok: false, error: 'No access token found' };
 
   const reinstallPath = integration.owned_by_organization_id
-    ? `/organizations/${integration.owned_by_organization_id}/integrations/slack/reinstall`
-    : '/integrations/slack/reinstall';
+    ? `/organizations/${integration.owned_by_organization_id}/integrations/slack`
+    : '/integrations/slack';
   const reinstallUrl = new URL(reinstallPath, APP_URL).toString();
   const scopeText = missingScopes.length > 0 ? ` Missing scopes: ${missingScopes.join(', ')}` : '';
 

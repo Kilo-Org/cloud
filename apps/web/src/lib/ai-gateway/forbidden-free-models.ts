@@ -13,7 +13,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'google/gemma-3-4b-it:free',
   'google/gemma-3n-e2b-it:free',
   'google/gemma-3n-e4b-it:free',
-  'google/gemma-4-26b-a4b-it:free', // usable through kilo-auto
+  'google/gemma-4-26b-a4b-it:free',
   'google/gemma-4-31b-it:free',
   'kilo/auto-free', // discontinued variant of kilo-auto/free
   'liquid/lfm-2.5-1.2b-instruct:free',
@@ -22,7 +22,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'meta-llama/llama-3.3-70b-instruct:free',
   'mistralai/mistral-small-3.1-24b-instruct:free',
   'minimax/minimax-m2.1:free',
-  'minimax/minimax-m2.5:free', // usable through kilo-auto
+  'minimax/minimax-m2.5:free',
   'moonshotai/kimi-k2.5:free',
   'nousresearch/hermes-3-llama-3.1-405b:free',
   'nvidia/nemotron-3-nano-30b-a3b:free',
@@ -41,7 +41,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'z-ai/glm-4.5-air:free',
   'z-ai/glm-4.7:free',
   'z-ai/glm-5:free',
-  claude_sonnet_clawsetup_model.public_id, // only usable through kilo-auto
+  claude_sonnet_clawsetup_model.public_id,
 ]);
 
 export function isForbiddenFreeModel(modelId: string): boolean {

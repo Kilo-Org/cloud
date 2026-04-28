@@ -43,8 +43,10 @@ export type VercelUserByokInferenceProviderId = z.infer<
 
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'byteplus-coding',
+  'chutes',
   'codestral',
   'kimi-coding',
+  'nano-gpt',
   'neuralwatt',
   'zai-coding',
 ]);
@@ -70,8 +72,10 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
+  [DirectUserByokInferenceProviderIdSchema.enum.chutes]: 'zai-org/GLM-4.7-FP8',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
+  [DirectUserByokInferenceProviderIdSchema.enum['nano-gpt']]: 'anthropic/claude-sonnet-4.6',
   [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
 } satisfies Record<UserByokProviderId, string>;

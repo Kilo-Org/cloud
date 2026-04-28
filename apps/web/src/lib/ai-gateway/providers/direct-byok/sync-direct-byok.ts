@@ -24,6 +24,17 @@ const NeuralwattModelsResponseSchema = z.object({
   ),
 });
 
+const ChutesModelsResponseSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      context_length: z.number().optional(),
+      max_model_len: z.number().optional(),
+      max_output_length: z.number().optional(),
+    })
+  ),
+});
+
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
@@ -69,29 +80,54 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     },
   },
   {
-    providerId: 'zai-coding',
+    providerId: 'chutes',
     async fetch() {
-      const response = await fetch('https://models.dev/api.json');
+      const response = await fetch('https://llm.chutes.ai/v1/models');
       if (!response.ok) {
-        throw new Error(
-          `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
-        );
+        throw new Error(`Failed to fetch Chutes models: ${response.status} ${response.statusText}`);
       }
-      const catalog = z.record(z.string(), z.unknown()).parse(await response.json());
-      const entry = catalog['zai-coding-plan'];
-      if (!entry) {
-        throw new Error('models.dev catalog missing zai-coding-plan entry');
-      }
-      const provider = ModelsDevProviderSchema.parse(entry);
-      return Object.values(provider.models).map(model => ({
+      const parsed = ChutesModelsResponseSchema.parse(await response.json());
+      return parsed.data.map(model => ({
         id: model.id,
-        name: model.name,
-        context_length: model.limit?.context,
-        max_completion_tokens: model.limit?.output,
+        context_length: model.context_length ?? model.max_model_len,
+        max_completion_tokens: model.max_output_length,
       }));
     },
   },
+  {
+    providerId: 'zai-coding',
+    async fetch() {
+      return fetchModelsDevProvider('zai-coding-plan');
+    },
+  },
+  {
+    providerId: 'nano-gpt',
+    async fetch() {
+      return fetchModelsDevProvider('nano-gpt');
+    },
+  },
 ];
+
+async function fetchModelsDevProvider(providerKey: string): Promise<RawModel[]> {
+  const response = await fetch('https://models.dev/api.json');
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
+    );
+  }
+  const catalog = z.record(z.string(), z.unknown()).parse(await response.json());
+  const entry = catalog[providerKey];
+  if (!entry) {
+    throw new Error(`models.dev catalog missing ${providerKey} entry`);
+  }
+  const provider = ModelsDevProviderSchema.parse(entry);
+  return Object.values(provider.models).map(model => ({
+    id: model.id,
+    name: model.name,
+    context_length: model.limit?.context,
+    max_completion_tokens: model.limit?.output,
+  }));
+}
 
 function stripVendorPrefix(id: string) {
   const slash = id.lastIndexOf('/');

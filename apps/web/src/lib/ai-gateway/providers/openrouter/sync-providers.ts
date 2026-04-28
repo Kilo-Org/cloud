@@ -344,10 +344,7 @@ export async function syncAndStoreProviders() {
     openrouterProviders,
   });
 
-  const openrouterModelsWithDescriptions = providers.providers.flatMap(provider =>
-    provider.models.map(model => ({ id: model.slug, description: model.description }))
-  );
-  const direct_byok_model_counts = await syncDirectByokModels(openrouterModelsWithDescriptions);
+  const direct_byok_model_counts = await syncDirectByokModels(openrouter_data);
   console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
 
   return {

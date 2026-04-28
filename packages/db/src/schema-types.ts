@@ -802,6 +802,7 @@ export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
+  description: z.string().optional(),
   type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
 });
 

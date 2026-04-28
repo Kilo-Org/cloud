@@ -6,6 +6,7 @@ import {
   type DirectByokModel,
 } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { StoredModel } from '@/lib/ai-gateway/providers/vercel/types';
 import { redisGet, redisSet } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 
@@ -156,11 +157,14 @@ async function syncProvider(
 }
 
 export async function syncDirectByokModels(
-  openrouterModelsWithDescriptions: ReadonlyArray<{ id: string; description: string }>
+  openrouterData: Record<string, StoredModel>
 ): Promise<Partial<Record<DirectUserByokInferenceProviderId, number>>> {
-  const openrouterDescriptions = new Map(
-    openrouterModelsWithDescriptions.map(model => [stripVendorPrefix(model.id), model.description])
-  );
+  const openrouterDescriptions = new Map<string, string>();
+  for (const model of Object.values(openrouterData)) {
+    if (model.description) {
+      openrouterDescriptions.set(stripVendorPrefix(model.id), model.description);
+    }
+  }
   const entries = await Promise.all(
     FETCHERS.map(
       async fetcher =>

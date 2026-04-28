@@ -2,7 +2,7 @@ import type { CreateSecretRequest, CreateServiceDeploymentRequest } from '@north
 import type { NorthflankProviderState } from '../../schemas/instance-config';
 import { getNorthflankProviderState } from '../../durable-objects/kiloclaw-instance/state';
 import type { RuntimeSpec, InstanceProviderAdapter } from '../types';
-import { getNorthflankConfig } from '../../northflank/config';
+import { northflankClientConfig } from '../../northflank/config';
 import {
   createDeploymentService,
   createProject,
@@ -58,20 +58,6 @@ function requireSandboxId(state: { sandboxId: string | null }): string {
     throw new Error('Provider northflank requires a sandboxId');
   }
   return state.sandboxId;
-}
-
-function northflankClientConfig(
-  env: Parameters<typeof getNorthflankConfig>[0]
-): NorthflankClientConfig {
-  const base = getNorthflankConfig(env);
-  // Always redact the edge-header secret: it's sent in request bodies
-  // (buildPortSecurity) under a non-sensitive key name (`value`), so
-  // redactUnknown's key-based heuristic does not catch it. Without this,
-  // Northflank 4xx/5xx responses that echo the submitted payload would
-  // leak the value into [northflank] api_request_failed logs and
-  // NorthflankApiError bodies.
-  const redactValues = [base.edgeHeaderValue].filter(value => value.length > 0);
-  return { ...base, redactValues };
 }
 
 async function getProvisioningNames(state: {

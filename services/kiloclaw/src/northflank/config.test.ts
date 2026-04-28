@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getNorthflankConfig, NORTHFLANK_API_BASE } from './config';
+import { getNorthflankConfig, northflankClientConfig, NORTHFLANK_API_BASE } from './config';
 
 const baseEnv = {
   NF_API_TOKEN: 'nf-token',
@@ -68,5 +68,14 @@ describe('getNorthflankConfig', () => {
     expect(() => getNorthflankConfig({ ...baseEnv, NF_VOLUME_SIZE_MB: 'ten' } as never)).toThrow(
       'NF_VOLUME_SIZE_MB must be a positive integer'
     );
+  });
+});
+
+describe('northflankClientConfig', () => {
+  it('redacts the ingress edge header value from every Northflank client', () => {
+    expect(northflankClientConfig(baseEnv as never)).toEqual({
+      ...getNorthflankConfig(baseEnv as never),
+      redactValues: ['edge-secret'],
+    });
   });
 });

@@ -1,4 +1,5 @@
 import type { KiloClawEnv } from '../types';
+import type { NorthflankClientConfig } from './client';
 
 export const NORTHFLANK_API_BASE = 'https://api.northflank.com/v1';
 
@@ -63,4 +64,16 @@ export function getNorthflankConfig(env: KiloClawEnv): NorthflankConfig {
     imagePathTemplate: optionalEnv(env, 'NF_IMAGE_PATH_TEMPLATE'),
     imageCredentialsId: optionalEnv(env, 'NF_IMAGE_CREDENTIALS_ID'),
   };
+}
+
+export function northflankClientConfig(env: KiloClawEnv): NorthflankClientConfig {
+  const base = getNorthflankConfig(env);
+  // Always redact the edge-header secret: it's sent in request bodies
+  // (buildPortSecurity) under a non-sensitive key name (`value`), so
+  // redactUnknown's key-based heuristic does not catch it. Without this,
+  // Northflank 4xx/5xx responses that echo the submitted payload would
+  // leak the value into [northflank] api_request_failed logs and
+  // NorthflankApiError bodies.
+  const redactValues = [base.edgeHeaderValue].filter(value => value.length > 0);
+  return { ...base, redactValues };
 }

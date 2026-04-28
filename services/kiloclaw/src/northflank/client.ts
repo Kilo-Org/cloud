@@ -52,26 +52,32 @@ const NorthflankServiceSchema = z
   .passthrough();
 const NorthflankSecretDetailsSchema = z.object({ id: z.string(), name: z.string() }).passthrough();
 
+const NorthflankPaginationSchema = z
+  .object({
+    hasNextPage: z.boolean().optional(),
+    cursor: z.string().optional(),
+  })
+  .passthrough()
+  .optional();
 const ProjectResponseSchema = z.object({ data: NorthflankProjectSchema });
 const ProjectListResponseSchema = z.object({
   data: z.object({ projects: z.array(NorthflankProjectSchema) }).passthrough(),
-  pagination: z
-    .object({
-      hasNextPage: z.boolean().optional(),
-      cursor: z.string().optional(),
-    })
-    .passthrough()
-    .optional(),
+  pagination: NorthflankPaginationSchema,
 });
 const VolumeResponseSchema = z.object({ data: NorthflankVolumeSchema });
-const VolumeListResponseSchema = z.object({ data: z.array(NorthflankVolumeSchema) });
+const VolumeListResponseSchema = z.object({
+  data: z.array(NorthflankVolumeSchema),
+  pagination: NorthflankPaginationSchema,
+});
 const ServiceResponseSchema = z.object({ data: NorthflankServiceSchema });
 const ServiceListResponseSchema = z.object({
   data: z.object({ services: z.array(NorthflankServiceSchema) }).passthrough(),
+  pagination: NorthflankPaginationSchema,
 });
 const SecretDetailsResponseSchema = z.object({ data: NorthflankSecretDetailsSchema });
 const SecretListResponseSchema = z.object({
   data: z.object({ secrets: z.array(NorthflankSecretDetailsSchema) }).passthrough(),
+  pagination: NorthflankPaginationSchema,
 });
 
 export type NorthflankProject = z.infer<typeof NorthflankProjectSchema>;
@@ -140,6 +146,9 @@ function northflankPath(config: NorthflankClientConfig, path: string, teamScoped
   return `${base}/teams/${encodeURIComponent(config.teamId)}${normalizedPath}`;
 }
 
+const NORTHFLANK_LIST_PER_PAGE = 100;
+const NORTHFLANK_LIST_MAX_PAGES = 50;
+
 function pathWithQuery(path: string, params: Record<string, string | number | boolean | null>) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -147,6 +156,13 @@ function pathWithQuery(path: string, params: Record<string, string | number | bo
   }
   const query = search.toString();
   return query ? `${path}?${query}` : path;
+}
+
+function paginatedPath(path: string, cursor: string | undefined): string {
+  return pathWithQuery(path, {
+    per_page: NORTHFLANK_LIST_PER_PAGE,
+    cursor: cursor ?? null,
+  });
 }
 
 function loggableNorthflankPath(url: string): string {
@@ -316,15 +332,11 @@ export async function findProjectByName(
   // in use, so a first-page-only lookup would silently miss existing
   // projects and the caller would then try to re-create them — hitting a
   // 409 conflict whose recovery also does a first-page lookup.
-  const PER_PAGE = 100; // Northflank API max
-  const MAX_PAGES = 50; // hard safety bound; covers 5000 projects per team
   let cursor: string | undefined;
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const params = new URLSearchParams({ per_page: String(PER_PAGE) });
-    if (cursor) params.set('cursor', cursor);
+  for (let page = 0; page < NORTHFLANK_LIST_MAX_PAGES; page++) {
     const response = await requestJson(
       config,
-      `/projects?${params.toString()}`,
+      paginatedPath('/projects', cursor),
       undefined,
       ProjectListResponseSchema,
       [200],
@@ -406,7 +418,7 @@ export async function listVolumes(
 ): Promise<NorthflankVolume[]> {
   const response = await requestJson(
     config,
-    `/projects/${encodeURIComponent(projectId)}/volumes`,
+    paginatedPath(`/projects/${encodeURIComponent(projectId)}/volumes`, undefined),
     undefined,
     VolumeListResponseSchema,
     [200],
@@ -420,8 +432,23 @@ export async function findVolumeByName(
   projectId: string,
   name: string
 ): Promise<NorthflankVolume | null> {
-  const volumes = await listVolumes(config, projectId);
-  return volumes.find(volume => volume.name === name) ?? null;
+  let cursor: string | undefined;
+  for (let page = 0; page < NORTHFLANK_LIST_MAX_PAGES; page++) {
+    const response = await requestJson(
+      config,
+      paginatedPath(`/projects/${encodeURIComponent(projectId)}/volumes`, cursor),
+      undefined,
+      VolumeListResponseSchema,
+      [200],
+      'findVolumeByName'
+    );
+    const match = response.data.find(volume => volume.name === name);
+    if (match) return match;
+    const pagination = response.pagination;
+    if (!pagination?.hasNextPage || !pagination.cursor) return null;
+    cursor = pagination.cursor;
+  }
+  return null;
 }
 
 export async function getVolume(
@@ -493,7 +520,7 @@ export async function listServices(
 ): Promise<{ services: NorthflankService[]; hasNextPage: boolean }> {
   const response = await requestJson(
     config,
-    `/projects/${encodeURIComponent(projectId)}/services`,
+    paginatedPath(`/projects/${encodeURIComponent(projectId)}/services`, undefined),
     undefined,
     ServiceListResponseSchema,
     [200],
@@ -507,8 +534,23 @@ export async function findServiceByName(
   projectId: string,
   name: string
 ): Promise<NorthflankService | null> {
-  const result = await listServices(config, projectId);
-  return result.services.find(service => service.name === name) ?? null;
+  let cursor: string | undefined;
+  for (let page = 0; page < NORTHFLANK_LIST_MAX_PAGES; page++) {
+    const response = await requestJson(
+      config,
+      paginatedPath(`/projects/${encodeURIComponent(projectId)}/services`, cursor),
+      undefined,
+      ServiceListResponseSchema,
+      [200],
+      'findServiceByName'
+    );
+    const match = response.data.services.find(service => service.name === name);
+    if (match) return match;
+    const pagination = response.pagination;
+    if (!pagination?.hasNextPage || !pagination.cursor) return null;
+    cursor = pagination.cursor;
+  }
+  return null;
 }
 
 export async function getService(
@@ -624,16 +666,24 @@ export async function findProjectSecretByName(
   projectId: string,
   name: string
 ): Promise<NorthflankSecretDetails | null> {
-  const response = await requestJson(
-    config,
-    `/projects/${encodeURIComponent(projectId)}/secrets`,
-    undefined,
-    SecretListResponseSchema,
-    [200],
-    'findProjectSecretByName',
-    { teamScoped: false }
-  );
-  return response.data.secrets.find(secret => secret.name === name) ?? null;
+  let cursor: string | undefined;
+  for (let page = 0; page < NORTHFLANK_LIST_MAX_PAGES; page++) {
+    const response = await requestJson(
+      config,
+      paginatedPath(`/projects/${encodeURIComponent(projectId)}/secrets`, cursor),
+      undefined,
+      SecretListResponseSchema,
+      [200],
+      'findProjectSecretByName',
+      { teamScoped: false }
+    );
+    const match = response.data.secrets.find(secret => secret.name === name);
+    if (match) return match;
+    const pagination = response.pagination;
+    if (!pagination?.hasNextPage || !pagination.cursor) return null;
+    cursor = pagination.cursor;
+  }
+  return null;
 }
 
 export async function getProjectSecretDetails(

@@ -21,7 +21,7 @@ import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
 } from '@kilocode/worker-utils/instance-id';
-import { getNorthflankConfig } from '../../northflank/config';
+import { northflankClientConfig } from '../../northflank/config';
 import {
   findProjectByName,
   findProjectSecretByName,
@@ -63,14 +63,14 @@ async function recoverNorthflankProviderState(
   env: KiloClawEnv,
   sandboxId: string
 ): Promise<NorthflankProviderState> {
-  const config = getNorthflankConfig(env);
+  const config = northflankClientConfig(env);
   const names = await northflankResourceNames(sandboxId);
   const project = await findProjectByName(config, names.projectName);
-  const volume = project ? await findVolumeByName(config, project.id, names.volumeName) : null;
-  const service = project ? await findServiceByName(config, project.id, names.serviceName) : null;
-  const secret = project
-    ? await findProjectSecretByName(config, project.id, names.secretName)
-    : null;
+  const [volume, service, secret] = await Promise.all([
+    project ? findVolumeByName(config, project.id, names.volumeName) : Promise.resolve(null),
+    project ? findServiceByName(config, project.id, names.serviceName) : Promise.resolve(null),
+    project ? findProjectSecretByName(config, project.id, names.secretName) : Promise.resolve(null),
+  ]);
 
   return {
     provider: 'northflank',

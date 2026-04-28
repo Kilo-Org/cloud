@@ -29,8 +29,6 @@ export type ResolvedAutoModel = {
   verbosity?: Verbosity;
 };
 
-export const GPT_53_CODEX_ID = 'openai/gpt-5.3-codex';
-
 export const KILO_AUTO_LEGACY_MODEL = 'kilo/auto'; // hardcoded in upstream OpenClaw
 
 export const modeSchema = z.enum([
@@ -78,14 +76,14 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: SONNET_FRONTIER,
 };
 
-export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
-  model: GPT_53_CODEX_ID,
+export const BALANCED_RESPONSES_FALLBACK_MODEL: ResolvedAutoModel = {
+  model: 'openai/gpt-5.5',
   reasoning: { enabled: true, effort: 'low' },
 };
 
-export const BALANCED_HAIKU_MODEL: ResolvedAutoModel = {
-  model: 'anthropic/claude-haiku-4.5',
-  reasoning: { enabled: true, effort: 'medium' },
+export const BALANCED_MESSAGES_FALLBACK_MODEL: ResolvedAutoModel = {
+  model: CLAUDE_SONNET_CURRENT_MODEL_ID,
+  reasoning: { enabled: true, effort: 'low' },
 };
 
 export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
@@ -137,7 +135,7 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Kilo Auto Balanced',
   description: 'Great balance of price and capability.',
-  context_length: 400_000,
+  context_length: 1_000_000,
   max_completion_tokens: 65_536,
   prompt_price: '0.000000325',
   completion_price: '0.00000195',
@@ -146,7 +144,7 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   supports_images: true,
   supports_pdf: false,
   opencode_settings: {
-    ai_sdk_provider: 'openai-compatible',
+    ai_sdk_provider: 'alibaba',
   },
 };
 

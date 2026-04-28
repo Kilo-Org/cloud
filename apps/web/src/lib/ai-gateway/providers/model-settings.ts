@@ -95,11 +95,12 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
 
 function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
   if (qwen36_plus_model.public_id === model) {
-    // with 'openai' prompt caching doesn't seem to work
-    return 'openai-compatible';
+    // with 'openai' (Responses) prompt caching doesn't work
+    // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
+    return 'alibaba';
   }
   if (seed_20_pro_free_model.public_id === model) {
-    // with 'openai' a bunch of bugs in vercel ai sdk v5 get triggered
+    // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
   }
   if (isAnthropicModel(model)) {

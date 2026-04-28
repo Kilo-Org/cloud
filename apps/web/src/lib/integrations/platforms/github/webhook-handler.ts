@@ -25,6 +25,7 @@ import {
   handleIssue,
   handlePRReviewComment,
 } from '@/lib/integrations/platforms/github/webhook-handlers';
+import { upsertSessionPullRequestsFromWebhook } from '@/lib/integrations/platforms/github/webhook-handlers/upsert-session-pull-request';
 import { PLATFORM, GITHUB_EVENT, GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
@@ -391,7 +392,14 @@ export async function handleGitHubWebhook(
 
       const action = parseResult.data.action;
 
-      // Filter out closed events - we don't log or process them
+      // Side-effect: keep cli_session_pull_requests in sync with the PR's head
+      // repo + branch. Runs BEFORE the closed-event early-return so that
+      // merged/closed state is persisted. Fires for opened / reopened /
+      // edited / synchronize / closed; no-op for other actions. Errors are
+      // captured internally and never throw.
+      await upsertSessionPullRequestsFromWebhook(parseResult.data);
+
+      // Filter out closed events - we don't log or process them further
       if (action === GITHUB_ACTION.CLOSED) {
         return NextResponse.json({ message: 'Event received' }, { status: 200 });
       }

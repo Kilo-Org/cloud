@@ -20,11 +20,34 @@ const UPSERT_ACTIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Derive `{ host, ownerRepo }` from an http(s) URL so we can synthesize the
+ * equivalent `git@host:owner/repo(.git)?` ssh forms. Returns null when the
+ * URL cannot be parsed or does not look like `/<owner>/<repo>`.
+ */
+function extractHostAndOwnerRepo(
+  httpUrl: string
+): { host: string; ownerRepo: string } | null {
+  try {
+    const parsed = new URL(httpUrl);
+    const pathname = parsed.pathname.replace(/^\/+/, '').replace(/\/+$/, '');
+    if (pathname === '') return null;
+    const ownerRepo = pathname.endsWith('.git')
+      ? pathname.slice(0, -'.git'.length)
+      : pathname;
+    if (!ownerRepo.includes('/')) return null;
+    return { host: parsed.host, ownerRepo };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Build the set of git_url values to look up against `cli_sessions_v2`. The
  * CLI stores whatever URL the user originally passed, so we try every shape
- * GitHub gives us in the webhook (verbatim and `.git`-suffixed) plus the
- * canonical normalized form. All variants share the same `(git_url, git_branch)`
- * index lookup, so adding extra candidates is cheap.
+ * GitHub gives us in the webhook (verbatim and `.git`-suffixed), the canonical
+ * normalized form, and the equivalent `git@host:owner/repo(.git)?` ssh forms.
+ * All variants share the same `(git_url, git_branch)` index lookup, so adding
+ * extra candidates is cheap.
  */
 function buildGitUrlCandidates(headRepo: { clone_url?: string; html_url?: string }): string[] {
   const out = new Set<string>();
@@ -37,6 +60,13 @@ function buildGitUrlCandidates(headRepo: { clone_url?: string; html_url?: string
     out.add(html_url);
     out.add(`${html_url}.git`);
     out.add(normalizeGitUrl(html_url));
+  }
+  for (const httpUrl of [clone_url, html_url]) {
+    if (!httpUrl) continue;
+    const parts = extractHostAndOwnerRepo(httpUrl);
+    if (!parts) continue;
+    out.add(`git@${parts.host}:${parts.ownerRepo}.git`);
+    out.add(`git@${parts.host}:${parts.ownerRepo}`);
   }
   return [...out];
 }

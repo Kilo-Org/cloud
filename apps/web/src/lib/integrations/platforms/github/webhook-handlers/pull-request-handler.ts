@@ -25,7 +25,6 @@ import {
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
-import { upsertSessionPullRequestsFromWebhook } from './upsert-session-pull-request';
 import { APP_URL } from '@/lib/constants';
 
 /**
@@ -495,12 +494,6 @@ export async function handlePullRequest(
   integration: PlatformIntegration
 ) {
   const { action } = payload;
-
-  // Side-effect: keep cli_session_pull_requests in sync with the PR's head
-  // repo + branch. Fires on opened / reopened / edited / synchronize / closed
-  // and is a no-op for other actions. Errors are captured internally so this
-  // never blocks the code-review routing below.
-  await upsertSessionPullRequestsFromWebhook(payload);
 
   switch (action) {
     case GITHUB_ACTION.OPENED:

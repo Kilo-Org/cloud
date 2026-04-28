@@ -1,6 +1,7 @@
 import { createGateway, generateText } from 'ai';
 import * as z from 'zod';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   DirectByokModelSchema,
   type DirectByokModel,
@@ -163,9 +164,13 @@ async function syncProvider(
   const previousById = new Map(previous.map(model => [model.id, model]));
 
   const fetched = await fetcher.fetch();
+  const curatedIds = new Set(
+    DIRECT_BYOK_PROVIDERS.find(p => p.id === fetcher.providerId)?.models.map(m => m.id) ?? []
+  );
+  const restricted = curatedIds.size > 0 ? fetched.filter(m => curatedIds.has(m.id)) : fetched;
   const models: DirectByokModel[] = [];
 
-  for (const raw of fetched) {
+  for (const raw of restricted) {
     const prior = previousById.get(raw.id);
     const name = raw.name ?? prior?.name ?? raw.id;
     const openrouterDescription = openrouterDescriptions.get(stripVendorPrefix(raw.id));

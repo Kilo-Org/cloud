@@ -79,14 +79,7 @@ export function OrganizationProvidersAndModelsConfigurationCard({
     }
 
     const settings = organizationData.settings;
-    const providerAllowList =
-      settings?.provider_policy_mode === 'allow'
-        ? settings.provider_allow_list
-        : settings?.provider_deny_list
-          ? openRouterProviders
-              .filter(provider => !settings.provider_deny_list?.includes(provider.slug))
-              .map(provider => provider.slug)
-          : undefined;
+    const providerAllowList = settings?.provider_allow_list;
 
     return computeProviderSelectionsForSummaryCard({
       openRouterProviders,

@@ -1495,7 +1495,6 @@ describe('L3: Enterprise-to-Teams plan transition preserves access lists', () =>
         plan: 'enterprise',
         settings: {
           model_deny_list: ['gpt-4', 'claude-3-opus'],
-          provider_policy_mode: 'allow',
           provider_allow_list: ['openai'],
         },
       })
@@ -1545,7 +1544,6 @@ describe('L3: Enterprise-to-Teams plan transition preserves access lists', () =>
 
     expect(updatedOrg.plan).toBe('teams');
     expect(updatedOrg.settings.model_deny_list).toEqual(['gpt-4', 'claude-3-opus']);
-    expect(updatedOrg.settings.provider_policy_mode).toBe('allow');
     expect(updatedOrg.settings.provider_allow_list).toEqual(['openai']);
 
     // Process a subscription event that transitions back to 'enterprise'
@@ -1581,7 +1579,6 @@ describe('L3: Enterprise-to-Teams plan transition preserves access lists', () =>
 
     expect(updatedOrg.plan).toBe('enterprise');
     expect(updatedOrg.settings.model_deny_list).toEqual(['gpt-4', 'claude-3-opus']);
-    expect(updatedOrg.settings.provider_policy_mode).toBe('allow');
     expect(updatedOrg.settings.provider_allow_list).toEqual(['openai']);
   });
 });

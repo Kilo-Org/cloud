@@ -190,14 +190,23 @@ export function listAgents(sql: SqlStorage, filter?: AgentFilter): Agent[] {
 }
 
 export function updateAgentStatus(sql: SqlStorage, agentId: string, status: string): void {
+  // Set stalled_at when transitioning into `stalled`, clear it when transitioning
+  // out. The reconciler uses stalled_at (not last_activity_at) to measure how
+  // long an agent has been stalled, so the 2.5h recovery window is anchored to
+  // the stall event rather than the last heartbeat (which keeps arriving while
+  // the container is still running post-GUPP force-stop).
   query(
     sql,
     /* sql */ `
       UPDATE ${agent_metadata}
-      SET ${agent_metadata.columns.status} = ?
+      SET ${agent_metadata.columns.status} = ?,
+          ${agent_metadata.columns.stalled_at} = CASE
+            WHEN ? = 'stalled' THEN COALESCE(${agent_metadata.columns.stalled_at}, ?)
+            ELSE NULL
+          END
       WHERE ${agent_metadata.bead_id} = ?
     `,
-    [status, agentId]
+    [status, status, now(), agentId]
   );
 }
 

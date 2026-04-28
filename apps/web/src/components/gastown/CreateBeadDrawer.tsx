@@ -82,22 +82,28 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
     }
   }, [isOpen]);
 
-  // Debounced AI enrichment
+  // Debounced AI enrichment.
+  // Advance the sequence number on every body change (not just when the
+  // debounced request fires) so any in-flight response from a previous
+  // edit is discarded the moment the user keeps typing. Without this, a
+  // response to an older body could arrive before the debounce timer for
+  // the newer body elapses and overwrite the draft with stale suggestions.
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
+    const seq = ++enrichSeqRef.current;
+
     if (body.length > 20) {
       debounceRef.current = setTimeout(() => {
-        const seq = ++enrichSeqRef.current;
         setIsEnriching(true);
         enrichBead.mutate(
           { body, townId },
           {
             onSuccess: result => {
-              // Discard the response if a newer request has since been fired
-              // or if the drawer has been closed and state has been reset.
+              // Discard the response if a newer edit has since superseded
+              // this request or if the drawer has been closed and state reset.
               if (seq !== enrichSeqRef.current) return;
               setIsEnriching(false);
               if (result) {

@@ -160,6 +160,7 @@ const AgentRow = AgentMetadataRecord.pick({
   last_event_type: true,
   last_event_at: true,
   active_tools: true,
+  stalled_at: true,
 }).extend({
   // Joined from beads table
   rig_id: BeadRecord.shape.rig_id,
@@ -746,6 +747,7 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
                  ${agent_metadata.status}, ${agent_metadata.current_hook_bead_id},
                  ${agent_metadata.dispatch_attempts},
                  ${agent_metadata.last_activity_at},
+                 ${agent_metadata.stalled_at},
                  b.${beads.columns.rig_id}
           FROM ${agent_metadata}
           LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
@@ -756,8 +758,12 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
     ]);
 
     for (const agent of longStalledAgents) {
-      if (!agent.last_activity_at) continue;
-      const stalledMs = Date.now() - new Date(agent.last_activity_at).getTime();
+      // Measure stalled duration from when the agent entered `stalled`,
+      // not from last_activity_at. Heartbeats keep arriving after GUPP
+      // force-stops a stalled container, which would otherwise collapse
+      // the 2.5h recovery window down to ~30min.
+      if (!agent.stalled_at) continue;
+      const stalledMs = Date.now() - new Date(agent.stalled_at).getTime();
       if (stalledMs <= STALLED_AUTO_IDLE_MS) continue;
 
       actions.push({

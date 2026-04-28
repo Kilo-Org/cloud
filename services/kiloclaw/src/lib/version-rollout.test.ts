@@ -116,7 +116,7 @@ describe('selectImageVersionForInstance', () => {
     }
   });
 
-  it('does not re-select the candidate if instance is already on it', async () => {
+  it('falls through to :latest when instance is already on the candidate', async () => {
     const kv = createJsonKV();
     await kv.put(imageVersionLatestKey('default'), JSON.stringify(entry('img-stable', 0, true)));
     await kv.put(imageVersionCandidateKey('default'), JSON.stringify(entry('img-candidate', 100)));
@@ -127,8 +127,10 @@ describe('selectImageVersionForInstance', () => {
       instanceId: 'instance-1',
       currentImageTag: 'img-candidate',
     });
-    // No upgrade — already on the candidate. Stable is older / not a forward step.
-    expect(result?.imageTag).not.toBe('img-candidate');
+    // The candidate is skipped (already on it). The latest pointer differs
+    // from the current tag, so the resolver returns it. Asserting the exact
+    // value catches a regression where the function returns null instead.
+    expect(result?.imageTag).toBe('img-stable');
   });
 
   it('treats percent=0 candidate as not-rolled-out (no one qualifies)', async () => {

@@ -46,6 +46,14 @@ export function imageVersionLatestKey(variant: string): string {
 }
 
 /**
+ * KV key for direct tag-to-entry lookup. Enables O(1) resolution of pinned
+ * image tags during provision and lookups by tag during rollout selection.
+ */
+export function imageVersionTagKey(imageTag: string): string {
+  return `image-version-tag:${imageTag}`;
+}
+
+/**
  * KV key for the tag index — a JSON array of image_tag strings.
  * Used by updateTagIndex() to maintain a fast lookup of registered tags.
  */

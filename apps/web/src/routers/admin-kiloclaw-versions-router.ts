@@ -143,6 +143,12 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
           .from(kiloclaw_image_catalog)
           .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag))
           .limit(1);
+        if (!updated) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Version not found after disable',
+          });
+        }
         return updated;
       }
 

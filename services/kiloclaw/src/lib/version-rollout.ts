@@ -22,6 +22,7 @@ import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import {
   ImageVersionEntrySchema,
   imageVersionLatestKey,
+  imageVersionTagKey,
   type ImageVariant,
   type ImageVersionEntry,
 } from '../schemas/image-version';
@@ -29,10 +30,6 @@ import { rolloutBucket } from './rollout-bucket';
 
 export function imageVersionCandidateKey(variant: string): string {
   return `image-version:candidate:${variant}`;
-}
-
-export function imageVersionTagKey(imageTag: string): string {
-  return `image-version-tag:${imageTag}`;
 }
 
 async function readPointer(kv: KVNamespace, key: string): Promise<ImageVersionEntry | null> {

@@ -2,18 +2,11 @@ import {
   ImageVersionEntrySchema,
   imageVersionKey,
   imageVersionLatestKey,
+  imageVersionTagKey,
   IMAGE_VERSION_INDEX_KEY,
 } from '../schemas/image-version';
 import type { ImageVersionEntry, ImageVariant } from '../schemas/image-version';
 import { upsertCatalogVersion } from './catalog-registration';
-
-/**
- * KV key for direct tag-to-entry lookup.
- * Enables O(1) resolution of pinned image tags during provision.
- */
-function imageVersionTagKey(imageTag: string): string {
-  return `image-version-tag:${imageTag}`;
-}
 
 /**
  * Read `image-version:latest:<variant>` from KV.

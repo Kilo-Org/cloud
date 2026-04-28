@@ -689,11 +689,33 @@ function parseRateLimitResetAt(error: unknown): Date {
   return new Date(Date.now() + 60_000);
 }
 
+function getErrorMessage(error: unknown): string {
+  if (typeof error !== 'object' || error === null) return '';
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' ? message : '';
+}
+
 function isRateLimitError(error: unknown): boolean {
   if (!isHttpError(error)) return false;
-  if (error.status === 403 || error.status === 429) return true;
+  // 429 is unambiguously rate limiting.
+  if (error.status === 429) return true;
+  // `x-ratelimit-remaining: 0` signals the primary rate limit is exhausted
+  // regardless of status.
   const remaining = getResponseHeader(error, 'x-ratelimit-remaining');
-  return remaining === '0';
+  if (remaining === '0') return true;
+  // 403 is overloaded: it can mean rate/abuse limiting OR a plain permission
+  // denial (e.g. installation lacks pull request access). Only treat 403 as
+  // rate-limited when the message indicates so, so that genuine permission
+  // failures are surfaced to the caller.
+  if (error.status === 403) {
+    const message = getErrorMessage(error).toLowerCase();
+    return (
+      message.includes('rate limit') ||
+      message.includes('secondary rate limit') ||
+      message.includes('abuse')
+    );
+  }
+  return false;
 }
 
 /**

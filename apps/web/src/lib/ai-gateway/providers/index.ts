@@ -12,11 +12,8 @@ import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/prov
 import { applyXaiModelSettings, isXaiModel } from '@/lib/ai-gateway/providers/xai';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
-import {
-  applyAnthropicModelSettings,
-  isAnthropicModel,
-  isHaikuModel,
-} from '@/lib/ai-gateway/providers/anthropic';
+import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
+import { isAnthropicModel, isHaikuModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
@@ -47,6 +44,7 @@ import {
   injectReasoningIntoContent,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isStepFunModel } from '@/lib/ai-gateway/providers/stepfun';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 
 function inferSupportedChatApis(
   aiSdkProvider: CustomLlmProvider | undefined,
@@ -291,7 +289,8 @@ export function applyProviderSpecificLogic(
   requestedModel: string,
   requestToMutate: GatewayRequest,
   extraHeaders: Record<string, string>,
-  userByok: BYOKResult[] | null
+  userByok: BYOKResult[] | null,
+  originalHeaders: FraudDetectionHeaders
 ) {
   const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   if (kiloExclusiveModel) {
@@ -334,6 +333,7 @@ export function applyProviderSpecificLogic(
   provider.transformRequest({
     model: requestedModel,
     request: requestToMutate,
+    originalHeaders,
     extraHeaders,
     userByok,
   });

@@ -1,0 +1,3 @@
+# Local backend URL used by o11y when it needs to call the Kilo API.
+# @url nextjs
+O11Y_API_BASE_URL=http://localhost:3000

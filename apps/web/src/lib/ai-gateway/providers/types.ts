@@ -1,5 +1,6 @@
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 
 export type ProviderId =
   | 'openrouter'
@@ -22,6 +23,7 @@ export type BYOKResult = {
 export type TransformRequestContext = {
   model: string;
   request: GatewayRequest;
+  originalHeaders: FraudDetectionHeaders;
   extraHeaders: Record<string, string>;
   userByok: BYOKResult[] | null;
 };

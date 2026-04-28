@@ -2,14 +2,6 @@ import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/reque
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { normalizeToolCallIds } from '@/lib/ai-gateway/tool-calling';
 
-export function isAnthropicModel(requestedModel: string) {
-  return requestedModel.startsWith('anthropic/');
-}
-
-export function isHaikuModel(requestedModel: string) {
-  return requestedModel.startsWith('anthropic/claude-haiku');
-}
-
 function appendAnthropicBetaHeader(extraHeaders: Record<string, string>, betaFlag: string) {
   for (const header of ['anthropic-beta', 'x-anthropic-beta']) {
     extraHeaders[header] = [extraHeaders[header], betaFlag].filter(Boolean).join(',');

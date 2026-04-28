@@ -8,7 +8,7 @@ import type { OpenClawPluginApi } from 'openclaw/plugin-sdk/plugin-entry';
 import { createNormalizedOutboundDeliverer } from 'openclaw/plugin-sdk/reply-payload';
 import { resolveApprovalOverGateway } from 'openclaw/plugin-sdk/approval-gateway-runtime';
 
-import { createKiloChatClient } from '../client.js';
+import { createKiloChatClient, type KiloChatClient } from '../client.js';
 import { resolveControllerUrl, resolveGatewayToken } from '../env.js';
 import { DEFAULT_ACCOUNT_ID } from '../channel.js';
 import { readSessionUsage, toContextPayload } from '../bot-status.js';
@@ -28,6 +28,21 @@ export async function handleActionExecuted(
     senderId: payload.executedBy,
     clientDisplayName: 'Kilo Chat',
   });
+}
+
+// Replies to kilo-chat's `bot.status_request` webhook. Reaching this handler
+// at all means the plugin is alive and reachable, so we publish `online: true`
+// with the current timestamp. Definitive offline signals (machine gone) are
+// detected upstream when the webhook fails to deliver. The `client` arg is
+// injectable for tests; production callers omit it.
+export async function handleBotStatusRequest(client?: KiloChatClient): Promise<void> {
+  const c =
+    client ??
+    createKiloChatClient({
+      controllerBaseUrl: resolveControllerUrl(),
+      gatewayToken: resolveGatewayToken(),
+    });
+  await c.sendBotStatus({ online: true, at: Date.now() });
 }
 
 function readSessionStore(cfg: unknown): string | undefined {

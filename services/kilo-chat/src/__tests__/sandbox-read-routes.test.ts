@@ -99,10 +99,10 @@ describe('GET /v1/sandboxes/:sandboxId/bot-status', () => {
     expect(res.status).toBe(401);
   });
 
-  it('404 when sandbox does not exist (no owner mapping)', async () => {
+  it('403 when sandbox does not exist (no owner mapping)', async () => {
     const app = makeReadAppAs('user-missing');
     const res = await app.request('/v1/sandboxes/sandbox-missing/bot-status', {}, makeEnv());
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(403);
   });
 
   it('403 when caller is not the sandbox owner', async () => {
@@ -137,6 +137,82 @@ describe('GET /v1/sandboxes/:sandboxId/bot-status', () => {
     expect(body.status.online).toBe(true);
     expect(body.status.at).toBe(1700000000000);
     expect(typeof body.status.updatedAt).toBe('number');
+  });
+});
+
+describe('POST /v1/sandboxes/:sandboxId/request-bot-status', () => {
+  type RecordingKiloclaw = typeof env.KILOCLAW & {
+    __recordedWebhookCalls(): Promise<Array<Record<string, unknown>>>;
+    __clearWebhookCalls(): Promise<void>;
+  };
+  const recordingKiloclaw = env.KILOCLAW as RecordingKiloclaw;
+
+  it('401 when unauthenticated', async () => {
+    const app = makeReadApp();
+    const res = await app.request(
+      '/v1/sandboxes/sandbox-req-noauth/request-bot-status',
+      { method: 'POST' },
+      makeEnv()
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('403 when caller does not own the sandbox', async () => {
+    grantSandbox('user-req-owner', 'sandbox-req-owned');
+    const app = makeReadAppAs('user-req-other');
+    const res = await app.request(
+      '/v1/sandboxes/sandbox-req-owned/request-bot-status',
+      { method: 'POST' },
+      makeEnv()
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('fires the bot.status_request webhook when no fresh cache exists', async () => {
+    grantSandbox('user-req-fresh', 'sandbox-req-fresh');
+    await recordingKiloclaw.__clearWebhookCalls();
+
+    const app = makeReadAppAs('user-req-fresh');
+    const res = await app.request(
+      '/v1/sandboxes/sandbox-req-fresh/request-bot-status',
+      { method: 'POST' },
+      makeEnv()
+    );
+    expect(res.status).toBe(200);
+
+    const calls = await recordingKiloclaw.__recordedWebhookCalls();
+    const myCalls = calls.filter(c => c.targetBotId === 'bot:kiloclaw:sandbox-req-fresh');
+    expect(myCalls).toHaveLength(1);
+    expect(myCalls[0]).toMatchObject({
+      type: 'bot.status_request',
+      targetBotId: 'bot:kiloclaw:sandbox-req-fresh',
+    });
+  });
+
+  it('skips the webhook when cached status is fresh (dedupe)', async () => {
+    grantSandbox('user-req-dedupe', 'sandbox-req-dedupe');
+    const testEnv = makeEnv();
+    const stub = testEnv.SANDBOX_STATUS_DO.get(
+      testEnv.SANDBOX_STATUS_DO.idFromName('sandbox-req-dedupe')
+    );
+    // putBotStatus stamps `updatedAt = Date.now()`, which by definition is
+    // within the FRESH_STATUS_TTL_MS window when the request below runs.
+    await stub.putBotStatus({ online: true, at: Date.now() });
+    await recordingKiloclaw.__clearWebhookCalls();
+
+    const app = makeReadAppAs('user-req-dedupe');
+    const res = await app.request(
+      '/v1/sandboxes/sandbox-req-dedupe/request-bot-status',
+      { method: 'POST' },
+      testEnv
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json<{ ok: boolean; dedupe?: string }>();
+    expect(body.dedupe).toBe('fresh');
+
+    const calls = await recordingKiloclaw.__recordedWebhookCalls();
+    const myCalls = calls.filter(c => c.targetBotId === 'bot:kiloclaw:sandbox-req-dedupe');
+    expect(myCalls).toHaveLength(0);
   });
 });
 

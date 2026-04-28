@@ -23,6 +23,7 @@ const SLACK_DEFAULT_MODEL = KILO_AUTO_FREE_MODEL.id;
 // These should be kept in sync with the scopes requested in the Slack app configuration
 export const SLACK_SCOPES = [
   'app_mentions:read',
+  'assistant:write',
   'channels:history',
   'channels:read',
   'chat:write',

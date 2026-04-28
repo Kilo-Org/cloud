@@ -12,6 +12,7 @@ import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/prov
 import { applyXaiModelSettings, isXaiModel } from '@/lib/ai-gateway/providers/xai';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
 import { isAnthropicModel, isHaikuModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
@@ -295,11 +296,12 @@ export function applyProviderSpecificLogic(
   const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   if (kiloExclusiveModel) {
     requestToMutate.body.model = kiloExclusiveModel.internal_id;
-    if (kiloExclusiveModel.inference_provider) {
+    const inferenceProvider = getInferenceProvider(kiloExclusiveModel);
+    if (inferenceProvider) {
       if (requestToMutate.body.provider) {
-        requestToMutate.body.provider.only = [kiloExclusiveModel.inference_provider];
+        requestToMutate.body.provider.only = [inferenceProvider];
       } else {
-        requestToMutate.body.provider = { only: [kiloExclusiveModel.inference_provider] };
+        requestToMutate.body.provider = { only: [inferenceProvider] };
       }
     }
   }

@@ -1,7 +1,10 @@
 import pLimit from 'p-limit';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
-import { convertFromKiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  convertFromKiloExclusiveModel,
+  getInferenceProvider,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
@@ -165,8 +168,13 @@ async function syncProviders(providers: OpenRouterProvider[]) {
   );
 
   const mappedExtraModels = kiloExclusiveModels
-    .filter(model => model.status === 'public' && model.inference_provider)
-    .map(kfm => {
+    .flatMap(kfm => {
+      if (kfm.status !== 'public') return [];
+      const inferenceProvider = getInferenceProvider(kfm);
+      if (!inferenceProvider) return [];
+      return [{ kfm, inferenceProvider }];
+    })
+    .map(({ kfm, inferenceProvider }) => {
       const model = convertFromKiloExclusiveModel(kfm);
       return {
         model: {
@@ -188,7 +196,7 @@ async function syncProviders(providers: OpenRouterProvider[]) {
             },
           },
         },
-        provider: kfm.inference_provider,
+        provider: inferenceProvider,
       };
     });
 

@@ -1,5 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import { autoFreeModels, isFreeModel, kiloExclusiveModels } from './models';
+import { getInferenceProvider } from './providers/kilo-exclusive-model';
 
 describe('isFreeModel', () => {
   describe('free models', () => {
@@ -45,16 +46,10 @@ describe('isFreeModel', () => {
       }
     });
 
-    test('all Kilo exclusive models whose gateway is not openrouter must have inference_provider set', () => {
-      // The enterprise provider selection screen filters models by inference_provider to determine
-      // which provider a model belongs to. Without it, the screen cannot correctly display or
-      // enforce provider-level access policy for models routed through non-OpenRouter gateways.
-      const modelsWithDirectGateway = kiloExclusiveModels.filter(m => m.gateway !== 'openrouter');
-
-      expect(modelsWithDirectGateway.length).toBeGreaterThan(0);
-
-      for (const model of modelsWithDirectGateway) {
-        expect(model.inference_provider).not.toBeNull();
+    test('getInferenceProvider does not crash for any Kilo exclusive model', () => {
+      expect(kiloExclusiveModels.length).toBeGreaterThan(0);
+      for (const model of kiloExclusiveModels) {
+        expect(() => getInferenceProvider(model)).not.toThrow();
       }
     });
 

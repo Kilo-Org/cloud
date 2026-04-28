@@ -1,5 +1,8 @@
 import type { FeatureValue } from '@/lib/feature-detection';
-import type { OpenRouterInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  OpenRouterInferenceProviderIdSchema,
+  type OpenRouterInferenceProviderId,
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
 export type KiloExclusiveModelFlag = 'reasoning' | 'vision';
@@ -29,11 +32,19 @@ export type KiloExclusiveModel = {
   flags: KiloExclusiveModelFlag[];
   gateway: ProviderId;
   internal_id: string;
-  inference_provider: OpenRouterInferenceProviderId | null;
+  stealth?: boolean;
   pricing: Pricing | null;
   /** Features allowed to use this model. Empty array means no restriction. */
   exclusive_to: ReadonlyArray<FeatureValue>;
 };
+
+export function getInferenceProvider(
+  model: KiloExclusiveModel
+): OpenRouterInferenceProviderId | null {
+  if (model.stealth) return 'stealth';
+  if (model.gateway === 'openrouter' || model.gateway === 'vercel') return null;
+  return OpenRouterInferenceProviderIdSchema.parse(model.gateway);
+}
 
 function formatPricePerMillionAsPerToken(price: number): string;
 function formatPricePerMillionAsPerToken(price: number | null | undefined): string | undefined;

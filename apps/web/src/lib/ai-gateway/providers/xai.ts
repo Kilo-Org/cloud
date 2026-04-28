@@ -12,7 +12,7 @@ export const grok_code_fast_1_optimized_free_model: KiloExclusiveModel = {
   flags: ['reasoning'],
   gateway: 'martian',
   internal_id: 'x-ai/grok-code-fast-1:optimized',
-  inference_provider: 'stealth',
+  stealth: true,
   pricing: null,
   exclusive_to: [],
 };

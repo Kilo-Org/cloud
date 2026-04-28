@@ -13,15 +13,33 @@ function getExtensionFromContentType(contentType: CloudAgentImageAllowedType): s
   return CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION[contentType];
 }
 
-function getImageKey(
-  service: Service,
-  userId: string,
-  messageUuid: string,
-  imageId: string,
-  contentType: CloudAgentImageAllowedType
-): string {
+export type GetImageAttachmentPathParams = {
+  service: Service;
+  userId: string;
+  messageUuid: string;
+  imageId: string;
+  contentType: CloudAgentImageAllowedType;
+};
+
+export type GetImageAttachmentPathResult = {
+  filename: string;
+  key: string;
+};
+
+export function getImageAttachmentPath({
+  service,
+  userId,
+  messageUuid,
+  imageId,
+  contentType,
+}: GetImageAttachmentPathParams): GetImageAttachmentPathResult {
   const ext = getExtensionFromContentType(contentType);
-  return `${userId}/${service}/${messageUuid}/${imageId}.${ext}`;
+  const filename = `${imageId}.${ext}`;
+
+  return {
+    filename,
+    key: `${userId}/${service}/${messageUuid}/${filename}`,
+  };
 }
 
 export type GenerateImageUploadUrlParams = {
@@ -39,17 +57,32 @@ export type GenerateImageUploadUrlResult = {
   expiresAt: string;
 };
 
-export async function generateImageUploadUrl({
-  service,
+export type UploadImageAttachmentParams = GetImageAttachmentPathParams & {
+  body: Uint8Array;
+};
+
+export type UploadImageAttachmentResult = GetImageAttachmentPathResult;
+
+function getImageAttachmentPutObjectCommand({
+  key,
   userId,
   messageUuid,
   imageId,
   contentType,
   contentLength,
-}: GenerateImageUploadUrlParams): Promise<GenerateImageUploadUrlResult> {
-  const key = getImageKey(service, userId, messageUuid, imageId, contentType);
+  body,
+}: {
+  key: string;
+  userId: string;
+  messageUuid: string;
+  imageId: string;
+  contentType: CloudAgentImageAllowedType;
+  contentLength: number;
+  body?: Uint8Array;
+}): PutObjectCommand {
+  const bodyInput = body === undefined ? {} : { Body: body };
 
-  const command = new PutObjectCommand({
+  return new PutObjectCommand({
     Bucket: r2CloudAgentAttachmentsBucketName,
     Key: key,
     ContentType: contentType,
@@ -59,6 +92,64 @@ export async function generateImageUploadUrl({
       messageUuid,
       imageId,
     },
+    ...bodyInput,
+  });
+}
+
+export async function uploadImageAttachment({
+  service,
+  userId,
+  messageUuid,
+  imageId,
+  contentType,
+  body,
+}: UploadImageAttachmentParams): Promise<UploadImageAttachmentResult> {
+  const { filename, key } = getImageAttachmentPath({
+    service,
+    userId,
+    messageUuid,
+    imageId,
+    contentType,
+  });
+
+  await r2Client.send(
+    getImageAttachmentPutObjectCommand({
+      key,
+      userId,
+      messageUuid,
+      imageId,
+      contentType,
+      contentLength: body.byteLength,
+      body,
+    })
+  );
+
+  return { filename, key };
+}
+
+export async function generateImageUploadUrl({
+  service,
+  userId,
+  messageUuid,
+  imageId,
+  contentType,
+  contentLength,
+}: GenerateImageUploadUrlParams): Promise<GenerateImageUploadUrlResult> {
+  const { key } = getImageAttachmentPath({
+    service,
+    userId,
+    messageUuid,
+    imageId,
+    contentType,
+  });
+
+  const command = getImageAttachmentPutObjectCommand({
+    key,
+    userId,
+    messageUuid,
+    imageId,
+    contentType,
+    contentLength,
   });
 
   const signedUrl = await getSignedUrl(r2Client, command, {

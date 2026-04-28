@@ -1,13 +1,11 @@
-import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
   CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
   CLOUD_AGENT_IMAGE_MAX_COUNT,
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
-  CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION,
   type CloudAgentImageAllowedType,
 } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
-import { r2Client, r2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
+import { uploadImageAttachment } from '@/lib/r2/cloud-agent-attachments';
 import { captureException } from '@sentry/nextjs';
 import type { Attachment, Message } from 'chat';
 import { randomUUID } from 'crypto';
@@ -53,16 +51,13 @@ export async function extractAndUploadImages(
   for (const attachment of toProcess) {
     try {
       const imageId = randomUUID();
-      const ext = CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION[attachment.mimeType];
-      const filename = `${imageId}.${ext}`;
-      const r2Key = `${userId}/cloud-agent/${messageUuid}/${filename}`;
 
       if (
         typeof attachment.size === 'number' &&
         attachment.size > CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES
       ) {
         throw new Error(
-          `Image ${attachment.name ?? filename} exceeds ${CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(attachment.size / (1024 * 1024)).toFixed(1)}MB)`
+          `Image ${attachment.name ?? imageId} exceeds ${CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(attachment.size / (1024 * 1024)).toFixed(1)}MB)`
         );
       }
 
@@ -70,20 +65,18 @@ export async function extractAndUploadImages(
 
       if (data.byteLength > CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES) {
         throw new Error(
-          `Image ${attachment.name ?? filename} exceeds ${CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(data.byteLength / (1024 * 1024)).toFixed(1)}MB)`
+          `Image ${attachment.name ?? imageId} exceeds ${CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES / (1024 * 1024)}MB limit (${(data.byteLength / (1024 * 1024)).toFixed(1)}MB)`
         );
       }
 
-      await r2Client.send(
-        new PutObjectCommand({
-          Bucket: r2CloudAgentAttachmentsBucketName,
-          Key: r2Key,
-          Body: data,
-          ContentType: attachment.mimeType,
-          ContentLength: data.byteLength,
-          Metadata: { userId, messageUuid, imageId },
-        })
-      );
+      const { filename } = await uploadImageAttachment({
+        service: 'cloud-agent',
+        userId,
+        messageUuid,
+        imageId,
+        contentType: attachment.mimeType,
+        body: data,
+      });
 
       filenames.push(filename);
     } catch (error) {

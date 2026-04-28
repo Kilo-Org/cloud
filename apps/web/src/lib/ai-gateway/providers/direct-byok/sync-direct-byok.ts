@@ -5,6 +5,7 @@ import {
   DirectByokModelSchema,
   type DirectByokModel,
 } from '@/lib/ai-gateway/providers/direct-byok/types';
+import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { redisGet, redisSet } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 
@@ -45,7 +46,7 @@ type RawModel = {
 };
 
 type ProviderFetcher = {
-  providerId: string;
+  providerId: DirectUserByokInferenceProviderId;
   fetch(): Promise<RawModel[]>;
 };
 
@@ -104,7 +105,9 @@ async function generateDescription(id: string, name: string): Promise<string> {
   return text.trim();
 }
 
-async function readPreviousModels(providerId: string): Promise<DirectByokModel[]> {
+async function readPreviousModels(
+  providerId: DirectUserByokInferenceProviderId
+): Promise<DirectByokModel[]> {
   const raw = await redisGet(directByokModelsRedisKey(providerId));
   if (!raw) return [];
   return DirectByokModelArraySchema.parse(JSON.parse(raw));
@@ -137,7 +140,9 @@ async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
   return models.length;
 }
 
-export async function syncDirectByokModels(): Promise<Record<string, number>> {
+export async function syncDirectByokModels(): Promise<
+  Partial<Record<DirectUserByokInferenceProviderId, number>>
+> {
   const entries = await Promise.all(
     FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher)] as const)
   );

@@ -215,8 +215,13 @@ export function useDeleteMessage(conversationId: string | null) {
   const client = useKiloChatClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ messageId, conversationId: cid }: { messageId: string; conversationId: string }) =>
-      client.deleteMessage(messageId, { conversationId: cid }),
+    mutationFn: ({
+      messageId,
+      conversationId: cid,
+    }: {
+      messageId: string;
+      conversationId: string;
+    }) => client.deleteMessage(messageId, { conversationId: cid }),
     onMutate: async variables => {
       if (!conversationId) return;
       const queryKey = ['kilo-chat', 'messages', conversationId];

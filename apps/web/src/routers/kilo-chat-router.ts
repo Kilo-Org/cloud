@@ -13,7 +13,7 @@ export const kiloChatRouter = createTRPCRouter({
       const token = generateApiToken(
         ctx.user,
         { tokenSource: 'kilo-chat' },
-        { expiresIn: ONE_HOUR_SECONDS },
+        { expiresIn: ONE_HOUR_SECONDS }
       );
       const expiresAt = new Date(Date.now() + ONE_HOUR_SECONDS * 1000).toISOString();
       return { token, expiresAt };

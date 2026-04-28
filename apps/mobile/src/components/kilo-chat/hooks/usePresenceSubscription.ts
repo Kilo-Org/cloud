@@ -60,6 +60,6 @@ export function usePresenceSubscription(conversationId: string) {
         subscribedRef.current = false;
       }
     },
-    [conversationId, eventService],
+    [conversationId, eventService]
   );
 }

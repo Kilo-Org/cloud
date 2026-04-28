@@ -122,12 +122,10 @@ describe('dispatchPushCore', () => {
 
   it('delivers, increments badge, writes idempotency key on first delivery', async () => {
     const db = makeDbMock([{ token: 'tok-a' }, { token: 'tok-b' }], 5);
-    const sendPush = vi
-      .fn()
-      .mockResolvedValue({
-        ticketTokenPairs: [{ ticketId: 'tid-1', token: 'tok-a' }],
-        staleTokens: [],
-      });
+    const sendPush = vi.fn().mockResolvedValue({
+      ticketTokenPairs: [{ ticketId: 'tid-1', token: 'tok-a' }],
+      staleTokens: [],
+    });
     const storage = makeStorage();
     const deps = makeDeps({
       db: db as unknown as ReturnType<typeof import('@kilocode/db/client').getWorkerDb>,

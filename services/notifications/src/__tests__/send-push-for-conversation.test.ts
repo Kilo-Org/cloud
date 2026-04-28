@@ -45,11 +45,14 @@ describe('sendPushForConversationCore', () => {
 
   it('returns correct userId in perRecipient entries', async () => {
     const deps = makeDeps();
-    const out = await sendPushForConversationCore({
-      ...baseInput,
-      senderUserId: null,
-      recipientUserIds: ['r1', 'r2'],
-    }, deps);
+    const out = await sendPushForConversationCore(
+      {
+        ...baseInput,
+        senderUserId: null,
+        recipientUserIds: ['r1', 'r2'],
+      },
+      deps
+    );
 
     expect(out.perRecipient.map(r => r.userId)).toEqual(['r1', 'r2']);
   });
@@ -71,10 +74,7 @@ describe('sendPushForConversationCore', () => {
 
   it('maps outcome.kind to perRecipient outcome', async () => {
     const deps = makeDeps({ kind: 'suppressed_presence' });
-    const out = await sendPushForConversationCore(
-      { ...baseInput, recipientUserIds: ['r1'] },
-      deps
-    );
+    const out = await sendPushForConversationCore({ ...baseInput, recipientUserIds: ['r1'] }, deps);
 
     expect(out.perRecipient[0]).toEqual({ userId: 'r1', outcome: 'suppressed_presence' });
   });

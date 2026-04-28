@@ -18,7 +18,7 @@ export function useKiloChatToken() {
       return ref.current.token;
     }
     const data = await queryClient.fetchQuery(
-      trpc.kiloChat.getToken.queryOptions(undefined, { staleTime: 0 }),
+      trpc.kiloChat.getToken.queryOptions(undefined, { staleTime: 0 })
     );
     ref.current = { token: data.token, expiresAt: new Date(data.expiresAt).getTime() };
     return data.token;

@@ -54,6 +54,12 @@ describe('model access predicates', () => {
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(true);
   });
 
+  test('provider allow list permits models without OpenRouter provider metadata', async () => {
+    const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['openai'], lookup({}));
+
+    await expect(isAllowed('custom-llm-id')).resolves.toBe(true);
+  });
+
   test('provider allow list still applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       ['openai/gpt-4o'],
@@ -69,6 +75,18 @@ describe('model access predicates', () => {
       modelDenyList: ['openai/gpt-4o'],
       providerDenyList: [],
     });
+
+    await expect(isAllowed('openai/gpt-4o')).resolves.toBe(false);
+  });
+
+  test('legacy provider deny list is used when no provider allow list exists', async () => {
+    const isAllowed = createAllowPredicateFromRestrictions(
+      {
+        modelDenyList: [],
+        providerDenyList: ['openai'],
+      },
+      lookup({ 'openai/gpt-4o': ['openai'] })
+    );
 
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(false);
   });

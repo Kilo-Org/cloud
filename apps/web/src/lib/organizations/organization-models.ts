@@ -38,24 +38,8 @@ export async function getAvailableModelsForOrganization(
     filteredModels = models;
   }
 
-  const directModels = await getDirectByokModelsForOrganization(organizationId);
-  const customModels = await listAvailableCustomLlms(organizationId);
-  if (hasActiveModelRestrictions(restrictions)) {
-    const isAllowed = createAllowPredicateFromRestrictions(restrictions);
-    for (const model of directModels) {
-      if (await isAllowed(model.id)) {
-        filteredModels.push(model);
-      }
-    }
-    for (const model of customModels) {
-      if (await isAllowed(model.id)) {
-        filteredModels.push(model);
-      }
-    }
-  } else {
-    filteredModels.push(...directModels);
-    filteredModels.push(...customModels);
-  }
+  filteredModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
+  filteredModels.push(...(await listAvailableCustomLlms(organizationId)));
 
   return {
     ...responseData,

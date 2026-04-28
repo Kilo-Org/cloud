@@ -58,7 +58,7 @@ export function createAllowPredicateFromProviderAllowList(
       return true;
     }
     const providerSlugs = await providerLookup(normalizedModelId);
-    if (providerSlugs.size === 0) return false;
+    if (providerSlugs.size === 0) return true;
     return [...providerSlugs].some(slug => providerAllowSet.has(slug));
   };
 }

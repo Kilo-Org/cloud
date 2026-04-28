@@ -34,7 +34,7 @@ export function computeProviderSelectionsForSummaryCard(params: {
   modelDenyList: string[] | undefined;
 }): ProviderSelection[] | null {
   const { openRouterProviders, providerAllowList, modelDenyList } = params;
-  if (providerAllowList === undefined && modelDenyList === undefined) {
+  if (providerAllowList === undefined && (!modelDenyList || modelDenyList.length === 0)) {
     return null;
   }
 
@@ -149,7 +149,7 @@ export function OrganizationProvidersAndModelsConfigurationCard({
                   >
                     {modelCount} {modelText}
                   </button>{' '}
-                  selected
+                  allowed
                 </>
               );
             })()}

@@ -136,6 +136,26 @@ describe('organizations settings trpc router', () => {
       expect(updatedOrg?.settings?.default_model).toBeUndefined();
     });
 
+    it('should clear default_model if its provider is removed from provider_allow_list', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await updateOrganizationSettings(orgWithSettings.id, {
+        default_model: 'openai/gpt-4o',
+        model_deny_list: [],
+        provider_policy_mode: 'allow',
+        provider_allow_list: ['openai'],
+      });
+      mockedGetProviderSlugsForModel.mockResolvedValue(new Set(['openai']));
+
+      const result = await caller.organizations.settings.updateAllowLists({
+        organizationId: orgWithSettings.id,
+        provider_policy_mode: 'allow',
+        provider_allow_list: ['anthropic'],
+      });
+
+      expect(result.settings.default_model).toBeUndefined();
+    });
+
     it('should not clear default_model if it is not denied and provider remains allowed', async () => {
       const caller = await createCallerForUser(owner.id);
 
@@ -439,7 +459,7 @@ describe('organizations settings trpc router', () => {
       );
     });
 
-    it('should allow any model when deny list is empty', async () => {
+    it('should allow any model when no access policy is configured', async () => {
       const caller = await createCallerForUser(owner.id);
 
       await updateOrganizationSettings(testOrganization.id, {

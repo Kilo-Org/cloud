@@ -128,6 +128,21 @@ describe('checkOrganizationModelRestrictions', () => {
       expect(result.providerConfig).toEqual({ only: ['openai'] });
     });
 
+    it('should prefer provider_allow_list over legacy provider_deny_list after migration', () => {
+      const result = checkOrganizationModelRestrictions({
+        modelId: 'anthropic/claude-3-opus',
+        settings: {
+          provider_policy_mode: 'allow',
+          provider_allow_list: ['openai'],
+          provider_deny_list: ['openai'],
+        },
+        organizationPlan: 'enterprise',
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.providerConfig).toEqual({ only: ['openai'] });
+    });
+
     it('should ignore stale provider_allow_list without policy marker', () => {
       const result = checkOrganizationModelRestrictions({
         modelId: 'anthropic/claude-3-opus',

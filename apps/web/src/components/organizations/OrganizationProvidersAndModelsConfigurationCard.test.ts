@@ -22,6 +22,23 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     expect(selections).toBeNull();
   });
 
+  test('empty model deny list without provider policy returns null', () => {
+    const openRouterProviders = [
+      {
+        slug: 'anthropic',
+        models: [{ slug: 'anthropic/claude-3-opus', endpoint: 'chat' }],
+      },
+    ];
+
+    const selections = computeProviderSelectionsForSummaryCard({
+      openRouterProviders,
+      providerAllowList: undefined,
+      modelDenyList: [],
+    });
+
+    expect(selections).toBeNull();
+  });
+
   test('providerAllowList excludes newly synced providers not listed', () => {
     const openRouterProviders = [
       {
@@ -132,7 +149,7 @@ describe('computeProviderSelectionsForSummaryCard', () => {
 
     const selections = computeProviderSelectionsForSummaryCard({
       openRouterProviders,
-      providerAllowList: undefined,
+      providerAllowList: ['anthropic'],
       modelDenyList: [],
     });
 

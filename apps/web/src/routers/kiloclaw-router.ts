@@ -3320,19 +3320,25 @@ export const kiloclawRouter = createTRPCRouter({
   /**
    * Toggle the signed in user's own `kiloclaw_early_access` flag.
    * Self serve counterpart of admin.kiloclawInstances.setEarlyAccess.
+   *
+   * Routes through the KiloClaw platform service (same path as the admin
+   * endpoint) so writes to this flag have a single choke-point — if that
+   * route ever gains side-effects (cache bust, audit log, DO notification),
+   * both admin and self-serve paths pick them up automatically.
    */
   setMyEarlyAccess: clawAccessProcedure
     .input(z.object({ value: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      const result = await db
-        .update(kilocode_users)
-        .set({ kiloclaw_early_access: input.value })
-        .where(eq(kilocode_users.id, ctx.user.id))
-        .returning({ id: kilocode_users.id });
-      if (result.length === 0) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+      const client = new KiloClawInternalClient();
+      try {
+        const result = await client.setUserKiloclawEarlyAccess(ctx.user.id, input.value);
+        return { earlyAccess: result.earlyAccess };
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 404) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
+        throw err;
       }
-      return { earlyAccess: input.value };
     }),
 
   getMyPin: baseProcedure.query(async ({ ctx }) => {

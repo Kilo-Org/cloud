@@ -351,9 +351,6 @@ function EarlyAccessRow({ userId, initialValue }: { userId: string; initialValue
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.users.getKiloClawState.queryKey({ userId }),
         });
-        void queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
-        });
       },
       onError: err => {
         setOptimistic(initialValue);

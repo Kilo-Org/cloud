@@ -3,7 +3,6 @@ import { Bot, ChevronRight } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { useKiloClawLatestMessage } from '@/lib/hooks/use-kiloclaw-latest-message';
 import { useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -17,17 +16,11 @@ type KiloClawCardProps = {
   };
 };
 
-function formatMessagePreview(message: { text: string; senderName: string }): string {
-  const text = message.text.length > 0 ? message.text : 'New message';
-  return message.senderName.length > 0 ? `${message.senderName}: ${text}` : text;
-}
-
 export function KiloClawCard({ instance }: Readonly<KiloClawCardProps>) {
   const router = useRouter();
   const colors = useThemeColors();
 
   const { data: status } = useKiloClawStatus(instance.organizationId);
-  const { data: latest } = useKiloClawLatestMessage(instance.organizationId);
 
   const botEmoji = status?.botEmoji ?? null;
   const displayName = status?.botName ?? instance.name ?? 'KiloClaw';
@@ -75,14 +68,6 @@ export function KiloClawCard({ instance }: Readonly<KiloClawCardProps>) {
         </View>
         <ChevronRight size={18} color={colors.mutedForeground} />
       </View>
-
-      {latest ? (
-        <View className="mt-3 border-t border-border pt-3">
-          <Text variant="muted" className="text-sm" numberOfLines={2}>
-            {formatMessagePreview(latest)}
-          </Text>
-        </View>
-      ) : null}
     </Pressable>
   );
 }

@@ -38,6 +38,48 @@ import {
 import { redisGet } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
 
+const CODESTRAL_FIM_URL = 'https://codestral.mistral.ai/v1/fim/completions';
+const CODESTRAL_TEST_MODEL = 'codestral-2508';
+
+async function testCodestralApiKey(apiKey: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(CODESTRAL_FIM_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: CODESTRAL_TEST_MODEL,
+        prompt: 'def hi():\n    ',
+        suffix: '\n',
+        max_tokens: 1,
+        stream: false,
+      }),
+    });
+    // Always drain the body so the underlying Undici connection is released,
+    // regardless of whether we care about the response payload.
+    const bodyText = await res.text().catch(() => '');
+    if (res.ok) {
+      return {
+        success: true,
+        message: `API key test success. Provider: codestral. Model: ${CODESTRAL_TEST_MODEL}.`,
+      };
+    }
+    return {
+      success: false,
+      message: `API key (codestral) test failed with status ${res.status}${
+        bodyText ? `: ${bodyText.slice(0, 200)}` : ''
+      }`,
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: `API key (codestral) test failed with: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+}
+
 async function fetchSupportedModels() {
   const vercelModelMetadataRaw = await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels);
   if (!vercelModelMetadataRaw) {
@@ -402,6 +444,13 @@ export const byokRouter = createTRPCRouter({
       }
 
       const decryptedKey = decryptByokRow(existingKey);
+
+      // Codestral keys only authenticate against codestral.mistral.ai, not api.mistral.ai
+      // (the endpoint the Vercel gateway's `mistral` provider uses). Test the key directly
+      // against the Codestral FIM endpoint instead of going through the gateway.
+      if (decryptedKey.providerId === 'codestral') {
+        return await testCodestralApiKey(decryptedKey.decryptedAPIKey);
+      }
 
       function setup() {
         const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);

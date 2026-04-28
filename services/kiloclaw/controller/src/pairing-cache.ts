@@ -56,6 +56,8 @@ type PairingCacheOptions = {
   readChannelPairingImpl?: ReadChannelPairingImpl;
   readDevicePairingImpl?: ReadDevicePairingImpl;
   nowMsImpl?: () => number;
+  /** Auto-approve pending device pairings from the gateway's own exec client. */
+  autoApproveGatewayClient?: boolean;
 };
 
 export const PERIODIC_INTERVAL_MS = 120_000;
@@ -217,6 +219,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       return JSON.parse(await fs.promises.readFile(filePath, 'utf8')) as unknown;
     },
     nowMsImpl = () => Date.now(),
+    autoApproveGatewayClient = false,
   } = options ?? {};
 
   let channelCache: CacheEntry<ChannelPairingRequest> = { requests: [], lastUpdated: '' };
@@ -352,6 +355,23 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
         deviceCache = { requests, lastUpdated: nowImpl() };
       }
       console.log(`[pairing-cache] devices: read ok, ${requests.length} pending`);
+
+      if (autoApproveGatewayClient) {
+        const gatewayRequests = requests.filter(r => r.clientId === 'gateway-client');
+        for (const req of gatewayRequests) {
+          console.log(`[pairing-cache] auto-approving gateway-client device ${req.requestId}`);
+          try {
+            await execImpl(OPENCLAW_BIN, ['devices', 'approve', req.requestId]);
+          } catch (err) {
+            console.error(`[pairing-cache] auto-approve failed for ${req.requestId}:`, err);
+          }
+        }
+        if (gatewayRequests.length > 0) {
+          // Re-read after approvals so the cache reflects the updated state.
+          await refreshDevicePairingInternal();
+        }
+      }
+
       return true;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {

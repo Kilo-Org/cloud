@@ -46,6 +46,7 @@ function fakeDeps(existingConfig?: string) {
         copied.push({ src, dest });
         dirEntries = [...dirEntries, dest.split('/').pop() ?? dest];
       }),
+      mkdirSync: vi.fn(),
       readdirSync: vi.fn(() => dirEntries),
       unlinkSync: vi.fn((filePath: string) => {
         unlinked.push(filePath);
@@ -823,6 +824,43 @@ describe('generateBaseConfig', () => {
     }
   });
 
+  // ─── Kilo Chat ───────────────────────────────────────────────────────────
+
+  it('always configures kilo-chat channel and plugin', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.channels['kilo-chat'].enabled).toBe(true);
+    // _configured provides the non-`enabled` key required by OpenClaw's
+    // hasMeaningfulChannelConfig gate (see comment in config-writer.ts).
+    expect(config.channels['kilo-chat']._configured).toBe(true);
+    expect(config.channels['kilo-chat']).not.toHaveProperty('reactionLevel');
+    expect(config.plugins.load.paths).toContain('/usr/local/lib/node_modules/@kiloclaw/kilo-chat');
+    expect(config.plugins.entries['kilo-chat'].enabled).toBe(true);
+  });
+
+  // ─── Session ─────────────────────────────────────────────────────────────
+
+  it('defaults session.dmScope to per-channel-peer', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.session.dmScope).toBe('per-channel-peer');
+  });
+
+  it('preserves existing session.dmScope', () => {
+    const existing = JSON.stringify({
+      gateway: { port: 3001, mode: 'local' },
+      agents: { defaults: { model: { primary: 'kilocode/anthropic/claude-opus-4.6' } } },
+      session: { dmScope: 'per-peer' },
+      plugins: { entries: { telegram: { enabled: false }, discord: { enabled: false } } },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.session.dmScope).toBe('per-peer');
+  });
+
   it('does not duplicate the plugin path on repeated generateBaseConfig calls', () => {
     const existing = JSON.stringify({
       channels: { streamchat: { apiKey: 'old-key', enabled: true } },
@@ -1554,6 +1592,7 @@ function mcporterFakeDeps(existingMcporterConfig?: string) {
       renameSync: vi.fn(),
       chmodSync: vi.fn(),
       copyFileSync: vi.fn(),
+      mkdirSync: vi.fn(),
       readdirSync: vi.fn(() => []),
       unlinkSync: vi.fn(),
       existsSync: vi.fn((filePath: string) => {

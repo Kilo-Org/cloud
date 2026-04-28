@@ -92,6 +92,11 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   },
 ];
 
+function stripVendorPrefix(id: string) {
+  const slash = id.lastIndexOf('/');
+  return (slash >= 0 ? id.slice(slash + 1) : id).toLowerCase();
+}
+
 async function generateDescription(id: string, name: string): Promise<string> {
   const gateway = createGateway({ apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey });
   const { text } = await generateText({
@@ -113,7 +118,10 @@ async function readPreviousModels(
   return DirectByokModelArraySchema.parse(JSON.parse(raw));
 }
 
-async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
+async function syncProvider(
+  fetcher: ProviderFetcher,
+  openrouterDescriptions: ReadonlyMap<string, string>
+): Promise<number> {
   const previous = await readPreviousModels(fetcher.providerId);
   const previousById = new Map(previous.map(model => [model.id, model]));
 
@@ -123,7 +131,9 @@ async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
   for (const raw of fetched) {
     const prior = previousById.get(raw.id);
     const name = raw.name ?? prior?.name ?? raw.id;
-    const description = prior?.description ?? (await generateDescription(raw.id, name));
+    const openrouterDescription = openrouterDescriptions.get(stripVendorPrefix(raw.id));
+    const description =
+      openrouterDescription ?? prior?.description ?? (await generateDescription(raw.id, name));
     const context_length =
       raw.context_length ?? prior?.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
     const max_completion_tokens = Math.min(
@@ -145,11 +155,17 @@ async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
   return models.length;
 }
 
-export async function syncDirectByokModels(): Promise<
-  Partial<Record<DirectUserByokInferenceProviderId, number>>
-> {
+export async function syncDirectByokModels(
+  openrouterModelsWithDescriptions: ReadonlyArray<{ id: string; description: string }>
+): Promise<Partial<Record<DirectUserByokInferenceProviderId, number>>> {
+  const openrouterDescriptions = new Map(
+    openrouterModelsWithDescriptions.map(model => [stripVendorPrefix(model.id), model.description])
+  );
   const entries = await Promise.all(
-    FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher)] as const)
+    FETCHERS.map(
+      async fetcher =>
+        [fetcher.providerId, await syncProvider(fetcher, openrouterDescriptions)] as const
+    )
   );
   return Object.fromEntries(entries);
 }

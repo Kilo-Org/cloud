@@ -75,37 +75,18 @@ afterEach(() => {
 });
 
 describe('Northflank Worker fetch client', () => {
-  it('logs Northflank requests without secrets', async () => {
+  it('does not log successful Northflank requests', async () => {
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-    mockFetchSequence([[200, { data: { projects: [{ id: 'project-1', name: 'kc-ki-test' }] } }]]);
+    mockFetchSequence([[200, { data: { id: 'kc-ki-test', name: 'kc-ki-test' } }]]);
 
     await expect(findProjectByName({ ...config, teamId: 'team-1' }, 'kc-ki-test')).resolves.toEqual(
       {
-        id: 'project-1',
+        id: 'kc-ki-test',
         name: 'kc-ki-test',
       }
     );
 
-    expect(infoSpy).toHaveBeenCalledWith(
-      '[northflank] api_request_start',
-      expect.objectContaining({
-        context: 'findProjectByName',
-        method: 'GET',
-        path: '/v1/teams/team-1/projects?per_page=100',
-        teamScoped: true,
-      })
-    );
-    expect(infoSpy).toHaveBeenCalledWith(
-      '[northflank] api_request_ok',
-      expect.objectContaining({
-        context: 'findProjectByName',
-        method: 'GET',
-        path: '/v1/teams/team-1/projects?per_page=100',
-        status: 200,
-      })
-    );
-    expect(JSON.stringify(infoSpy.mock.calls)).not.toContain('nf-token');
-    expect(JSON.stringify(infoSpy.mock.calls)).not.toContain('edge-secret');
+    expect(infoSpy).not.toHaveBeenCalled();
   });
 
   it('sends auth headers and creates volumes mounted at /root', async () => {
@@ -138,171 +119,67 @@ describe('Northflank Worker fetch client', () => {
     });
   });
 
-  it('finds projects by deterministic name', async () => {
-    mockFetchSequence([
-      [
-        200,
-        {
-          data: { projects: [{ id: 'project-1', name: 'kc-ki-test' }] },
-          pagination: { hasNextPage: false },
-        },
-      ],
+  it('finds projects by deterministic name with a direct GET', async () => {
+    const fetchMock = mockFetchSequence([
+      [200, { data: { id: 'kc-ki-test', name: 'kc-ki-test' } }],
     ]);
 
     await expect(findProjectByName(config, 'kc-ki-test')).resolves.toEqual({
-      id: 'project-1',
-      name: 'kc-ki-test',
-    });
-  });
-
-  it('paginates projects to find names that live past the first page', async () => {
-    const fetchMock = mockFetchSequence([
-      [
-        200,
-        {
-          data: { projects: [{ id: 'project-other', name: 'kc-ki-other' }] },
-          pagination: { hasNextPage: true, cursor: 'page2-cursor' },
-        },
-      ],
-      [
-        200,
-        {
-          data: { projects: [{ id: 'project-target', name: 'kc-ki-test' }] },
-          pagination: { hasNextPage: false },
-        },
-      ],
-    ]);
-
-    await expect(findProjectByName(config, 'kc-ki-test')).resolves.toEqual({
-      id: 'project-target',
+      id: 'kc-ki-test',
       name: 'kc-ki-test',
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const [firstUrl] = firstFetchCall(fetchMock);
-    expect(firstUrl).toBe('https://api.northflank.com/v1/projects?per_page=100');
-    const [secondUrl] = fetchCall(fetchMock, 1);
-    expect(secondUrl).toBe(
-      'https://api.northflank.com/v1/projects?per_page=100&cursor=page2-cursor'
-    );
+    const [url] = firstFetchCall(fetchMock);
+    expect(url).toBe('https://api.northflank.com/v1/projects/kc-ki-test');
   });
 
-  it('returns null when the project name is not found across all pages', async () => {
-    const fetchMock = mockFetchSequence([
-      [
-        200,
-        {
-          data: { projects: [{ id: 'project-a', name: 'kc-ki-a' }] },
-          pagination: { hasNextPage: true, cursor: 'page2' },
-        },
-      ],
-      [
-        200,
-        {
-          data: { projects: [{ id: 'project-b', name: 'kc-ki-b' }] },
-          pagination: { hasNextPage: false },
-        },
-      ],
-    ]);
+  it('returns null when a direct project lookup returns 404', async () => {
+    const fetchMock = mockFetchSequence([[404, { message: 'not found' }]]);
 
     await expect(findProjectByName(config, 'kc-ki-missing')).resolves.toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('paginates volumes to find names that live past the first page', async () => {
+  it('finds volumes by deterministic name with a direct GET', async () => {
     const fetchMock = mockFetchSequence([
-      [
-        200,
-        {
-          data: [{ id: 'volume-other', name: 'kc-ki-other' }],
-          pagination: { hasNextPage: true, cursor: 'page2-cursor' },
-        },
-      ],
-      [
-        200,
-        {
-          data: [{ id: 'volume-target', name: 'kc-ki-test' }],
-          pagination: { hasNextPage: false },
-        },
-      ],
+      [200, { data: { id: 'kc-ki-test', name: 'kc-ki-test' } }],
     ]);
 
     await expect(findVolumeByName(config, 'project-1', 'kc-ki-test')).resolves.toEqual({
-      id: 'volume-target',
+      id: 'kc-ki-test',
       name: 'kc-ki-test',
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const [firstUrl] = firstFetchCall(fetchMock);
-    expect(firstUrl).toBe('https://api.northflank.com/v1/projects/project-1/volumes?per_page=100');
-    const [secondUrl] = fetchCall(fetchMock, 1);
-    expect(secondUrl).toBe(
-      'https://api.northflank.com/v1/projects/project-1/volumes?per_page=100&cursor=page2-cursor'
-    );
+    const [url] = firstFetchCall(fetchMock);
+    expect(url).toBe('https://api.northflank.com/v1/projects/project-1/volumes/kc-ki-test');
   });
 
-  it('paginates services to find names that live past the first page', async () => {
+  it('finds services by deterministic name with a direct GET', async () => {
     const fetchMock = mockFetchSequence([
-      [
-        200,
-        {
-          data: { services: [{ id: 'service-other', name: 'kc-ki-other' }] },
-          pagination: { hasNextPage: true, cursor: 'page2-cursor' },
-        },
-      ],
-      [
-        200,
-        {
-          data: { services: [{ id: 'service-target', name: 'kc-ki-test' }] },
-          pagination: { hasNextPage: false },
-        },
-      ],
+      [200, { data: { id: 'kc-ki-test', name: 'kc-ki-test' } }],
     ]);
 
     await expect(findServiceByName(config, 'project-1', 'kc-ki-test')).resolves.toEqual({
-      id: 'service-target',
+      id: 'kc-ki-test',
       name: 'kc-ki-test',
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const [firstUrl] = firstFetchCall(fetchMock);
-    expect(firstUrl).toBe('https://api.northflank.com/v1/projects/project-1/services?per_page=100');
-    const [secondUrl] = fetchCall(fetchMock, 1);
-    expect(secondUrl).toBe(
-      'https://api.northflank.com/v1/projects/project-1/services?per_page=100&cursor=page2-cursor'
-    );
+    const [url] = firstFetchCall(fetchMock);
+    expect(url).toBe('https://api.northflank.com/v1/projects/project-1/services/kc-ki-test');
   });
 
-  it('paginates project secrets to find names that live past the first page', async () => {
+  it('finds project secrets by deterministic name with a direct GET', async () => {
     const fetchMock = mockFetchSequence([
-      [
-        200,
-        {
-          data: { secrets: [{ id: 'secret-other', name: 'kc-ki-other' }] },
-          pagination: { hasNextPage: true, cursor: 'page2-cursor' },
-        },
-      ],
-      [
-        200,
-        {
-          data: { secrets: [{ id: 'secret-target', name: 'kc-ki-test' }] },
-          pagination: { hasNextPage: false },
-        },
-      ],
+      [200, { data: { id: 'kc-ki-test', name: 'kc-ki-test' } }],
     ]);
 
     await expect(findProjectSecretByName(config, 'project-1', 'kc-ki-test')).resolves.toEqual({
-      id: 'secret-target',
+      id: 'kc-ki-test',
       name: 'kc-ki-test',
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const [firstUrl] = firstFetchCall(fetchMock);
-    expect(firstUrl).toBe('https://api.northflank.com/v1/projects/project-1/secrets?per_page=100');
-    const [secondUrl] = fetchCall(fetchMock, 1);
-    expect(secondUrl).toBe(
-      'https://api.northflank.com/v1/projects/project-1/secrets?per_page=100&cursor=page2-cursor'
-    );
+    const [url] = firstFetchCall(fetchMock);
+    expect(url).toBe('https://api.northflank.com/v1/projects/project-1/secrets/kc-ki-test');
   });
 
   it('lists services with deployment status and ingress DNS', async () => {

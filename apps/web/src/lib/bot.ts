@@ -1,5 +1,5 @@
 import { Chat, type ActionEvent, type Message, type Thread } from 'chat';
-import { createSlackAdapter } from '@chat-adapter/slack';
+import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
 import { getPlatformIdentity, getPlatformIntegration } from '@/lib/bot/platform-helpers';
@@ -8,8 +8,28 @@ import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
 import { processMessage } from '@/lib/bot/run';
 import { createChatState } from '@/lib/bot/state';
-import { updateSlackAssistantSuggestions } from '@/lib/bot/assistant-prompts';
 import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET } from '@/lib/config.server';
+
+const SLACK_ASSISTANT_SUGGESTED_PROMPTS = [
+  {
+    title: 'Fix an issue in my codebase',
+    message: 'Please ask me for the link to an issue that I want you to fix.',
+  },
+  {
+    title: 'Fix a bug',
+    message: 'Help me investigate and fix a bug in my codebase.',
+  },
+  {
+    title: 'Review code',
+    message: 'Please ask me for a PR that you should review',
+  },
+  {
+    title: 'Explain Kilo Bot',
+    message: 'What can Kilo Bot do from Slack, and how do I get started?',
+  },
+] as const;
+
+const ASSISTANT_PROMPTS_TITLE = 'Try asking Kilo Bot';
 
 function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
   const chatBot = new Chat({
@@ -98,14 +118,21 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
   });
 
   chatBot.onAssistantThreadStarted(async event => {
-    try {
-      await updateSlackAssistantSuggestions(slackAdapter, event);
-    } catch (error) {
-      console.error('[Bot] Failed to set Slack assistant suggestions:', error);
-      captureException(error, {
-        tags: { component: 'kilo-bot', op: 'assistant-thread-started' },
-        extra: { userId: event.userId, channelId: event.channelId },
-      });
+    if (event.adapter instanceof SlackAdapter) {
+      try {
+        await event.adapter.setSuggestedPrompts(
+          event.channelId,
+          event.threadTs,
+          [...SLACK_ASSISTANT_SUGGESTED_PROMPTS],
+          ASSISTANT_PROMPTS_TITLE
+        );
+      } catch (error) {
+        console.error('[Bot] Failed to set suggested prompts:', error);
+        captureException(error, {
+          tags: { component: 'kilo-bot', op: 'assistant-thread-started' },
+          extra: { userId: event.userId, channelId: event.channelId },
+        });
+      }
     }
   });
 

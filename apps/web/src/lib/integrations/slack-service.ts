@@ -239,7 +239,7 @@ export async function postSlackReinstallNoticeByTeamId({
     ? `/organizations/${integration.owned_by_organization_id}/integrations/slack/reinstall`
     : '/integrations/slack/reinstall';
   const reinstallUrl = new URL(reinstallPath, APP_URL).toString();
-  const scopeText = missingScopes.length > 0 ? ` Missing scopes: ${missingScopes.join(', ')}.` : '';
+  const scopeText = missingScopes.length > 0 ? ` Missing scopes: ${missingScopes.join(', ')}` : '';
 
   return postSlackMessageByAccessToken(metadata.access_token, {
     channel: channelId,

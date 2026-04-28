@@ -32,8 +32,14 @@ export function EarlyAccessCard() {
         void queryClient.invalidateQueries({
           queryKey: trpc.kiloclaw.myEarlyAccess.queryKey(),
         });
+        // Refresh both personal and org latest-version queries — this card
+        // renders on both Settings pages and the toggle affects whichever
+        // instance the user is looking at.
         void queryClient.invalidateQueries({
           queryKey: trpc.kiloclaw.latestVersion.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.kiloclaw.latestVersion.queryKey(),
         });
       },
       onError: err => {

@@ -3321,12 +3321,17 @@ export const kiloclawRouter = createTRPCRouter({
    * Toggle the signed in user's own `kiloclaw_early_access` flag.
    * Self serve counterpart of admin.kiloclawInstances.setEarlyAccess.
    *
+   * Uses baseProcedure (not clawAccessProcedure) because the Settings page is
+   * shared between personal and org contexts. An org-only user — who has
+   * KiloClaw access via their org but no personal subscription/trial — must
+   * still be able to toggle this user-level preference for their org instance.
+   *
    * Routes through the KiloClaw platform service (same path as the admin
    * endpoint) so writes to this flag have a single choke-point — if that
    * route ever gains side-effects (cache bust, audit log, DO notification),
    * both admin and self-serve paths pick them up automatically.
    */
-  setMyEarlyAccess: clawAccessProcedure
+  setMyEarlyAccess: baseProcedure
     .input(z.object({ value: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const client = new KiloClawInternalClient();

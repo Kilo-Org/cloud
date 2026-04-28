@@ -3,6 +3,10 @@ import { NextRequest } from 'next/server';
 import { GET } from './route';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+import {
+  getModelIdToProviderSlugsIndex,
+  getProviderSlugsForModel,
+} from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { db } from '@/lib/drizzle';
@@ -14,13 +18,13 @@ jest.mock('@/lib/organizations/organization-auth');
 jest.mock('@/lib/ai-gateway/providers/openrouter');
 jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
   getModelIdToProviderSlugsIndex: jest.fn(),
+  getProviderSlugsForModel: jest.fn(),
 }));
-
-import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContext);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetModelIdToProviderSlugsIndex = jest.mocked(getModelIdToProviderSlugsIndex);
+const mockedGetProviderSlugsForModel = jest.mocked(getProviderSlugsForModel);
 
 function makeOpenRouterModel(id: string): OpenRouterModel {
   return {
@@ -53,6 +57,9 @@ describe('GET /api/organizations/[id]/defaults', () => {
     mockedGetAuthorizedOrgContext.mockReset();
     mockedGetEnhancedOpenRouterModels.mockReset();
     mockedGetModelIdToProviderSlugsIndex.mockReset();
+    mockedGetProviderSlugsForModel.mockReset();
+    mockedGetModelIdToProviderSlugsIndex.mockResolvedValue(new Map());
+    mockedGetProviderSlugsForModel.mockResolvedValue(new Set(['openai']));
   });
 
   afterEach(async () => {

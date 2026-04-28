@@ -65,8 +65,6 @@
     },
     "patchedDependencies": {
       "@storybook/nextjs@9.1.20": "patches/@storybook__nextjs@9.1.20.patch",
-      "@gorhom/bottom-sheet@5.1.8": "patches/@gorhom__bottom-sheet@5.1.8.patch",
-      "stream-chat-react-native-core": "patches/stream-chat-react-native-core.patch",
       "expo-server-sdk": "patches/expo-server-sdk.patch"
     },
     "onlyBuiltDependencies": [
@@ -77,8 +75,7 @@
       "esbuild",
       "libpq",
       "protobufjs",
-      "stream-chat-react-native-core",
-      "workerd"
+"workerd"
     ]
   }
 }

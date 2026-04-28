@@ -44,6 +44,7 @@ import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import type { CodeReviewPlatform } from '../core/schemas';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 
 export type PreparePayloadParams = {
   reviewId: string;
@@ -385,6 +386,7 @@ export async function prepareReviewPayload(
     // GitLab: uses gitUrl (full HTTPS URL) + gitToken
     const variant = config.thinking_effort ?? undefined;
     const gateThreshold = config.gate_threshold ?? 'off';
+    const githubCheckoutRef = getGitHubPullRequestCheckoutRef(review.pr_number);
     const sessionInput: SessionInput =
       platform === PLATFORM.GITLAB
         ? {
@@ -410,7 +412,7 @@ export async function prepareReviewPayload(
             mode: DEFAULT_CODE_REVIEW_MODE as 'code',
             model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
             variant,
-            upstreamBranch: review.head_ref,
+            upstreamBranch: githubCheckoutRef,
             ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
           };
 

@@ -25,7 +25,12 @@ import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
-import { grok_code_fast_1_optimized_free_model } from '@/lib/ai-gateway/providers/xai';
+import {
+  grok_code_fast_1_optimized_free_model,
+  isGrok4Model,
+} from '@/lib/ai-gateway/providers/xai';
+import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
@@ -61,6 +66,10 @@ export function isFreeModel(model: string): boolean {
     model === 'openrouter/free' ||
     isOpenRouterStealthModel(model ?? '')
   );
+}
+
+export function isPdfSupportingModel(model: string): boolean {
+  return isAnthropicModel(model) || isOpenAiModel(model) || isGrok4Model(model);
 }
 
 export function isKiloExclusiveFreeModel(model: string): boolean {

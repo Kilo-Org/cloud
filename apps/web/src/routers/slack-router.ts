@@ -2,6 +2,7 @@ import 'server-only';
 import { z } from 'zod';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as slackService from '@/lib/integrations/slack-service';
+import { createOAuthState } from '@/lib/integrations/oauth-state';
 import { TRPCError } from '@trpc/server';
 import {
   resolveOwner,
@@ -65,7 +66,10 @@ export const slackRouter = createTRPCRouter({
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
     }
-    const state = input?.organizationId ? `org_${input.organizationId}` : `user_${ctx.user.id}`;
+    const statePrefix = input?.organizationId
+      ? `org_${input.organizationId}`
+      : `user_${ctx.user.id}`;
+    const state = createOAuthState(statePrefix, ctx.user.id);
     return {
       url: slackService.getSlackOAuthUrl(state),
     };

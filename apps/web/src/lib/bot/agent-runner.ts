@@ -113,7 +113,7 @@ async function buildSystemPrompt(
 - If the user's request is ambiguous, ask 1-2 clarifying questions instead of guessing.
 
 ## Answering questions about Kilo Bot
-- When users ask what you can do, how you work, or for general help, include a link to the Bot documentation: https://kilo.ai/docs/advanced-usage/slackbot
+- When users ask what you can do, how you work, or for general help, include a link to the Bot documentation: https://kilo.ai/docs/code-with-ai/platforms/slack
 - Provide the docs link along with your answer so users can learn more.
 
 ## Context you may receive
@@ -126,6 +126,9 @@ ${formatGitHubRepositoriesForPrompt(githubContext)}
 ${formatGitLabRepositoriesForPrompt(gitlabContext)}
 
 Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo (or group/project for GitLab) and ensure it's accessible to the integration. Never invent repository names.
+
+## Cloud Agent tool
+If the user asks you to analyze or act on an attached image, you must use the spawnCloudAgentSession tool to start a Cloud Agent session that will analyze the image.
 
 ## Accuracy & safety
 - Don't claim you ran tools, changed code, or created a PR/MR unless the tool results confirm it.
@@ -272,6 +275,9 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
         execute: async args => {
           let resolvedCloudAgentSessionId: string | undefined;
           let resolvedKiloSessionId: string | undefined;
+
+          await params.thread.startTyping('Spawning Cloud Agent session...');
+
           const currentStep = getNextBotCallbackStep({
             completedStepCount,
             completedStepsInCurrentRun: collectedSteps.length,

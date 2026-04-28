@@ -19,6 +19,7 @@ type AutoModel = {
   input_cache_read_price: string | undefined;
   input_cache_write_price: string | undefined;
   supports_images: boolean;
+  supports_pdf: boolean;
   opencode_settings: OpenCodeSettings | undefined;
 };
 
@@ -109,6 +110,7 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   input_cache_read_price: '0.0000005',
   input_cache_write_price: '0.00000625',
   supports_images: true,
+  supports_pdf: true,
   opencode_settings: {
     family: 'claude',
     prompt: 'anthropic',
@@ -127,6 +129,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   input_cache_read_price: '0',
   input_cache_write_price: '0',
   supports_images: false,
+  supports_pdf: false,
   opencode_settings: undefined,
 };
 
@@ -141,6 +144,7 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   input_cache_read_price: '0.0000000325',
   input_cache_write_price: '0.00000040625',
   supports_images: true,
+  supports_pdf: false,
   opencode_settings: {
     ai_sdk_provider: 'openai-compatible',
   },
@@ -157,6 +161,7 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   input_cache_read_price: '0.000000005',
   input_cache_write_price: undefined,
   supports_images: true,
+  supports_pdf: false,
   opencode_settings: undefined,
 };
 

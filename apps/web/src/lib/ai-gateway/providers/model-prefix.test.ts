@@ -1,5 +1,5 @@
 import { modelStartsWith, stripModelTilde } from './model-prefix';
-import { isAnthropicModel, isHaikuModel } from './anthropic';
+import { isAnthropicModel, isHaikuModel } from './anthropic.constants';
 import { isOpenAiModel, isOpenAiOssModel } from './openai';
 import { isGeminiModel, isGemmaModel, isGemini3Model } from './google';
 import { isMoonshotModel } from './moonshotai';

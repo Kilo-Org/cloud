@@ -1,10 +1,11 @@
+import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
-import { isXaiModel } from '@/lib/ai-gateway/providers/xai';
+import { isGrok4Model, isXaiModel } from '@/lib/ai-gateway/providers/xai';
 import { isZaiModel } from '@/lib/ai-gateway/providers/zai';
 import type {
   CustomLlmProvider,
@@ -36,7 +37,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
     };
   }
-  if (modelStartsWith(model, 'anthropic/')) {
+  if (isAnthropicModel(model)) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
@@ -83,7 +84,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       high: { reasoning: { enabled: true, effort: 'high' } },
     };
   }
-  if (model.startsWith('x-ai/grok-4')) {
+  if (isGrok4Model(model)) {
     return {
       'non-reasoning': { reasoning: { enabled: false, effort: 'none' } },
       reasoning: { reasoning: { enabled: true, effort: 'medium' } },
@@ -101,6 +102,10 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
     // with 'openai' a bunch of bugs in vercel ai sdk v5 get triggered
     return 'openai-compatible';
   }
+  if (isAnthropicModel(model)) {
+    // on Vercel AI Gateway, this is necessary to support document attachments
+    return 'anthropic';
+  }
   if (isOpenAiModel(model) || isXaiModel(model)) {
     // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
     // xAI: "The Responses API is the recommended way to interact with xAI models."
@@ -116,6 +121,10 @@ export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined
 }
 
 export function getOpenClawSettings(model: string): OpenClawModelSettings | undefined {
+  // 2026-04-28: this is aspirational, the OpenClaw Kilo provider does not respect this
+  if (isAnthropicModel(model)) {
+    return { api_adapter: 'anthropic-messages' };
+  }
   if (isOpenAiModel(model) || isXaiModel(model)) {
     return { api_adapter: 'openai-responses' };
   }

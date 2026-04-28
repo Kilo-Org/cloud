@@ -3,7 +3,6 @@ import { runBotAgent } from '@/lib/bot/agent-runner';
 import { extractAndUploadImages } from '@/lib/bot/images';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
-import { emoji } from 'chat';
 import { captureException } from '@sentry/nextjs';
 
 export async function processMessage({
@@ -55,9 +54,7 @@ export async function processMessage({
     }
 
     if (!result.startedCloudAgentSession) {
-      const received = thread.createSentMessageFromMessage(message);
       await thread.post({ markdown: result.finalText });
-      await Promise.all([received.removeReaction(emoji.eyes), received.addReaction(emoji.check)]);
     }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -72,9 +69,7 @@ export async function processMessage({
 
     console.error(`[KiloBot] Error during bot run:`, errMsg, error);
 
-    const received = thread.createSentMessageFromMessage(message);
     await Promise.all([
-      received.removeReaction(emoji.eyes).catch(() => {}),
       thread.post(`Sorry, there was an error calling the AI service: ${errMsg.slice(0, 200)}`),
     ]);
   }

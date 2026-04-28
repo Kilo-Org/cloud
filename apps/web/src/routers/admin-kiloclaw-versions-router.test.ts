@@ -11,8 +11,12 @@ import {
 import { eq } from 'drizzle-orm';
 
 // Mock KiloClawInternalClient so tests don't require KILOCLAW_API_URL.
-// getLatestVersion returns null (no latest set) so disable-latest guard passes.
-// disableImageAndClearRollout mocks the kiloclaw service's atomic SQL write
+// The mock factory is hoisted above the imports below, but each
+// mockImplementation runs only when the mocked method is called — by which
+// time the regular ES imports (db, schema, eq) at the top of the file have
+// been resolved and are safe to reference.
+//
+// disableImageAndClearRollout mimics the kiloclaw service's atomic SQL write
 // so the post-call re-read in updateVersionStatus sees the disabled state.
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn().mockImplementation(() => ({
@@ -21,21 +25,15 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
     disableImageAndClearRollout: jest
       .fn()
       .mockImplementation(async (imageTag: string, updatedBy: string) => {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { db: testDb } = require('@/lib/drizzle');
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const schema = require('@kilocode/db/schema');
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const drizzleOrm = require('drizzle-orm');
-        await testDb
-          .update(schema.kiloclaw_image_catalog)
+        await db
+          .update(kiloclaw_image_catalog)
           .set({
             status: 'disabled',
             rollout_percent: 0,
             updated_by: updatedBy,
             updated_at: new Date().toISOString(),
           })
-          .where(drizzleOrm.eq(schema.kiloclaw_image_catalog.image_tag, imageTag));
+          .where(eq(kiloclaw_image_catalog.image_tag, imageTag));
         return { ok: true };
       }),
   })),

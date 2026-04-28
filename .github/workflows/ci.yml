@@ -259,6 +259,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
 
+      - name: Pull Vercel environment
+        working-directory: apps/web
+        run: |
+          pnpm install --global vercel@latest
+          vercel link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
+          vercel env pull .env.production.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
       - name: Build application
         env:
           NODE_ENV: production

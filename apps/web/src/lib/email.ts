@@ -41,6 +41,7 @@ export const subjects = {
   clawCreditRenewalFailed: 'Action Required: KiloClaw Hosting Renewal Failed',
   clawComplementaryInferenceEnded: 'Your Free AI Inference Period Has Ended',
   accountDeletionRequest: 'Kilo: Account Deletion Request Received',
+  creditsTopUp: 'Your Kilo credit top-up',
   kiloClawSubscriptionStarted: 'Your KiloClaw subscription is active',
 } as const;
 
@@ -393,6 +394,40 @@ export async function sendAccountDeletionSupportNotification(
   });
 }
 
+const CREDITS_TOPUP_COPY = {
+  manual: {
+    subject: 'Your Kilo credit top-up',
+    heading: 'Thanks for your top-up',
+    intro:
+      'Your Kilo credit top-up has been processed and the credits are now available on your account.',
+  },
+  auto: {
+    subject: 'Kilo auto top-up successful',
+    heading: 'Your auto top-up was successful',
+    intro:
+      'Your account was automatically topped up so you can keep using Kilo without interruption. The new credits are available now.',
+  },
+} as const;
+
+export type CreditsTopUpVariant = keyof typeof CREDITS_TOPUP_COPY;
+
+type SendCreditsTopUpEmailProps = {
+  to: string;
+  variant: CreditsTopUpVariant;
+  amountCents: number;
+  creditsCents: number;
+  purchaseDate: Date;
+  receiptUrl?: string | null;
+};
+
+export function buildCreditsTopUpReceiptSection(receiptUrl: string | null | undefined): RawHtml {
+  if (!receiptUrl) return new RawHtml('');
+  const escaped = escapeHtml(receiptUrl);
+  return new RawHtml(
+    `<a href="${escaped}" style="color: #1a1a1a; text-decoration: underline">View your Stripe receipt</a>.`
+  );
+}
+
 function formatUsd(cents: number): string {
   return (cents / 100).toFixed(2);
 }
@@ -405,6 +440,27 @@ function formatDate(date: Date): string {
     month: 'long',
     day: 'numeric',
     timeZone: 'UTC',
+  });
+}
+
+export async function sendCreditsTopUpEmail(
+  props: SendCreditsTopUpEmailProps
+): Promise<SendResult> {
+  const copy = CREDITS_TOPUP_COPY[props.variant];
+  const credits_url = `${NEXTAUTH_URL}/credits`;
+  return send({
+    to: props.to,
+    templateName: 'creditsTopUp',
+    subjectOverride: copy.subject,
+    templateVars: {
+      heading: copy.heading,
+      intro: copy.intro,
+      amount_usd: formatUsd(props.amountCents),
+      credits_usd: formatUsd(props.creditsCents),
+      purchase_date: formatDate(props.purchaseDate),
+      credits_url,
+      receipt_section: buildCreditsTopUpReceiptSection(props.receiptUrl),
+    },
   });
 }
 

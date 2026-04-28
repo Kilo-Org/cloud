@@ -18,7 +18,7 @@ import {
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
-import { cli_sessions_v2 } from '@kilocode/db/schema';
+import { cli_sessions_v2, cli_session_pull_requests } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateApiToken, generateInternalServiceToken } from '@/lib/tokens';
 import {
@@ -31,6 +31,14 @@ import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { KNOWN_PLATFORMS, sanitizeGitUrl } from '@/routers/cli-sessions-router';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import {
+  fetchPullRequestForBranch,
+  GitHubRateLimitError,
+  type AssociatedPullRequest,
+} from '@/lib/integrations/platforms/github/adapter';
+import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import type { Owner } from '@/lib/integrations/core/types';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -80,6 +88,78 @@ const commonSessionFields = {
 
 const sessionIdField = z.string().min(1);
 const cloudAgentSessionIdField = z.string().min(1).max(255);
+
+/**
+ * Zod schema for the associated pull request shape returned by the router.
+ * Used both as a response field in `getWithRuntimeState` and as the payload
+ * of `refreshAssociatedPullRequest`.
+ */
+const associatedPrSchema = z.object({
+  url: z.string(),
+  number: z.number(),
+  state: z.string(),
+  title: z.string().nullable(),
+  headSha: z.string().nullable(),
+  lastSyncedAt: z.string(),
+});
+
+type AssociatedPrOut = z.infer<typeof associatedPrSchema>;
+
+type CliSessionPullRequestRow = {
+  pr_url: string;
+  pr_number: number;
+  pr_state: string;
+  pr_title: string | null;
+  pr_head_sha: string | null;
+  pr_last_synced_at: string;
+};
+
+function formatAssociatedPr(
+  row: CliSessionPullRequestRow | null | undefined
+): AssociatedPrOut | null {
+  if (!row) return null;
+  return {
+    url: row.pr_url,
+    number: row.pr_number,
+    state: row.pr_state,
+    title: row.pr_title,
+    headSha: row.pr_head_sha,
+    lastSyncedAt: new Date(row.pr_last_synced_at).toISOString(),
+  };
+}
+
+/**
+ * Parse a GitHub clone URL (https or ssh) into `{ owner, repo }`.
+ * Returns null when the URL is not a github.com URL or cannot be parsed.
+ */
+function parseGitHubOwnerRepo(
+  gitUrl: string | null | undefined
+): { owner: string; repo: string } | null {
+  if (!gitUrl) return null;
+
+  // SSH: git@github.com:owner/repo(.git)?
+  const sshMatch = gitUrl.match(/^git@([^:]+):(.+?)(?:\.git)?$/);
+  if (sshMatch) {
+    if (sshMatch[1] !== 'github.com' && sshMatch[1] !== 'www.github.com') return null;
+    const [owner, repo] = sshMatch[2].split('/');
+    if (!owner || !repo) return null;
+    return { owner, repo };
+  }
+
+  try {
+    const url = new URL(gitUrl);
+    if (url.hostname !== 'github.com' && url.hostname !== 'www.github.com') return null;
+    const parts = url.pathname
+      .replace(/^\//, '')
+      .replace(/\.git$/, '')
+      .split('/');
+    const [owner, repo] = parts;
+    if (!owner || !repo) return null;
+    return { owner, repo };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Verify user owns the session. Returns the session if found.
@@ -432,15 +512,24 @@ export const cliSessionsV2Router = createTRPCRouter({
         version: z.number(),
         // Runtime state from DO (null for CLI sessions without cloud_agent_session_id)
         runtimeState: baseGetSessionNextOutputSchema.nullable(),
+        // Associated pull request (from cli_session_pull_requests side table)
+        associatedPr: associatedPrSchema.nullable(),
       })
     )
     .query(async ({ ctx, input }) => {
       const { session_id } = input;
 
-      // 1. Fetch from DB with ownership check
-      const [session] = await db
-        .select()
+      // 1. Fetch from DB with ownership check + LEFT JOIN associated PR
+      const [row] = await db
+        .select({
+          session: cli_sessions_v2,
+          pr: cli_session_pull_requests,
+        })
         .from(cli_sessions_v2)
+        .leftJoin(
+          cli_session_pull_requests,
+          eq(cli_session_pull_requests.session_id, cli_sessions_v2.session_id)
+        )
         .where(
           and(
             eq(cli_sessions_v2.session_id, session_id),
@@ -449,12 +538,14 @@ export const cliSessionsV2Router = createTRPCRouter({
         )
         .limit(1);
 
-      if (!session) {
+      if (!row) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Session not found',
         });
       }
+
+      const { session, pr } = row;
 
       // 2. If session has cloud_agent_session_id, fetch runtime state from DO
       let runtimeState: z.infer<typeof baseGetSessionNextOutputSchema> | null = null;
@@ -497,7 +588,178 @@ export const cliSessionsV2Router = createTRPCRouter({
         updated_at: session.updated_at,
         version: session.version,
         runtimeState,
+        associatedPr: formatAssociatedPr(pr),
       };
+    }),
+
+  /**
+   * Manually refresh the associated pull request for a session.
+   *
+   * The common case is webhook-driven (see the GitHub `pull_request` handler);
+   * this mutation is the user-facing escape hatch for sessions whose associated
+   * PR got out of sync. Throttled server-side to at most one GitHub API call
+   * per session per 10 seconds to cap abuse from a hot "Refresh PR info" button.
+   */
+  refreshAssociatedPullRequest: baseProcedure
+    .input(z.object({ sessionId: sessionIdField }))
+    .output(z.object({ associatedPr: associatedPrSchema.nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const { sessionId } = input;
+
+      // 1. Authz + load: ownership check by kilo_user_id, mirroring getWithRuntimeState.
+      const [row] = await db
+        .select({
+          session: cli_sessions_v2,
+          pr: cli_session_pull_requests,
+        })
+        .from(cli_sessions_v2)
+        .leftJoin(
+          cli_session_pull_requests,
+          eq(cli_session_pull_requests.session_id, cli_sessions_v2.session_id)
+        )
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
+          )
+        )
+        .limit(1);
+
+      if (!row) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Session not found',
+        });
+      }
+
+      const { session, pr: existingPr } = row;
+
+      // 2. Require git_url + git_branch to have any hope of finding a PR.
+      if (!session.git_url || !session.git_branch) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Session is not associated with a git repository and branch',
+        });
+      }
+
+      // 3. Parse git_url. Non-GitHub URLs are not supported for PR lookup —
+      //    treat as BAD_REQUEST so the UI can show a meaningful error.
+      const parsed = parseGitHubOwnerRepo(session.git_url);
+      if (!parsed) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Session git URL is not a GitHub repository',
+        });
+      }
+      const { owner, repo } = parsed;
+
+      // 4. Throttle: if we synced within the last 10s, return DB value unchanged.
+      if (existingPr) {
+        const lastSyncedMs = new Date(existingPr.pr_last_synced_at).getTime();
+        if (Number.isFinite(lastSyncedMs) && Date.now() - lastSyncedMs < 10_000) {
+          return { associatedPr: formatAssociatedPr(existingPr) };
+        }
+      }
+
+      // 5. Resolve installation id via the existing integration helper.
+      //    Org sessions use the org's GitHub integration; personal sessions use
+      //    the session owner's personal integration. ensureOrganizationAccess
+      //    enforces the "user is a member of the org" security check.
+      const integrationOwner: Owner = session.organization_id
+        ? { type: 'org', id: session.organization_id }
+        : { type: 'user', id: session.kilo_user_id };
+
+      if (integrationOwner.type === 'org') {
+        await ensureOrganizationAccess(ctx, integrationOwner.id);
+      }
+
+      const integration = await getIntegrationForOwner(integrationOwner, PLATFORM.GITHUB);
+      if (!integration?.platform_installation_id) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'No GitHub integration available for this session',
+        });
+      }
+
+      const installationId = Number(integration.platform_installation_id);
+      if (!Number.isFinite(installationId)) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'GitHub integration has an invalid installation id',
+        });
+      }
+
+      const appType = integration.github_app_type ?? 'standard';
+
+      // 6. Fetch PR from GitHub.
+      let pr: AssociatedPullRequest | null;
+      try {
+        pr = await fetchPullRequestForBranch({
+          installationId,
+          owner,
+          repo,
+          branch: session.git_branch,
+          appType,
+        });
+      } catch (error) {
+        if (error instanceof GitHubRateLimitError) {
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: `GitHub rate limited, retry after ${error.resetAt.toISOString()}`,
+            cause: error,
+          });
+        }
+        captureException(error, {
+          tags: {
+            source: 'cli-sessions-v2-router',
+            endpoint: 'refreshAssociatedPullRequest',
+          },
+          extra: { sessionId, owner, repo, branch: session.git_branch },
+        });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch pull request from GitHub',
+        });
+      }
+
+      // 7. Persist.
+      if (pr === null) {
+        await db
+          .delete(cli_session_pull_requests)
+          .where(eq(cli_session_pull_requests.session_id, sessionId));
+        return { associatedPr: null };
+      }
+
+      const now = new Date().toISOString();
+      const values = {
+        session_id: sessionId,
+        pr_url: pr.htmlUrl,
+        pr_number: pr.number,
+        pr_state: pr.state,
+        pr_title: pr.title,
+        pr_head_sha: pr.headSha,
+        pr_last_synced_at: now,
+        updated_at: now,
+      };
+
+      const [upserted] = await db
+        .insert(cli_session_pull_requests)
+        .values(values)
+        .onConflictDoUpdate({
+          target: cli_session_pull_requests.session_id,
+          set: {
+            pr_url: values.pr_url,
+            pr_number: values.pr_number,
+            pr_state: values.pr_state,
+            pr_title: values.pr_title,
+            pr_head_sha: values.pr_head_sha,
+            pr_last_synced_at: values.pr_last_synced_at,
+            updated_at: values.updated_at,
+          },
+        })
+        .returning();
+
+      return { associatedPr: formatAssociatedPr(upserted) };
     }),
 
   /**

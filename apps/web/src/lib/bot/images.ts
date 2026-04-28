@@ -14,6 +14,11 @@ import { randomUUID } from 'crypto';
 
 const ALLOWED_TYPES_SET = new Set<string>(CLOUD_AGENT_IMAGE_ALLOWED_TYPES);
 
+type UploadableImageAttachment = Attachment & {
+  mimeType: CloudAgentImageAllowedType;
+  fetchData: () => Promise<Buffer>;
+};
+
 function isAllowedImageType(mimeType: string): mimeType is CloudAgentImageAllowedType {
   return ALLOWED_TYPES_SET.has(mimeType);
 }
@@ -30,7 +35,7 @@ export async function extractAndUploadImages(
   userId: string
 ): Promise<Images | undefined> {
   const imageAttachments = message.attachments.filter(
-    (a): a is Attachment & { mimeType: string; fetchData: () => Promise<Buffer> } =>
+    (a): a is UploadableImageAttachment =>
       a.type === 'image' &&
       typeof a.mimeType === 'string' &&
       isAllowedImageType(a.mimeType) &&
@@ -43,11 +48,12 @@ export async function extractAndUploadImages(
   const toProcess = imageAttachments.slice(0, CLOUD_AGENT_IMAGE_MAX_COUNT);
 
   const messageUuid = randomUUID();
-  const uploadResults = await Promise.allSettled(
-    toProcess.map(async attachment => {
+  const filenames: string[] = [];
+
+  for (const attachment of toProcess) {
+    try {
       const imageId = randomUUID();
-      const ext =
-        CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION[attachment.mimeType as CloudAgentImageAllowedType];
+      const ext = CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION[attachment.mimeType];
       const filename = `${imageId}.${ext}`;
       const r2Key = `${userId}/cloud-agent/${messageUuid}/${filename}`;
 
@@ -79,17 +85,10 @@ export async function extractAndUploadImages(
         })
       );
 
-      return filename;
-    })
-  );
-
-  const filenames: string[] = [];
-  for (const result of uploadResults) {
-    if (result.status === 'fulfilled') {
-      filenames.push(result.value);
-    } else {
-      console.error('[KiloBot] Failed to upload image attachment:', result.reason);
-      captureException(result.reason, {
+      filenames.push(filename);
+    } catch (error) {
+      console.error('[KiloBot] Failed to upload image attachment:', error);
+      captureException(error, {
         tags: { component: 'kilo-bot', op: 'upload-slack-image' },
       });
     }

@@ -32,25 +32,9 @@ export function canonicalizeDenyList(raw: ReadonlyArray<string>): string[] {
   return sortUniqueStrings(raw.map(entry => normalizeModelId(entry)));
 }
 
-export function canonicalizeModelAllowList(raw: ReadonlyArray<string> | undefined): string[] {
-  if (!raw) return [];
-  return sortUniqueStrings(raw.map(entry => normalizeModelId(entry)));
-}
-
 export function canonicalizeProviderAllowList(raw: ReadonlyArray<string> | undefined): string[] {
   if (!raw) return [];
   return sortUniqueStrings(raw);
-}
-
-export function deriveModelAllowListFromLegacyDenyList(
-  modelDenyList: ReadonlyArray<string> | undefined,
-  openRouterModels: ReadonlyArray<OpenRouterModelSlugSnapshot>
-): string[] {
-  const denied = new Set(canonicalizeDenyList(modelDenyList ?? []));
-  const allowed = openRouterModels
-    .map(model => normalizeModelId(model.slug))
-    .filter(model => !denied.has(model));
-  return sortUniqueStrings(allowed);
 }
 
 export function deriveProviderAllowListFromLegacyDenyList(
@@ -98,11 +82,13 @@ export function computeEnabledProviderSlugs(
 }
 
 export function computeAllowedModelIds(
-  draftModelAllowList: ReadonlyArray<string>,
+  draftModelDenyList: ReadonlyArray<string>,
   openRouterModels: ReadonlyArray<OpenRouterModelSlugSnapshot>
 ): Set<string> {
-  const known = new Set(openRouterModels.map(model => normalizeModelId(model.slug)));
-  const allowed = new Set(draftModelAllowList.filter(model => known.has(model)));
+  const denied = new Set(canonicalizeDenyList(draftModelDenyList));
+  const allowed = new Set(
+    openRouterModels.map(model => normalizeModelId(model.slug)).filter(model => !denied.has(model))
+  );
   return allowed;
 }
 
@@ -135,14 +121,14 @@ export function toggleProviderEnabled(params: {
 export function toggleModelAllowed(params: {
   modelId: string;
   nextAllowed: boolean;
-  draftModelAllowList: ReadonlyArray<string>;
+  draftModelDenyList: ReadonlyArray<string>;
 }): string[] {
-  const { modelId, nextAllowed, draftModelAllowList } = params;
-  const allowed = new Set(draftModelAllowList);
+  const { modelId, nextAllowed, draftModelDenyList } = params;
+  const denied = new Set(draftModelDenyList.map(entry => normalizeModelId(entry)));
   if (nextAllowed) {
-    allowed.add(modelId);
-    return sortUniqueStrings([...allowed]);
+    denied.delete(normalizeModelId(modelId));
+    return sortUniqueStrings([...denied]);
   }
-  allowed.delete(modelId);
-  return sortUniqueStrings([...allowed]);
+  denied.add(normalizeModelId(modelId));
+  return sortUniqueStrings([...denied]);
 }

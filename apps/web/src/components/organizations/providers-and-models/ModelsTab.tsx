@@ -33,7 +33,8 @@ export function ModelsTab({
   return (
     <div className="flex flex-col gap-y-4">
       <p className="text-muted-foreground text-sm">
-        Select which models organization members can use.
+        Disable specific models for organization members. New models from enabled providers are
+        allowed by default.
       </p>
 
       {isLoading ? (

@@ -470,8 +470,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
 
     // Organization model/provider restrictions check
-    // Model allow list only applies to Enterprise plans
-    // Provider allow list applies to Enterprise plans; data collection applies to all plans
+    // Provider/model access policy applies to Enterprise plans; data collection applies to all plans.
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
       modelId: originalModelIdLowerCased,
       settings,

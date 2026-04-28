@@ -2,7 +2,7 @@ import { describe, test, expect } from '@jest/globals';
 import { computeProviderSelectionsForSummaryCard } from './OrganizationProvidersAndModelsConfigurationCard';
 
 describe('computeProviderSelectionsForSummaryCard', () => {
-  test('undefined allow lists return null (all providers and models)', () => {
+  test('undefined provider allow and model deny lists return null (all providers and models)', () => {
     const openRouterProviders = [
       {
         slug: 'anthropic',
@@ -16,7 +16,7 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     const selections = computeProviderSelectionsForSummaryCard({
       openRouterProviders,
       providerAllowList: undefined,
-      modelAllowList: undefined,
+      modelDenyList: undefined,
     });
 
     expect(selections).toBeNull();
@@ -37,7 +37,7 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     const selections = computeProviderSelectionsForSummaryCard({
       openRouterProviders,
       providerAllowList: ['openai'],
-      modelAllowList: undefined,
+      modelDenyList: undefined,
     });
 
     expect(selections).toEqual([
@@ -48,7 +48,7 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     ]);
   });
 
-  test('modelAllowList excludes newly synced models not listed', () => {
+  test('modelDenyList excludes denied models but not newly synced models', () => {
     const openRouterProviders = [
       {
         slug: 'anthropic',
@@ -62,7 +62,7 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     const selections = computeProviderSelectionsForSummaryCard({
       openRouterProviders,
       providerAllowList: undefined,
-      modelAllowList: ['anthropic/claude-3-sonnet'],
+      modelDenyList: ['anthropic/claude-3-opus'],
     });
 
     expect(selections).toEqual([
@@ -73,7 +73,7 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     ]);
   });
 
-  test('combined allow lists include only matching providers and models', () => {
+  test('combined provider allow and model deny lists apply both filters', () => {
     const openRouterProviders = [
       {
         slug: 'openai',
@@ -91,7 +91,7 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     const selections = computeProviderSelectionsForSummaryCard({
       openRouterProviders,
       providerAllowList: ['anthropic'],
-      modelAllowList: ['anthropic/claude-3-sonnet'],
+      modelDenyList: ['anthropic/claude-3-opus'],
     });
 
     expect(selections).toEqual([
@@ -113,7 +113,7 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     const selections = computeProviderSelectionsForSummaryCard({
       openRouterProviders,
       providerAllowList: [],
-      modelAllowList: undefined,
+      modelDenyList: undefined,
     });
 
     expect(selections).toEqual([]);
@@ -133,9 +133,14 @@ describe('computeProviderSelectionsForSummaryCard', () => {
     const selections = computeProviderSelectionsForSummaryCard({
       openRouterProviders,
       providerAllowList: undefined,
-      modelAllowList: ['anthropic/disabled-model'],
+      modelDenyList: [],
     });
 
-    expect(selections).toEqual([]);
+    expect(selections).toEqual([
+      {
+        slug: 'anthropic',
+        models: ['anthropic/claude-3-opus'],
+      },
+    ]);
   });
 });

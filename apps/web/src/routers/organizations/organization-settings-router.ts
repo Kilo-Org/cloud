@@ -29,25 +29,25 @@ const PRIVILEGED_ORGANIZATION_IDS = [
 /**
  * Creates a human-readable diff message for model/provider access changes
  */
-function createAllowListsDiffMessage(
+function createAccessListsDiffMessage(
   oldSettings: OrganizationSettings | undefined,
   newSettings: OrganizationSettings
 ): string {
   const changes: string[] = [];
   const old = oldSettings || {};
 
-  if (old.model_allow_list !== newSettings.model_allow_list) {
-    const oldModels = new Set(old.model_allow_list || []);
-    const newModels = new Set(newSettings.model_allow_list || []);
+  if (old.model_deny_list !== newSettings.model_deny_list) {
+    const oldModels = new Set(old.model_deny_list || []);
+    const newModels = new Set(newSettings.model_deny_list || []);
 
     const added = [...newModels].filter(model => !oldModels.has(model));
     const removed = [...oldModels].filter(model => !newModels.has(model));
 
     if (added.length > 0) {
-      changes.push(`Allowed models: ${added.join(', ')}`);
+      changes.push(`Denied models: ${added.join(', ')}`);
     }
     if (removed.length > 0) {
-      changes.push(`Disallowed models: ${removed.join(', ')}`);
+      changes.push(`Allowed models: ${removed.join(', ')}`);
     }
   }
 
@@ -66,7 +66,7 @@ function createAllowListsDiffMessage(
     }
   }
 
-  return changes.length > 0 ? changes.join('; ') : 'Updated allow lists';
+  return changes.length > 0 ? changes.join('; ') : 'Updated access lists';
 }
 
 /**
@@ -92,8 +92,8 @@ function createDefaultModelDiffMessage(
 }
 
 const UpdateAllowListsInputSchema = OrganizationIdInputSchema.extend({
-  model_allow_list: z.array(z.string()).optional(),
   provider_allow_list: z.array(z.string()).optional(),
+  provider_policy_mode: z.literal('allow').optional(),
   model_deny_list: z.array(z.string()).optional(),
   provider_deny_list: z.array(z.string()).optional(),
 });
@@ -170,8 +170,8 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const {
         organizationId,
-        model_allow_list,
         provider_allow_list,
+        provider_policy_mode,
         model_deny_list,
         provider_deny_list,
       } = input;
@@ -198,14 +198,14 @@ export const organizationsSettingsRouter = createTRPCRouter({
         ...currentSettings,
       };
 
-      if (model_allow_list !== undefined) {
-        settingsUpdate.model_allow_list = dedupeModels(model_allow_list);
-      }
       if (provider_allow_list !== undefined) {
         settingsUpdate.provider_allow_list = dedupeStrings(provider_allow_list);
       }
+      if (provider_policy_mode !== undefined) {
+        settingsUpdate.provider_policy_mode = provider_policy_mode;
+      }
 
-      if (model_allow_list === undefined && model_deny_list !== undefined) {
+      if (model_deny_list !== undefined) {
         settingsUpdate.model_deny_list = dedupeModels(model_deny_list);
       }
       if (provider_allow_list === undefined && provider_deny_list !== undefined) {
@@ -214,15 +214,17 @@ export const organizationsSettingsRouter = createTRPCRouter({
 
       // Check if default_model needs to be cleared when access lists change
       if (
-        (model_allow_list !== undefined ||
-          provider_allow_list !== undefined ||
+        (provider_allow_list !== undefined ||
+          provider_policy_mode !== undefined ||
           model_deny_list !== undefined ||
           provider_deny_list !== undefined) &&
         currentSettings.default_model
       ) {
         const isAllowed = createAllowPredicateFromRestrictions({
-          modelAllowList: settingsUpdate.model_allow_list,
-          providerAllowList: settingsUpdate.provider_allow_list,
+          providerAllowList:
+            settingsUpdate.provider_policy_mode === 'allow'
+              ? settingsUpdate.provider_allow_list
+              : undefined,
           modelDenyList: settingsUpdate.model_deny_list ?? [],
           providerDenyList: settingsUpdate.provider_deny_list ?? [],
         });
@@ -240,7 +242,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
         actor_email: ctx.user.google_user_email,
         actor_id: ctx.user.id,
         actor_name: ctx.user.google_user_name,
-        message: createAllowListsDiffMessage(existingOrg.settings, updatedSettings),
+        message: createAccessListsDiffMessage(existingOrg.settings, updatedSettings),
         organization_id: organizationId,
       });
 

@@ -38,13 +38,13 @@ describe('Organization Usage Functions', () => {
     test('should return balance for organization member', async () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 50000, {
-        model_allow_list: ['fizz', 'buzz'],
+        model_deny_list: ['fizz', 'buzz'],
       });
 
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
 
       expect(result.balance).toBe(0.05); // 50000 microdollars = 0.05 USD
-      expect(result.settings?.model_allow_list).toEqual(['fizz', 'buzz']);
+      expect(result.settings?.model_deny_list).toEqual(['fizz', 'buzz']);
     });
 
     test('should return balance for regular member', async () => {

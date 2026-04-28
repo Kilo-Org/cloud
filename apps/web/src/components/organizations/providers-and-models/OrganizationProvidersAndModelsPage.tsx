@@ -29,11 +29,7 @@ import {
   useProvidersAndModelsAllowListsState,
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
-import {
-  deriveModelAllowListFromLegacyDenyList,
-  deriveProviderAllowListFromLegacyDenyList,
-  uniqueStrings,
-} from '@/components/organizations/providers-and-models/allowLists.domain';
+import { deriveProviderAllowListFromLegacyDenyList } from '@/components/organizations/providers-and-models/allowLists.domain';
 import { preferredModels } from '@/lib/ai-gateway/models';
 
 type Props = {
@@ -145,23 +141,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     return rows;
   }, [openRouterModels, preferredIndexByModelId, providerIndex]);
 
-  const initialModelAllowList = useMemo(() => {
-    if (!organizationData) return [];
-    if (organizationData.settings?.model_allow_list !== undefined) {
-      return organizationData.settings.model_allow_list;
-    }
-    if (organizationData.settings?.model_deny_list === undefined) {
-      return uniqueStrings(openRouterModels.map(model => normalizeModelId(model.slug)));
-    }
-    return deriveModelAllowListFromLegacyDenyList(
-      organizationData.settings?.model_deny_list,
-      openRouterModels
-    );
-  }, [openRouterModels, organizationData]);
+  const initialModelDenyList = organizationData?.settings?.model_deny_list ?? [];
 
   const initialProviderAllowList = useMemo(() => {
     if (!organizationData) return [];
-    if (organizationData.settings?.provider_allow_list !== undefined) {
+    if (
+      organizationData.settings?.provider_policy_mode === 'allow' &&
+      organizationData.settings.provider_allow_list !== undefined
+    ) {
       return organizationData.settings.provider_allow_list;
     }
     if (organizationData.settings?.provider_deny_list === undefined) {
@@ -178,12 +165,12 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     if (isOpenRouterLoading) return;
     if (state.status === 'ready') return;
     actions.initFromServer({
-      modelAllowList: initialModelAllowList,
+      modelDenyList: initialModelDenyList,
       providerAllowList: initialProviderAllowList,
     });
   }, [
     actions,
-    initialModelAllowList,
+    initialModelDenyList,
     initialProviderAllowList,
     isOpenRouterLoading,
     organizationData,
@@ -225,8 +212,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     try {
       await updateOrganizationSettings.mutateAsync({
         organizationId,
-        model_allow_list: state.draftModelAllowList,
+        model_deny_list: state.draftModelDenyList,
         provider_allow_list: state.draftProviderAllowList,
+        provider_policy_mode: 'allow',
       });
 
       actions.markSaved();

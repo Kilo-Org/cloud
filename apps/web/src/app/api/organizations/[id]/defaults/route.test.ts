@@ -85,7 +85,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
     expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
   });
 
-  test('allow list blocking PRIMARY_DEFAULT_MODEL falls back to first allowed model from OpenRouter', async () => {
+  test('deny list blocking PRIMARY_DEFAULT_MODEL falls back to first non-denied model from OpenRouter', async () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
 
@@ -105,7 +105,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
           ...organization,
           plan: 'enterprise' as const,
           settings: {
-            model_allow_list: ['openai/gpt-4o'],
+            model_deny_list: [PRIMARY_DEFAULT_MODEL],
           },
         },
       },
@@ -120,7 +120,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
     expect(body.defaultModel).toBe('openai/gpt-4o');
   });
 
-  test('org-configured default model is returned when in allow list', async () => {
+  test('org-configured default model is returned when not denied', async () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
 
@@ -134,7 +134,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
           plan: 'enterprise' as const,
           settings: {
             default_model: 'openai/gpt-4o',
-            model_allow_list: ['openai/gpt-4o'],
+            model_deny_list: ['anthropic/claude-3-opus'],
           },
         },
       },
@@ -150,7 +150,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
     expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
   });
 
-  test('returns 409 when all models are blocked by policy', async () => {
+  test('returns 409 when all available models are blocked by policy', async () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
 
@@ -164,7 +164,8 @@ describe('GET /api/organizations/[id]/defaults', () => {
           ...organization,
           plan: 'enterprise' as const,
           settings: {
-            model_allow_list: [],
+            provider_policy_mode: 'allow',
+            provider_allow_list: [],
           },
         },
       },

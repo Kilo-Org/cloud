@@ -78,7 +78,7 @@ export function DefaultModelDialog({
 
   const handleClearDefaultModel = async () => {
     try {
-      // Clear by updating allow lists without the default model
+      // Clear only the default model; provider/model access policy stays unchanged.
       await updateDefaultModelMutation.mutateAsync({
         organizationId,
         default_model: null,

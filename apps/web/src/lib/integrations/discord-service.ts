@@ -211,7 +211,7 @@ export async function upsertDiscordInstallation(
     return updated;
   }
 
-  // For org integrations, get a model that respects the allow list
+  // For org integrations, get a model that respects org access policy.
   // For user integrations, use the Discord-specific default model
   const defaultModel =
     owner.type === 'org'
@@ -352,7 +352,7 @@ export async function getModel(owner: Owner): Promise<string | null> {
 
 /**
  * Update the model for a Discord integration.
- * For organization-owned integrations, validates the model against the allow list.
+ * For organization-owned integrations, validates the model against org access policy.
  */
 export async function updateModel(
   owner: Owner,
@@ -364,7 +364,7 @@ export async function updateModel(
     return { success: false, error: 'No Discord installation found' };
   }
 
-  // For org integrations, validate the model against the allow list
+  // For org integrations, validate the model against org access policy.
   if (owner.type === 'org') {
     const organization = await getOrganizationById(owner.id);
     if (organization) {

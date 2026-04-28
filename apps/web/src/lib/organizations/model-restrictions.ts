@@ -7,8 +7,10 @@ export function getEffectiveModelRestrictions(organization: Organization): Model
     return { modelDenyList: [], providerDenyList: [] };
   }
   return {
-    modelAllowList: organization.settings?.model_allow_list,
-    providerAllowList: organization.settings?.provider_allow_list,
+    providerAllowList:
+      organization.settings?.provider_policy_mode === 'allow'
+        ? organization.settings.provider_allow_list
+        : undefined,
     modelDenyList: organization.settings?.model_deny_list ?? [],
     providerDenyList: organization.settings?.provider_deny_list ?? [],
   };

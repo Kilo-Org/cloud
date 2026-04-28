@@ -11,7 +11,7 @@ describe('providersAndModelsAllowListsReducer', () => {
 
     state = providersAndModelsAllowListsReducer(state, {
       type: 'INIT_FROM_SERVER',
-      modelAllowList: ['openai/gpt-4.1', 'anthropic/claude-3-opus'],
+      modelDenyList: ['anthropic/claude-3-opus'],
       providerAllowList: ['openai'],
     });
 
@@ -22,7 +22,7 @@ describe('providersAndModelsAllowListsReducer', () => {
     state = providersAndModelsAllowListsReducer(state, {
       type: 'TOGGLE_MODEL',
       modelId: 'anthropic/claude-3-opus',
-      nextAllowed: false,
+      nextAllowed: true,
     });
 
     state = providersAndModelsAllowListsReducer(state, { type: 'RESET_TO_INITIAL' });
@@ -31,7 +31,7 @@ describe('providersAndModelsAllowListsReducer', () => {
       throw new Error('expected ready state');
     }
 
-    expect(state.draftModelAllowList).toEqual(state.initialModelAllowList);
+    expect(state.draftModelDenyList).toEqual(state.initialModelDenyList);
     expect(state.draftProviderAllowList).toEqual(state.initialProviderAllowList);
   });
 
@@ -40,7 +40,7 @@ describe('providersAndModelsAllowListsReducer', () => {
 
     state = providersAndModelsAllowListsReducer(state, {
       type: 'INIT_FROM_SERVER',
-      modelAllowList: ['openai/gpt-4.1'],
+      modelDenyList: [],
       providerAllowList: ['openai'],
     });
 
@@ -61,6 +61,6 @@ describe('providersAndModelsAllowListsReducer', () => {
     }
 
     expect(state.initialProviderAllowList).toEqual(state.draftProviderAllowList);
-    expect(state.initialModelAllowList).toEqual(state.draftModelAllowList);
+    expect(state.initialModelDenyList).toEqual(state.draftModelDenyList);
   });
 });

@@ -278,10 +278,11 @@ export const OrganizationPlanSchema = z.enum(['teams', 'enterprise']);
 export type OrganizationPlan = z.infer<typeof OrganizationPlanSchema>;
 
 const OrganizationSettingsSchema = z.object({
+  /** @deprecated model access is deny-list based. */
   model_allow_list: z.array(z.string()).optional(),
   provider_allow_list: z.array(z.string()).optional(),
+  provider_policy_mode: z.enum(['allow']).optional(),
 
-  /** Legacy fallback for orgs that have not saved explicit allow lists yet. */
   model_deny_list: z.array(z.string()).optional(),
   /** Legacy fallback for orgs that have not saved explicit allow lists yet. */
   provider_deny_list: z.array(z.string()).optional(),

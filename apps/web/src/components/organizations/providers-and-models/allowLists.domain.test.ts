@@ -1,15 +1,12 @@
 import { describe, expect, test } from '@jest/globals';
 import {
   canonicalizeDenyList,
-  canonicalizeModelAllowList,
   canonicalizeProviderAllowList,
   computeAllowedModelIds,
   computeEnabledProviderSlugs,
-  deriveModelAllowListFromLegacyDenyList,
   deriveProviderAllowListFromLegacyDenyList,
   toggleModelAllowed,
   toggleProviderEnabled,
-  uniqueStrings,
 } from '@/components/organizations/providers-and-models/allowLists.domain';
 
 describe('allowLists.domain', () => {
@@ -23,50 +20,36 @@ describe('allowLists.domain', () => {
     expect([...enabled]).toEqual([]);
   });
 
-  test('model allow list excludes newly synced models', () => {
+  test('model deny list does not exclude newly synced models', () => {
     const openRouterModels = [{ slug: 'openai/gpt-4.1' }, { slug: 'anthropic/claude-3-opus' }];
 
     const allowed = computeAllowedModelIds(['openai/gpt-4.1'], openRouterModels);
-    expect([...allowed]).toEqual(['openai/gpt-4.1']);
+    expect([...allowed].sort()).toEqual(['anthropic/claude-3-opus']);
   });
 
-  test('empty model allow list means no models allowed', () => {
+  test('empty model deny list means all models allowed', () => {
     const openRouterModels = [{ slug: 'openai/gpt-4.1' }];
 
     const allowed = computeAllowedModelIds([], openRouterModels);
-    expect([...allowed]).toEqual([]);
+    expect([...allowed]).toEqual(['openai/gpt-4.1']);
   });
 
-  test('canonicalize allow lists normalize and dedupe', () => {
-    expect(canonicalizeModelAllowList(['openai/gpt-4.1:free', 'openai/gpt-4.1'])).toEqual([
+  test('canonicalize deny list normalizes and dedupes model ids', () => {
+    expect(canonicalizeDenyList(['openai/gpt-4.1:free', 'openai/gpt-4.1'])).toEqual([
       'openai/gpt-4.1',
     ]);
+  });
+
+  test('canonicalize provider allow list dedupes and sorts providers', () => {
     expect(canonicalizeProviderAllowList(['openai', 'openai', 'anthropic'])).toEqual([
       'anthropic',
       'openai',
     ]);
   });
 
-  test('uniqueStrings preserves source order for unrestricted snapshot migration', () => {
-    expect(uniqueStrings(['openai', 'anthropic', 'openai'])).toEqual(['openai', 'anthropic']);
-  });
-
-  test('legacy model deny list can be inverted into an allow list snapshot', () => {
-    const openRouterModels = [{ slug: 'openai/gpt-4.1' }, { slug: 'anthropic/claude-3-opus' }];
-
-    const allowed = deriveModelAllowListFromLegacyDenyList(['openai/gpt-4.1'], openRouterModels);
-    expect(allowed).toEqual(['anthropic/claude-3-opus']);
-  });
-
   test('legacy provider deny list can be inverted into an allow list snapshot', () => {
     const allowed = deriveProviderAllowListFromLegacyDenyList(['openai'], ['anthropic', 'openai']);
     expect(allowed).toEqual(['anthropic']);
-  });
-
-  test('canonicalizeDenyList still supports legacy fallback normalization', () => {
-    expect(canonicalizeDenyList(['openai/gpt-4.1:free', 'openai/gpt-4.1'])).toEqual([
-      'openai/gpt-4.1',
-    ]);
   });
 
   test('toggleProviderEnabled(disable) removes provider from allow list', () => {
@@ -87,21 +70,21 @@ describe('allowLists.domain', () => {
     expect(next).toEqual(['anthropic', 'openai']);
   });
 
-  test('toggleModelAllowed(disallow) removes model from allow list', () => {
+  test('toggleModelAllowed(disallow) adds model to deny list', () => {
     const next = toggleModelAllowed({
       modelId: 'openai/gpt-4.1',
       nextAllowed: false,
-      draftModelAllowList: ['openai/gpt-4.1', 'anthropic/claude-3-opus'],
+      draftModelDenyList: ['anthropic/claude-3-opus'],
     });
-    expect(next).toEqual(['anthropic/claude-3-opus']);
+    expect(next).toEqual(['anthropic/claude-3-opus', 'openai/gpt-4.1']);
   });
 
-  test('toggleModelAllowed(allow) adds model to allow list', () => {
+  test('toggleModelAllowed(allow) removes model from deny list', () => {
     const next = toggleModelAllowed({
       modelId: 'openai/gpt-4.1',
       nextAllowed: true,
-      draftModelAllowList: ['anthropic/claude-3-opus'],
+      draftModelDenyList: ['anthropic/claude-3-opus', 'openai/gpt-4.1'],
     });
-    expect(next).toEqual(['anthropic/claude-3-opus', 'openai/gpt-4.1']);
+    expect(next).toEqual(['anthropic/claude-3-opus']);
   });
 });

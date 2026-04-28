@@ -1,8 +1,7 @@
 /**
  * Hook for fetching and filtering organization models
  *
- * Handles fetching organization configuration, all available models,
- * and filtering based on the organization's allow list.
+ * Handles fetching organization configuration and available models.
  */
 
 import { useMemo } from 'react';
@@ -22,8 +21,7 @@ type UseOrganizationModelsReturn = {
 /**
  * Fetches and filters models based on organization configuration.
  *
- * If organizationId is provided, filters models based on the org's allow list.
- * If no allow list is configured, returns all available models.
+ * If organizationId is provided, the models API applies org access policy.
  *
  * @param organizationId - Optional organization ID to filter models for
  */

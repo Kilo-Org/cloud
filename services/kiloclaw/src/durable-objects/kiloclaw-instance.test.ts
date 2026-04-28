@@ -2855,6 +2855,7 @@ describe('updateChannels', () => {
           botToken: 'data',
           enabled: true,
           dmPolicy: 'pairing',
+          groupPolicy: 'open',
         },
         discord: {
           token: 'discord-data',
@@ -8887,6 +8888,7 @@ describe('channel config patch builder', () => {
           botToken: 'telegram-token',
           enabled: true,
           dmPolicy: 'pairing',
+          groupPolicy: 'open',
         },
         discord: {
           token: 'discord-token',
@@ -9051,6 +9053,7 @@ describe('flushPendingConfigToGateway: alarm retry for pending identity/exec/cha
           botToken: 'telegram-token',
           enabled: true,
           dmPolicy: 'pairing',
+          groupPolicy: 'open',
         },
       },
       plugins: { entries: { telegram: { enabled: true } } },

@@ -8,6 +8,7 @@ export type ChannelConfigPatch = {
       botToken: string;
       enabled: true;
       dmPolicy: string;
+      groupPolicy: 'open';
     };
     discord?: {
       token: string;
@@ -58,6 +59,7 @@ export function buildChannelConfigPatch(
       botToken: channelEnv.TELEGRAM_BOT_TOKEN,
       enabled: true,
       dmPolicy,
+      groupPolicy: 'open',
     };
     patch.plugins.entries.telegram = { enabled: true };
   }

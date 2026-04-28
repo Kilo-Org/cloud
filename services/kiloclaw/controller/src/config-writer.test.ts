@@ -667,6 +667,7 @@ describe('generateBaseConfig', () => {
     expect(config.channels.telegram.botToken).toBe('tg-token-123');
     expect(config.channels.telegram.enabled).toBe(true);
     expect(config.channels.telegram.dmPolicy).toBe('pairing');
+    expect(config.channels.telegram.groupPolicy).toBe('open');
     expect(config.plugins.entries.telegram.enabled).toBe(true);
   });
 
@@ -690,6 +691,57 @@ describe('generateBaseConfig', () => {
     expect(config.channels.telegram.enabled).toBe(true);
     expect(config.channels.telegram.groupPolicy).toBe('restricted');
     expect(config.channels.telegram.customField).toBe('user-value');
+  });
+
+  it('does not default Telegram group policy when group access is already configured', () => {
+    const existing = JSON.stringify({
+      channels: {
+        telegram: {
+          botToken: 'tg-token-old',
+          enabled: true,
+          dmPolicy: 'pairing',
+          groups: { '-5055658641': {} },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), TELEGRAM_BOT_TOKEN: 'tg-token-new' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels.telegram.groupPolicy).toBeUndefined();
+    expect(config.channels.telegram.groups).toEqual({ '-5055658641': {} });
+  });
+
+  it('does not default Telegram group policy when sender access is already configured', () => {
+    const existing = JSON.stringify({
+      channels: {
+        telegram: {
+          botToken: 'tg-token-old',
+          enabled: true,
+          dmPolicy: 'pairing',
+          allowFrom: ['7676134290'],
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), TELEGRAM_BOT_TOKEN: 'tg-token-new' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels.telegram.groupPolicy).toBeUndefined();
+    expect(config.channels.telegram.allowFrom).toEqual(['7676134290']);
+  });
+
+  it('does not default Telegram group policy when env supplies sender access', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      TELEGRAM_BOT_TOKEN: 'tg-token-new',
+      TELEGRAM_DM_ALLOW_FROM: '7676134290',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.channels.telegram.groupPolicy).toBeUndefined();
+    expect(config.channels.telegram.allowFrom).toEqual(['7676134290']);
   });
 
   it('configures Telegram with open DM policy and allowFrom wildcard', () => {

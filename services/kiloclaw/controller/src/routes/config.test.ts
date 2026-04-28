@@ -221,6 +221,175 @@ describe('/_kilo/config/patch routes', () => {
     expect(written.gateway.port).toBe(3001);
   });
 
+  it('does not overwrite an existing Telegram groupPolicy with a managed default', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    readMock.mockReturnValue(
+      JSON.stringify({
+        channels: {
+          telegram: {
+            botToken: 'old-token',
+            enabled: true,
+            dmPolicy: 'pairing',
+            groupPolicy: 'restricted',
+          },
+        },
+      })
+    );
+
+    const resp = await app.request('/_kilo/config/patch', {
+      method: 'POST',
+      body: JSON.stringify({
+        channels: {
+          telegram: {
+            botToken: 'new-token',
+            enabled: true,
+            dmPolicy: 'pairing',
+            groupPolicy: 'open',
+          },
+        },
+      }),
+      headers: authHeaders(),
+    });
+
+    expect(resp.status).toBe(200);
+    expect(atomicWriteMock).toHaveBeenCalledOnce();
+    const written = JSON.parse(atomicWriteMock.mock.calls[0][1] as string);
+    expect(written.channels.telegram).toEqual({
+      botToken: 'new-token',
+      enabled: true,
+      dmPolicy: 'pairing',
+      groupPolicy: 'restricted',
+    });
+  });
+
+  it('does not seed Telegram groupPolicy when group access is already configured', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    readMock.mockReturnValue(
+      JSON.stringify({
+        channels: {
+          telegram: {
+            botToken: 'old-token',
+            enabled: true,
+            dmPolicy: 'pairing',
+            groups: { '-5055658641': {} },
+          },
+        },
+      })
+    );
+
+    const resp = await app.request('/_kilo/config/patch', {
+      method: 'POST',
+      body: JSON.stringify({
+        channels: {
+          telegram: {
+            botToken: 'new-token',
+            enabled: true,
+            dmPolicy: 'pairing',
+            groupPolicy: 'open',
+          },
+        },
+      }),
+      headers: authHeaders(),
+    });
+
+    expect(resp.status).toBe(200);
+    const written = JSON.parse(atomicWriteMock.mock.calls[0][1] as string);
+    expect(written.channels.telegram).toEqual({
+      botToken: 'new-token',
+      enabled: true,
+      dmPolicy: 'pairing',
+      groups: { '-5055658641': {} },
+    });
+  });
+
+  it('does not seed Telegram groupPolicy when sender access is already configured', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    readMock.mockReturnValue(
+      JSON.stringify({
+        channels: {
+          telegram: {
+            botToken: 'old-token',
+            enabled: true,
+            dmPolicy: 'pairing',
+            groupAllowFrom: ['7676134290'],
+          },
+        },
+      })
+    );
+
+    const resp = await app.request('/_kilo/config/patch', {
+      method: 'POST',
+      body: JSON.stringify({
+        channels: {
+          telegram: {
+            botToken: 'new-token',
+            enabled: true,
+            dmPolicy: 'pairing',
+            groupPolicy: 'open',
+          },
+        },
+      }),
+      headers: authHeaders(),
+    });
+
+    expect(resp.status).toBe(200);
+    const written = JSON.parse(atomicWriteMock.mock.calls[0][1] as string);
+    expect(written.channels.telegram).toEqual({
+      botToken: 'new-token',
+      enabled: true,
+      dmPolicy: 'pairing',
+      groupAllowFrom: ['7676134290'],
+    });
+  });
+
+  it('seeds Telegram groupPolicy from a managed patch when no setting exists', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, createMockSupervisor(), 'test-token');
+
+    readMock.mockReturnValue(
+      JSON.stringify({
+        channels: {
+          telegram: {
+            botToken: 'old-token',
+            enabled: true,
+            dmPolicy: 'pairing',
+          },
+        },
+      })
+    );
+
+    const resp = await app.request('/_kilo/config/patch', {
+      method: 'POST',
+      body: JSON.stringify({
+        channels: {
+          telegram: {
+            botToken: 'new-token',
+            enabled: true,
+            dmPolicy: 'pairing',
+            groupPolicy: 'open',
+          },
+        },
+      }),
+      headers: authHeaders(),
+    });
+
+    expect(resp.status).toBe(200);
+    expect(atomicWriteMock).toHaveBeenCalledOnce();
+    const written = JSON.parse(atomicWriteMock.mock.calls[0][1] as string);
+    expect(written.channels.telegram).toEqual({
+      botToken: 'new-token',
+      enabled: true,
+      dmPolicy: 'pairing',
+      groupPolicy: 'open',
+    });
+  });
+
   it('rejects non-object body', async () => {
     const app = new Hono();
     registerConfigRoutes(app, createMockSupervisor(), 'test-token');

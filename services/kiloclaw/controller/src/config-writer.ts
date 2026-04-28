@@ -9,6 +9,7 @@ import { execFileSync as nodeExecFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { shouldDefaultTelegramGroupPolicyOpen } from './telegram-group-policy';
 
 const DEFAULT_CONFIG_PATH = '/root/.openclaw/openclaw.json';
 
@@ -436,6 +437,9 @@ export function generateBaseConfig(
       config.channels.telegram.allowFrom = env.TELEGRAM_DM_ALLOW_FROM.split(',');
     } else if (!('allowFrom' in config.channels.telegram)) {
       config.channels.telegram.allowFrom = dmPolicy === 'open' ? ['*'] : [];
+    }
+    if (shouldDefaultTelegramGroupPolicyOpen(config.channels.telegram)) {
+      config.channels.telegram.groupPolicy = 'open';
     }
 
     config.plugins = config.plugins ?? {};

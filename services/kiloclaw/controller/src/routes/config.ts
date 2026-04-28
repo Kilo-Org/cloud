@@ -7,6 +7,7 @@ import { timingSafeTokenEqual } from '../auth';
 import type { Supervisor } from '../supervisor';
 import { backupConfigFile, writeBaseConfig } from '../config-writer';
 import { GOG_SECTION_CONFIG, seedExecApprovalsDefaults, updateToolsMdSection } from '../bootstrap';
+import { shouldDefaultTelegramGroupPolicyOpen } from '../telegram-group-policy';
 import { getBearerToken } from './gateway';
 
 const ReplaceConfigBodySchema = z.object({
@@ -57,6 +58,23 @@ function deepMerge(target: Record<string, unknown>, patch: Record<string, unknow
       target[key] = value;
     }
   }
+}
+
+function stripManagedTelegramGroupPolicyWhenConfigured(
+  config: Record<string, unknown>,
+  patch: Record<string, unknown>
+): void {
+  const existingChannels = config.channels;
+  const patchChannels = patch.channels;
+  if (!isJsonObject(existingChannels) || !isJsonObject(patchChannels)) return;
+
+  const existingTelegram = existingChannels.telegram;
+  const patchTelegram = patchChannels.telegram;
+  if (!isJsonObject(existingTelegram) || !isJsonObject(patchTelegram)) return;
+  if (!('groupPolicy' in patchTelegram)) return;
+  if (shouldDefaultTelegramGroupPolicyOpen(existingTelegram)) return;
+
+  delete patchTelegram.groupPolicy;
 }
 
 export function registerConfigRoutes(
@@ -195,6 +213,7 @@ export function registerConfigRoutes(
     try {
       const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
       const config = JSON.parse(raw);
+      stripManagedTelegramGroupPolicyWhenConfigured(config, patch as Record<string, unknown>);
       deepMerge(config, patch as Record<string, unknown>);
 
       // Sync exec-approvals.json BEFORE writing openclaw.json so the host

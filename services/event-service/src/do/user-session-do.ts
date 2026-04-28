@@ -84,6 +84,14 @@ export class UserSessionDO extends DurableObject<Env> {
     ws.close(1011, 'WebSocket error');
   }
 
+  async hasContext(context: string): Promise<boolean> {
+    for (const ws of this.ctx.getWebSockets()) {
+      const raw = ws.deserializeAttachment() as SerializedState | null;
+      if (raw?.contexts?.includes(context)) return true;
+    }
+    return false;
+  }
+
   // ── Event push ─────────────────────────────────────────────────────
 
   async pushEvent<Name extends string>(

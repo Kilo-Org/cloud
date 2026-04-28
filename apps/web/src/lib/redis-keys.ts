@@ -24,6 +24,9 @@ export const GATEWAY_METADATA_REDIS_KEYS = {
   openrouterProviders: redisKey('ai-gateway.metadata:openrouter-providers'),
 } as const;
 
+export const directByokModelsRedisKey = (providerId: string) =>
+  redisKey(`ai-gateway.metadata:direct-byok-models:${providerId}`);
+
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 
 export const requestLogRedisKey = (hash: string) => redisKey(`ai-gateway.request-log:${hash}`);

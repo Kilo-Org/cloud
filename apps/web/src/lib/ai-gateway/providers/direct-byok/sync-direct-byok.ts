@@ -1,0 +1,171 @@
+import { createGateway, generateText } from 'ai';
+import * as z from 'zod';
+import { OpenCodeVariantSchema } from '@kilocode/db';
+import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import type { DirectByokModel } from '@/lib/ai-gateway/providers/direct-byok/types';
+import { redisGet, redisSet } from '@/lib/redis';
+import { directByokModelsRedisKey } from '@/lib/redis-keys';
+
+const DEFAULT_MAX_COMPLETION_TOKENS = 32_768;
+const DESCRIPTION_MODEL = 'google/gemma-4-26b-a4b-it';
+
+const DirectByokModelFlagSchema = z.enum(['recommended', 'vision']);
+
+const DirectByokModelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  flags: z.array(DirectByokModelFlagSchema).readonly(),
+  description: z.string(),
+  context_length: z.number(),
+  max_completion_tokens: z.number(),
+  variants: z.record(z.string(), OpenCodeVariantSchema).nullable(),
+}) satisfies z.ZodType<DirectByokModel>;
+
+const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
+
+const NeuralwattModelsResponseSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      max_model_len: z.number().optional(),
+    })
+  ),
+});
+
+const ModelsDevModelSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  limit: z
+    .object({
+      context: z.number().optional(),
+      output: z.number().optional(),
+    })
+    .optional(),
+});
+
+const ModelsDevProviderSchema = z.object({
+  models: z.record(z.string(), ModelsDevModelSchema),
+});
+
+type RawModel = {
+  id: string;
+  name?: string;
+  context_length?: number;
+  max_completion_tokens?: number;
+};
+
+type ProviderFetcher = {
+  providerId: string;
+  fetch(): Promise<RawModel[]>;
+};
+
+const FETCHERS: ReadonlyArray<ProviderFetcher> = [
+  {
+    providerId: 'neuralwatt',
+    async fetch() {
+      const response = await fetch('https://api.neuralwatt.com/v1/models');
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch Neuralwatt models: ${response.status} ${response.statusText}`
+        );
+      }
+      const parsed = NeuralwattModelsResponseSchema.parse(await response.json());
+      return parsed.data.map(model => ({
+        id: model.id,
+        context_length: model.max_model_len,
+      }));
+    },
+  },
+  {
+    providerId: 'zai-coding',
+    async fetch() {
+      const response = await fetch('https://models.dev/api.json');
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
+        );
+      }
+      const catalog = z.record(z.string(), z.unknown()).parse(await response.json());
+      const entry = catalog['zai-coding-plan'];
+      if (!entry) {
+        throw new Error('models.dev catalog missing zai-coding-plan entry');
+      }
+      const provider = ModelsDevProviderSchema.parse(entry);
+      return Object.values(provider.models).map(model => ({
+        id: model.id,
+        name: model.name,
+        context_length: model.limit?.context,
+        max_completion_tokens: model.limit?.output,
+      }));
+    },
+  },
+];
+
+async function generateDescription(id: string, name: string): Promise<string> {
+  const gateway = createGateway({ apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey });
+  const { text } = await generateText({
+    model: gateway(DESCRIPTION_MODEL),
+    prompt:
+      `Write a concise 1-2 sentence description of the AI model "${name}" ` +
+      `(id: "${id}"), suitable for display in a model picker. ` +
+      `Output only the description with no preamble or quoting.`,
+    maxOutputTokens: 300,
+  });
+  return text.trim();
+}
+
+async function readPreviousModels(providerId: string): Promise<DirectByokModel[]> {
+  const raw = await redisGet(directByokModelsRedisKey(providerId));
+  if (!raw) return [];
+  try {
+    return DirectByokModelArraySchema.parse(JSON.parse(raw));
+  } catch (error) {
+    console.warn(
+      `[syncDirectByokModels] ignoring malformed previous models for ${providerId}:`,
+      error
+    );
+    return [];
+  }
+}
+
+async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
+  const previous = await readPreviousModels(fetcher.providerId);
+  const previousById = new Map(previous.map(model => [model.id, model]));
+
+  const fetched = await fetcher.fetch();
+  const models: DirectByokModel[] = [];
+
+  for (const raw of fetched) {
+    const prior = previousById.get(raw.id);
+    const name = raw.name ?? prior?.name ?? raw.id;
+    const description = prior?.description ?? (await generateDescription(raw.id, name));
+    models.push({
+      id: raw.id,
+      name,
+      description,
+      flags: prior?.flags ?? [],
+      context_length: raw.context_length ?? prior?.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS,
+      max_completion_tokens:
+        raw.max_completion_tokens ?? prior?.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
+      variants: prior?.variants ?? null,
+    });
+  }
+
+  await redisSet(directByokModelsRedisKey(fetcher.providerId), JSON.stringify(models));
+  return models.length;
+}
+
+export async function syncDirectByokModels(): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  await Promise.all(
+    FETCHERS.map(async fetcher => {
+      try {
+        counts[fetcher.providerId] = await syncProvider(fetcher);
+      } catch (error) {
+        console.error(`[syncDirectByokModels] failed to sync ${fetcher.providerId}:`, error);
+        counts[fetcher.providerId] = -1;
+      }
+    })
+  );
+  return counts;
+}

@@ -67,9 +67,9 @@ async function getPlatformIntegrationById(platformIntegrationId: string | null) 
   return integration ?? null;
 }
 
-async function getSlackBotToken(platformIntegrationId: string | null): Promise<string | null> {
+async function getSlackBotToken(platformIntegrationId: string | null): Promise<string> {
   if (!platformIntegrationId) {
-    return null;
+    throw new Error('No Slack bot token found for null platform integration');
   }
 
   const [integration] = await db
@@ -82,14 +82,18 @@ async function getSlackBotToken(platformIntegrationId: string | null): Promise<s
 
   const teamId = integration?.platformInstallationId;
   if (!teamId) {
-    return null;
+    throw new Error(`No Slack team found for platform integration ${platformIntegrationId}`);
   }
 
   await bot.initialize();
   const slackAdapter = bot.getAdapter('slack');
   const installation = await slackAdapter.getInstallation(teamId);
 
-  return installation?.botToken ?? null;
+  if (!installation?.botToken) {
+    throw new Error(`No Slack bot token found for platform integration ${platformIntegrationId}`);
+  }
+
+  return installation.botToken;
 }
 
 function logCallback(message: string, extra?: Record<string, unknown>) {
@@ -192,11 +196,6 @@ async function startTyping({
   platformIntegrationId: string | null;
 }): Promise<void> {
   const botToken = await getSlackBotToken(platformIntegrationId);
-  if (!botToken) {
-    throw new Error(
-      `No Slack bot token found for platform integration ${platformIntegrationId ?? 'null'}`
-    );
-  }
 
   await bot.initialize();
   const slackAdapter = bot.getAdapter('slack');
@@ -218,11 +217,6 @@ async function postSlackThreadMessage(params: {
   });
 
   const botToken = await getSlackBotToken(params.platformIntegrationId);
-  if (!botToken) {
-    throw new Error(
-      `No Slack bot token found for platform integration ${params.platformIntegrationId ?? 'null'}`
-    );
-  }
 
   await bot.initialize();
   const slackAdapter = bot.getAdapter('slack');
@@ -262,11 +256,6 @@ async function continueBotAgentAfterCallback(params: {
   bot.registerSingleton();
   const slackAdapter = bot.getAdapter('slack');
   const botToken = await getSlackBotToken(params.requestRow.platform_integration_id);
-  if (!botToken) {
-    throw new Error(
-      `No Slack bot token found for platform integration ${params.requestRow.platform_integration_id ?? 'null'}`
-    );
-  }
 
   return await slackAdapter.withBotToken(botToken, async () => {
     const [threadInfo, originalMessage] = await Promise.all([

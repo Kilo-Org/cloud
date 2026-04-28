@@ -10,6 +10,7 @@ import {
   shouldSaveBotIdentity,
   shouldSaveExecPreset,
 } from '@/lib/onboarding';
+import { useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
 import { type ReactNode, useCallback, useEffect, useReducer } from 'react';
@@ -42,6 +43,7 @@ import {
   useKiloClawStatus,
 } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useTRPC } from '@/lib/trpc';
 
 function categorizeProvisionError(error: {
   data?: { code?: string | null } | null;
@@ -86,12 +88,16 @@ function resolveUserTimezone(): string | undefined {
 export function OnboardingFlow() {
   const router = useRouter();
   const colors = useThemeColors();
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
   const onboardingQuery = useKiloClawMobileOnboardingState();
   const mutations = useKiloClawMutations(null);
 
   const [state, dispatch] = useReducer(reduce, INITIAL_STATE);
 
-  const statusQuery = useKiloClawStatus(null, state.provisionStarted);
+  // Faster poll during onboarding (5s) so the "setting up" screen tracks the
+  // gateway-ready poll cadence. Other screens keep the 10s default.
+  const statusQuery = useKiloClawStatus(null, state.provisionStarted, 5000);
   const instanceStatus = statusQuery.data?.status ?? null;
 
   const gatewayReadyQuery = useKiloClawGatewayReady(null, state.provisionStarted);
@@ -264,8 +270,35 @@ export function OnboardingFlow() {
   }, []);
 
   const onDismiss = useCallback(() => {
+    // When provision has started (or an instance exists), land on Home so the
+    // user sees the live status card. Otherwise return to the entry screen.
+    if (state.provisionStarted || state.sandboxId !== null) {
+      // Home's focus-effect invalidation may miss this transition when a
+      // modal is replaced with a tab route — tabs were mounted under the
+      // modal the whole time, so no focus change fires. The provision
+      // mutation's `onSuccess` already invalidates these keys, but with
+      // `freezeOnBlur: true` Home's query observer may not be "active"
+      // and the refetch would be deferred until the user interacts.
+      // Force an immediate refetch here so the new card is visible as
+      // soon as the server responds.
+      void queryClient.refetchQueries({
+        queryKey: trpc.kiloclaw.listAllInstances.queryKey(),
+      });
+      void queryClient.refetchQueries({
+        queryKey: trpc.kiloclaw.getStatus.queryKey(),
+      });
+      router.replace('/(app)/(tabs)/(0_home)' as Href);
+      return;
+    }
     router.back();
-  }, [router]);
+  }, [
+    queryClient,
+    router,
+    state.provisionStarted,
+    state.sandboxId,
+    trpc.kiloclaw.getStatus,
+    trpc.kiloclaw.listAllInstances,
+  ]);
 
   const onOpenInstance = useCallback(() => {
     // Dismiss the onboarding modal, then open the chat. `chat/[instance-id]`

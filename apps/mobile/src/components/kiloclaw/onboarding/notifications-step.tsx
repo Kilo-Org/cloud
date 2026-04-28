@@ -95,8 +95,11 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
       keyboardShouldPersistTaps="handled"
     >
       <View className="gap-2">
-        <Text variant="large">Stay in the loop</Text>
-        <Text variant="muted">
+        <Text variant="eyebrow" className="text-xs">
+          Notifications
+        </Text>
+        <Text className="text-2xl font-semibold">Stay in the loop</Text>
+        <Text variant="muted" className="text-base">
           Get notified when {botName} finishes a task so you never miss a response.
         </Text>
       </View>
@@ -120,11 +123,11 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
 
       <View className="gap-3">
         <Button size="lg" onPress={() => void handleEnable()}>
-          <Text>Enable notifications</Text>
+          <Text className="text-base">Enable notifications</Text>
           <ChevronRight size={16} color={colors.primaryForeground} />
         </Button>
         <Button variant="ghost" size="lg" onPress={() => void handleSkip()}>
-          <Text>Skip for now</Text>
+          <Text className="text-base">Skip for now</Text>
         </Button>
       </View>
     </ScrollView>

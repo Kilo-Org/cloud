@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { MOBILE_ONBOARDING_STATE_QUERY_KEY } from '@/lib/derive-mobile-onboarding-state';
+import { type ClawInstance } from '@/lib/hooks/use-instance-context';
 import { useTRPC } from '@/lib/trpc';
 import { asyncNoop } from '@/lib/utils';
 
@@ -365,8 +366,31 @@ export function useKiloClawMutations(organizationId?: string | null) {
     }),
     destroy: useMutation({
       ...dispatch(trpc.kiloclaw.destroy, trpc.organizations.kiloclaw.destroy),
-      onSuccess: invalidateStatus,
-      onError: onMutationError,
+      // Optimistically remove this context's row from the list cache so
+      // Home reflects the destruction immediately. A race between focus
+      // refetch and the server marking `destroyed_at` would otherwise
+      // re-surface the destroyed row briefly.
+      onMutate: async () => {
+        await queryClient.cancelQueries({ queryKey: listAllInstancesKey });
+        const previous = queryClient.getQueryData<ClawInstance[]>(listAllInstancesKey);
+        const contextOrgId = organizationId ?? null;
+        queryClient.setQueryData<ClawInstance[]>(listAllInstancesKey, old =>
+          old ? old.filter(row => (row.organizationId ?? null) !== contextOrgId) : old
+        );
+        return { previous };
+      },
+      onError: (error, _input, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(listAllInstancesKey, context.previous);
+        }
+        onMutationError(error);
+      },
+      onSettled: async () => {
+        await Promise.all([
+          invalidateStatus(),
+          queryClient.invalidateQueries({ queryKey: listAllInstancesKey }),
+        ]);
+      },
     }),
     updateModel: useMutation({
       ...dispatch(

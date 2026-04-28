@@ -10,6 +10,11 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
   const flatListRef = useRef<FlatList<ItemT>>(null);
   const shouldAutoScrollRef = useRef(true);
   const isAutoScrollingRef = useRef(false);
+  // Tracks whether the user is currently dragging or the list is still in a
+  // momentum fling. While this is true we must not programmatically scroll —
+  // otherwise a content-size update from a streaming response yanks the
+  // viewport back to the bottom and the user's drag appears to "bounce back".
+  const isUserScrollingRef = useRef(false);
   const lastContentHeightRef = useRef(0);
   const autoScrollResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -19,6 +24,14 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
     if (timeout) {
       clearTimeout(timeout);
       autoScrollResetTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearAutoScrollRetryTimeout = useCallback(() => {
+    const timeout = autoScrollRetryTimeoutRef.current;
+    if (timeout) {
+      clearTimeout(timeout);
+      autoScrollRetryTimeoutRef.current = null;
     }
   }, []);
 
@@ -36,20 +49,18 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
   }, [clearAutoScrollResetTimeout]);
 
   const scheduleScrollToLatestMessage = useCallback(() => {
-    scrollToLatestMessage();
-
-    const retryTimeout = autoScrollRetryTimeoutRef.current;
-    if (retryTimeout) {
-      clearTimeout(retryTimeout);
+    if (isUserScrollingRef.current) {
+      return;
     }
-
+    scrollToLatestMessage();
+    clearAutoScrollRetryTimeout();
     autoScrollRetryTimeoutRef.current = setTimeout(() => {
       autoScrollRetryTimeoutRef.current = null;
-      if (shouldAutoScrollRef.current) {
+      if (shouldAutoScrollRef.current && !isUserScrollingRef.current) {
         scrollToLatestMessage();
       }
     }, 80);
-  }, [scrollToLatestMessage]);
+  }, [clearAutoScrollRetryTimeout, scrollToLatestMessage]);
 
   useEffect(() => {
     shouldAutoScrollRef.current = true;
@@ -57,7 +68,7 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
   }, [resetKey]);
 
   useEffect(() => {
-    if (itemCount > 0 && shouldAutoScrollRef.current) {
+    if (itemCount > 0 && shouldAutoScrollRef.current && !isUserScrollingRef.current) {
       scheduleScrollToLatestMessage();
     }
   }, [itemCount, scheduleScrollToLatestMessage]);
@@ -65,12 +76,9 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
   useEffect(
     () => () => {
       clearAutoScrollResetTimeout();
-      const retryTimeout = autoScrollRetryTimeoutRef.current;
-      if (retryTimeout) {
-        clearTimeout(retryTimeout);
-      }
+      clearAutoScrollRetryTimeout();
     },
-    [clearAutoScrollResetTimeout]
+    [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout]
   );
 
   const updateAutoScrollFromEvent = useCallback(
@@ -93,15 +101,32 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
   );
 
   const handleScrollBeginDrag = useCallback(() => {
+    isUserScrollingRef.current = true;
     isAutoScrollingRef.current = false;
     clearAutoScrollResetTimeout();
-  }, [clearAutoScrollResetTimeout]);
+    clearAutoScrollRetryTimeout();
+  }, [clearAutoScrollResetTimeout, clearAutoScrollRetryTimeout]);
+
+  const handleScrollEndDrag = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      updateAutoScrollFromEvent(event);
+    },
+    [updateAutoScrollFromEvent]
+  );
+
+  const handleMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      isUserScrollingRef.current = false;
+      updateAutoScrollFromEvent(event);
+    },
+    [updateAutoScrollFromEvent]
+  );
 
   const handleContentSizeChange = useCallback(
     (_width: number, height: number) => {
       const didContentHeightChange = height !== lastContentHeightRef.current;
       lastContentHeightRef.current = height;
-      if (shouldAutoScrollRef.current && didContentHeightChange) {
+      if (shouldAutoScrollRef.current && didContentHeightChange && !isUserScrollingRef.current) {
         scheduleScrollToLatestMessage();
       }
     },
@@ -109,7 +134,7 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
   );
 
   const handleListLayout = useCallback(() => {
-    if (shouldAutoScrollRef.current) {
+    if (shouldAutoScrollRef.current && !isUserScrollingRef.current) {
       scheduleScrollToLatestMessage();
     }
   }, [scheduleScrollToLatestMessage]);
@@ -120,5 +145,7 @@ export function useSessionAutoScroll<ItemT>({ itemCount, resetKey }: UseSessionA
     handleListLayout,
     handleScroll,
     handleScrollBeginDrag,
+    handleScrollEndDrag,
+    handleMomentumScrollEnd,
   };
 }

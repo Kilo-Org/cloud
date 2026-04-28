@@ -71,6 +71,7 @@ const config: ExpoConfig = {
     ],
     'expo-router',
     'expo-image',
+    'expo-font',
     'expo-secure-store',
     [
       'expo-notifications',

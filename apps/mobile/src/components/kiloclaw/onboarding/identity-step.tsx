@@ -10,6 +10,7 @@ import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { agentColor } from '@/lib/agent-color';
 import { useTRPC } from '@/lib/trpc';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -108,10 +109,62 @@ export function IdentityStep({
   const [locationInputKey, setLocationInputKey] = useState(0);
   const [locationDefaultValue, setLocationDefaultValue] = useState(initialLocation);
   const [isGpsLoading, setIsGpsLoading] = useState(false);
+  const [locationFeedback, setLocationFeedback] = useState<{
+    message: string;
+    status: 'validated' | 'service_unavailable';
+  } | null>(null);
+  const [validatedLocation, setValidatedLocation] = useState<string | null>(null);
 
   const validateLocation = useMutation(trpc.kiloclaw.validateWeatherLocation.mutationOptions({}));
+  const validateLocationAsync = validateLocation.mutateAsync;
+  const validateLocationMutate = validateLocation.mutate;
 
   const nature = NATURE_PRESETS.find(n => n.id === selectedNatureId) ?? DEFAULT_NATURE;
+  const selectedTint = agentColor(selectedEmoji);
+
+  const applyLocationText = useCallback((value: string) => {
+    locationTextRef.current = value;
+    setLocationDefaultValue(value);
+    setLocationInputKey(k => k + 1);
+  }, []);
+
+  const handleLocationBlur = useCallback(async () => {
+    const trimmed = locationTextRef.current.trim();
+    if (!trimmed) {
+      return;
+    }
+    if (trimmed === validatedLocation) {
+      return;
+    }
+    if (isGpsLoading || validateLocation.isPending) {
+      return;
+    }
+
+    try {
+      const result = await validateLocationAsync({ location: trimmed });
+      // Guard against stale responses: user may have kept typing after blur.
+      if (locationTextRef.current.trim() !== trimmed) {
+        return;
+      }
+      applyLocationText(result.location);
+      setLocationFeedback({ message: result.currentWeatherText, status: result.status });
+      setValidatedLocation(result.location);
+    } catch (error) {
+      if (locationTextRef.current.trim() !== trimmed) {
+        return;
+      }
+      setLocationFeedback(null);
+      setValidatedLocation(null);
+      const message = error instanceof Error ? error.message : 'Location could not be validated.';
+      toast.error(message);
+    }
+  }, [
+    applyLocationText,
+    isGpsLoading,
+    validateLocation.isPending,
+    validateLocationAsync,
+    validatedLocation,
+  ]);
 
   const handleGpsPress = useCallback(async () => {
     setIsGpsLoading(true);
@@ -128,18 +181,26 @@ export function IdentityStep({
       const latitude = pos.coords.latitude.toFixed(GPS_COORDINATE_PRECISION);
       const longitude = pos.coords.longitude.toFixed(GPS_COORDINATE_PRECISION);
       const coords = `${latitude},${longitude}`;
-      locationTextRef.current = coords;
-      setLocationDefaultValue(coords);
-      setLocationInputKey(k => k + 1);
+
+      try {
+        const result = await validateLocationAsync({ location: coords });
+        applyLocationText(result.location);
+        setLocationFeedback({ message: result.currentWeatherText, status: result.status });
+        setValidatedLocation(result.location);
+      } catch {
+        applyLocationText(coords);
+        setLocationFeedback(null);
+        setValidatedLocation(null);
+        toast.error('Could not resolve your location. You can edit it manually.');
+      }
     } catch (error) {
       Sentry.captureException(error);
       toast.error('Could not get your location. Enter it manually.');
     } finally {
       setIsGpsLoading(false);
     }
-  }, []);
+  }, [applyLocationText, validateLocationAsync]);
 
-  const validateLocationMutate = validateLocation.mutate;
   const handleContinue = useCallback(() => {
     const trimmedName = nameRef.current.trim();
     const identity: BotIdentity = {
@@ -152,6 +213,11 @@ export function IdentityStep({
     const trimmedLocation = locationTextRef.current.trim();
     if (!trimmedLocation) {
       onContinue(identity, null);
+      return;
+    }
+
+    if (trimmedLocation === validatedLocation) {
+      onContinue(identity, trimmedLocation);
       return;
     }
 
@@ -170,14 +236,14 @@ export function IdentityStep({
         },
       }
     );
-  }, [nature, onContinue, selectedEmoji, validateLocationMutate]);
+  }, [nature, onContinue, selectedEmoji, validateLocationMutate, validatedLocation]);
 
   const isValidating = validateLocation.isPending;
 
   return (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="p-4 gap-5"
+      contentContainerClassName="p-4 gap-6"
       automaticallyAdjustKeyboardInsets
       keyboardShouldPersistTaps="handled"
     >
@@ -190,16 +256,15 @@ export function IdentityStep({
               setAvatarExpanded(v => !v);
             }}
             className={cn(
-              'h-14 w-14 items-center justify-center rounded-xl border',
-              avatarExpanded
-                ? 'border-primary bg-neutral-200 dark:bg-neutral-800'
-                : 'border-border bg-card active:opacity-70'
+              'h-14 w-14 items-center justify-center rounded-[14px] border active:opacity-70',
+              selectedTint.tileBgClass,
+              avatarExpanded ? 'border-primary' : selectedTint.tileBorderClass
             )}
           >
-            <Text className="text-3xl">{selectedEmoji}</Text>
+            <Text className="text-2xl">{selectedEmoji}</Text>
           </Pressable>
           <TextInput
-            className="h-14 flex-1 rounded-xl border border-input bg-background px-3 text-sm leading-5 text-foreground"
+            className="h-14 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-6 text-foreground"
             placeholder="Name your bot"
             placeholderTextColor={colors.mutedForeground}
             defaultValue={initialName}
@@ -215,31 +280,34 @@ export function IdentityStep({
 
         {avatarExpanded && (
           <View className="flex-row flex-wrap gap-3">
-            {EMOJI_OPTIONS.map(emoji => (
-              <Pressable
-                key={emoji}
-                accessibilityLabel={`Select ${emoji} as avatar`}
-                accessibilityRole="button"
-                onPress={() => {
-                  setSelectedEmoji(emoji);
-                  setAvatarExpanded(false);
-                }}
-                className={cn(
-                  'h-14 w-14 items-center justify-center rounded-xl border',
-                  selectedEmoji === emoji
-                    ? 'border-primary bg-neutral-200 dark:bg-neutral-800'
-                    : 'border-border active:opacity-70'
-                )}
-              >
-                <Text className="text-2xl">{emoji}</Text>
-              </Pressable>
-            ))}
+            {EMOJI_OPTIONS.map(emoji => {
+              const tint = agentColor(emoji);
+              const isSelected = selectedEmoji === emoji;
+              return (
+                <Pressable
+                  key={emoji}
+                  accessibilityLabel={`Select ${emoji} as avatar`}
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setSelectedEmoji(emoji);
+                    setAvatarExpanded(false);
+                  }}
+                  className={cn(
+                    'h-14 w-14 items-center justify-center rounded-[14px] border active:opacity-70',
+                    tint.tileBgClass,
+                    isSelected ? 'border-primary' : tint.tileBorderClass
+                  )}
+                >
+                  <Text className="text-2xl">{emoji}</Text>
+                </Pressable>
+              );
+            })}
           </View>
         )}
       </Animated.View>
 
       <Animated.View layout={LinearTransition} className="gap-2">
-        <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <Text variant="eyebrow" className="text-xs">
           Personality
         </Text>
         {personalityExpanded ? (
@@ -254,16 +322,16 @@ export function IdentityStep({
                   setPersonalityExpanded(false);
                 }}
                 className={cn(
-                  'flex-row items-center gap-3 rounded-md border px-3 py-3',
+                  'flex-row items-center gap-3 rounded-xl border px-3 py-3',
                   selectedNatureId === preset.id
                     ? 'border-primary bg-neutral-200 dark:bg-neutral-800'
-                    : 'border-border active:opacity-70'
+                    : 'border-transparent bg-secondary active:opacity-70'
                 )}
               >
-                <Text className="text-xl">{preset.emoji}</Text>
+                <Text className="text-2xl">{preset.emoji}</Text>
                 <View className="flex-1 gap-0.5">
-                  <Text className="text-sm font-medium">{preset.label}</Text>
-                  <Text className="text-xs text-muted-foreground">{preset.vibe}</Text>
+                  <Text className="text-base font-medium">{preset.label}</Text>
+                  <Text className="text-sm text-muted-foreground">{preset.vibe}</Text>
                 </View>
               </Pressable>
             ))}
@@ -284,12 +352,12 @@ export function IdentityStep({
             onPress={() => {
               setPersonalityExpanded(true);
             }}
-            className="flex-row items-center gap-3 rounded-md border border-border px-3 py-3 active:opacity-70"
+            className="flex-row items-center gap-3 rounded-xl bg-secondary px-3 py-3 active:opacity-70"
           >
-            <Text className="text-xl">{nature.emoji}</Text>
+            <Text className="text-2xl">{nature.emoji}</Text>
             <View className="flex-1 gap-0.5">
-              <Text className="text-sm font-medium">{nature.label}</Text>
-              <Text className="text-xs text-muted-foreground">{nature.vibe}</Text>
+              <Text className="text-base font-medium">{nature.label}</Text>
+              <Text className="text-sm text-muted-foreground">{nature.vibe}</Text>
             </View>
             <ChevronDown size={16} color={colors.mutedForeground} />
           </Pressable>
@@ -297,18 +365,27 @@ export function IdentityStep({
       </Animated.View>
 
       <Animated.View layout={LinearTransition} className="gap-2">
-        <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <Text variant="eyebrow" className="text-xs">
           Location
         </Text>
         <View className="flex-row items-center gap-2">
           <TextInput
             key={locationInputKey}
-            className="h-11 flex-1 rounded-xl border border-input bg-background px-3 text-sm leading-5 text-foreground"
+            className="h-11 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-6 text-foreground"
             placeholder="City or region (optional)"
             placeholderTextColor={colors.mutedForeground}
             defaultValue={locationDefaultValue}
             onChangeText={value => {
               locationTextRef.current = value;
+              if (locationFeedback !== null) {
+                setLocationFeedback(null);
+              }
+              if (validatedLocation !== null) {
+                setValidatedLocation(null);
+              }
+            }}
+            onBlur={() => {
+              void handleLocationBlur();
             }}
             autoCapitalize="words"
             autoCorrect={false}
@@ -322,7 +399,7 @@ export function IdentityStep({
               void handleGpsPress();
             }}
             disabled={isGpsLoading || isValidating}
-            className="h-11 w-11 items-center justify-center rounded-xl border border-input bg-background active:opacity-70 disabled:opacity-50"
+            className="h-11 w-11 items-center justify-center rounded-xl bg-secondary active:opacity-70 disabled:opacity-50"
           >
             {isGpsLoading ? (
               <ActivityIndicator size="small" color={colors.mutedForeground} />
@@ -331,6 +408,18 @@ export function IdentityStep({
             )}
           </Pressable>
         </View>
+        {locationFeedback && (
+          <Text
+            className={cn(
+              'px-1 text-sm',
+              locationFeedback.status === 'service_unavailable'
+                ? 'text-amber-700 dark:text-amber-400'
+                : 'text-muted-foreground'
+            )}
+          >
+            {locationFeedback.message}
+          </Text>
+        )}
       </Animated.View>
 
       <Button size="lg" onPress={handleContinue} disabled={isValidating} className="mt-2">
@@ -338,7 +427,7 @@ export function IdentityStep({
           <ActivityIndicator size="small" color={colors.primaryForeground} />
         ) : (
           <>
-            <Text>Continue</Text>
+            <Text className="text-base">Continue</Text>
             <ChevronRight size={16} color={colors.primaryForeground} />
           </>
         )}

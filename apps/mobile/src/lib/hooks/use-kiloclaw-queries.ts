@@ -15,22 +15,38 @@ export type GatewayState = NonNullable<
   ReturnType<typeof useKiloClawGatewayStatus>['data']
 >['state'];
 
-export function useKiloClawStatus(organizationId?: string | null, enabled = true) {
+export function useKiloClawStatus(
+  organizationId?: string | null,
+  enabled = true,
+  pollIntervalMs = 10_000
+) {
   const trpc = useTRPC();
   const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId, enabled);
   const personal = useQuery(
     trpc.kiloclaw.getStatus.queryOptions(undefined, {
       enabled: personalEnabled,
-      refetchInterval: personalEnabled ? 10_000 : false,
+      refetchInterval: personalEnabled ? pollIntervalMs : false,
     })
   );
   const org = useQuery(
     trpc.organizations.kiloclaw.getStatus.queryOptions(orgInput, {
       enabled: orgEnabled,
-      refetchInterval: orgEnabled ? 10_000 : false,
+      refetchInterval: orgEnabled ? pollIntervalMs : false,
     })
   );
   return isOrg ? org : personal;
+}
+
+/**
+ * Query key for `useKiloClawStatus` — personal vs. org namespace mirrors
+ * the subscribing hook above. Exported so non-subscribing peeks
+ * (`queryClient.getQueryData`) stay in sync with the hook.
+ */
+export function useKiloClawStatusQueryKey(organizationId: string | null) {
+  const trpc = useTRPC();
+  return organizationId
+    ? trpc.organizations.kiloclaw.getStatus.queryKey({ organizationId })
+    : trpc.kiloclaw.getStatus.queryKey();
 }
 
 export function useKiloClawBillingStatus(enabled = true) {

@@ -1,10 +1,8 @@
 import { Play, Power, RefreshCw, RotateCcw } from 'lucide-react-native';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
+import { ActionButton } from '@/components/ui/action-button';
 import { type InstanceStatus, type useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type InstanceControlsProps = {
   status: InstanceStatus | null | undefined;
@@ -12,8 +10,6 @@ type InstanceControlsProps = {
 };
 
 export function InstanceControls({ status, mutations }: Readonly<InstanceControlsProps>) {
-  const colors = useThemeColors();
-
   const canStart = status === 'stopped' || status === 'provisioned';
   const canStop = status === 'running';
   const canRestartOpenClaw = status === 'running';
@@ -71,66 +67,36 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
   return (
     <View className="gap-2">
       <View className="flex-row gap-2">
-        <Button
-          className="flex-1"
-          variant="outline"
-          size="sm"
+        <ActionButton
+          icon={Play}
+          label="Start"
+          tone="accent"
           disabled={!canStart || mutations.start.isPending}
           onPress={handleStart}
-        >
-          {mutations.start.isPending ? (
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-          ) : (
-            <Play size={14} color={canStart ? '#10b981' : colors.mutedForeground} />
-          )}
-          <Text>Start</Text>
-        </Button>
-
-        <Button
-          className="flex-1"
-          variant="outline"
-          size="sm"
+        />
+        <ActionButton
+          icon={Power}
+          label="Stop"
+          tone="danger"
           disabled={!canStop || mutations.stop.isPending}
           onPress={handleStop}
-        >
-          {mutations.stop.isPending ? (
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-          ) : (
-            <Power size={14} color={canStop ? '#ef4444' : colors.mutedForeground} />
-          )}
-          <Text>Stop</Text>
-        </Button>
+        />
       </View>
       <View className="flex-row gap-2">
-        <Button
-          className="flex-1"
-          variant="outline"
-          size="sm"
+        <ActionButton
+          icon={RotateCcw}
+          label="Restart"
+          tone="warn"
           disabled={!canRestartOpenClaw || mutations.restartOpenClaw.isPending}
           onPress={handleRestartOpenClaw}
-        >
-          {mutations.restartOpenClaw.isPending ? (
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-          ) : (
-            <RotateCcw size={14} color={canRestartOpenClaw ? '#f59e0b' : colors.mutedForeground} />
-          )}
-          <Text>Restart</Text>
-        </Button>
-
-        <Button
-          className="flex-1"
-          variant="outline"
-          size="sm"
+        />
+        <ActionButton
+          icon={RefreshCw}
+          label="Redeploy"
+          tone="accent"
           disabled={!canRedeploy || mutations.restartMachine.isPending}
           onPress={handleRedeploy}
-        >
-          {mutations.restartMachine.isPending ? (
-            <ActivityIndicator size="small" color={colors.mutedForeground} />
-          ) : (
-            <RefreshCw size={14} color={canRedeploy ? '#3b82f6' : colors.mutedForeground} />
-          )}
-          <Text>Redeploy</Text>
-        </Button>
+        />
       </View>
     </View>
   );

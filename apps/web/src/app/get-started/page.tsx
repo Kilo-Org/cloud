@@ -16,9 +16,9 @@ export default async function GetStartedPage() {
 
   return (
     <PageContainer className="min-h-screen max-w-7xl justify-center py-8 md:py-12">
-      <div className="mx-auto w-full max-w-6xl">
+      <main className="mx-auto w-full max-w-6xl">
         <ProductOptionsContent isAuthenticated={isAuthenticated} />
-      </div>
+      </main>
     </PageContainer>
   );
 }

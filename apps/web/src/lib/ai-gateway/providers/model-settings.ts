@@ -68,6 +68,14 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   ) {
     return REASONING_VARIANTS_BINARY;
   }
+  if (model === seed_20_pro_free_model.public_id) {
+    return {
+      none: { reasoning: { enabled: false, effort: 'minimal' } },
+      low: { reasoning: { enabled: true, effort: 'low' } },
+      medium: { reasoning: { enabled: true, effort: 'medium' } },
+      high: { reasoning: { enabled: true, effort: 'high' } },
+    };
+  }
   if (model.startsWith('inception/mercury-2')) {
     return {
       instant: { reasoning: { enabled: false, effort: 'none' } },
@@ -90,6 +98,10 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
     // with 'openai' (Responses) prompt caching doesn't work
     // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
     return 'alibaba';
+  }
+  if (seed_20_pro_free_model.public_id === model) {
+    // with 'openai' (Responses API) prompt caching doesn't work
+    return 'openai-compatible';
   }
   if (isAnthropicModel(model)) {
     // on Vercel AI Gateway, this is necessary to support document attachments

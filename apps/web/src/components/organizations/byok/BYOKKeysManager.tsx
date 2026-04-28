@@ -50,6 +50,7 @@ import * as z from 'zod';
 const VERCEL_BYOK_PROVIDERS = [
   { id: VercelUserByokInferenceProviderIdSchema.enum.anthropic, name: 'Anthropic' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.bedrock, name: 'AWS Bedrock' },
+  { id: VercelUserByokInferenceProviderIdSchema.enum.fireworks, name: 'Fireworks AI' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.openai, name: 'OpenAI' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.inception, name: 'Inception' },
   { id: VercelUserByokInferenceProviderIdSchema.enum.google, name: 'Google AI Studio' },

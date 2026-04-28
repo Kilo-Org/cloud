@@ -757,6 +757,13 @@
       "when": 1777390826147,
       "tag": "0107_bouncy_micromacro",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1777409500403,
+      "tag": "0108_salty_proteus",
+      "breakpoints": true
     }
   ]
 }

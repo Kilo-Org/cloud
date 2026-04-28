@@ -1,0 +1,3 @@
+DROP INDEX "IDX_kiloclaw_image_catalog_is_latest";--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_kiloclaw_image_catalog_one_latest_per_variant" ON "kiloclaw_image_catalog" USING btree ("variant") WHERE "kiloclaw_image_catalog"."is_latest" = true;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_kiloclaw_image_catalog_one_candidate_per_variant" ON "kiloclaw_image_catalog" USING btree ("variant") WHERE "kiloclaw_image_catalog"."is_latest" = false AND "kiloclaw_image_catalog"."rollout_percent" > 0 AND "kiloclaw_image_catalog"."status" = 'available';

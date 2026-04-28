@@ -3986,11 +3986,24 @@ export const kiloclaw_image_catalog = pgTable(
   table => [
     index('IDX_kiloclaw_image_catalog_status').on(table.status),
     index('IDX_kiloclaw_image_catalog_variant').on(table.variant),
-    // Speed up "find the :latest for variant X" queries. Partial index keeps
-    // it tiny (one row per variant) while still helping the hot path.
-    index('IDX_kiloclaw_image_catalog_is_latest')
+    // Enforce "at most one :latest per variant" at the DB layer. Without this
+    // partial UNIQUE, two concurrent markImageAsLatest transactions could each
+    // clear the old :latest and then set different rows to true. Matches the
+    // codebase pattern for single-row-per-key invariants (see UQ_kilo_pass_*,
+    // UQ_kilocode_users_* in this file).
+    uniqueIndex('UQ_kiloclaw_image_catalog_one_latest_per_variant')
       .on(table.variant)
       .where(sql`${table.is_latest} = true`),
+    // Enforce "at most one in-flight candidate per variant" at the DB layer.
+    // The candidate is any available, non-:latest row with a non-zero rollout
+    // percent. Prevents two concurrent setRolloutPercent calls from each
+    // creating a candidate, which refreshPointersForVariant would otherwise
+    // resolve by published_at and silently hide one from instances.
+    uniqueIndex('UQ_kiloclaw_image_catalog_one_candidate_per_variant')
+      .on(table.variant)
+      .where(
+        sql`${table.is_latest} = false AND ${table.rollout_percent} > 0 AND ${table.status} = 'available'`
+      ),
   ]
 );
 

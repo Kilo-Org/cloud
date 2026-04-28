@@ -1,6 +1,5 @@
 import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
-import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';

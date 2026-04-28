@@ -2260,37 +2260,40 @@ export const kiloclawRouter = createTRPCRouter({
     return fetchKiloClawServiceDegraded();
   }),
 
-  latestVersion: baseProcedure.query(async ({ ctx }) => {
-    // Pass instance context (for the bucket math) plus the per-user early-access
-    // flag (which applies regardless of which instance the user is looking at —
-    // personal or org). The kiloclaw service's selector handles the "already on
-    // it" check via tag comparison; we just pipe the inputs through.
-    const [instance] = await db
-      .select({ id: kiloclaw_instances.id })
-      .from(kiloclaw_instances)
-      .where(
-        and(
-          eq(kiloclaw_instances.user_id, ctx.user.id),
-          isNull(kiloclaw_instances.organization_id),
-          isNull(kiloclaw_instances.destroyed_at)
+  latestVersion: baseProcedure
+    .input(z.object({ currentImageTag: z.string().min(1).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      // Pass instance context (for the bucket math) plus the per-user early-access
+      // flag (which applies regardless of which instance the user is looking at —
+      // personal or org). currentImageTag suppresses false-positive banners when
+      // the instance is already on the candidate (or whatever the resolver picks).
+      const [instance] = await db
+        .select({ id: kiloclaw_instances.id })
+        .from(kiloclaw_instances)
+        .where(
+          and(
+            eq(kiloclaw_instances.user_id, ctx.user.id),
+            isNull(kiloclaw_instances.organization_id),
+            isNull(kiloclaw_instances.destroyed_at)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    const [user] = await db
-      .select({ early_access: kilocode_users.kiloclaw_early_access })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, ctx.user.id))
-      .limit(1);
+      const [user] = await db
+        .select({ early_access: kilocode_users.kiloclaw_early_access })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, ctx.user.id))
+        .limit(1);
 
-    const client = new KiloClawInternalClient();
-    if (!instance) return client.getLatestVersion();
+      const client = new KiloClawInternalClient();
+      if (!instance) return client.getLatestVersion();
 
-    return client.getLatestVersion({
-      instanceId: instance.id,
-      autoEnroll: user?.early_access ?? false,
-    });
-  }),
+      return client.getLatestVersion({
+        instanceId: instance.id,
+        currentImageTag: input?.currentImageTag ?? null,
+        autoEnroll: user?.early_access ?? false,
+      });
+    }),
 
   validateWeatherLocation: baseProcedure
     .input(weatherLocationInputSchema)

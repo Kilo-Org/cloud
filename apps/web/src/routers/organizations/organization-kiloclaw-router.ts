@@ -291,22 +291,26 @@ export const organizationKiloclawRouter = createTRPCRouter({
     }
   }),
 
-  latestVersion: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    const client = new KiloClawInternalClient();
-    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-    if (!instance) return client.getLatestVersion();
-    // Per-user early-access opt-in lives on kilocode_users; the org instance
-    // inherits it (every instance the user owns sees the same flag).
-    const [user] = await db
-      .select({ early_access: kilocode_users.kiloclaw_early_access })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, ctx.user.id))
-      .limit(1);
-    return client.getLatestVersion({
-      instanceId: instance.id,
-      autoEnroll: user?.early_access ?? false,
-    });
-  }),
+  latestVersion: organizationMemberProcedure
+    .input(z.object({ currentImageTag: z.string().min(1).optional() }))
+    .query(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+      if (!instance) return client.getLatestVersion();
+      // Per-user early-access opt-in lives on kilocode_users; the org instance
+      // inherits it. currentImageTag suppresses false-positive banners when
+      // the instance is already on the candidate.
+      const [user] = await db
+        .select({ early_access: kilocode_users.kiloclaw_early_access })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, ctx.user.id))
+        .limit(1);
+      return client.getLatestVersion({
+        instanceId: instance.id,
+        currentImageTag: input.currentImageTag ?? null,
+        autoEnroll: user?.early_access ?? false,
+      });
+    }),
 
   // ── Instance status ───────────────────────────────────────────
 

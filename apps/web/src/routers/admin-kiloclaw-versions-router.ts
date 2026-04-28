@@ -372,6 +372,31 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
     return row?.image_tag ?? null;
   }),
 
+  /**
+   * Returns the variant's :latest and active candidate rows independent of
+   * the paginated catalog list. The Versions admin page uses this for the
+   * hero panel and for the StartRolloutButton's "clear existing candidate"
+   * logic — both must reflect global state, not just whatever's on the
+   * current page of `listVersions`.
+   */
+  getActiveRollout: adminProcedure
+    .input(z.object({ variant: z.string().default('default') }))
+    .query(async ({ input }) => {
+      const rows = await db
+        .select()
+        .from(kiloclaw_image_catalog)
+        .where(
+          and(
+            eq(kiloclaw_image_catalog.variant, input.variant),
+            eq(kiloclaw_image_catalog.status, 'available')
+          )
+        );
+
+      const latest = rows.find(r => r.is_latest) ?? null;
+      const candidate = rows.find(r => !r.is_latest && r.rollout_percent > 0) ?? null;
+      return { latest, candidate };
+    }),
+
   syncCatalog: adminProcedure.mutation(async () => {
     const client = new KiloClawInternalClient();
     let kvVersions;

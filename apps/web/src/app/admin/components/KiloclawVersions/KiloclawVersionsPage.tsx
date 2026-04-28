@@ -374,13 +374,22 @@ export function VersionsTab() {
     })
   );
 
+  // After any mutation that changes catalog state, invalidate both the
+  // paginated list (table view) AND the active rollout query (hero panel).
+  const invalidateRolloutState = () => {
+    void queryClient.invalidateQueries({
+      queryKey: trpc.admin.kiloclawVersions.listVersions.queryKey(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.admin.kiloclawVersions.getActiveRollout.queryKey(),
+    });
+  };
+
   const { mutateAsync: updateStatus } = useMutation(
     trpc.admin.kiloclawVersions.updateVersionStatus.mutationOptions({
       onSuccess: () => {
         toast.success('Version status updated');
-        void queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawVersions.listVersions.queryKey(),
-        });
+        invalidateRolloutState();
       },
       onError: err => {
         toast.error(`Failed to update status: ${err.message}`);
@@ -392,9 +401,7 @@ export function VersionsTab() {
     trpc.admin.kiloclawVersions.setRolloutPercent.mutationOptions({
       onSuccess: result => {
         toast.success(`Rollout updated: ${result.imageTag} → ${result.rolloutPercent}%`);
-        void queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawVersions.listVersions.queryKey(),
-        });
+        invalidateRolloutState();
       },
       onError: err => {
         toast.error(`Failed to update rollout: ${err.message}`);
@@ -406,9 +413,7 @@ export function VersionsTab() {
     trpc.admin.kiloclawVersions.markLatest.mutationOptions({
       onSuccess: result => {
         toast.success(`Marked ${result.imageTag} as :latest`);
-        void queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawVersions.listVersions.queryKey(),
-        });
+        invalidateRolloutState();
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawVersions.getLatestTag.queryKey(),
         });
@@ -420,12 +425,14 @@ export function VersionsTab() {
   );
 
   // Top-of-page state — the hero panel and per-row affordances both depend on
-  // these. With at most one :latest and at most one candidate per variant in
-  // the steady state, finding the first matching row is sufficient.
-  const currentLatest = data?.items.find(v => v.is_latest && v.status === 'available') ?? null;
-  const currentCandidate =
-    data?.items.find(v => !v.is_latest && v.status === 'available' && v.rollout_percent > 0) ??
-    null;
+  // these. Source these from a dedicated catalog query (NOT from the paginated
+  // table data) so we never miss an active candidate just because it sits on a
+  // different page than what the admin is currently viewing.
+  const { data: activeRollout } = useQuery(
+    trpc.admin.kiloclawVersions.getActiveRollout.queryOptions({ variant: 'default' })
+  );
+  const currentLatest = (activeRollout?.latest ?? null) as CatalogRow | null;
+  const currentCandidate = (activeRollout?.candidate ?? null) as CatalogRow | null;
 
   // Newly published images sit dormant until ops promotes them. Surface a
   // reminder when there are available rows newer than :latest at 0% rollout

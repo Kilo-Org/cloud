@@ -19,7 +19,11 @@ export function EarlyAccessCard() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const { data: enabled, isLoading } = useQuery(trpc.kiloclaw.myEarlyAccess.queryOptions());
+  const {
+    data: enabled,
+    isLoading,
+    isError,
+  } = useQuery(trpc.kiloclaw.myEarlyAccess.queryOptions());
 
   const { mutateAsync, isPending } = useMutation(
     trpc.kiloclaw.setMyEarlyAccess.mutationOptions({
@@ -65,14 +69,16 @@ export function EarlyAccessCard() {
         <div className="flex items-center gap-3 pt-0.5">
           <Switch
             checked={!!enabled}
-            disabled={isLoading || isPending}
+            disabled={isLoading || isPending || isError}
             onCheckedChange={next => {
               void mutateAsync({ value: next });
             }}
             aria-label="Early Access"
           />
           <span className="text-sm">
-            {isLoading || isPending ? (
+            {isError ? (
+              <span className="text-destructive">Failed to load</span>
+            ) : isLoading || isPending ? (
               <span className="text-muted-foreground">…</span>
             ) : enabled ? (
               <span className="font-medium text-green-500">Enabled</span>

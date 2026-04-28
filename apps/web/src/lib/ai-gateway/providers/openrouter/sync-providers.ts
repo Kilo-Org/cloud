@@ -14,7 +14,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { desc, lt } from 'drizzle-orm';
+import { desc, lt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
@@ -28,6 +28,14 @@ const ATTRIBUTION_HEADERS = {
   'HTTP-Referer': 'https://kilocode.ai',
   'X-Title': 'Kilo Code',
 } as const;
+
+/**
+ * Advisory lock key hashed from a stable identifier. Serializes concurrent
+ * calls to `applySnapshotChangesAndAudit` so two overlapping syncs cannot
+ * both read the same "previous" snapshot and emit duplicate system audit
+ * logs for the same diff. Auto-releases on transaction commit/rollback.
+ */
+const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
 async function fetchGatewayModels(gateway: Provider) {
   const headers = {
@@ -312,9 +320,11 @@ async function mirrorToRedis(values: {
  * this with a new synthetic snapshot, and assert on the resulting rows in
  * `organization_audit_logs`.
  *
- * The previous-snapshot read is performed INSIDE the same transaction that
- * inserts the new row, so concurrent sync runs cannot observe each other's
- * partial writes.
+ * Concurrency safety: a transaction-scoped Postgres advisory lock
+ * (`pg_advisory_xact_lock`) is taken before the previous-snapshot read so
+ * two overlapping sync runs cannot both observe the same "previous" row
+ * and emit duplicate system audit logs for the same diff. The lock is
+ * released automatically on commit/rollback.
  */
 export async function applySnapshotChangesAndAudit(params: {
   providers: NormalizedOpenRouterResponse;
@@ -328,6 +338,10 @@ export async function applySnapshotChangesAndAudit(params: {
   const { providers, openrouter_data, vercel_data } = params;
 
   const { row, previousSnapshot } = await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY}))`
+    );
+
     const [previousSnapshotRow] = await tx
       .select({ data: modelsByProvider.data })
       .from(modelsByProvider)

@@ -312,4 +312,58 @@ describe('applySnapshotChangesAndAudit (wiring)', () => {
     const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
     expect(logs).toHaveLength(0);
   });
+
+  test('advisory lock serializes concurrent calls: second call sees first call’s commit as its previousSnapshot', async () => {
+    const owner = await insertTestUser();
+    const enterpriseOrg = await createTestOrganization('Concurrent Wiring Org', owner.id, 0, {
+      provider_policy_mode: 'allow',
+      provider_allow_list: ['z-ai'],
+    });
+
+    const initialSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+    await db.insert(modelsByProvider).values({
+      data: initialSnapshot,
+      openrouter: {},
+      vercel: {},
+    });
+
+    const nextSnapshotA = buildSnapshot([
+      { slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1-a'] },
+    ]);
+    const nextSnapshotB = buildSnapshot([
+      { slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1-a', 'z-ai/glm-5.1-b'] },
+    ]);
+
+    const [resultA, resultB] = await Promise.all([
+      applySnapshotChangesAndAudit({
+        providers: nextSnapshotA,
+        openrouter_data: {},
+        vercel_data: {},
+      }),
+      applySnapshotChangesAndAudit({
+        providers: nextSnapshotB,
+        openrouter_data: {},
+        vercel_data: {},
+      }),
+    ]);
+
+    const sortedById = [resultA, resultB].sort((a, b) => a.id - b.id);
+    const [firstResult, secondResult] = sortedById;
+
+    const firstPreviousModelIds =
+      firstResult.previousSnapshot?.providers[0].models.map(m => m.slug) ?? [];
+    const secondPreviousModelIds =
+      secondResult.previousSnapshot?.providers[0].models.map(m => m.slug) ?? [];
+
+    expect(firstPreviousModelIds).toEqual(['z-ai/glm-5']);
+    expect(secondPreviousModelIds.length).toBeGreaterThan(firstPreviousModelIds.length);
+    expect(secondPreviousModelIds).toContain(
+      firstResult.data.providers[0].models[firstResult.data.providers[0].models.length - 1].slug
+    );
+
+    const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
+    expect(logs).toHaveLength(2);
+    const messages = logs.map(log => log.message).sort();
+    expect(messages).not.toEqual([messages[0], messages[0]]);
+  });
 });

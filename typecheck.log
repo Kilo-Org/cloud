@@ -1,0 +1,16 @@
+.                                        |  WARN  Unsupported engine: wanted: {"node":">=24 <25"} (current: {"node":"v20.20.2","pnpm":"10.33.0"})
+
+> web@0.1.0 typecheck /workspace/9d278969-5453-4ae3-a51f-a8d2274a7b56/2bbc9955-5dc2-428c-a353-be59d89a8130/sessions/agent_a985ef68-6a68-4bf7-8c37-6e7886b7b748/apps/web
+> pnpm --filter @kilocode/trpc run build && tsgo --noEmit
+
+../..                                    |  WARN  Unsupported engine: wanted: {"node":">=24 <25"} (current: {"node":"v20.20.2","pnpm":"10.33.0"})
+
+> @kilocode/trpc@0.0.1 build /workspace/9d278969-5453-4ae3-a51f-a8d2274a7b56/2bbc9955-5dc2-428c-a353-be59d89a8130/sessions/agent_a985ef68-6a68-4bf7-8c37-6e7886b7b748/packages/trpc
+> tsgo -p tsconfig.json && rollup -c rollup.config.mjs
+
+[36m
+[1m./dist/tsc/packages/trpc/src/index.d.ts[22m → [1m./dist/index.d.ts[22m...[39m
+[1m[33m(!) Unresolved dependencies[39m[22m
+[90mhttps://rollupjs.org/troubleshooting/#warning-treating-module-as-external-dependency[39m
+[1m@kilocode/worker-utils[22m (imported by "dist/tsc/apps/web/src/lib/kiloclaw/kiloclaw-internal-client.d.ts")
+[32mcreated [1m./dist/index.d.ts[22m in [1m2.9s[22m[39m

@@ -1,0 +1,118 @@
+ WARN  Unsupported engine: wanted: {"node":">=24 <25"} (current: {"node":"v20.20.2","pnpm":"10.33.0"})
+Scope: all 40 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +2512
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 2512, reused 0, downloaded 0, added 0
+Progress: resolved 2512, reused 0, downloaded 15, added 0
+Progress: resolved 2512, reused 0, downloaded 16, added 0
+Progress: resolved 2512, reused 0, downloaded 55, added 15
+Progress: resolved 2512, reused 0, downloaded 114, added 36
+Progress: resolved 2512, reused 0, downloaded 252, added 91
+Progress: resolved 2512, reused 0, downloaded 283, added 106
+Progress: resolved 2512, reused 0, downloaded 298, added 110
+Progress: resolved 2512, reused 0, downloaded 347, added 130
+Progress: resolved 2512, reused 0, downloaded 421, added 174
+Progress: resolved 2512, reused 0, downloaded 439, added 181
+Progress: resolved 2512, reused 0, downloaded 481, added 194
+Progress: resolved 2512, reused 0, downloaded 577, added 260
+Progress: resolved 2512, reused 0, downloaded 608, added 268
+Progress: resolved 2512, reused 0, downloaded 630, added 276
+Progress: resolved 2512, reused 0, downloaded 635, added 276
+Progress: resolved 2512, reused 0, downloaded 700, added 296
+Progress: resolved 2512, reused 0, downloaded 719, added 304
+Progress: resolved 2512, reused 0, downloaded 749, added 312
+Progress: resolved 2512, reused 0, downloaded 761, added 317
+Progress: resolved 2512, reused 0, downloaded 762, added 317
+Progress: resolved 2512, reused 0, downloaded 767, added 320
+Progress: resolved 2512, reused 0, downloaded 768, added 320
+Progress: resolved 2512, reused 0, downloaded 776, added 321
+Progress: resolved 2512, reused 0, downloaded 804, added 333
+Progress: resolved 2512, reused 0, downloaded 827, added 341
+Progress: resolved 2512, reused 0, downloaded 849, added 349
+Progress: resolved 2512, reused 0, downloaded 933, added 392
+Progress: resolved 2512, reused 0, downloaded 1067, added 469
+Progress: resolved 2512, reused 0, downloaded 1185, added 512
+Progress: resolved 2512, reused 0, downloaded 1278, added 551
+Progress: resolved 2512, reused 0, downloaded 1362, added 583
+Progress: resolved 2512, reused 0, downloaded 1447, added 659
+Progress: resolved 2512, reused 0, downloaded 1532, added 731
+Progress: resolved 2512, reused 0, downloaded 1576, added 748
+Progress: resolved 2512, reused 0, downloaded 1589, added 752
+Progress: resolved 2512, reused 0, downloaded 1602, added 756
+Progress: resolved 2512, reused 0, downloaded 1620, added 761
+Progress: resolved 2512, reused 0, downloaded 1639, added 769
+Progress: resolved 2512, reused 0, downloaded 1692, added 796
+Progress: resolved 2512, reused 0, downloaded 1747, added 859
+Progress: resolved 2512, reused 0, downloaded 1782, added 871
+Progress: resolved 2512, reused 0, downloaded 1800, added 876
+Progress: resolved 2512, reused 0, downloaded 1833, added 887
+Progress: resolved 2512, reused 0, downloaded 1864, added 897
+Progress: resolved 2512, reused 0, downloaded 1911, added 914
+Progress: resolved 2512, reused 0, downloaded 2032, added 960
+Progress: resolved 2512, reused 0, downloaded 2140, added 1012
+Progress: resolved 2512, reused 0, downloaded 2155, added 1016
+Progress: resolved 2512, reused 0, downloaded 2163, added 1020
+Progress: resolved 2512, reused 0, downloaded 2180, added 1024
+Progress: resolved 2512, reused 0, downloaded 2190, added 1028
+Progress: resolved 2512, reused 0, downloaded 2210, added 1036
+Progress: resolved 2512, reused 0, downloaded 2225, added 1040
+Progress: resolved 2512, reused 0, downloaded 2227, added 1040
+Progress: resolved 2512, reused 0, downloaded 2284, added 1066
+Progress: resolved 2512, reused 0, downloaded 2308, added 1074
+Progress: resolved 2512, reused 0, downloaded 2393, added 1111
+Progress: resolved 2512, reused 0, downloaded 2428, added 1130
+Progress: resolved 2512, reused 0, downloaded 2429, added 1543
+Progress: resolved 2512, reused 0, downloaded 2429, added 1863
+Progress: resolved 2512, reused 0, downloaded 2429, added 1923
+Progress: resolved 2512, reused 0, downloaded 2429, added 1997
+Progress: resolved 2512, reused 0, downloaded 2429, added 2512, done
+.../node_modules/core-js-pure postinstall$ node -e "try{require('./postinstall')}catch(e){}"
+.../node_modules/@swc/core postinstall$ node postinstall.js
+.../esbuild@0.27.4/node_modules/esbuild postinstall$ node install.js
+.../node_modules/protobufjs postinstall$ node scripts/postinstall
+.../node_modules/core-js-pure postinstall: Thank you for using core-js ( https://github.com/zloirock/core-js ) for polyfilling JavaScript standard library!
+.../node_modules/core-js-pure postinstall: The project needs your help! Please consider supporting core-js:
+.../node_modules/core-js-pure postinstall: > https://opencollective.com/core-js 
+.../node_modules/core-js-pure postinstall: > https://patreon.com/zloirock 
+.../node_modules/core-js-pure postinstall: > https://boosty.to/zloirock 
+.../node_modules/core-js-pure postinstall: > bitcoin: bc1qlea7544qtsmj2rayg0lthvza9fau63ux0fstcz 
+.../node_modules/core-js-pure postinstall: I highly recommend reading this: https://github.com/zloirock/core-js/blob/master/docs/2023-02-14-so-whats-next.md 
+.../node_modules/core-js-pure postinstall: Done
+.../node_modules/@swc/core postinstall: Done
+.../node_modules/protobufjs postinstall: Done
+.../esbuild@0.27.4/node_modules/esbuild postinstall: Done
+.../node_modules/workerd postinstall$ node install.js
+.../node_modules/workerd postinstall: Done
+.../node_modules/workerd postinstall$ node install.js
+.../node_modules/workerd postinstall$ node install.js
+.../node_modules/workerd postinstall: Done
+.../node_modules/workerd postinstall: Done
+.../stream-chat-react-native-core postinstall$ node ./bin/patch-bottom-sheet-5.1.8-pr-2561.js
+.../stream-chat-react-native-core postinstall: Done
+
+devDependencies:
++ @typescript/native-preview 7.0.0-dev.20260319.1
++ husky 9.1.7
++ ink 6.8.0
++ oxfmt 0.40.0
++ oxlint 1.55.0
++ oxlint-plugin-react-native 0.2.9
++ oxlint-tsgolint 0.17.1
++ react 19.2.4
++ tsx 4.21.0
++ typescript 5.9.3
+
+. prepare$ bash scripts/prepare.sh
+. prepare: .                                        |  WARN  Unsupported engine: wanted: {"node":">=24 <25"} (current: {"node":"v20.20.2","pnpm":"10.33.0"})
+. prepare: > @kilocode/trpc@0.0.1 build /workspace/9d278969-5453-4ae3-a51f-a8d2274a7b56/2bbc9955-5dc2-428c-a353-be59d89a8130/sessions/agent_a985ef68-6a68-4bf7-8c37-6e7886b7b748/packages/trpc
+. prepare: > tsgo -p tsconfig.json && rollup -c rollup.config.mjs
+. prepare: [36m
+. prepare: [1m./dist/tsc/packages/trpc/src/index.d.ts[22m → [1m./dist/index.d.ts[22m...[39m
+. prepare: [1m[33m(!) Unresolved dependencies[39m[22m
+. prepare: [90mhttps://rollupjs.org/troubleshooting/#warning-treating-module-as-external-dependency[39m
+. prepare: [1m@kilocode/worker-utils[22m (imported by "dist/tsc/apps/web/src/lib/kiloclaw/kiloclaw-internal-client.d.ts")
+. prepare: [32mcreated [1m./dist/index.d.ts[22m in [1m2.9s[22m[39m
+. prepare: Done
+Done in 2m 17.2s using pnpm v10.33.0

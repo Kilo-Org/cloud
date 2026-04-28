@@ -55,6 +55,7 @@ import {
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { AdvancedConfig } from '@/components/shared/AdvancedConfig';
 import { cn } from '@/lib/utils';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@/lib/cloud-agent/constants';
 import { MODES } from './ResumeConfigModal';
 
 type CloudSessionsPageProps = {
@@ -604,6 +605,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
 
   const isFormValid =
     prompt.trim().length > 0 &&
+    prompt.length <= CLOUD_AGENT_PROMPT_MAX_LENGTH &&
     selectedRepo.length > 0 &&
     model.length > 0 &&
     !isPreparing &&
@@ -845,6 +847,9 @@ const PromptField = memo(function PromptField({ value, onChange }: PromptFieldPr
     [onChange]
   );
 
+  const isOverLimit = value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH;
+  const showCounter = value.length >= CLOUD_AGENT_PROMPT_MAX_LENGTH * 0.9;
+
   return (
     <div className="space-y-2">
       <Label htmlFor="prompt">Task Description</Label>
@@ -855,8 +860,16 @@ const PromptField = memo(function PromptField({ value, onChange }: PromptFieldPr
         placeholder="Describe your task..."
         rows={3}
         className="resize-y"
+        maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
       />
-      <p className="text-xs text-gray-400">Describe what you want the cloud agent to do</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs text-gray-400">Describe what you want the cloud agent to do</p>
+        {showCounter && (
+          <p className={cn('text-xs', isOverLimit ? 'text-red-400' : 'text-gray-400')}>
+            {value.length.toLocaleString()} / {CLOUD_AGENT_PROMPT_MAX_LENGTH.toLocaleString()}
+          </p>
+        )}
+      </div>
     </div>
   );
 });

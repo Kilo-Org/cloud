@@ -40,6 +40,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
 import {
   Loader2,
@@ -52,6 +53,7 @@ import {
   Square,
   Plus,
   Minus,
+  Ban,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -302,11 +304,20 @@ function StartRolloutButton({
         setOpen(next);
       }}
     >
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-          Start rollout
-        </Button>
-      </PopoverTrigger>
+      {/* Both PopoverTrigger and TooltipTrigger use asChild — they need to
+          wrap the Button directly so click + hover handlers both reach the
+          DOM element. Nesting Tooltip inside PopoverTrigger broke the click
+          handler because Tooltip is a Provider (no DOM output). */}
+      <Tooltip>
+        <PopoverTrigger asChild>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 w-8 p-0" aria-label="Start rollout">
+              <Rocket className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+        </PopoverTrigger>
+        <TooltipContent>Start rollout</TooltipContent>
+      </Tooltip>
       <PopoverContent className="w-[300px]" align="end">
         <div className="flex flex-col gap-2">
           {replacing && (
@@ -523,7 +534,7 @@ export function VersionsTab() {
               <TableHead>Digest</TableHead>
               <TableHead>State</TableHead>
               <TableHead>Published</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="w-[140px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -599,66 +610,121 @@ export function VersionsTab() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex justify-end gap-1">
-                        {isAvailable && !isLatest && !isCandidate && (
-                          <StartRolloutButton
-                            imageTag={version.image_tag}
-                            existingCandidate={currentCandidate}
-                            onStart={async percent => {
-                              if (
-                                currentCandidate &&
-                                currentCandidate.image_tag !== version.image_tag
-                              ) {
+                      {/* Three fixed slots so action icons line up vertically
+                          across rows. Each slot is one of: a button OR an
+                          empty 8x8 placeholder. Tooltip names each action on
+                          hover. Slot order:
+                            1) Start rollout (Rocket)
+                            2) Make / Promote :latest (Anchor)
+                            3) Disable (Ban) or Re-enable (CheckCircle) */}
+                      <TooltipProvider delayDuration={150}>
+                        <div className="flex items-center gap-1">
+                          {/* Slot 1: Start rollout */}
+                          {isAvailable && !isLatest && !isCandidate ? (
+                            <StartRolloutButton
+                              imageTag={version.image_tag}
+                              existingCandidate={currentCandidate}
+                              onStart={async percent => {
+                                if (
+                                  currentCandidate &&
+                                  currentCandidate.image_tag !== version.image_tag
+                                ) {
+                                  await setRolloutPercent({
+                                    imageTag: currentCandidate.image_tag,
+                                    percent: 0,
+                                  });
+                                }
                                 await setRolloutPercent({
-                                  imageTag: currentCandidate.image_tag,
-                                  percent: 0,
+                                  imageTag: version.image_tag,
+                                  percent,
                                 });
-                              }
-                              await setRolloutPercent({
-                                imageTag: version.image_tag,
-                                percent,
-                              });
-                            }}
-                          />
-                        )}
-                        {isAvailable && !isLatest && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => {
-                              if (
-                                window.confirm(
-                                  `Mark ${version.image_tag} as :latest? This replaces the current :latest and clears any rollout percent on this image.`
-                                )
-                              ) {
-                                void markLatest({ imageTag: version.image_tag });
-                              }
-                            }}
-                          >
-                            Make :latest
-                          </Button>
-                        )}
-                        <Select
-                          value={version.status}
-                          onValueChange={newStatus => {
-                            if (newStatus === 'available' || newStatus === 'disabled') {
-                              void updateStatus({
-                                imageTag: version.image_tag,
-                                status: newStatus,
-                              });
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="h-7 w-[110px] text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="available">Available</SelectItem>
-                            <SelectItem value="disabled">Disabled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                              }}
+                            />
+                          ) : (
+                            <div className="h-8 w-8" aria-hidden="true" />
+                          )}
+                          {/* Slot 2: Make / Promote :latest */}
+                          {isAvailable && !isLatest ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  className="h-8 w-8 bg-blue-600 p-0 text-white hover:bg-blue-700"
+                                  aria-label="Make :latest"
+                                  onClick={() => {
+                                    if (
+                                      window.confirm(
+                                        isCandidate
+                                          ? `Promote ${version.image_tag} to :latest? This replaces the current :latest and ends the rollout.`
+                                          : `Mark ${version.image_tag} as :latest? This replaces the current :latest and clears any rollout percent on this image.`
+                                      )
+                                    ) {
+                                      void markLatest({ imageTag: version.image_tag });
+                                    }
+                                  }}
+                                >
+                                  <Anchor className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {isCandidate ? 'Promote to :latest' : 'Make :latest'}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <div className="h-8 w-8" aria-hidden="true" />
+                          )}
+                          {/* Slot 3: Disable (available rows) or Re-enable (disabled rows) */}
+                          {isAvailable && !isLatest && !isCandidate ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-red-500 hover:bg-red-950/30 hover:text-red-400"
+                                  aria-label="Disable image"
+                                  onClick={() => {
+                                    if (
+                                      window.confirm(
+                                        `Disable ${version.image_tag}? It will no longer be available for new pins or rollouts. Already pinned instances continue running it.`
+                                      )
+                                    ) {
+                                      void updateStatus({
+                                        imageTag: version.image_tag,
+                                        status: 'disabled',
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Ban className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Disable image</TooltipContent>
+                            </Tooltip>
+                          ) : isDisabled ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                  aria-label="Re-enable image"
+                                  onClick={() => {
+                                    void updateStatus({
+                                      imageTag: version.image_tag,
+                                      status: 'available',
+                                    });
+                                  }}
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Re-enable image</TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <div className="h-8 w-8" aria-hidden="true" />
+                          )}
+                        </div>
+                      </TooltipProvider>
                     </TableCell>
                   </TableRow>
                 );

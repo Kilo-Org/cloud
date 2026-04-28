@@ -2644,11 +2644,41 @@ export const cli_sessions_v2 = pgTable(
     index('IDX_cli_sessions_v2_kilo_user_id').on(table.kilo_user_id),
     index('IDX_cli_sessions_v2_created_at').on(table.created_at),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
+    uniqueIndex('UQ_cli_sessions_v2_session_id').on(table.session_id),
   ]
 );
 
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
+
+export const cli_session_pull_requests = pgTable(
+  'cli_session_pull_requests',
+  {
+    session_id: text()
+      .notNull()
+      .primaryKey()
+      .references(() => cli_sessions_v2.session_id, { onDelete: 'cascade' }),
+    pr_url: text().notNull(),
+    pr_number: integer().notNull(),
+    pr_state: text().notNull(),
+    pr_title: text(),
+    pr_head_sha: text(),
+    pr_last_synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('cli_session_pull_requests_pr_state_idx').on(table.pr_state),
+    index('cli_session_pull_requests_pr_number_idx').on(table.pr_number),
+  ]
+);
+
+export type CliSessionPullRequest = typeof cli_session_pull_requests.$inferSelect;
+export type NewCliSessionPullRequest = typeof cli_session_pull_requests.$inferInsert;
 
 export const device_auth_requests = pgTable(
   'device_auth_requests',

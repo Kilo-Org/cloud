@@ -12,9 +12,15 @@ import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 
 jest.mock('@/lib/organizations/organization-auth');
 jest.mock('@/lib/ai-gateway/providers/openrouter');
+jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
+  getModelIdToProviderSlugsIndex: jest.fn(),
+}));
+
+import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContext);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
+const mockedGetModelIdToProviderSlugsIndex = jest.mocked(getModelIdToProviderSlugsIndex);
 
 function makeOpenRouterModel(id: string): OpenRouterModel {
   return {
@@ -46,6 +52,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
   beforeEach(() => {
     mockedGetAuthorizedOrgContext.mockReset();
     mockedGetEnhancedOpenRouterModels.mockReset();
+    mockedGetModelIdToProviderSlugsIndex.mockReset();
   });
 
   afterEach(async () => {
@@ -155,6 +162,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
     const organization = await createOrganization('Test Org', user.id);
 
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [] });
+    mockedGetModelIdToProviderSlugsIndex.mockResolvedValue(new Map());
 
     mockedGetAuthorizedOrgContext.mockResolvedValue({
       success: true,

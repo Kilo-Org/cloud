@@ -7,6 +7,7 @@ const GATEWAY_CLIENT_ID = 'gateway-client';
 const BACKEND_CLIENT_MODE = 'backend';
 const OPERATOR_ROLE = 'operator';
 const OPERATOR_APPROVALS_SCOPE = 'operator.approvals';
+const SAFE_REPAIR_SCOPES = new Set(['operator.read', OPERATOR_APPROVALS_SCOPE]);
 
 export const KILOCLAW_PAIRING_REPAIR_TAG = 'KILOCLAW_PAIRING_REPAIR_2026_04_28';
 
@@ -63,6 +64,13 @@ function mergeStrings(...groups: readonly string[][]): string[] {
     }
   }
   return merged;
+}
+
+function safeRepairScopes(...groups: readonly string[][]): string[] {
+  return mergeStrings(
+    ...groups.map(group => group.filter(scope => SAFE_REPAIR_SCOPES.has(scope))),
+    [OPERATOR_APPROVALS_SCOPE]
+  );
 }
 
 function arraysEqual(left: readonly string[], right: readonly string[]): boolean {
@@ -149,10 +157,9 @@ function repairPairedDevice(record: JsonRecord): {
   let changed = false;
   let tokenScopesUpdated = false;
 
-  const desiredScopes = mergeStrings(
+  const desiredScopes = safeRepairScopes(
     getStringArray(record, 'approvedScopes'),
-    getStringArray(record, 'scopes'),
-    [OPERATOR_APPROVALS_SCOPE]
+    getStringArray(record, 'scopes')
   );
   if (!arraysEqual(getStringArray(record, 'approvedScopes'), desiredScopes)) {
     next.approvedScopes = desiredScopes;
@@ -176,9 +183,7 @@ function repairPairedDevice(record: JsonRecord): {
   if (isRecord(record.tokens)) {
     const operatorToken = record.tokens[OPERATOR_ROLE];
     if (isRecord(operatorToken) && operatorToken.revokedAtMs === undefined) {
-      const desiredTokenScopes = mergeStrings(getStringArray(operatorToken, 'scopes'), [
-        OPERATOR_APPROVALS_SCOPE,
-      ]);
+      const desiredTokenScopes = safeRepairScopes(getStringArray(operatorToken, 'scopes'));
       if (!arraysEqual(getStringArray(operatorToken, 'scopes'), desiredTokenScopes)) {
         next.tokens = {
           ...record.tokens,

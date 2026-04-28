@@ -170,6 +170,36 @@ describe('repairInternalGatewayClientPairingState', () => {
     expect(Object.keys(readJson(pendingPath(stateDir)))).toEqual(['request-1']);
   });
 
+  it('does not propagate unsafe paired scopes between scope fields while repairing', () => {
+    const stateDir = makeStateDir();
+    writeJson(pairedPath(stateDir), {
+      'gateway-device': staleGatewayClientDevice({
+        scopes: ['operator.read', 'operator.write'],
+        approvedScopes: ['operator.read', 'operator.admin'],
+        tokens: {
+          operator: {
+            token: 'token-redacted',
+            role: 'operator',
+            scopes: ['operator.read', 'operator.pairing'],
+            createdAtMs: 1,
+          },
+        },
+      }),
+    });
+    writeJson(pendingPath(stateDir), {});
+
+    repairInternalGatewayClientPairingState({ stateDir });
+
+    const paired = readJson(pairedPath(stateDir));
+    const device = paired['gateway-device'] as Record<string, unknown>;
+    expect(device.scopes).toEqual(['operator.read', 'operator.approvals']);
+    expect(device.approvedScopes).toEqual(['operator.read', 'operator.approvals']);
+    expect((device.tokens as Record<string, Record<string, unknown>>).operator.scopes).toEqual([
+      'operator.read',
+      'operator.approvals',
+    ]);
+  });
+
   it('does not create token material when the operator token is absent', () => {
     const stateDir = makeStateDir();
     writeJson(pairedPath(stateDir), {

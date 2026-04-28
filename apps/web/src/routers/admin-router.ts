@@ -673,7 +673,7 @@ export const adminRouter = createTRPCRouter({
 
     getKiloClawState: adminProcedure.input(GetKiloClawStateSchema).query(async ({ input }) => {
       const user = await db.query.kilocode_users.findFirst({
-        columns: { id: true },
+        columns: { id: true, kiloclaw_early_access: true },
         where: eq(kilocode_users.id, input.userId),
       });
 
@@ -776,6 +776,7 @@ export const adminRouter = createTRPCRouter({
             }
           : null,
         activeInstanceId: activeInstance?.id ?? null,
+        kiloclawEarlyAccess: user.kiloclaw_early_access ?? false,
         billingStateError,
         needsSupportReview: billingStateError !== null,
       };

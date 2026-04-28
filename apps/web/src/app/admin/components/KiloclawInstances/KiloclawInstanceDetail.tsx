@@ -33,7 +33,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   User,
@@ -193,45 +192,14 @@ function CopySshCommandButton({
 
 function EarlyAccessSection({
   userId,
-  initialValue,
+  value,
   isPinned,
 }: {
   userId: string;
-  initialValue: boolean;
+  value: boolean;
   /** When true, the user's pin takes precedence and Early Access has no effect for this instance. */
   isPinned: boolean;
 }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const [optimistic, setOptimistic] = useState(initialValue);
-
-  // Keep the toggle in sync if the parent's data refreshes out-of-band (e.g.,
-  // another admin toggles the same flag, or React Query cache invalidates).
-  // useState's initializer only runs on mount; without this we'd render stale
-  // state after a refetch.
-  useEffect(() => {
-    setOptimistic(initialValue);
-  }, [initialValue]);
-
-  const { mutateAsync, isPending } = useMutation(
-    trpc.admin.kiloclawInstances.setEarlyAccess.mutationOptions({
-      onSuccess: result => {
-        toast.success(
-          result.earlyAccess
-            ? 'Early Access enabled for this user'
-            : 'Early Access disabled for this user'
-        );
-        void queryClient.invalidateQueries({
-          queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
-        });
-      },
-      onError: err => {
-        setOptimistic(initialValue);
-        toast.error(`Failed to update Early Access: ${err.message}`);
-      },
-    })
-  );
-
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -240,30 +208,28 @@ function EarlyAccessSection({
       </div>
       <p className="text-muted-foreground text-sm">
         Offers this user the newest available image (including any in-flight rollout candidate)
-        across all of their instances — personal and org. Used for staff dogfooding and designated
-        beta testers. Per instance pins still take precedence.
+        across all of their instances — personal and org. Per instance pins still take precedence.
       </p>
-      <div className="flex items-center gap-3">
-        <Switch
-          checked={optimistic}
-          disabled={isPending}
-          onCheckedChange={next => {
-            setOptimistic(next);
-            void mutateAsync({ userId, value: next });
-          }}
-          aria-label="Early Access"
-        />
-        <span className="text-sm">
-          {isPending ? (
-            <span className="text-muted-foreground">Saving…</span>
-          ) : optimistic ? (
-            <span className="font-medium text-green-500">Enabled</span>
-          ) : (
-            <span className="text-muted-foreground">Disabled</span>
-          )}
-        </span>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span className="text-muted-foreground">Status:</span>
+        {value ? (
+          <span className="font-medium text-green-500">Enabled</span>
+        ) : (
+          <span className="text-muted-foreground">Disabled</span>
+        )}
+        <Link
+          href={`/admin/users/${encodeURIComponent(userId)}?tab=kiloclaw`}
+          className="group ml-auto inline-flex items-center gap-1 text-xs text-blue-400 hover:underline"
+        >
+          Edit on user page
+          <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+        </Link>
       </div>
-      {isPinned && optimistic && (
+      <p className="text-muted-foreground text-xs">
+        Early Access is a per-user setting. Edit it on the user admin page; the user can also toggle
+        it themselves under Settings → Manage Version.
+      </p>
+      {isPinned && value && (
         <p className="flex items-start gap-1 text-xs text-amber-500">
           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
           This instance is pinned, so Early Access has no effect here. Other instances owned by this
@@ -465,11 +431,11 @@ function VersionPinSection({ userId, instanceId }: { userId: string; instanceId:
 function VersionManagementCard({
   userId,
   instanceId,
-  earlyAccessInitial,
+  earlyAccessValue,
 }: {
   userId: string;
   instanceId: string;
-  earlyAccessInitial: boolean;
+  earlyAccessValue: boolean;
 }) {
   const trpc = useTRPC();
   // Same query VersionPinSection uses — React Query dedupes on the key, so
@@ -492,11 +458,7 @@ function VersionManagementCard({
       <CardContent>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <VersionPinSection userId={userId} instanceId={instanceId} />
-          <EarlyAccessSection
-            userId={userId}
-            initialValue={earlyAccessInitial}
-            isPinned={isPinned}
-          />
+          <EarlyAccessSection userId={userId} value={earlyAccessValue} isPinned={isPinned} />
         </div>
       </CardContent>
     </Card>
@@ -3339,7 +3301,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         <VersionManagementCard
           userId={data.user_id}
           instanceId={data.id}
-          earlyAccessInitial={data.user_kiloclaw_early_access}
+          earlyAccessValue={data.user_kiloclaw_early_access}
         />
 
         {/* Workspace File Editor */}

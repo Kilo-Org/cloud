@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, MessageSquare, CheckCircle2, Building2, User } from 'lucide-react';
 import type { WorkspaceSelection } from './types';
+import { useState } from 'react';
 
 type SlackConnectStepProps = {
   workspace: WorkspaceSelection;
@@ -15,17 +16,23 @@ type SlackConnectStepProps = {
 
 export function SlackConnectStep({ workspace, onBack }: SlackConnectStepProps) {
   const trpc = useTRPC();
+  const [isStartingSlackConnection, setIsStartingSlackConnection] = useState(false);
 
-  // Get OAuth URL based on workspace type
-  const { data: oauthUrlData, isLoading: isLoadingOAuthUrl } = useQuery(
+  // Get OAuth URL only when the user clicks Connect so the signed state is fresh.
+  const { refetch: refetchOAuthUrl, isFetching: isFetchingOAuthUrl } = useQuery(
     trpc.slack.getOAuthUrl.queryOptions(
-      workspace.type === 'org' ? { organizationId: workspace.id } : undefined
+      workspace.type === 'org' ? { organizationId: workspace.id } : undefined,
+      { enabled: false }
     )
   );
 
-  const handleConnectSlack = () => {
-    if (oauthUrlData?.url) {
-      window.location.href = oauthUrlData.url;
+  const handleConnectSlack = async () => {
+    setIsStartingSlackConnection(true);
+    const result = await refetchOAuthUrl();
+    if (result.data?.url) {
+      window.location.href = result.data.url;
+    } else {
+      setIsStartingSlackConnection(false);
     }
   };
 
@@ -104,10 +111,10 @@ export function SlackConnectStep({ workspace, onBack }: SlackConnectStepProps) {
             onClick={handleConnectSlack}
             size="lg"
             className="w-full bg-[#4A154B] text-white hover:bg-[#3a1039]"
-            disabled={isLoadingOAuthUrl || !oauthUrlData?.url}
+            disabled={isStartingSlackConnection || isFetchingOAuthUrl}
           >
             <MessageSquare className="mr-2 h-5 w-5" />
-            {isLoadingOAuthUrl ? 'Loading...' : 'Connect Slack'}
+            {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Connect Slack'}
           </Button>
 
           <p className="text-muted-foreground text-center text-xs">

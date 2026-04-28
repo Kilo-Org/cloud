@@ -27,6 +27,7 @@ const MAX_CONCURRENT_REVIEWS_PER_OWNER = 20;
 // window are considered abandoned (e.g. process crashed after claim) and
 // become eligible for re-dispatch.
 const STALE_CLAIM_MINUTES = 5;
+const STALE_RUNNING_MINUTES = 90;
 
 export interface DispatchResult {
   dispatched: number;
@@ -42,10 +43,11 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
   try {
     logExceptInTest(`[tryDispatchPendingReviews] Starting dispatch check`, { owner });
 
-    const staleCutoff = sql`now() - interval '${sql.raw(String(STALE_CLAIM_MINUTES))} minutes'`;
+    const staleQueuedCutoff = sql`now() - interval '${sql.raw(String(STALE_CLAIM_MINUTES))} minutes'`;
+    const staleRunningCutoff = sql`now() - interval '${sql.raw(String(STALE_RUNNING_MINUTES))} minutes'`;
 
     // 1. Get active review count for this owner.
-    //    Stale queued rows are excluded so abandoned claims do not block recovery.
+    //    Stale queued and running rows are excluded so abandoned work does not block recovery.
     const activeCountResult = await db
       .select({ count: count() })
       .from(cloud_agent_code_reviews)
@@ -55,10 +57,17 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
             ? eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id)
             : eq(cloud_agent_code_reviews.owned_by_user_id, owner.id),
           or(
-            eq(cloud_agent_code_reviews.status, 'running'),
+            and(
+              eq(cloud_agent_code_reviews.status, 'running'),
+              sql`COALESCE(
+                ${cloud_agent_code_reviews.started_at},
+                ${cloud_agent_code_reviews.updated_at},
+                ${cloud_agent_code_reviews.created_at}
+              ) >= ${staleRunningCutoff}`
+            ),
             and(
               eq(cloud_agent_code_reviews.status, 'queued'),
-              gte(cloud_agent_code_reviews.updated_at, staleCutoff)
+              gte(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
             )
           )
         )
@@ -94,7 +103,7 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
             eq(cloud_agent_code_reviews.status, 'pending'),
             and(
               eq(cloud_agent_code_reviews.status, 'queued'),
-              lt(cloud_agent_code_reviews.updated_at, staleCutoff)
+              lt(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
             )
           )
         )
@@ -115,7 +124,7 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
 
     // 5. Dispatch all pending reviews in parallel
     const results = await Promise.allSettled(
-      pendingReviews.map(review => dispatchReview(review, owner, staleCutoff))
+      pendingReviews.map(review => dispatchReview(review, owner, staleQueuedCutoff))
     );
 
     let dispatched = 0;
@@ -180,7 +189,7 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
 async function dispatchReview(
   review: CloudAgentCodeReview,
   owner: Owner,
-  staleCutoff: ReturnType<typeof sql>
+  staleQueuedCutoff: ReturnType<typeof sql>
 ): Promise<boolean> {
   // Get platform from review (defaults to 'github' for backward compatibility)
   const platform = (review.platform || 'github') as CodeReviewPlatform;
@@ -222,7 +231,7 @@ async function dispatchReview(
           eq(cloud_agent_code_reviews.status, 'pending'),
           and(
             eq(cloud_agent_code_reviews.status, 'queued'),
-            lt(cloud_agent_code_reviews.updated_at, staleCutoff)
+            lt(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
           )
         )
       )

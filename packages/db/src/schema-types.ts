@@ -278,12 +278,16 @@ export const OrganizationPlanSchema = z.enum(['teams', 'enterprise']);
 export type OrganizationPlan = z.infer<typeof OrganizationPlanSchema>;
 
 const OrganizationSettingsSchema = z.object({
-  /** @deprecated use model_deny_list instead. delete if this is still here May 2026 */
-  model_allow_list: z.array(z.string()).optional(),
-  /** @deprecated use provider_deny_list instead. delete if this is still here May 2026 */
   provider_allow_list: z.array(z.string()).optional(),
+  /**
+   * Migration marker for provider restrictions.
+   * Existing provider_allow_list values can be stale from the pre-deny-list era,
+   * so only trust provider_allow_list when this is set.
+   */
+  provider_policy_mode: z.enum(['allow']).optional(),
 
   model_deny_list: z.array(z.string()).optional(),
+  /** Legacy fallback for orgs that have not saved explicit allow lists yet. */
   provider_deny_list: z.array(z.string()).optional(),
 
   default_model: z.string().optional(),
@@ -680,34 +684,6 @@ export const NormalizedOpenRouterResponse = z.object({
   total_models: z.number(),
   generated_at: z.string(),
 });
-
-// --- Model settings ---
-
-export const ToolSchema = z.enum([
-  'apply_diff',
-  'apply_patch',
-  'delete_file',
-  'edit_file',
-  'search_replace',
-  'search_and_replace',
-  'write_file',
-  'write_to_file',
-]);
-
-export type Tool = z.infer<typeof ToolSchema>;
-
-export const ToolArraySchema = z.array(ToolSchema);
-
-export const ModelSettingsSchema = z.object({
-  included_tools: ToolArraySchema,
-  excluded_tools: ToolArraySchema,
-});
-
-export type ModelSettings = z.infer<typeof ModelSettingsSchema>;
-
-export const VersionedSettingsSchema = z.record(z.string(), ModelSettingsSchema);
-
-export type VersionedSettings = z.infer<typeof VersionedSettingsSchema>;
 
 export const OpenCodePromptSchema = z.enum([
   'codex',

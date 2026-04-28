@@ -54,7 +54,7 @@ import {
 } from '@/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
 import { computeOpenRouterCostFields, drainSseStream } from '@/lib/ai-gateway/processUsage.shared';
-import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic';
+import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 

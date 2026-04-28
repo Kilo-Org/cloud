@@ -1234,6 +1234,15 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
    * based on the targetBotId (bot:kiloclaw:{sandboxId}).
    *
    * See resolveChatWebhookDoKey for the two supported sandboxId formats.
+   *
+   * Load-bearing error strings: the messages thrown below ("has no sandboxId",
+   * "No routing target", "Webhook forward failed: <status>") are pattern-matched
+   * by `isDefiniteUnreachable` in services/kilo-chat/src/services/bot-status-request.ts
+   * to decide whether to flip a bot to offline immediately. Typed errors don't
+   * survive the Workers RPC boundary, so kilo-chat does substring matching on
+   * `err.message`. If you reword these, update the classifier in lock-step —
+   * otherwise the worst case is degrading to "always transient" (UI shows
+   * stale-online until staleness inference catches up, ~poll interval).
    */
   async deliverChatWebhook(payload: ChatWebhookPayload): Promise<void> {
     const parsed = chatWebhookRpcSchema.parse(payload);

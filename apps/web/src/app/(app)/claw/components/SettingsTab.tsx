@@ -1305,7 +1305,6 @@ export function SettingsTab({
   onSecretsChanged,
   dirtySecrets,
   onRedeploy,
-  onUpgrade,
   onRequestUpgrade,
   organizationName,
 }: {
@@ -1314,9 +1313,7 @@ export function SettingsTab({
   onSecretsChanged?: (entryId: string) => void;
   dirtySecrets: Set<string>;
   onRedeploy?: () => void;
-  /** Callback that triggers an image upgrade (pull latest) instead of a plain restart. */
-  onUpgrade?: () => void;
-  /** Callback that requests an upgrade via the InstanceControls dialog. */
+  /** Callback that opens the focused upgrade confirmation flow. */
   onRequestUpgrade?: () => void;
   /** Present in organization context; required in the destroy confirmation phrase. */
   organizationName?: string;
@@ -1879,7 +1876,7 @@ export function SettingsTab({
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
-                  onRedeploy={onUpgrade ?? onRedeploy}
+                  onRedeploy={onRequestUpgrade ?? onRedeploy}
                   redeployLabel="Upgrade"
                   actionRowExtra={<AgentCardSetupGuide />}
                 />

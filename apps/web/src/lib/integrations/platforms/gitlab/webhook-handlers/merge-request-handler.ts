@@ -16,6 +16,7 @@ import {
   createCodeReview,
   findExistingReview,
   findActiveReviewsForPR,
+  updateReviewHeadShaAndCheckRun,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -177,6 +178,21 @@ export async function handleMergeRequestCodeReview(
         project: project.path_with_namespace,
         head_sha: headSha,
       });
+
+      // The preserved review is still pinned to the prior commit's status,
+      // so any required 'kilo/code-review' gate would stay stuck on that
+      // SHA while MR branch protection evaluates the new HEAD. Repoint the
+      // review at the merge-commit SHA and drop a fresh pending status so
+      // the eventual completion callback writes its final state to the
+      // commit GitLab actually evaluates.
+      await migrateInFlightReviewsToMergeCommitHead({
+        integrationId: integration.id,
+        projectId: project.id,
+        repoFullName: project.path_with_namespace,
+        mrIid: mr.iid,
+        newHeadSha: headSha,
+      });
+
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
     }
 
@@ -360,6 +376,68 @@ export async function shouldSkipUpdateForMergeCommit(args: {
   } catch (error) {
     logExceptInTest('Failed to check for merge commit, proceeding with review:', error);
     return false;
+  }
+}
+
+/**
+ * When a merge-commit update arrives and we bail out to preserve the
+ * in-flight review, the review row still points at the previous SHA, so
+ * the completion callback would post its final GitLab commit status on
+ * the abandoned commit. Repoint the review at the merge-commit SHA and
+ * drop a fresh pending status on it. Best-effort: any failure is logged
+ * but does not fail the webhook.
+ */
+async function migrateInFlightReviewsToMergeCommitHead(args: {
+  integrationId: string;
+  projectId: number;
+  repoFullName: string;
+  mrIid: number;
+  newHeadSha: string;
+}) {
+  try {
+    const activeReviewIds = await findActiveReviewsForPR(
+      args.repoFullName,
+      args.mrIid,
+      args.newHeadSha
+    );
+    if (activeReviewIds.length === 0) return;
+
+    const fullIntegration = await getIntegrationById(args.integrationId);
+    if (!fullIntegration) return;
+    const metadata = fullIntegration.metadata as { gitlab_instance_url?: string } | null;
+    const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
+
+    // In practice an MR has at most one active review; migrate the first.
+    const [reviewId] = activeReviewIds;
+
+    // Update the DB row first. If this fails we never touched the new SHA,
+    // so there's nothing to clean up. If it succeeds but setCommitStatus
+    // fails below, the eventual completion callback will still target the
+    // correct (new) SHA — we just miss the transient pending badge.
+    await updateReviewHeadShaAndCheckRun(reviewId, args.newHeadSha, null);
+
+    try {
+      const pratToken = await getOrCreateProjectAccessToken(fullIntegration, args.projectId);
+      const detailsUrl = `${APP_URL}/code-reviews/${reviewId}`;
+      await setCommitStatus(
+        pratToken,
+        args.projectId,
+        args.newHeadSha,
+        'pending',
+        {
+          targetUrl: detailsUrl,
+          description: 'Kilo Code Review continuing from previous commit',
+        },
+        instanceUrl
+      );
+      logExceptInTest(
+        `Migrated review ${reviewId} to merge-commit head ${args.newHeadSha} and set pending status`
+      );
+    } catch (statusError) {
+      logExceptInTest('Failed to set pending status on merge-commit head:', statusError);
+    }
+  } catch (migrateError) {
+    logExceptInTest('Failed to migrate in-flight review onto merge commit head:', migrateError);
   }
 }
 

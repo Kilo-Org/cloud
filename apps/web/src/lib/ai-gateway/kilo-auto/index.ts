@@ -5,7 +5,7 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { ModelSettings, OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
+import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 
 type AutoModel = {
@@ -19,7 +19,7 @@ type AutoModel = {
   input_cache_read_price: string | undefined;
   input_cache_write_price: string | undefined;
   supports_images: boolean;
-  roocode_settings: ModelSettings | undefined;
+  supports_pdf: boolean;
   opencode_settings: OpenCodeSettings | undefined;
 };
 
@@ -28,8 +28,6 @@ export type ResolvedAutoModel = {
   reasoning?: OpenRouterReasoningConfig;
   verbosity?: Verbosity;
 };
-
-export const GPT_53_CODEX_ID = 'openai/gpt-5.3-codex';
 
 export const KILO_AUTO_LEGACY_MODEL = 'kilo/auto'; // hardcoded in upstream OpenClaw
 
@@ -78,14 +76,14 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: SONNET_FRONTIER,
 };
 
-export const BALANCED_CODEX_MODEL: ResolvedAutoModel = {
-  model: GPT_53_CODEX_ID,
+export const BALANCED_RESPONSES_FALLBACK_MODEL: ResolvedAutoModel = {
+  model: 'openai/gpt-5.5',
   reasoning: { enabled: true, effort: 'low' },
 };
 
-export const BALANCED_HAIKU_MODEL: ResolvedAutoModel = {
-  model: 'anthropic/claude-haiku-4.5',
-  reasoning: { enabled: true, effort: 'medium' },
+export const BALANCED_MESSAGES_FALLBACK_MODEL: ResolvedAutoModel = {
+  model: CLAUDE_SONNET_CURRENT_MODEL_ID,
+  reasoning: { enabled: true, effort: 'low' },
 };
 
 export const BALANCED_CLAW_SETUP_MODEL: ResolvedAutoModel = {
@@ -110,7 +108,7 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   input_cache_read_price: '0.0000005',
   input_cache_write_price: '0.00000625',
   supports_images: true,
-  roocode_settings: undefined,
+  supports_pdf: true,
   opencode_settings: {
     family: 'claude',
     prompt: 'anthropic',
@@ -129,7 +127,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   input_cache_read_price: '0',
   input_cache_write_price: '0',
   supports_images: false,
-  roocode_settings: undefined,
+  supports_pdf: false,
   opencode_settings: undefined,
 };
 
@@ -137,16 +135,16 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Kilo Auto Balanced',
   description: 'Great balance of price and capability.',
-  context_length: 400_000,
+  context_length: 1_000_000,
   max_completion_tokens: 65_536,
   prompt_price: '0.000000325',
   completion_price: '0.00000195',
   input_cache_read_price: '0.0000000325',
   input_cache_write_price: '0.00000040625',
   supports_images: true,
-  roocode_settings: undefined,
+  supports_pdf: false,
   opencode_settings: {
-    ai_sdk_provider: 'openai-compatible',
+    ai_sdk_provider: 'alibaba',
   },
 };
 
@@ -161,7 +159,7 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   input_cache_read_price: '0.000000005',
   input_cache_write_price: undefined,
   supports_images: true,
-  roocode_settings: undefined,
+  supports_pdf: false,
   opencode_settings: undefined,
 };
 

@@ -30,12 +30,11 @@ const notificationDataSchema = z.object({
   instanceId: z.string().min(1),
 });
 
-export type NotificationData = z.infer<typeof notificationDataSchema>;
+type NotificationData = z.infer<typeof notificationDataSchema>;
 
 // Runtime-validates that an arbitrary notification `data` payload matches the
-// shape we care about. Use this instead of `as NotificationData` when reading
-// from the OS-provided notification content, since push producers can evolve
-// independently of the app.
+// shape we care about. Push producers can evolve independently of the app, so
+// always parse before reading fields from the OS-provided notification content.
 export function parseNotificationData(data: unknown): NotificationData | null {
   const parsed = notificationDataSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
@@ -61,10 +60,10 @@ export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous
     handleNotification: async notification => {
-      const data = notification.request.content.data as NotificationData | undefined;
+      const data = parseNotificationData(notification.request.content.data);
 
       // Suppress only if the user is already viewing this exact chat
-      if (data?.type === 'chat' && data.instanceId === activeChatInstanceId) {
+      if (data && data.instanceId === activeChatInstanceId) {
         return suppressed;
       }
 
@@ -85,9 +84,9 @@ export function getPendingNotificationLink(): string | null {
 
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-    const data = response.notification.request.content.data as NotificationData | undefined;
+    const data = parseNotificationData(response.notification.request.content.data);
 
-    if (data?.type === 'chat') {
+    if (data) {
       const path = `/(app)/chat/${data.instanceId}`;
       // If the router is ready (has segments), navigate immediately.
       // Otherwise store as pending for consumption after auth completes.
@@ -108,8 +107,8 @@ export function checkInitialNotification(): void {
   if (!response) {
     return;
   }
-  const data = response.notification.request.content.data as NotificationData | undefined;
-  if (data?.type === 'chat') {
+  const data = parseNotificationData(response.notification.request.content.data);
+  if (data) {
     pendingNotificationLink = `/(app)/chat/${data.instanceId}`;
   }
 }

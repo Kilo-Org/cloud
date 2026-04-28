@@ -99,10 +99,10 @@ describe('GET /v1/sandboxes/:sandboxId/bot-status', () => {
     expect(res.status).toBe(401);
   });
 
-  it('404 when sandbox does not exist (no owner mapping)', async () => {
+  it('403 when sandbox does not exist (no owner mapping)', async () => {
     const app = makeReadAppAs('user-missing');
     const res = await app.request('/v1/sandboxes/sandbox-missing/bot-status', {}, makeEnv());
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(403);
   });
 
   it('403 when caller is not the sandbox owner', async () => {

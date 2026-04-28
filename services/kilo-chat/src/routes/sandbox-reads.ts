@@ -2,7 +2,7 @@ import type { Context, Hono } from 'hono';
 import type { AuthContext } from '../auth';
 import { sandboxIdSchema, ulidSchema } from '@kilocode/kilo-chat';
 import { withDORetry } from '@kilocode/worker-utils';
-import { lookupSandboxOwnerUserId } from '../services/sandbox-ownership';
+import { userOwnsSandbox } from '../services/sandbox-ownership';
 import { extractSandboxId } from '../services/event-push';
 import { handleRequestBotStatus } from '../services/bot-status-request';
 
@@ -14,9 +14,8 @@ async function handleGetBotStatus(c: HonoCtx): Promise<Response> {
   const sandboxId = parsed.data;
 
   const userId = c.get('callerId');
-  const owner = await lookupSandboxOwnerUserId(c.env, sandboxId);
-  if (!owner) return c.json({ error: 'sandbox_not_found' }, 404);
-  if (owner !== userId) return c.json({ error: 'forbidden' }, 403);
+  const owns = await userOwnsSandbox(c.env, userId, sandboxId);
+  if (!owns) return c.json({ error: 'forbidden' }, 403);
 
   const status = await withDORetry(
     () => c.env.SANDBOX_STATUS_DO.get(c.env.SANDBOX_STATUS_DO.idFromName(sandboxId)),

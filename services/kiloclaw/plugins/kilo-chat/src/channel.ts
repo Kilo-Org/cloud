@@ -109,19 +109,19 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
 
         // Bot-status is driven by client polling (kilo-chat sends a
         // `bot.status_request` webhook on demand and the plugin replies).
-        // We still emit a single startup heartbeat so the server cache
-        // reflects "online" before the first poll, and a shutdown heartbeat
-        // so a graceful abort flips the UI to offline immediately rather
-        // than waiting for cache staleness.
+        // We still emit one startup ping so the server cache reflects
+        // "online" before the first poll, and one shutdown ping so a
+        // graceful abort flips the UI to offline immediately rather than
+        // waiting for cache staleness.
         const client = makeClient();
-        const sendHeartbeat = (online: boolean) => {
+        const sendPresence = (online: boolean) => {
           void client.sendBotStatus({ online, at: Date.now() });
         };
-        sendHeartbeat(true);
+        sendPresence(true);
         abortSignal.addEventListener(
           'abort',
           () => {
-            sendHeartbeat(false);
+            sendPresence(false);
           },
           { once: true }
         );

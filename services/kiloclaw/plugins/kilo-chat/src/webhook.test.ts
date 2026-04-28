@@ -8,6 +8,7 @@ import {
   parseActionExecutedPayload,
   parseInboundPayload,
 } from './webhook/index.js';
+import { handleBotStatusRequest } from './webhook/dispatch.js';
 import type { KiloChatClient } from './client.js';
 
 describe('parseInboundPayload', () => {
@@ -252,6 +253,21 @@ describe('createKiloChatWebhookHandler', () => {
     const { res, getStatus } = makeRes();
     await handler(makeReq(body), res);
     expect(getStatus()).toBe(202);
+  });
+
+  it('handleBotStatusRequest pushes online:true with a current timestamp', async () => {
+    const sendBotStatus = vi.fn().mockResolvedValue(undefined);
+    const fakeClient = { sendBotStatus } as unknown as KiloChatClient;
+
+    const before = Date.now();
+    await handleBotStatusRequest(fakeClient);
+    const after = Date.now();
+
+    expect(sendBotStatus).toHaveBeenCalledTimes(1);
+    const arg = sendBotStatus.mock.calls[0]?.[0] as { online: boolean; at: number };
+    expect(arg.online).toBe(true);
+    expect(arg.at).toBeGreaterThanOrEqual(before);
+    expect(arg.at).toBeLessThanOrEqual(after);
   });
 
   it('accepts message.created type explicitly', async () => {

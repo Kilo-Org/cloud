@@ -4562,28 +4562,27 @@ export type SecurityAdvisorContent = typeof security_advisor_content.$inferSelec
 export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferInsert;
 
 // ============ CHANNEL BADGE COUNTS ============
-// Per-user per-channel unread notification counts for mobile app badge display.
-// (user_id, channel_id) is the composite PK — one row per user per chat channel.
-// Keyed by channel rather than instance to support multiple channels per instance
-// in future. The notification service increments badge_count on each push and sums
-// across all channels to get the total badge count to include in the push payload.
-// The mobile client resets a channel's count (to 0) when the user views that chat.
+// Per-user per-bucket unread notification counts for mobile app badge display.
+// (user_id, badge_bucket) is the composite PK — one row per user per chat conversation.
+// The notification service increments badge_count on each push and sums
+// across all buckets to get the total badge count to include in the push payload.
+// The mobile client resets a bucket's count (to 0) when the user views that conversation.
 
-export const channel_badge_counts = pgTable(
-  'channel_badge_counts',
+export const badge_counts = pgTable(
+  'badge_counts',
   {
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    channel_id: text().notNull(),
+    badge_bucket: text().notNull(),
     badge_count: integer().notNull().default(0),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
   },
-  table => [primaryKey({ columns: [table.user_id, table.channel_id] })]
+  table => [primaryKey({ columns: [table.user_id, table.badge_bucket] })]
 );
 
-export type ChannelBadgeCount = typeof channel_badge_counts.$inferSelect;
+export type BadgeCount = typeof badge_counts.$inferSelect;
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

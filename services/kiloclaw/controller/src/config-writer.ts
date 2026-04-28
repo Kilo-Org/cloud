@@ -541,6 +541,8 @@ export function generateBaseConfig(
     config.hooks.enabled = true;
     config.hooks.token = env.KILOCLAW_HOOKS_TOKEN;
     config.hooks.path = '/hooks';
+    config.hooks.allowRequestSessionKey = true;
+    config.hooks.allowedSessionKeyPrefixes = ['hook:', 'inbound-email:'];
 
     config.hooks.mappings = Array.isArray(config.hooks.mappings)
       ? config.hooks.mappings.map((mapping: ConfigObject) => migrateHookMapping(mapping))

@@ -932,6 +932,8 @@ describe('generateBaseConfig', () => {
     expect(config.hooks.enabled).toBe(true);
     expect(config.hooks.token).toBe('test-hooks-token');
     expect(config.hooks.path).toBe('/hooks');
+    expect(config.hooks.allowRequestSessionKey).toBe(true);
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
     expect(config.hooks.presets).toBeUndefined();
     expect(config.hooks.mappings).toContainEqual({
       id: 'cloudflare-email-inbound',
@@ -971,6 +973,8 @@ describe('generateBaseConfig', () => {
     const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'test-hooks-token' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
+    expect(config.hooks.allowRequestSessionKey).toBe(true);
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
     expect(config.hooks.mappings).toContainEqual({
       id: 'cloudflare-email-inbound',
       match: { path: 'email' },

@@ -8,6 +8,13 @@ const BACKEND_CLIENT_MODE = 'backend';
 const OPERATOR_ROLE = 'operator';
 const OPERATOR_APPROVALS_SCOPE = 'operator.approvals';
 
+export const KILOCLAW_PAIRING_REPAIR_TAG = 'KILOCLAW_PAIRING_REPAIR_2026_04_28';
+
+// KILOCLAW_PAIRING_REPAIR_2026_04_28: temporary recovery for persisted
+// OpenClaw <=2026.4.26 internal gateway-client backend device records missing
+// operator.approvals. Remove after fleet volumes have been repaired and
+// OpenClaw no longer routes native approval startup through this stale baseline.
+
 type JsonRecord = Record<string, unknown>;
 
 export type DevicePairingRepairResult = {

@@ -116,6 +116,7 @@ async function loadStartControllerWithMocks(options: {
   }));
 
   vi.doMock('./device-pairing-repair.js', () => ({
+    KILOCLAW_PAIRING_REPAIR_TAG: 'KILOCLAW_PAIRING_REPAIR_2026_04_28',
     repairInternalGatewayClientPairingState:
       options.repairInternalGatewayClientPairingState ??
       (() => ({

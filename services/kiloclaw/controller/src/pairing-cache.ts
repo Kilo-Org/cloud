@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import {
+  KILOCLAW_PAIRING_REPAIR_TAG,
   repairInternalGatewayClientPairingState,
   type DevicePairingRepairResult,
 } from './device-pairing-repair.js';
@@ -379,18 +380,21 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       if (autoApproveGatewayClient && allowAutoRepair) {
         const gatewayRequests = requests.filter(isInternalGatewayClientBackendRequest);
         if (gatewayRequests.length > 0) {
+          // KILOCLAW_PAIRING_REPAIR_2026_04_28: use local file repair for the
+          // internal backend gateway-client so we do not depend on Gateway RPC
+          // while Gateway itself may be blocked by pairing-required state.
           console.log(
-            `[pairing-cache] repairing ${gatewayRequests.length} internal gateway-client device request(s)`
+            `[pairing-cache] ${KILOCLAW_PAIRING_REPAIR_TAG} repairing ${gatewayRequests.length} internal gateway-client device request(s)`
           );
           try {
             const repairResult = await repairInternalGatewayClientPairingImpl();
             if (repairResult.status === 'warning') {
               console.warn(
-                `[pairing-cache] internal gateway-client repair warning: ${repairResult.warnings.join('; ')}`
+                `[pairing-cache] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair warning: ${repairResult.warnings.join('; ')}`
               );
             } else if (repairResult.status === 'repaired') {
               console.log(
-                `[pairing-cache] internal gateway-client repair applied paired=${repairResult.pairedDevicesRepaired} pendingRemoved=${repairResult.pendingRequestsRemoved} tokenScopesUpdated=${repairResult.operatorTokenScopesUpdated}`
+                `[pairing-cache] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair applied paired=${repairResult.pairedDevicesRepaired} pendingRemoved=${repairResult.pendingRequestsRemoved} tokenScopesUpdated=${repairResult.operatorTokenScopesUpdated}`
               );
             }
           } catch (err) {

@@ -54,7 +54,10 @@ import { getOpenclawVersion } from './openclaw-version';
 import { startCheckin } from './checkin';
 import { collectProductTelemetry } from './product-telemetry';
 import { GoogleOAuthTokenProvider } from './google-oauth-token-provider';
-import { repairInternalGatewayClientPairingState } from './device-pairing-repair.js';
+import {
+  KILOCLAW_PAIRING_REPAIR_TAG,
+  repairInternalGatewayClientPairingState,
+} from './device-pairing-repair.js';
 
 export type RuntimeConfig = {
   port: number;
@@ -545,17 +548,22 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   }
 
   if (env.AUTO_APPROVE_DEVICES === 'true') {
+    // KILOCLAW_PAIRING_REPAIR_2026_04_28: run before gateway startup so stale
+    // internal gateway-client pairing state cannot recreate the native approval
+    // handler's scope-upgrade loop on boot.
     const repairResult = repairInternalGatewayClientPairingState();
     if (repairResult.status === 'warning') {
       console.warn(
-        `[pairing-repair] internal gateway-client repair warning: ${repairResult.warnings.join('; ')}`
+        `[pairing-repair] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair warning: ${repairResult.warnings.join('; ')}`
       );
     } else if (repairResult.status === 'repaired') {
       console.log(
-        `[pairing-repair] internal gateway-client repair applied paired=${repairResult.pairedDevicesRepaired} pendingRemoved=${repairResult.pendingRequestsRemoved} tokenScopesUpdated=${repairResult.operatorTokenScopesUpdated}`
+        `[pairing-repair] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair applied paired=${repairResult.pairedDevicesRepaired} pendingRemoved=${repairResult.pendingRequestsRemoved} tokenScopesUpdated=${repairResult.operatorTokenScopesUpdated}`
       );
     } else {
-      console.log('[pairing-repair] internal gateway-client repair not needed');
+      console.log(
+        `[pairing-repair] ${KILOCLAW_PAIRING_REPAIR_TAG} internal gateway-client repair not needed`
+      );
     }
   }
 

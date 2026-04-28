@@ -293,7 +293,7 @@ export function applyProviderSpecificLogic(
   requestToMutate: GatewayRequest,
   extraHeaders: Record<string, string>,
   userByok: BYOKResult[] | null,
-  fraudHeaders: FraudDetectionHeaders
+  originalHeaders: FraudDetectionHeaders
 ) {
   const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   if (kiloExclusiveModel) {
@@ -336,9 +336,9 @@ export function applyProviderSpecificLogic(
   provider.transformRequest({
     model: requestedModel,
     request: requestToMutate,
+    originalHeaders,
     extraHeaders,
     userByok,
-    fraudHeaders,
   });
 }
 

@@ -23,9 +23,9 @@ export type BYOKResult = {
 export type TransformRequestContext = {
   model: string;
   request: GatewayRequest;
+  originalHeaders: FraudDetectionHeaders;
   extraHeaders: Record<string, string>;
   userByok: BYOKResult[] | null;
-  fraudHeaders: FraudDetectionHeaders;
 };
 
 export type GatewayChatApiKind = GatewayRequest['kind'];

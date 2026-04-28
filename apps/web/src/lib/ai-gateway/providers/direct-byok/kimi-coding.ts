@@ -13,7 +13,8 @@ export default {
   ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {
     const reasoningDisabled =
-      isRooCodeBasedClient(context.fraudHeaders) || isReasoningExplicitlyDisabled(context.request);
+      isRooCodeBasedClient(context.originalHeaders) ||
+      isReasoningExplicitlyDisabled(context.request);
     context.request.body.thinking = {
       type: reasoningDisabled ? 'disabled' : 'enabled',
     };

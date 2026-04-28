@@ -150,7 +150,7 @@ export function OrganizationProvidersAndModelsConfigurationCard({
             })()}
       </CardDescription>
       <CardContent className="flex-1 overflow-hidden">
-        <div className="h-72 overflow-y-auto">
+        <div className="max-h-72 overflow-y-auto">
           <CondensedProviderAndModelsList
             selections={providerSelections}
             defaultModel={organizationData.settings?.default_model}

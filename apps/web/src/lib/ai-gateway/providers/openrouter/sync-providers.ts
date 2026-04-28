@@ -344,14 +344,15 @@ export async function syncAndStoreProviders() {
     openrouterProviders,
   });
 
-  const directByokCounts = await syncDirectByokModels();
-  console.log('[syncAndStoreProviders] direct-byok model counts:', directByokCounts);
+  const direct_byok_model_counts = await syncDirectByokModels();
+  console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
 
   return {
     id: result.id,
     generated_at: result.data.generated_at,
     total_models: result.data.total_models,
     total_providers: result.data.total_providers,
+    direct_byok_model_counts,
     time: performance.now() - startTime,
   };
 }

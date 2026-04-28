@@ -1,25 +1,15 @@
 import { createGateway, generateText } from 'ai';
 import * as z from 'zod';
-import { OpenCodeVariantSchema } from '@kilocode/db';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
-import type { DirectByokModel } from '@/lib/ai-gateway/providers/direct-byok/types';
+import {
+  DirectByokModelSchema,
+  type DirectByokModel,
+} from '@/lib/ai-gateway/providers/direct-byok/types';
 import { redisGet, redisSet } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 
-const DEFAULT_MAX_COMPLETION_TOKENS = 32_768;
+const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
 const DESCRIPTION_MODEL = 'google/gemma-4-26b-a4b-it';
-
-const DirectByokModelFlagSchema = z.enum(['recommended', 'vision']);
-
-const DirectByokModelSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  flags: z.array(DirectByokModelFlagSchema).readonly(),
-  description: z.string(),
-  context_length: z.number(),
-  max_completion_tokens: z.number(),
-  variants: z.record(z.string(), OpenCodeVariantSchema).nullable(),
-}) satisfies z.ZodType<DirectByokModel>;
 
 const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
 
@@ -117,15 +107,7 @@ async function generateDescription(id: string, name: string): Promise<string> {
 async function readPreviousModels(providerId: string): Promise<DirectByokModel[]> {
   const raw = await redisGet(directByokModelsRedisKey(providerId));
   if (!raw) return [];
-  try {
-    return DirectByokModelArraySchema.parse(JSON.parse(raw));
-  } catch (error) {
-    console.warn(
-      `[syncDirectByokModels] ignoring malformed previous models for ${providerId}:`,
-      error
-    );
-    return [];
-  }
+  return DirectByokModelArraySchema.parse(JSON.parse(raw));
 }
 
 async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
@@ -156,16 +138,8 @@ async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
 }
 
 export async function syncDirectByokModels(): Promise<Record<string, number>> {
-  const counts: Record<string, number> = {};
-  await Promise.all(
-    FETCHERS.map(async fetcher => {
-      try {
-        counts[fetcher.providerId] = await syncProvider(fetcher);
-      } catch (error) {
-        console.error(`[syncDirectByokModels] failed to sync ${fetcher.providerId}:`, error);
-        counts[fetcher.providerId] = -1;
-      }
-    })
+  const entries = await Promise.all(
+    FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher)] as const)
   );
-  return counts;
+  return Object.fromEntries(entries);
 }

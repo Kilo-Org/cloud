@@ -13,6 +13,7 @@ type SyncResult = {
   generated_at: string;
   total_providers: number;
   total_models: number;
+  direct_byok_model_counts: Record<string, number>;
   time: number;
 };
 
@@ -74,6 +75,11 @@ export function SyncProvidersContent() {
                 <li>Generated at: {new Date(lastResult.generated_at).toLocaleString()}</li>
                 <li>Providers: {lastResult.total_providers}</li>
                 <li>Models: {lastResult.total_models}</li>
+                {Object.entries(lastResult.direct_byok_model_counts).map(([provider, count]) => (
+                  <li key={provider}>
+                    Direct BYOK {provider}: {count} models
+                  </li>
+                ))}
                 <li>Duration: {(lastResult.time / 1000).toFixed(1)}s</li>
               </ul>
             </div>

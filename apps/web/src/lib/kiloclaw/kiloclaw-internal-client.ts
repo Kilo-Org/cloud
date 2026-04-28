@@ -246,37 +246,6 @@ export class KiloClawInternalClient {
     });
   }
 
-  async getStreamChatCredentials(
-    userId: string,
-    instanceId?: string
-  ): Promise<{
-    apiKey: string;
-    userId: string;
-    userToken: string;
-    channelId: string;
-  } | null> {
-    const params = new URLSearchParams({ userId });
-    if (instanceId) params.set('instanceId', instanceId);
-    return this.request(`/api/platform/stream-chat-credentials?${params.toString()}`, undefined, {
-      userId,
-    });
-  }
-
-  async sendChatMessage(
-    userId: string,
-    message: string,
-    instanceId?: string
-  ): Promise<{ success: boolean; channelId: string }> {
-    return this.request(
-      '/api/platform/send-chat-message',
-      {
-        method: 'POST',
-        body: JSON.stringify({ userId, message, instanceId }),
-      },
-      { userId }
-    );
-  }
-
   async getMorningBriefingStatus(
     userId: string,
     instanceId?: string

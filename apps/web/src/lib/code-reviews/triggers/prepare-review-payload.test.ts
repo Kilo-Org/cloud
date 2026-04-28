@@ -76,4 +76,65 @@ describe('prepareReviewPayload', () => {
       upstreamBranch: 'refs/pull/1234/head',
     });
   });
+
+  it('does not continue previous cloud-agent sessions for GitHub pull-ref reviews', async () => {
+    const prNumber = 1235;
+    const repo = `${REPO}-session-continuation`;
+
+    await db.insert(cloud_agent_code_reviews).values({
+      owned_by_user_id: testUser.id,
+      repo_full_name: repo,
+      pr_number: prNumber,
+      pr_url: `https://github.com/${repo}/pull/${prNumber}`,
+      pr_title: 'Previous completed review',
+      pr_author: 'octocat',
+      base_ref: 'main',
+      head_ref: 'feature/old-head',
+      head_sha: 'sha-previous',
+      platform: 'github',
+      status: 'completed',
+      session_id: 'previous-cloud-agent-session',
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: testUser.id,
+        repo_full_name: repo,
+        pr_number: prNumber,
+        pr_url: `https://github.com/${repo}/pull/${prNumber}`,
+        pr_title: 'Current review',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/current-head',
+        head_sha: 'sha-current',
+        platform: 'github',
+        status: 'pending',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected inserted review');
+    }
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      agentConfig: {
+        config: codeReviewConfig,
+      },
+      platform: 'github',
+    });
+
+    expect(payload.previousCloudAgentSessionId).toBeUndefined();
+    expect(payload.sessionInput).toMatchObject({
+      githubRepo: repo,
+      platform: 'github',
+      upstreamBranch: 'refs/pull/1235/head',
+    });
+  });
 });

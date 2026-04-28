@@ -310,9 +310,9 @@ export async function prepareReviewPayload(
       }
     }
 
-    // 4. Check for previous completed review (incremental review optimization)
-    // Both previousHeadSha (for diff base) and previousCloudAgentSessionId (for session
-    // continuation) are derived from the same review row to avoid mismatches.
+    // 4. Check for previous completed review (incremental review optimization).
+    // Keep previousHeadSha for prompt diff context, but disable GitHub session
+    // continuation because sendMessageV2 does not refetch refs/pull/<n>/head.
     let previousHeadSha: string | null = null;
     let previousCloudAgentSessionId: string | undefined;
     try {
@@ -323,7 +323,21 @@ export async function prepareReviewPayload(
         platform
       );
       previousHeadSha = previousReview?.head_sha ?? null;
-      previousCloudAgentSessionId = previousReview?.session_id ?? undefined;
+
+      if (previousReview?.session_id) {
+        if (platform === PLATFORM.GITHUB) {
+          logExceptInTest(
+            '[prepareReviewPayload] Disabling GitHub session continuation for pull-ref checkout safety',
+            {
+              reviewId,
+              previousCloudAgentSessionId: previousReview.session_id,
+              upstreamBranch: getGitHubPullRequestCheckoutRef(review.pr_number),
+            }
+          );
+        } else {
+          previousCloudAgentSessionId = previousReview.session_id;
+        }
+      }
 
       if (previousHeadSha) {
         logExceptInTest(
@@ -332,6 +346,7 @@ export async function prepareReviewPayload(
             reviewId,
             previousHeadSha: previousHeadSha.substring(0, 8),
             currentHeadSha: review.head_sha.substring(0, 8),
+            previousSessionIdAvailable: !!previousReview?.session_id,
             previousCloudAgentSessionId,
           }
         );

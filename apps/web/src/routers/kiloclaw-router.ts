@@ -2263,10 +2263,9 @@ export const kiloclawRouter = createTRPCRouter({
   latestVersion: baseProcedure
     .input(z.object({ currentImageTag: z.string().min(1).optional() }).optional())
     .query(async ({ ctx, input }) => {
-      // Pass instance context (for the bucket math) plus the per-user early-access
-      // flag (which applies regardless of which instance the user is looking at —
-      // personal or org). currentImageTag suppresses false-positive banners when
-      // the instance is already on the candidate (or whatever the resolver picks).
+      // Pass instance + currentImageTag through; Early Access is resolved
+      // server-side from the instance's owning user (the platform endpoint
+      // does the kilocode_users lookup itself, so callers can't fake it).
       const [instance] = await db
         .select({ id: kiloclaw_instances.id })
         .from(kiloclaw_instances)
@@ -2279,19 +2278,12 @@ export const kiloclawRouter = createTRPCRouter({
         )
         .limit(1);
 
-      const [user] = await db
-        .select({ early_access: kilocode_users.kiloclaw_early_access })
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, ctx.user.id))
-        .limit(1);
-
       const client = new KiloClawInternalClient();
       if (!instance) return client.getLatestVersion();
 
       return client.getLatestVersion({
         instanceId: instance.id,
         currentImageTag: input?.currentImageTag ?? null,
-        autoEnroll: user?.early_access ?? false,
       });
     }),
 

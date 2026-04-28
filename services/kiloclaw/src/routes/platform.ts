@@ -27,7 +27,7 @@ import {
   markImageAsLatest,
   disableImageAndClearRollout,
 } from '../lib/version-rollout';
-import { setKiloclawEarlyAccess } from '../lib/user-flags';
+import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { flattenError, z } from 'zod';
 import {
@@ -3423,23 +3423,42 @@ platform.get('/versions', async c => {
 // Query params (all optional):
 //   instanceId       — bucket subject for rollout candidate selection
 //   currentImageTag  — caller's current image; used to suppress self-upgrades
-//   autoEnroll       — "true" to bypass bucketing (staff/beta tester instance)
 //
-// Without query params, returns the current :latest pointer (back-compat for
+// Without instanceId, returns the current :latest pointer (back-compat for
 // anonymous callers — public version banner, CI, etc.). With instanceId, runs
 // the rollout-aware selector and returns the candidate when the instance falls
 // in cohort, the :latest baseline when not, or 404 when the caller is already
 // on the newest applicable image (banner: "no upgrade").
+//
+// The Early Access flag is looked up server-side from the instance's owning
+// user — callers cannot pass it as a query param. This keeps the service as
+// the single authoritative source: even an internal-key-holding caller can't
+// claim Early Access for an arbitrary instance.
 platform.get('/versions/latest', async c => {
   try {
     const instanceId = c.req.query('instanceId');
     const currentImageTag = c.req.query('currentImageTag') ?? null;
-    const autoEnroll = c.req.query('autoEnroll') === 'true';
 
     if (!instanceId) {
       const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
       if (!latest) return c.json({ error: 'No latest version registered' }, 404);
       return c.json(latest);
+    }
+
+    // Resolve Early Access from the instance's owner. This requires Hyperdrive;
+    // without it we degrade gracefully to autoEnroll=false (the bucket math
+    // still works correctly — only the staff/beta-tester override is missing).
+    let autoEnroll = false;
+    const connectionString = c.env.HYPERDRIVE?.connectionString;
+    if (connectionString) {
+      try {
+        autoEnroll = await lookupKiloclawEarlyAccessByInstanceId(connectionString, instanceId);
+      } catch (err) {
+        console.warn(
+          '[platform] Early Access lookup failed; treating as false:',
+          err instanceof Error ? err.message : err
+        );
+      }
     }
 
     const selected = await selectImageVersionForInstance({

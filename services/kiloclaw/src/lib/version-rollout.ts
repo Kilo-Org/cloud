@@ -117,8 +117,13 @@ export interface SetRolloutPercentResult {
  * Set an image's rollout_percent. Refuses to operate on a row marked is_latest
  * (the slider doesn't apply to :latest — it's served unconditionally).
  *
- * Does NOT auto-demote any other image. The "at most one candidate per variant"
- * invariant is enforced by the admin UI's explicit replacement flow, not here.
+ * Enforces the "at most one candidate per variant" invariant: when setting a
+ * non-zero percent on a row, any OTHER non-:latest available row in the same
+ * variant with a non-zero percent is reset to 0. The admin UI confirms this
+ * replacement with a dialog before calling, but the enforcement also lives
+ * here so direct API calls or future callers can't end up with two
+ * candidates simultaneously (which would make refreshPointersForVariant pick
+ * one by published_at and silently hide the other from instances).
  */
 export async function setRolloutPercent(opts: {
   kv: KVNamespace;
@@ -142,12 +147,33 @@ export async function setRolloutPercent(opts: {
     throw new Error(`Image not available: ${opts.imageTag} (status=${target.status})`);
   if (target.is_latest) throw new Error('Cannot set rollout percent on the :latest image');
 
-  const [row] = await db
-    .update(kiloclaw_image_catalog)
-    .set({ rollout_percent: opts.percent, updated_at: sql`NOW()` })
-    .where(eq(kiloclaw_image_catalog.image_tag, opts.imageTag))
-    .returning();
-  if (!row) throw new Error(`Image not found: ${opts.imageTag}`);
+  // Atomically: clear any OTHER in-flight candidate for this variant, then
+  // set the new percent on the target. Both operations in a single TX so we
+  // never observe two candidates at once.
+  const row = await db.transaction(async tx => {
+    if (opts.percent > 0) {
+      await tx
+        .update(kiloclaw_image_catalog)
+        .set({ rollout_percent: 0, updated_at: sql`NOW()` })
+        .where(
+          and(
+            eq(kiloclaw_image_catalog.variant, target.variant),
+            ne(kiloclaw_image_catalog.image_tag, opts.imageTag),
+            eq(kiloclaw_image_catalog.status, 'available'),
+            eq(kiloclaw_image_catalog.is_latest, false),
+            sql`${kiloclaw_image_catalog.rollout_percent} > 0`
+          )
+        );
+    }
+
+    const [updated] = await tx
+      .update(kiloclaw_image_catalog)
+      .set({ rollout_percent: opts.percent, updated_at: sql`NOW()` })
+      .where(eq(kiloclaw_image_catalog.image_tag, opts.imageTag))
+      .returning();
+    if (!updated) throw new Error(`Image not found: ${opts.imageTag}`);
+    return updated;
+  });
 
   await mirrorTagEntryToKv(opts.kv, row);
   await refreshPointersForVariant(opts.kv, opts.hyperdriveConnectionString, row.variant);

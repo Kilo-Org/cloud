@@ -45,7 +45,7 @@ export function Slider({
       min={min}
       max={max}
       step={step}
-      value={value[0] || min}
+      value={value[0] ?? min}
       onChange={e => onValueChange([+e.target.value])}
       onMouseUp={e => commit(e.currentTarget.value)}
       onTouchEnd={e => commit(e.currentTarget.value)}

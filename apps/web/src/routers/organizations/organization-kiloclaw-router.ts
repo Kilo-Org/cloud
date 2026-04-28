@@ -297,18 +297,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
       const client = new KiloClawInternalClient();
       const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
       if (!instance) return client.getLatestVersion();
-      // Per-user early-access opt-in lives on kilocode_users; the org instance
-      // inherits it. currentImageTag suppresses false-positive banners when
-      // the instance is already on the candidate.
-      const [user] = await db
-        .select({ early_access: kilocode_users.kiloclaw_early_access })
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, ctx.user.id))
-        .limit(1);
+      // Early Access is resolved server-side via the platform endpoint
+      // (instance → owner → kiloclaw_early_access lookup), not passed by us.
       return client.getLatestVersion({
         instanceId: instance.id,
         currentImageTag: input.currentImageTag ?? null,
-        autoEnroll: user?.early_access ?? false,
       });
     }),
 

@@ -242,9 +242,13 @@ export async function POST(request: NextRequest) {
   });
 
   if (upstream.status >= 400) {
-    console.error(
-      `[exa-mcp] upstream error: status=${upstream.status} user=${user.id} tool=${toolName}`
-    );
+    // Log only fields that are known to be safe (numeric status, validated IDs).
+    // toolName is user-controlled, so report it via Sentry tags instead of console.
+    console.error(`[exa-mcp] upstream error: status=${upstream.status}`);
+    captureException(new Error(`Exa upstream error (status ${upstream.status})`), {
+      tags: { route: '/api/exa/mcp', tool: toolName },
+      extra: { userId: user.id },
+    });
     let message = `Exa upstream error (status ${upstream.status})`;
     try {
       const errBody = (await upstream.clone().json()) as {

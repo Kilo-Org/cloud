@@ -55,6 +55,7 @@ import {
   ArrowUpDown,
   RefreshCw,
   Pin,
+  Tag,
   Rocket,
   Stethoscope,
   CheckCircle2,
@@ -1290,6 +1291,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [resizeMachineDialogOpen, setResizeMachineDialogOpen] = useState(false);
   const [selectedMachineSize, setSelectedMachineSize] = useState<string>('performance-1x');
   const [resizeConfirmText, setResizeConfirmText] = useState('');
+  const [changeVersionDialogOpen, setChangeVersionDialogOpen] = useState(false);
+  const [changeVersionSelectedTag, setChangeVersionSelectedTag] = useState<string>('');
   const [resizePhase, setResizePhase] = useState<
     'idle' | 'stopping' | 'resizing' | 'starting' | 'waiting' | 'done' | 'error'
   >('idle');
@@ -1316,6 +1319,23 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     }),
     enabled: !!userId,
   });
+
+  // Pin + version catalog data for the Change Version dialog. React Query
+  // dedupes against the same queries used by VersionPinSection, so this is
+  // only one network request total per page.
+  const { data: changeVersionPinData } = useQuery({
+    ...trpc.admin.kiloclawVersions.getUserPin.queryOptions({
+      userId: userId ?? '',
+      instanceId,
+    }),
+    enabled: !!userId,
+  });
+  const { data: changeVersionListData } = useQuery(
+    trpc.admin.kiloclawVersions.listVersions.queryOptions({
+      status: 'available',
+      limit: 100,
+    })
+  );
 
   const sandboxId = data?.sandbox_id;
   const aeDiskUsage = useControllerTelemetryDiskUsage(sandboxId ?? '');
@@ -1560,6 +1580,31 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
       },
       onError: err => {
         toast.error(`Failed to upgrade: ${err.message}`);
+      },
+    })
+  );
+
+  // Change-version flow: lets an admin force the instance onto an arbitrary
+  // available image tag (upgrade or downgrade). Direction-agnostic. The
+  // backend gate at admin.kiloclawInstances.restartMachine deletes any
+  // existing pin when acknowledgeOverride is true, so the dialog UI is
+  // the consent surface.
+  const { mutateAsync: machineChangeVersion, isPending: isChangingVersion } = useMutation(
+    trpc.admin.kiloclawInstances.restartMachine.mutationOptions({
+      onSuccess: () => {
+        toast.success('Version change requested');
+        invalidateMachineQueries();
+        invalidateGatewayQueries();
+        setAwaitingRestartCompletion(true);
+        setChangeVersionDialogOpen(false);
+        setChangeVersionSelectedTag('');
+        // Pin may have been cleared as part of the override — refresh.
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawVersions.getUserPin.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to change version: ${err.message}`);
       },
     })
   );
@@ -1848,8 +1893,40 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     isMachineStopping ||
     isMachineRedeploying ||
     isMachineUpgrading ||
+    isChangingVersion ||
     isRetryingRecovery ||
     isDestroyingFlyMachine;
+
+  // Whether the provider supports the imageTag override path on
+  // restartMachine. Fly redeploys with the new tag for real; docker-local
+  // updates DO state so the upgrade UX can be exercised in dev even
+  // though the actual local container is unchanged. Other providers
+  // (e.g. northflank) reject imageTag at the DO layer, so we hide the
+  // affordances that would just produce errors.
+  const supportsImageTagOverride = isFlyProvider || provider === 'docker-local';
+
+  // Change-version dialog helpers. The catalog `listVersions` is sorted by
+  // published_at desc. The instance's current trackedImageTag may or may
+  // not still be in the available catalog (it could have been disabled
+  // since); when missing, the older-version advisory is suppressed.
+  const currentTrackedImageTag = data?.workerStatus?.trackedImageTag ?? null;
+  const availableVersions = changeVersionListData?.items ?? [];
+  const availableVersionsForChange = availableVersions.filter(
+    v => v.image_tag !== currentTrackedImageTag
+  );
+  const currentVersionEntry = currentTrackedImageTag
+    ? (availableVersions.find(v => v.image_tag === currentTrackedImageTag) ?? null)
+    : null;
+  const selectedVersionEntry = changeVersionSelectedTag
+    ? (availableVersions.find(v => v.image_tag === changeVersionSelectedTag) ?? null)
+    : null;
+  const selectedIsOlder = !!(
+    selectedVersionEntry &&
+    currentVersionEntry &&
+    new Date(selectedVersionEntry.published_at).getTime() <
+      new Date(currentVersionEntry.published_at).getTime()
+  );
+
   const gatewayActionPending =
     isGatewayStarting ||
     isGatewayStopping ||
@@ -2675,7 +2752,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   )}
                   Redeploy
                 </Button>
-                {isFlyProvider && (
+                {supportsImageTagOverride && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -2688,6 +2765,21 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       <ArrowUpCircle className="mr-1 h-4 w-4" />
                     )}
                     Upgrade to Latest
+                  </Button>
+                )}
+                {supportsImageTagOverride && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={machineActionPending || machineRestartBlocked || !hasRuntime}
+                    onClick={() => setChangeVersionDialogOpen(true)}
+                  >
+                    {isChangingVersion ? (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Tag className="mr-1 h-4 w-4" />
+                    )}
+                    Change Version…
                   </Button>
                 )}
                 <Button
@@ -2966,6 +3058,114 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 onClick={() => void handleResize()}
               >
                 Confirm Resize
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Change Version Dialog */}
+        <Dialog
+          open={changeVersionDialogOpen}
+          onOpenChange={open => {
+            if (isChangingVersion) return;
+            setChangeVersionDialogOpen(open);
+            if (!open) setChangeVersionSelectedTag('');
+          }}
+        >
+          <DialogContent className="sm:max-w-[520px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Tag className="h-5 w-5" />
+                Change Version
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                Switch this instance to any available image tag. The instance will redeploy on the
+                chosen version. Direction-agnostic — works for upgrades and downgrades.
+                <span className="text-foreground mt-2 block font-medium">
+                  User: {data?.user_email ?? data?.user_id}
+                </span>
+                <span className="mt-2 block text-sm">
+                  Current:{' '}
+                  {currentTrackedImageTag ? (
+                    <code className="text-xs">{currentTrackedImageTag}</code>
+                  ) : (
+                    '—'
+                  )}
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-sm font-medium">Target version</label>
+                <Select
+                  value={changeVersionSelectedTag}
+                  onValueChange={setChangeVersionSelectedTag}
+                  disabled={isChangingVersion}
+                >
+                  <SelectTrigger className="mt-1 w-full">
+                    <SelectValue placeholder="Select a version..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableVersionsForChange.length === 0 ? (
+                      <div className="text-muted-foreground px-2 py-1.5 text-sm">
+                        No other available versions in catalog.
+                      </div>
+                    ) : (
+                      availableVersionsForChange.map(v => (
+                        <SelectItem key={v.image_tag} value={v.image_tag}>
+                          {v.image_tag} (OpenClaw {v.openclaw_version})
+                          {v.is_latest ? ' — latest' : ''}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedIsOlder && (
+                <Alert className="border-orange-500/50">
+                  <AlertTriangle className="h-4 w-4 text-orange-500" />
+                  <AlertDescription>
+                    The selected version is older than the instance is currently running. Older
+                    versions may be missing features or unable to read data written by newer
+                    versions.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {changeVersionPinData && (
+                <Alert className="border-blue-500/50">
+                  <Pin className="h-4 w-4 text-blue-500" />
+                  <AlertDescription>
+                    This instance has a version pin to{' '}
+                    <code className="text-xs">{changeVersionPinData.image_tag}</code> set by{' '}
+                    <strong>
+                      {changeVersionPinData.pinned_by_email ?? changeVersionPinData.pinned_by}
+                    </strong>
+                    . Proceeding will remove the pin.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isChangingVersion}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                onClick={() => {
+                  if (!data || !changeVersionSelectedTag) return;
+                  void machineChangeVersion({
+                    instanceId: data.id,
+                    imageTag: changeVersionSelectedTag,
+                    acknowledgeOverride: true,
+                  });
+                }}
+                disabled={!changeVersionSelectedTag || isChangingVersion}
+              >
+                {isChangingVersion && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                Apply
               </Button>
             </DialogFooter>
           </DialogContent>

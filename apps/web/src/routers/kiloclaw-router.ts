@@ -2949,11 +2949,66 @@ export const kiloclawRouter = createTRPCRouter({
               'Image tag must be alphanumeric with dots, hyphens, or underscores'
             )
             .optional(),
+          // When true, the caller has confirmed they understand a redeploy
+          // with imageTag will remove their existing user-set pin. The
+          // frontend Upgrade flow sets this after showing the user a
+          // confirmation dialog. Ignored when no pin exists or imageTag is
+          // omitted (a plain restart never touches pin state).
+          acknowledgePinRemoval: z.boolean().default(false),
         })
         .optional()
     )
     .mutation(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'No active KiloClaw instance found' });
+      }
+
+      // Pin consent gate: when the caller is asking for a specific image
+      // tag (typically `latest`), surface a confirmation gate if a pin
+      // exists. Pins are advisory consent gates, not locks — the user is
+      // informed and consents, then the upgrade proceeds. This applies
+      // whether the pin was set by the user themselves or by an admin;
+      // both kinds are removable via the consent dialog. The DO does not
+      // consult the pin table on restart (push-on-write architecture from
+      // PR #2913), so the gate lives here at the web layer.
+      if (input?.imageTag) {
+        const [pin] = await db
+          .select({ image_tag: kiloclaw_version_pins.image_tag })
+          .from(kiloclaw_version_pins)
+          .where(eq(kiloclaw_version_pins.instance_id, instance.id))
+          .limit(1);
+
+        if (pin && !input.acknowledgePinRemoval) {
+          // Frontend handles this discriminator by surfacing a confirmation
+          // dialog and re-calling with acknowledgePinRemoval: true. Pin
+          // details for the dialog come from the existing getMyPin query;
+          // the dialog copy can differentiate user-set vs admin-set based
+          // on the pinned_by field returned there.
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'PIN_EXISTS',
+          });
+        }
+
+        if (pin) {
+          // Consent has been given — drop the pin row and proceed. Any
+          // pin is removable via this path (user-set or admin-set); the
+          // consent dialog is the protection, not the pinned_by check.
+          await db
+            .delete(kiloclaw_version_pins)
+            .where(eq(kiloclaw_version_pins.instance_id, instance.id));
+
+          // Sync the cleared pin into DO state. The follow-up restartMachine
+          // call below overwrites trackedImageTag anyway, but pushing the
+          // clear keeps DB and DO state consistent if the restart fails
+          // after this point. Mirrors the removeMyPin pattern. Failures are
+          // logged inside pushPinToWorker; we don't surface them here
+          // because the restart call is the operative side effect.
+          await pushPinToWorker(ctx.user.id, instance.id, null);
+        }
+      }
+
       const client = new KiloClawUserClient(
         generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
       );
@@ -3369,21 +3424,12 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
-      // Prevent users from overwriting admin-set pins
-      const [existingPin] = await db
-        .select({ pinned_by: kiloclaw_version_pins.pinned_by })
-        .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
-        .limit(1);
-
-      if (existingPin && existingPin.pinned_by !== ctx.user.id) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message:
-            'Your version is pinned by an admin. Contact your Kilo admin to change or remove the pin.',
-        });
-      }
-
+      // Pins are advisory consent metadata. Either the user or an admin
+      // can write/replace/delete the pin at any time — overrides happen
+      // through explicit upgrade/downgrade actions where the consent
+      // dialog enforces awareness, not through this metadata mutation.
+      // The upsert below handles overwriting any existing pin (including
+      // admin-set) with the caller's pin.
       let result: typeof kiloclaw_version_pins.$inferSelect | undefined;
       try {
         [result] = await db
@@ -3430,36 +3476,14 @@ export const kiloclawRouter = createTRPCRouter({
       throw new TRPCError({ code: 'NOT_FOUND', message: 'No active KiloClaw instance found' });
     }
 
-    // Atomically delete only self-set pins — the WHERE clause enforces the admin-pin guard
-    // so there's no TOCTOU race between checking pinned_by and deleting.
+    // Pins are advisory consent metadata — either the user or an admin
+    // can clear it at any time. Idempotent: if no row exists, we still
+    // push the clear to the DO so a previously-failed worker sync can be
+    // retried by simply calling removeMyPin again.
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
-      .where(
-        and(
-          eq(kiloclaw_version_pins.instance_id, instance.id),
-          eq(kiloclaw_version_pins.pinned_by, ctx.user.id)
-        )
-      )
+      .where(eq(kiloclaw_version_pins.instance_id, instance.id))
       .returning();
-
-    if (!deleted) {
-      // No self-set pin was deleted. Either an admin pin exists (forbid),
-      // or no pin exists at all. In the latter case we still push the
-      // clear to the DO so a previously-failed worker sync can be retried
-      // by simply calling removeMyPin again.
-      const [existingPin] = await db
-        .select({ pinned_by: kiloclaw_version_pins.pinned_by })
-        .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
-        .limit(1);
-
-      if (existingPin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Your version is pinned by an admin. Contact your Kilo admin to remove the pin.',
-        });
-      }
-    }
 
     const workerSync = await pushPinToWorker(ctx.user.id, instance.id, null);
 

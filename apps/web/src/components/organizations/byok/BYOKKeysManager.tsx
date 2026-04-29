@@ -565,9 +565,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
               {selectedProvider &&
                 (() => {
-                  const directProvider = DIRECT_BYOK_PROVIDERS.find(
-                    p => p.id === selectedProvider
-                  );
+                  const directProvider = DIRECT_BYOK_PROVIDERS.find(p => p.id === selectedProvider);
                   return directProvider ? (
                     <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
                       <AlertTriangle className="h-4 w-4 text-amber-500" />

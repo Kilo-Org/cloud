@@ -3,7 +3,12 @@ import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
 import type { HomeView } from '@slack/types';
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
-import { getPlatformIdentity, getPlatformIntegration } from '@/lib/bot/platform-helpers';
+import { isSlackMissingScopeError, postSlackReinstallInstruction } from '@/lib/bot/helpers';
+import {
+  getPlatformIdentity,
+  getPlatformIntegration,
+  getPlatformIntegrationByBotUserId,
+} from '@/lib/bot/platform-helpers';
 import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-account';
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
@@ -214,11 +219,25 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
         ASSISTANT_PROMPTS_TITLE
       );
     } catch (error) {
-      console.error('[Bot] Failed to set suggested prompts:', error);
-      captureException(error, {
-        tags: { component: 'kilo-bot', op: 'assistant-thread-started' },
-        extra: { userId: event.userId, channelId: event.channelId },
-      });
+      if (isSlackMissingScopeError(error)) {
+        const platformIntegration = await getPlatformIntegrationByBotUserId(
+          event.adapter.name,
+          event.adapter.botUserId
+        );
+        console.error('[Bot] Missing scope:', error.data.needed);
+        await postSlackReinstallInstruction(
+          event.adapter,
+          event.threadId,
+          error.data.needed,
+          platformIntegration
+        );
+      } else {
+        console.error('[Bot] Failed to set suggested prompts:', error);
+        captureException(error, {
+          tags: { component: 'kilo-bot', op: 'assistant-thread-started' },
+          extra: { userId: event.userId, channelId: event.channelId },
+        });
+      }
     }
   });
 

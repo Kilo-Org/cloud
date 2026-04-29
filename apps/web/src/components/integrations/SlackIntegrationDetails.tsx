@@ -3,8 +3,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, XCircle, MessageSquare, Trash2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
+  Trash2,
+  RefreshCw,
+  AlertTriangle,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -232,9 +239,31 @@ export function SlackIntegrationDetails({
 
   const isInstalled = installationData?.installed;
   const installation = installationData?.installation;
+  const missingScopes = installation?.missingScopes ?? [];
 
   return (
     <div className="space-y-6">
+      {isInstalled && missingScopes.length > 0 && (
+        <Alert variant="warning">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Slack permissions need to be refreshed</AlertTitle>
+          <AlertDescription className="gap-3">
+            <p>
+              This Slack installation is missing required permissions. Re-install the Slack app to
+              refresh its scopes.
+            </p>
+            <Button
+              onClick={handleInstall}
+              disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+              className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install'}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Installation Status Card */}
       <Card>
         <CardHeader>
@@ -305,9 +334,17 @@ export function SlackIntegrationDetails({
                 />
               </div>
 
-              {/* Actions */}
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleInstall}
+                    disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+                    title="Re-run the Slack OAuth flow to refresh scopes and permissions"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install'}
+                  </Button>
                   <TestConnectionButton
                     isPending={testConnection.isPending}
                     state={connectionCheck}

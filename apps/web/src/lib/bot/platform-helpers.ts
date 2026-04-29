@@ -1,6 +1,6 @@
 import type { PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { type SlackEvent } from '@chat-adapter/slack';
 import { platform_integrations } from '@kilocode/db';
@@ -44,12 +44,41 @@ async function getSlackPlatformIntegration(teamId: string) {
   return integration ?? null;
 }
 
+async function getSlackPlatformIntegrationByBotUserId(botUserId: string) {
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.SLACK),
+        eq(sql<string>`${platform_integrations.metadata}->>'bot_user_id'`, botUserId)
+      )
+    )
+    .limit(1);
+
+  return integration ?? null;
+}
+
 export async function getPlatformIntegration(thread: Thread, message: Message) {
   const platform = thread.id.split(':')[0];
 
   switch (platform) {
     case 'slack':
       return await getSlackPlatformIntegration(getSlackTeamId(message as Message<SlackEvent>));
+    default:
+      throw new Error(`PlatformNotSupported: ${platform}`);
+  }
+}
+
+export async function getPlatformIntegrationByBotUserId(
+  platform: string,
+  botUserId: string | undefined
+) {
+  if (!botUserId) return null;
+
+  switch (platform) {
+    case 'slack':
+      return await getSlackPlatformIntegrationByBotUserId(botUserId);
     default:
       throw new Error(`PlatformNotSupported: ${platform}`);
   }

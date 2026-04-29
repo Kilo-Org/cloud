@@ -147,6 +147,7 @@ import {
   handleDrainStatus,
 } from './handlers/town-eviction.handler';
 import { handleRefreshGitToken } from './handlers/refresh-git-token.handler';
+import { handleRefreshContainerToken } from './handlers/town-container-token.handler';
 
 export { GastownUserDO } from './dos/GastownUser.do';
 export { GastownOrgDO } from './dos/GastownOrg.do';
@@ -593,6 +594,12 @@ app.post('/api/towns/:townId/container-eviction', c =>
 app.post('/api/towns/:townId/container-ready', c =>
   instrumented(c, 'POST /api/towns/:townId/container-ready', () =>
     handleContainerReady(c, c.req.param())
+  )
+);
+
+app.post('/api/towns/:townId/refresh-container-token', c =>
+  instrumented(c, 'POST /api/towns/:townId/refresh-container-token', () =>
+    handleRefreshContainerToken(c, c.req.param())
   )
 );
 

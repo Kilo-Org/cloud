@@ -382,6 +382,39 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     expect(row.pr_state).toBe('closed');
   });
 
+  it('allows closed -> open transition on reopened action', async () => {
+    const sessionId = await insertSession(`https://github.com/${REPO}.git`, 'feature/reopened');
+
+    // A closed, unmerged PR gets reopened — the monotonic guard must NOT
+    // trap pr_state at 'closed' in this case; `reopened` is exempt.
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 203,
+        state: 'closed',
+        merged: false,
+        headRef: 'feature/reopened',
+        headSha: 'sha-203',
+      })
+    );
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'reopened',
+        prNumber: 203,
+        state: 'open',
+        headRef: 'feature/reopened',
+        headSha: 'sha-203-reopen',
+      })
+    );
+
+    const [row] = await db
+      .select()
+      .from(cli_session_pull_requests)
+      .where(eq(cli_session_pull_requests.session_id, sessionId));
+    expect(row.pr_state).toBe('open');
+    expect(row.pr_head_sha).toBe('sha-203-reopen');
+  });
+
   it('still allows legitimate closed -> merged transitions', async () => {
     const sessionId = await insertSession(
       `https://github.com/${REPO}.git`,

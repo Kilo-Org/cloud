@@ -136,9 +136,25 @@ export async function upsertCliSessionPullRequestsFromWebhook(
 
     // Defense-in-depth against out-of-order webhook deliveries: once a PR has
     // reached a terminal state (`closed`/`merged`) we never demote it back to
-    // `open`. Webhook deduplication (by x-github-delivery) already blocks
-    // exact replays, but GitHub can redeliver older events after a later
-    // terminal event; this guarantees `pr_state` is monotonic.
+    // `open` via a stale `opened`/`synchronize`/`edited` redelivery. Webhook
+    // deduplication (by x-github-delivery) already blocks exact replays, but
+    // GitHub can redeliver older events after a later terminal event; this
+    // guarantees `pr_state` is monotonic for those actions.
+    //
+    // `reopened` is explicitly exempt: a closed, unmerged PR can legitimately
+    // be reopened, and the guard must allow `closed` -> `open` in that case.
+    // (Merged PRs cannot be reopened on GitHub, so `merged` -> `open` stays
+    // impossible regardless.)
+    const prStateSet =
+      action === GITHUB_ACTION.REOPENED
+        ? sql`excluded.pr_state`
+        : sql`CASE
+            WHEN ${cli_session_pull_requests.pr_state} IN ('closed', 'merged')
+              AND excluded.pr_state = 'open'
+            THEN ${cli_session_pull_requests.pr_state}
+            ELSE excluded.pr_state
+          END`;
+
     await db
       .insert(cli_session_pull_requests)
       .values(values)
@@ -147,12 +163,7 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         set: {
           pr_url: sql`excluded.pr_url`,
           pr_number: sql`excluded.pr_number`,
-          pr_state: sql`CASE
-            WHEN ${cli_session_pull_requests.pr_state} IN ('closed', 'merged')
-              AND excluded.pr_state = 'open'
-            THEN ${cli_session_pull_requests.pr_state}
-            ELSE excluded.pr_state
-          END`,
+          pr_state: prStateSet,
           pr_title: sql`excluded.pr_title`,
           pr_head_sha: sql`excluded.pr_head_sha`,
           pr_last_synced_at: now,

@@ -87,6 +87,11 @@ import {
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
+import {
+  getLastUsedModel,
+  getPreferredInitialModel,
+  setLastUsedModel,
+} from '@/components/cloud-agent/model-preferences';
 
 type Repository = {
   id: number;
@@ -213,9 +218,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
     const isCurrentModelAvailable = modelOptions.some(m => m.id === model);
     if (!isCurrentModelAvailable || !model || !isModelUserSelected) {
-      const defaultModel = defaultsData?.defaultModel;
-      const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
-      const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;
+      const newModel = getPreferredInitialModel({
+        modelOptions,
+        lastUsedModel: getLastUsedModel(organizationId),
+        defaultModel: defaultsData?.defaultModel,
+      });
 
       if (newModel && newModel !== model) {
         setModel(newModel);
@@ -225,7 +232,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         setVariant(newVariants[0]);
       }
     }
-  }, [defaultsData?.defaultModel, modelOptions, model, isModelUserSelected]);
+  }, [defaultsData?.defaultModel, modelOptions, model, isModelUserSelected, organizationId]);
 
   // ---------------------------------------------------------------------------
   // Profiles
@@ -653,6 +660,8 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         }
       }
 
+      setLastUsedModel(model, organizationId);
+
       void queryClient.invalidateQueries({
         queryKey: trpc.unifiedSessions.list.queryKey({
           limit: 3,
@@ -879,6 +888,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               onModelChange={newModel => {
                 setModel(newModel);
                 setIsModelUserSelected(true);
+                setLastUsedModel(newModel, organizationId);
                 const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
                 if (!variant || !newVariants.includes(variant)) {
                   setVariant(newVariants[0]);
@@ -907,6 +917,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 onValueChange={newModel => {
                   setModel(newModel);
                   setIsModelUserSelected(true);
+                  setLastUsedModel(newModel, organizationId);
                   const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
                   if (!variant || !newVariants.includes(variant)) {
                     setVariant(newVariants[0]);

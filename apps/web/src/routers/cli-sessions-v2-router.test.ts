@@ -469,7 +469,7 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
-    it('deletes the side-table row when GitHub returns null', async () => {
+    it('clears the PR data when GitHub returns null while retaining a sentinel row for throttling', async () => {
       await db.insert(cli_session_pull_requests).values({
         session_id: sessionId,
         pr_url: 'https://github.com/kilo/repo/pull/1',
@@ -490,7 +490,32 @@ describe('cli-sessions-v2-router', () => {
         .select()
         .from(cli_session_pull_requests)
         .where(eq(cli_session_pull_requests.session_id, sessionId));
-      expect(rows).toHaveLength(0);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        pr_url: null,
+        pr_number: null,
+        pr_state: null,
+        pr_title: null,
+        pr_head_sha: null,
+      });
+      // Sentinel row's pr_last_synced_at is fresh, so the next refresh would
+      // short-circuit on the throttle.
+      const syncedMs = Date.parse(rows[0].pr_last_synced_at);
+      expect(Date.now() - syncedMs).toBeLessThan(5_000);
+    });
+
+    it('throttles repeated refreshes even when there is no PR for the branch', async () => {
+      fetchSpy.mockResolvedValue(null);
+
+      const caller = await createCallerForUser(regularUser.id);
+      // First call persists a sentinel row with fresh pr_last_synced_at.
+      await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      // Second call within the throttle window short-circuits.
+      const second = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(second.associatedPr).toBeNull();
     });
 
     it('short-circuits on the 10-second throttle without calling GitHub', async () => {
@@ -554,6 +579,37 @@ describe('cli-sessions-v2-router', () => {
         caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('rejects org-scoped refreshes for a user who is not a current org member', async () => {
+      const [otherOrg] = await db
+        .insert(organizations)
+        .values({
+          name: 'Refresh PR Org Access Test',
+          created_by_kilo_user_id: regularUser.id,
+        })
+        .returning();
+
+      // Session row ties regularUser to the org even though they have no
+      // membership row — simulates stale access after org removal.
+      await db
+        .update(cli_sessions_v2)
+        .set({ organization_id: otherOrg.id })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        expect(fetchSpy).not.toHaveBeenCalled();
+      } finally {
+        await db
+          .update(cli_sessions_v2)
+          .set({ organization_id: null })
+          .where(eq(cli_sessions_v2.session_id, sessionId));
+        await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
+      }
     });
   });
 });

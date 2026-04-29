@@ -1,8 +1,8 @@
 CREATE TABLE "cli_session_pull_requests" (
 	"session_id" text PRIMARY KEY NOT NULL,
-	"pr_url" text NOT NULL,
-	"pr_number" integer NOT NULL,
-	"pr_state" text NOT NULL,
+	"pr_url" text,
+	"pr_number" integer,
+	"pr_state" text,
 	"pr_title" text,
 	"pr_head_sha" text,
 	"pr_last_synced_at" timestamp with time zone DEFAULT now() NOT NULL,

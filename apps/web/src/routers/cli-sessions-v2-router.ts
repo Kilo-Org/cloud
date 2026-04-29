@@ -680,17 +680,23 @@ export const cliSessionsV2Router = createTRPCRouter({
         }
       }
 
-      // 3. Resolve the GitHub installation for this session's owner. Using the
-      //    session's owner (org if org-scoped, otherwise the user) means the
-      //    installation lookup doubles as the org-membership security check —
-      //    we only surface PRs visible to an installation the session owner
-      //    controls.
-      const integration = session.organization_id
-        ? await getIntegrationForOwner(
-            { type: 'org', id: session.organization_id },
-            PLATFORM.GITHUB
-          )
-        : await getIntegrationForOwner({ type: 'user', id: ctx.user.id }, PLATFORM.GITHUB);
+      // 3. Resolve the GitHub installation for this session's owner. For
+      //    org-scoped sessions we must re-verify the caller is still a member
+      //    of the org before touching its installation — an old session row
+      //    with our kilo_user_id alone is not sufficient authorization.
+      let integration;
+      if (session.organization_id) {
+        await ensureOrganizationAccess(ctx, session.organization_id);
+        integration = await getIntegrationForOwner(
+          { type: 'org', id: session.organization_id },
+          PLATFORM.GITHUB
+        );
+      } else {
+        integration = await getIntegrationForOwner(
+          { type: 'user', id: ctx.user.id },
+          PLATFORM.GITHUB
+        );
+      }
 
       if (!integration?.platform_installation_id) {
         throw new TRPCError({
@@ -739,33 +745,28 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
-      // 5. Persist the result.
-      if (fetched === null) {
-        await db
-          .delete(cli_session_pull_requests)
-          .where(eq(cli_session_pull_requests.session_id, sessionId));
-        return { associatedPr: null };
-      }
+      // 5. Persist the result. Even for a null (no-PR) result we upsert a
+      //    sentinel row with pr_last_synced_at = now() so the throttle in
+      //    step 2 applies to subsequent refreshes for branches without a PR.
+      const prColumns = {
+        pr_url: fetched?.htmlUrl ?? null,
+        pr_number: fetched?.number ?? null,
+        pr_state: fetched?.state ?? null,
+        pr_title: fetched?.title ?? null,
+        pr_head_sha: fetched?.headSha ?? null,
+      };
 
       const [persisted] = await db
         .insert(cli_session_pull_requests)
         .values({
           session_id: sessionId,
-          pr_url: fetched.htmlUrl,
-          pr_number: fetched.number,
-          pr_state: fetched.state,
-          pr_title: fetched.title,
-          pr_head_sha: fetched.headSha,
+          ...prColumns,
           pr_last_synced_at: sql`now()`,
         })
         .onConflictDoUpdate({
           target: cli_session_pull_requests.session_id,
           set: {
-            pr_url: fetched.htmlUrl,
-            pr_number: fetched.number,
-            pr_state: fetched.state,
-            pr_title: fetched.title,
-            pr_head_sha: fetched.headSha,
+            ...prColumns,
             pr_last_synced_at: sql`now()`,
             updated_at: sql`now()`,
           },

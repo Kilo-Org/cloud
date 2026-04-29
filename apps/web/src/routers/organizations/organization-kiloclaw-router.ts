@@ -1114,6 +1114,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
       .returning();
 
     if (!deleted) {
+      // No self-set pin was deleted. Either an admin pin exists (forbid),
+      // or no pin exists at all. In the latter case we still push the
+      // clear to the DO so a previously-failed worker sync can be retried
+      // by simply calling removeMyPin again.
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
@@ -1126,13 +1130,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
           message: 'Your version is pinned by an admin. Contact your Kilo admin to remove the pin.',
         });
       }
-
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'No pin found for your account' });
     }
 
     const workerSync = await pushPinToWorker(ctx.user.id, instance.id, null);
 
-    return { success: true, worker_sync: workerSync };
+    return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
   // ── Stream Chat ────────────────────────────────────────────────

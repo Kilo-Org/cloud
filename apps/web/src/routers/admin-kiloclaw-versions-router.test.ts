@@ -343,14 +343,17 @@ describe('admin.kiloclawVersions pin operations', () => {
       expect(pin).toBeNull();
     });
 
-    it('throws NOT_FOUND when no pin exists', async () => {
+    it('is idempotent when no pin exists — still pushes clear to DO so failed syncs are retryable', async () => {
       const caller = await createCallerForUser(adminUser.id);
-      await expect(
-        caller.admin.kiloclawVersions.removePin({ instanceId: targetInstanceId })
-      ).rejects.toThrow('No pin found for this user');
+      const result = await caller.admin.kiloclawVersions.removePin({
+        instanceId: targetInstanceId,
+      });
+      expect(result.success).toBe(true);
+      expect(result.deleted).toBe(false);
+      expect(result.worker_sync).toEqual({ ok: true, openclawVersion: null, imageTag: null });
     });
 
-    it('reports worker_sync ok on successful clear', async () => {
+    it('reports deleted=true and worker_sync ok on successful clear', async () => {
       const caller = await createCallerForUser(adminUser.id);
       await caller.admin.kiloclawVersions.setPin({
         userId: targetUser.id,
@@ -362,6 +365,7 @@ describe('admin.kiloclawVersions pin operations', () => {
       });
 
       expect(result.success).toBe(true);
+      expect(result.deleted).toBe(true);
       expect(result.worker_sync).toEqual({ ok: true, openclawVersion: null, imageTag: null });
     });
   });

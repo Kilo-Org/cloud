@@ -385,15 +385,14 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
       .returning();
 
-    if (!deleted) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'No pin found for this user' });
-    }
-
-    // Reset the DO to the current rollout target. Same failure policy as
-    // setPin — log and continue.
+    // Idempotent clear: always push null to the DO, even if no row
+    // existed. This makes `removePin` safe to retry after a failed
+    // worker sync — the DB row is already gone but a stale
+    // `trackedImageTag` in the DO can still be cleaned up by calling
+    // removePin again.
     const workerSync = await pushPinToWorker(ownerUserId, input.instanceId, null);
 
-    return { success: true, worker_sync: workerSync };
+    return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
   getLatestTag: adminProcedure.query(async () => {

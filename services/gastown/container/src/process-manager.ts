@@ -302,26 +302,6 @@ async function runWalCheckpoint(dbPath: string, agentId: string): Promise<boolea
   }
 }
 
-/**
- * Race a promise against a timeout, always clearing the timer so it
- * doesn't keep the event loop (and `ref`'d timer state) alive after
- * the underlying work finishes. Returns the resolved value or throws
- * a timeout Error after `timeoutMs`.
- */
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label} timeout`)), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-  }
-}
-
 async function saveDbSnapshot(
   agentId: string,
   apiUrl: string,

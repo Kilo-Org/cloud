@@ -4,9 +4,6 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { after } from 'next/server';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { kilologHash } from '@/lib/ai-gateway/kilologHash';
-import { createHash } from 'crypto';
-import { redisSet } from '@/lib/redis';
-import { requestLogRedisKey } from '@/lib/redis-keys';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 
 const users = [

@@ -55,9 +55,15 @@ type RawModel = {
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
 };
 
+type ModelsDevCatalog = Record<string, unknown>;
+
+type FetchContext = {
+  modelsDevCatalog(): Promise<ModelsDevCatalog>;
+};
+
 type ProviderFetcher = {
   providerId: DirectUserByokInferenceProviderId;
-  fetch(): Promise<RawModel[]>;
+  fetch(ctx: FetchContext): Promise<RawModel[]>;
 };
 
 const FETCHERS: ReadonlyArray<ProviderFetcher> = [
@@ -87,14 +93,8 @@ function modelsDevFetcher(
 ): ProviderFetcher {
   return {
     providerId,
-    async fetch() {
-      const response = await fetch('https://models.dev/api.json');
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
-        );
-      }
-      const catalog = z.record(z.string(), z.unknown()).parse(await response.json());
+    async fetch(ctx) {
+      const catalog = await ctx.modelsDevCatalog();
       const entry = catalog[catalogKey];
       if (!entry) {
         throw new Error(`models.dev catalog missing ${catalogKey} entry`);
@@ -107,6 +107,23 @@ function modelsDevFetcher(
         max_completion_tokens: model.limit?.output,
         input_modalities: model.modalities?.input,
       }));
+    },
+  };
+}
+
+function createFetchContext(): FetchContext {
+  let cached: Promise<ModelsDevCatalog> | null = null;
+  return {
+    modelsDevCatalog() {
+      return (cached ??= (async () => {
+        const response = await fetch('https://models.dev/api.json');
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
+          );
+        }
+        return z.record(z.string(), z.unknown()).parse(await response.json());
+      })());
     },
   };
 }
@@ -143,12 +160,13 @@ async function readPreviousModels(
 
 async function syncProvider(
   fetcher: ProviderFetcher,
-  fallbackDescriptions: ReadonlyMap<string, string>
+  fallbackDescriptions: ReadonlyMap<string, string>,
+  ctx: FetchContext
 ): Promise<number> {
   const previous = await readPreviousModels(fetcher.providerId);
   const previousById = new Map(previous.map(model => [model.id, model]));
 
-  const fetched = await fetcher.fetch();
+  const fetched = await fetcher.fetch(ctx);
   const models: DirectByokModel[] = [];
 
   for (const raw of fetched) {
@@ -194,10 +212,11 @@ export async function syncDirectByokModels(
   vercelData: Record<string, StoredModel>
 ): Promise<Partial<Record<DirectUserByokInferenceProviderId, number>>> {
   const fallbackDescriptions = buildFallbackDescriptions([vercelData, openrouterData]);
+  const ctx = createFetchContext();
   const entries = await Promise.all(
     FETCHERS.map(
       async fetcher =>
-        [fetcher.providerId, await syncProvider(fetcher, fallbackDescriptions)] as const
+        [fetcher.providerId, await syncProvider(fetcher, fallbackDescriptions, ctx)] as const
     )
   );
   return Object.fromEntries(entries);

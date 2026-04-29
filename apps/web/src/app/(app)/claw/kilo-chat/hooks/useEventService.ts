@@ -1,5 +1,9 @@
 import { useEffect, useMemo } from 'react';
-import { EventServiceClient } from '@kilocode/event-service';
+import {
+  EventServiceClient,
+  kiloclawInstanceContext,
+  kiloclawConversationContext,
+} from '@kilocode/event-service';
 import { KiloChatClient } from '@kilocode/kilo-chat';
 import { KILO_CHAT_URL, EVENT_SERVICE_URL } from '@/lib/constants';
 import { clearKiloChatToken } from '../token';
@@ -46,7 +50,7 @@ export function useEventService(getToken: () => Promise<string>) {
 export function useInstanceContext(eventService: EventServiceClient, sandboxId: string | null) {
   useEffect(() => {
     if (!sandboxId) return;
-    const context = `/kiloclaw/${sandboxId}`;
+    const context = kiloclawInstanceContext(sandboxId);
     eventService.subscribe([context]);
     return () => eventService.unsubscribe([context]);
   }, [eventService, sandboxId]);
@@ -63,7 +67,7 @@ export function useConversationContext(
 ) {
   useEffect(() => {
     if (!sandboxId || !conversationId) return;
-    const context = `/kiloclaw/${sandboxId}/${conversationId}`;
+    const context = kiloclawConversationContext(sandboxId, conversationId);
     eventService.subscribe([context]);
     return () => eventService.unsubscribe([context]);
   }, [eventService, sandboxId, conversationId]);

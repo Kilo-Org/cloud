@@ -15,6 +15,7 @@ import {
   useExecuteAction,
 } from '../hooks/useMessages';
 import { useConversationContext } from '../hooks/useEventService';
+import { kiloclawConversationContext } from '@kilocode/event-service';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
 import {
   useConversationDetail,
@@ -81,7 +82,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   // Event Service delivers subscribed contexts to every handler, so each
   // handler must validate the incoming `ctx` against this string before
   // applying changes to the active conversation's state.
-  const expectedContext = sandboxId ? `/kiloclaw/${sandboxId}/${conversationId}` : null;
+  const expectedContext = sandboxId ? kiloclawConversationContext(sandboxId, conversationId) : null;
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
     kiloChatClient,

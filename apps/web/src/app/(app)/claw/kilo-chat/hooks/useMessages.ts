@@ -16,6 +16,7 @@ import type {
   ExecApprovalDecision,
 } from '@kilocode/kilo-chat';
 import { useEffect } from 'react';
+import { kiloclawConversationContext } from '@kilocode/event-service';
 import { toast } from 'sonner';
 
 const PAGE_SIZE = 50;
@@ -401,7 +402,7 @@ export function useMessageCacheUpdater(
   useEffect(() => {
     if (!conversationId || !sandboxId) return;
     const queryKey = ['kilo-chat', 'messages', conversationId];
-    const expectedContext = `/kiloclaw/${sandboxId}/${conversationId}`;
+    const expectedContext = kiloclawConversationContext(sandboxId, conversationId);
 
     const onCreated = (ctx: string, e: MessageCreatedEvent) => {
       if (ctx !== expectedContext) return;

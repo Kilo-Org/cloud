@@ -134,8 +134,8 @@ function looksReactLike(name, initializer) {
   }
   return (
     /=>\s*[\n\s]*[<(]/.test(initializer) ||
-    /React\.(forwardRef|memo|lazy)\s*\(/.test(initializer) ||
-    /\b(memo|forwardRef)\s*\(/.test(initializer) ||
+    /React\.(forwardRef|memo|lazy)\s*(?:<[\s\S]*?>)?\s*\(/.test(initializer) ||
+    /\b(memo|forwardRef)\s*(?:<[\s\S]*?>)?\s*\(/.test(initializer) ||
     /\bfunction\s+[A-Z][A-Za-z0-9]*\s*\(/.test(initializer)
   );
 }
@@ -205,17 +205,20 @@ function extractExportedComponents(content) {
     if (/\sfrom\s+['"]/.test(exportStatement)) {
       continue;
     }
-    const names = match[1]
+    const exportSpecifiers = match[1]
       .split(',')
       .map(part => part.trim())
+      .filter(Boolean)
       .map(part => {
-        const aliasMatch = part.match(/(?:^|\s+as\s+)([A-Z][A-Za-z0-9]*)$/);
-        return aliasMatch ? aliasMatch[1] : part;
+        const aliasParts = part.split(/\s+as\s+/);
+        const localName = aliasParts[0].trim();
+        const exportedName = (aliasParts[1] ?? aliasParts[0]).trim();
+        return { localName, exportedName };
       });
-    for (const name of names) {
-      const localCandidate = localCandidates.get(name);
+    for (const { localName, exportedName } of exportSpecifiers) {
+      const localCandidate = localCandidates.get(localName);
       if (localCandidate) {
-        addComponent(name, localCandidate.line, 'named');
+        addComponent(exportedName, localCandidate.line, 'named');
       }
     }
   }
@@ -291,9 +294,9 @@ function parseImportSpecifiers(importClause) {
       }
       const cleanPart = part.replace(/^type\s+/, '');
       const aliasParts = cleanPart.split(/\s+as\s+/);
-      const localName = aliasParts[1] ?? aliasParts[0];
-      if (isPascalCase(localName.trim())) {
-        specifiers.push(localName.trim());
+      const importedName = aliasParts[0].trim();
+      if (isPascalCase(importedName)) {
+        specifiers.push(importedName);
       }
     }
   }

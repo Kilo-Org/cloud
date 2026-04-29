@@ -12,7 +12,7 @@ const meta: Meta = {
     docs: {
       description: {
         component:
-          'Row-by-row drift between the proposed stickersheet and the current Kilo Cloud app. Reference document, not a designed page — each row lists the proposal, the current reality, and the pending decision.',
+          'Row-by-row drift between the proposed stickersheet and the current Kilo Cloud app. Reference document, not a designed page — each row lists the proposal, the current reality, and the migration decision.',
       },
     },
   },
@@ -205,14 +205,14 @@ function DriftAuditPage() {
           }}
         >
           The stickersheet proposal differs from the current app in several meaningful ways. Each
-          row lists the proposal, the current reality, and the decision still open.
+          row lists the proposal, the current reality, and the migration decision.
         </p>
       </header>
 
       <Row
         area="Primary action color"
         status="drift"
-        decision="Decide whether --primary should become the Kilo yellow-green and whether the ui/button 'primary' variant should lose the hardcoded blue."
+        decision="Primary CTAs should use the Kilo yellow-green primary token. Migrate --primary and ui/button 'primary' away from hardcoded blue; keep blue for inline links and legacy drift only."
         proposal={
           <>
             <Swatch color="#EDFF00" label="#EDFF00" />
@@ -224,7 +224,8 @@ function DriftAuditPage() {
             <Swatch color="oklch(0.922 0 0)" label="--primary" />
             <Swatch color="#2B6AD2" label="ui/button primary" />
             <Note>
-              --primary token is near-white; button &quot;primary&quot; variant is hardcoded blue
+              --primary token is still near-white; button &quot;primary&quot; variant is still
+              hardcoded blue
             </Note>
           </>
         }
@@ -351,7 +352,7 @@ function DriftAuditPage() {
       <Row
         area="Blue as link-only"
         status="drift"
-        decision="Proposal says blue is a legacy inline-link role. App has blue button backgrounds in SuggestionCard, SeatsSubscribeCard, KiloClawSubscribeCard, WelcomeContent, and multiple banners. Decide migration scope."
+        decision="Blue is a legacy inline-link role only. App blue button backgrounds in SuggestionCard, SeatsSubscribeCard, KiloClawSubscribeCard, WelcomeContent, and multiple banners should migrate to primary or secondary variants as those surfaces are updated."
         proposal={
           <span style={{ fontSize: 13, color: '#60A5FA' }}>
             Inline link only — never a button background.

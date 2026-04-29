@@ -33,6 +33,7 @@ const mockUser: User = {
   api_token_pepper: 'test-pepper-456',
   web_session_pepper: null,
   auto_top_up_enabled: false,
+  kiloclaw_early_access: false,
   default_model: null,
   is_bot: false,
   cohorts: {},

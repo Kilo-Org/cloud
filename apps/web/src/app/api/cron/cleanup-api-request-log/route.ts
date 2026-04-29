@@ -4,9 +4,6 @@ import { api_request_log } from '@kilocode/db/schema';
 import { lt } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 
-const BETTERSTACK_HEARTBEAT_URL =
-  'https://uptime.betterstack.com/api/v1/heartbeat/UcSxCC84Yvhr8DfSZ8GJ2tx7';
-
 function getDaysAgo(days: number) {
   const date = new Date();
   date.setDate(date.getDate() - days);
@@ -20,9 +17,6 @@ export async function GET(request: Request) {
 
   const cutoffDate = getDaysAgo(30).toISOString();
   const result = await db.delete(api_request_log).where(lt(api_request_log.created_at, cutoffDate));
-
-  await fetch(BETTERSTACK_HEARTBEAT_URL);
-  // don't report failures to betterstack immediately, it's fine if this fails occasionally
 
   return NextResponse.json({
     deletedCount: result.rowCount ?? 0,

@@ -24,7 +24,6 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   flags: ['vision'],
   gateway: 'openrouter',
   internal_id: 'google/gemma-4-26b-a4b-it',
-  inference_provider: 'novita',
   pricing: null,
   exclusive_to: [],
 };

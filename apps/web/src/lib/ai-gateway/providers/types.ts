@@ -5,7 +5,7 @@ import type { FraudDetectionHeaders } from '@/lib/utils';
 export type ProviderId =
   | 'openrouter'
   | 'alibaba'
-  | 'bytedance'
+  | 'seed'
   | 'direct-byok'
   | 'inception'
   | 'martian'

@@ -24,28 +24,27 @@ type ProviderForSummaryCard = {
   slug: string;
   models: Array<{
     slug: string;
-    endpoint?: unknown;
+    endpoint?: unknown | null;
   }>;
 };
 
 export function computeProviderSelectionsForSummaryCard(params: {
   openRouterProviders: ProviderForSummaryCard[];
-  providerDenyList: string[];
-  modelDenyList: string[];
+  providerAllowList: string[] | undefined;
+  modelDenyList: string[] | undefined;
 }): ProviderSelection[] | null {
-  const { openRouterProviders, providerDenyList, modelDenyList } = params;
-  // If both deny lists are empty, there are no restrictions
-  if (providerDenyList.length === 0 && modelDenyList.length === 0) {
+  const { openRouterProviders, providerAllowList, modelDenyList } = params;
+  if (providerAllowList === undefined && (!modelDenyList || modelDenyList.length === 0)) {
     return null;
   }
 
-  const providerDenySet = new Set(providerDenyList);
-  const modelDenySet = new Set(modelDenyList.map(id => normalizeModelId(id)));
+  const providerAllowSet = providerAllowList ? new Set(providerAllowList) : null;
+  const modelDenySet = new Set(modelDenyList?.map(id => normalizeModelId(id)) ?? []);
 
   const selections: ProviderSelection[] = [];
 
   for (const provider of openRouterProviders) {
-    if (providerDenySet.has(provider.slug)) continue;
+    if (providerAllowSet && !providerAllowSet.has(provider.slug)) continue;
 
     const availableModels = provider.models
       .filter(model => model.endpoint && !modelDenySet.has(normalizeModelId(model.slug)))
@@ -59,7 +58,7 @@ export function computeProviderSelectionsForSummaryCard(params: {
     }
   }
 
-  // Empty array means restrictions exist but nothing survived — distinct from null ("no restrictions")
+  // Empty array means configured selections exist but nothing survived the current snapshot.
   return selections.length > 0 ? selections : [];
 }
 
@@ -80,13 +79,19 @@ export function OrganizationProvidersAndModelsConfigurationCard({
     }
 
     const settings = organizationData.settings;
-    const providerDenyList = settings?.provider_deny_list ?? [];
-    const modelDenyList = settings?.model_deny_list ?? [];
+    const providerAllowList =
+      settings?.provider_policy_mode === 'allow'
+        ? settings.provider_allow_list
+        : settings?.provider_deny_list
+          ? openRouterProviders
+              .filter(provider => !settings.provider_deny_list?.includes(provider.slug))
+              .map(provider => provider.slug)
+          : undefined;
 
     return computeProviderSelectionsForSummaryCard({
       openRouterProviders,
-      providerDenyList,
-      modelDenyList,
+      providerAllowList,
+      modelDenyList: settings?.model_deny_list,
     });
   }, [configurationData, organizationData, openRouterProviders]);
 
@@ -144,7 +149,7 @@ export function OrganizationProvidersAndModelsConfigurationCard({
                   >
                     {modelCount} {modelText}
                   </button>{' '}
-                  selected
+                  allowed
                 </>
               );
             })()}

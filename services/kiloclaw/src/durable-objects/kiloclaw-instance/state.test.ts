@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { ProviderStateSchema } from '../../schemas/instance-config';
 import { createMutableState } from './state';
 import {
   applyProviderState,
   getFlyProviderState,
+  getNorthflankProviderState,
+  getProviderRegion,
   getRuntimeId,
   getStorageId,
   syncProviderStateForStorage,
@@ -169,5 +172,91 @@ describe('provider state helpers', () => {
       flyVolumeId: null,
       flyRegion: null,
     });
+  });
+
+  it('parses Northflank provider state with null defaults', () => {
+    expect(ProviderStateSchema.parse({ provider: 'northflank' })).toEqual({
+      provider: 'northflank',
+      projectId: null,
+      projectName: null,
+      serviceId: null,
+      serviceName: null,
+      volumeId: null,
+      volumeName: null,
+      secretId: null,
+      secretName: null,
+      secretContentHash: null,
+      ingressHost: null,
+      region: null,
+    });
+  });
+
+  it('builds Northflank providerState defaults when providerState is absent', () => {
+    const state = createMutableState();
+
+    expect(getNorthflankProviderState(state)).toEqual({
+      provider: 'northflank',
+      projectId: null,
+      projectName: null,
+      serviceId: null,
+      serviceName: null,
+      volumeId: null,
+      volumeName: null,
+      secretId: null,
+      secretName: null,
+      secretContentHash: null,
+      ingressHost: null,
+      region: null,
+    });
+  });
+
+  it('uses Northflank runtime, storage, and region identifiers', () => {
+    const state = createMutableState();
+
+    applyProviderState(state, {
+      provider: 'northflank',
+      projectId: 'project-1',
+      projectName: 'kc-ki-test',
+      serviceId: 'service-1',
+      serviceName: 'kc-ki-test',
+      volumeId: 'volume-1',
+      volumeName: 'kc-ki-test',
+      secretId: 'secret-1',
+      secretName: 'kc-ki-test',
+      secretContentHash: null,
+      ingressHost: 'kc-ki-test.code.run',
+      region: 'us-central',
+    });
+
+    expect(state.flyAppName).toBeNull();
+    expect(state.flyMachineId).toBeNull();
+    expect(state.flyVolumeId).toBeNull();
+    expect(state.flyRegion).toBeNull();
+    expect(getRuntimeId(state)).toBe('service-1');
+    expect(getStorageId(state)).toBe('volume-1');
+    expect(getProviderRegion(state)).toBe('us-central');
+  });
+
+  it('falls back to Northflank names when IDs are not known yet', () => {
+    const state = createMutableState();
+
+    applyProviderState(state, {
+      provider: 'northflank',
+      projectId: null,
+      projectName: 'kc-ki-test',
+      serviceId: null,
+      serviceName: 'kc-ki-test',
+      volumeId: null,
+      volumeName: 'kc-ki-test',
+      secretId: null,
+      secretName: 'kc-ki-test',
+      secretContentHash: null,
+      ingressHost: null,
+      region: null,
+    });
+
+    expect(getRuntimeId(state)).toBe('kc-ki-test');
+    expect(getStorageId(state)).toBe('kc-ki-test');
+    expect(getProviderRegion(state)).toBeNull();
   });
 });

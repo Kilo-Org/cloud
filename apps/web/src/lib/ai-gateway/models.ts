@@ -14,7 +14,7 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { trinity_large_thinking_free_model } from '@/lib/ai-gateway/providers/arcee';
-import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
+import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   MINIMAX_CURRENT_MODEL_ID,
@@ -79,14 +79,11 @@ export function isKiloExclusiveFreeModel(model: string): boolean {
 }
 
 export const kiloExclusiveModels = [
-  // Please do not remove models from this list immediately.
-  // Instead, set status to 'disabled' first
-  // and only remove when very few users are requesting it.
   gemma_4_26b_a4b_it_free_model,
   minimax_m25_free_model,
   morph_warp_grep_free_model,
   grok_code_fast_1_optimized_free_model,
-  seed_20_pro_free_model,
+  seed_20_code_free_model,
   qwen36_plus_model,
   trinity_large_thinking_free_model,
   claude_sonnet_clawsetup_model,
@@ -94,7 +91,7 @@ export const kiloExclusiveModels = [
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && m.inference_provider === 'stealth');
+  return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));
 }
 
 function isOpenRouterStealthModel(model: string): boolean {

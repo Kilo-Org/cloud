@@ -12,6 +12,7 @@ import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/prov
 import { applyXaiModelSettings, isXaiModel } from '@/lib/ai-gateway/providers/xai';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
 import { isAnthropicModel, isHaikuModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
@@ -74,7 +75,7 @@ async function checkDirectBYOK(
   requestedModel: string,
   organizationId: string | undefined
 ) {
-  const { provider: directByok, model: directByokModel } = getDirectByokModel(requestedModel);
+  const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
   if (!directByok || !directByokModel) {
     return null;
   }
@@ -236,10 +237,6 @@ function applyToolChoiceSetting(
 
 function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isAnthropicModel(requestedModel)) {
-    // Use `order` (set below in applyPreferredProvider) to preferentially
-    // route Anthropic models to Bedrock and Anthropic. Google Vertex doesn't
-    // support assistant message prefill, which causes 400 errors on tool
-    // calls when OpenRouter falls back to it.
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,
@@ -252,13 +249,19 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.mistral];
   }
   if (isMoonshotModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.moonshotai];
+    return [
+      OpenRouterInferenceProviderIdSchema.enum.moonshotai,
+      OpenRouterInferenceProviderIdSchema.enum.novita,
+    ];
   }
   if (isStepFunModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
   }
   if (isZaiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.novita];
+    return [
+      OpenRouterInferenceProviderIdSchema.enum.novita,
+      OpenRouterInferenceProviderIdSchema.enum['z-ai'],
+    ];
   }
   return [];
 }
@@ -295,11 +298,12 @@ export function applyProviderSpecificLogic(
   const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   if (kiloExclusiveModel) {
     requestToMutate.body.model = kiloExclusiveModel.internal_id;
-    if (kiloExclusiveModel.inference_provider) {
+    const inferenceProvider = getInferenceProvider(kiloExclusiveModel);
+    if (inferenceProvider) {
       if (requestToMutate.body.provider) {
-        requestToMutate.body.provider.only = [kiloExclusiveModel.inference_provider];
+        requestToMutate.body.provider.only = [inferenceProvider];
       } else {
-        requestToMutate.body.provider = { only: [kiloExclusiveModel.inference_provider] };
+        requestToMutate.body.provider = { only: [inferenceProvider] };
       }
     }
   }

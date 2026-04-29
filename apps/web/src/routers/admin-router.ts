@@ -17,6 +17,8 @@ import {
   kiloclaw_email_log,
   kiloclaw_instances,
   organizations,
+  modelsByProvider,
+  api_request_log,
 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
@@ -1727,6 +1729,31 @@ export const adminRouter = createTRPCRouter({
     triggerSync: adminProcedure.mutation(async () => {
       const result = await syncAndStoreProviders();
       return result;
+    }),
+    getLastSync: adminProcedure.query(async () => {
+      const [latest] = await db
+        .select({ id: modelsByProvider.id, data: modelsByProvider.data })
+        .from(modelsByProvider)
+        .orderBy(desc(modelsByProvider.id))
+        .limit(1);
+      if (!latest) return null;
+      return {
+        id: latest.id,
+        generated_at: latest.data.generated_at,
+        total_providers: latest.data.total_providers,
+        total_models: latest.data.total_models,
+      };
+    }),
+  }),
+
+  apiRequestLog: createTRPCRouter({
+    getOldestEntry: adminProcedure.query(async () => {
+      const [oldest] = await db
+        .select({ created_at: api_request_log.created_at })
+        .from(api_request_log)
+        .orderBy(asc(api_request_log.created_at))
+        .limit(1);
+      return oldest ? { created_at: oldest.created_at } : null;
     }),
   }),
 

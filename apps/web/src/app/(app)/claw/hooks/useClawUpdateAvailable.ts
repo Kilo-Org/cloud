@@ -22,7 +22,11 @@ export function useClawUpdateAvailable(status: {
     isLoading: isLoadingControllerVersion,
     isError: isControllerVersionError,
   } = useClawControllerVersion(isRunning);
-  const { data: latestVersion } = useClawLatestVersion();
+  // Pass the instance's current trackedImageTag to the resolver. Without it
+  // the resolver can return :latest as an "upgrade" for an instance that's
+  // actually on the (newer) candidate — surfacing as a misleading downgrade
+  // banner.
+  const { data: latestVersion } = useClawLatestVersion(status.trackedImageTag);
 
   const trackedVersion = cleanVersion(status.openclawVersion);
   const runningVersion = cleanVersion(controllerVersion?.openclawVersion);

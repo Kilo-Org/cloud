@@ -4,6 +4,7 @@ import {
   type ProviderState,
   type FlyProviderState,
   type DockerLocalProviderState,
+  type NorthflankProviderState,
 } from '../../schemas/instance-config';
 import type { InstanceMutableState } from './types';
 
@@ -98,6 +99,28 @@ export function getDockerLocalProviderState(
   };
 }
 
+export function getNorthflankProviderState(
+  source: Pick<InstanceMutableState, 'providerState'>
+): NorthflankProviderState {
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState;
+  }
+  return {
+    provider: 'northflank',
+    projectId: null,
+    projectName: null,
+    serviceId: null,
+    serviceName: null,
+    volumeId: null,
+    volumeName: null,
+    secretId: null,
+    secretName: null,
+    secretContentHash: null,
+    ingressHost: null,
+    region: null,
+  };
+}
+
 export function getRuntimeId(
   source: Pick<InstanceMutableState, 'providerState' | 'flyMachineId'>
 ): string | null {
@@ -106,6 +129,9 @@ export function getRuntimeId(
   }
   if (source.providerState?.provider === 'docker-local') {
     return source.providerState.containerName;
+  }
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState.serviceId ?? source.providerState.serviceName;
   }
   return source.flyMachineId;
 }
@@ -119,6 +145,9 @@ export function getStorageId(
   if (source.providerState?.provider === 'docker-local') {
     return source.providerState.volumeName;
   }
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState.volumeId ?? source.providerState.volumeName;
+  }
   return source.flyVolumeId;
 }
 
@@ -130,6 +159,9 @@ export function getProviderRegion(
   }
   if (source.providerState?.provider === 'docker-local') {
     return null;
+  }
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState.region;
   }
   return source.flyRegion;
 }

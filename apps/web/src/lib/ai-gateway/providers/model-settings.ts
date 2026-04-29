@@ -1,10 +1,10 @@
 import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrok4Model, isXaiModel } from '@/lib/ai-gateway/providers/xai';
 import { isZaiModel } from '@/lib/ai-gateway/providers/zai';
 import type {
@@ -68,7 +68,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   ) {
     return REASONING_VARIANTS_BINARY;
   }
-  if (model === seed_20_pro_free_model.public_id) {
+  if (model === seed_20_code_free_model.public_id) {
     return {
       none: { reasoning: { enabled: false, effort: 'minimal' } },
       low: { reasoning: { enabled: true, effort: 'low' } },
@@ -95,11 +95,12 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
 
 function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
   if (qwen36_plus_model.public_id === model) {
-    // with 'openai' prompt caching doesn't seem to work
-    return 'openai-compatible';
+    // with 'openai' (Responses) prompt caching doesn't work
+    // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
+    return 'alibaba';
   }
-  if (seed_20_pro_free_model.public_id === model) {
-    // with 'openai' a bunch of bugs in vercel ai sdk v5 get triggered
+  if (seed_20_code_free_model.public_id === model) {
+    // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
   }
   if (isAnthropicModel(model)) {

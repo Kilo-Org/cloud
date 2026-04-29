@@ -1,9 +1,14 @@
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
+import {
+  createAllowPredicateFromRestrictions,
+  hasActiveModelRestrictions,
+  type ModelRestrictions,
+} from '@/lib/model-allow.server';
 import { listAvailableCustomLlms } from '@/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { getDirectByokModelsForOrganization } from '@/lib/ai-gateway/providers/direct-byok';
 import { getOrganizationById } from '@/lib/organizations/organizations';
+import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 export async function getAvailableModelsForOrganization(
   organizationId: string
@@ -13,19 +18,17 @@ export async function getAvailableModelsForOrganization(
     return null;
   }
 
-  let deniedModels: string[] | undefined;
-  let deniedProviders: string[] | undefined;
+  let restrictions: ModelRestrictions = { modelDenyList: [], providerDenyList: [] };
 
   if (organization.plan === 'enterprise') {
-    deniedModels = organization.settings?.model_deny_list;
-    deniedProviders = organization.settings?.provider_deny_list;
+    restrictions = getEffectiveModelRestrictions(organization);
   }
 
   const responseData = await getEnhancedOpenRouterModels();
 
   let filteredModels = responseData.data;
-  if (deniedModels?.length || deniedProviders?.length) {
-    const isAllowed = createAllowPredicateFromDenyList(deniedModels, deniedProviders);
+  if (hasActiveModelRestrictions(restrictions)) {
+    const isAllowed = createAllowPredicateFromRestrictions(restrictions);
     const models = [];
     for (const model of responseData.data) {
       if (await isAllowed(model.id)) {

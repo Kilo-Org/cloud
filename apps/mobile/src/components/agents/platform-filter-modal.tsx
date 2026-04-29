@@ -1,6 +1,6 @@
+import { Check, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
-import { Check, X } from 'lucide-react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -8,7 +8,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 const PLATFORM_FILTERS = ['cloud-agent', 'extension', 'cli', 'slack', 'other'] as const;
-const chipScrollContentStyle = { paddingHorizontal: 16, paddingVertical: 8, gap: 8 };
+const chipScrollContentStyle = { paddingHorizontal: 22, paddingVertical: 8, gap: 8 };
 
 export type ProjectFilterOption = {
   gitUrl: string;
@@ -116,30 +116,35 @@ export function SessionFilterChips({
         return (
           <Pressable
             key={`project-${gitUrl}`}
-            className="flex-row items-center gap-1 rounded-full bg-secondary px-3 py-1"
+            className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5"
             onPress={() => {
               onRemoveProject(gitUrl);
             }}
             accessibilityLabel={`Remove ${label} project filter`}
           >
-            <Text className="text-xs font-medium" numberOfLines={1}>
+            <Text
+              className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground"
+              numberOfLines={1}
+            >
               {label}
             </Text>
-            <X size={12} color={colors.mutedForeground} />
+            <X size={12} color={colors.accentSoftForeground} />
           </Pressable>
         );
       })}
       {platformFilter.map(platform => (
         <Pressable
           key={`platform-${platform}`}
-          className="flex-row items-center gap-1 rounded-full bg-secondary px-3 py-1"
+          className="flex-row items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5"
           onPress={() => {
             onRemovePlatform(platform);
           }}
           accessibilityLabel={`Remove ${platformFilterLabel(platform)} platform filter`}
         >
-          <Text className="text-xs font-medium">{platformFilterLabel(platform)}</Text>
-          <X size={12} color={colors.mutedForeground} />
+          <Text className="font-mono-medium text-[11px] uppercase tracking-[0.6px] text-accent-soft-foreground">
+            {platformFilterLabel(platform)}
+          </Text>
+          <X size={12} color={colors.accentSoftForeground} />
         </Pressable>
       ))}
     </ScrollView>
@@ -173,7 +178,7 @@ export function SessionFilterModal({
       <Pressable className="flex-1 justify-start px-6 pt-[20%]" onPress={onClose}>
         <View className="absolute inset-0 bg-black opacity-50" />
         <Pressable
-          className="rounded-xl bg-card p-5 gap-4"
+          className="gap-4 rounded-2xl bg-popover p-5"
           onPress={e => {
             e.stopPropagation();
           }}
@@ -182,7 +187,7 @@ export function SessionFilterModal({
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
               <View className="gap-1">
-                <Text className="px-3 text-xs font-semibold uppercase text-muted-foreground">
+                <Text variant="eyebrow" className="px-3">
                   Platform
                 </Text>
                 {PLATFORM_FILTERS.map(platform => (
@@ -198,7 +203,7 @@ export function SessionFilterModal({
               </View>
               {projectOptions.length > 0 && (
                 <View className="gap-1">
-                  <Text className="px-3 text-xs font-semibold uppercase text-muted-foreground">
+                  <Text variant="eyebrow" className="px-3">
                     Project
                   </Text>
                   {projectOptions.map(project => (

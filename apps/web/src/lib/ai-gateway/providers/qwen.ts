@@ -15,7 +15,6 @@ export const qwen36_plus_model: KiloExclusiveModel = {
   flags: ['reasoning', 'vision'],
   gateway: 'alibaba',
   internal_id: 'qwen3.6-plus',
-  inference_provider: 'alibaba',
   pricing: {
     prompt_per_million: 0.325,
     completion_per_million: 1.95,

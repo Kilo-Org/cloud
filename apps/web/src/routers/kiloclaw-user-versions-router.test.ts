@@ -266,10 +266,15 @@ describe('kiloclaw.removeMyPin', () => {
     expect(pins.length).toBe(0);
   });
 
-  it('throws error when no pin exists', async () => {
+  it('is idempotent when no pin exists — still pushes clear to DO so failed syncs are retryable', async () => {
     const caller = await createCallerForUser(userA.id);
 
-    await expect(caller.kiloclaw.removeMyPin()).rejects.toThrow('No pin found for your account');
+    const result = await caller.kiloclaw.removeMyPin();
+    expect(result.success).toBe(true);
+    expect(result.deleted).toBe(false);
+    // DO sync may fail in tests (no KILOCLAW_API_URL); the point is the
+    // mutation does not throw NOT_FOUND, so a UI retry can succeed.
+    expect(result.worker_sync).toBeDefined();
   });
 });
 

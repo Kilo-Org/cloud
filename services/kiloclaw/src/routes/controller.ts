@@ -107,6 +107,17 @@ type GoogleGrantsBySource = {
   oauth?: string[];
 };
 
+function sqlTextArray(values: readonly string[]) {
+  if (values.length === 0) {
+    return sql`ARRAY[]::text[]`;
+  }
+
+  return sql`ARRAY[${sql.join(
+    values.map(value => sql`${value}`),
+    sql`, `
+  )}]::text[]`;
+}
+
 function normalizeCapabilities(capabilities: readonly string[]): string[] {
   return [...new Set(capabilities.map(capability => capability.trim()).filter(Boolean))].sort();
 }
@@ -689,7 +700,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
       UPDATE kiloclaw_google_oauth_connections
       SET
         grants_by_source = ${JSON.stringify(grantsBySource)}::jsonb,
-        capabilities = ${capabilities},
+        capabilities = ${sqlTextArray(capabilities)},
         updated_at = ${now}
       WHERE instance_id = ${instance.id}
     `);
@@ -714,7 +725,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
         account_email = ${parsed.data.accountEmail},
         account_subject = ${parsed.data.accountSubject},
         grants_by_source = ${JSON.stringify(grantsBySource)}::jsonb,
-        capabilities = ${capabilities},
+        capabilities = ${sqlTextArray(capabilities)},
         connected_at = ${now},
         updated_at = ${now}
       WHERE instance_id = ${instance.id}
@@ -749,9 +760,9 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
         ${encryptWithSymmetricKey(parsed.data.oauthClientSecret, encryptionKey)},
         'legacy',
         ${encryptWithSymmetricKey(parsed.data.refreshToken, encryptionKey)},
-        ${scopes},
+        ${sqlTextArray(scopes)},
         ${JSON.stringify(grantsBySource)}::jsonb,
-        ${capabilities},
+        ${sqlTextArray(capabilities)},
         'active',
         ${now},
         ${now},
@@ -813,7 +824,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
       UPDATE kiloclaw_google_oauth_connections
       SET
         grants_by_source = ${JSON.stringify(mergedGrantsBySource)}::jsonb,
-        capabilities = ${resolvedCapabilities},
+        capabilities = ${sqlTextArray(resolvedCapabilities)},
         updated_at = ${now}
       WHERE instance_id = ${instance.id}
     `);

@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server';
 import { baseProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import {
@@ -2259,10 +2260,32 @@ export const kiloclawRouter = createTRPCRouter({
     return fetchKiloClawServiceDegraded();
   }),
 
-  latestVersion: baseProcedure.query(async () => {
-    const client = new KiloClawInternalClient();
-    return client.getLatestVersion();
-  }),
+  latestVersion: baseProcedure
+    .input(z.object({ currentImageTag: z.string().min(1).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      // Pass instance + currentImageTag through; Early Access is resolved
+      // server-side from the instance's owning user (the platform endpoint
+      // does the kilocode_users lookup itself, so callers can't fake it).
+      const [instance] = await db
+        .select({ id: kiloclaw_instances.id })
+        .from(kiloclaw_instances)
+        .where(
+          and(
+            eq(kiloclaw_instances.user_id, ctx.user.id),
+            isNull(kiloclaw_instances.organization_id),
+            isNull(kiloclaw_instances.destroyed_at)
+          )
+        )
+        .limit(1);
+
+      const client = new KiloClawInternalClient();
+      if (!instance) return client.getLatestVersion();
+
+      return client.getLatestVersion({
+        instanceId: instance.id,
+        currentImageTag: input?.currentImageTag ?? null,
+      });
+    }),
 
   validateWeatherLocation: baseProcedure
     .input(weatherLocationInputSchema)
@@ -3396,7 +3419,9 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
       }
 
-      return result;
+      const workerSync = await pushPinToWorker(ctx.user.id, instance.id, input.imageTag);
+
+      return { ...result, worker_sync: workerSync };
     }),
 
   removeMyPin: clawAccessProcedure.mutation(async ({ ctx }) => {
@@ -3418,7 +3443,10 @@ export const kiloclawRouter = createTRPCRouter({
       .returning();
 
     if (!deleted) {
-      // Check if a pin exists at all — if so, it's admin-set
+      // No self-set pin was deleted. Either an admin pin exists (forbid),
+      // or no pin exists at all. In the latter case we still push the
+      // clear to the DO so a previously-failed worker sync can be retried
+      // by simply calling removeMyPin again.
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
@@ -3431,11 +3459,11 @@ export const kiloclawRouter = createTRPCRouter({
           message: 'Your version is pinned by an admin. Contact your Kilo admin to remove the pin.',
         });
       }
-
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'No pin found for your account' });
     }
 
-    return { success: true };
+    const workerSync = await pushPinToWorker(ctx.user.id, instance.id, null);
+
+    return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
   fileTree: clawAccessProcedure.query(async ({ ctx }) => {

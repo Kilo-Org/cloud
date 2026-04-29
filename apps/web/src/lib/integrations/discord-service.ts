@@ -10,7 +10,10 @@ import { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN } from '@/l
 import { APP_URL } from '@/lib/constants';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
-import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
+import {
+  createAllowPredicateFromRestrictions,
+  hasActiveModelRestrictions,
+} from '@/lib/model-allow.server';
 import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
@@ -208,7 +211,7 @@ export async function upsertDiscordInstallation(
     return updated;
   }
 
-  // For org integrations, get a model that respects the allow list
+  // For org integrations, get a model that respects org access policy.
   // For user integrations, use the Discord-specific default model
   const defaultModel =
     owner.type === 'org'
@@ -349,7 +352,7 @@ export async function getModel(owner: Owner): Promise<string | null> {
 
 /**
  * Update the model for a Discord integration.
- * For organization-owned integrations, validates the model against the allow list.
+ * For organization-owned integrations, validates the model against org access policy.
  */
 export async function updateModel(
   owner: Owner,
@@ -361,13 +364,13 @@ export async function updateModel(
     return { success: false, error: 'No Discord installation found' };
   }
 
-  // For org integrations, validate the model against the allow list
+  // For org integrations, validate the model against org access policy.
   if (owner.type === 'org') {
     const organization = await getOrganizationById(owner.id);
     if (organization) {
-      const { modelDenyList, providerDenyList } = getEffectiveModelRestrictions(organization);
-      if (modelDenyList.length > 0 || providerDenyList.length > 0) {
-        const isAllowed = createAllowPredicateFromDenyList(modelDenyList, providerDenyList);
+      const restrictions = getEffectiveModelRestrictions(organization);
+      if (hasActiveModelRestrictions(restrictions)) {
+        const isAllowed = createAllowPredicateFromRestrictions(restrictions);
         if (!(await isAllowed(modelSlug))) {
           return { success: false, error: 'Model is not allowed by organization policy' };
         }

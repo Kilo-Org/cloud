@@ -28,7 +28,7 @@ export function cachedEnhancedDirectByokModelList({
         ),
         variants,
       }),
-    60_000,
+    600_000,
     recommendedModels
   );
 }

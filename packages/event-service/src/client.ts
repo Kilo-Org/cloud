@@ -103,6 +103,10 @@ export class EventServiceClient {
     }
 
     const token = await this.getToken();
+    // disconnect() may have run while we were awaiting the token. Bail before
+    // creating the socket so we don't leak a WebSocket + ping timer past
+    // provider unmount (e.g. sign-out, navigation, strict-mode remount).
+    if (this.destroyed) return;
     const subprotocol = `${SUBPROTOCOL_PREFIX}${encodeBase64Url(token)}`;
 
     return new Promise((resolve, reject) => {

@@ -63,6 +63,10 @@ const UpdateVersionStatusSchema = z.object({
   status: z.enum(['available', 'disabled']),
 });
 
+// max(50) is a defensive bound on the raw payload, NOT a guarantee about
+// distinct operations. The handler dedupes server side via Set, so a caller
+// passing 50 copies of one tag collapses to a single op rather than 50.
+// In practice the UI only sends unique tags from the rendered page.
 const BulkDisableVersionsSchema = z.object({
   imageTags: z.array(z.string().min(1).max(128)).min(1).max(50),
 });
@@ -102,8 +106,17 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
 
     const whereCondition = status ? eq(kiloclaw_image_catalog.status, status) : undefined;
 
-    const sortColumn = SORTABLE_COLUMNS[sortBy];
-    const primaryOrder = sortDir === 'asc' ? asc(sortColumn) : desc(sortColumn);
+    // openclaw_version is stored as text but values follow CalVer
+    // (YYYY.M.D, no zero padding). Plain text ordering would put
+    // '2026.2.10' before '2026.2.9'. Cast components to int[] so the
+    // sort matches what admins expect from a version selector.
+    // Catalog values are validated against /^\d{4}\.\d{1,2}\.\d{1,2}$/
+    // in syncCatalog, so the cast is safe for all rows.
+    const sortExpression =
+      sortBy === 'openclaw_version'
+        ? sql`string_to_array(${kiloclaw_image_catalog.openclaw_version}, '.')::int[]`
+        : SORTABLE_COLUMNS[sortBy];
+    const primaryOrder = sortDir === 'asc' ? asc(sortExpression) : desc(sortExpression);
     // Secondary tiebreaker on image_tag keeps row order stable across pages
     // when the primary column has duplicates (very common for status, less
     // for openclaw_version, rare for published_at).

@@ -168,7 +168,7 @@ describe('admin.kiloclawVersions.listVersions', () => {
     expect(v1).toBeGreaterThan(v2);
   });
 
-  it('sorts by openclaw_version asc', async () => {
+  it('sorts by openclaw_version asc (numeric, not lex)', async () => {
     const caller = await createCallerForUser(adminUser.id);
     const result = await caller.admin.kiloclawVersions.listVersions({
       sortBy: 'openclaw_version',
@@ -179,11 +179,13 @@ describe('admin.kiloclawVersions.listVersions', () => {
     const tags = result.items.map(i => i.image_tag);
     const v1 = tags.indexOf(catalogEntry.image_tag); // 2026.2.9
     const v2 = tags.indexOf(catalogEntry2.image_tag); // 2026.2.10
-    // openclaw_version is text, so '2026.2.10' sorts before '2026.2.9'
-    // ascending lexicographically. We just check both are present in
-    // a stable order, not their absolute positions.
     expect(v1).toBeGreaterThanOrEqual(0);
     expect(v2).toBeGreaterThanOrEqual(0);
+    // CalVer ordering: 2026.2.9 is OLDER than 2026.2.10, so v1 must
+    // come before v2 in ascending order. A naive text sort would put
+    // '2026.2.10' first ('1' < '9' lex), so this also catches a
+    // regression to lex ordering.
+    expect(v1).toBeLessThan(v2);
   });
 
   it('rejects an unknown sort column via zod', async () => {

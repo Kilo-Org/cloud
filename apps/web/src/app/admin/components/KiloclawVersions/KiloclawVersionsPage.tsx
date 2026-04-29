@@ -972,25 +972,40 @@ export function VersionsTab() {
         </div>
       )}
 
-      {/* Bulk-disable confirmation. AlertDialog (not Dialog) is the right
-          primitive for destructive confirms — escape-to-dismiss is disabled
-          while the mutation is pending. */}
+      {/* Bulk disable confirmation. AlertDialog wraps Radix Dialog, which
+          fires onOpenChange for both Escape and overlay clicks. The wrapper
+          handler suppresses our own state flip while the mutation is in
+          flight, but Radix still processes the underlying event and would
+          flip its internal open state out from under React. Pass through
+          onEscapeKeyDown and onPointerDownOutside guards so Radix never
+          gets the chance.
+
+          AlertDialogAction is a plain Button (no DialogClose wrapper), so
+          the dialog dismisses through the mutation's onSuccess / onError
+          handlers calling setBulkConfirmOpen(false). */}
       <AlertDialog
         open={bulkConfirmOpen}
         onOpenChange={open => {
           if (!open && !isBulkDisabling) setBulkConfirmOpen(false);
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent
+          onEscapeKeyDown={e => {
+            if (isBulkDisabling) e.preventDefault();
+          }}
+          onPointerDownOutside={e => {
+            if (isBulkDisabling) e.preventDefault();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>
               Disable {selectedTags.size} version{selectedTags.size === 1 ? '' : 's'}?
             </AlertDialogTitle>
             <AlertDialogDescription>
               {selectedTags.size === 1 ? 'This image' : `These ${selectedTags.size} images`} will be
-              marked <code>status=&apos;disabled&apos;</code> and any in-flight rollout on{' '}
+              marked <code>status=&apos;disabled&apos;</code> and any in flight rollout on{' '}
               {selectedTags.size === 1 ? 'it' : 'them'} will be cleared. New instances and unpinned
-              upgrades won&apos;t pick {selectedTags.size === 1 ? 'it' : 'them'} up. Already-pinned
+              upgrades won&apos;t pick {selectedTags.size === 1 ? 'it' : 'them'} up. Already pinned
               instances continue running their pinned image untouched.
             </AlertDialogDescription>
           </AlertDialogHeader>

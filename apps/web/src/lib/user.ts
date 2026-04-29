@@ -161,26 +161,21 @@ async function checkSignupIpRateLimit(
   const sustainedWindowStart = new Date(now - SIGNUP_SUSTAINED_WINDOW_MS).toISOString();
 
   const burstCount = await countSignupsFromIpSince(signupIp, burstWindowStart, tx);
-  if (burstCount >= SIGNUP_BURST_MAX) {
-    console.warn('[auth] Signup rejected due to per-IP burst rate limit', {
-      ip_address: signupIp,
-      existing_accounts_24h: burstCount,
-      max_signups_24h: SIGNUP_BURST_MAX,
-    });
-    return failureResult('SIGNUP-RATE-LIMITED');
-  }
-
   const sustainedCount = await countSignupsFromIpSince(signupIp, sustainedWindowStart, tx);
-  if (sustainedCount >= SIGNUP_SUSTAINED_MAX) {
-    console.warn('[auth] Signup rejected due to per-IP sustained rate limit', {
-      ip_address: signupIp,
-      existing_accounts_30d: sustainedCount,
-      max_signups_30d: SIGNUP_SUSTAINED_MAX,
-    });
-    return failureResult('SIGNUP-RATE-LIMITED');
+
+  if (burstCount < SIGNUP_BURST_MAX && sustainedCount < SIGNUP_SUSTAINED_MAX) {
+    return successResult(null);
   }
 
-  return successResult(null);
+  console.warn('[auth] Signup rejected due to per-IP rate limit', {
+    ip_address: signupIp,
+    existing_accounts_24h: burstCount,
+    existing_accounts_30d: sustainedCount,
+    max_signups_24h: SIGNUP_BURST_MAX,
+    max_signups_30d: SIGNUP_SUSTAINED_MAX,
+  });
+
+  return failureResult('SIGNUP-RATE-LIMITED');
 }
 
 async function checkNormalizedEmailUnique(

@@ -3,7 +3,6 @@ import {
   BOT_VERSION,
   DEFAULT_BOT_MODEL,
   MAX_ITERATIONS,
-  SUMMARY_MODEL,
 } from '@/lib/bot/constants';
 import {
   getConversationContext,
@@ -19,7 +18,6 @@ import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/ste
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
-import { buildSessionUrl } from '@/lib/cloud-agent-next/session-url';
 import { APP_URL } from '@/lib/constants';
 import { FEATURE_HEADER } from '@/lib/feature-detection';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
@@ -32,15 +30,12 @@ import {
   formatGitLabRepositoriesForPrompt,
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
-import { isFreeModel } from '@/lib/ai-gateway/models';
 import { generateApiToken } from '@/lib/tokens';
-import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { BotRequestStep } from '@kilocode/db/schema';
-import { ToolLoopAgent, generateText, stepCountIs, tool } from 'ai';
+import { ToolLoopAgent, stepCountIs, tool } from 'ai';
 import type { StepResult, ToolSet } from 'ai';
-import { Actions, Card, CardText, LinkButton, Section } from 'chat';
 import { ThreadImpl } from 'chat';
 import type { Author, Message, Thread } from 'chat';
 import { randomUUID } from 'crypto';
@@ -139,60 +134,6 @@ If the user asks you to analyze or act on an attached image, you must use the sp
 ${formatConversationContextForPrompt(conversationContext)}`;
 }
 
-function pickSummaryModel(modelSlug: string): string {
-  return isFreeModel(modelSlug) ? modelSlug : SUMMARY_MODEL;
-}
-
-async function summarizePrompt(
-  provider: ReturnType<typeof createOpenAICompatible>,
-  modelSlug: string,
-  prompt: string
-): Promise<string> {
-  const result = await generateText({
-    model: provider.chatModel(pickSummaryModel(modelSlug)),
-    prompt: `Summarize the following task in at most 10 words. Output only the summary, nothing else.\n\n${prompt}`,
-  });
-  return result.text.trim();
-}
-
-export async function postSessionLinkEphemeral(params: {
-  thread: Thread;
-  message: BotAgentMessageLike;
-  sessionUrl: string;
-  prompt: string;
-  provider: ReturnType<typeof createOpenAICompatible>;
-  modelSlug: string;
-}): Promise<void> {
-  let description = 'A Cloud Agent session has been started for this task.';
-  try {
-    const summary = await summarizePrompt(params.provider, params.modelSlug, params.prompt);
-    if (summary) description = `Cloud Agent session started: ${summary}`;
-  } catch (error) {
-    captureException(error, { tags: { component: 'kilo-bot', op: 'summarize-prompt' } });
-  }
-
-  params.thread
-    .postEphemeral(
-      params.message.author,
-      Card({
-        children: [
-          Section([CardText(description)]),
-          Actions([
-            LinkButton({ label: 'View Session', url: params.sessionUrl, style: 'primary' }),
-          ]),
-        ],
-      }),
-      { fallbackToDM: true }
-    )
-    .catch(error => {
-      console.error('[KiloBot] Failed to post session link ephemeral:', error);
-      captureException(error, {
-        tags: { component: 'kilo-bot', op: 'post-session-link-ephemeral' },
-        extra: { sessionUrl: params.sessionUrl },
-      });
-    });
-}
-
 export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentContinuation> {
   const headers: Record<string, string> = {
     'X-KiloCode-Version': BOT_VERSION,
@@ -215,7 +156,6 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
   const modelSlug =
     (params.platformIntegration.metadata as { model_slug?: string }).model_slug ??
     DEFAULT_BOT_MODEL;
-  const owner = ownerFromIntegration(params.platformIntegration);
   const chatPlatform = params.thread.id.split(':')[0];
 
   // Build PR signature from requester info (display name + message permalink)
@@ -295,15 +235,6 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               resolvedCloudAgentSessionId = cloudAgentSessionId;
               resolvedKiloSessionId = kiloSessionId;
               params.onSessionReady?.({ kiloSessionId, cloudAgentSessionId, prompt: args.prompt });
-              const sessionUrl = buildSessionUrl(kiloSessionId, owner);
-              void postSessionLinkEphemeral({
-                thread: params.thread,
-                message: params.message,
-                sessionUrl,
-                prompt: args.prompt,
-                provider,
-                modelSlug,
-              });
             },
             {
               prSignature,

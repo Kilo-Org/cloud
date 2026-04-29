@@ -4,7 +4,7 @@
 
 Allow a cloud-agent-next session to use a user-provided dev container as the execution environment, so the Kilo server and agent loop run with the repository's declared OS packages, language runtimes, tools, and dependency setup.
 
-The safest practical path is to keep the existing Cloudflare Sandbox as an outer control plane, run Docker-in-Docker inside it, create the user's dev container as an inner container, and start the cloud-agent wrapper plus Kilo server inside that inner container.
+The safest practical path is to keep the existing Cloudflare Sandbox as an outer control plane, run Docker-in-Docker inside it, create the user's dev container as an inner container, start only `kilo serve` inside that inner container, and keep the cloud-agent wrapper in the outer sandbox connected to Kilo over HTTP.
 
 ## Current Architecture Touchpoints
 
@@ -23,11 +23,12 @@ The safest practical path is to keep the existing Cloudflare Sandbox as an outer
 1. Outer container: Cloudflare Sandbox with rootless Docker daemon and devcontainer CLI installed.
 2. Workspace clone: continue cloning the repository into the outer sandbox under `/workspace/.../sessions/<agent_session_id>`.
 3. Dev container creation: run `devcontainer up --workspace-folder <outerWorkspacePath>` from the outer sandbox.
-4. Tool injection: mount or copy a Kilo tool bundle into the inner dev container.
-5. Wrapper execution: start `kilocode-wrapper` inside the inner dev container, with `WORKSPACE_PATH` set to the devcontainer `remoteWorkspaceFolder`.
-6. Prompt execution: keep worker -> wrapper HTTP flow, but execute the HTTP calls from the outer sandbox against the wrapper port exposed through host networking.
+4. Tool injection: mount or copy a Kilo server bundle into the inner dev container.
+5. Kilo server execution: start `kilo serve` inside the inner dev container, with its working directory set to the devcontainer `remoteWorkspaceFolder`.
+6. Wrapper execution: start `kilocode-wrapper` in the outer sandbox image, where we control Bun/Node/runtime dependencies.
+7. Prompt execution: keep worker -> wrapper HTTP flow unchanged; the wrapper connects to the inner Kilo server over HTTP.
 
-This keeps Kilo's file tools, shell commands, MCP local processes, and package managers inside the same environment the user intended.
+This keeps Kilo's file tools, shell commands, MCP local processes, and package managers inside the same environment the user intended, while keeping the wrapper in a trusted and predictable runtime that does not depend on the user's image.
 
 ### Why not make each user devcontainer the Cloudflare Container image directly?
 
@@ -88,7 +89,7 @@ Persist in:
 
 ### 3. Introduce an execution runtime abstraction
 
-Today code assumes `ExecutionSession` from `@cloudflare/sandbox`. Devcontainers need an adapter because commands, processes, and wrapper discovery must happen inside the inner container.
+Today code assumes `ExecutionSession` from `@cloudflare/sandbox` and the wrapper starts its own in-process Kilo server. Devcontainers need a split runtime because the wrapper should remain in the outer sandbox while Kilo runs inside the inner container.
 
 Add something like:
 
@@ -99,19 +100,20 @@ type WorkspaceRuntime = {
   startProcess(command: string, options?: StartProcessOptions): Promise<ProcessHandle>;
   writeFile(path: string, content: string): Promise<void>;
   resolveWorkspacePath(hostPath: string): string;
-  findWrapper(agentSessionId: string): Promise<{ port: number } | null>;
-  stopWrapper(agentSessionId: string): Promise<void>;
+  ensureKiloServer(agentSessionId: string, options: KiloServerOptions): Promise<{ url: string }>;
+  stopKiloServer(agentSessionId: string): Promise<void>;
 };
 ```
 
 Implementations:
 
-- `SandboxRuntime`: wraps the current Cloudflare sandbox session; behavior stays unchanged.
-- `DevcontainerRuntime`: executes via `docker exec` or `devcontainer exec` into the inner container; maps outer workspace path to `remoteWorkspaceFolder`; scans inner container processes for wrapper markers.
+- `SandboxRuntime`: wraps the current Cloudflare sandbox session; behavior stays unchanged and can still use wrapper-created in-process Kilo.
+- `DevcontainerRuntime`: starts and controls `kilo serve` via `docker exec` or `devcontainer exec` inside the inner container; maps outer workspace path to `remoteWorkspaceFolder`; tracks the Kilo server process and URL.
 
 Then update:
 
-- `WrapperClient` to depend on the runtime instead of directly on `ExecutionSession` and `SandboxInstance`.
+- The wrapper to support an externally managed Kilo server URL instead of always calling `createKilo()`.
+- `WrapperClient` or a new `KiloServerManager` to start/stop the inner Kilo server before starting the wrapper.
 - `SessionService` and `async-preparation` to return both host session and active runtime.
 - image attachment download logic to write files where the active runtime can read them.
 
@@ -157,27 +159,27 @@ MVP rejected or deferred properties:
 - GPU/device requirements
 - complex port forwarding semantics beyond host-network access
 
-### 5. Inject Kilo tooling into arbitrary containers
+### 5. Inject Kilo server tooling into arbitrary containers
 
-The inner devcontainer cannot be assumed to have Bun, Node, npm, or Kilo installed.
+The inner devcontainer cannot be assumed to have Bun, Node, npm, or Kilo installed. The wrapper does not need to be injected if it stays in the outer sandbox; only the Kilo server runtime needs to be available inside the devcontainer.
 
 Options:
 
-1. Compile the wrapper into a standalone Linux binary and copy/mount it into the devcontainer.
-2. Build a small Kilo devcontainer Feature that installs Bun plus the wrapper/CLI.
-3. Mount a read-only `/opt/kilo-agent` bundle from the outer sandbox and run it from there.
+1. Mount a read-only `/opt/kilo-agent` bundle from the outer sandbox into the devcontainer and run `kilo serve` from there.
+2. Copy the bundle into the devcontainer after startup with `docker cp` and run it from a session-scoped path.
+3. Build a small Kilo devcontainer Feature that installs the Kilo CLI/server during devcontainer build/create.
 
-Best MVP path: standalone wrapper or mounted tool bundle. Avoid relying on the user's package manager.
+Best MVP path: mounted Kilo server bundle. Avoid relying on the user's package manager.
 
-The wrapper still can use `createKilo()` internally. If product language requires "kilo serve", the wrapper can later be changed to spawn `kilo serve` as a subprocess inside the devcontainer, but the important architectural point is that the Kilo server process must live inside the user's devcontainer.
+The wrapper should stop using `createKilo()` for devcontainer sessions and instead connect to an externally started `kilo serve` URL. If `@kilocode/sdk` does not expose a client constructor for an existing server URL, add one or keep the wrapper's current raw HTTP adapter and instantiate it directly against the URL.
 
 ### 6. Handle environment, auth, and home directory
 
 Current session setup injects `HOME=/home/<sessionId>`, writes auth to `<HOME>/.local/share/kilo/auth.json`, and writes global rules to `<HOME>/.kilocode/rules/cloud-agent.md`.
 
-Devcontainer support needs to decide between two models:
+Devcontainer support needs to decide which home/config model `kilo serve` uses inside the devcontainer:
 
-- Preserve cloud-agent HOME: run wrapper and agent commands with `HOME=/home/<sessionId>` inside the devcontainer, mounted from the outer sandbox.
+- Preserve cloud-agent HOME: run `kilo serve` with `HOME=/home/<sessionId>` inside the devcontainer, mounted from the outer sandbox.
 - Use remote user's HOME: write Kilo auth/rules into the devcontainer remote user's actual home and keep `SESSION_HOME` as Kilo-specific storage.
 
 The second model is more compatible with devcontainers because language managers and profile-based paths often assume the remote user's home. It requires changing auth/rule writing to target the inner runtime's effective home.
@@ -217,8 +219,9 @@ Devcontainer order should be:
 7. run cloud-agent `setupCommands` inside the devcontainer, or document that devcontainer lifecycle supersedes them
 8. write Kilo auth/rules into the runtime home
 9. import/restore Kilo session inside the devcontainer
-10. start wrapper inside the devcontainer
-11. persist devcontainer metadata in the session DO
+10. start `kilo serve` inside the devcontainer
+11. start or reuse the wrapper in the outer sandbox, connected to the inner Kilo server URL
+12. persist devcontainer metadata in the session DO
 
 Add preparation progress steps such as:
 
@@ -227,17 +230,17 @@ Add preparation progress steps such as:
 - `devcontainer_start`
 - `devcontainer_lifecycle`
 
-### 8. Rework wrapper networking and security
+### 8. Rework Kilo server networking and security
 
-Because DIND requires host networking for reliable connectivity, the wrapper port will be reachable from other processes in the outer sandbox and probably from the inner user container.
+Because DIND requires host networking for reliable connectivity, the inner `kilo serve` port will likely be reachable from other processes in the outer sandbox and probably from the inner user container.
 
 Hardening to add before broad rollout:
 
-- Require a random wrapper auth token on all wrapper HTTP requests.
-- Keep wrapper bound to `127.0.0.1` when possible.
+- Require a random auth token on all wrapper HTTP requests and, if supported, on `kilo serve` HTTP requests.
+- Keep both wrapper and `kilo serve` bound to `127.0.0.1` when possible.
 - Allocate ports from a controlled range and record them in metadata.
-- Make wrapper discovery work via inner `docker exec pgrep` plus labels, not only outer `sandbox.listProcesses()`.
-- Stop wrappers and inner containers during idle cleanup and session deletion.
+- Track the inner Kilo server process via `docker exec pgrep` plus labels or a session marker.
+- Stop Kilo servers and inner containers during idle cleanup and session deletion.
 
 ### 9. Caching and cold resume
 
@@ -289,8 +292,9 @@ Devcontainers increase risk compared with current setup commands because arbitra
 - Build a DIND-enabled cloud-agent sandbox image.
 - Manually run a sample repo with `.devcontainer/devcontainer.json`.
 - Verify `devcontainer up` works in Cloudflare Sandbox rootless Docker.
-- Mount/copy the wrapper into the inner container.
-- Start wrapper inside the devcontainer and send one prompt through the existing worker flow.
+- Mount/copy the Kilo server bundle into the inner container.
+- Start `kilo serve` inside the devcontainer.
+- Keep wrapper in the outer sandbox and send one prompt through the existing worker flow to the inner Kilo server.
 - Validate auto-commit still sees the same git checkout.
 
 Exit criteria: one internal sample repo can run Kilo inside a devcontainer in staging.
@@ -304,7 +308,7 @@ Exit criteria: one internal sample repo can run Kilo inside a devcontainer in st
 - Reject compose, privileged settings, and unsafe mounts.
 - Add preparation progress and sanitized build logs.
 - Recreate devcontainer on cold resume.
-- Add wrapper auth token.
+- Add wrapper and Kilo-server auth tokens where supported.
 
 Exit criteria: allowlisted orgs can use repo-checked-in devcontainers with clear failures and no manual intervention.
 
@@ -340,12 +344,12 @@ Exit criteria: most common Codespaces-style repos work without custom Kilo setup
 - Should the default be auto-detect devcontainer config, or explicit opt-in per session?
 - Is Docker Compose required for the first useful customer set?
 - Do users need private registry credentials at launch?
-- Should wrapper/Kilo run as `remoteUser`, `containerUser`, or a Kilo-managed user?
+- Should `kilo serve` run as `remoteUser`, `containerUser`, or a Kilo-managed user?
 - Should we preserve `HOME=/home/<sessionId>` or use the devcontainer user's home?
-- Can we ship a standalone wrapper binary to avoid relying on Bun in user containers?
+- Can we ship a self-contained Kilo server bundle to avoid relying on Node/Bun/npm in user containers?
 - How much cold-start time is acceptable for Dockerfile builds?
 - Should cloud-agent `setupCommands` still run when a devcontainer is present, and if so before or after lifecycle commands?
 
 ## Recommendation
 
-Start with a DIND-based, single-container, repo-config MVP behind an allowlist. The highest-leverage early work is the runtime abstraction plus a devcontainer manager. Once the wrapper can run inside an arbitrary inner container and the current sandbox path still works unchanged, the rest of the work becomes mostly configuration coverage, caching, and hardening.
+Start with a DIND-based, single-container, repo-config MVP behind an allowlist. The highest-leverage early work is the runtime abstraction plus a devcontainer manager. Once the wrapper can connect to an externally managed `kilo serve` process inside an arbitrary inner container and the current sandbox path still works unchanged, the rest of the work becomes mostly configuration coverage, caching, and hardening.

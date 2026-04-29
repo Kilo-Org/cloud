@@ -113,6 +113,17 @@ export class UserSessionDO extends DurableObject<Env> {
     });
   }
 
+  async hasContext(context: string): Promise<boolean> {
+    return withLogTags({ source: 'UserSessionDO.hasContext' }, () => {
+      logger.setTags({ userId: this.ctx.id.name, context });
+      for (const ws of this.ctx.getWebSockets()) {
+        const state = this.getState(ws);
+        if (state.contexts.has(context)) return true;
+      }
+      return false;
+    });
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────
 
   private getState(ws: WebSocket): { contexts: Set<string> } {

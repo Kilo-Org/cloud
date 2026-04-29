@@ -67,6 +67,7 @@ import {
   Plus,
   Minus,
   Ban,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -640,8 +641,14 @@ export function VersionsTab() {
         </Button>
       </div>
 
-      {/* Bulk action bar — visible only when at least one row is selected. */}
-      {selectedTags.size > 0 && (
+      {/* Bulk action bar — always rendered so the affordance is discoverable.
+          Empty state shows a muted hint; active state shows count + buttons. */}
+      {selectedTags.size === 0 ? (
+        <div className="text-muted-foreground border-border/60 flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs">
+          <Info className="h-3 w-3 opacity-60" />
+          <span>Use the checkboxes to select rows for bulk actions.</span>
+        </div>
+      ) : (
         <div className="flex items-center gap-3 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2">
           <span className="text-muted-foreground text-sm">{selectedTags.size} selected</span>
           <Button

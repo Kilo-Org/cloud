@@ -69,7 +69,10 @@ describe('createCachedFetch', () => {
     const fetcher = jest
       .fn<() => Promise<string>>()
       .mockResolvedValueOnce('good')
-      .mockRejectedValueOnce(new Error('Redis timeout'));
+      .mockRejectedValueOnce(new Error('Redis timeout'))
+      // Further stale-triggered background refreshes after the failure keep
+      // failing; we still expect the cached 'good' to be served.
+      .mockRejectedValue(new Error('Redis timeout'));
     const get = createCachedFetch(fetcher, 0, 'fallback');
 
     expect(await get()).toBe('good');
@@ -98,7 +101,7 @@ describe('createCachedFetch', () => {
       .fn<() => Promise<number>>()
       .mockResolvedValueOnce(10)
       .mockRejectedValueOnce(new Error('timeout'))
-      .mockResolvedValueOnce(20);
+      .mockResolvedValue(20);
     const get = createCachedFetch(fetcher, 0, 0);
 
     expect(await get()).toBe(10);

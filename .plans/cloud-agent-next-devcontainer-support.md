@@ -173,6 +173,15 @@ Best MVP path: mounted Kilo server bundle. Avoid relying on the user's package m
 
 The wrapper should stop using `createKilo()` for devcontainer sessions and instead connect to an externally started `kilo serve` URL. If `@kilocode/sdk` does not expose a client constructor for an existing server URL, add one or keep the wrapper's current raw HTTP adapter and instantiate it directly against the URL.
 
+Concrete packaging for `@kilocode/cli`:
+
+- Do not rely on the top-level npm `bin/kilo` shim inside the user devcontainer.
+- At outer sandbox image build time, install or unpack `@kilocode/cli` plus its platform optional packages into `/opt/kilo-agent`.
+- Include Linux platform artifacts we expect to encounter in devcontainers, at minimum glibc and musl x64 builds, for example `@kilocode/cli-linux-x64` and `@kilocode/cli-linux-x64-musl`.
+- Add our own `/opt/kilo-agent/bin/kilo` launcher shell script that detects architecture/libc inside the devcontainer and `exec`s the matching packaged binary.
+- Mount `/opt/kilo-agent` read-only into the devcontainer, or `docker cp` it into a session-scoped path if bind mounts are not reliable.
+- Run `kilo serve` from that mounted/copied binary. `npm`, `node`, or `bun` should only be needed in the outer image build process, not inside the user devcontainer, assuming the platform package binary is self-contained.
+
 ### 6. Handle environment, auth, and home directory
 
 Current session setup injects `HOME=/home/<sessionId>`, writes auth to `<HOME>/.local/share/kilo/auth.json`, and writes global rules to `<HOME>/.kilocode/rules/cloud-agent.md`.

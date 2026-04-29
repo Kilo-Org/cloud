@@ -77,8 +77,16 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
       }));
     },
   },
-  {
-    providerId: 'zai-coding',
+  modelsDevFetcher('zai-coding', 'zai-coding-plan'),
+  modelsDevFetcher('ollama-cloud', 'ollama-cloud'),
+];
+
+function modelsDevFetcher(
+  providerId: DirectUserByokInferenceProviderId,
+  catalogKey: string
+): ProviderFetcher {
+  return {
+    providerId,
     async fetch() {
       const response = await fetch('https://models.dev/api.json');
       if (!response.ok) {
@@ -87,9 +95,9 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
         );
       }
       const catalog = z.record(z.string(), z.unknown()).parse(await response.json());
-      const entry = catalog['zai-coding-plan'];
+      const entry = catalog[catalogKey];
       if (!entry) {
-        throw new Error('models.dev catalog missing zai-coding-plan entry');
+        throw new Error(`models.dev catalog missing ${catalogKey} entry`);
       }
       const provider = ModelsDevProviderSchema.parse(entry);
       return Object.values(provider.models).map(model => ({
@@ -100,8 +108,8 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
         input_modalities: model.modalities?.input,
       }));
     },
-  },
-];
+  };
+}
 
 function stripVendorPrefix(id: string) {
   const slash = id.lastIndexOf('/');

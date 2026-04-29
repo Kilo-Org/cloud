@@ -5,6 +5,7 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   'byteplus-coding': 'BytePlus Coding Plan',
   'kimi-coding': 'Kimi Code',
   neuralwatt: 'Neuralwatt',
+  'ollama-cloud': 'Ollama Cloud',
   'zai-coding': 'Z.ai Coding Plan',
 } as const satisfies Record<Exclude<DirectUserByokInferenceProviderId, 'codestral'>, string>;
 

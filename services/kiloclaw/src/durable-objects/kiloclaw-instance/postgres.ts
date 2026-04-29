@@ -248,9 +248,17 @@ export async function restoreFromPostgres(
 
 /**
  * Best-effort sync of the DO's trackedImageTag to the Postgres registry row.
+ *
+ * This is one of the two Worker-side Postgres write carve-outs documented in
+ * services/kiloclaw/AGENTS.md ("Next.js owns the Postgres registry; the Worker
+ * writes only narrow operational metadata"). The DO remains the source of truth
+ * for trackedImageTag; the Postgres column is a denormalized read cache that
+ * exists so admin tooling can filter populations of instances by current
+ * running version via SQL (Phase 1.5+ bulk version change).
+ *
  * Postgres failures are logged and swallowed so they cannot break the alarm
  * reconciler. The UPDATE is a no-op at the SQL level when the value already
- * matches (IS DISTINCT FROM), keeping vacuum pressure low on idle instances.
+ * matches (IS DISTINCT FROM), keeping vacuum pressure low on idle fleets.
  */
 export async function syncTrackedImageTagToPostgresHelper(
   env: KiloClawEnv,

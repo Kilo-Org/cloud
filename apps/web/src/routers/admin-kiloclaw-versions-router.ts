@@ -10,6 +10,7 @@ import { eq, desc, sql, or, ilike, inArray, and, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { TRPCError } from '@trpc/server';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 
 /**
  * Resolve a user's active personal instance, throwing NOT_FOUND if none exists.
@@ -59,34 +60,6 @@ async function resolveInstanceOwnerUserId(
   });
 }
 
-type WorkerPinSync =
-  | { ok: true; openclawVersion: string | null; imageTag: string | null }
-  | { ok: false; error: string };
-
-async function pushPinToWorker(
-  userId: string,
-  instanceId: string,
-  imageTag: string | null
-): Promise<WorkerPinSync> {
-  try {
-    const client = new KiloClawInternalClient();
-    const applied = await client.applyPinnedVersion(userId, instanceId, imageTag);
-    return {
-      ok: true,
-      openclawVersion: applied.openclawVersion,
-      imageTag: applied.imageTag,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[admin-kiloclaw-versions] Failed to push pin to worker', {
-      userId,
-      instanceId,
-      imageTag,
-      error: message,
-    });
-    return { ok: false, error: message };
-  }
-}
 import * as z from 'zod';
 
 const ListVersionsSchema = z.object({

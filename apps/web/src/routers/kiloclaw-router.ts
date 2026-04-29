@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server';
 import { baseProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import {
@@ -3418,7 +3419,9 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
       }
 
-      return result;
+      const workerSync = await pushPinToWorker(ctx.user.id, instance.id, input.imageTag);
+
+      return { ...result, worker_sync: workerSync };
     }),
 
   removeMyPin: clawAccessProcedure.mutation(async ({ ctx }) => {
@@ -3457,7 +3460,9 @@ export const kiloclawRouter = createTRPCRouter({
       throw new TRPCError({ code: 'NOT_FOUND', message: 'No pin found for your account' });
     }
 
-    return { success: true };
+    const workerSync = await pushPinToWorker(ctx.user.id, instance.id, null);
+
+    return { success: true, worker_sync: workerSync };
   }),
 
   fileTree: clawAccessProcedure.query(async ({ ctx }) => {

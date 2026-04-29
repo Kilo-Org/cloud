@@ -4,11 +4,9 @@ import kimiCoding from './kimi-coding';
 import neuralwatt from './neurowatt';
 import zaiCoding from './zai-coding';
 
-const DIRECT_BYOK_PROVIDERS = [
+export default [
   byteplusCoding,
   kimiCoding,
   neuralwatt,
   zaiCoding,
 ] satisfies ReadonlyArray<DirectByokProvider>;
-
-export default DIRECT_BYOK_PROVIDERS;

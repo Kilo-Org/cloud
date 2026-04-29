@@ -14,22 +14,20 @@ type CachedEnhancedModelListOptions = {
   variants: Record<string, OpenCodeVariant> | null;
 };
 
-export function cacheEnhancedDirectByokModelList({
+export function cachedEnhancedDirectByokModelList({
   providerId,
   recommendedModels,
   variants,
 }: CachedEnhancedModelListOptions) {
   return createCachedFetch<ReadonlyArray<DirectByokModel>>(
-    async () => {
-      const stored = DirectByokModelArraySchema.parse(
-        JSON.parse((await redisGet(directByokModelsRedisKey(providerId))) ?? '[]')
-      );
-      return enhanceDirectByokModelList({
+    async () =>
+      enhanceDirectByokModelList({
         recommendedModels,
-        remainingModels: stored,
+        remainingModels: DirectByokModelArraySchema.parse(
+          JSON.parse((await redisGet(directByokModelsRedisKey(providerId))) ?? '[]')
+        ),
         variants,
-      });
-    },
+      }),
     60_000,
     recommendedModels
   );

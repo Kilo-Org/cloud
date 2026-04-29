@@ -1,4 +1,4 @@
-import { cacheEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
@@ -6,7 +6,7 @@ export default {
   base_url: 'https://api.neuralwatt.com/v1',
   ai_sdk_provider: 'openai-compatible',
   transformRequest(_context) {},
-  models: cacheEnhancedDirectByokModelList({
+  models: cachedEnhancedDirectByokModelList({
     providerId: 'neuralwatt',
     recommendedModels: [
       {

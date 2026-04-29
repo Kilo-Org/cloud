@@ -65,16 +65,14 @@ function convertModel(
 
 async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
   let nextPreferredId = preferredModels.length;
-  const enabledProviders = DIRECT_BYOK_PROVIDERS.filter(provider =>
-    byokProviders.includes(provider.id)
-  );
-  const results = await Promise.all(
-    enabledProviders.map(async provider => {
-      const models = await provider.models();
-      return models.map(model => convertModel(provider, model, nextPreferredId++));
-    })
-  );
-  return results.flat();
+  return (
+    await Promise.all(
+      DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).map(
+        async provider =>
+          (await provider.models()).map(model => convertModel(provider, model, nextPreferredId++))
+      )
+    )
+  ).flat();
 }
 
 export async function getDirectByokModel(requestedModel: string): Promise<{
@@ -82,8 +80,9 @@ export async function getDirectByokModel(requestedModel: string): Promise<{
   model: DirectByokModel | null;
 }> {
   for (const provider of DIRECT_BYOK_PROVIDERS) {
-    const models = await provider.models();
-    const model = models.find(model => formatDirectByokModelId(provider, model) === requestedModel);
+    const model = (await provider.models()).find(
+      model => formatDirectByokModelId(provider, model) === requestedModel
+    );
     if (model) {
       return { provider, model };
     }

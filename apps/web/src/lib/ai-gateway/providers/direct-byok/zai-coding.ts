@@ -1,7 +1,7 @@
 import { REASONING_VARIANTS_BINARY } from '@/lib/ai-gateway/providers/model-settings';
 import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
-import { cacheEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
+import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 
 export default {
   id: 'zai-coding',
@@ -12,7 +12,7 @@ export default {
       type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
     };
   },
-  models: cacheEnhancedDirectByokModelList({
+  models: cachedEnhancedDirectByokModelList({
     providerId: 'zai-coding',
     recommendedModels: [
       {

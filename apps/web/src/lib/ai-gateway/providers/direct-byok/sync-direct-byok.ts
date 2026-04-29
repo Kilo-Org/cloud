@@ -128,13 +128,14 @@ function createFetchContext(): FetchContext {
   };
 }
 
-function stripVendorPrefix(id: string) {
-  const slash = id.lastIndexOf('/');
-  return slash >= 0 ? id.slice(slash + 1) : id;
+function bareModelId(id: string) {
+  const afterVendor = id.slice(id.lastIndexOf('/') + 1);
+  const colon = afterVendor.indexOf(':');
+  return colon >= 0 ? afterVendor.slice(0, colon) : afterVendor;
 }
 
-function stripVendorPrefixLowerCased(id: string) {
-  return stripVendorPrefix(id).toLowerCase();
+function bareModelIdLowerCased(id: string) {
+  return bareModelId(id).toLowerCase();
 }
 
 async function generateDescription(id: string, name: string): Promise<string> {
@@ -171,8 +172,8 @@ async function syncProvider(
 
   for (const raw of fetched) {
     const prior = previousById.get(raw.id);
-    const name = raw.name ?? stripVendorPrefix(raw.id);
-    const fallbackDescription = fallbackDescriptions.get(stripVendorPrefixLowerCased(raw.id));
+    const name = raw.name ?? bareModelId(raw.id);
+    const fallbackDescription = fallbackDescriptions.get(bareModelIdLowerCased(raw.id));
     const description =
       fallbackDescription ?? prior?.description ?? (await generateDescription(raw.id, name));
     const context_length = raw.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
@@ -199,7 +200,7 @@ function buildFallbackDescriptions(sources: Record<string, StoredModel>[]): Map<
   const fallbackDescriptions = new Map<string, string>();
   for (const source of sources) {
     for (const model of Object.values(source)) {
-      const id = stripVendorPrefixLowerCased(model.id);
+      const id = bareModelIdLowerCased(model.id);
       if (!model.description || fallbackDescriptions.has(id)) continue;
       fallbackDescriptions.set(id, model.description);
     }

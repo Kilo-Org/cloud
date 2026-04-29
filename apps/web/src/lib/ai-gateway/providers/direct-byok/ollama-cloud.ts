@@ -15,9 +15,9 @@ export default {
     recommendedModels: [
       {
         id: 'kimi-k2.6:cloud',
-        name: 'Kimi K2.6',
+        name: 'kimi-k2.6',
         description:
-          "Kimi K2.6 is Moonshot AI's next-generation multimodal model, designed for long-horizon coding, coding-driven UI/UX generation, and multi-agent orchestration.",
+          'A high-performance cloud-based model optimized for advanced reasoning, complex instruction following, and sophisticated multilingual tasks.',
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 262144,

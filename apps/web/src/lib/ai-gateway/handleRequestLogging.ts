@@ -75,10 +75,10 @@ export async function handleRequestLogging(params: {
         //ignore
       }
       try {
-        const serialized = JSON.stringify(request.body);
-        const hash = createHash('sha256').update(serialized).digest('hex');
-        await redisSet(requestLogRedisKey(hash), serialized, 86400);
-        logExceptInTest('[handleRequestLogging] request hash: ' + hash);
+        logExceptInTest(
+          '[handleRequestLogging] request (truncated): ' +
+            JSON.stringify(request.body).substring(0, 4000)
+        );
       } catch {
         //ignore
       }

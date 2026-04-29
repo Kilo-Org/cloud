@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 
 import { trpcClient } from '@/lib/trpc';
 
@@ -7,39 +7,48 @@ type TokenCache = {
   expiresAtMs: number;
 };
 
+// Module-level singletons so all useKiloChatTokenGetter() instances share the
+// same cache and in-flight dedup. Auth token is a per-app singleton (one
+// logged-in user), so process-wide state is correct.
+let cache: TokenCache | null = null;
+let inFlight: Promise<string> | null = null;
+
 /**
  * Returns a stable getter function that fetches a kilo-chat JWT, caching it
  * until 60 seconds before expiry. Concurrent callers share a single in-flight
- * fetch via a dedup ref.
+ * fetch via a module-level dedup ref.
  */
 export function useKiloChatTokenGetter(): () => Promise<string> {
-  const cacheRef = useRef<TokenCache | null>(null);
-  const inFlightRef = useRef<Promise<string> | null>(null);
-
   return useCallback(async () => {
-    const cached = cacheRef.current;
-    if (cached && cached.expiresAtMs - Date.now() > 60_000) {
-      return cached.token;
+    if (cache && cache.expiresAtMs - Date.now() > 60_000) {
+      return cache.token;
     }
 
-    const existing = inFlightRef.current;
-    if (existing) {
-      return existing;
+    if (inFlight) {
+      return inFlight;
     }
 
-    // Create a shared promise and set inFlightRef before awaiting so concurrent
+    // Create a shared promise and set inFlight before awaiting so concurrent
     // callers share this fetch rather than starting duplicate requests.
     let resolveShared: (token: string) => void = () => undefined;
-    const sharedPromise = new Promise<string>(resolve => {
+    let rejectShared: (err: unknown) => void = () => undefined;
+    const sharedPromise = new Promise<string>((resolve, reject) => {
       resolveShared = resolve;
+      rejectShared = reject;
     });
-    inFlightRef.current = sharedPromise;
+    inFlight = sharedPromise;
 
-    const { token, expiresAt } = await trpcClient.kiloChat.getToken.query();
-    const expiresAtMs = new Date(expiresAt).getTime();
-    cacheRef.current = { token, expiresAtMs };
-    inFlightRef.current = null;
-    resolveShared(token);
-    return token;
+    try {
+      const { token, expiresAt } = await trpcClient.kiloChat.getToken.query();
+      const expiresAtMs = new Date(expiresAt).getTime();
+      cache = { token, expiresAtMs };
+      resolveShared(token);
+      return token;
+    } catch (error) {
+      rejectShared(error);
+      throw error;
+    } finally {
+      inFlight = null;
+    }
   }, []);
 }

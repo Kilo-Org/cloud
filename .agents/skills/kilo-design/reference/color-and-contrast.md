@@ -16,45 +16,45 @@ Prefer Tailwind utilities that map to Kilo's semantic tokens
 raw hex. The token layer is in `apps/web/src/app/globals.css`; the
 Tailwind bindings are in the `@theme inline` block.
 
-### Brand accent use
+### Primary and brand accent use
 
 `--brand-primary` / `text-brand-primary` / `bg-brand-primary` (electric
-yellow-green, `oklch(95% 0.15 108)`) is **restrained-strategy** accent
-color. Hold it under 10% of pixel weight on any given surface. Reserve for:
+yellow-green, `oklch(95% 0.15 108)`) is the same swatch as the semantic
+`primary` token. It is both brand and primary action color. Hold it under
+10% of pixel weight on any given surface. Reserve for:
 
 - Logo, wordmark, and logo-adjacent affordances.
+- The single primary CTA on a surface.
 - Focus rings on branded hero controls (see `HeaderLogo.tsx`).
 - Intentional glow moments (see `animate-pulse-once` in `globals.css`).
 - A small number of brand-defining selected / "on" toggles.
 
 Do **not** use yellow-green as:
 
-- Default primary CTA color.
+- Multiple competing CTAs on the same surface.
 - Body or link text color.
 - Chart series color (the `chart-*` tokens exist for that).
 - Border color on product surfaces.
 
-### Product action blue
+### Primary action token
 
-The current primary product CTA is blue:
+The primary product CTA is the brand yellow-green semantic token:
 
-- Background `#2B6AD2`
-- Hover `#225eb9`
-- Focus ring `#3b7de8`
+- Background `primary` / `--brand-primary` / `oklch(95% 0.15 108)`
+- Foreground `primary-foreground` (near-black)
+- Hover: slightly darker yellow-green
+- Focus ring: semantic `ring` or low-alpha yellow-green
 
-This color exists in `apps/web/src/components/ui/button.tsx` (`variant: "primary"`)
-and the legacy `Button.tsx`. It is the canonical "click this to proceed"
-color in product and marketing flows. Do not replace it with yellow-green,
-and do not invent a second blue. Elevating this to a semantic token
-(`--color-action` / `--color-action-foreground`) is a reasonable follow-up
-refactor, but out of scope for routine design work.
+Hardcoded blue buttons (`#2B6AD2`, Tailwind `blue-*` fills) are legacy drift.
+Migrate them to `primary` when touching the owning component or flow. Blue is
+reserved for inline links and historical references, not action fills.
 
 ### Palette structure (how Kilo's tokens map)
 
 | Role     | Purpose                           | Kilo tokens                                                                                                           |
 | -------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Brand    | Rare, load-bearing accent         | `brand-primary`                                                                                                       |
-| Action   | Primary CTAs in product/marketing | `#2B6AD2` (see Button `variant: "primary"`)                                                                           |
+| Action   | Primary CTAs in product/marketing | `primary` / `primary-foreground`                                                                                      |
 | Neutral  | Text, backgrounds, borders        | `background`, `foreground`, `muted`, `accent`, `secondary`, `card`, `popover`, `border`, `input`, `ring`, `kilo-gray` |
 | Semantic | Destructive, success pills        | `destructive`, badge variants `beta`/`new`                                                                            |
 | Surface  | Sidebar, charts, Kilo gray        | `sidebar-*`, `chart-1`..`chart-5`, `kilo-gray`                                                                        |
@@ -76,6 +76,7 @@ tree actually react to theme changes.
 - Rainbow accent palettes introduced just because the screen felt
   monochromatic.
 - Yellow-green on body copy, sidebar surfaces, or form fields.
+- Blue button backgrounds for new primary actions.
 
 ---
 
@@ -123,8 +124,8 @@ This is **visual weight**, not pixel count:
 - **10%** — Accent: CTAs, highlights, focus states
 
 Accent colors work _because_ they are rare. Overuse kills their power.
-In Kilo, "accent" has two constituents: the product blue CTA and the
-brand-primary yellow-green. Combined, they should still stay near 10%.
+In Kilo, the primary CTA and brand accent share the same yellow-green swatch.
+That shared role should still stay near 10% visual weight.
 
 ## Contrast & Accessibility
 

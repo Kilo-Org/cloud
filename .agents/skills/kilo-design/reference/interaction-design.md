@@ -24,10 +24,11 @@ any interactive control from scratch, check these locations first:
   explicit brand ring for branded controls (see `HeaderLogo.tsx` which
   uses `focus:ring-brand-primary focus:ring-3`). Never strip the ring
   without a replacement.
-- **Button variants are authoritative.** Use `variant="primary"` for
-  blue CTAs, `variant="default"` for shadcn primary, `variant="destructive"`
-  for destructive, `variant="outline"` for secondary, `variant="ghost"`
-  for bare. Don't invent new variants per feature.
+- **Button variants are authoritative.** Use the semantic `primary` token /
+  primary variant for the single yellow CTA on a surface,
+  `variant="destructive"` for red destructive actions, `variant="outline"`
+  or `variant="secondary"` for secondary actions, and `variant="ghost"` for
+  bare actions. Don't invent new variants per feature.
 - **Forms use visible labels.** Placeholders are not labels. Pair inputs
   with `<Label>` (shadcn) and use `aria-describedby` for help/error text.
 - **Validate on blur**, not every keystroke (password strength is an

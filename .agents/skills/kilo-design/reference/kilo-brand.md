@@ -43,8 +43,10 @@ compact, and task-oriented.
 ## Theme
 
 Kilo's web app is **dark-first**. `:root` in `apps/web/src/app/globals.css`
-forces `color-scheme: dark`. Mobile's `apps/mobile/src/global.css` follows
-`prefers-color-scheme`. Design with dark as the default.
+forces `color-scheme: dark`. Mobile's `apps/mobile/src/global.css` defines
+light tokens in `:root` and dark tokens under `prefers-color-scheme`. Design
+web surfaces with dark as the default; check mobile surfaces in both system
+themes.
 
 Do not "add a light mode" speculatively. If asked to work in light, check
 that the surface actually participates in theme switching and that the
@@ -58,58 +60,54 @@ These are declared as CSS variables in `globals.css` and surfaced to
 Tailwind via `@theme inline`. Prefer the Tailwind utility that maps to the
 token (e.g. `bg-background`, `text-foreground`, `border-border`) over hex.
 
-| Token                          | Role                                                       |
-| ------------------------------ | ---------------------------------------------------------- |
-| `background`                   | Page/body surface. Near-black `oklch(0.145 0 0)`.          |
-| `foreground`                   | Default text. Near-white `oklch(0.985 0 0)`.               |
-| `card`, `popover`              | Elevated dark surface `oklch(0.205 0 0)`.                  |
-| `card-foreground`              | Text on card.                                              |
-| `primary`                      | shadcn primary. Light neutral; pairs with dark foreground. |
-| `secondary`, `muted`, `accent` | Mid-dark surfaces `oklch(0.269 0 0)` for chips, hovers.    |
-| `muted-foreground`             | Secondary text `oklch(0.708 0 0)`.                         |
-| `border`, `input`, `ring`      | Hairline borders and focus rings.                          |
-| `destructive`                  | Error/danger state.                                        |
-| `sidebar-*`                    | Sidebar app-shell tokens.                                  |
-| `chart-1`..`chart-5`           | Data viz palette.                                          |
+| Token                          | Role                                                    |
+| ------------------------------ | ------------------------------------------------------- |
+| `background`                   | Page/body surface. Near-black `oklch(0.145 0 0)`.       |
+| `foreground`                   | Default text. Near-white `oklch(0.985 0 0)`.            |
+| `card`, `popover`              | Elevated dark surface `oklch(0.205 0 0)`.               |
+| `card-foreground`              | Text on card.                                           |
+| `primary`                      | Brand yellow-green primary CTA token.                   |
+| `primary-foreground`           | Near-black text on primary yellow-green.                |
+| `secondary`, `muted`, `accent` | Mid-dark surfaces `oklch(0.269 0 0)` for chips, hovers. |
+| `muted-foreground`             | Secondary text `oklch(0.708 0 0)`.                      |
+| `border`, `input`, `ring`      | Hairline borders and focus rings.                       |
+| `destructive`                  | Red error/danger state.                                 |
+| `sidebar-*`                    | Sidebar app-shell tokens.                               |
+| `chart-1`..`chart-5`           | Data viz palette.                                       |
 
 ### Kilo-specific primitives
 
-| Token                               | Value                                           | Use                                                   |
-| ----------------------------------- | ----------------------------------------------- | ----------------------------------------------------- |
-| `--brand-primary` / `brand-primary` | `oklch(95% 0.15 108)` (electric yellow-green)   | Brand moments: logo, focus ring, glow, key highlights |
-| `--color-kilo-gray`                 | `oklch(0.24 0.007 1)`                           | Kilo-branded neutral surface                          |
-| `--color-kilo-gray-lighter`         | Derived via `oklch(from ... calc(l + 0.1) c h)` | Paired with `kilo-gray`                               |
-| `--ease-out-strong`                 | `cubic-bezier(0.23, 1, 0.32, 1)`                | Preferred easing for transitions                      |
+| Token                               | Value                                           | Use                              |
+| ----------------------------------- | ----------------------------------------------- | -------------------------------- |
+| `--brand-primary` / `brand-primary` | `oklch(95% 0.15 108)` (electric yellow-green)   | Alias of primary for brand roles |
+| `--color-kilo-gray`                 | `oklch(0.24 0.007 1)`                           | Kilo-branded neutral surface     |
+| `--color-kilo-gray-lighter`         | Derived via `oklch(from ... calc(l + 0.1) c h)` | Paired with `kilo-gray`          |
+| `--ease-out-strong`                 | `cubic-bezier(0.23, 1, 0.32, 1)`                | Preferred easing for transitions |
 
-### Product action color
+### Primary action color
 
-There is also a product-blue CTA used in `apps/web/src/components/ui/button.tsx`
-variant `primary` and in the legacy `Button` component:
+The product primary CTA is the Kilo brand yellow-green, exposed through the
+semantic `primary` token and `--brand-primary` alias:
 
-| Role       | Value     |
-| ---------- | --------- |
-| Background | `#2B6AD2` |
-| Hover      | `#225eb9` |
-| Focus ring | `#3b7de8` |
+| Role       | Value                                    |
+| ---------- | ---------------------------------------- |
+| Background | `oklch(95% 0.15 108)` (`#EDFF00`-ish)    |
+| Hover      | Slightly darker yellow-green             |
+| Text       | Near-black via `primary-foreground`      |
+| Focus ring | Low-alpha yellow-green / semantic `ring` |
 
-This is not (yet) a semantic token. Treat it as:
-
-- Existing canonical blue for primary product CTAs in marketing and legacy
-  forms.
-- Do not replace it with `--brand-primary` yellow without a design
-  decision — those two colors mean different things.
-- Do not invent new blues. If you need a primary action color, reuse this.
-
-Technical note: elevating `#2B6AD2` to a semantic token
-(e.g. `--color-action` / `--color-action-foreground`) is a reasonable
-follow-up refactor, but out of scope for routine design work.
+Use it for the main action on a surface, exactly once. Blue is no longer a
+primary CTA color; treat hardcoded `#2B6AD2` buttons as legacy drift and
+migrate them to semantic `primary` when the owning surface is updated. Blue
+remains acceptable for inline links and historical references only.
 
 ## Brand Accent Discipline
 
-`--brand-primary` (electric yellow-green) is load-bearing precisely because
-it is rare. Reserve it for:
+The yellow-green primary is load-bearing precisely because it is rare.
+Reserve it for:
 
 - The Kilo logo and wordmark.
+- The primary CTA, once per surface.
 - Focus rings on branded / hero controls.
 - Confirmation glow on intentional brand moments (see
   `animate-pulse-once` / `pulse-glow` in `globals.css`).
@@ -218,11 +216,11 @@ Current conventions:
 
 These hurt Kilo specifically, on top of general anti-slop rules:
 
-- **Yellow everywhere.** If the screen screams yellow, back off to semantic
-  tokens and keep brand-primary for real moments.
-- **Swapping the blue CTA for yellow** without design approval.
-- **Inventing a new primary color** instead of using `primary` or the
-  existing product blue.
+- **Yellow everywhere.** If the screen screams yellow, keep yellow to the
+  single primary action plus real brand moments.
+- **Blue button backgrounds.** Blue is for inline links and legacy drift,
+  not primary action fills.
+- **Inventing a new primary color** instead of using the `primary` token.
 - **Purple gradient heroes, gradient text, glassmorphism defaults.**
 - **Nested cards** (card inside card). Use hierarchy and spacing instead.
 - **New font families** beyond Inter / Roboto Mono / JetBrains Mono.

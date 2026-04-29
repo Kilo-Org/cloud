@@ -190,8 +190,9 @@ DevTools device emulation is useful for layout but misses:
 
 Test on at least one real iPhone, one real Android, a tablet if relevant.
 Cheap Android phones reveal performance issues you'll never see on
-simulators. For Kilo's mobile app, test on a real device via Expo Go or
-the dev client before shipping significant UI changes.
+simulators. For Kilo's mobile app, use a dev build / dev client on a real
+device before shipping significant UI changes. Do not use Expo Go; the app
+does not support it.
 
 ---
 

@@ -19,10 +19,10 @@ other reference in this skill conflicts with `kilo-brand.md`,
 Load `reference/kilo-brand.md` on every invocation of this skill before
 picking tokens, typography, layout, or motion. It captures:
 
-- Kilo's dark-first theme and existing CSS tokens.
-- Brand accent discipline (electric yellow-green `--brand-primary`,
-  used sparingly).
-- Product CTA blue (`#2B6AD2`) as the established action color.
+- Kilo's dark-first web theme, mobile light/dark token split, and existing
+  CSS tokens.
+- Brand yellow-green `primary` token as the primary CTA color, used once
+  per surface.
 - Typography (Inter / Roboto Mono / JetBrains Mono) and the known
   font-token mismatch.
 - Spacing, radius, component, and motion conventions.
@@ -81,8 +81,9 @@ Follow these on every task:
    solves the problem.
 3. **Do not rename or restructure the shadcn UI layer** unless the user
    explicitly asks for a design-system refactor.
-4. **Do not replace the product CTA blue** (`#2B6AD2`) with
-   `--brand-primary` yellow-green without an explicit design decision.
+4. **Use the `primary` token for primary CTAs.** The product primary is the
+   Kilo brand yellow-green. Blue is reserved for links and legacy drift
+   that should be migrated when touched.
 5. **Do not add new motion libraries.** `motion/react` and
    `tw-animate-css` are already available.
 6. **Respect `prefers-reduced-motion`** on any motion change beyond
@@ -102,8 +103,8 @@ Follow these on every task:
 When producing code:
 
 - Use Tailwind utilities that map to semantic tokens
-  (`bg-background`, `text-foreground`, `border-border`, etc.) before
-  reaching for hex.
+  (`bg-background`, `text-foreground`, `border-border`, `bg-primary`,
+  `text-primary-foreground`, etc.) before reaching for hex.
 - Extend `cva` variants in existing `ui/` primitives rather than cloning.
 - Icons: `lucide-react`, typically `size-4`, inheriting `currentColor`.
 - Add `aria-label` to icon-only buttons.
@@ -148,8 +149,8 @@ This skill is intentionally scoped. It does **not**:
 - Run automated anti-pattern scans.
 - Run or expose Impeccable's "live mode."
 - Generate a root `DESIGN.md`.
-- Rewrite the font-token mismatch or hardcoded CTA blue as semantic
-  tokens. Those are real follow-ups but belong in separate,
+- Rewrite the font-token mismatch or migrate every legacy hardcoded blue
+  CTA. Those are real follow-ups but belong in separate,
   design-system-scoped PRs.
 
 ## Reference map

@@ -678,6 +678,23 @@ export const adminCodeReviewsRouter = createTRPCRouter({
   searchOrganizations: adminProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
+      const searchTerm = input.query.trim();
+      if (!searchTerm) {
+        return [];
+      }
+
+      const escapedTerm = searchTerm.replace(/[%_\\]/g, '\\$&');
+      const ilikePattern = `%${escapedTerm}%`;
+      const nameSearchCondition = ilike(organizations.name, ilikePattern);
+      const organizationId = z.string().uuid().safeParse(searchTerm);
+      const searchCondition = organizationId.success
+        ? or(nameSearchCondition, eq(organizations.id, organizationId.data))
+        : nameSearchCondition;
+
+      if (!searchCondition) {
+        return [];
+      }
+
       const result = await db
         .select({
           id: organizations.id,
@@ -685,7 +702,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
           plan: organizations.plan,
         })
         .from(organizations)
-        .where(or(ilike(organizations.name, `%${input.query}%`), eq(organizations.id, input.query)))
+        .where(searchCondition)
         .limit(20);
 
       return result;

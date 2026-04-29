@@ -36,7 +36,7 @@ function timestamp(minutesFromDayStart: number): string {
   return new Date(Date.UTC(2035, 0, 10, 0, minutesFromDayStart)).toISOString();
 }
 
-describe('adminCodeReviewsRouter wait time stats', () => {
+describe('adminCodeReviewsRouter', () => {
   let adminUser: User;
   let regularUser: User;
   let testOrganizationId = '';
@@ -208,5 +208,33 @@ describe('adminCodeReviewsRouter wait time stats', () => {
     await expect(caller.admin.codeReviews.getWaitTimeStats(filterInput())).rejects.toThrow(
       'Admin access required'
     );
+  });
+
+  it('searches organizations by text without requiring a UUID query', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.codeReviews.searchOrganizations({
+      query: 'Admin Code Review Wait',
+    });
+
+    expect(result.some(row => row.id === testOrganizationId)).toBe(true);
+  });
+
+  it('searches organizations by exact UUID', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.codeReviews.searchOrganizations({
+      query: testOrganizationId,
+    });
+
+    expect(result.some(row => row.id === testOrganizationId)).toBe(true);
+  });
+
+  it('returns no organizations for whitespace-only search', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+
+    const result = await caller.admin.codeReviews.searchOrganizations({ query: '   ' });
+
+    expect(result).toEqual([]);
   });
 });

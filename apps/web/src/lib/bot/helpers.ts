@@ -41,7 +41,8 @@ export function isSlackWebApiPlatformError(error: unknown): error is SlackWebApi
 
 /**
  * Posts a thread message telling the user the Slack app is missing a scope
- * and needs to be re-installed. Links to the Kilo integrations page.
+ * and needs to be re-installed. Links to an authenticated Kilo route that
+ * creates a fresh signed Slack OAuth state before redirecting to Slack.
  */
 export async function postSlackReinstallInstruction(
   adapter: SlackAdapter,
@@ -50,12 +51,12 @@ export async function postSlackReinstallInstruction(
   platformIntegration?: PlatformIntegration | null
 ): Promise<void> {
   const url = platformIntegration?.owned_by_organization_id
-    ? `${APP_URL}/organizations/${platformIntegration.owned_by_organization_id}/integrations/slack`
-    : `${APP_URL}/integrations/slack`;
+    ? `${APP_URL}/organizations/${platformIntegration.owned_by_organization_id}/integrations/slack/reinstall`
+    : `${APP_URL}/integrations/slack/reinstall`;
 
   await adapter.postMessage(threadId, {
     markdown:
       `Kilo Bot is missing the \`${missingScope}\` Slack scope and needs to be re-installed. ` +
-      `Open the [Slack integration page](${url}) to re-install the app.`,
+      `Open the [Slack reinstall link](${url}) to refresh the app permissions.`,
   });
 }

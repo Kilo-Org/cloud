@@ -391,12 +391,11 @@ export async function handleGitHubWebhook(
 
       const action = parseResult.data.action;
 
-      // Filter out closed events - we don't log or process them
-      if (action === GITHUB_ACTION.CLOSED) {
-        return NextResponse.json({ message: 'Event received' }, { status: 200 });
-      }
-
-      // Log webhook event for both user and organization-owned integrations
+      // Log webhook event for both user and organization-owned integrations.
+      // `closed` events used to be filtered out here, but the PR handler now
+      // needs to observe `closed` (with `merged`) to keep the
+      // `cli_session_pull_requests` side table in sync. Code-review routing
+      // still ignores `closed` inside `handlePullRequest`.
       const logResult = await logWebhook(integration, action);
       if (logResult.isDuplicate) {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });

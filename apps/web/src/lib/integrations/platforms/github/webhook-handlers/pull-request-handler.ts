@@ -26,6 +26,7 @@ import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-wo
 import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
 import { APP_URL } from '@/lib/constants';
+import { upsertCliSessionPullRequestFromWebhook } from './upsert-cli-session-pull-request';
 
 /**
  * GitHub Pull Request Event Handler
@@ -494,6 +495,12 @@ export async function handlePullRequest(
   integration: PlatformIntegration
 ) {
   const { action } = payload;
+
+  // Associated-PR side table: keep cli_session_pull_requests in sync for any
+  // session on this head repo + branch. Additive to code-review routing.
+  // Runs before the code-review branch so an early `closed` return still
+  // records the closed/merged state.
+  await upsertCliSessionPullRequestFromWebhook(payload);
 
   switch (action) {
     case GITHUB_ACTION.OPENED:

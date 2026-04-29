@@ -13,7 +13,7 @@ function baseParams(
 ): SendInstanceLifecycleNotificationParams {
   return {
     userId: 'user-1',
-    instanceId: 'inst-1',
+    instanceId: 'sandbox-1',
     sandboxId: 'ki_deadbeef',
     event: 'ready',
     instanceName: 'My Bot',
@@ -78,7 +78,7 @@ describe('buildInstanceLifecycleMessages', () => {
     expect(m.data).toEqual({
       type: 'instance-lifecycle',
       event: 'ready',
-      instanceId: 'inst-1',
+      instanceId: 'sandbox-1',
     });
     expect(m.sound).toBe('default');
     expect(m.priority).toBe('high');
@@ -205,17 +205,12 @@ describe('dispatchInstanceLifecyclePush', () => {
     expect(calls.sentMessages).toHaveLength(0);
   });
 
-  it('carries the deep-link instanceId through to the Expo data payload', async () => {
+  it('carries the chat route id through to the Expo data payload', async () => {
     const { deps, calls } = fakeDeps();
 
-    await dispatchInstanceLifecyclePush(
-      baseParams({ instanceId: '123e4567-e89b-12d3-a456-426614174000' }),
-      deps
-    );
+    await dispatchInstanceLifecyclePush(baseParams({ instanceId: 'ki_deadbeef' }), deps);
 
     const sent = calls.sentMessages[0];
-    expect((sent[0].data as { instanceId: string }).instanceId).toBe(
-      '123e4567-e89b-12d3-a456-426614174000'
-    );
+    expect((sent[0].data as { instanceId: string }).instanceId).toBe('ki_deadbeef');
   });
 });

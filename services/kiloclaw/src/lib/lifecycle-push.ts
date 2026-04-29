@@ -13,10 +13,6 @@
 import { getWorkerDb } from '@kilocode/db/client';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
-import {
-  isInstanceKeyedSandboxId,
-  instanceIdFromSandboxId,
-} from '@kilocode/worker-utils/instance-id';
 
 import { READY_PUSH_PROBE_WINDOW_MS } from '../config';
 import type { KiloClawEnv } from '../types';
@@ -94,25 +90,6 @@ async function lookupInstanceName(
 }
 
 /**
- * Resolve the id that the mobile deep link uses (`/(app)/chat/{instanceId}`).
- *
- * Instance-keyed sandboxIds decode back to the `kiloclaw_instances.id` UUID.
- * Legacy userId-keyed instances fall back to the sandboxId — the mobile app
- * already keys its chat routes by sandboxId for the legacy path.
- */
-function resolveInstanceIdForDispatch(state: InstanceMutableState): string | null {
-  if (!state.sandboxId) return null;
-  if (isInstanceKeyedSandboxId(state.sandboxId)) {
-    try {
-      return instanceIdFromSandboxId(state.sandboxId);
-    } catch {
-      return state.sandboxId;
-    }
-  }
-  return state.sandboxId;
-}
-
-/**
  * Dispatch a one-shot "instance ready" push when `getGatewayReady` first
  * reports the gateway is serving. Flips the DO flag before the outbound
  * RPC so a crash mid-dispatch cannot cause a duplicate on the next alarm.
@@ -140,8 +117,6 @@ export async function maybeDispatchReadyPush(
   // instance somehow lacks a userId/sandboxId, leave the flag unset so a
   // later alarm can retry once conditions are met.
   if (!state.userId || !state.sandboxId || !env.NOTIFICATIONS) return;
-  const instanceId = resolveInstanceIdForDispatch(state);
-  if (!instanceId) return;
 
   state.instanceReadyPushSent = true;
   await ctx.storage.put(storageUpdate({ instanceReadyPushSent: true }));
@@ -151,7 +126,7 @@ export async function maybeDispatchReadyPush(
   try {
     await env.NOTIFICATIONS.sendInstanceLifecycleNotification({
       userId: state.userId,
-      instanceId,
+      instanceId: state.sandboxId,
       sandboxId: state.sandboxId,
       event: 'ready',
       instanceName,
@@ -182,16 +157,13 @@ export async function maybeDispatchStartFailurePush(
   state.startFailurePushSentForAttempt = true;
   await ctx.storage.put(storageUpdate({ startFailurePushSentForAttempt: true }));
 
-  const instanceId = resolveInstanceIdForDispatch(state);
-  if (!instanceId) return;
-
   const instanceName = await lookupInstanceName(env, state);
   const errorText = formatStartFailureReason(label);
 
   try {
     await env.NOTIFICATIONS.sendInstanceLifecycleNotification({
       userId: state.userId,
-      instanceId,
+      instanceId: state.sandboxId,
       sandboxId: state.sandboxId,
       event: 'start_failed',
       instanceName,

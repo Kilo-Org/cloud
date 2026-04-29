@@ -12,7 +12,7 @@ export type InstanceLifecycleEvent = 'ready' | 'start_failed';
 
 export type SendInstanceLifecycleNotificationParams = {
   userId: string;
-  /** kiloclaw_instances.id UUID — surfaced on the device so taps deep-link to the chat route. */
+  /** Chat route id surfaced on the device. Currently this is the instance sandboxId. */
   instanceId: string;
   /** Included for worker-side logs only. */
   sandboxId: string;

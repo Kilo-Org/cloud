@@ -39,7 +39,7 @@ const notificationDataSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
-export type NotificationData = z.infer<typeof notificationDataSchema>;
+type NotificationData = z.infer<typeof notificationDataSchema>;
 
 // Runtime-validates that an arbitrary notification `data` payload matches the
 // shape we care about. Push producers can evolve independently of the app, so

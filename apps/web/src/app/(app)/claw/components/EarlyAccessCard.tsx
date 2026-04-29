@@ -1,6 +1,6 @@
 'use client';
 
-import { Rocket, Info } from 'lucide-react';
+import { Rocket, Info, AlertTriangle } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -61,6 +61,14 @@ export function EarlyAccessCard() {
             Get new versions before everyone else. When a release is rolling out, your instances see
             it right away instead of waiting for full availability.
           </p>
+          <div className="flex items-start gap-1 text-xs text-amber-500">
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+            <span>
+              Heads up: early versions are still being tested. They may have bugs or rough edges
+              that the general release won&apos;t. Leave this off if you want the most stable
+              experience.
+            </span>
+          </div>
           <div className="text-muted-foreground flex items-start gap-1 text-xs">
             <Info className="mt-0.5 h-3 w-3 shrink-0" />
             <span>

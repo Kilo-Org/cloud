@@ -4,6 +4,7 @@ process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 const mockLimit = jest.fn();
 const mockDeleteWhere = jest.fn();
 const mockAuthRevoke = jest.fn();
+const mockAuthTest = jest.fn();
 
 jest.mock('@/lib/drizzle', () => ({
   db: {
@@ -24,12 +25,13 @@ jest.mock('@slack/web-api', () => ({
   WebClient: jest.fn(() => ({
     auth: {
       revoke: mockAuthRevoke,
+      test: mockAuthTest,
     },
   })),
 }));
 
 import type { Owner } from '@/lib/integrations/core/types';
-import { uninstallApp } from './slack-service';
+import { testConnection, uninstallApp } from './slack-service';
 
 const owner = { type: 'user', id: 'user-1' } satisfies Owner;
 
@@ -113,5 +115,60 @@ describe('slack-service uninstallApp', () => {
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T456');
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('slack-service testConnection', () => {
+  beforeEach(() => {
+    mockLimit.mockReset();
+    mockAuthTest.mockReset();
+  });
+
+  it('returns success when auth.test succeeds', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockAuthTest.mockResolvedValue({ ok: true });
+
+    await expect(testConnection(owner)).resolves.toEqual({ success: true });
+    expect(mockAuthTest).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns failure when there is no Slack installation', async () => {
+    mockLimit.mockResolvedValue([]);
+
+    await expect(testConnection(owner)).resolves.toEqual({
+      success: false,
+      error: 'No Slack installation found',
+    });
+    expect(mockAuthTest).not.toHaveBeenCalled();
+  });
+
+  it('returns failure when the access token is missing from metadata', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration({ metadata: {} })]);
+
+    await expect(testConnection(owner)).resolves.toEqual({
+      success: false,
+      error: 'No access token found',
+    });
+    expect(mockAuthTest).not.toHaveBeenCalled();
+  });
+
+  it('returns the Slack error when auth.test rejects the token', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockAuthTest.mockResolvedValue({ ok: false, error: 'invalid_auth' });
+
+    await expect(testConnection(owner)).resolves.toEqual({
+      success: false,
+      error: 'invalid_auth',
+    });
+  });
+
+  it('returns a failure when the Slack client throws', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    mockAuthTest.mockRejectedValue(new Error('network down'));
+
+    await expect(testConnection(owner)).resolves.toEqual({
+      success: false,
+      error: 'network down',
+    });
   });
 });

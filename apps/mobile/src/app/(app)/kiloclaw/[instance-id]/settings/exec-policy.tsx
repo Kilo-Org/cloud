@@ -9,9 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMutations, useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
+import { type ExecPreset, execPresetToConfig } from '@/lib/onboarding';
 import { cn } from '@/lib/utils';
-
-type ExecPreset = 'always-ask' | 'never-ask';
 
 type PolicyOption = {
   id: ExecPreset;
@@ -19,8 +18,6 @@ type PolicyOption = {
   iconColor: string;
   label: string;
   description: string;
-  security: string;
-  ask: string;
 };
 
 const POLICY_OPTIONS: PolicyOption[] = [
@@ -30,8 +27,6 @@ const POLICY_OPTIONS: PolicyOption[] = [
     iconColor: '#10b981',
     label: 'Always Ask',
     description: 'Confirm every command before execution. Most secure.',
-    security: 'ask',
-    ask: 'true',
   },
   {
     id: 'never-ask',
@@ -39,8 +34,6 @@ const POLICY_OPTIONS: PolicyOption[] = [
     iconColor: '#f59e0b',
     label: 'Never Ask',
     description: 'Execute commands without confirmation. Faster but less safe.',
-    security: 'open',
-    ask: 'false',
   },
 ];
 
@@ -48,10 +41,10 @@ function resolvePreset(
   execSecurity: string | null | undefined,
   execAsk: string | null | undefined
 ): ExecPreset | undefined {
-  if (execSecurity === 'ask' && execAsk === 'true') {
+  if (execSecurity === 'allowlist' && execAsk === 'on-miss') {
     return 'always-ask';
   }
-  if (execSecurity === 'open' && execAsk === 'false') {
+  if (execSecurity === 'full' && execAsk === 'off') {
     return 'never-ask';
   }
   return undefined;
@@ -98,8 +91,15 @@ export default function ExecPolicyScreen() {
   }
 
   function handleSelect(option: PolicyOption) {
-    mutations.patchExecPreset.mutate({ security: option.security, ask: option.ask });
+    mutations.patchExecPreset.mutate(execPresetToConfig(option.id));
   }
+
+  const pendingPreset = mutations.patchExecPreset.isPending
+    ? resolvePreset(
+        mutations.patchExecPreset.variables.security,
+        mutations.patchExecPreset.variables.ask
+      )
+    : undefined;
 
   return (
     <Animated.View layout={LinearTransition} className="flex-1 bg-background">
@@ -108,9 +108,10 @@ export default function ExecPolicyScreen() {
         <Animated.View entering={FadeIn.duration(200)} className="gap-3">
           {POLICY_OPTIONS.map(option => {
             const Icon = option.icon;
-            const isSelected = mutations.patchExecPreset.isPending
-              ? mutations.patchExecPreset.variables.security === option.security
-              : currentPreset === option.id;
+            const isSelected =
+              pendingPreset !== undefined
+                ? pendingPreset === option.id
+                : currentPreset === option.id;
             return (
               <Pressable
                 key={option.id}

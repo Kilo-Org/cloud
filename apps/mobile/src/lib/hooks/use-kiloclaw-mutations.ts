@@ -1,12 +1,48 @@
+/* eslint-disable max-lines */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
+import { type ClawInstance } from '@/lib/hooks/use-instance-context';
 import { useTRPC } from '@/lib/trpc';
 import { asyncNoop } from '@/lib/utils';
 
 const onMutationError = (error: { message: string }) => {
   toast.error(error.message || 'Something went wrong');
 };
+
+/**
+ * Extract the tRPC `data.httpStatus` field without an `as` cast. Returns
+ * `undefined` for any shape that doesn't match the tRPC error envelope.
+ */
+function getTrpcHttpStatus(error: unknown): number | undefined {
+  if (error === null || typeof error !== 'object' || !('data' in error)) {
+    return undefined;
+  }
+  const data = error.data;
+  if (data === null || typeof data !== 'object' || !('httpStatus' in data)) {
+    return undefined;
+  }
+  return typeof data.httpStatus === 'number' ? data.httpStatus : undefined;
+}
+
+/**
+ * Retry policy for mutations we want to be resilient against transient
+ * network blips and 5xx hiccups. Bails immediately on 4xx so permission or
+ * validation errors surface without three rounds of backoff first.
+ */
+const retryTransient = (failureCount: number, error: unknown): boolean => {
+  if (failureCount >= 3) {
+    return false;
+  }
+  const httpStatus = getTrpcHttpStatus(error);
+  if (httpStatus !== undefined && httpStatus >= 400 && httpStatus < 500) {
+    return false;
+  }
+  return true;
+};
+
+const retryTransientDelay = (attemptIndex: number): number =>
+  Math.min(1000 * 2 ** attemptIndex, 10_000);
 
 export function useKiloClawMutations(organizationId?: string | null) {
   const trpc = useTRPC();
@@ -48,14 +84,35 @@ export function useKiloClawMutations(organizationId?: string | null) {
     trpc.organizations.kiloclaw.listDevicePairingRequests
   );
 
+  const listAllInstancesKey = trpc.kiloclaw.listAllInstances.queryKey();
+  const billingStatusKey = trpc.kiloclaw.getBillingStatus.queryKey();
+
   const invalidateStatus = async () => {
-    await queryClient.invalidateQueries({ queryKey: statusKey });
-    await queryClient.invalidateQueries({ queryKey: controllerVersionKey });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: statusKey }),
+      queryClient.invalidateQueries({ queryKey: controllerVersionKey }),
+    ]);
   };
 
   const invalidateStatusAndPin = async () => {
-    await invalidateStatus();
-    await queryClient.invalidateQueries({ queryKey: pinKey });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: statusKey }),
+      queryClient.invalidateQueries({ queryKey: controllerVersionKey }),
+      queryClient.invalidateQueries({ queryKey: pinKey }),
+    ]);
+  };
+
+  // `billingStatusKey` is included because the mobile onboarding state is
+  // derived client-side from `getBillingStatus` (see
+  // `lib/derive-mobile-onboarding-state.ts`). Invalidating billing is what
+  // actually refreshes the onboarding facade.
+  const invalidateProvisioned = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: listAllInstancesKey }),
+      queryClient.invalidateQueries({ queryKey: statusKey }),
+      queryClient.invalidateQueries({ queryKey: gatewayStatusKey }),
+      queryClient.invalidateQueries({ queryKey: billingStatusKey }),
+    ]);
   };
 
   function optimistic<TInput, TData extends Record<string, unknown>>(
@@ -170,6 +227,33 @@ export function useKiloClawMutations(organizationId?: string | null) {
       },
       onError: onMutationError,
     }),
+    patchBotIdentity: useMutation({
+      ...dispatch(trpc.kiloclaw.patchBotIdentity, trpc.organizations.kiloclaw.patchBotIdentity),
+      onSuccess: async () => {
+        await invalidateStatus();
+        await queryClient.invalidateQueries({ queryKey: configKey });
+      },
+      onError: onMutationError,
+      retry: retryTransient,
+      retryDelay: retryTransientDelay,
+      // Serialize concurrent writes to the same bot identity so a re-submission
+      // (e.g. user tapped back on onboarding, changed the name, re-submitted
+      // while the first mutation was mid-retry) always lands at the DO after
+      // the first call completes. Guarantees last-write-wins without manual
+      // AbortController plumbing.
+      scope: { id: `kiloclaw-patch-bot-identity:${organizationId ?? 'personal'}` },
+    }),
+    patchOpenclawConfig: useMutation({
+      ...dispatch(
+        trpc.kiloclaw.patchOpenclawConfig,
+        trpc.organizations.kiloclaw.patchOpenclawConfig
+      ),
+      onSuccess: async () => {
+        await invalidateStatus();
+        await queryClient.invalidateQueries({ queryKey: configKey });
+      },
+      onError: onMutationError,
+    }),
     patchExecPreset: useMutation({
       ...dispatch(trpc.kiloclaw.patchExecPreset, trpc.organizations.kiloclaw.patchExecPreset),
       ...optimistic(
@@ -181,6 +265,10 @@ export function useKiloClawMutations(organizationId?: string | null) {
         }),
         invalidateStatus
       ),
+      retry: retryTransient,
+      retryDelay: retryTransientDelay,
+      // Serialize concurrent exec-preset writes (see patchBotIdentity note).
+      scope: { id: `kiloclaw-patch-exec-preset:${organizationId ?? 'personal'}` },
     }),
     setMyPin: useMutation({
       ...dispatch(trpc.kiloclaw.setMyPin, trpc.organizations.kiloclaw.setMyPin),
@@ -279,8 +367,31 @@ export function useKiloClawMutations(organizationId?: string | null) {
     }),
     destroy: useMutation({
       ...dispatch(trpc.kiloclaw.destroy, trpc.organizations.kiloclaw.destroy),
-      onSuccess: invalidateStatus,
-      onError: onMutationError,
+      // Optimistically remove this context's row from the list cache so
+      // Home reflects the destruction immediately. A race between focus
+      // refetch and the server marking `destroyed_at` would otherwise
+      // re-surface the destroyed row briefly.
+      onMutate: async () => {
+        await queryClient.cancelQueries({ queryKey: listAllInstancesKey });
+        const previous = queryClient.getQueryData<ClawInstance[]>(listAllInstancesKey);
+        const contextOrgId = organizationId ?? null;
+        queryClient.setQueryData<ClawInstance[]>(listAllInstancesKey, old =>
+          old ? old.filter(row => (row.organizationId ?? null) !== contextOrgId) : old
+        );
+        return { previous };
+      },
+      onError: (error, _input, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(listAllInstancesKey, context.previous);
+        }
+        onMutationError(error);
+      },
+      onSettled: async () => {
+        await Promise.all([
+          invalidateStatus(),
+          queryClient.invalidateQueries({ queryKey: listAllInstancesKey }),
+        ]);
+      },
     }),
     updateModel: useMutation({
       ...dispatch(
@@ -289,6 +400,14 @@ export function useKiloClawMutations(organizationId?: string | null) {
       ),
       ...optimistic(configKey, (old, input: Record<string, unknown>) => ({ ...old, ...input })),
     }),
+    // Errors are categorized at the onboarding screen (locked/billing conflict,
+    // quarantined, generic). The screen's callsite `onError` owns user-visible
+    // feedback and falls back to `toast.error` for the generic case.
+    provision: useMutation(
+      trpc.kiloclaw.provision.mutationOptions({
+        onSuccess: invalidateProvisioned,
+      })
+    ),
 
     // Expose keys for screens that need manual invalidation (e.g., device-pairing)
     queryKeys: {

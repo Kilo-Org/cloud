@@ -237,10 +237,6 @@ function applyToolChoiceSetting(
 
 function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isAnthropicModel(requestedModel)) {
-    // Use `order` (set below in applyPreferredProvider) to preferentially
-    // route Anthropic models to Bedrock and Anthropic. Google Vertex doesn't
-    // support assistant message prefill, which causes 400 errors on tool
-    // calls when OpenRouter falls back to it.
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,
@@ -253,13 +249,19 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.mistral];
   }
   if (isMoonshotModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.moonshotai];
+    return [
+      OpenRouterInferenceProviderIdSchema.enum.moonshotai,
+      OpenRouterInferenceProviderIdSchema.enum.novita,
+    ];
   }
   if (isStepFunModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
   }
   if (isZaiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.novita];
+    return [
+      OpenRouterInferenceProviderIdSchema.enum.novita,
+      OpenRouterInferenceProviderIdSchema.enum['z-ai'],
+    ];
   }
   return [];
 }

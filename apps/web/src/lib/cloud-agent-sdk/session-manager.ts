@@ -180,12 +180,9 @@ type SessionManager = {
 // Error formatting
 // ---------------------------------------------------------------------------
 
+const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
+
 function formatError(err: unknown): string {
-  if (err instanceof Error) {
-    if (err.message.includes('ECONNREFUSED') || err.message.includes('fetch failed'))
-      return 'Connection lost. Please retry in a moment.';
-    return 'Connection failed. Please retry in a moment.';
-  }
   const r = errorShapeSchema.safeParse(err);
   if (r.success) {
     const code = r.data.data?.code ?? r.data.shape?.code;
@@ -197,9 +194,23 @@ function formatError(err: unknown): string {
     if (code === 'NOT_FOUND') return 'Service is unavailable right now. Please try again.';
     if (code === 'CONFLICT' || http === 409)
       return 'Previous task is still finishing up. Please wait a moment.';
-    return 'Something went wrong. Please retry in a moment.';
+    if (code === 'SERVICE_UNAVAILABLE' || http === 503)
+      return 'Service is temporarily unavailable. Please retry in a moment.';
+    if (code !== undefined || http !== undefined) {
+      return GENERIC_ERROR;
+    }
+    // `errorShapeSchema` uses `.passthrough()`, so `safeParse` succeeds on any
+    // object — including plain `Error` instances whose own properties satisfy
+    // the schema vacuously. Fall through to the transport-level checks below
+    // when neither `code` nor `httpStatus` is present so genuine connection
+    // failures keep their existing wording.
   }
-  return 'Something went wrong. Please retry in a moment.';
+  if (err instanceof Error) {
+    if (err.message.includes('ECONNREFUSED') || err.message.includes('fetch failed'))
+      return 'Connection lost. Please retry in a moment.';
+    return 'Connection failed. Please retry in a moment.';
+  }
+  return GENERIC_ERROR;
 }
 
 // ---------------------------------------------------------------------------

@@ -11,12 +11,11 @@ const buttonVariants = cva(
       variant: {
         default: 'bg-primary active:opacity-80 shadow-sm shadow-black/5',
         destructive: 'bg-destructive active:opacity-80 shadow-sm shadow-black/5',
-        outline:
-          'border-border bg-background active:opacity-80 dark:border-neutral-700 dark:bg-secondary border shadow-sm shadow-black/5',
-        secondary:
-          'bg-secondary active:bg-neutral-200 dark:active:bg-neutral-700 shadow-sm shadow-black/5',
-        ghost: 'active:bg-neutral-100 dark:active:bg-neutral-800',
+        outline: 'border-border bg-card active:opacity-80 border shadow-sm shadow-black/5',
+        secondary: 'bg-secondary active:opacity-80 shadow-sm shadow-black/5',
+        ghost: 'active:opacity-60',
         link: '',
+        'accent-soft': 'bg-accent-soft active:opacity-80 shadow-sm shadow-black/5',
       },
       size: {
         default: 'h-10 px-4 py-2',
@@ -32,15 +31,16 @@ const buttonVariants = cva(
   }
 );
 
-const buttonTextVariants = cva('text-foreground text-sm font-medium', {
+const buttonTextVariants = cva('text-foreground text-sm font-semibold', {
   variants: {
     variant: {
       default: 'text-primary-foreground',
-      destructive: 'text-white',
-      outline: 'group-active:text-accent-foreground',
+      destructive: 'text-destructive-foreground',
+      outline: 'text-foreground',
       secondary: 'text-secondary-foreground',
-      ghost: 'group-active:text-accent-foreground',
+      ghost: 'text-foreground',
       link: 'text-primary group-active:underline',
+      'accent-soft': 'text-accent-soft-foreground',
     },
     size: {
       default: '',

@@ -2,96 +2,232 @@
 @import 'tailwindcss/preflight.css' layer(base);
 @import 'tailwindcss/utilities.css';
 
-/* shadcn/ui design tokens (light) */
+/* Focus design tokens — LIGHT (FL palette).
+ * Hex values are used directly (no hsl()) so the shadcn token names map
+ * one-to-one with the Focus source values. The `/opacity` Tailwind modifier
+ * still does NOT work with these CSS-variable tokens — use the paired
+ * `*-tile-bg` / `*-tile-border` tokens below for tinted surfaces.
+ */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 0 0% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 3.9%;
-  --primary: 0 0% 9%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 0 0% 96.1%;
-  --secondary-foreground: 0 0% 9%;
-  --muted: 0 0% 96.1%;
-  --muted-foreground: 0 0% 45.1%;
-  --accent: 0 0% 96.1%;
-  --accent-foreground: 0 0% 9%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 89.8%;
-  --input: 0 0% 89.8%;
-  --ring: 0 0% 63%;
+  /* Neutrals */
+  --background: #fbfaf5;
+  --foreground: #14130f;
+  --card: #ffffff;
+  --card-foreground: #14130f;
+  --popover: #ffffff;
+  --popover-foreground: #14130f;
+  --secondary: #f0eee6;
+  --secondary-foreground: #14130f;
+  --muted: #f0eee6;
+  --muted-foreground: #7a756b;
+  --accent: #4f5a10;
+  --accent-foreground: #ffffff;
+  --primary: #4f5a10;
+  --primary-foreground: #ffffff;
+  --destructive: #c25647;
+  --destructive-foreground: #ffffff;
+  --border: rgba(20, 15, 10, 0.09);
+  --input: rgba(20, 15, 10, 0.09);
+  --ring: #4f5a10;
   --radius: 0.625rem;
+
+  /* Focus-only tokens */
+  --ink2: #3c382f;
+  --muted-soft: #a9a39a;
+  --hair-soft: rgba(20, 15, 10, 0.05);
+  --accent-soft: #e8f27a;
+  --accent-soft-foreground: #1a1a10;
+  --good: #2f9a5f;
+  --good-foreground: #ffffff;
+  --good-tile-bg: #2f9a5f1a;
+  --good-tile-border: #2f9a5f33;
+  --warn: #b27214;
+  --warn-foreground: #ffffff;
+  --warn-tile-bg: #b272141a;
+  --warn-tile-border: #b2721433;
+  --danger-tile-bg: #c256471a;
+  --danger-tile-border: #c2564733;
+
+  /* Per-agent hues + pre-tinted tile pairs.
+   * The *-tile-bg (10% alpha) and *-tile-border (20% alpha) tokens exist
+   * because NativeWind v5's `/opacity` modifier cannot decompose theme
+   * colors, so we pre-bake alpha into separate tokens.
+   */
+  --agent-yuki: #6b4fd6;
+  --agent-yuki-tile-bg: #6b4fd61a;
+  --agent-yuki-tile-border: #6b4fd633;
+  --agent-workclaw: #4f5a10;
+  --agent-workclaw-tile-bg: #4f5a101a;
+  --agent-workclaw-tile-border: #4f5a1033;
+  --agent-cloud: #2f9a5f;
+  --agent-cloud-tile-bg: #2f9a5f1a;
+  --agent-cloud-tile-border: #2f9a5f33;
+  --agent-kilocode: #b27214;
+  --agent-kilocode-tile-bg: #b272141a;
+  --agent-kilocode-tile-border: #b2721433;
+  --agent-coral: #c25647;
+  --agent-coral-tile-bg: #c256471a;
+  --agent-coral-tile-border: #c2564733;
+  --agent-sky: #2c7fb0;
+  --agent-sky-tile-bg: #2c7fb01a;
+  --agent-sky-tile-border: #2c7fb033;
 }
 
-/* shadcn/ui design tokens (dark) */
+/* Focus design tokens — DARK (FD palette) */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 70.9% 59.4%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 300 0% 45%;
+    /* Neutrals */
+    --background: #0e0e10;
+    --foreground: #f2f0eb;
+    --card: #17171a;
+    --card-foreground: #f2f0eb;
+    --popover: #1f1f24;
+    --popover-foreground: #f2f0eb;
+    --secondary: #1f1f24;
+    --secondary-foreground: #f2f0eb;
+    --muted: #1f1f24;
+    --muted-foreground: #8a8680;
+    --accent: #e8f27a;
+    --accent-foreground: #1a1a10;
+    --primary: #e8f27a;
+    --primary-foreground: #1a1a10;
+    --destructive: #f28b7a;
+    --destructive-foreground: #1a1a10;
+    --border: rgba(255, 255, 255, 0.07);
+    --input: rgba(255, 255, 255, 0.07);
+    --ring: #e8f27a;
     --radius: 0.625rem;
+
+    /* Focus-only tokens */
+    --ink2: #c4c1b8;
+    --muted-soft: #56544f;
+    --hair-soft: rgba(255, 255, 255, 0.04);
+    --accent-soft: #e8f27a;
+    --accent-soft-foreground: #1a1a10;
+    --good: #5fcb8e;
+    --good-foreground: #0e0e10;
+    --good-tile-bg: #5fcb8e1a;
+    --good-tile-border: #5fcb8e33;
+    --warn: #f2b05f;
+    --warn-foreground: #1a1a10;
+    --warn-tile-bg: #f2b05f1a;
+    --warn-tile-border: #f2b05f33;
+    --danger-tile-bg: #f28b7a1a;
+    --danger-tile-border: #f28b7a33;
+
+    /* Per-agent hues + pre-tinted tile pairs (dark values) */
+    --agent-yuki: #a78bfa;
+    --agent-yuki-tile-bg: #a78bfa1a;
+    --agent-yuki-tile-border: #a78bfa33;
+    --agent-workclaw: #e8f27a;
+    --agent-workclaw-tile-bg: #e8f27a1a;
+    --agent-workclaw-tile-border: #e8f27a33;
+    --agent-cloud: #5fcb8e;
+    --agent-cloud-tile-bg: #5fcb8e1a;
+    --agent-cloud-tile-border: #5fcb8e33;
+    --agent-kilocode: #f2b05f;
+    --agent-kilocode-tile-bg: #f2b05f1a;
+    --agent-kilocode-tile-border: #f2b05f33;
+    --agent-coral: #f28b7a;
+    --agent-coral-tile-bg: #f28b7a1a;
+    --agent-coral-tile-border: #f28b7a33;
+    --agent-sky: #6bb5e0;
+    --agent-sky-tile-bg: #6bb5e01a;
+    --agent-sky-tile-border: #6bb5e033;
   }
 }
 
 /* Map CSS variables to Tailwind v4 color tokens */
 @theme inline {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Focus-only */
+  --color-ink2: var(--ink2);
+  --color-muted-soft: var(--muted-soft);
+  --color-hair-soft: var(--hair-soft);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent-soft-foreground);
+  --color-good: var(--good);
+  --color-good-foreground: var(--good-foreground);
+  --color-good-tile-bg: var(--good-tile-bg);
+  --color-good-tile-border: var(--good-tile-border);
+  --color-warn: var(--warn);
+  --color-warn-foreground: var(--warn-foreground);
+  --color-warn-tile-bg: var(--warn-tile-bg);
+  --color-warn-tile-border: var(--warn-tile-border);
+  --color-danger-tile-bg: var(--danger-tile-bg);
+  --color-danger-tile-border: var(--danger-tile-border);
+
+  /* Per-agent colors (Tailwind classes: bg-agent-yuki, bg-agent-yuki-tile-bg, ...) */
+  --color-agent-yuki: var(--agent-yuki);
+  --color-agent-yuki-tile-bg: var(--agent-yuki-tile-bg);
+  --color-agent-yuki-tile-border: var(--agent-yuki-tile-border);
+  --color-agent-workclaw: var(--agent-workclaw);
+  --color-agent-workclaw-tile-bg: var(--agent-workclaw-tile-bg);
+  --color-agent-workclaw-tile-border: var(--agent-workclaw-tile-border);
+  --color-agent-cloud: var(--agent-cloud);
+  --color-agent-cloud-tile-bg: var(--agent-cloud-tile-bg);
+  --color-agent-cloud-tile-border: var(--agent-cloud-tile-border);
+  --color-agent-kilocode: var(--agent-kilocode);
+  --color-agent-kilocode-tile-bg: var(--agent-kilocode-tile-bg);
+  --color-agent-kilocode-tile-border: var(--agent-kilocode-tile-border);
+  --color-agent-coral: var(--agent-coral);
+  --color-agent-coral-tile-bg: var(--agent-coral-tile-bg);
+  --color-agent-coral-tile-border: var(--agent-coral-tile-border);
+  --color-agent-sky: var(--agent-sky);
+  --color-agent-sky-tile-bg: var(--agent-sky-tile-bg);
+  --color-agent-sky-tile-border: var(--agent-sky-tile-border);
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+
+  /* Font-family utilities per weight. Use these instead of `font-medium`
+   * / `font-semibold` / `font-bold` when Inter Tight or JetBrains Mono
+   * is needed — React Native requires an exact fontFamily string per
+   * weight with Google Fonts (weights are not synthesised at runtime).
+   *
+   * Usage:
+   *   font-sans-medium    → Inter Tight 500
+   *   font-sans-semibold  → Inter Tight 600
+   *   font-sans-bold      → Inter Tight 700
+   *   font-mono-medium    → JetBrains Mono 500
+   *   font-mono-semibold  → JetBrains Mono 600
+   */
+  --font-mono-medium: 'JetBrainsMono_500Medium';
+  --font-mono-semibold: 'JetBrainsMono_600SemiBold';
 }
 
 @media android {
   :root {
-    --font-mono: monospace;
+    --font-mono: 'JetBrainsMono_500Medium';
     --font-rounded: normal;
     --font-serif: serif;
-    --font-sans: normal;
   }
 }
 
 @media ios {
   :root {
-    --font-mono: ui-monospace;
+    --font-mono: 'JetBrainsMono_500Medium';
     --font-serif: ui-serif;
-    --font-sans: system-ui;
     --font-rounded: ui-rounded;
   }
 }

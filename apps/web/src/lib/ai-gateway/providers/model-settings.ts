@@ -4,7 +4,7 @@ import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
-import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/seed';
+import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrok4Model, isXaiModel } from '@/lib/ai-gateway/providers/xai';
 import { isZaiModel } from '@/lib/ai-gateway/providers/zai';
 import type {
@@ -68,7 +68,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   ) {
     return REASONING_VARIANTS_BINARY;
   }
-  if (model === seed_20_pro_free_model.public_id) {
+  if (model === seed_20_code_free_model.public_id) {
     return {
       none: { reasoning: { enabled: false, effort: 'minimal' } },
       low: { reasoning: { enabled: true, effort: 'low' } },
@@ -99,7 +99,7 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
     // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
     return 'alibaba';
   }
-  if (seed_20_pro_free_model.public_id === model) {
+  if (seed_20_code_free_model.public_id === model) {
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
   }

@@ -12,7 +12,7 @@ type RequesterInfo = {
 };
 
 const PLATFORM_LINKS: Record<string, { label: string; url: string }> = {
-  slack: { label: 'Kilo for Slack', url: 'https://kilo.ai/features/slack-integration' },
+  slack: { label: 'Kilo for Slack', url: 'https://kilo.ai/slack' },
   discord: { label: 'Kilo for Discord', url: 'https://kilo.ai' },
 };
 

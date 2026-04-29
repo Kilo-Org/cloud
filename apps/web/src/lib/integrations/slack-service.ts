@@ -174,9 +174,16 @@ export async function upsertSlackInstallation({
       : SLACK_DEFAULT_MODEL;
 
   const metadata = {
+    ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
     access_token: installation.botToken,
     bot_user_id: installation.botUserId,
-    model_slug: defaultModel,
+    model_slug:
+      existing?.metadata &&
+      typeof existing.metadata === 'object' &&
+      'model_slug' in existing.metadata &&
+      typeof existing.metadata.model_slug === 'string'
+        ? existing.metadata.model_slug
+        : defaultModel,
   };
 
   if (existing) {

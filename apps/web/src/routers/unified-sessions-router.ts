@@ -37,7 +37,7 @@ const ListSessionsInputSchema = z.object({
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
     .optional(),
-  orderBy: z.enum(['created_at', 'updated_at']).optional().default('created_at'),
+  orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
   organizationId: z.uuid().nullable().optional(),
   includeSubSessions: z.boolean().optional().default(false),
   gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),

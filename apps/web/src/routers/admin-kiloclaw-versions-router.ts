@@ -10,6 +10,7 @@ import { eq, desc, sql, or, ilike, inArray, and, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { TRPCError } from '@trpc/server';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 
 /**
  * Resolve a user's active personal instance, throwing NOT_FOUND if none exists.
@@ -35,6 +36,30 @@ async function requireActivePersonalInstance(userId: string) {
   }
   return instance;
 }
+
+/**
+ * Look up the owner userId for an instance. Falls back to `fallbackUserId`
+ * if provided and the row is not found — keeps set/removePin usable even
+ * for instance rows that have been hard-deleted (shouldn't happen for
+ * pin flows, but defensive).
+ */
+async function resolveInstanceOwnerUserId(
+  instanceId: string,
+  fallbackUserId?: string
+): Promise<string> {
+  const [row] = await db
+    .select({ user_id: kiloclaw_instances.user_id })
+    .from(kiloclaw_instances)
+    .where(eq(kiloclaw_instances.id, instanceId))
+    .limit(1);
+  if (row?.user_id) return row.user_id;
+  if (fallbackUserId) return fallbackUserId;
+  throw new TRPCError({
+    code: 'NOT_FOUND',
+    message: `Instance ${instanceId} has no owner userId`,
+  });
+}
+
 import * as z from 'zod';
 
 const ListVersionsSchema = z.object({
@@ -340,20 +365,34 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
     }
 
-    return result;
+    // Push the resolved pin into DO state so the next redeploy boots the
+    // pinned image. Failures are logged but do NOT roll back the DB row —
+    // the pin is the intent of record; the DO will converge on next
+    // provision if this sync fails.
+    const ownerUserId = await resolveInstanceOwnerUserId(resolvedInstanceId, input.userId);
+    const workerSync = await pushPinToWorker(ownerUserId, resolvedInstanceId, input.imageTag);
+
+    return { ...result, worker_sync: workerSync };
   }),
 
   removePin: adminProcedure.input(RemovePinSchema).mutation(async ({ input }) => {
+    // Look up the owner before deleting so we can still push the clear to
+    // the worker after the row is gone.
+    const ownerUserId = await resolveInstanceOwnerUserId(input.instanceId);
+
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
       .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
       .returning();
 
-    if (!deleted) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'No pin found for this user' });
-    }
+    // Idempotent clear: always push null to the DO, even if no row
+    // existed. This makes `removePin` safe to retry after a failed
+    // worker sync — the DB row is already gone but a stale
+    // `trackedImageTag` in the DO can still be cleaned up by calling
+    // removePin again.
+    const workerSync = await pushPinToWorker(ownerUserId, input.instanceId, null);
 
-    return { success: true };
+    return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
   getLatestTag: adminProcedure.query(async () => {

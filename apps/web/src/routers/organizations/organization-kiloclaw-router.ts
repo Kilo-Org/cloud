@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import {
@@ -1094,7 +1095,9 @@ export const organizationKiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
       }
 
-      return result;
+      const workerSync = await pushPinToWorker(ctx.user.id, instance.id, input.imageTag);
+
+      return { ...result, worker_sync: workerSync };
     }),
 
   removeMyPin: organizationMemberMutationProcedure.mutation(async ({ ctx, input }) => {
@@ -1111,6 +1114,10 @@ export const organizationKiloclawRouter = createTRPCRouter({
       .returning();
 
     if (!deleted) {
+      // No self-set pin was deleted. Either an admin pin exists (forbid),
+      // or no pin exists at all. In the latter case we still push the
+      // clear to the DO so a previously-failed worker sync can be retried
+      // by simply calling removeMyPin again.
       const [existingPin] = await db
         .select({ pinned_by: kiloclaw_version_pins.pinned_by })
         .from(kiloclaw_version_pins)
@@ -1123,11 +1130,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
           message: 'Your version is pinned by an admin. Contact your Kilo admin to remove the pin.',
         });
       }
-
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'No pin found for your account' });
     }
 
-    return { success: true };
+    const workerSync = await pushPinToWorker(ctx.user.id, instance.id, null);
+
+    return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
   // ── Stream Chat ────────────────────────────────────────────────

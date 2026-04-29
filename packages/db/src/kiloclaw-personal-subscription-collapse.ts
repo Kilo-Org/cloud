@@ -38,7 +38,6 @@ type ChangeLogFailureContext = {
 
 type CollapseOptions = {
   changeLogFailurePolicy?: ChangeLogFailurePolicy;
-  cancelSingleCurrentAccessRow?: boolean;
   onChangeLogFailure?: (context: ChangeLogFailureContext) => Promise<void> | void;
 };
 
@@ -152,20 +151,6 @@ function isAccessGrantingSubscription(
     return new Date(row.trial_ends_at).getTime() > now.getTime();
   }
   return false;
-}
-
-function shouldCancelSingleDestroyedCurrentAccessRow(row: KiloClawSubscription): boolean {
-  if (row.stripe_subscription_id !== null) {
-    return false;
-  }
-  if (row.plan === 'trial' && row.status === 'trialing' && row.payment_source === null) {
-    return true;
-  }
-  return (
-    (row.plan === 'standard' || row.plan === 'commit') &&
-    row.status === 'active' &&
-    row.payment_source === 'credits'
-  );
 }
 
 function getHeadSelectionPriority(
@@ -324,53 +309,6 @@ function buildTransferPlan(rows: PersonalSubscriptionRow[], now: Date): Transfer
   };
 }
 
-async function cancelSingleDestroyedCurrentAccessRow(params: {
-  actor: KiloClawSubscriptionChangeActor;
-  executor: PersonalSubscriptionCollapseWriter;
-  reason: string;
-  row: KiloClawSubscription;
-}): Promise<string | null> {
-  if (!isAccessGrantingSubscription(params.row, new Date())) {
-    return null;
-  }
-  if (!shouldCancelSingleDestroyedCurrentAccessRow(params.row)) {
-    return null;
-  }
-
-  const [after] = await params.executor
-    .update(kiloclaw_subscriptions)
-    .set({
-      status: 'canceled',
-      suspended_at: null,
-      destruction_deadline: null,
-      auto_resume_requested_at: null,
-      auto_resume_retry_after: null,
-      auto_resume_attempt_count: 0,
-      auto_top_up_triggered_for_period: null,
-      cancel_at_period_end: false,
-      pending_conversion: false,
-      scheduled_plan: null,
-      scheduled_by: null,
-    })
-    .where(eq(kiloclaw_subscriptions.id, params.row.id))
-    .returning();
-
-  if (!after) {
-    throw new Error(`Failed to cancel destroyed current subscription ${params.row.id}`);
-  }
-
-  await insertKiloClawSubscriptionChangeLog(params.executor, {
-    subscriptionId: after.id,
-    actor: params.actor,
-    action: 'canceled',
-    reason: params.reason,
-    before: params.row,
-    after,
-  });
-
-  return after.id;
-}
-
 async function applyTransferUpdates(
   executor: PersonalSubscriptionCollapseWriter,
   updates: TransferUpdate[],
@@ -428,6 +366,14 @@ async function applyTransferUpdates(
   return updatedSubscriptionIds;
 }
 
+/**
+ * Repairs historical multi-row personal subscription drift after a personal
+ * instance is destroyed. Destroying a user's only current personal instance is
+ * not a billing cancellation: if its current subscription still grants access,
+ * the row remains current and keeps its entitlement. A later reprovision creates
+ * a successor row via the provision-bootstrap transfer path, preserving the
+ * remaining trial or paid billing period without a second charge.
+ */
 export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
   actor: KiloClawSubscriptionChangeActor;
   buildTransferUpdatesOverride?: BuildTransferUpdatesOverride;
@@ -435,7 +381,6 @@ export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
   destroyedInstanceId: string;
   executor: PersonalSubscriptionCollapseWriter;
   onChangeLogFailure?: (context: ChangeLogFailureContext) => Promise<void> | void;
-  cancelSingleCurrentAccessRow?: boolean;
   reason: string;
   userId: string;
 }): Promise<{ updatedSubscriptionIds: string[] }> {
@@ -459,23 +404,8 @@ export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
     return { updatedSubscriptionIds: [] };
   }
 
-  if (currentRows.length === 1) {
-    if (!params.cancelSingleCurrentAccessRow) {
-      return { updatedSubscriptionIds: [] };
-    }
-
-    const [currentRow] = currentRows;
-    if (currentRow?.instance.id !== params.destroyedInstanceId) {
-      return { updatedSubscriptionIds: [] };
-    }
-
-    const canceledSubscriptionId = await cancelSingleDestroyedCurrentAccessRow({
-      actor: params.actor,
-      executor: params.executor,
-      reason: 'destroy_path_cancel_single_current_access_row',
-      row: currentRow.subscription,
-    });
-    return { updatedSubscriptionIds: canceledSubscriptionId ? [canceledSubscriptionId] : [] };
+  if (currentRows.length <= 1) {
+    return { updatedSubscriptionIds: [] };
   }
 
   const now = new Date();
@@ -529,6 +459,12 @@ export async function collapseOrphanPersonalSubscriptionsOnDestroy(params: {
   };
 }
 
+/**
+ * Marks a personal instance destroyed without revoking any still-valid personal
+ * subscription attached to it. Access-granting trial/active/past-due rows remain
+ * current so the user can immediately reprovision and transfer the remaining
+ * entitlement to the new instance.
+ */
 export async function markInstanceDestroyedWithPersonalSubscriptionCollapse(params: {
   actor: KiloClawSubscriptionChangeActor;
   buildTransferUpdatesOverride?: BuildTransferUpdatesOverride;
@@ -606,7 +542,6 @@ export async function markInstanceDestroyedWithPersonalSubscriptionCollapse(para
       changeLogFailurePolicy: params.changeLogFailurePolicy,
       destroyedInstanceId: destroyedInstance.id,
       executor: params.executor,
-      cancelSingleCurrentAccessRow: true,
       onChangeLogFailure: params.onChangeLogFailure,
       reason: params.reason,
       userId: params.userId,

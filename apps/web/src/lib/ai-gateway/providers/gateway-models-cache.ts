@@ -18,7 +18,7 @@ function createGatewayModelsFetcher(redisKey: RedisKey, name: string) {
           .map(model => model.id)
       );
     },
-    60_000,
+    600_000,
     new Set<string>()
   );
 }

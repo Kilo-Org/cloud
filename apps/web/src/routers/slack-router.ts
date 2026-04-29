@@ -55,6 +55,7 @@ export const slackRouter = createTRPCRouter({
         teamId: integration.platform_account_id,
         teamName: integration.platform_account_login,
         scopes: integration.scopes,
+        missingScopes: slackService.getMissingSlackScopes(integration.scopes),
         installedAt: integration.installed_at,
         modelSlug: metadata?.model_slug || null,
       },
@@ -109,16 +110,6 @@ export const slackRouter = createTRPCRouter({
     }
     const owner = resolveOwner(ctx, input?.organizationId);
     return slackService.testConnection(owner);
-  }),
-
-  // Send a test message to Slack
-  sendTestMessage: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
-    if (input?.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId);
-      await requireActiveSubscriptionOrTrial(input.organizationId);
-    }
-    const owner = resolveOwner(ctx, input?.organizationId);
-    return slackService.sendTestMessage(owner);
   }),
 
   // Update the model for Slack integration

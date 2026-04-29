@@ -150,6 +150,131 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.ctx.storage.put(storageUpdate(syncProviderStateForStorage(this.s, patch)));
   }
 
+  /**
+   * Resolve the image version for a pin/rollout decision and write the four
+   * image fields (openclawVersion, imageVariant, trackedImageTag,
+   * trackedImageDigest) on `this.s`. Does NOT persist — callers are
+   * responsible for writing these fields to storage via `persist` or their
+   * own storage.put.
+   *
+   * When `pinnedImageTag` is a tag: resolves against KV, then the Postgres
+   * catalog, then falls back to storing the tag verbatim with null metadata.
+   *
+   * When `pinnedImageTag` is null: runs the rollout selector (honours
+   * per-user kiloclaw_early_access). If the selector returns nothing and
+   * `isNew` is true, clears the fields; otherwise preserves the existing
+   * tracked image so a restart keeps running what it's running.
+   */
+  private async resolveImageStateForPin(
+    pinnedImageTag: string | null,
+    userId: string,
+    instanceId: string,
+    opts: { isNew: boolean; ignoreCurrentImageTag?: boolean }
+  ): Promise<void> {
+    if (pinnedImageTag) {
+      let pinned = await resolveVersionByTag(this.env.KV_CLAW_CACHE, pinnedImageTag);
+
+      if (!pinned && !this.env.HYPERDRIVE?.connectionString) {
+        doError(this.s, 'HYPERDRIVE not configured — cannot look up pinned tag in Postgres', {
+          pinnedImageTag,
+        });
+      }
+      if (!pinned && this.env.HYPERDRIVE?.connectionString) {
+        try {
+          const catalogEntry = await lookupCatalogVersion(
+            this.env.HYPERDRIVE.connectionString,
+            pinnedImageTag
+          );
+          if (catalogEntry) {
+            const variantParse = ImageVariantSchema.safeParse(catalogEntry.variant);
+            if (!variantParse.success) {
+              doError(this.s, 'Invalid variant from Postgres catalog, skipping', {
+                variant: catalogEntry.variant,
+                pinnedImageTag,
+                validationErrors: variantParse.error.flatten(),
+              });
+            } else {
+              pinned = {
+                openclawVersion: catalogEntry.openclawVersion,
+                variant: variantParse.data,
+                imageTag: catalogEntry.imageTag,
+                imageDigest: catalogEntry.imageDigest,
+                publishedAt: catalogEntry.publishedAt,
+                // Pinned instances bypass rollout gating entirely; defaults
+                // are placeholders. The :latest / candidate state of the
+                // pinned tag is irrelevant to selection.
+                rolloutPercent: 0,
+                isLatest: false,
+              };
+            }
+          }
+        } catch (err) {
+          doWarn(this.s, 'Failed to look up pinned tag in Postgres', {
+            error: toLoggable(err),
+          });
+        }
+      }
+
+      if (pinned) {
+        this.s.openclawVersion = pinned.openclawVersion;
+        this.s.imageVariant = pinned.variant;
+        this.s.trackedImageTag = pinned.imageTag;
+        this.s.trackedImageDigest = pinned.imageDigest;
+      } else {
+        doWarn(this.s, 'Pinned tag not found in KV or Postgres, using tag directly', {
+          pinnedImageTag,
+        });
+        this.s.openclawVersion = null;
+        this.s.imageVariant = null;
+        this.s.trackedImageTag = pinnedImageTag;
+        this.s.trackedImageDigest = null;
+      }
+      return;
+    }
+
+    const variant: ImageVariant = 'default';
+    // Per-user early-access opt-in: when set, the user is offered the
+    // current candidate (if any) for every instance they own — personal or
+    // org. The flag lives on kilocode_users, not on the instance.
+    let autoEnroll = false;
+    if (this.env.HYPERDRIVE?.connectionString) {
+      try {
+        autoEnroll = await lookupKiloclawEarlyAccess(this.env.HYPERDRIVE.connectionString, userId);
+      } catch (err) {
+        doWarn(this.s, 'Failed to look up kiloclaw_early_access; treating as false', {
+          error: toLoggable(err),
+        });
+      }
+    }
+    // When clearing an explicit pin (`ignoreCurrentImageTag`), we must not
+    // pass the current tracked tag to the selector. The selector's sticky-
+    // on-candidate behavior (see lib/version-rollout.ts) would otherwise
+    // preserve the previously-pinned tag for a user who isn't in the
+    // candidate's rollout cohort, defeating the point of removing the pin.
+    const selectorCurrentImageTag = opts.ignoreCurrentImageTag ? null : this.s.trackedImageTag;
+    const selected = await selectImageVersionForInstance({
+      kv: this.env.KV_CLAW_CACHE,
+      variant,
+      instanceId,
+      currentImageTag: selectorCurrentImageTag,
+      autoEnroll,
+    });
+    if (selected) {
+      this.s.openclawVersion = selected.openclawVersion;
+      this.s.imageVariant = selected.variant;
+      this.s.trackedImageTag = selected.imageTag;
+      this.s.trackedImageDigest = selected.imageDigest;
+    } else if (opts.isNew) {
+      this.s.openclawVersion = null;
+      this.s.imageVariant = null;
+      this.s.trackedImageTag = null;
+      this.s.trackedImageDigest = null;
+    }
+    // Existing-instance redeploys with no eligible upgrade keep their
+    // current trackedImageTag — already true in this branch since we only
+    // overwrite when `selected` is non-null.
+  }
+
   private async scheduleAlarm(): Promise<void> {
     if (!this.s.status) return;
     await this.ctx.storage.setAlarm(nextAlarmTime(this.s.status));
@@ -594,109 +719,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     // Resolve the image version for this provision.
     console.debug('[DO] provision: pinnedImageTag from config:', config.pinnedImageTag ?? 'none');
-    if (config.pinnedImageTag) {
-      let pinned = await resolveVersionByTag(this.env.KV_CLAW_CACHE, config.pinnedImageTag);
-
-      if (!pinned && !this.env.HYPERDRIVE?.connectionString) {
-        doError(this.s, 'HYPERDRIVE not configured — cannot look up pinned tag in Postgres', {
-          pinnedImageTag: config.pinnedImageTag,
-        });
-      }
-      if (!pinned && this.env.HYPERDRIVE?.connectionString) {
-        try {
-          const catalogEntry = await lookupCatalogVersion(
-            this.env.HYPERDRIVE.connectionString,
-            config.pinnedImageTag
-          );
-          if (catalogEntry) {
-            const variantParse = ImageVariantSchema.safeParse(catalogEntry.variant);
-            if (!variantParse.success) {
-              doError(this.s, 'Invalid variant from Postgres catalog, skipping', {
-                variant: catalogEntry.variant,
-                pinnedImageTag: config.pinnedImageTag,
-                validationErrors: variantParse.error.flatten(),
-              });
-            } else {
-              pinned = {
-                openclawVersion: catalogEntry.openclawVersion,
-                variant: variantParse.data,
-                imageTag: catalogEntry.imageTag,
-                imageDigest: catalogEntry.imageDigest,
-                publishedAt: catalogEntry.publishedAt,
-                // Pinned instances bypass rollout gating entirely; defaults
-                // are placeholders. The :latest / candidate state of the
-                // pinned tag is irrelevant to selection.
-                rolloutPercent: 0,
-                isLatest: false,
-              };
-              console.debug(
-                '[DO] Resolved pinned tag from Postgres catalog:',
-                config.pinnedImageTag
-              );
-            }
-          }
-        } catch (err) {
-          doWarn(this.s, 'Failed to look up pinned tag in Postgres', {
-            error: toLoggable(err),
-          });
-        }
-      }
-
-      if (pinned) {
-        this.s.openclawVersion = pinned.openclawVersion;
-        this.s.imageVariant = pinned.variant;
-        this.s.trackedImageTag = pinned.imageTag;
-        this.s.trackedImageDigest = pinned.imageDigest;
-        console.debug('[DO] Using pinned version:', pinned.openclawVersion, '→', pinned.imageTag);
-      } else {
-        doWarn(this.s, 'Pinned tag not found in KV or Postgres, using tag directly', {
-          pinnedImageTag: config.pinnedImageTag,
-        });
-        this.s.openclawVersion = null;
-        this.s.imageVariant = null;
-        this.s.trackedImageTag = config.pinnedImageTag;
-        this.s.trackedImageDigest = null;
-      }
-    } else {
-      const variant: ImageVariant = 'default';
-      // Per-user early-access opt-in: when set, the user is offered the
-      // current candidate (if any) for every instance they own — personal or
-      // org. The flag lives on kilocode_users, not on the instance.
-      let autoEnroll = false;
-      if (this.env.HYPERDRIVE?.connectionString) {
-        try {
-          autoEnroll = await lookupKiloclawEarlyAccess(
-            this.env.HYPERDRIVE.connectionString,
-            userId
-          );
-        } catch (err) {
-          doWarn(this.s, 'Failed to look up kiloclaw_early_access; treating as false', {
-            error: toLoggable(err),
-          });
-        }
-      }
-      const selected = await selectImageVersionForInstance({
-        kv: this.env.KV_CLAW_CACHE,
-        variant,
-        instanceId: opts?.instanceId ?? userId,
-        currentImageTag: this.s.trackedImageTag,
-        autoEnroll,
-      });
-      if (selected) {
-        this.s.openclawVersion = selected.openclawVersion;
-        this.s.imageVariant = selected.variant;
-        this.s.trackedImageTag = selected.imageTag;
-        this.s.trackedImageDigest = selected.imageDigest;
-      } else if (isNew) {
-        this.s.openclawVersion = null;
-        this.s.imageVariant = null;
-        this.s.trackedImageTag = null;
-        this.s.trackedImageDigest = null;
-      }
-      // Existing-instance redeploys with no eligible upgrade keep their
-      // current trackedImageTag — already true in this branch since we only
-      // overwrite when `selected` is non-null.
-    }
+    await this.resolveImageStateForPin(
+      config.pinnedImageTag ?? null,
+      userId,
+      opts?.instanceId ?? userId,
+      { isNew }
+    );
 
     const previousUserTimezone = this.s.userTimezone ?? null;
     const previousUserLocation = this.s.userLocation ?? null;
@@ -1722,6 +1750,73 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.ctx.storage.setAlarm(Date.now());
 
     return { ok: true };
+  }
+
+  /**
+   * Apply or clear an admin version pin by writing the resolved image
+   * fields into DO state. Does not restart the machine — the next
+   * provision/restart/redeploy picks up the new trackedImageTag via
+   * resolveImageTag(state, env).
+   *
+   * Pass `imageTag` = tag string to pin, or null to clear the pin (resets
+   * to the current rollout target via selectImageVersionForInstance).
+   *
+   * Returns the resolved image metadata so the caller can surface what
+   * was actually applied.
+   */
+  async applyPinnedVersion(
+    imageTag: string | null,
+    instanceId?: string
+  ): Promise<{
+    openclawVersion: string | null;
+    imageTag: string | null;
+    imageDigest: string | null;
+    variant: string | null;
+  }> {
+    await this.loadState();
+
+    if (!this.s.status) {
+      throw Object.assign(new Error('Cannot apply pin: instance has no status'), { status: 404 });
+    }
+    if (this.s.status === 'destroying') {
+      throw Object.assign(new Error('Cannot apply pin: instance is being destroyed'), {
+        status: 409,
+      });
+    }
+    if (!this.s.userId) {
+      throw Object.assign(new Error('Cannot apply pin: instance has no userId'), { status: 404 });
+    }
+
+    const resolvedInstanceId = instanceId ?? this.s.userId;
+    await this.resolveImageStateForPin(imageTag, this.s.userId, resolvedInstanceId, {
+      isNew: false,
+      // When clearing a pin (imageTag === null), force a fresh rollout
+      // decision instead of preserving the currently-tracked tag. Without
+      // this, an instance that was pinned to the current candidate would
+      // stay on that candidate even when the user isn't in the rollout
+      // cohort — effectively leaving the pin in place.
+      ignoreCurrentImageTag: imageTag === null,
+    });
+
+    await this.persist({
+      openclawVersion: this.s.openclawVersion,
+      imageVariant: this.s.imageVariant,
+      trackedImageTag: this.s.trackedImageTag,
+      trackedImageDigest: this.s.trackedImageDigest,
+    });
+
+    doLog(this.s, 'applyPinnedVersion: DO state updated', {
+      requestedImageTag: imageTag,
+      resolvedImageTag: this.s.trackedImageTag,
+      openclawVersion: this.s.openclawVersion,
+    });
+
+    return {
+      openclawVersion: this.s.openclawVersion,
+      imageTag: this.s.trackedImageTag,
+      imageDigest: this.s.trackedImageDigest,
+      variant: this.s.imageVariant,
+    };
   }
 
   async start(

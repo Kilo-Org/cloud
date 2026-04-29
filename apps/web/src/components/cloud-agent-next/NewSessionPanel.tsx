@@ -87,6 +87,14 @@ import {
   CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
+import {
+  getLastUsedModel,
+  getLastUsedVariant,
+  getPreferredInitialModel,
+  getPreferredInitialVariant,
+  setLastUsedModel,
+  setLastUsedVariant,
+} from '@/components/cloud-agent-next/model-preferences';
 
 type Repository = {
   id: number;
@@ -213,19 +221,54 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
     const isCurrentModelAvailable = modelOptions.some(m => m.id === model);
     if (!isCurrentModelAvailable || !model || !isModelUserSelected) {
-      const defaultModel = defaultsData?.defaultModel;
-      const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
-      const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;
+      const newModel = getPreferredInitialModel({
+        modelOptions,
+        lastUsedModel: getLastUsedModel(organizationId),
+        defaultModel: defaultsData?.defaultModel,
+      });
 
       if (newModel && newModel !== model) {
         setModel(newModel);
         setIsModelUserSelected(false);
-        // Default variant to first available variant (typically "none") for the new model
+        // Restore the last-used variant for this model, otherwise fall back to the first
+        // available variant (typically "none").
         const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
-        setVariant(newVariants[0]);
+        setVariant(
+          getPreferredInitialVariant({
+            availableVariants: newVariants,
+            lastUsedVariant: getLastUsedVariant(newModel, organizationId),
+          })
+        );
       }
     }
-  }, [defaultsData?.defaultModel, modelOptions, model, isModelUserSelected]);
+  }, [defaultsData?.defaultModel, modelOptions, model, isModelUserSelected, organizationId]);
+
+  const handleModelChange = useCallback(
+    (newModel: string) => {
+      setModel(newModel);
+      setIsModelUserSelected(true);
+      setLastUsedModel(newModel, organizationId);
+      const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
+      setVariant(
+        getPreferredInitialVariant({
+          availableVariants: newVariants,
+          lastUsedVariant: getLastUsedVariant(newModel, organizationId),
+          currentVariant: variant,
+        })
+      );
+    },
+    [modelOptions, organizationId, variant]
+  );
+
+  const handleVariantChange = useCallback(
+    (newVariant: string) => {
+      setVariant(newVariant);
+      if (model) {
+        setLastUsedVariant(model, newVariant, organizationId);
+      }
+    },
+    [model, organizationId]
+  );
 
   // ---------------------------------------------------------------------------
   // Profiles
@@ -653,6 +696,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         }
       }
 
+      setLastUsedModel(model, organizationId);
+      if (variant) {
+        setLastUsedVariant(model, variant, organizationId);
+      }
+
       void queryClient.invalidateQueries({
         queryKey: trpc.unifiedSessions.list.queryKey({
           limit: 3,
@@ -876,18 +924,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               onModeChange={setMode}
               model={model}
               modelOptions={modelOptions}
-              onModelChange={newModel => {
-                setModel(newModel);
-                setIsModelUserSelected(true);
-                const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
-                if (!variant || !newVariants.includes(variant)) {
-                  setVariant(newVariants[0]);
-                }
-              }}
+              onModelChange={handleModelChange}
               isLoadingModels={!modelsData}
               variant={variant}
               availableVariants={availableVariants}
-              onVariantChange={setVariant}
+              onVariantChange={handleVariantChange}
               disabled={isPreparing}
               className="md:hidden"
             />
@@ -904,14 +945,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
               <ModelCombobox
                 models={modelOptions}
                 value={model}
-                onValueChange={newModel => {
-                  setModel(newModel);
-                  setIsModelUserSelected(true);
-                  const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
-                  if (!variant || !newVariants.includes(variant)) {
-                    setVariant(newVariants[0]);
-                  }
-                }}
+                onValueChange={handleModelChange}
                 isLoading={!modelsData}
                 variant="compact"
                 disabled={isPreparing}
@@ -921,7 +955,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 <VariantCombobox
                   variants={availableVariants}
                   value={variant}
-                  onValueChange={setVariant}
+                  onValueChange={handleVariantChange}
                   disabled={isPreparing}
                   className="min-w-0"
                 />

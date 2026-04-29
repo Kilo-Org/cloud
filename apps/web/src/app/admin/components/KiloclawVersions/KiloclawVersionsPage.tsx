@@ -56,6 +56,7 @@ import {
   Ban,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
 import { formatDistanceToNow } from 'date-fns';
 
 function StatusBadge({ status }: { status: string }) {
@@ -812,8 +813,8 @@ export function PinsTab() {
 
   const { mutateAsync: setPin, isPending: isPinning } = useMutation(
     trpc.admin.kiloclawVersions.setPin.mutationOptions({
-      onSuccess: () => {
-        toast.success('Pin created');
+      onSuccess: result => {
+        toastPinMutationResult(result, 'Pin created');
         invalidatePinQueries();
         setSelectedUserId(null);
         setSelectedUserEmail(null);
@@ -829,8 +830,8 @@ export function PinsTab() {
 
   const { mutateAsync: removePin, isPending: isRemoving } = useMutation(
     trpc.admin.kiloclawVersions.removePin.mutationOptions({
-      onSuccess: () => {
-        toast.success('Pin removed');
+      onSuccess: result => {
+        toastPinMutationResult(result, 'Pin removed');
         invalidatePinQueries();
         setRemovingInstanceId(null);
       },

@@ -352,7 +352,7 @@ export async function syncAndStoreProviders() {
     openrouterProviders,
   });
 
-  const direct_byok_model_counts = await syncDirectByokModels(openrouter_data);
+  const direct_byok_model_counts = await syncDirectByokModels(openrouter_data, vercel_data);
   console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
 
   return {

@@ -16,9 +16,12 @@
     "lint": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json apps/mobile/src",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
-    "check:unused": "knip"
+    "check:unused": "knip",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
+    "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo/react-native-action-sheet": "^4.1.1",
     "@kilocode/trpc": "workspace:*",
     "@react-native-community/netinfo": "11.5.2",
@@ -36,18 +39,21 @@
     "expo-application": "~55.0.13",
     "expo-asset": "~55.0.13",
     "expo-audio": "~55.0.12",
+    "expo-blur": "~55.0.14",
     "expo-build-properties": "~55.0.12",
     "expo-clipboard": "~55.0.12",
     "expo-constants": "~55.0.12",
     "expo-crypto": "~55.0.14",
     "expo-dev-client": "~55.0.23",
     "expo-document-picker": "~55.0.12",
+    "expo-font": "~55.0.6",
     "expo-haptics": "~55.0.13",
     "expo-image": "~55.0.8",
     "expo-image-manipulator": "~55.0.14",
     "expo-image-picker": "~55.0.17",
     "expo-insights": "55.0.15",
     "expo-linking": "~55.0.11",
+    "expo-location": "~55.1.8",
     "expo-notifications": "~55.0.17",
     "expo-router": "~55.0.11",
     "expo-secure-store": "~55.0.12",
@@ -84,7 +90,8 @@
     "@typescript/native-preview": "catalog:",
     "eslint-plugin-sonarjs": "^4.0.2",
     "knip": "^6.0.6",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^4.1.0"
   },
   "private": true
 }

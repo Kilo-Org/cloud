@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { OpenCodeVariantSchema } from '@kilocode/db/schema-types';
-import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { DirectByokProviderMetaId } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
 import type { CustomLlmProvider } from '@kilocode/db';
 
@@ -18,13 +18,14 @@ export const DirectByokModelSchema = z.object({
   variants: z.record(z.string(), OpenCodeVariantSchema).nullable(),
 });
 
+export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
+
 export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
 
 export type DirectByokProvider = {
-  id: DirectUserByokInferenceProviderId;
-  name: string;
+  id: DirectByokProviderMetaId;
   base_url: string;
-  models: ReadonlyArray<DirectByokModel>;
+  models: () => Promise<ReadonlyArray<DirectByokModel>>;
   ai_sdk_provider: CustomLlmProvider;
   transformRequest(context: TransformRequestContext): void;
 };

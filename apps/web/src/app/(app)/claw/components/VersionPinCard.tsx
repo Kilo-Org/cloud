@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Pin, PinOff, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
 import { useClawAvailableVersions, useClawMyPin } from '../hooks/useClawHooks';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { Button } from '@/components/ui/button';
@@ -48,11 +49,12 @@ export function VersionPinCard({
     }
 
     try {
-      await mutations.setMyPin.mutateAsync({
+      const result = await mutations.setMyPin.mutateAsync({
         imageTag: selectedImageTag,
         reason: reason.trim() || undefined,
       });
-      toast.success(
+      toastPinMutationResult(
+        result,
         'Version pinned successfully. Use the "Redeploy or Upgrade" button to apply this version.'
       );
       setSelectedImageTag('');
@@ -65,8 +67,9 @@ export function VersionPinCard({
 
   const handleUnpin = async () => {
     try {
-      await mutations.removeMyPin.mutateAsync();
-      toast.success(
+      const result = await mutations.removeMyPin.mutateAsync();
+      toastPinMutationResult(
+        result,
         'Version pin removed. Use the "Redeploy or Upgrade" button to return to the latest version.'
       );
     } catch (error) {

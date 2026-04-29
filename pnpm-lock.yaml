@@ -140,6 +140,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@expo-google-fonts/jetbrains-mono':
+        specifier: ^0.4.1
+        version: 0.4.1
       '@expo/react-native-action-sheet':
         specifier: ^4.1.1
         version: 4.1.1(@types/react@19.2.14)(react@19.2.0)
@@ -191,6 +194,9 @@ importers:
       expo-audio:
         specifier: ~55.0.12
         version: 55.0.12(expo-asset@55.0.13(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3))(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
+      expo-blur:
+        specifier: ~55.0.14
+        version: 55.0.14(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       expo-build-properties:
         specifier: ~55.0.12
         version: 55.0.12(expo@55.0.12)
@@ -209,6 +215,9 @@ importers:
       expo-document-picker:
         specifier: ~55.0.12
         version: 55.0.12(expo@55.0.12)
+      expo-font:
+        specifier: ~55.0.6
+        version: 55.0.6(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       expo-haptics:
         specifier: ~55.0.13
         version: 55.0.13(expo@55.0.12)
@@ -227,6 +236,9 @@ importers:
       expo-linking:
         specifier: ~55.0.11
         version: 55.0.11(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)
+      expo-location:
+        specifier: ~55.1.8
+        version: 55.1.8(expo@55.0.12)(typescript@5.9.3)
       expo-notifications:
         specifier: ~55.0.17
         version: 55.0.17(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)
@@ -333,6 +345,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
 
   apps/storybook:
     dependencies:
@@ -464,14 +479,14 @@ importers:
         specifier: ^3.1009.0
         version: 3.1009.0
       '@chat-adapter/slack':
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       '@chat-adapter/state-memory':
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       '@chat-adapter/state-redis':
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       '@emoji-mart/data':
         specifier: ^1.2.1
         version: 1.2.1
@@ -653,8 +668,8 @@ importers:
         specifier: ^7.0.1
         version: 7.0.1
       chat:
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1282,18 +1297,12 @@ importers:
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.13.0(typescript@5.9.3))(hono@4.12.8)
-      '@kilocode/db':
-        specifier: workspace:*
-        version: link:../../packages/db
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
-      '@octokit/auth-app':
-        specifier: 'catalog:'
-        version: 8.2.0
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.13.0(typescript@5.9.3)
@@ -1834,7 +1843,7 @@ importers:
     dependencies:
       '@cloudflare/containers':
         specifier: ^0.3.2
-        version: 0.3.2
+        version: 0.3.3
       hono:
         specifier: ^4.12.7
         version: 4.12.8
@@ -3182,17 +3191,17 @@ packages:
   '@braintree/sanitize-url@6.0.4':
     resolution: {integrity: sha512-s3jaWicZd0pkP0jf5ysyHUI/RE7MHos6qlToFcGWXVp+ykHOy77OUMrfbgJ9it2C5bow7OIQwYYaHjk9XlBQ2A==}
 
-  '@chat-adapter/shared@4.20.1':
-    resolution: {integrity: sha512-UawGmT7O+3vxvaU9f+lc0PVQKU+TvE0PUxa0zL43qH1rqGkosngtT3cOOhW6JOx+rxt3jox2a99xr8hnJPkshA==}
+  '@chat-adapter/shared@4.26.0':
+    resolution: {integrity: sha512-YD0MGktFXrArUqTBsyPfL5vkdD1WBS58PAWO0oVrMQAMmPxpAXfWGjBtZCkf3y8R8Svb0uVuVXiMZSForaEnMQ==}
 
-  '@chat-adapter/slack@4.20.1':
-    resolution: {integrity: sha512-DGrNKHiYCFPFd6WzWkoJmCmtK/TuHw5euUjev6i01ygYNLQ7h2JiL424iqkdZmXfkOIxnDcnVBbKDuF9uEKQlg==}
+  '@chat-adapter/slack@4.26.0':
+    resolution: {integrity: sha512-NNN47rURI6qpJf4rRK8xyeumjPTAXr7YSU4/FnViU8cFV/vKYFR4xZTzlFMVWNrYi9SmSwasUjcBmQznigK54Q==}
 
-  '@chat-adapter/state-memory@4.20.1':
-    resolution: {integrity: sha512-JtITUuz4xYwXMOSH8dCYjuxgIgtkecVH5RUVR46PT9Nh8QT4l6WRMNZvdrWkJOn9jOZToXiNS/ae0OFJHJtN+g==}
+  '@chat-adapter/state-memory@4.26.0':
+    resolution: {integrity: sha512-FsfyM/A9Bf1yFc1FWmOsK+a4YVwm5FogX25hZxFG6cEvyFb6Cd924SsbtvF06yItY/7J2UFetCsMmBPkdPKshQ==}
 
-  '@chat-adapter/state-redis@4.20.1':
-    resolution: {integrity: sha512-aAN+GXNTCKrXsSurh5arLMDGl8XbbxTspD1qLZuYXPwQBBZsuF3mPBfeFmwRJqweHuwv+3b/VofXvxFmRosR6A==}
+  '@chat-adapter/state-redis@4.26.0':
+    resolution: {integrity: sha512-NSX2E6wkDlg0AMfKFx4LPoV6cBHolL08Ht3cT+S01jss24t9GzlDw/BUsrWOeoTElwEhxZcQw5bUkStUAA7JMg==}
 
   '@chromatic-com/playwright@0.12.8':
     resolution: {integrity: sha512-2oi8ghd+2N+hDI0Y65Ac/aYfsvDTyDHvEZMNS4Ln7VzyZ6SdGLoQLOvP80IGJlekTI68K8gQpzXewRV2chUaZQ==}
@@ -3218,8 +3227,8 @@ packages:
   '@cloudflare/containers@0.3.0':
     resolution: {integrity: sha512-8HM1NgXThWCTk7SH28QFxqMNLJwl6RrMkj3qd0KvDA59BALsn3mZXNDT94i1JaGZnP4Bc8sPGs1u9UAl/mVUVg==}
 
-  '@cloudflare/containers@0.3.2':
-    resolution: {integrity: sha512-hWobJrpXCgFJ/HYii6E49eegnnlUDWGacjLd0Fb6nQwTD005+T2eHUPI6qOEq9KPJOd7xTWkhkuXEKxDFvfyqQ==}
+  '@cloudflare/containers@0.3.3':
+    resolution: {integrity: sha512-ZSXmArCoo5bVTp8pGAJdl5WKmwtZDcffJqr4JcZEbSmMIFjU+AlBqgysuxXMgu03Rp239cOdqerbjK7H0K2krQ==}
 
   '@cloudflare/kv-asset-handler@0.4.0':
     resolution: {integrity: sha512-+tv3z+SPp+gqTIcImN9o0hqE9xyfQjI1XD9pL6NuKjua9B1y7mNYv0S9cP+QEbA4ppVgGZEmKOvHX5G5Ei1CVA==}
@@ -3643,6 +3652,9 @@ packages:
     resolution: {integrity: sha512-EriSTlt5OC9/7SXkRSCAhfSxxoSUgBm33OH+IkwbdpgoqsSsUg7y3uh+IICI/Qg4BBWr3U2i39RpmycbxMq4ew==}
     engines: {node: ^12.0.0 || ^14.0.0 || >=16.0.0}
 
+  '@expo-google-fonts/jetbrains-mono@0.4.1':
+    resolution: {integrity: sha512-CslACrtMOcRwoWXCO7OMEI+9w3fukWSoBtvNz46OqPoogEuuoY0tkDY1O8sFumk8t0pC6Cx0Xr95O0TOQhpkug==}
+
   '@expo-google-fonts/material-symbols@0.4.27':
     resolution: {integrity: sha512-cnb3DZnWUWpezGFkJ8y4MT5f/lw6FcgDzeJzic+T+vpQHLHG1cg3SC3i1w1i8Bk4xKR4HPY3t9iIRNvtr5ml8A==}
 
@@ -3703,6 +3715,9 @@ packages:
   '@expo/image-utils@0.8.12':
     resolution: {integrity: sha512-3KguH7kyKqq7pNwLb9j6BBdD/bjmNwXZG/HPWT6GWIXbwrvAJt2JNyYTP5agWJ8jbbuys1yuCzmkX+TU6rmI7A==}
 
+  '@expo/image-utils@0.8.13':
+    resolution: {integrity: sha512-1I//yBQeTY6p0u1ihqGNDAr35EbSG8uFEupFrIF0jd++h9EWH33521yZJU1yE+mwGlzCb61g3ehu78siMhXBlA==}
+
   '@expo/json-file@10.0.13':
     resolution: {integrity: sha512-pX/XjQn7tgNw6zuuV2ikmegmwe/S7uiwhrs2wXrANMkq7ozrA+JcZwgW9Q/8WZgciBzfAhNp5hnackHcrmapQA==}
 
@@ -3760,6 +3775,14 @@ packages:
 
   '@expo/require-utils@55.0.3':
     resolution: {integrity: sha512-TS1m5tW45q4zoaTlt6DwmdYHxvFTIxoLrTHKOFrIirHIqIXnHCzpceg8wumiBi+ZXSaGY2gobTbfv+WVhJY6Fw==}
+    peerDependencies:
+      typescript: ^5.0.0 || ^5.0.0-0
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@expo/require-utils@55.0.4':
+    resolution: {integrity: sha512-JAANvXqV7MOysWeVWgaiDzikoyDjJWOV/ulOW60Zb3kXJfrx2oZOtGtDXDFKD1mXuahQgoM5QOjuZhF7gFRNjA==}
     peerDependencies:
       typescript: ^5.0.0 || ^5.0.0-0
     peerDependenciesMeta:
@@ -8757,8 +8780,8 @@ packages:
   character-reference-invalid@2.0.1:
     resolution: {integrity: sha512-iBZ4F4wRbyORVsu0jPV7gXkOsGYjGHPmAyv+HiHG8gi5PtC9KI2j1+v8/tlibRvjoWX027ypmG/n0HtO5t7unw==}
 
-  chat@4.20.1:
-    resolution: {integrity: sha512-TwvP1bbzK2g3sYHhD94wot2watxnySCYLQkaMdYjM79T43OTybG8hSSFhOrrp/AXjLHei2sch4GCOQu+4zcfHw==}
+  chat@4.26.0:
+    resolution: {integrity: sha512-QToDnIEGpyb8yQA6YLMHOSRK30YVk4RtsyFyuWFYyB2c4jQlyIrSWtwVK7qyvmvqzQp9uDwCdJRAhS8GtCHAGQ==}
 
   check-error@2.1.3:
     resolution: {integrity: sha512-PAJdDJusoxnwm1VwW07VWwUN1sl7smmC3OKggvndJFadxxDRyFJBX/ggnu/KE4kQAB7a3Dp8f/YXC1FlUprWmA==}
@@ -9888,6 +9911,13 @@ packages:
       react: '*'
       react-native: '*'
 
+  expo-blur@55.0.14:
+    resolution: {integrity: sha512-NKyCKFWTNpX4CZSsiE1sgkqk/yvR1K0UTukuIbxVKoobB+yALLg1CFav0NqfdQqjhtoj5oEzP0Brlq92Z08Zfg==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
+      react-native: '*'
+
   expo-build-properties@55.0.12:
     resolution: {integrity: sha512-PUK0uPxFESZTegqFk+v3V9HWRhjIgvkImoHAgXU22xAyzfrdPnWKCwesyd88rdhGdSc/7lGFmIB7bOYKi2vjkQ==}
     peerDependencies:
@@ -10009,6 +10039,11 @@ packages:
     peerDependencies:
       react: '*'
       react-native: '*'
+
+  expo-location@55.1.8:
+    resolution: {integrity: sha512-mEExFf84nmWLwi14GFfUsFLrCm10gbcqFn9EPXpuruQ28YMtJWgCD+jJtESYPQkYF44N21fVok3T28fLuCqydA==}
+    peerDependencies:
+      expo: '*'
 
   expo-manifests@55.0.14:
     resolution: {integrity: sha512-l2+fYFkZBR/hbd//LfKz5qBaUAQfC1kWdnqNr3HCa7vGNYcGKA4aMSTXZAJ0SEo1lkO26yz5cEFMGjYPbAAg0g==}
@@ -16524,30 +16559,30 @@ snapshots:
 
   '@braintree/sanitize-url@6.0.4': {}
 
-  '@chat-adapter/shared@4.20.1':
+  '@chat-adapter/shared@4.26.0':
     dependencies:
-      chat: 4.20.1
+      chat: 4.26.0
     transitivePeerDependencies:
       - supports-color
 
-  '@chat-adapter/slack@4.20.1':
+  '@chat-adapter/slack@4.26.0':
     dependencies:
-      '@chat-adapter/shared': 4.20.1
+      '@chat-adapter/shared': 4.26.0
       '@slack/web-api': 7.15.0
-      chat: 4.20.1
+      chat: 4.26.0
     transitivePeerDependencies:
       - debug
       - supports-color
 
-  '@chat-adapter/state-memory@4.20.1':
+  '@chat-adapter/state-memory@4.26.0':
     dependencies:
-      chat: 4.20.1
+      chat: 4.26.0
     transitivePeerDependencies:
       - supports-color
 
-  '@chat-adapter/state-redis@4.20.1':
+  '@chat-adapter/state-redis@4.26.0':
     dependencies:
-      chat: 4.20.1
+      chat: 4.26.0
       redis: 5.11.0
     transitivePeerDependencies:
       - '@node-rs/xxhash'
@@ -16632,7 +16667,7 @@ snapshots:
 
   '@cloudflare/containers@0.3.0': {}
 
-  '@cloudflare/containers@0.3.2': {}
+  '@cloudflare/containers@0.3.3': {}
 
   '@cloudflare/kv-asset-handler@0.4.0':
     dependencies:
@@ -16957,6 +16992,8 @@ snapshots:
 
   '@eslint-community/regexpp@4.12.2': {}
 
+  '@expo-google-fonts/jetbrains-mono@0.4.1': {}
+
   '@expo-google-fonts/material-symbols@0.4.27': {}
 
   '@expo/cli@55.0.22(@expo/metro-runtime@55.0.9)(bufferutil@4.1.0)(expo-constants@55.0.12)(expo-font@55.0.6)(expo-router@55.0.11)(expo@55.0.12)(react-dom@19.2.4(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)':
@@ -17129,6 +17166,19 @@ snapshots:
       resolve-from: 5.0.0
       semver: 7.7.4
 
+  '@expo/image-utils@0.8.13(typescript@5.9.3)':
+    dependencies:
+      '@expo/require-utils': 55.0.4(typescript@5.9.3)
+      '@expo/spawn-async': 1.7.2
+      chalk: 4.1.2
+      getenv: 2.0.0
+      jimp-compact: 0.16.1
+      parse-png: 2.1.0
+      semver: 7.7.4
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
   '@expo/json-file@10.0.13':
     dependencies:
       '@babel/code-frame': 7.29.0
@@ -17259,6 +17309,16 @@ snapshots:
       - '@types/react'
 
   '@expo/require-utils@55.0.3(typescript@5.9.3)':
+    dependencies:
+      '@babel/code-frame': 7.29.0
+      '@babel/core': 7.29.0
+      '@babel/plugin-transform-modules-commonjs': 7.28.6(@babel/core@7.29.0)
+    optionalDependencies:
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - supports-color
+
+  '@expo/require-utils@55.0.4(typescript@5.9.3)':
     dependencies:
       '@babel/code-frame': 7.29.0
       '@babel/core': 7.29.0
@@ -23028,7 +23088,7 @@ snapshots:
 
   character-reference-invalid@2.0.1: {}
 
-  chat@4.20.1:
+  chat@4.26.0:
     dependencies:
       '@workflow/serde': 4.1.0-beta.2
       mdast-util-to-string: 4.0.0
@@ -24165,6 +24225,12 @@ snapshots:
       react: 19.2.0
       react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
 
+  expo-blur@55.0.14(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0):
+    dependencies:
+      expo: 55.0.12(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@55.0.9)(bufferutil@4.1.0)(expo-router@55.0.11)(react-dom@19.2.4(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
+      react: 19.2.0
+      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
+
   expo-build-properties@55.0.12(expo@55.0.12):
     dependencies:
       '@expo/schema-utils': 55.0.3
@@ -24292,6 +24358,14 @@ snapshots:
       react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - expo
+      - supports-color
+      - typescript
+
+  expo-location@55.1.8(expo@55.0.12)(typescript@5.9.3):
+    dependencies:
+      '@expo/image-utils': 0.8.13(typescript@5.9.3)
+      expo: 55.0.12(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@55.0.9)(bufferutil@4.1.0)(expo-router@55.0.11)(react-dom@19.2.4(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
+    transitivePeerDependencies:
       - supports-color
       - typescript
 

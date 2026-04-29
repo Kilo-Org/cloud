@@ -35,7 +35,7 @@ const getVercelRoutingPercentage = createCachedFetch(
     const { vercel_routing_percentage } = GatewayPercentageSchema.parse(JSON.parse(raw));
     return vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE;
   },
-  10_000,
+  600_000,
   DEFAULT_VERCEL_PERCENTAGE
 );
 

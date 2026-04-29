@@ -992,7 +992,15 @@ async function subscribeToEvents(
     }
   } finally {
     clearIdleTimer(agent.agentId);
-    eventAbortControllers.delete(agent.agentId);
+    // Only clear the map entry if it still points at *our* controller.
+    // A concurrent refresh/model-swap may have already stored a fresh
+    // controller for a new subscription; an unconditional delete here
+    // would strand that stream with no way to abort it on future
+    // stops or refreshes.
+    const current = eventAbortControllers.get(agent.agentId);
+    if (current === controller) {
+      eventAbortControllers.delete(agent.agentId);
+    }
   }
 }
 
@@ -1370,9 +1378,16 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
   // accepted so the message survives a container crash mid-response.
   // Polecats/refineries/triage have different session semantics (fresh
   // session per dispatch) and rely on exit/drain snapshots.
+  //
+  // Prefer process.env.GASTOWN_CONTAINER_TOKEN over agent.gastownContainerToken:
+  // /refresh-token updates the env var first (process.env.GASTOWN_CONTAINER_TOKEN
+  // = body.token) and only then restarts agents, so the live env token is
+  // always at least as fresh as the cached field. Using the cached field
+  // first would 401 the snapshot upload after rotation and lose the turn
+  // we are trying to preserve.
   if (agent.role === 'mayor') {
     const apiUrl = agent.gastownApiUrl;
-    const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+    const token = process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? null;
     if (apiUrl && token) {
       void saveDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
     }
@@ -1442,9 +1457,17 @@ const LIVE_ENV_KEYS = new Set([
  * - Start from `agent.startupEnv` (original dispatch env).
  * - For every key in `LIVE_ENV_KEYS`, read from `process.env` so live
  *   updates (container-token refresh, config sync) are picked up.
- * - Never include `KILO_CONFIG_CONTENT` / `OPENCODE_CONFIG_CONTENT`:
- *   the caller is responsible for setting these on `process.env`
- *   before the SDK restart if the model changed.
+ * - `KILO_CONFIG_CONTENT` / `OPENCODE_CONFIG_CONTENT` handling:
+ *     - Model hot-swap (`updateAgentModel`) rebuilds these for the new
+ *       model and writes them to `agent.startupEnv` before calling this
+ *       helper, so picking them up from `startupEnv` keeps the hot-swap
+ *       agent-specific.
+ *     - Token refresh does not touch the model, so `startupEnv` already
+ *       carries the correct per-agent config. Pulling it in here
+ *       guarantees each agent restart sets its own config on
+ *       `process.env` before `ensureSDKServer` spawns, even when a
+ *       different agent's config was last left in the global env by a
+ *       previous model swap or refresh.
  * - Overlay town-config custom `env_vars` so values added/changed
  *   after the initial dispatch are honoured. Infra keys in
  *   `LIVE_ENV_KEYS` and `RESERVED_ENV_KEYS` always win.
@@ -1457,7 +1480,6 @@ function buildLiveHotSwapEnv(agent: ManagedAgent): Record<string, string> {
   const env: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(agent.startupEnv)) {
-    if (key === 'KILO_CONFIG_CONTENT' || key === 'OPENCODE_CONFIG_CONTENT') continue;
     if (LIVE_ENV_KEYS.has(key)) {
       const live = process.env[key];
       if (live) env[key] = live;
@@ -1554,9 +1576,18 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 export async function refreshTokenForAllAgents(): Promise<
   Array<{ agentId: string; success: boolean; durationMs: number; error?: string }>
 > {
-  const snapshot = [...agents.values()].filter(
-    a => a.status === 'running' || a.status === 'starting'
-  );
+  // Only restart fully-running agents. A `starting` agent may not yet
+  // have a `sessionId` or an `sdkInstances` entry (still hydrating the
+  // DB or waiting on ensureSDKServer), and racing the startup path
+  // would leave duplicate subscriptions, an over-counted sessionCount,
+  // or an orphan server that never closes. `startAgent()` already
+  // reads `process.env.GASTOWN_CONTAINER_TOKEN` when it spawns the
+  // SDK server, so an agent that is still starting will pick up the
+  // fresh token on its own as part of normal startup — no restart
+  // needed. Agents in any terminal state (`exited`, `failed`, etc.)
+  // are also skipped: restarting them would revive a process that the
+  // completion/exit path already tore down.
+  const snapshot = [...agents.values()].filter(a => a.status === 'running');
 
   // Restart agents in parallel. Each agent has its own workdir (and
   // therefore its own sdkInstances key), so the Map mutations don't
@@ -1776,6 +1807,8 @@ export async function updateAgentModel(
   const oldModel = agent.model;
   const prevConfigContent = process.env.KILO_CONFIG_CONTENT;
   const prevOpenCodeContent = process.env.OPENCODE_CONFIG_CONTENT;
+  const prevStartupConfig = agent.startupEnv.KILO_CONFIG_CONTENT;
+  const prevStartupOpenCode = agent.startupEnv.OPENCODE_CONFIG_CONTENT;
 
   console.log(
     `${MANAGER_LOG} updateAgentModel: restarting SDK server for agent ${agentId} with model=${model}`
@@ -1799,8 +1832,13 @@ export async function updateAgentModel(
     agent.startupEnv = { ...agent.startupEnv, GASTOWN_ORGANIZATION_ID: organizationId };
   }
 
-  // 2. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
-  //    so the next createKilo() spawns kilo serve with fresh config.
+  // 2. Rebuild KILO_CONFIG_CONTENT with the new model and persist it on
+  //    `agent.startupEnv` so subsequent hot-swaps (including token
+  //    refreshes performed by another code path) pick up the new model
+  //    instead of replaying the stale dispatch-time config. We also set
+  //    process.env as a secondary signal for any callers that read it
+  //    directly, but buildLiveHotSwapEnv is the authoritative source
+  //    now that it pulls KILO_CONFIG_CONTENT from startupEnv.
   const kilocodeToken = process.env.KILOCODE_TOKEN;
   if (kilocodeToken) {
     const configJson = buildKiloConfigContent(
@@ -1811,6 +1849,11 @@ export async function updateAgentModel(
     );
     process.env.KILO_CONFIG_CONTENT = configJson;
     process.env.OPENCODE_CONFIG_CONTENT = configJson;
+    agent.startupEnv = {
+      ...agent.startupEnv,
+      KILO_CONFIG_CONTENT: configJson,
+      OPENCODE_CONFIG_CONTENT: configJson,
+    };
   }
 
   // 3. Remove the old instance from the map so ensureSDKServer creates a
@@ -1820,9 +1863,10 @@ export async function updateAgentModel(
   agent.model = model;
 
   // Replay the full env from the initial dispatch so the new SDK server
-  // gets the same git identity, auth tokens, and plugin vars. Exclude
-  // KILO_CONFIG_CONTENT / OPENCODE_CONFIG_CONTENT — those were already
-  // rebuilt above with the new model and set on process.env.
+  // gets the same git identity, auth tokens, and plugin vars.
+  // KILO_CONFIG_CONTENT is now pulled from startupEnv (which we just
+  // updated above), making this hot-swap agent-specific even when
+  // process.env carries another agent's config.
   const hotSwapEnv = buildLiveHotSwapEnv(agent);
 
   try {
@@ -1922,6 +1966,21 @@ export async function updateAgentModel(
     if (prevConfigContent !== undefined) process.env.KILO_CONFIG_CONTENT = prevConfigContent;
     if (prevOpenCodeContent !== undefined)
       process.env.OPENCODE_CONFIG_CONTENT = prevOpenCodeContent;
+    // Also restore the startupEnv copy; buildLiveHotSwapEnv now reads
+    // from startupEnv, so a stale forward-config could carry over into
+    // the next hot-swap otherwise.
+    const restoredStartup = { ...agent.startupEnv };
+    if (prevStartupConfig === undefined) {
+      delete restoredStartup.KILO_CONFIG_CONTENT;
+    } else {
+      restoredStartup.KILO_CONFIG_CONTENT = prevStartupConfig;
+    }
+    if (prevStartupOpenCode === undefined) {
+      delete restoredStartup.OPENCODE_CONFIG_CONTENT;
+    } else {
+      restoredStartup.OPENCODE_CONFIG_CONTENT = prevStartupOpenCode;
+    }
+    agent.startupEnv = restoredStartup;
     throw err;
   }
 }

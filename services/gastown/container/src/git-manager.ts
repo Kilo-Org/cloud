@@ -592,6 +592,8 @@ async function createWorktreeInner(options: WorktreeOptions): Promise<string> {
     await execWithAuthRetry('git', () => ['pull', '--rebase', '--autostash'], {
       cwd: dir,
       rigId: options.rigId,
+      envVars: options.envVars,
+      gitUrl: options.gitUrl,
     }).catch(() => {
       // Pull may fail if remote branch doesn't exist yet; that's fine
     });

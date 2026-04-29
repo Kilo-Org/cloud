@@ -62,19 +62,27 @@ function convertModel(
   };
 }
 
-function getDirectByokModels(byokProviders: UserByokProviderId[]) {
+async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
   let nextPreferredId = preferredModels.length;
-  return DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).flatMap(
-    provider => provider.models.map(model => convertModel(provider, model, nextPreferredId++))
+  const enabledProviders = DIRECT_BYOK_PROVIDERS.filter(provider =>
+    byokProviders.includes(provider.id)
   );
+  const results = await Promise.all(
+    enabledProviders.map(async provider => {
+      const models = await provider.models;
+      return models.map(model => convertModel(provider, model, nextPreferredId++));
+    })
+  );
+  return results.flat();
 }
 
-export function getDirectByokModel(requestedModel: string): {
+export async function getDirectByokModel(requestedModel: string): Promise<{
   provider: DirectByokProvider | null;
   model: DirectByokModel | null;
-} {
+}> {
   for (const provider of DIRECT_BYOK_PROVIDERS) {
-    const model = provider?.models.find(
+    const models = await provider.models;
+    const model = models.find(
       model => formatDirectByokModelId(provider, model) === requestedModel
     );
     if (model) {
@@ -90,7 +98,7 @@ export async function getDirectByokModelsForOrganization(organizationId: string)
     organizationId,
     DIRECT_BYOK_PROVIDERS.map(provider => provider.id)
   );
-  return userByok ? getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
+  return userByok ? await getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
 }
 
 export async function getDirectByokModelsForUser(userId: string) {
@@ -99,7 +107,7 @@ export async function getDirectByokModelsForUser(userId: string) {
     userId,
     DIRECT_BYOK_PROVIDERS.map(provider => provider.id)
   );
-  return userByok ? getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
+  return userByok ? await getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
 }
 
 export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {

@@ -7,6 +7,7 @@ import {
 } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 
 const cachedModels = cacheDirectByokModelList('zai-coding');
+
 export default {
   id: 'zai-coding',
   name: 'Z.ai Coding Plan',
@@ -17,18 +18,17 @@ export default {
       type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
     };
   },
-
   models: (async () =>
     enhanceDirectByokModelList({
       recommendedModels: [
         {
-          id: 'moonshotai/Kimi-K2.6',
-          name: 'moonshotai/Kimi-K2.6',
+          id: 'glm-5.1',
+          name: 'GLM-5.1',
           description:
-            'Kimi K2.6 demonstrates particularly strong performance in long-horizon coding tasks and produces professional-grade design with code and vision.',
+            'GLM-5.1 delivers a major leap in coding capability, with particularly significant gains in handling long-horizon tasks. Unlike previous models built around minute-level interactions, GLM-5.1 can work independently and continuously on a single task for more than 8 hours—autonomously planning, executing, and improving itself throughout the process—ultimately delivering complete, engineering-grade results.',
           flags: [],
-          context_length: 262144,
-          max_completion_tokens: 32000,
+          context_length: 200000,
+          max_completion_tokens: 131072,
           variants: null,
         },
       ],

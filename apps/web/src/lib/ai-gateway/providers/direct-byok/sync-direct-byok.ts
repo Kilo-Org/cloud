@@ -105,7 +105,11 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
 
 function stripVendorPrefix(id: string) {
   const slash = id.lastIndexOf('/');
-  return (slash >= 0 ? id.slice(slash + 1) : id).toLowerCase();
+  return slash >= 0 ? id.slice(slash + 1) : id;
+}
+
+function stripVendorPrefixLowerCased(id: string) {
+  return stripVendorPrefix(id).toLowerCase();
 }
 
 async function generateDescription(id: string, name: string): Promise<string> {
@@ -142,7 +146,7 @@ async function syncProvider(
   for (const raw of fetched) {
     const prior = previousById.get(raw.id);
     const name = raw.name ?? stripVendorPrefix(raw.id);
-    const openrouterDescription = openrouterDescriptions.get(stripVendorPrefix(raw.id));
+    const openrouterDescription = openrouterDescriptions.get(stripVendorPrefixLowerCased(raw.id));
     const description =
       openrouterDescription ?? prior?.description ?? (await generateDescription(raw.id, name));
     const context_length = raw.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
@@ -169,7 +173,7 @@ function buildFallbackDescriptions(sources: Record<string, StoredModel>[]): Map<
   const fallbackDescriptions = new Map<string, string>();
   for (const source of sources) {
     for (const model of Object.values(source)) {
-      const id = stripVendorPrefix(model.id);
+      const id = stripVendorPrefixLowerCased(model.id);
       if (!model.description || fallbackDescriptions.has(id)) continue;
       fallbackDescriptions.set(id, model.description);
     }

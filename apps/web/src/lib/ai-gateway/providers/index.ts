@@ -75,7 +75,7 @@ async function checkDirectBYOK(
   requestedModel: string,
   organizationId: string | undefined
 ) {
-  const { provider: directByok, model: directByokModel } = getDirectByokModel(requestedModel);
+  const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
   if (!directByok || !directByokModel) {
     return null;
   }

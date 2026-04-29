@@ -17,7 +17,7 @@ export default {
       recommendedModels: [
         {
           id: 'moonshotai/Kimi-K2.6',
-          name: 'moonshotai/Kimi-K2.6',
+          name: 'Kimi-K2.6',
           description:
             'Kimi K2.6 demonstrates particularly strong performance in long-horizon coding tasks and produces professional-grade design with code and vision.',
           flags: [],

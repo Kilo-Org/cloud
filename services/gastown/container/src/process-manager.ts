@@ -292,9 +292,7 @@ async function runWalCheckpoint(dbPath: string, agentId: string): Promise<boolea
       );
       return false;
     }
-    console.log(
-      `${MANAGER_LOG} WAL checkpoint succeeded for ${agentId} (frames=${checkpointed})`
-    );
+    console.log(`${MANAGER_LOG} WAL checkpoint succeeded for ${agentId} (frames=${checkpointed})`);
     return true;
   } catch (err) {
     console.warn(`${MANAGER_LOG} WAL checkpoint failed for ${agentId}:`, err);
@@ -1543,10 +1541,7 @@ const REFRESH_AGENT_TIMEOUT_MS = 6_000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const handle = setTimeout(
-      () => reject(new Error(`timeout after ${ms}ms: ${label}`)),
-      ms
-    );
+    const handle = setTimeout(() => reject(new Error(`timeout after ${ms}ms: ${label}`)), ms);
     promise.then(
       value => {
         clearTimeout(handle);
@@ -1713,12 +1708,58 @@ export async function refreshTokenForAllAgents(): Promise<
     } catch (err) {
       const durationMs = Date.now() - t0;
       const message = err instanceof Error ? err.message : String(err);
-      // Restore the old SDK instance in the map so the agent keeps
-      // pointing at a tracked server. The old kilo serve child still
-      // has the stale token, but having SOME server is strictly better
-      // than having none: session.prompt still works, and the next
-      // refresh / model swap will pick it up again.
-      if (oldInstance && !sdkInstances.has(agent.workdir)) {
+      // Three failure shapes to unwind, distinguished by what's in
+      // sdkInstances[workdir] and whether pendingEnsure is still set:
+      //
+      //   A. ensureSDKServer not yet resolved (pendingEnsure != null):
+      //      the map is empty (we deleted at 1619 and nothing was put
+      //      back yet). Restore old now; attach a reaper for the
+      //      eventual orphan that ensureSDKServer will install when
+      //      it finally resolves.
+      //
+      //   B. ensureSDKServer resolved, failure happened before or
+      //      inside the block that installs the new instance:
+      //      the map is empty. Restore old.
+      //
+      //   C. ensureSDKServer resolved AND new instance installed, but
+      //      a post-start step threw (e.g. an added future check, or
+      //      a throw from one of the already-caught calls if its
+      //      handler is ever changed). The map contains the fresh
+      //      instance. Close it, remove it, restore old, and point
+      //      the agent back at the old port/session.
+      const current = sdkInstances.get(agent.workdir);
+      if (current && current !== oldInstance) {
+        // Case C — fresh instance is installed. Tear it down and
+        // restore the old one so we don't leak a kilo serve process
+        // or leave the agent pointing at a partially-configured
+        // server (no event subscription, no session count bump, old
+        // server still alive on oldPort).
+        sdkInstances.delete(agent.workdir);
+        try {
+          current.server.close();
+        } catch (closeErr) {
+          log.warn('refresh_token.fresh_close_failed', {
+            agentId: agent.agentId,
+            error: closeErr instanceof Error ? closeErr.message : String(closeErr),
+          });
+        }
+        if (oldInstance) {
+          sdkInstances.set(agent.workdir, oldInstance);
+          agent.serverPort = oldPort;
+          agent.sessionId = oldSessionId;
+        }
+        log.warn('refresh_token.fresh_rolled_back', {
+          agentId: agent.agentId,
+          oldPort,
+          error: message,
+        });
+      } else if (oldInstance && !sdkInstances.has(agent.workdir)) {
+        // Case A/B — map is empty. Restore the old SDK instance in
+        // the map so the agent keeps pointing at a tracked server.
+        // The old kilo serve child still has the stale token, but
+        // having SOME server is strictly better than having none:
+        // session.prompt still works, and the next refresh / model
+        // swap will pick it up again.
         sdkInstances.set(agent.workdir, oldInstance);
         agent.serverPort = oldPort;
         agent.sessionId = oldSessionId;
@@ -2266,8 +2307,15 @@ export async function drainAll(): Promise<void> {
       // write doesn't block container exit, but log loudly if it times out.
       // withTimeout clears the timer on success so we don't leave a ref'd
       // setTimeout keeping the process alive after drain finishes.
+      //
+      // Prefer process.env.GASTOWN_CONTAINER_TOKEN over the per-agent
+      // cached token for the same reason as the mayor sendMessage
+      // snapshot path: /refresh-token rotates the env var first, so a
+      // cached token captured at dispatch time may already be expired
+      // and would 401 the snapshot upload, silently dropping the latest
+      // kilo.db state on eviction.
       const apiUrl = agent.gastownApiUrl;
-      const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+      const token = process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? null;
       if (apiUrl && token) {
         await withTimeout(
           saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId),
@@ -2338,8 +2386,12 @@ export async function stopAll(): Promise<void> {
       // but a loud error is emitted so we can observe snapshot drops.
       // withTimeout clears the timer on success so stopAll doesn't return
       // with a still-ref'd setTimeout delaying container exit.
+      //
+      // Prefer the live env token over the per-agent cached token —
+      // /refresh-token rotates process.env first so the cached field
+      // can be expired after a rotation, 401'ing the final snapshot.
       const apiUrl = agent.gastownApiUrl;
-      const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+      const token = process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? null;
       if (apiUrl && token) {
         await withTimeout(
           saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId),

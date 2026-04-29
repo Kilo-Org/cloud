@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { getTableName } from 'drizzle-orm';
 import type { DispatchPushInput } from '@kilocode/notifications';
@@ -127,5 +127,61 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(first.kind).toBe('failed');
     const second = await stub.dispatchPush(input);
     expect(second.kind).not.toBe('duplicate');
+  });
+
+  it('does not re-increment the badge when retrying after Expo failure', async () => {
+    const insertSpy = vi.fn().mockReturnValue({
+      values: () => ({ onConflictDoUpdate: async () => undefined }),
+    });
+    vi.spyOn(dbClient, 'getWorkerDb').mockReturnValue({
+      select: () => ({
+        from: (table: Parameters<typeof getTableName>[0]) => ({
+          where: async () => {
+            if (getTableName(table) === 'user_push_tokens') {
+              return [{ token: 'tok1' }];
+            }
+            return [{ total: 1 }];
+          },
+        }),
+      }),
+      insert: insertSpy,
+      delete: () => ({ where: async () => undefined }),
+    } as unknown as ReturnType<typeof dbClient.getWorkerDb>);
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    vi.mocked(sendPushNotifications).mockRejectedValueOnce(new Error('boom'));
+
+    const stub = getDO('conv-no-double');
+    const input = baseInput({ idempotencyKey: 'k-no-double' });
+
+    const first = await stub.dispatchPush(input);
+    expect(first.kind).toBe('failed');
+    expect(insertSpy).toHaveBeenCalledTimes(1);
+
+    const second = await stub.dispatchPush(input);
+    expect(second.kind).toBe('delivered');
+    // Badge must not be incremented twice across the retry — the first
+    // attempt's `pending` marker gates the second insert out.
+    expect(insertSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reset the alarm on every successful send', async () => {
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 1 });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('conv-alarm');
+
+    await stub.dispatchPush(baseInput({ idempotencyKey: 'k-alarm-1' }));
+    const firstAlarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    expect(firstAlarm).not.toBeNull();
+
+    // Advance Date.now so a naive setAlarm would push the alarm forward.
+    const realNow = Date.now;
+    try {
+      vi.spyOn(Date, 'now').mockImplementation(() => realNow.call(Date) + 60_000);
+      await stub.dispatchPush(baseInput({ idempotencyKey: 'k-alarm-2' }));
+    } finally {
+      vi.mocked(Date.now).mockRestore();
+    }
+    const secondAlarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    expect(secondAlarm).toBe(firstAlarm);
   });
 });

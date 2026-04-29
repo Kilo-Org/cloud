@@ -67,7 +67,7 @@ export async function sendPushForConversationCore(
   return { perRecipient };
 }
 
-export default class NotificationsService extends WorkerEntrypoint<Env> {
+export class NotificationsService extends WorkerEntrypoint<Env> {
   override async fetch(request: Request): Promise<Response> {
     return app.fetch(request, this.env, this.ctx);
   }
@@ -87,3 +87,5 @@ export default class NotificationsService extends WorkerEntrypoint<Env> {
     });
   }
 }
+
+export default NotificationsService;

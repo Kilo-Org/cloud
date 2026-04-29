@@ -14,7 +14,7 @@ import { useEventServiceClient } from '@/contexts/EventServiceContext';
 export function usePresenceSubscription(context: string, active: boolean) {
   const { eventService } = useEventServiceClient();
   useEffect(() => {
-    if (!active) return;
+    if (!active || !context) return;
     eventService.subscribe([context]);
     return () => {
       eventService.unsubscribe([context]);

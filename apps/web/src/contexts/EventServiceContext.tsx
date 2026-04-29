@@ -4,10 +4,7 @@ import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'r
 import { EventServiceClient } from '@kilocode/event-service';
 import { KiloChatClient } from '@kilocode/kilo-chat';
 import { EVENT_SERVICE_URL, KILO_CHAT_URL } from '@/lib/constants';
-import {
-  getKiloChatToken,
-  clearKiloChatToken,
-} from '@/app/(app)/claw/kilo-chat/token';
+import { getKiloChatToken, clearKiloChatToken } from '@/app/(app)/claw/kilo-chat/token';
 
 export type EventServiceContextValue = {
   eventService: EventServiceClient;

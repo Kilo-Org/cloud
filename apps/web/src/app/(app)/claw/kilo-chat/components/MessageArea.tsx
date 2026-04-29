@@ -14,8 +14,8 @@ import {
   useRemoveReaction,
   useExecuteAction,
 } from '../hooks/useMessages';
-import { useConversationContext } from '../hooks/useEventService';
 import { kiloclawConversationContext } from '@kilocode/event-service';
+import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
 import {
   useConversationDetail,
@@ -77,7 +77,10 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const [renameText, setRenameText] = useState('');
 
   // Subscribe to this conversation's events via the event-service WebSocket
-  useConversationContext(eventService, sandboxId, conversationId);
+  usePresenceSubscription(
+    sandboxId && conversationId ? kiloclawConversationContext(sandboxId, conversationId) : '',
+    Boolean(sandboxId && conversationId)
+  );
 
   // Event Service delivers subscribed contexts to every handler, so each
   // handler must validate the incoming `ctx` against this string before

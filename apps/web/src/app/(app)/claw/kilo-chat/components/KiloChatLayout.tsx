@@ -7,9 +7,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { formatKiloChatError } from '@kilocode/kilo-chat';
 import { ConversationList } from './ConversationList';
 import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
-import { useInstanceContext } from '../hooks/useEventService';
+import { kiloclawInstanceContext } from '@kilocode/event-service';
+import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
 import { useEventServiceClient } from '@/contexts/EventServiceContext';
-import { getKiloChatToken } from '../token';
 import {
   useConversations,
   useCreateConversation,
@@ -45,7 +45,7 @@ export function KiloChatLayout({
   const router = useRouter();
 
   const { eventService, kiloChatClient } = useEventServiceClient();
-  useInstanceContext(eventService, sandboxId);
+  usePresenceSubscription(sandboxId ? kiloclawInstanceContext(sandboxId) : '', Boolean(sandboxId));
 
   const queryClient = useQueryClient();
   const params = useParams<{ conversationId?: string }>();
@@ -189,7 +189,6 @@ export function KiloChatLayout({
 
   const contextValue = useMemo<KiloChatContextValue>(
     () => ({
-      getToken: getKiloChatToken,
       currentUserId,
       instanceStatus,
       leavingConversationId,

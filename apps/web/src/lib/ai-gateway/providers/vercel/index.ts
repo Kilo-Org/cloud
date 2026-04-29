@@ -59,14 +59,21 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
+  // Both fetchers are in-process SWR caches, so this is effectively free on
+  // the warm path; parallelizing only matters on cold start, where it halves
+  // latency versus the previous sequential awaits.
+  const [routingPercentage, vercelModels] = await Promise.all([
+    getVercelRoutingPercentage(),
+    getVercelModels(),
+  ]);
+
   const passedRandomization =
-    getRandomNumber('vercel_routing_' + randomSeed, 100) < (await getVercelRoutingPercentage());
+    getRandomNumber('vercel_routing_' + randomSeed, 100) < routingPercentage;
 
   if (!passedRandomization) {
     return false;
   }
 
-  const vercelModels = await getVercelModels();
   const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);

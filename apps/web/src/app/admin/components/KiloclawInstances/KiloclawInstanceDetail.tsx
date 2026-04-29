@@ -75,6 +75,7 @@ import {
 } from './shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
 import { AdminFileEditor } from './AdminFileEditor';
 import { KiloCliRunCard } from './KiloCliRunCard';
 import { BumpVolumeTo15GbButton } from './BumpVolumeTo15GbDialog';
@@ -293,8 +294,8 @@ function VersionPinSection({ userId, instanceId }: { userId: string; instanceId:
 
   const { mutateAsync: setPin, isPending: isPinning } = useMutation(
     trpc.admin.kiloclawVersions.setPin.mutationOptions({
-      onSuccess: () => {
-        toast.success('Version pin set');
+      onSuccess: result => {
+        toastPinMutationResult(result, 'Version pin set');
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawVersions.getUserPin.queryKey(),
         });
@@ -312,8 +313,8 @@ function VersionPinSection({ userId, instanceId }: { userId: string; instanceId:
 
   const { mutateAsync: removePin, isPending: isUnpinning } = useMutation(
     trpc.admin.kiloclawVersions.removePin.mutationOptions({
-      onSuccess: () => {
-        toast.success('Version pin removed');
+      onSuccess: result => {
+        toastPinMutationResult(result, 'Version pin removed');
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawVersions.getUserPin.queryKey(),
         });

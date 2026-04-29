@@ -26,7 +26,7 @@ export type DirectByokProvider = {
   id: DirectUserByokInferenceProviderId;
   name: string;
   base_url: string;
-  models: Promise<ReadonlyArray<DirectByokModel>>;
+  models: () => Promise<ReadonlyArray<DirectByokModel>>;
   ai_sdk_provider: CustomLlmProvider;
   transformRequest(context: TransformRequestContext): void;
 };

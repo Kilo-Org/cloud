@@ -43,7 +43,7 @@ import {
   VercelUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
+import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import * as z from 'zod';
 
 // Hardcoded BYOK providers list
@@ -60,12 +60,7 @@ const VERCEL_BYOK_PROVIDERS = [
   { id: VercelUserByokInferenceProviderIdSchema.enum.zai, name: 'Z.ai (pay as you go)' },
 ] as const;
 
-const DIRECT_BYOK_PROVIDERS_LIST = DIRECT_BYOK_PROVIDERS.map(plan => ({
-  id: plan.id,
-  name: plan.name,
-}));
-
-const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
+const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_META, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
   a.name.localeCompare(b.name)
 );
 
@@ -555,7 +550,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
               {selectedProvider &&
                 (() => {
-                  const directProvider = DIRECT_BYOK_PROVIDERS_LIST.find(
+                  const directProvider = DIRECT_BYOK_PROVIDERS_META.find(
                     p => p.id === selectedProvider
                   );
                   return directProvider ? (

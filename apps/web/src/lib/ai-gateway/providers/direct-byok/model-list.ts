@@ -8,18 +8,34 @@ import { redisGet } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 
-export function cacheDirectByokModelList(providerId: DirectUserByokInferenceProviderId) {
-  return createCachedFetch(
-    async () =>
-      DirectByokModelArraySchema.parse(
+type CachedEnhancedModelListOptions = {
+  providerId: DirectUserByokInferenceProviderId;
+  recommendedModels: ReadonlyArray<DirectByokModel>;
+  variants: Record<string, OpenCodeVariant> | null;
+};
+
+export function cacheEnhancedDirectByokModelList({
+  providerId,
+  recommendedModels,
+  variants,
+}: CachedEnhancedModelListOptions) {
+  return createCachedFetch<ReadonlyArray<DirectByokModel>>(
+    async () => {
+      const stored = DirectByokModelArraySchema.parse(
         JSON.parse((await redisGet(directByokModelsRedisKey(providerId))) ?? '[]')
-      ),
+      );
+      return enhanceDirectByokModelList({
+        recommendedModels,
+        remainingModels: stored,
+        variants,
+      });
+    },
     60_000,
-    []
+    recommendedModels
   );
 }
 
-export function enhanceDirectByokModelList({
+function enhanceDirectByokModelList({
   recommendedModels,
   remainingModels,
   variants,

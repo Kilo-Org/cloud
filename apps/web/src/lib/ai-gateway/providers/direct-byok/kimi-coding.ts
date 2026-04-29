@@ -20,16 +20,17 @@ export default {
     };
     context.extraHeaders['user-agent'] = COMPATIBLE_USER_AGENT;
   },
-  models: Promise.resolve([
-    {
-      id: 'kimi-for-coding',
-      name: 'Kimi for Coding',
-      flags: ['recommended', 'vision'],
-      context_length: 262144,
-      max_completion_tokens: 32768,
-      description:
-        'Kimi Code is a premium subscription tier within the Kimi ecosystem, specifically engineered to empower developers with advanced AI capabilities for coding.',
-      variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
-    },
-  ]),
+  models: () =>
+    Promise.resolve([
+      {
+        id: 'kimi-for-coding',
+        name: 'Kimi for Coding',
+        flags: ['recommended', 'vision'],
+        context_length: 262144,
+        max_completion_tokens: 32768,
+        description:
+          'Kimi Code is a premium subscription tier within the Kimi ecosystem, specifically engineered to empower developers with advanced AI capabilities for coding.',
+        variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+      },
+    ]),
 } satisfies DirectByokProvider;

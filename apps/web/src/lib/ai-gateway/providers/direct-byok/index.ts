@@ -69,7 +69,7 @@ async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
   );
   const results = await Promise.all(
     enabledProviders.map(async provider => {
-      const models = await provider.models;
+      const models = await provider.models();
       return models.map(model => convertModel(provider, model, nextPreferredId++));
     })
   );
@@ -81,7 +81,7 @@ export async function getDirectByokModel(requestedModel: string): Promise<{
   model: DirectByokModel | null;
 }> {
   for (const provider of DIRECT_BYOK_PROVIDERS) {
-    const models = await provider.models;
+    const models = await provider.models();
     const model = models.find(model => formatDirectByokModelId(provider, model) === requestedModel);
     if (model) {
       return { provider, model };

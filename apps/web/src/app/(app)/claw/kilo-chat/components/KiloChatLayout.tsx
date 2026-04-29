@@ -7,7 +7,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { formatKiloChatError } from '@kilocode/kilo-chat';
 import { ConversationList } from './ConversationList';
 import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
-import { useEventService, useInstanceContext } from '../hooks/useEventService';
+import { useInstanceContext } from '../hooks/useEventService';
+import { useEventServiceClient } from '@/contexts/EventServiceContext';
+import { getKiloChatToken } from '../token';
 import {
   useConversations,
   useCreateConversation,
@@ -20,7 +22,6 @@ import {
 
 // ── Layout component ────────────────────────────────────────────────
 type KiloChatLayoutProps = {
-  getToken: () => Promise<string>;
   currentUserId: string;
   sandboxId: string | null;
   basePath: string;
@@ -32,7 +33,6 @@ type KiloChatLayoutProps = {
 };
 
 export function KiloChatLayout({
-  getToken,
   currentUserId,
   sandboxId,
   basePath,
@@ -44,7 +44,7 @@ export function KiloChatLayout({
 }: KiloChatLayoutProps) {
   const router = useRouter();
 
-  const { eventService, kiloChatClient } = useEventService(getToken);
+  const { eventService, kiloChatClient } = useEventServiceClient();
   useInstanceContext(eventService, sandboxId);
 
   const queryClient = useQueryClient();
@@ -189,7 +189,7 @@ export function KiloChatLayout({
 
   const contextValue = useMemo<KiloChatContextValue>(
     () => ({
-      getToken,
+      getToken: getKiloChatToken,
       currentUserId,
       instanceStatus,
       leavingConversationId,
@@ -202,7 +202,6 @@ export function KiloChatLayout({
       kiloChatClient,
     }),
     [
-      getToken,
       currentUserId,
       instanceStatus,
       leavingConversationId,

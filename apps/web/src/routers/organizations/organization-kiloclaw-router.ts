@@ -814,10 +814,41 @@ export const organizationKiloclawRouter = createTRPCRouter({
           .max(128)
           .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/)
           .optional(),
+        // Mirrors kiloclaw-router.restartMachine: when the redeploy targets a
+        // specific image tag, any existing pin is treated as a consent gate.
+        // The frontend dialog click flips this to true; backend deletes the
+        // pin row and pushes the clear to DO state before redeploying.
+        acknowledgePinRemoval: z.boolean().default(false),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+
+      // Pin consent gate. Symmetric with the personal user path: any pin
+      // (set by org member or admin) requires explicit acknowledgement
+      // before a version-changing redeploy proceeds.
+      if (input.imageTag) {
+        const [pin] = await db
+          .select({ image_tag: kiloclaw_version_pins.image_tag })
+          .from(kiloclaw_version_pins)
+          .where(eq(kiloclaw_version_pins.instance_id, instance.id))
+          .limit(1);
+
+        if (pin && !input.acknowledgePinRemoval) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'PIN_EXISTS',
+          });
+        }
+
+        if (pin) {
+          await db
+            .delete(kiloclaw_version_pins)
+            .where(eq(kiloclaw_version_pins.instance_id, instance.id));
+          await pushPinToWorker(ctx.user.id, instance.id, null);
+        }
+      }
+
       const token = generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
       const client = new KiloClawUserClient(token);
       return client.restartMachine(input.imageTag ? { imageTag: input.imageTag } : undefined, {

@@ -5,8 +5,12 @@ import { toast } from 'sonner';
 import { Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
-import { useKiloClawStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
-import { useOrgKiloClawStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
+import { useKiloClawStatus, useKiloClawMutations, useKiloClawMyPin } from '@/hooks/useKiloClaw';
+import {
+  useOrgKiloClawStatus,
+  useOrgKiloClawMutations,
+  useOrgKiloClawMyPin,
+} from '@/hooks/useOrgKiloClaw';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawInstanceOverview } from './ClawInstanceOverview';
@@ -32,6 +36,14 @@ function ClawSettingsInner({
   const personalMutations = useKiloClawMutations();
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
   const mutations = organizationId ? orgMutations : personalMutations;
+
+  // Pin state for the upgrade-confirmation dialog. The dialog surfaces a
+  // warning when a pin exists; the click then acts as the consent that
+  // removes the pin and proceeds with the upgrade.
+  const personalPin = useKiloClawMyPin();
+  const orgPin = useOrgKiloClawMyPin(organizationId ?? '');
+  const pin = organizationId ? orgPin.data : personalPin.data;
+  const pinnedImageTag = pin?.image_tag ?? null;
 
   const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
   const [confirmUpgrade, setConfirmUpgrade] = useState(false);
@@ -60,8 +72,11 @@ function ClawSettingsInner({
   }, []);
 
   const onConfirmUpgrade = useCallback(() => {
+    // The dialog click acts as the user's consent. Always send
+    // acknowledgePinRemoval: true so the backend gate clears any existing
+    // pin and proceeds. Backend ignores the flag when no pin exists.
     mutations.restartMachine.mutate(
-      { imageTag: 'latest' },
+      { imageTag: 'latest', acknowledgePinRemoval: true },
       {
         onSuccess: () => {
           toast.success('Upgrading KiloClaw');
@@ -99,6 +114,7 @@ function ClawSettingsInner({
         }}
         isPending={mutations.restartMachine.isPending}
         onConfirm={onConfirmUpgrade}
+        pinnedImageTag={pinnedImageTag}
       />
     </>
   );

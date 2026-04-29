@@ -76,8 +76,12 @@ export function StartKiloCliRunDialog({
   };
 
   const handleRedeploy = () => {
+    // The "needs redeploy" prompt the user just clicked is itself the
+    // consent — pass acknowledgePinRemoval so the backend gate clears any
+    // existing pin and proceeds. Backend ignores the flag when no pin
+    // exists. (See kiloclaw.restartMachine consent gate.)
     redeployMutation.mutate(
-      { imageTag: 'latest' },
+      { imageTag: 'latest', acknowledgePinRemoval: true },
       {
         onSuccess: () => {
           startMutation.reset();

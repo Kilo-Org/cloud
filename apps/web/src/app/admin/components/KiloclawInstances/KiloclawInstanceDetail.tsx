@@ -1579,6 +1579,17 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         setAwaitingRestartCompletion(true);
       },
       onError: err => {
+        // Defensive fallback for the rare race where a pin appears between
+        // the click-time pre-flight check and the backend gate. Reroute
+        // through the Change Version dialog so the admin sees and consents
+        // to the override.
+        const code = (err as { data?: { code?: string } }).data?.code;
+        if (code === 'PRECONDITION_FAILED' && err.message === 'PIN_EXISTS') {
+          const latestEntry = availableVersions.find(v => v.is_latest);
+          if (latestEntry) setChangeVersionSelectedTag(latestEntry.image_tag);
+          setChangeVersionDialogOpen(true);
+          return;
+        }
         toast.error(`Failed to upgrade: ${err.message}`);
       },
     })
@@ -2757,7 +2768,19 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     size="sm"
                     variant="outline"
                     disabled={machineActionPending || machineRestartBlocked || !hasRuntime}
-                    onClick={() => void machineUpgrade({ instanceId: data.id, imageTag: 'latest' })}
+                    onClick={() => {
+                      // Pre-flight: if a pin exists, route through the
+                      // Change Version dialog so the admin can see and
+                      // consent to the override. Avoids a confusing
+                      // PIN_EXISTS toast on the happy path.
+                      if (changeVersionPinData) {
+                        const latestEntry = availableVersions.find(v => v.is_latest);
+                        if (latestEntry) setChangeVersionSelectedTag(latestEntry.image_tag);
+                        setChangeVersionDialogOpen(true);
+                        return;
+                      }
+                      void machineUpgrade({ instanceId: data.id, imageTag: 'latest' });
+                    }}
                   >
                     {isMachineUpgrading ? (
                       <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -3142,7 +3165,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     <strong>
                       {changeVersionPinData.pinned_by_email ?? changeVersionPinData.pinned_by}
                     </strong>
-                    . Proceeding will remove the pin.
+                    {'. Proceeding will remove the pin.'}
                   </AlertDescription>
                 </Alert>
               )}

@@ -6,6 +6,7 @@ import {
   Cpu,
   HardDrive,
   Pencil,
+  Pin,
   Play,
   RefreshCw,
   RotateCw,
@@ -16,6 +17,7 @@ import {
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +32,9 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useKiloClawMyPin } from '@/hooks/useKiloClaw';
+import { useOrgKiloClawMyPin } from '@/hooks/useOrgKiloClaw';
+import { useClawContext } from './ClawContext';
 import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
@@ -66,6 +71,16 @@ export function InstanceControls({
 }) {
   const posthog = usePostHog();
   const gatewayUrl = useGatewayUrl(status);
+  const { organizationId } = useClawContext();
+
+  // Pin state for the upgrade-confirmation dialogs (inline confirm + the
+  // separate UpgradeKiloClawDialog). The dialog click is the user's
+  // consent — sending acknowledgePinRemoval: true unconditionally on
+  // upgrade lets the backend gate clear any existing pin and proceed.
+  const personalPin = useKiloClawMyPin();
+  const orgPin = useOrgKiloClawMyPin(organizationId ?? '');
+  const pin = organizationId ? orgPin.data : personalPin.data;
+  const pinnedImageTag = pin?.image_tag ?? null;
   const isRunning = status.status === 'running';
   const isProvisioned = status.status === 'provisioned';
   const isStarting = status.status === 'starting';
@@ -127,8 +142,10 @@ export function InstanceControls({
       instance_status: status.status,
       redeploy_mode: 'upgrade',
     });
+    // Dialog click is the consent — acknowledgePinRemoval lets backend
+    // clear any existing pin and proceed.
     mutations.restartMachine.mutate(
-      { imageTag: 'latest' },
+      { imageTag: 'latest', acknowledgePinRemoval: true },
       {
         onSuccess: () => {
           toast.success('Upgrading KiloClaw');
@@ -421,6 +438,15 @@ export function InstanceControls({
               </div>
             )}
           </RadioGroup>
+          {redeployMode === 'upgrade' && pinnedImageTag && (
+            <Alert className="border-blue-500/50">
+              <Pin className="h-4 w-4 text-blue-500" />
+              <AlertDescription>
+                This instance has a version pin to <code className="text-xs">{pinnedImageTag}</code>
+                {'. Upgrading will remove the pin.'}
+              </AlertDescription>
+            </Alert>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -437,7 +463,17 @@ export function InstanceControls({
                   instance_status: status.status,
                   redeploy_mode: redeployMode,
                 });
-                mutations.restartMachine.mutate(imageTag ? { imageTag } : undefined, {
+                // For the upgrade path, the dialog click is the consent —
+                // pass acknowledgePinRemoval so the backend can clear any
+                // existing pin and proceed. Plain redeploy (no imageTag)
+                // never triggers the gate.
+                const input =
+                  imageTag === 'latest'
+                    ? { imageTag, acknowledgePinRemoval: true }
+                    : imageTag
+                      ? { imageTag }
+                      : undefined;
+                mutations.restartMachine.mutate(input, {
                   onSuccess: () => {
                     toast.success(
                       redeployMode === 'upgrade' ? 'Upgrading KiloClaw' : 'Redeploying'
@@ -479,6 +515,7 @@ export function InstanceControls({
         }}
         isPending={mutations.restartMachine.isPending}
         onConfirm={handleUpgradeConfirm}
+        pinnedImageTag={pinnedImageTag}
       />
       <RunDoctorDialog
         open={doctorOpen}

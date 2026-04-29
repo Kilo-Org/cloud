@@ -57,7 +57,6 @@ import { AdvancedConfig } from '@/components/shared/AdvancedConfig';
 import { cn } from '@/lib/utils';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@/lib/cloud-agent/constants';
 import { MODES } from './ResumeConfigModal';
-import { getLastUsedModel, getPreferredInitialModel, setLastUsedModel } from './model-preferences';
 
 type CloudSessionsPageProps = {
   organizationId?: string;
@@ -152,18 +151,17 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
     // reset to an allowed model
     const isCurrentModelAvailable = modelOptions.some(m => m.id === model);
     if (!isCurrentModelAvailable || !model || !isModelUserSelected) {
-      const newModel = getPreferredInitialModel({
-        modelOptions,
-        lastUsedModel: getLastUsedModel(organizationId),
-        defaultModel: defaultsData?.defaultModel,
-      });
+      // Prefer the default model if it is available under org policy, otherwise use the first available.
+      const defaultModel = defaultsData?.defaultModel;
+      const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
+      const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;
 
       if (newModel && newModel !== model) {
         setModel(newModel);
         setIsModelUserSelected(false); // Auto-selected, not user-selected
       }
     }
-  }, [defaultsData?.defaultModel, modelOptions, model, isModelUserSelected, organizationId]);
+  }, [defaultsData?.defaultModel, modelOptions, model, isModelUserSelected]);
 
   // Fetch profiles list to find default profile
   // In org context, use combined profiles to get both org and personal profiles
@@ -469,8 +467,6 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
         }
       }
 
-      setLastUsedModel(model, organizationId);
-
       // Invalidate the sessions list cache so the sidebar shows the new session
       void queryClient.invalidateQueries({
         queryKey: trpc.unifiedSessions.list.queryKey({
@@ -521,7 +517,6 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
         setSelectedRepo(demoForkInRepos.forkedRepo);
         setModel(demo.model);
         setIsModelUserSelected(true);
-        setLastUsedModel(demo.model, organizationId);
         setMode(demo.mode);
         setIsDemoMode(true);
 
@@ -595,7 +590,6 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
       setSelectedRepo(forkCheck.forkedRepo);
       setModel(selectedDemo.model);
       setIsModelUserSelected(true);
-      setLastUsedModel(selectedDemo.model, organizationId);
       setMode(selectedDemo.mode);
       setIsDemoMode(true);
 
@@ -684,7 +678,6 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
             onModelChange={newModel => {
               setModel(newModel);
               setIsModelUserSelected(true);
-              setLastUsedModel(newModel, organizationId);
             }}
             modelOptions={modelOptions}
             isLoadingModels={!modelsData}

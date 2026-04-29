@@ -94,7 +94,7 @@ import {
   getPreferredInitialVariant,
   setLastUsedModel,
   setLastUsedVariant,
-} from '@/components/cloud-agent/model-preferences';
+} from '@/components/cloud-agent-next/model-preferences';
 
 type Repository = {
   id: number;

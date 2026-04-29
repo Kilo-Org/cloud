@@ -254,11 +254,17 @@ export async function refreshGitToken(rigId: string): Promise<string | null> {
     // process.env) see the new token via authenticateGitUrl.
     process.env.GIT_TOKEN = freshToken;
 
-    // Rewrite every /tmp/.git-credentials* file that currently stores a
-    // token. The credential helper reads these verbatim, so the agent's
-    // own `git push` (running in a subprocess outside this module) picks
-    // up the new token on the next invocation without restart.
-    await rewriteCredentialStoreFiles(freshToken);
+    // Rewrite the per-rig /tmp/.git-credentials* files that currently
+    // store a token. The credential helper reads these verbatim, so the
+    // agent's own `git push` (running in a subprocess outside this module)
+    // picks up the new token on the next invocation without restart.
+    //
+    // Scoped to the current rig only — both configureGitCredentials and
+    // configureRepoCredentials slugify a path containing the rigId into
+    // the credential filename, so we can select them by substring match.
+    // Rewriting every file would clobber other rigs' tokens (each rig can
+    // have a distinct platformIntegrationId, so tokens are not interchangeable).
+    await rewriteCredentialStoreFiles(rigId, freshToken);
 
     console.log(`[refreshGitToken] refreshed token for rig=${rigId}`);
     return freshToken;
@@ -270,11 +276,17 @@ export async function refreshGitToken(rigId: string): Promise<string | null> {
 
 /**
  * Walk /tmp for credential-store files previously written by
- * configureRepoCredentials / configureGitCredentials and rewrite them
- * to use the new token. Silently skips files for non-GitHub remotes
- * (those use gitlab_token which has a different refresh path).
+ * configureRepoCredentials / configureGitCredentials for the given rig
+ * and rewrite them to use the new token. Files for other rigs are left
+ * alone so this refresh doesn't stomp their (possibly distinct) tokens.
+ *
+ * Files are identified by the slugified rigId appearing in the filename
+ * (both writers embed a path under `/workspace/rigs/<rigId>/...` in the
+ * credential file name, slugified via `replace(/[^a-zA-Z0-9]/g, '-')`).
+ * Only GitHub `x-access-token` lines are rewritten; GitLab `oauth2`
+ * lines are left alone (they use gitlab_token, not an installation token).
  */
-async function rewriteCredentialStoreFiles(freshToken: string): Promise<void> {
+async function rewriteCredentialStoreFiles(rigId: string, freshToken: string): Promise<void> {
   let entries: string[];
   try {
     entries = await readdir('/tmp');
@@ -282,8 +294,11 @@ async function rewriteCredentialStoreFiles(freshToken: string): Promise<void> {
     return;
   }
 
+  const rigSlug = rigId.replace(/[^a-zA-Z0-9]/g, '-');
+
   for (const name of entries) {
     if (!name.startsWith('.git-credentials')) continue;
+    if (!name.includes(rigSlug)) continue;
     const path = `/tmp/${name}`;
     let content: string;
     try {
@@ -323,11 +338,23 @@ async function rewriteCredentialStoreFiles(freshToken: string): Promise<void> {
  *
  * `buildArgs` is called again on retry so callers that embed the token
  * in a URL (e.g. `git clone https://<token>@...`) can regenerate it.
+ *
+ * For operations that talk to `origin` (fetch, pull, push without a URL
+ * arg), pass `gitUrl` so that after refresh we rewrite the `origin`
+ * remote URL with the new token. Git reads the embedded password from
+ * the remote URL before consulting the credential helper, so without
+ * this the retry would re-send the same expired token.
  */
 async function execWithAuthRetry(
   cmd: string,
   buildArgs: () => string[] | Promise<string[]>,
-  opts: { cwd?: string; rigId: string; envVars?: Record<string, string> }
+  opts: {
+    cwd?: string;
+    rigId: string;
+    envVars?: Record<string, string>;
+    /** Git URL to rebuild `origin` with after a token refresh. */
+    gitUrl?: string;
+  }
 ): Promise<string> {
   try {
     const args = await buildArgs();
@@ -335,10 +362,9 @@ async function execWithAuthRetry(
   } catch (err) {
     if (!isAuthFailure(err)) throw err;
 
+    const rawMsg = err instanceof Error ? err.message.split('\n')[0] : String(err);
     console.warn(
-      `[execWithAuthRetry] auth failure for rig=${opts.rigId}, refreshing token and retrying: ${
-        err instanceof Error ? err.message.split('\n')[0] : String(err)
-      }`
+      `[execWithAuthRetry] auth failure for rig=${opts.rigId}, refreshing token and retrying: ${redactGitTokens(rawMsg)}`
     );
 
     const fresh = await refreshGitToken(opts.rigId);
@@ -353,9 +379,38 @@ async function execWithAuthRetry(
       opts.envVars.GIT_TOKEN = fresh;
     }
 
+    // If the operation uses the `origin` remote, its stored URL still
+    // has the old token embedded. Rewrite it before retrying so the
+    // retry sends the fresh token.
+    if (opts.gitUrl && opts.cwd) {
+      try {
+        await exec(
+          'git',
+          ['remote', 'set-url', 'origin', authenticateGitUrl(opts.gitUrl, opts.envVars)],
+          opts.cwd
+        );
+      } catch (setUrlErr) {
+        const m = setUrlErr instanceof Error ? setUrlErr.message.split('\n')[0] : String(setUrlErr);
+        console.warn(
+          `[execWithAuthRetry] failed to rewrite origin URL for rig=${opts.rigId}: ${redactGitTokens(m)}`
+        );
+      }
+    }
+
     const retryArgs = await buildArgs();
     return await exec(cmd, retryArgs, opts.cwd);
   }
+}
+
+/**
+ * Redact tokens from a string that may include authenticated git URLs
+ * (e.g. `https://x-access-token:<token>@github.com/...` or
+ * `https://oauth2:<token>@gitlab.com/...`). Used on every error string
+ * and log line that could contain a command line or git stderr, so an
+ * auth failure never leaks the token.
+ */
+function redactGitTokens(s: string): string {
+  return s.replace(/(https?:\/\/)([^:@/\s]+):([^@/\s]+)(@)/g, '$1$2:***REDACTED***$4');
 }
 
 async function exec(cmd: string, args: string[], cwd?: string): Promise<string> {
@@ -382,7 +437,9 @@ async function exec(cmd: string, args: string[], cwd?: string): Promise<string> 
 
   if (exitCode !== 0) {
     const stderr = await new Response(proc.stderr).text();
-    throw new Error(`${cmd} ${args.join(' ')} failed: ${stderr || `exit code ${exitCode}`}`);
+    const cmdLine = redactGitTokens(`${cmd} ${args.join(' ')}`);
+    const detail = redactGitTokens(stderr || `exit code ${exitCode}`);
+    throw new Error(`${cmdLine} failed: ${detail}`);
   }
 
   return stdout.trim();
@@ -446,6 +503,7 @@ async function cloneRepoInner(
       cwd: dir,
       rigId: options.rigId,
       envVars: options.envVars,
+      gitUrl: options.gitUrl,
     });
     console.log(`Fetched latest for rig ${options.rigId}`);
     return dir;
@@ -499,7 +557,7 @@ async function cloneRepoInner(
     await execWithAuthRetry(
       'git',
       () => ['push', 'origin', `HEAD:${options.defaultBranch}`],
-      { cwd: dir, rigId: options.rigId, envVars: options.envVars }
+      { cwd: dir, rigId: options.rigId, envVars: options.envVars, gitUrl: options.gitUrl }
     );
     // Best-effort: set remote HEAD so future operations know the default branch
     await exec('git', ['remote', 'set-head', 'origin', options.defaultBranch], dir).catch(() => {});
@@ -508,6 +566,7 @@ async function cloneRepoInner(
       cwd: dir,
       rigId: options.rigId,
       envVars: options.envVars,
+      gitUrl: options.gitUrl,
     });
     console.log(`Created initial commit on empty repo for rig ${options.rigId}`);
   }
@@ -740,6 +799,7 @@ export async function mergeBranch(options: {
       cwd: repo,
       rigId: options.rigId,
       envVars: options.envVars,
+      gitUrl: options.gitUrl,
     });
   }
 
@@ -789,7 +849,7 @@ export async function mergeBranch(options: {
     await execWithAuthRetry(
       'git',
       () => ['push', 'origin', `${tmpBranch}:${options.targetBranch}`],
-      { cwd: mergeDir, rigId: options.rigId, envVars: options.envVars }
+      { cwd: mergeDir, rigId: options.rigId, envVars: options.envVars, gitUrl: options.gitUrl }
     );
 
     return { status: 'merged', message: 'Merge successful', commitSha };

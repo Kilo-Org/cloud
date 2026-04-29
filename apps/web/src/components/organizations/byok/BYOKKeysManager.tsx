@@ -590,9 +590,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <Alert>
                       <Info className="h-4 w-4" />
                       <AlertDescription>
-                        No separate model entry is needed for this provider. Your key will
-                        automatically be used when you select any of the supported models through
-                        the regular gateway in your client.
+                        Once saved, your key will automatically be used whenever you select one of
+                        the supported models above through the regular gateway in your client — no
+                        dedicated model entry is required.
                       </AlertDescription>
                     </Alert>
                   );

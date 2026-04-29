@@ -327,11 +327,15 @@ export const cliSessionsV2Router = createTRPCRouter({
       whereConditions.push(isNull(cli_sessions_v2.parent_session_id));
     }
 
-    // Escape ILIKE wildcard characters so literal %, _ in user input are matched exactly
-    const escaped = search_string.replace(/[%_]/g, '\\$&');
-
+    // Use position() for a case-insensitive substring match. This avoids LIKE
+    // wildcard semantics entirely, so %, _, and \ in user input are matched
+    // literally without any escaping dance.
+    const needle = search_string.toLowerCase();
     whereConditions.push(
-      sql`(COALESCE(${cli_sessions_v2.title}, '') ILIKE ${`%${escaped}%`} OR ${cli_sessions_v2.session_id}::text ILIKE ${`%${escaped}%`})`
+      sql`(
+        position(${needle} in lower(COALESCE(${cli_sessions_v2.title}, ''))) > 0
+        OR position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0
+      )`
     );
 
     const baseWhere = and(...whereConditions);

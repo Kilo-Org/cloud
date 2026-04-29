@@ -351,15 +351,21 @@ export const unifiedSessionsRouter = createTRPCRouter({
     const v1Where = buildScopeFragments('cli_sessions', scopeOpts);
     const v2Where = buildScopeFragments('cli_sessions_v2', scopeOpts);
 
-    // Escape ILIKE wildcard characters so literal %, _ in user input are matched exactly
-    const escaped = search_string.replace(/[%_]/g, '\\$&');
-
-    // Search filter: ILIKE on title and session_id::text
+    // Use position() for a case-insensitive substring match. This avoids LIKE
+    // wildcard semantics entirely, so %, _, and \ in user input are matched
+    // literally without any escaping dance.
+    const needle = search_string.toLowerCase();
     v1Where.push(
-      sql`(${cliSessions.title} ILIKE ${`%${escaped}%`} OR ${cliSessions.session_id}::text ILIKE ${`%${escaped}%`})`
+      sql`(
+        position(${needle} in lower(${cliSessions.title})) > 0
+        OR position(${needle} in lower(${cliSessions.session_id}::text)) > 0
+      )`
     );
     v2Where.push(
-      sql`(COALESCE(${cli_sessions_v2.title}, '') ILIKE ${`%${escaped}%`} OR ${cli_sessions_v2.session_id}::text ILIKE ${`%${escaped}%`})`
+      sql`(
+        position(${needle} in lower(COALESCE(${cli_sessions_v2.title}, ''))) > 0
+        OR position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0
+      )`
     );
 
     const unionQuery = sql`

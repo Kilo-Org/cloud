@@ -31,9 +31,19 @@ export default {
       name: 'Kimi-K2.5',
       description:
         'Open-source SoTA native multimodal model with text-only input (for now), stronger code/UI generation.',
-      flags: ['recommended'],
+      flags: [],
       context_length: 262144,
       max_completion_tokens: 32768,
+      variants: REASONING_VARIANTS_BINARY,
+    },
+    {
+      id: 'glm-5.1',
+      name: 'GLM-5.1',
+      description:
+        'Z.AI’s latest flagship model, designed for long-horizon tasks. It can work continuously and autonomously on a single task for up to 8 hours.',
+      flags: [],
+      context_length: 204800,
+      max_completion_tokens: 131072,
       variants: REASONING_VARIANTS_BINARY,
     },
     {
@@ -41,7 +51,7 @@ export default {
       name: 'GLM-4.7',
       description:
         "Z.ai's latest flagship model, enhanced programming capabilities and more stable multi-step reasoning/execution.",
-      flags: ['recommended'],
+      flags: [],
       context_length: 204800,
       max_completion_tokens: 131072,
       variants: REASONING_VARIANTS_BINARY,
@@ -55,6 +65,15 @@ export default {
       context_length: 131072,
       max_completion_tokens: 65536,
       variants: null,
+    },
+    {
+      id: 'dola-seed-2.0-code',
+      name: 'Dola-Seed-2.0-Code',
+      description: 'An enhanced coding version of Seed 2.0, better suited for agentic coding.',
+      flags: ['vision'],
+      context_length: 262144,
+      max_completion_tokens: 131072,
+      variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
     },
     {
       id: 'dola-seed-2.0-pro',

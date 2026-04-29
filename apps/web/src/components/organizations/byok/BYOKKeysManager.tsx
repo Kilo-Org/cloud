@@ -583,7 +583,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         </p>
                       </AlertDescription>
                     </Alert>
-                  ) : null;
+                  ) : (
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        <p>
+                          This key takes effect on the regular gateway model entries — no separate
+                          model entry is needed. Just keep using the same models you normally would
+                          and requests will be routed through your key.
+                        </p>
+                      </AlertDescription>
+                    </Alert>
+                  );
                 })()}
             </div>
 

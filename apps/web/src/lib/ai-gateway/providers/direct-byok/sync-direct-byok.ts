@@ -141,14 +141,13 @@ async function syncProvider(
 
   for (const raw of fetched) {
     const prior = previousById.get(raw.id);
-    const name = raw.name ?? prior?.name ?? raw.id;
+    const name = raw.name ?? stripVendorPrefix(raw.id);
     const openrouterDescription = openrouterDescriptions.get(stripVendorPrefix(raw.id));
     const description =
       openrouterDescription ?? prior?.description ?? (await generateDescription(raw.id, name));
-    const context_length =
-      raw.context_length ?? prior?.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
+    const context_length = raw.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
     const max_completion_tokens = Math.min(
-      raw.max_completion_tokens ?? prior?.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
+      raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
       context_length
     );
     models.push({
@@ -158,7 +157,7 @@ async function syncProvider(
       flags: raw.input_modalities?.includes('image') ? ['vision'] : [],
       context_length,
       max_completion_tokens,
-      variants: prior?.variants ?? null,
+      variants: null,
     });
   }
 

@@ -15,7 +15,7 @@ export default {
       type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
     };
   },
-  models: [
+  models: Promise.resolve([
     {
       id: 'bytedance-seed-code',
       name: 'Seed-Code',
@@ -76,5 +76,5 @@ export default {
       max_completion_tokens: 131072,
       variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
     },
-  ],
+  ]),
 } satisfies DirectByokProvider;

@@ -20,20 +20,24 @@ export function cacheDirectByokModelList(providerId: DirectUserByokInferenceProv
 }
 
 export function enhanceDirectByokModelList({
-  models,
-  addFlags,
-  getVariants,
+  recommendedModels,
+  remainingModels,
+  variants,
 }: {
-  models: ReadonlyArray<DirectByokModel>;
-  addFlags: (model: DirectByokModel) => ReadonlyArray<string>;
-  getVariants: (model: DirectByokModel) => Record<string, OpenCodeVariant>;
-}) {
+  recommendedModels: ReadonlyArray<DirectByokModel>;
+  remainingModels: ReadonlyArray<DirectByokModel>;
+  variants: Record<string, OpenCodeVariant> | null;
+}): ReadonlyArray<DirectByokModel> {
   const seenIds = new Set<string>();
-  return models
+  return [...recommendedModels, ...remainingModels]
     .filter(model => (seenIds.has(model.id) ? false : (seenIds.add(model.id), true)))
-    .map(model => ({
-      ...model,
-      flags: [...new Set([...model.flags, ...addFlags(model)])],
-      variants: getVariants(model),
-    }));
+    .map(model => {
+      const flags = new Set(model.flags);
+      if (recommendedModels.some(m => m.id === model.id)) flags.add('recommended');
+      return {
+        ...model,
+        flags: [...flags],
+        variants: model.variants ?? variants,
+      };
+    });
 }

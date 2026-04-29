@@ -6749,7 +6749,7 @@ describe('start failure analytics events', () => {
   });
 });
 
-describe('manual and crash recovery analytics events', () => {
+describe('manual lifecycle analytics events', () => {
   it('can record manual start success events through Analytics Engine payloads', () => {
     const env = createFakeEnv();
     const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
@@ -6778,37 +6778,6 @@ describe('manual and crash recovery analytics events', () => {
     expect(successEvents).toHaveLength(1);
     expect(successEvents[0].blobs).toEqual(
       expect.arrayContaining(['instance.manual_start_succeeded', 'user-1', 'http'])
-    );
-  });
-
-  it('can record crash recovery failure events through Analytics Engine payloads', () => {
-    const env = createFakeEnv();
-    const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
-
-    dataset.writeDataPoint({
-      blobs: [
-        'instance.crash_recovery_failed',
-        'user-1',
-        'http',
-        '',
-        'restart failed',
-        'acct-test',
-        'machine-1',
-        'sandbox-1',
-        'running',
-        '',
-        '',
-        '',
-        '',
-      ],
-      doubles: [34, 0],
-      indexes: ['instance.crash_recovery_failed'],
-    });
-
-    const failureEvents = analyticsEventsByName(env, 'instance.crash_recovery_failed');
-    expect(failureEvents).toHaveLength(1);
-    expect(failureEvents[0].blobs).toEqual(
-      expect.arrayContaining(['instance.crash_recovery_failed', 'user-1', 'http', 'restart failed'])
     );
   });
 });

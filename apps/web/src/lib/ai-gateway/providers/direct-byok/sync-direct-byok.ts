@@ -94,9 +94,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     async fetch() {
       const response = await fetch('https://llm.chutes.ai/v1/models');
       if (!response.ok) {
-        throw new Error(
-          `Failed to fetch Chutes models: ${response.status} ${response.statusText}`
-        );
+        throw new Error(`Failed to fetch Chutes models: ${response.status} ${response.statusText}`);
       }
       const parsed = ChutesModelsResponseSchema.parse(await response.json());
       return parsed.data.map(model => ({

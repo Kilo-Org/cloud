@@ -142,6 +142,14 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
   const setFetchedSessionData = useSetAtom(manager.atoms.fetchedSessionData);
 
+  // Keep a ref on the latest fetched session data so async handlers can read
+  // the current value rather than a closed-over snapshot that may be stale by
+  // the time an awaited request resolves.
+  const fetchedSessionDataRef = useRef(fetchedSessionData);
+  useEffect(() => {
+    fetchedSessionDataRef.current = fetchedSessionData;
+  }, [fetchedSessionData]);
+
   const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
 
   // -- Organization models --------------------------------------------------
@@ -332,13 +340,17 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const handleRefreshPr = useCallback(async () => {
     if (!sessionIdFromParams) return;
-    const result = await refreshAssociatedPrMutation({ sessionId: sessionIdFromParams });
+    const requestedSessionId = sessionIdFromParams;
+    const result = await refreshAssociatedPrMutation({ sessionId: requestedSessionId });
     // Patch the fetched session data in-place so the UI reflects the refreshed
-    // PR immediately without a round-trip through getWithRuntimeState.
-    if (fetchedSessionData) {
-      setFetchedSessionData({ ...fetchedSessionData, associatedPr: result.associatedPr });
-    }
-  }, [sessionIdFromParams, refreshAssociatedPrMutation, setFetchedSessionData, fetchedSessionData]);
+    // PR immediately without a round-trip through getWithRuntimeState. Read
+    // the latest value via a ref and compare against the session id captured
+    // at call time so a session switch mid-request does not clobber the
+    // newly-active session with a stale snapshot.
+    const latest = fetchedSessionDataRef.current;
+    if (!latest || latest.kiloSessionId !== requestedSessionId) return;
+    setFetchedSessionData({ ...latest, associatedPr: result.associatedPr });
+  }, [sessionIdFromParams, refreshAssociatedPrMutation, setFetchedSessionData]);
 
   // Only expose the "Refresh PR info" action for sessions where the server can
   // actually look up a PR — a persisted session with a GitHub URL + branch.

@@ -362,3 +362,16 @@ Exit criteria: most common Codespaces-style repos work without custom Kilo setup
 ## Recommendation
 
 Start with a DIND-based, single-container, repo-config MVP behind an allowlist. The highest-leverage early work is the runtime abstraction plus a devcontainer manager. Once the wrapper can connect to an externally managed `kilo serve` process inside an arbitrary inner container and the current sandbox path still works unchanged, the rest of the work becomes mostly configuration coverage, caching, and hardening.
+
+## Sandbox Test Notes
+
+Tested from the current cloud-agent sandbox container on 2026-04-29:
+
+- The current sandbox image has `kilo` 7.1.23, `node`, `npm`, and `bun`, but does not have `docker`; actual devcontainer/Docker-in-Docker testing requires a DIND-enabled sandbox image.
+- `kilo serve --help` works from the installed CLI.
+- Downloaded npm tarballs for `@kilocode/cli@7.1.23`, `@kilocode/cli-linux-x64@7.1.23`, and `@kilocode/cli-linux-x64-musl@7.1.23`.
+- Built a test `/opt/kilo-agent`-style bundle under `/tmp` using the platform packages plus a launcher script.
+- The direct x64 binary runs with a minimal `PATH=/usr/bin:/bin` that contains no `node`, `npm`, or `bun`; `kilo --version` and `kilo serve --help` both work.
+- `kilo serve` starts successfully without Node/npm/Bun on PATH, creates its SQLite state under `$HOME/.local/share/kilo`, and listens on the requested host/port.
+- Setting `KILO_SERVER_PASSWORD` enables Basic auth; `curl -u kilo:<password>` succeeds while unauthenticated requests get 401.
+- The unpacked glibc + musl x64 bundle is about 418 MB because both platform packages include large binaries and source maps.

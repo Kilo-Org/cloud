@@ -3,10 +3,7 @@ import type { KiloClawEnv } from '../../types';
 import { buildEnvVars } from '../../gateway/env';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../../utils/env-encryption';
 import { findPepperByUserId, getWorkerDb } from '../../db';
-import {
-  KILOCODE_API_KEY_EXPIRY_SECONDS,
-  WORKER_CONTROLLER_CAPABILITIES_VERSION,
-} from '../../config';
+import { KILOCODE_API_KEY_EXPIRY_SECONDS } from '../../config';
 import type { InstanceMutableState } from './types';
 import { getAppKey } from './types';
 import { storageUpdate } from './state';
@@ -254,31 +251,4 @@ export async function buildUserEnvVars(
     },
     minSecretsVersion: secretsVersion,
   };
-}
-
-/**
- * Record that the running machine has been successfully configured with the
- * env set produced by the current worker's `buildUserEnvVars`. Callers must
- * only invoke this *after* the provider confirms the update was applied
- * (e.g. after `startRuntime` / `restartRuntime` returns without throwing and
- * `persistProviderResult` has been called). Persisting earlier would leave
- * the DO reporting a capability the running machine does not actually have
- * if the provider update then fails.
- *
- * Idempotent: no-ops if the DO is already at the worker's current version,
- * avoiding redundant storage writes on repeated start/restart cycles.
- */
-export async function markControllerCapabilitiesApplied(
-  ctx: DurableObjectState,
-  state: Pick<InstanceMutableState, 'controllerCapabilitiesVersion'>
-): Promise<void> {
-  if (state.controllerCapabilitiesVersion === WORKER_CONTROLLER_CAPABILITIES_VERSION) {
-    return;
-  }
-  state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
-  await ctx.storage.put(
-    storageUpdate({
-      controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
-    })
-  );
 }

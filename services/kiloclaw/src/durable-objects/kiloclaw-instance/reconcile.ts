@@ -10,6 +10,7 @@ import {
   RESTARTING_TIMEOUT_MS,
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
   getProactiveRefreshThresholdMs,
 } from '../../config';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../../utils/env-encryption';
@@ -877,12 +878,19 @@ export async function syncStatusWithFly(
     if (state.lastStartedAt === null) {
       state.lastStartedAt = Date.now();
     }
+    // Mark the capability version here too: this is the reconcile-driven
+    // success path that covers the case where _startInner / restart's
+    // waitForState timed out (408) but the machine did in fact start with the
+    // new env. Without this mark, a timed-out-but-successful restart would
+    // leave the DO reporting a stale pre-cutover capability version.
+    state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
     await ctx.storage.put(
       storageUpdate({
         status: 'running',
         startingAt: null,
         healthCheckFailCount: 0,
         lastStartedAt: state.lastStartedAt,
+        controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
       })
     );
     return {};
@@ -1086,6 +1094,7 @@ export async function markRestartSuccessful(
   state.healthCheckFailCount = 0;
   state.lastRestartErrorMessage = null;
   state.lastRestartErrorAt = null;
+  state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
   await ctx.storage.put(
     storageUpdate({
       status: 'running',
@@ -1096,6 +1105,7 @@ export async function markRestartSuccessful(
       healthCheckFailCount: 0,
       lastRestartErrorMessage: null,
       lastRestartErrorAt: null,
+      controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
     })
   );
 }

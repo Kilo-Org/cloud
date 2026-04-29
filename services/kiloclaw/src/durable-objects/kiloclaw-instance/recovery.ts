@@ -1,7 +1,7 @@
 import type { PersistedState } from '../../schemas/instance-config';
 import type { KiloClawEnv } from '../../types';
 import * as fly from '../../fly/client';
-import { PREVIOUS_VOLUME_RETENTION_MS } from '../../config';
+import { PREVIOUS_VOLUME_RETENTION_MS, WORKER_CONTROLLER_CAPABILITIES_VERSION } from '../../config';
 import * as regionHelpers from '../regions';
 import { buildRuntimeSpec, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { InstanceMutableState } from './types';
@@ -12,11 +12,7 @@ import {
   storageUpdate,
   syncProviderStateForStorage,
 } from './state';
-import {
-  buildUserEnvVars,
-  markControllerCapabilitiesApplied,
-  resolveRuntimeImageRef,
-} from './config';
+import { buildUserEnvVars, resolveRuntimeImageRef } from './config';
 import * as gateway from './gateway';
 import * as flyMachines from './fly-machines';
 import { buildFlyMachineConfig } from './fly-machines';
@@ -293,6 +289,7 @@ export async function completeUnexpectedStopRecovery(runtime: RecoveryRuntime): 
   state.lastStartedAt = now;
   state.lastRecoveryErrorMessage = null;
   state.lastRecoveryErrorAt = null;
+  state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
   await runtime.persist({
     status: 'running',
     flyMachineId: state.flyMachineId,
@@ -306,6 +303,7 @@ export async function completeUnexpectedStopRecovery(runtime: RecoveryRuntime): 
     lastStartedAt: now,
     lastRecoveryErrorMessage: null,
     lastRecoveryErrorAt: null,
+    controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
   });
 
   runtime.emitEvent({
@@ -450,7 +448,6 @@ export async function runUnexpectedStopRecoveryInBackground(
           })
         )
       );
-      await markControllerCapabilitiesApplied(ctx, state);
     } catch (err) {
       const isStartupTimeout = err instanceof fly.FlyApiError && err.status === 408;
       if (!isStartupTimeout || !state.flyMachineId) {

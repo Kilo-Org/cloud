@@ -7,8 +7,7 @@
  * whether the user is actively on a surface.
  */
 
-export const kiloclawInstanceContext = (sandboxId: string) =>
-  `/kiloclaw/${sandboxId}` as const;
+export const kiloclawInstanceContext = (sandboxId: string) => `/kiloclaw/${sandboxId}` as const;
 
 export const kiloclawConversationContext = (sandboxId: string, conversationId: string) =>
   `/kiloclaw/${sandboxId}/${conversationId}` as const;

@@ -6,9 +6,11 @@ import type {
   SendPushForConversationInput,
 } from '@kilocode/notifications';
 
-import * as do_module from '../dos/NotificationChannelDO';
+import type * as do_module from '../dos/NotificationChannelDO';
 
-const baseInput = (over: Partial<SendPushForConversationInput> = {}): SendPushForConversationInput => ({
+const baseInput = (
+  over: Partial<SendPushForConversationInput> = {}
+): SendPushForConversationInput => ({
   conversationId: 'conv1',
   sandboxId: 'sb1',
   senderUserId: 'sender',
@@ -50,7 +52,9 @@ describe('NotificationsService.sendPushForConversation', () => {
       dispatchPush: stubSpy,
     } as unknown as DurableObjectStub<do_module.NotificationChannelDO>);
 
-    await env.SELF.sendPushForConversation(baseInput({ recipientUserIds: ['r1'], senderUserId: null }));
+    await env.SELF.sendPushForConversation(
+      baseInput({ recipientUserIds: ['r1'], senderUserId: null })
+    );
     const firstCall = stubSpy.mock.calls[0];
     if (!firstCall) throw new Error('expected dispatchPush to be called');
     const call: DispatchPushInput = firstCall[0];

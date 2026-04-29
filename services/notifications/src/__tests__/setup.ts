@@ -6,7 +6,7 @@ vi.mock('@kilocode/db/client', () => ({
       from: (table: { _: { name: string } }) => ({
         where: () => {
           if (table._.name === 'user_push_tokens') return [];
-          if (table._.name === 'channel_badge_counts') return [{ total: 0 }];
+          if (table._.name === 'badge_counts') return [{ total: 0 }];
           return [];
         },
       }),

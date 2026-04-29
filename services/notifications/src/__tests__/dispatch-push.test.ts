@@ -20,7 +20,7 @@ type DbState = {
 
 function installDbMock(state: DbState) {
   const fakeDb = {
-    select: (cols?: unknown) => ({
+    select: () => ({
       from: (table: Parameters<typeof getTableName>[0]) => ({
         where: async () => {
           if (getTableName(table) === 'user_push_tokens') {

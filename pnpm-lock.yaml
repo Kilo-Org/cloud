@@ -2032,9 +2032,6 @@ importers:
       hono:
         specifier: ^4.12.7
         version: 4.12.8
-      stream-chat:
-        specifier: 'catalog:'
-        version: 9.38.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod:
         specifier: 'catalog:'
         version: 4.3.6

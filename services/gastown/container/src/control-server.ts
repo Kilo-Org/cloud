@@ -16,6 +16,8 @@ import {
   isDraining,
   getAgentEvents,
   registerEventSink,
+  refreshTokenForAllAgents,
+  listAgents,
 } from './process-manager';
 import { log } from './logger';
 import { startHeartbeat, stopHeartbeat, notifyContainerReady } from './heartbeat';
@@ -247,16 +249,43 @@ app.post('/dashboard-context', async c => {
 
 // POST /refresh-token
 // Hot-swap the container-scoped JWT on the running process. Called by
-// the TownDO alarm to push a fresh token before the current one expires.
-// Updates process.env so all subsequent API calls use the new token.
+// the TownDO alarm (or the user-facing "Refresh Token" button) to push
+// a fresh token before the current one expires.
+//
+// Updating `process.env.GASTOWN_CONTAINER_TOKEN` alone is not enough:
+// the spawned `kilo serve` child processes snapshot the parent env at
+// spawn time, so the mayor plugin reads the OLD token. To propagate
+// the new token to every agent, we restart each running agent's SDK
+// server — matching the model hot-swap path.
 app.post('/refresh-token', async c => {
   const body: unknown = await c.req.json().catch(() => null);
   if (!body || typeof body !== 'object' || !('token' in body) || typeof body.token !== 'string') {
     return c.json({ error: 'Missing or invalid token field' }, 400);
   }
   process.env.GASTOWN_CONTAINER_TOKEN = body.token;
-  console.log('[control-server] Container token refreshed');
-  return c.json({ refreshed: true });
+
+  const activeAgents = listAgents().filter(a => a.status === 'running' || a.status === 'starting');
+  log.info('refresh_token.received', {
+    agentCount: activeAgents.length,
+    agentIds: activeAgents.map(a => a.agentId),
+  });
+
+  const t0 = Date.now();
+  const results = await refreshTokenForAllAgents();
+  const successCount = results.filter(r => r.success).length;
+  log.info('refresh_token.completed', {
+    agentCount: results.length,
+    successCount,
+    failureCount: results.length - successCount,
+    totalMs: Date.now() - t0,
+  });
+
+  return c.json({
+    refreshed: true,
+    agentsRestarted: successCount,
+    agentsFailed: results.length - successCount,
+    results,
+  });
 });
 
 // POST /sync-config

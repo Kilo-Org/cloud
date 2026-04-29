@@ -467,12 +467,7 @@ export function InstanceControls({
                 // pass acknowledgePinRemoval so the backend can clear any
                 // existing pin and proceed. Plain redeploy (no imageTag)
                 // never triggers the gate.
-                const input =
-                  imageTag === 'latest'
-                    ? { imageTag, acknowledgePinRemoval: true }
-                    : imageTag
-                      ? { imageTag }
-                      : undefined;
+                const input = imageTag ? { imageTag, acknowledgePinRemoval: true } : undefined;
                 mutations.restartMachine.mutate(input, {
                   onSuccess: () => {
                     toast.success(

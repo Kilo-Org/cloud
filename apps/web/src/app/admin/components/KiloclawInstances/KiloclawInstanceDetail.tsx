@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
 import { useTRPC } from '@/lib/trpc/utils';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import { formatBytes, formatUptime, formatVolumeUsage } from '@/lib/kiloclaw/instance-display';
@@ -1583,8 +1584,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         // the click-time pre-flight check and the backend gate. Reroute
         // through the Change Version dialog so the admin sees and consents
         // to the override.
-        const code = (err as { data?: { code?: string } }).data?.code;
-        if (code === 'PRECONDITION_FAILED' && err.message === 'PIN_EXISTS') {
+        if (
+          err instanceof TRPCClientError &&
+          err.data?.code === 'PRECONDITION_FAILED' &&
+          err.message === 'PIN_EXISTS'
+        ) {
           const latestEntry = availableVersions.find(v => v.is_latest);
           if (latestEntry) setChangeVersionSelectedTag(latestEntry.image_tag);
           setChangeVersionDialogOpen(true);

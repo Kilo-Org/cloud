@@ -15,6 +15,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useKiloClawMyPin } from '@/hooks/useKiloClaw';
+import { useOrgKiloClawMyPin } from '@/hooks/useOrgKiloClaw';
 import type { PlatformStatusResponse } from '@/lib/kiloclaw/types';
 import { useClawContext } from './ClawContext';
 import { AnimatedDots } from './AnimatedDots';
@@ -47,6 +49,13 @@ export function StartKiloCliRunDialog({
   const [prompt, setPrompt] = useState('');
   const startMutation = mutations.startKiloCliRun;
   const redeployMutation = mutations.restartMachine;
+
+  // Pin state — surfaced inline on the redeploy prompt so the user knows
+  // their pin will be cleared when they click Upgrade & Redeploy here.
+  const personalPin = useKiloClawMyPin();
+  const orgPin = useOrgKiloClawMyPin(organizationId ?? '');
+  const pin = organizationId ? orgPin.data : personalPin.data;
+  const pinnedImageTag = pin?.image_tag ?? null;
 
   const needsRedeploy = startMutation.isError && isNeedsRedeployError(startMutation.error);
   const machineReady = machineStatus === 'running';
@@ -124,6 +133,13 @@ export function StartKiloCliRunDialog({
               <p className="text-sm text-amber-200">
                 Your KiloClaw instance is running an older version that doesn&apos;t support the
                 recovery agent. Upgrade to the latest version to use this feature.
+                {pinnedImageTag && (
+                  <>
+                    {' '}
+                    This will also remove your version pin to{' '}
+                    <code className="text-xs">{pinnedImageTag}</code>.
+                  </>
+                )}
               </p>
             </div>
             <DialogFooter>

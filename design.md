@@ -13,6 +13,7 @@ colors:
   foreground: '#FAFAFA'
   foreground-muted: '#A3A3A3'
   foreground-subtle: '#7A7A7A'
+  foreground-on-red: '#FFFFFF'
 
   # Borders — the most characteristic move (white at low alpha)
   border: '#FFFFFF1A' # 10% — default
@@ -144,7 +145,7 @@ components:
     textColor: '{colors.on-primary}'
     typography: '{typography.body-strong}'
     rounded: '{rounded.sm}'
-    height: 34px
+    height: 36px
     padding: '0 14px'
   button-primary-hover:
     backgroundColor: '{colors.primary-hover}'
@@ -155,7 +156,7 @@ components:
     textColor: '{colors.on-secondary}'
     typography: '{typography.body-strong}'
     rounded: '{rounded.sm}'
-    height: 34px
+    height: 36px
     padding: '0 14px'
   button-secondary-hover:
     backgroundColor: '{colors.secondary-hover}'
@@ -165,21 +166,22 @@ components:
     backgroundColor: 'transparent'
     textColor: '{colors.foreground}'
     rounded: '{rounded.sm}'
-    height: 34px
+    height: 36px
     padding: '0 4px'
 
   # Destructive — red, only inside dialogs and confirms.
   button-destructive:
     backgroundColor: '{colors.red-500}'
-    textColor: '{colors.on-primary}'
+    textColor: '{colors.foreground-on-red}'
     typography: '{typography.body-strong}'
     rounded: '{rounded.sm}'
-    height: 34px
+    height: 36px
     padding: '0 14px'
 
   # Card — the containing surface for almost everything in the dashboard.
   card:
     backgroundColor: '{colors.surface}'
+    borderColor: '{colors.border}'
     rounded: '{rounded.xl}'
     padding: 24px
 
@@ -332,7 +334,7 @@ Do not invent new status hues. Do not use status colors outside this badge patte
 
 ## Shapes
 
-**Three radii, applied by role.**
+**Five radii, applied by role.**
 
 - **`rounded.sm` (6px)** — controls. Buttons, inputs, badges, status pills, menu items.
 - **`rounded.md` (8px)** — popovers, dropdowns, secondary surfaces.

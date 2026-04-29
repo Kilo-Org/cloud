@@ -2667,9 +2667,12 @@ export const cli_session_pull_requests = pgTable(
       .notNull()
       .primaryKey()
       .references(() => cli_sessions_v2.session_id, { onDelete: 'cascade' }),
-    pr_url: text().notNull(),
-    pr_number: integer().notNull(),
-    pr_state: text().notNull(),
+    // pr_url/pr_number/pr_state are nullable so we can persist a "no PR exists
+    // for this branch" sentinel row: pr_last_synced_at then throttles repeated
+    // refresh attempts even when GitHub has no matching PR.
+    pr_url: text(),
+    pr_number: integer(),
+    pr_state: text(),
     pr_title: text(),
     pr_head_sha: text(),
     pr_last_synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),

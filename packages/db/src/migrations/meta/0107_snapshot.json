@@ -1,5 +1,5 @@
 {
-  "id": "9338cc67-2d9e-4c7b-b035-4a6f4ad3565c",
+  "id": "ac01713d-8124-41eb-8d9a-09eac0adec36",
   "prevId": "ec49ba08-673e-479f-a8a2-490c71ad9186",
   "version": "7",
   "dialect": "postgresql",
@@ -3562,19 +3562,19 @@
           "name": "pr_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "pr_number": {
           "name": "pr_number",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "pr_state": {
           "name": "pr_state",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "pr_title": {
           "name": "pr_title",

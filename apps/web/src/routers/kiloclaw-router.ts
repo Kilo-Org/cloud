@@ -2988,6 +2988,7 @@ export const kiloclawRouter = createTRPCRouter({
           .select({
             id: kiloclaw_version_pins.id,
             image_tag: kiloclaw_version_pins.image_tag,
+            updated_at: kiloclaw_version_pins.updated_at,
           })
           .from(kiloclaw_version_pins)
           .where(eq(kiloclaw_version_pins.instance_id, instance.id))
@@ -3006,16 +3007,20 @@ export const kiloclawRouter = createTRPCRouter({
         }
 
         if (pin) {
-          // Conditional delete tied to the row id we observed. If the
-          // pin was replaced between SELECT and DELETE, returning() comes
-          // back empty and we throw PIN_EXISTS so the caller re-checks
-          // against the new pin instead of silently overriding it.
+          // Conditional delete tied to both the row id and the updated_at
+          // we observed. setMyPin uses onConflictDoUpdate which keeps the
+          // same row id but bumps updated_at, so checking id alone would
+          // miss in-place edits. Pinning updated_at as an optimistic lock
+          // catches both replacement (different id) and update (same id,
+          // newer updated_at). Empty returning() means the row changed,
+          // so we throw PIN_EXISTS and let the caller re-check.
           const deleted = await db
             .delete(kiloclaw_version_pins)
             .where(
               and(
                 eq(kiloclaw_version_pins.instance_id, instance.id),
-                eq(kiloclaw_version_pins.id, pin.id)
+                eq(kiloclaw_version_pins.id, pin.id),
+                eq(kiloclaw_version_pins.updated_at, pin.updated_at)
               )
             )
             .returning({ id: kiloclaw_version_pins.id });

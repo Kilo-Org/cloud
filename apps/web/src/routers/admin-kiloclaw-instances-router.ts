@@ -1251,6 +1251,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             id: kiloclaw_version_pins.id,
             image_tag: kiloclaw_version_pins.image_tag,
             pinned_by: kiloclaw_version_pins.pinned_by,
+            updated_at: kiloclaw_version_pins.updated_at,
           })
           .from(kiloclaw_version_pins)
           .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
@@ -1268,10 +1269,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         }
 
         if (pin) {
-          // Conditional delete tied to the row id we observed. If the
-          // pin was replaced between SELECT and DELETE, returning() is
-          // empty and we throw PIN_EXISTS so the admin re-confirms
-          // against the new pin instead of silently overriding it.
+          // Conditional delete tied to both the row id and the updated_at
+          // we observed. setMyPin uses onConflictDoUpdate which keeps the
+          // same row id but bumps updated_at, so checking id alone would
+          // miss in-place edits. Pinning updated_at catches both
+          // replacement (different id) and update (same id, newer
+          // updated_at). Empty returning() means the row changed.
           // Admin override deletes any pin (user-set or admin-set). No
           // replacement pin written — once the consent gate has been
           // spent, the user is free to re-establish their own pin.
@@ -1280,7 +1283,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             .where(
               and(
                 eq(kiloclaw_version_pins.instance_id, input.instanceId),
-                eq(kiloclaw_version_pins.id, pin.id)
+                eq(kiloclaw_version_pins.id, pin.id),
+                eq(kiloclaw_version_pins.updated_at, pin.updated_at)
               )
             )
             .returning({ id: kiloclaw_version_pins.id });

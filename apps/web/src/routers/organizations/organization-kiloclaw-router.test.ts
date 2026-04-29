@@ -5,6 +5,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@j
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
+import type { createCallerForUser as TestUtilsCallerFactory } from '@/routers/test-utils';
 import {
   kiloclaw_image_catalog,
   kiloclaw_instances,
@@ -100,7 +101,7 @@ const kiloclawUserClientMock = jest.requireMock<KiloClawUserClientMock>(
 // Use the real test-utils caller type so we get the full router shape
 // (destroy, patchWebSearchConfig, restartMachine, setMyPin, removeMyPin,
 // etc.) without transcribing each procedure signature.
-let createCallerForUser: typeof import('@/routers/test-utils').createCallerForUser;
+let createCallerForUser: typeof TestUtilsCallerFactory;
 
 beforeAll(async () => {
   const mod = await import('@/routers/test-utils');
@@ -436,13 +437,14 @@ describe('organizations.kiloclaw.restartMachine pin consent gate', () => {
 
   it('conditional delete does not remove a concurrently replaced pin row', async () => {
     // Direct DB-level test of the conditional-delete WHERE clause that
-    // the gate uses. Captures the original pin's id, simulates a
-    // replacement (delete + re-insert with a new id), then attempts to
-    // delete by the original id. The delete must not match — that empty
-    // returning() is what the runtime gate maps to PIN_EXISTS so the
-    // caller re-checks against the new pin instead of overriding it.
-    // The router-level PIN_EXISTS surface is exercised by the other
-    // tests in this suite; this one isolates the DB invariant.
+    // the gate uses. Captures the original pin's id and updated_at,
+    // simulates a replacement (delete + re-insert with a new id), then
+    // attempts the gate's conditional delete. The delete must not match
+    // — that empty returning() is what the runtime gate maps to
+    // PIN_EXISTS so the caller re-checks against the new pin instead of
+    // overriding it. The router-level PIN_EXISTS surface is exercised
+    // by the other tests in this suite; this one isolates the DB
+    // invariant.
     const user = await insertTestUser({
       google_user_email: `org-restart-pin-race-${crypto.randomUUID()}@example.com`,
     });
@@ -452,7 +454,10 @@ describe('organizations.kiloclaw.restartMachine pin consent gate', () => {
     const [originalPin] = await db
       .insert(kiloclaw_version_pins)
       .values({ instance_id: instanceId, image_tag: olderTag, pinned_by: user.id })
-      .returning({ id: kiloclaw_version_pins.id });
+      .returning({
+        id: kiloclaw_version_pins.id,
+        updated_at: kiloclaw_version_pins.updated_at,
+      });
     if (!originalPin) throw new Error('Expected original pin id');
 
     // Simulate someone replacing the pin between the gate's SELECT and
@@ -469,7 +474,8 @@ describe('organizations.kiloclaw.restartMachine pin consent gate', () => {
       .where(
         and(
           eq(kiloclaw_version_pins.instance_id, instanceId),
-          eq(kiloclaw_version_pins.id, originalPin.id)
+          eq(kiloclaw_version_pins.id, originalPin.id),
+          eq(kiloclaw_version_pins.updated_at, originalPin.updated_at)
         )
       )
       .returning({ id: kiloclaw_version_pins.id });
@@ -484,6 +490,68 @@ describe('organizations.kiloclaw.restartMachine pin consent gate', () => {
       .where(eq(kiloclaw_version_pins.instance_id, instanceId));
     expect(pins).toHaveLength(1);
     expect(pins[0]?.image_tag).toBe(newerTag);
+  });
+
+  it('conditional delete does not remove a concurrently in-place updated pin row', async () => {
+    // setMyPin uses onConflictDoUpdate which keeps the same row id but
+    // bumps updated_at. Without checking updated_at, the gate would
+    // silently delete a pin that was edited (image_tag, reason, or
+    // pinned_by changed) since the SELECT — which is exactly the case
+    // the reviewer flagged. This test pins updated_at as the optimistic
+    // lock and asserts the gate's conditional delete refuses to fire.
+    const user = await insertTestUser({
+      google_user_email: `org-restart-pin-update-${crypto.randomUUID()}@example.com`,
+    });
+    const organization = await createOrganization('Org Restart Pin Update Test', user.id);
+    const instanceId = await createActiveOrgInstance(user.id, organization.id);
+
+    const [originalPin] = await db
+      .insert(kiloclaw_version_pins)
+      .values({
+        instance_id: instanceId,
+        image_tag: olderTag,
+        pinned_by: user.id,
+        reason: 'before',
+      })
+      .returning({
+        id: kiloclaw_version_pins.id,
+        updated_at: kiloclaw_version_pins.updated_at,
+      });
+    if (!originalPin) throw new Error('Expected original pin id');
+
+    // Simulate setMyPin in-place edit: same row id, new image_tag and
+    // updated_at. Force a distinct timestamp so the optimistic-lock
+    // comparison can distinguish the two states reliably even on hosts
+    // where consecutive defaultNow() calls land in the same microsecond.
+    const bumpedUpdatedAt = new Date(Date.now() + 1000).toISOString();
+    await db
+      .update(kiloclaw_version_pins)
+      .set({ image_tag: newerTag, reason: 'after', updated_at: bumpedUpdatedAt })
+      .where(eq(kiloclaw_version_pins.id, originalPin.id));
+
+    const conditionalDelete = await db
+      .delete(kiloclaw_version_pins)
+      .where(
+        and(
+          eq(kiloclaw_version_pins.instance_id, instanceId),
+          eq(kiloclaw_version_pins.id, originalPin.id),
+          eq(kiloclaw_version_pins.updated_at, originalPin.updated_at)
+        )
+      )
+      .returning({ id: kiloclaw_version_pins.id });
+
+    // Pin id is unchanged but updated_at moved — the conditional delete
+    // must refuse to fire so the caller surfaces PIN_EXISTS at the
+    // router layer.
+    expect(conditionalDelete).toHaveLength(0);
+
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, instanceId));
+    expect(pins).toHaveLength(1);
+    expect(pins[0]?.image_tag).toBe(newerTag);
+    expect(pins[0]?.reason).toBe('after');
   });
 });
 

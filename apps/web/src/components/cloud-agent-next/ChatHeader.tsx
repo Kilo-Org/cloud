@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,12 +12,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ExternalLink, MoreHorizontal } from 'lucide-react';
+import { ExternalLink, Loader2, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { SessionInfoDialog } from './SessionInfoDialog';
 import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
-import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
+import { useTRPC } from '@/lib/trpc/utils';
+import type { AssociatedPullRequest } from '@/lib/cloud-agent-sdk';
+import { prStateVisual, resolveGitHubMenuAction } from './utils/pr-menu';
 
 type ChatHeaderProps = {
   cloudAgentSessionId: string;
@@ -29,6 +34,7 @@ type ChatHeaderProps = {
   soundEnabled?: boolean;
   onToggleSound?: () => void;
   sessionTitle?: string;
+  associatedPr?: AssociatedPullRequest | null;
 };
 
 export function ChatHeader({
@@ -44,15 +50,47 @@ export function ChatHeader({
   kiloSessionId,
   organizationId,
   sessionTitle,
+  associatedPr,
 }: ChatHeaderProps) {
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [showActionsDialog, setShowActionsDialog] = useState(false);
 
-  const browseUrl = buildRepoBrowseUrl(gitUrl);
-  const repoUrl =
-    browseUrl && branch && detectGitPlatform(gitUrl) === 'github'
-      ? `${browseUrl}/compare/${branch}?expand=1`
-      : browseUrl;
+  const menuAction = resolveGitHubMenuAction({ gitUrl, branch, associatedPr });
+
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const refreshMutation = useMutation(
+    trpc.cliSessionsV2.refreshAssociatedPullRequest.mutationOptions({
+      onSuccess: () => {
+        if (kiloSessionId) {
+          void queryClient.invalidateQueries({
+            queryKey: trpc.cliSessionsV2.getWithRuntimeState.queryKey({
+              session_id: kiloSessionId,
+            }),
+          });
+        }
+        toast.success('PR info refreshed');
+      },
+      onError: (error: unknown) => {
+        if (error instanceof TRPCClientError && error.data?.code === 'TOO_MANY_REQUESTS') {
+          toast.error('Try again in a moment — PR info was just refreshed.');
+          return;
+        }
+        if (error instanceof TRPCClientError && error.data?.code === 'BAD_REQUEST') {
+          toast.error(error.message || 'Cannot refresh PR info for this session.');
+          return;
+        }
+        toast.error('Failed to refresh PR info.');
+      },
+    })
+  );
+
+  const handleRefresh = () => {
+    if (!kiloSessionId || refreshMutation.isPending) return;
+    refreshMutation.mutate({ sessionId: kiloSessionId });
+  };
+
+  const stateVisual = associatedPr ? prStateVisual(associatedPr.state) : null;
 
   return (
     <>
@@ -64,6 +102,7 @@ export function ChatHeader({
         model={model}
         modelDisplayName={modelDisplayName}
         cost={totalCost * 1_000_000}
+        associatedPr={associatedPr ?? null}
       />
       <SessionActionsDialog
         open={showActionsDialog}
@@ -86,12 +125,35 @@ export function ChatHeader({
             <DropdownMenuItem onClick={() => setShowActionsDialog(true)}>
               Share or Fork
             </DropdownMenuItem>
-            {repoUrl && (
+            {menuAction && (
               <DropdownMenuItem asChild>
-                <a href={repoUrl} target="_blank" rel="noopener noreferrer">
+                <a href={menuAction.href} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Open in GitHub
+                  <span className="flex-1">{menuAction.label}</span>
+                  {stateVisual && menuAction.kind === 'pr' && (
+                    <span
+                      className={`ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${stateVisual.chipClassName}`}
+                    >
+                      {stateVisual.label}
+                    </span>
+                  )}
                 </a>
+              </DropdownMenuItem>
+            )}
+            {kiloSessionId && (
+              <DropdownMenuItem
+                onSelect={event => {
+                  event.preventDefault();
+                  handleRefresh();
+                }}
+                disabled={refreshMutation.isPending}
+              >
+                {refreshMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Refresh PR info
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />

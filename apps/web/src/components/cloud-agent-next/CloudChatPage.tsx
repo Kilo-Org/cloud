@@ -331,11 +331,14 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
       kiloSessionId={sessionIdFromParams ?? undefined}
       organizationId={organizationId}
       repository={sessionConfig?.repository ?? ''}
+      branch={fetchedSessionData?.gitBranch ?? undefined}
+      gitUrl={fetchedSessionData?.gitUrl ?? null}
       model={sessionConfig?.model}
       modelDisplayName={modelDisplayName}
       totalCost={totalCost}
       soundEnabled={soundEnabled}
       onToggleSound={handleToggleSound}
+      associatedPr={fetchedSessionData?.associatedPr ?? null}
     />
   );
 

@@ -36,6 +36,7 @@ import { ensureVolume, staleProvisionAgeMs } from './fly-machines';
 import { mintFreshApiKey } from './config';
 import * as gateway from './gateway';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
+import { maybeDispatchReadyPush, maybeDispatchStartFailurePush } from '../../lib/lifecycle-push';
 
 export type ReconcileWithFlyResult = {
   beginUnexpectedStopRecovery?: {
@@ -93,6 +94,7 @@ export async function reconcileWithFly(
 
   if (state.status === 'starting') {
     await reconcileStarting(flyConfig, ctx, state, env, rctx);
+    await maybeDispatchReadyPush(env, state, ctx);
     return {};
   }
 
@@ -129,6 +131,9 @@ export async function reconcileWithFly(
 
   await reconcileVolume(flyConfig, ctx, state, env, rctx);
   await reconcileApiKeyExpiry(flyConfig, ctx, state, env, rctx);
+  if (state.status === 'running') {
+    await maybeDispatchReadyPush(env, state, ctx);
+  }
   return result;
 }
 
@@ -344,6 +349,13 @@ async function reconcileStarting(
         'starting_timeout',
         state.lastStartErrorMessage ?? undefined
       );
+      await maybeDispatchStartFailurePush(
+        env,
+        state,
+        ctx,
+        'starting_timeout',
+        state.lastStartErrorMessage
+      );
       return;
     }
     // start() hasn't persisted a machine ID yet — still in progress, wait.
@@ -393,6 +405,13 @@ async function reconcileStarting(
         'starting_timeout_with_machine',
         state.lastStartErrorMessage ?? undefined
       );
+      await maybeDispatchStartFailurePush(
+        env,
+        state,
+        ctx,
+        'starting_timeout_with_machine',
+        state.lastStartErrorMessage
+      );
     }
   } catch (err) {
     if (fly.isFlyNotFound(err)) {
@@ -419,6 +438,13 @@ async function reconcileStarting(
         )
       );
       emitStartFailedEvent(env, state, 'starting_machine_gone', 'machine gone during start');
+      await maybeDispatchStartFailurePush(
+        env,
+        state,
+        ctx,
+        'starting_machine_gone',
+        'machine gone during start'
+      );
     } else if (isTimedOut) {
       // Transient Fly API error but we've exceeded the starting timeout.
       // Fall back to 'stopped' so the user can retry instead of staying
@@ -445,6 +471,13 @@ async function reconcileStarting(
       emitStartFailedEvent(
         env,
         state,
+        'starting_timeout_transient_error',
+        err instanceof Error ? err.message : String(err)
+      );
+      await maybeDispatchStartFailurePush(
+        env,
+        state,
+        ctx,
         'starting_timeout_transient_error',
         err instanceof Error ? err.message : String(err)
       );
@@ -945,6 +978,13 @@ export async function syncStatusWithFly(
     );
     if (wasStarting) {
       emitStartFailedEvent(rctx.env, state, 'fly_failed_state', 'fly machine entered failed state');
+      await maybeDispatchStartFailurePush(
+        rctx.env,
+        state,
+        ctx,
+        'fly_failed_state',
+        'fly machine entered failed state'
+      );
     }
     return {};
   }

@@ -94,6 +94,7 @@ import {
   markRestartSuccessful,
 } from './reconcile';
 import { restoreFromPostgres, markDestroyedInPostgresHelper } from './postgres';
+import { maybeDispatchReadyPush, maybeDispatchStartFailurePush } from '../../lib/lifecycle-push';
 import { legacyDoKeysForIdentity } from '../../lib/instance-routing';
 import {
   beginUnexpectedStopRecovery,
@@ -152,7 +153,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async scheduleAlarm(): Promise<void> {
     if (!this.s.status) return;
-    await this.ctx.storage.setAlarm(nextAlarmTime(this.s.status));
+    await this.ctx.storage.setAlarm(nextAlarmTime(this.s.status, this.s));
   }
 
   private recoveryRuntime(): RecoveryRuntime {
@@ -280,6 +281,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       lastStartErrorMessage: message,
       lastStartErrorAt: now,
     });
+    await maybeDispatchStartFailurePush(
+      this.env,
+      this.s,
+      this.ctx,
+      'provider_start_failed',
+      message
+    );
   }
 
   private async markRestartFailedFromProvider(message: string): Promise<void> {
@@ -340,6 +348,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         durationMs: startingAt ? Date.now() - startingAt : undefined,
       });
     }
+
+    await maybeDispatchReadyPush(this.env, this.s, this.ctx);
   }
 
   private async reconcileNonFlyRuntimeFromAlarm(): Promise<void> {
@@ -758,6 +768,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             pendingDestroyVolumeId: null,
             pendingPostgresMarkOnFinalize: false,
             instanceReadyEmailSent: false,
+            instanceReadyPushSent: false,
+            startFailurePushSentForAttempt: false,
           })
         )
       : syncProviderStateForStorage(
@@ -794,6 +806,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.pendingDestroyVolumeId = null;
       this.s.pendingPostgresMarkOnFinalize = false;
       this.s.instanceReadyEmailSent = false;
+      this.s.instanceReadyPushSent = false;
+      this.s.startFailurePushSentForAttempt = false;
     }
     this.s.loaded = true;
 
@@ -2028,6 +2042,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
 
     await this.scheduleAlarm();
+    await maybeDispatchReadyPush(this.env, this.s, this.ctx);
     return {
       started: true,
       previousStatus,
@@ -2080,10 +2095,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.status = 'starting';
     this.s.startingAt = Date.now();
     this.s.pendingStartReason = options?.reason ?? null;
+    // Re-arm the failure push flag so this start attempt can trigger its own
+    // notification even if a previous attempt already sent one.
+    this.s.startFailurePushSentForAttempt = false;
     await this.persist({
       status: 'starting',
       startingAt: this.s.startingAt,
       pendingStartReason: this.s.pendingStartReason,
+      startFailurePushSentForAttempt: false,
     });
     await this.scheduleAlarm();
 
@@ -2581,6 +2600,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     restoreStartedAt: string | null;
     pendingRestoreVolumeId: string | null;
     instanceReadyEmailSent: boolean;
+    instanceReadyPushSent: boolean;
+    startFailurePushSentForAttempt: boolean;
     // --- env key diagnostics ---
     envKeyAppDOKey: string | null;
     envKeyAppDOFlyAppName: string | null;
@@ -2666,6 +2687,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       restoreStartedAt: this.s.restoreStartedAt,
       pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
       instanceReadyEmailSent: this.s.instanceReadyEmailSent,
+      instanceReadyPushSent: this.s.instanceReadyPushSent,
+      startFailurePushSentForAttempt: this.s.startFailurePushSentForAttempt,
       envKeyAppDOKey,
       envKeyAppDOFlyAppName: envKeyDiag?.flyAppName ?? null,
       envKeyAppDOKeySet: envKeyDiag?.envKeySet ?? null,
@@ -3535,6 +3558,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           );
         } else {
           await this.reconcileNonFlyRuntimeFromAlarm();
+          if (this.s.status === 'running') {
+            await maybeDispatchReadyPush(this.env, this.s, this.ctx);
+          }
         }
         if (this.s.status) {
           await this.scheduleAlarm();

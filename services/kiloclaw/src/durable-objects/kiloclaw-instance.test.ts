@@ -163,6 +163,8 @@ import {
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   STALE_PROVISION_THRESHOLD_MS,
+  READY_PUSH_PROBE_WINDOW_MS,
+  READY_PUSH_PROBE_CADENCE_MS,
 } from '../config';
 
 // ============================================================================
@@ -9406,5 +9408,512 @@ describe('Stream Chat backfill on restartMachine', () => {
     await Promise.all(waitUntilPromises);
 
     expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// Lifecycle push notifications
+// ============================================================================
+
+type LifecyclePushCall = {
+  userId: string;
+  instanceId: string;
+  sandboxId: string;
+  event: 'ready' | 'start_failed';
+  instanceName: string | null;
+  errorMessage?: string;
+};
+
+function createFakeNotificationsBinding(): {
+  binding: {
+    sendInstanceLifecycleNotification: (params: LifecyclePushCall) => Promise<{
+      sent: number;
+      staleTokens: number;
+    }>;
+  };
+  calls: LifecyclePushCall[];
+} {
+  const calls: LifecyclePushCall[] = [];
+  return {
+    binding: {
+      sendInstanceLifecycleNotification: async (params: LifecyclePushCall) => {
+        calls.push(params);
+        return { sent: 1, staleTokens: 0 };
+      },
+    },
+    calls,
+  };
+}
+
+function stubReadyProbe(ready: boolean) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/_kilo/gateway/ready')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ready }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 200 }));
+    })
+  );
+}
+
+describe('instance ready push', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('dispatches exactly one ready push when getGatewayReady reports ready', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage, {
+      instanceReadyPushSent: false,
+      flyAppName: 'acct-test',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-test',
+        machineId: 'machine-1',
+        volumeId: 'vol-1',
+        region: 'iad',
+      },
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    stubReadyProbe(true);
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('ready');
+    expect(calls[0].userId).toBe('user-1');
+    expect(storage._store.get('instanceReadyPushSent')).toBe(true);
+  });
+
+  it('does not dispatch when getGatewayReady reports not-ready', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage, {
+      instanceReadyPushSent: false,
+      flyAppName: 'acct-test',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-test',
+        machineId: 'machine-1',
+        volumeId: 'vol-1',
+        region: 'iad',
+      },
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    stubReadyProbe(false);
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(0);
+    expect(storage._store.get('instanceReadyPushSent')).toBeFalsy();
+  });
+
+  it('does not dispatch a second ready push once the flag is set', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage, {
+      instanceReadyPushSent: true,
+      flyAppName: 'acct-test',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-test',
+        machineId: 'machine-1',
+        volumeId: 'vol-1',
+        region: 'iad',
+      },
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    stubReadyProbe(true);
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it('does not dispatch once the probe window has elapsed', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    // lastStartedAt older than the 5-min probe window.
+    const staleStart = Date.now() - READY_PUSH_PROBE_WINDOW_MS - 1000;
+    await seedRunning(storage, {
+      instanceReadyPushSent: false,
+      lastStartedAt: staleStart,
+      flyAppName: 'acct-test',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-test',
+        machineId: 'machine-1',
+        volumeId: 'vol-1',
+        region: 'iad',
+      },
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    stubReadyProbe(true);
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(0);
+    expect(storage._store.get('instanceReadyPushSent')).toBeFalsy();
+  });
+
+  it('initializes the flag to false on initial provision()', async () => {
+    const env = createFakeEnv();
+    const { binding } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    const { instance, storage, waitUntilPromises } = createInstance(createFakeStorage(), env);
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    // Fresh provision explicitly seeds the flag as false (same semantic as
+    // instanceReadyEmailSent) so the push probe arms for the new lifecycle.
+    expect(storage._store.get('instanceReadyPushSent')).toBe(false);
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(false);
+  });
+
+  it('clamps the running alarm cadence while the probe window is active', async () => {
+    const env = createFakeEnv();
+    const { binding } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage, {
+      instanceReadyPushSent: false,
+      flyAppName: 'acct-test',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-test',
+        machineId: 'machine-1',
+        volumeId: 'vol-1',
+        region: 'iad',
+      },
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    stubReadyProbe(false);
+
+    const beforeAlarm = Date.now();
+    await instance.alarm();
+    const alarm = storage._getAlarm() ?? 0;
+
+    const delay = alarm - beforeAlarm;
+    // Clamped cadence is 10s with jitter capped at the clamped interval
+    // (so up to ~2× the base) to desync concurrent instances while still
+    // staying well under the 5-min running cadence.
+    expect(delay).toBeGreaterThanOrEqual(READY_PUSH_PROBE_CADENCE_MS);
+    expect(delay).toBeLessThanOrEqual(READY_PUSH_PROBE_CADENCE_MS * 2 + 100);
+    expect(delay).toBeLessThan(ALARM_INTERVAL_RUNNING_MS);
+  });
+
+  it('reverts to the normal running cadence after the flag flips', async () => {
+    const env = createFakeEnv();
+    const { binding } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage, {
+      instanceReadyPushSent: false,
+      flyAppName: 'acct-test',
+      providerState: {
+        provider: 'fly',
+        appName: 'acct-test',
+        machineId: 'machine-1',
+        volumeId: 'vol-1',
+        region: 'iad',
+      },
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    stubReadyProbe(true);
+
+    const beforeAlarm = Date.now();
+    await instance.alarm();
+
+    // The probe succeeded, flag flipped, so the alarm was scheduled *after*
+    // the clamp decision with the flag already true → normal cadence.
+    expect(storage._store.get('instanceReadyPushSent')).toBe(true);
+    const alarm = storage._getAlarm() ?? 0;
+    expect(alarm - beforeAlarm).toBeGreaterThan(READY_PUSH_PROBE_CADENCE_MS);
+  });
+});
+
+describe('instance start-failed push', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('dispatches one push when start times out without a machine', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: null,
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: false,
+    });
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('dispatches one push when the machine is gone (404) during start', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: 'machine-1',
+      startFailurePushSentForAttempt: false,
+    });
+
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('dispatches one push when the machine enters a failed state', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: 'machine-1',
+      startFailurePushSentForAttempt: false,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'failed',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('does not dispatch a second push for the same attempt', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: null,
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: true,
+    });
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it('re-arms the flag on each startAsync attempt', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      startFailurePushSentForAttempt: true,
+      flyMachineId: null,
+    });
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.startAsync('user-1');
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(false);
+  });
+});
+
+describe('non-Fly lifecycle push dispatch', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('dispatches a ready push when the docker-local alarm observes running', async () => {
+    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedDockerInstance(storage, {
+      status: 'starting',
+      startingAt: Date.now(),
+      lastStartedAt: null,
+      instanceReadyPushSent: false,
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.includes('/_kilo/gateway/ready')) {
+        return new Response(JSON.stringify({ ready: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          Id: 'container-1',
+          Name: '/kiloclaw-sandbox-1',
+          State: { Running: true, Status: 'running' },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('running');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('ready');
+    expect(calls[0].userId).toBe('user-1');
+    expect(storage._store.get('instanceReadyPushSent')).toBe(true);
+  });
+
+  it('dispatches a start-failed push when the docker-local alarm detects a timeout', async () => {
+    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedDockerInstance(storage, {
+      status: 'starting',
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: false,
+    });
+
+    vi.mocked(fetch).mockResolvedValue(new Response('', { status: 404 }));
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].errorMessage).toBe('Start failed.');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('dispatches a start-failed push when docker-local inline start throws', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+      DOCKER_LOCAL_PORT_RANGE: '45000-45010',
+    };
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(createFakeStorage(), env);
+    await seedDockerInstance(storage, {
+      status: 'provisioned',
+      providerState: dockerProviderState({ hostPort: null }),
+      startFailurePushSentForAttempt: false,
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response(JSON.stringify({ Name: 'kiloclaw-root-sandbox-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/containers/json?all=1')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/containers/kiloclaw-sandbox-1/json')) {
+        return new Response('', { status: 404 });
+      }
+      if (url.includes('/containers/create?name=kiloclaw-sandbox-1')) {
+        return new Response('create failed', { status: 500 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    await instance.startAsync();
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].errorMessage).toBe('Start failed.');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
   });
 });

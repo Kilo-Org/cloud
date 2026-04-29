@@ -1,4 +1,5 @@
 import type { InstanceMutableState, InstanceStatus } from './types';
+import type { KiloClawEnv } from '../../types';
 import {
   ALARM_INTERVAL_RUNNING_MS,
   ALARM_INTERVAL_STARTING_MS,
@@ -7,8 +8,10 @@ import {
   ALARM_INTERVAL_DESTROYING_MS,
   ALARM_INTERVAL_IDLE_MS,
   ALARM_JITTER_MS,
+  READY_PUSH_PROBE_CADENCE_MS,
 } from '../../config';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
+import { readyPushProbeActive } from '../../lib/lifecycle-push';
 
 type LoggableInstanceContext = Pick<
   InstanceMutableState,
@@ -42,7 +45,7 @@ export function reconcileLog(
 
 export type ReconcileContext = {
   readonly state: InstanceMutableState;
-  readonly env: { KILOCLAW_AE?: AnalyticsEngineDataset };
+  readonly env: KiloClawEnv;
   readonly reason: string;
   /** Log a reconcile action to both console and Analytics Engine. */
   log: (action: string, details?: Record<string, unknown>) => void;
@@ -50,7 +53,7 @@ export type ReconcileContext = {
 
 export function createReconcileContext(
   state: InstanceMutableState,
-  env: { KILOCLAW_AE?: AnalyticsEngineDataset },
+  env: KiloClawEnv,
   reason: string
 ): ReconcileContext {
   return {
@@ -234,7 +237,28 @@ export function alarmIntervalForStatus(status: InstanceStatus): number {
 
 /**
  * Next alarm time with jitter.
+ *
+ * Accepts an optional state snapshot so the scheduler can clamp the `running`
+ * cadence while the ready-push probe window is still open. During the probe
+ * window we poll `getGatewayReady` every ~10s so the push lands within seconds
+ * of OpenClaw opening its listen socket. Once the flag flips or the window
+ * closes, the normal 5-min running cadence returns.
  */
-export function nextAlarmTime(status: InstanceStatus): number {
-  return Date.now() + alarmIntervalForStatus(status) + Math.random() * ALARM_JITTER_MS;
+export function nextAlarmTime(status: InstanceStatus, state?: InstanceMutableState): number {
+  const now = Date.now();
+  let interval = alarmIntervalForStatus(status);
+  if (
+    status === 'running' &&
+    state &&
+    readyPushProbeActive(state, now) &&
+    READY_PUSH_PROBE_CADENCE_MS < interval
+  ) {
+    interval = READY_PUSH_PROBE_CADENCE_MS;
+    // Cap jitter to the clamped interval so concurrent just-started instances
+    // don't all fire on an exact 10s grid, but still stay well under the
+    // non-clamped running cadence.
+    const clampedJitter = Math.min(ALARM_JITTER_MS, interval);
+    return now + interval + Math.random() * clampedJitter;
+  }
+  return now + interval + Math.random() * ALARM_JITTER_MS;
 }

@@ -332,6 +332,14 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     // Legacy instances pre-dating this field treat absence as already-sent
     // to avoid spurious emails after deploy.
     s.instanceReadyEmailSent = 'instanceReadyEmailSent' in raw ? d.instanceReadyEmailSent : true;
+    // Same migration treatment for the push flag so newly-deployed code
+    // doesn't blast every running instance with a "ready" push on first alarm.
+    s.instanceReadyPushSent = 'instanceReadyPushSent' in raw ? d.instanceReadyPushSent : true;
+    // Legacy instances with an in-flight `starting` attempt at deploy time
+    // should not emit a retroactive `start_failed` push for that attempt.
+    // startAsync() re-arms this flag for every subsequent attempt.
+    s.startFailurePushSentForAttempt =
+      'startFailurePushSentForAttempt' in raw ? d.startFailurePushSentForAttempt : true;
     s.customSecretMeta = d.customSecretMeta;
     s.streamChatApiKey = d.streamChatApiKey;
     s.streamChatBotUserId = d.streamChatBotUserId;
@@ -432,6 +440,8 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
   s.instanceReadyEmailSent = false;
+  s.instanceReadyPushSent = false;
+  s.startFailurePushSentForAttempt = false;
   s.streamChatApiKey = null;
   s.streamChatBotUserId = null;
   s.streamChatBotUserToken = null;
@@ -525,6 +535,8 @@ export function createMutableState(): InstanceMutableState {
     preRestoreStatus: null,
     pendingRestoreVolumeId: null,
     instanceReadyEmailSent: false,
+    instanceReadyPushSent: false,
+    startFailurePushSentForAttempt: false,
     customSecretMeta: null,
     streamChatApiKey: null,
     streamChatBotUserId: null,

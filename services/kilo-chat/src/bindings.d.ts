@@ -1,5 +1,9 @@
 import type { z } from 'zod';
 import type { chatWebhookRpcSchema, KiloChatEventName } from '@kilocode/kilo-chat';
+import type {
+  SendPushForConversationInput,
+  SendPushForConversationOutput,
+} from '@kilocode/notifications';
 
 // Augment the wrangler-generated Env with RPC method signatures for service
 // bindings. `worker-configuration.d.ts` types these as plain Fetcher; this
@@ -22,6 +26,11 @@ declare global {
         event: KiloChatEventName,
         payload: unknown
       ): Promise<boolean>;
+    };
+    NOTIFICATIONS: Fetcher & {
+      sendPushForConversation(
+        input: SendPushForConversationInput
+      ): Promise<SendPushForConversationOutput>;
     };
   }
 }

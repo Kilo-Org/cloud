@@ -1808,9 +1808,15 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
+      '@kilocode/event-service':
+        specifier: workspace:*
+        version: link:../../packages/event-service
       '@kilocode/kilo-chat':
         specifier: workspace:*
         version: link:../../packages/kilo-chat
+      '@kilocode/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

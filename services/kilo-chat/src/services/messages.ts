@@ -10,11 +10,13 @@
 import type { ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
+import { contentBlocksToText } from '../util/content';
 import {
   extractConversationContext,
   pushEventToHumanMembers,
   pushInstanceEvent,
 } from './event-push';
+import { fetchSandboxLabel } from './sandbox-lookup';
 import type { ConversationInfo } from '../do/conversation-do';
 
 export type DeferCtx = { waitUntil: (p: Promise<unknown>) => void };
@@ -303,6 +305,32 @@ async function postCommitFanOut(
       );
     }
     await Promise.allSettled(instanceEvents);
+  }
+
+  // ── Block E: Push notification fanout ─────────────────────────────────
+  // Runs after realtime/event-service delivery has been attempted. Sender is
+  // excluded; bot members are not push recipients (kind=bot, never in
+  // humanMemberIds). Failures are logged but never propagate — the send has
+  // already succeeded and any other post-commit work must complete.
+  const pushRecipients = humanMemberIds.filter(id => id !== callerId);
+  if (sandboxId !== null && pushRecipients.length > 0) {
+    try {
+      const senderUserId = isSenderHuman ? callerId : null;
+      const bodyPreview = contentBlocksToText(content).slice(0, 200);
+      const sandboxLabel = await fetchSandboxLabel(env.HYPERDRIVE.connectionString, sandboxId);
+      const conversationTitle = info.title ?? autoTitle ?? 'Untitled';
+      await env.NOTIFICATIONS.sendPushForConversation({
+        conversationId,
+        sandboxId,
+        senderUserId,
+        recipientUserIds: pushRecipients,
+        title: `${sandboxLabel} · ${conversationTitle}`,
+        bodyPreview,
+        messageId,
+      });
+    } catch (err) {
+      logger.error('sendPushForConversation failed', formatError(err));
+    }
   }
 }
 

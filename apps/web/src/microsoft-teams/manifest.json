@@ -1,0 +1,36 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "10e87660-8c95-4136-bd51-e6c9287d6887",
+  "packageName": "com.yourcompany.chatbot",
+  "developer": {
+    "name": "Your Company",
+    "websiteUrl": "https://kilo.ai",
+    "privacyUrl": "https://kilo.ai/privacy",
+    "termsOfUseUrl": "https://kilo.ai/terms"
+  },
+  "name": {
+    "short": "KiloDev Bot",
+    "full": "Chat SDK Demo Bot"
+  },
+  "description": {
+    "short": "A chat bot powered by Chat SDK",
+    "full": "A chat bot powered by Chat SDK that responds to messages and commands."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#FFFFFF",
+  "bots": [
+    {
+      "botId": "10e87660-8c95-4136-bd51-e6c9287d6887",
+      "scopes": ["personal", "team", "groupchat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["kilo.ai"]
+}

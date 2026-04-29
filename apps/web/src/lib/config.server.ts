@@ -122,6 +122,11 @@ export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
 
+// Microsoft Teams
+export const TEAMS_APP_ID = getEnvVariable('TEAMS_APP_ID');
+export const TEAMS_APP_PASSWORD = getEnvVariable('TEAMS_APP_PASSWORD');
+export const TEAMS_APP_TENANT_ID = getEnvVariable('TEAMS_APP_TENANT_ID');
+
 // Discord (bot integration — existing)
 export const DISCORD_CLIENT_ID = getEnvVariable('DISCORD_CLIENT_ID');
 export const DISCORD_CLIENT_SECRET = getEnvVariable('DISCORD_CLIENT_SECRET');

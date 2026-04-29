@@ -461,14 +461,17 @@ importers:
         specifier: ^3.1009.0
         version: 3.1009.0
       '@chat-adapter/slack':
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       '@chat-adapter/state-memory':
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       '@chat-adapter/state-redis':
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
+      '@chat-adapter/teams':
+        specifier: ^4.26.0
+        version: 4.26.0
       '@emoji-mart/data':
         specifier: ^1.2.1
         version: 1.2.1
@@ -650,8 +653,8 @@ importers:
         specifier: ^7.0.1
         version: 7.0.1
       chat:
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2458,6 +2461,14 @@ packages:
     resolution: {integrity: sha512-iY8yvjE0y651BixKNPgmv1WrQc+GZ142sb0z4gYnChDDY2YqI4P/jsSopBWrKfAt7LOJAkOXt7rC/hms+WclQQ==}
     engines: {node: '>=18.0.0'}
 
+  '@azure/msal-common@15.17.0':
+    resolution: {integrity: sha512-VQ5/gTLFADkwue+FohVuCqlzFPUq4xSrX8jeZe+iwZuY6moliNC8xt86qPVNYdtbQfELDf2Nu6LI+demFPHGgw==}
+    engines: {node: '>=0.8.0'}
+
+  '@azure/msal-node@3.8.10':
+    resolution: {integrity: sha512-0Hz7Kx4hs70KZWep/Rd7aw/qOLUF92wUOhn7ZsOuB5xNR/06NL1E2RAI9+UKH1FtvN8nD6mFjH7UKSjv6vOWvQ==}
+    engines: {node: '>=16'}
+
   '@babel/code-frame@7.29.0':
     resolution: {integrity: sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==}
     engines: {node: '>=6.9.0'}
@@ -3179,17 +3190,20 @@ packages:
   '@braintree/sanitize-url@6.0.4':
     resolution: {integrity: sha512-s3jaWicZd0pkP0jf5ysyHUI/RE7MHos6qlToFcGWXVp+ykHOy77OUMrfbgJ9it2C5bow7OIQwYYaHjk9XlBQ2A==}
 
-  '@chat-adapter/shared@4.20.1':
-    resolution: {integrity: sha512-UawGmT7O+3vxvaU9f+lc0PVQKU+TvE0PUxa0zL43qH1rqGkosngtT3cOOhW6JOx+rxt3jox2a99xr8hnJPkshA==}
+  '@chat-adapter/shared@4.26.0':
+    resolution: {integrity: sha512-YD0MGktFXrArUqTBsyPfL5vkdD1WBS58PAWO0oVrMQAMmPxpAXfWGjBtZCkf3y8R8Svb0uVuVXiMZSForaEnMQ==}
 
-  '@chat-adapter/slack@4.20.1':
-    resolution: {integrity: sha512-DGrNKHiYCFPFd6WzWkoJmCmtK/TuHw5euUjev6i01ygYNLQ7h2JiL424iqkdZmXfkOIxnDcnVBbKDuF9uEKQlg==}
+  '@chat-adapter/slack@4.26.0':
+    resolution: {integrity: sha512-NNN47rURI6qpJf4rRK8xyeumjPTAXr7YSU4/FnViU8cFV/vKYFR4xZTzlFMVWNrYi9SmSwasUjcBmQznigK54Q==}
 
-  '@chat-adapter/state-memory@4.20.1':
-    resolution: {integrity: sha512-JtITUuz4xYwXMOSH8dCYjuxgIgtkecVH5RUVR46PT9Nh8QT4l6WRMNZvdrWkJOn9jOZToXiNS/ae0OFJHJtN+g==}
+  '@chat-adapter/state-memory@4.26.0':
+    resolution: {integrity: sha512-FsfyM/A9Bf1yFc1FWmOsK+a4YVwm5FogX25hZxFG6cEvyFb6Cd924SsbtvF06yItY/7J2UFetCsMmBPkdPKshQ==}
 
-  '@chat-adapter/state-redis@4.20.1':
-    resolution: {integrity: sha512-aAN+GXNTCKrXsSurh5arLMDGl8XbbxTspD1qLZuYXPwQBBZsuF3mPBfeFmwRJqweHuwv+3b/VofXvxFmRosR6A==}
+  '@chat-adapter/state-redis@4.26.0':
+    resolution: {integrity: sha512-NSX2E6wkDlg0AMfKFx4LPoV6cBHolL08Ht3cT+S01jss24t9GzlDw/BUsrWOeoTElwEhxZcQw5bUkStUAA7JMg==}
+
+  '@chat-adapter/teams@4.26.0':
+    resolution: {integrity: sha512-Hg7TzN7Y/G/PcJr7VWKnv26XBDjP8+KDoe1gp62BAN7Y2MXCPdhsZLSR3cWQ5AH7nw0oz3vPZ38UilWUIhCxFg==}
 
   '@chromatic-com/playwright@0.12.8':
     resolution: {integrity: sha512-2oi8ghd+2N+hDI0Y65Ac/aYfsvDTyDHvEZMNS4Ln7VzyZ6SdGLoQLOvP80IGJlekTI68K8gQpzXewRV2chUaZQ==}
@@ -4405,6 +4419,30 @@ packages:
     peerDependencies:
       '@types/react': '>=16'
       react: '>=16'
+
+  '@microsoft/teams.api@2.0.8':
+    resolution: {integrity: sha512-N13idaRZNnfL7aefzsn2rhPtujqke1QVM81bNWq1XeK+5yeXod3aLTmBY701DEKkZUXiSG0AogvzkNwVnBw4+g==}
+    engines: {node: '>=20'}
+
+  '@microsoft/teams.apps@2.0.8':
+    resolution: {integrity: sha512-6YBOxnQSoEPu841zMa1SDBdwH3gsuzrz0LCONuaGOHJ3Kmv2S+7ih1DqEx4Ak3iAYHeCvxnWGqjcYSBhgeiuMQ==}
+    engines: {node: '>=20'}
+
+  '@microsoft/teams.cards@2.0.8':
+    resolution: {integrity: sha512-WrGAgkDKqhvFhnsKPwFeKTkhAXu/fbySxq5+uIOqY1ffdgiEdEoj6c0cjyQJy0HJ9B5u/0SQ4hO2KUc6jlZSZw==}
+    engines: {node: '>=20'}
+
+  '@microsoft/teams.common@2.0.8':
+    resolution: {integrity: sha512-nkolOYX9qCpfK2uitiuAYm3EvMleHer5P3OCx3IBOp2gxkkFvNNOcOIDXuPZ6BtiENt47FPn4fYMMgJrawCHcA==}
+    engines: {node: '>=20'}
+
+  '@microsoft/teams.graph-endpoints@2.0.8':
+    resolution: {integrity: sha512-KjDhMWn8ZcwTjDOw1hL0By/HvHEXe5+Bzy8tmEOsqPGUc/1HfwtBZAYsr8FUVBSBe0CObLYs2Pkh0wiHqWNNPw==}
+    engines: {node: '>=20'}
+
+  '@microsoft/teams.graph@2.0.8':
+    resolution: {integrity: sha512-M/skUNJFD+lIVNa+ng0iy8t3sFmki6NOiWpGwnWOBAKFgTYBTJVtPfWm6SNdGFTCUsV9rjep4s9S5zTKUg2HJg==}
+    engines: {node: '>=20'}
 
   '@mistralai/mistralai@1.15.1':
     resolution: {integrity: sha512-fb995eiz3r0KsBGtRjFV+/iLbX+UpfalxpF+YitT3R6ukrPD4PN+FGwwmYcRFhNAzVzDUtTVxQYnjQWEnwV5nw==}
@@ -8754,8 +8792,8 @@ packages:
   character-reference-invalid@2.0.1:
     resolution: {integrity: sha512-iBZ4F4wRbyORVsu0jPV7gXkOsGYjGHPmAyv+HiHG8gi5PtC9KI2j1+v8/tlibRvjoWX027ypmG/n0HtO5t7unw==}
 
-  chat@4.20.1:
-    resolution: {integrity: sha512-TwvP1bbzK2g3sYHhD94wot2watxnySCYLQkaMdYjM79T43OTybG8hSSFhOrrp/AXjLHei2sch4GCOQu+4zcfHw==}
+  chat@4.26.0:
+    resolution: {integrity: sha512-QToDnIEGpyb8yQA6YLMHOSRK30YVk4RtsyFyuWFYyB2c4jQlyIrSWtwVK7qyvmvqzQp9uDwCdJRAhS8GtCHAGQ==}
 
   check-error@2.1.3:
     resolution: {integrity: sha512-PAJdDJusoxnwm1VwW07VWwUN1sl7smmC3OKggvndJFadxxDRyFJBX/ggnu/KE4kQAB7a3Dp8f/YXC1FlUprWmA==}
@@ -11422,8 +11460,16 @@ packages:
   jwa@2.0.1:
     resolution: {integrity: sha512-hRF04fqJIP8Abbkq5NKGN0Bbr3JxlQ+qhZufXVr0DvujKy93ZCbXZMHDL4EOtodSbCWxOqR8MS1tXA5hwqCXDg==}
 
+  jwks-rsa@3.2.2:
+    resolution: {integrity: sha512-BqTyEDV+lS8F2trk3A+qJnxV5Q9EqKCBJOPti3W97r7qTympCZjb7h2X6f2kc+0K3rsSTY1/6YG2eaXKoj497w==}
+    engines: {node: '>=14'}
+
   jws@4.0.1:
     resolution: {integrity: sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==}
+
+  jwt-decode@4.0.0:
+    resolution: {integrity: sha512-+KJGIyHgkGuIq3IEBNftfhW/LfWhXUIY6OmyVWjliu5KH1y0fw7VQ8YndE2O4qZdMSd9SqbnC8GOcZEy0Om7sA==}
+    engines: {node: '>=18'}
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
@@ -11532,6 +11578,9 @@ packages:
     resolution: {integrity: sha512-xi6IyHML+c9+Q3W0S4fCQJOym42pyurFiJUHEcEyHS0CeKzia4yZDEsLlqOFykxOdHpNy0NmvVO31vcSqAxJCg==}
     engines: {node: '>= 12.0.0'}
 
+  limiter@1.1.5:
+    resolution: {integrity: sha512-FWWMIEOxz3GwUI4Ts/IvgVy6LPvoMPgjMdQ185nN6psJyBJ4yOpzqm695/h5umdLJg2vW3GR5iG11MAkR2AzJA==}
+
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
 
@@ -11570,6 +11619,9 @@ packages:
 
   lodash-es@4.17.23:
     resolution: {integrity: sha512-kVI48u3PZr38HdYz98UmfPnXl2DXrpdctLrFLCd3kOx1xUkOmpFPx7gCWWM5MPkL/fD8zb+Ph0QzjGFs4+hHWg==}
+
+  lodash.clonedeep@4.5.0:
+    resolution: {integrity: sha512-H5ZhCF25riFd9uB5UCkVKo61m3S/xZk1x4wA6yp/L3RFP6Z/eHH1ymQcGLo7J3GMPfm0V/7m1tryHuGVxpqEBQ==}
 
   lodash.debounce@4.0.8:
     resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
@@ -11663,6 +11715,9 @@ packages:
   lru-cache@6.0.0:
     resolution: {integrity: sha512-Jo6dJ04CmSjuznwJSS3pUeWmd/H0ffTlkXXgwZi+eq1UCmqQwCh+eLsYOYCwY991i2Fah4h1BEMCx4qThGbsiA==}
     engines: {node: '>=10'}
+
+  lru-memoizer@2.3.0:
+    resolution: {integrity: sha512-GXn7gyHAMhO13WSKrIiNfztwxodVsP8IoZ3XfrJV4yH2x0/OeTO/FIaAHTY5YekdGgW94njfuKmyyt1E0mR6Ug==}
 
   lucide-react-native@1.7.0:
     resolution: {integrity: sha512-wGJY5nosSawh028jg8r1ZKqnGPDIVfIL9xvKOs4wPYFQHeJMHsADYm/lmuFYXMXXatSkHhpsCjeqIRgeFGzf8g==}
@@ -13239,6 +13294,9 @@ packages:
   refa@0.12.1:
     resolution: {integrity: sha512-J8rn6v4DBb2nnFqkqwy6/NnTYMcgLA+sLr0iIO41qpv0n+ngb7ksag2tMRl0inb1bbO/esUwzW1vbJi7K0sI0g==}
     engines: {node: ^12.0.0 || ^14.0.0 || >=16.0.0}
+
+  reflect-metadata@0.2.2:
+    resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
 
   regenerate-unicode-properties@10.2.2:
     resolution: {integrity: sha512-m03P+zhBeQd1RGnYxrGyDAPpWX/epKirLrp8e3qevZdVkKtnCrjjWczIbYc8+xd6vcTStVlqfycTx1KR4LOr0g==}
@@ -15612,6 +15670,14 @@ snapshots:
 
   '@aws/lambda-invoke-store@0.2.4': {}
 
+  '@azure/msal-common@15.17.0': {}
+
+  '@azure/msal-node@3.8.10':
+    dependencies:
+      '@azure/msal-common': 15.17.0
+      jsonwebtoken: 9.0.3
+      uuid: 8.3.2
+
   '@babel/code-frame@7.29.0':
     dependencies:
       '@babel/helper-validator-identifier': 7.28.5
@@ -16521,33 +16587,45 @@ snapshots:
 
   '@braintree/sanitize-url@6.0.4': {}
 
-  '@chat-adapter/shared@4.20.1':
+  '@chat-adapter/shared@4.26.0':
     dependencies:
-      chat: 4.20.1
+      chat: 4.26.0
     transitivePeerDependencies:
       - supports-color
 
-  '@chat-adapter/slack@4.20.1':
+  '@chat-adapter/slack@4.26.0':
     dependencies:
-      '@chat-adapter/shared': 4.20.1
+      '@chat-adapter/shared': 4.26.0
       '@slack/web-api': 7.15.0
-      chat: 4.20.1
+      chat: 4.26.0
     transitivePeerDependencies:
       - debug
       - supports-color
 
-  '@chat-adapter/state-memory@4.20.1':
+  '@chat-adapter/state-memory@4.26.0':
     dependencies:
-      chat: 4.20.1
+      chat: 4.26.0
     transitivePeerDependencies:
       - supports-color
 
-  '@chat-adapter/state-redis@4.20.1':
+  '@chat-adapter/state-redis@4.26.0':
     dependencies:
-      chat: 4.20.1
+      chat: 4.26.0
       redis: 5.11.0
     transitivePeerDependencies:
       - '@node-rs/xxhash'
+      - supports-color
+
+  '@chat-adapter/teams@4.26.0':
+    dependencies:
+      '@chat-adapter/shared': 4.26.0
+      '@microsoft/teams.api': 2.0.8
+      '@microsoft/teams.apps': 2.0.8
+      '@microsoft/teams.cards': 2.0.8
+      '@microsoft/teams.graph-endpoints': 2.0.8
+      chat: 4.26.0
+    transitivePeerDependencies:
+      - debug
       - supports-color
 
   '@chromatic-com/playwright@0.12.8(@playwright/test@1.58.2)(@swc/core@1.15.18)(@types/react@19.2.14)(bufferutil@4.1.0)(esbuild@0.27.4)(typescript@5.9.3)(utf-8-validate@6.0.6)':
@@ -18012,6 +18090,48 @@ snapshots:
       '@types/mdx': 2.0.13
       '@types/react': 19.2.14
       react: 19.2.4
+
+  '@microsoft/teams.api@2.0.8':
+    dependencies:
+      '@microsoft/teams.cards': 2.0.8
+      '@microsoft/teams.common': 2.0.8
+      jwt-decode: 4.0.0
+      qs: 6.15.0
+    transitivePeerDependencies:
+      - debug
+
+  '@microsoft/teams.apps@2.0.8':
+    dependencies:
+      '@azure/msal-node': 3.8.10
+      '@microsoft/teams.api': 2.0.8
+      '@microsoft/teams.common': 2.0.8
+      '@microsoft/teams.graph': 2.0.8
+      axios: 1.15.0
+      cors: 2.8.6
+      express: 5.2.1
+      jsonwebtoken: 9.0.3
+      jwks-rsa: 3.2.2
+      reflect-metadata: 0.2.2
+    transitivePeerDependencies:
+      - debug
+      - supports-color
+
+  '@microsoft/teams.cards@2.0.8': {}
+
+  '@microsoft/teams.common@2.0.8':
+    dependencies:
+      axios: 1.15.0
+    transitivePeerDependencies:
+      - debug
+
+  '@microsoft/teams.graph-endpoints@2.0.8': {}
+
+  '@microsoft/teams.graph@2.0.8':
+    dependencies:
+      '@microsoft/teams.common': 2.0.8
+      qs: 6.15.0
+    transitivePeerDependencies:
+      - debug
 
   '@mistralai/mistralai@1.15.1(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
@@ -23025,7 +23145,7 @@ snapshots:
 
   character-reference-invalid@2.0.1: {}
 
-  chat@4.20.1:
+  chat@4.26.0:
     dependencies:
       '@workflow/serde': 4.1.0-beta.2
       mdast-util-to-string: 4.0.0
@@ -26348,10 +26468,22 @@ snapshots:
       ecdsa-sig-formatter: 1.0.11
       safe-buffer: 5.2.1
 
+  jwks-rsa@3.2.2:
+    dependencies:
+      '@types/jsonwebtoken': 9.0.10
+      debug: 4.4.3
+      jose: 4.15.9
+      limiter: 1.1.5
+      lru-memoizer: 2.3.0
+    transitivePeerDependencies:
+      - supports-color
+
   jws@4.0.1:
     dependencies:
       jwa: 2.0.1
       safe-buffer: 5.2.1
+
+  jwt-decode@4.0.0: {}
 
   keyv@4.5.4:
     dependencies:
@@ -26457,6 +26589,8 @@ snapshots:
       lightningcss-win32-arm64-msvc: 1.30.1
       lightningcss-win32-x64-msvc: 1.30.1
 
+  limiter@1.1.5: {}
+
   lines-and-columns@1.2.4: {}
 
   linkify-it@5.0.0:
@@ -26490,6 +26624,8 @@ snapshots:
       p-locate: 6.0.0
 
   lodash-es@4.17.23: {}
+
+  lodash.clonedeep@4.5.0: {}
 
   lodash.debounce@4.0.8: {}
 
@@ -26562,6 +26698,11 @@ snapshots:
   lru-cache@6.0.0:
     dependencies:
       yallist: 4.0.0
+
+  lru-memoizer@2.3.0:
+    dependencies:
+      lodash.clonedeep: 4.5.0
+      lru-cache: 6.0.0
 
   lucide-react-native@1.7.0(react-native-svg@15.15.3(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0):
     dependencies:
@@ -28825,6 +28966,8 @@ snapshots:
   refa@0.12.1:
     dependencies:
       '@eslint-community/regexpp': 4.12.2
+
+  reflect-metadata@0.2.2: {}
 
   regenerate-unicode-properties@10.2.2:
     dependencies:

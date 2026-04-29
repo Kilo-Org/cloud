@@ -1,5 +1,6 @@
 import { Chat, type ActionEvent, type Message, type Thread } from 'chat';
 import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
+import { createTeamsAdapter } from '@chat-adapter/teams';
 import { captureException } from '@sentry/nextjs';
 import type { HomeView } from '@slack/types';
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
@@ -9,7 +10,14 @@ import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
 import { processMessage } from '@/lib/bot/run';
 import { createChatState } from '@/lib/bot/state';
-import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET } from '@/lib/config.server';
+import {
+  SLACK_CLIENT_ID,
+  SLACK_CLIENT_SECRET,
+  SLACK_SIGNING_SECRET,
+  TEAMS_APP_ID,
+  TEAMS_APP_PASSWORD,
+  TEAMS_APP_TENANT_ID,
+} from '@/lib/config.server';
 
 const SLACK_ASSISTANT_SUGGESTED_PROMPTS = [
   {
@@ -117,11 +125,15 @@ export function buildSlackAppHomeView() {
   } satisfies HomeView;
 }
 
-function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
+function createKiloBot(
+  slackAdapter: ReturnType<typeof createSlackAdapter>,
+  teamsAdapter: ReturnType<typeof createTeamsAdapter>
+) {
   const chatBot = new Chat({
     userName: process.env.NODE_ENV === 'production' ? 'Kilo' : 'Henk',
     adapters: {
       slack: slackAdapter,
+      teams: teamsAdapter,
     },
     state: createChatState(),
   });
@@ -245,4 +257,11 @@ const slackAdapter = createSlackAdapter({
   signingSecret: SLACK_SIGNING_SECRET,
 });
 
-export const bot = createKiloBot(slackAdapter);
+const teamsAdapter = createTeamsAdapter({
+  appId: TEAMS_APP_ID,
+  appPassword: TEAMS_APP_PASSWORD,
+  appTenantId: TEAMS_APP_TENANT_ID,
+  appType: 'SingleTenant',
+});
+
+export const bot = createKiloBot(slackAdapter, teamsAdapter);

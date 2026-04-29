@@ -22,18 +22,24 @@ export function useKiloChatTokenGetter(): () => Promise<string> {
       return cached.token;
     }
 
-    if (inFlightRef.current) {
-      return inFlightRef.current;
+    const existing = inFlightRef.current;
+    if (existing) {
+      return existing;
     }
 
-    const promise = trpcClient.kiloChat.getToken.query().then(({ token, expiresAt }) => {
-      const expiresAtMs = new Date(expiresAt).getTime();
-      cacheRef.current = { token, expiresAtMs };
-      inFlightRef.current = null;
-      return token;
+    // Create a shared promise and set inFlightRef before awaiting so concurrent
+    // callers share this fetch rather than starting duplicate requests.
+    let resolveShared: (token: string) => void = () => undefined;
+    const sharedPromise = new Promise<string>(resolve => {
+      resolveShared = resolve;
     });
+    inFlightRef.current = sharedPromise;
 
-    inFlightRef.current = promise;
-    return promise;
+    const { token, expiresAt } = await trpcClient.kiloChat.getToken.query();
+    const expiresAtMs = new Date(expiresAt).getTime();
+    cacheRef.current = { token, expiresAtMs };
+    inFlightRef.current = null;
+    resolveShared(token);
+    return token;
   }, []);
 }

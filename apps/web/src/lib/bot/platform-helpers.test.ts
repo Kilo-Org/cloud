@@ -13,7 +13,7 @@ jest.mock('@/lib/drizzle', () => ({
 }));
 
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { getPlatformIntegration } from './platform-helpers';
+import { getPlatformIntegration, getPlatformIntegrationByBotUserId } from './platform-helpers';
 
 describe('platform helpers', () => {
   beforeEach(() => {
@@ -51,5 +51,25 @@ describe('platform helpers', () => {
     );
 
     expect(result).toBeNull();
+  });
+
+  it('returns the Slack platform integration for a bot user id', async () => {
+    const integration = {
+      id: 'pi_slack',
+      platform: PLATFORM.SLACK,
+      metadata: { bot_user_id: 'U_BOT' },
+    };
+    mockLimit.mockResolvedValue([integration]);
+
+    const result = await getPlatformIntegrationByBotUserId('slack', 'U_BOT');
+
+    expect(result).toBe(integration);
+  });
+
+  it('returns null when no bot user id is available', async () => {
+    const result = await getPlatformIntegrationByBotUserId('slack', undefined);
+
+    expect(result).toBeNull();
+    expect(mockLimit).not.toHaveBeenCalled();
   });
 });

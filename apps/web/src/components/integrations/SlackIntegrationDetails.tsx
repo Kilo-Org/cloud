@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, XCircle, MessageSquare, Trash2 } from 'lucide-react';
+import { CheckCircle2, XCircle, MessageSquare, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -305,9 +305,17 @@ export function SlackIntegrationDetails({
                 />
               </div>
 
-              {/* Actions */}
               <div className="space-y-2">
                 <div className="flex flex-wrap gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleInstall}
+                    disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+                    title="Re-run the Slack OAuth flow to refresh scopes and permissions"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install'}
+                  </Button>
                   <TestConnectionButton
                     isPending={testConnection.isPending}
                     state={connectionCheck}

@@ -123,6 +123,9 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     handleListLayout,
     handleScroll,
     handleScrollBeginDrag,
+    handleScrollEndDrag,
+    handleMomentumScrollBegin,
+    handleMomentumScrollEnd,
   } = useSessionAutoScroll<StoredMessage>({ itemCount: messages.length, resetKey: sessionId });
 
   useEffect(() => {
@@ -305,6 +308,9 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
         renderItem={renderItem}
         onScroll={handleScroll}
         onScrollBeginDrag={handleScrollBeginDrag}
+        onScrollEndDrag={handleScrollEndDrag}
+        onMomentumScrollBegin={handleMomentumScrollBegin}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
         onContentSizeChange={handleContentSizeChange}
         onLayout={handleListLayout}
         scrollEventThrottle={16}

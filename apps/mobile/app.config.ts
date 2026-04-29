@@ -71,6 +71,7 @@ const config: ExpoConfig = {
     ],
     'expo-router',
     'expo-image',
+    'expo-font',
     'expo-secure-store',
     [
       'expo-notifications',
@@ -107,6 +108,16 @@ const config: ExpoConfig = {
       'expo-document-picker',
       {
         iCloudContainerEnvironment: 'Production',
+      },
+    ],
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'Allow $(PRODUCT_NAME) to use your location to set up local weather.',
+        isIosBackgroundLocationEnabled: false,
+        isAndroidBackgroundLocationEnabled: false,
+        isAndroidForegroundServiceEnabled: false,
       },
     ],
     'expo-apple-authentication',

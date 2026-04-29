@@ -1,8 +1,10 @@
+import { type StoredMessage } from 'cloud-agent-sdk';
+import * as Clipboard from 'expo-clipboard';
 import { useCallback } from 'react';
 import { ActionSheetIOS, Platform, Pressable, View } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
-import { type StoredMessage } from 'cloud-agent-sdk';
 import { toast } from 'sonner-native';
+
+import { Bubble } from '@/components/ui/bubble';
 
 import { CompactionSeparator } from './compaction-separator';
 import { FilePartRenderer } from './file-part-renderer';
@@ -68,17 +70,13 @@ export function MessageBubble({
     const fileParts = message.parts.filter(isFilePart);
 
     return (
-      <View className="items-end px-4 py-1">
-        <View
-          className="max-w-[85%] rounded-2xl bg-primary px-3.5 py-2.5"
-          // eslint-disable-next-line react-native/no-inline-styles -- NativeWind has no className for borderCurve
-          style={{ borderCurve: 'continuous' }}
-        >
+      <View className="px-4 py-1">
+        <Bubble side="user">
           {textContent ? <MarkdownText value={textContent} variant="user" /> : null}
           {fileParts.map(part => (
             <FilePartRenderer key={part.id} part={part} />
           ))}
-        </View>
+        </Bubble>
       </View>
     );
   }

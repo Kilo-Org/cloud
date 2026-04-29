@@ -17,7 +17,9 @@ export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) 
   return (
     <View className="mx-4">
       <Button
-        variant="outline"
+        variant="default"
+        size="lg"
+        className="w-full"
         onPress={() => {
           const path = organizationId
             ? `/(app)/agent-chat/new?organizationId=${organizationId}`
@@ -25,8 +27,8 @@ export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) 
           router.push(path as Href);
         }}
       >
-        <Plus size={16} color={colors.foreground} />
-        <Text>New coding task</Text>
+        <Plus size={18} color={colors.primaryForeground} />
+        <Text className="font-semibold">New coding task</Text>
       </Button>
     </View>
   );

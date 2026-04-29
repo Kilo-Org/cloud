@@ -1,13 +1,12 @@
 import { type Href, useRouter } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { CompactSessionRow } from '@/components/home/compact-session-row';
-import { SectionHeader } from '@/components/home/section-header';
 import {
   expandPlatformFilter,
   formatGitUrlProject,
 } from '@/components/agents/session-list-helpers';
-import { Text } from '@/components/ui/text';
+import { CompactSessionRow } from '@/components/home/compact-session-row';
+import { SectionHeader } from '@/components/home/section-header';
 import {
   type ActiveSession,
   type StoredSession,
@@ -18,26 +17,31 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
 const MAX_ROWS = 3;
 const CLOUD_AGENT_PLATFORMS = new Set(expandPlatformFilter(['cloud-agent']));
 
-type StatusPresentation = {
-  label: string | null;
-  tone: 'running' | 'ready' | 'idle';
-};
-
-function presentStatus(status: string | null | undefined): StatusPresentation {
-  if (!status) {
-    return { label: null, tone: 'idle' };
+/**
+ * Map backend `created_on_platform` strings to a pretty uppercase label.
+ * The row's hue is hashed from the label in `SessionRow`, so no agent
+ * key needs to be emitted here.
+ */
+function platformLabel(platform: string): string {
+  switch (platform) {
+    case 'cloud-agent':
+    case 'cloud-agent-web': {
+      return 'CLOUD AGENT';
+    }
+    case 'vscode':
+    case 'agent-manager': {
+      return 'VSCODE';
+    }
+    case 'slack': {
+      return 'SLACK';
+    }
+    case 'cli': {
+      return 'CLI';
+    }
+    default: {
+      return platform.toUpperCase();
+    }
   }
-  const normalized = status.toLowerCase();
-  if (normalized.includes('running') || normalized === 'active') {
-    return { label: 'Running', tone: 'running' };
-  }
-  if (normalized.includes('pr') || normalized.includes('ready') || normalized.includes('review')) {
-    return { label: 'PR ready', tone: 'ready' };
-  }
-  if (normalized.includes('complete') || normalized.includes('done')) {
-    return { label: 'Completed', tone: 'idle' };
-  }
-  return { label: status, tone: 'idle' };
 }
 
 function repoNameFromGitUrl(gitUrl: string | null | undefined): string | null {
@@ -118,6 +122,29 @@ type AgentSessionsSectionProps = {
   organizationId: string | null;
 };
 
+function activeSessionTitle(session: ActiveSession): string {
+  return session.title.length > 0 ? session.title : 'Untitled session';
+}
+
+function storedSessionTitle(session: StoredSession): string {
+  return session.title && session.title.length > 0 ? session.title : 'Untitled session';
+}
+
+function storedSessionMeta(session: StoredSession): string {
+  const tsSource = session.status_updated_at ?? session.updated_at;
+  return timeAgo(parseTimestamp(tsSource)).toUpperCase();
+}
+
+function activeSessionLabel(session: ActiveSession): string {
+  const repo = repoNameFromGitUrl(session.gitUrl);
+  return repo ? repo.toUpperCase() : platformLabel('cloud-agent');
+}
+
+function storedSessionLabel(session: StoredSession): string {
+  const repo = repoNameFromGitUrl(session.git_url);
+  return repo ? repo.toUpperCase() : platformLabel(session.created_on_platform);
+}
+
 export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsSectionProps>) {
   const router = useRouter();
   const { activeSessions, storedSessions, activeSessionIds } = useAgentSessions({
@@ -138,59 +165,52 @@ export function AgentSessionsSection({ organizationId }: Readonly<AgentSessionsS
   };
 
   return (
-    <View className="gap-2">
+    <View>
       <SectionHeader
         label="Agent sessions"
-        action={
-          <Pressable
-            onPress={() => {
-              router.push('/(app)/(tabs)/(2_agents)' as Href);
-            }}
-            hitSlop={8}
-            accessibilityLabel="See all agent sessions"
-          >
-            <Text className="text-sm text-primary">See all</Text>
-          </Pressable>
-        }
+        actionLabel="See all"
+        onActionPress={() => {
+          router.push('/(app)/(tabs)/(2_agents)' as Href);
+        }}
       />
       <View className="mx-4 gap-2">
         {rows.map(row => {
           if (row.kind === 'active') {
             const { session } = row;
-            const status = presentStatus(session.status);
             return (
-              <CompactSessionRow
+              <View
                 key={row.key}
-                repoName={repoNameFromGitUrl(session.gitUrl)}
-                title={session.title.length > 0 ? session.title : 'Untitled session'}
-                statusLabel={status.label}
-                statusTone={status.tone}
-                timeLabel={null}
-                isLive
-                onPress={() => {
-                  navigateTo(session.id);
-                }}
-              />
+                className="overflow-hidden rounded-2xl border border-border bg-card"
+              >
+                <CompactSessionRow
+                  agentLabel={activeSessionLabel(session)}
+                  title={activeSessionTitle(session)}
+                  isLive
+                  last
+                  onPress={() => {
+                    navigateTo(session.id);
+                  }}
+                />
+              </View>
             );
           }
           const { session } = row;
-          const title =
-            session.title && session.title.length > 0 ? session.title : 'Untitled session';
-          const status = presentStatus(session.status);
-          const tsSource = session.status_updated_at ?? session.updated_at;
           return (
-            <CompactSessionRow
+            <View
               key={row.key}
-              repoName={repoNameFromGitUrl(session.git_url)}
-              title={title}
-              statusLabel={status.label}
-              statusTone={status.tone}
-              timeLabel={timeAgo(parseTimestamp(tsSource))}
-              isLive={row.isLive}
-              onPress={() => {
-                navigateTo(session.session_id, session.organization_id);
-              }}
-            />
+              className="overflow-hidden rounded-2xl border border-border bg-card"
+            >
+              <CompactSessionRow
+                agentLabel={storedSessionLabel(session)}
+                title={storedSessionTitle(session)}
+                meta={storedSessionMeta(session)}
+                isLive={row.isLive}
+                last
+                onPress={() => {
+                  navigateTo(session.session_id, session.organization_id);
+                }}
+              />
+            </View>
           );
         })}
       </View>

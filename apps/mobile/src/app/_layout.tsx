@@ -2,10 +2,15 @@ import '../global.css';
 import '@/lib/cloud-agent-runtime';
 
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
+import {
+  JetBrainsMono_500Medium,
+  JetBrainsMono_600SemiBold,
+} from '@expo-google-fonts/jetbrains-mono';
 import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { isRunningInExpoGo } from 'expo';
+import { useFonts } from 'expo-font';
 import { type Href, Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -68,12 +73,16 @@ checkInitialNotification();
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
   const { updateRequired, isChecking: updateChecking } = useForceUpdate();
+  const [fontsLoaded] = useFonts({
+    JetBrainsMono_500Medium,
+    JetBrainsMono_600SemiBold,
+  });
   const segments = useSegments();
   const router = useRouter();
 
   useUnreadCountsInvalidation();
 
-  const isLoading = authLoading || updateChecking;
+  const isLoading = authLoading || updateChecking || !fontsLoaded;
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
 

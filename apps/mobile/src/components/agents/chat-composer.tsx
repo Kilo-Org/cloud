@@ -14,6 +14,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { useTextHeight } from '@/components/agents/use-text-height';
+import { BlurBar } from '@/components/ui/blur-bar';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -116,7 +117,7 @@ export function ChatComposer({
   };
 
   return (
-    <View className="border-t border-border bg-background">
+    <BlurBar>
       {measure.measureElement}
 
       {showToolbar ? (
@@ -135,7 +136,7 @@ export function ChatComposer({
 
       <View className="flex-row items-center p-2.5 px-3">
         <View
-          className="mx-2.5 flex-1 overflow-hidden rounded-[20px] border border-border"
+          className="mx-2.5 flex-1 overflow-hidden rounded-[20px] border border-border bg-card"
           onLayout={handleInputLayout}
         >
           <TextInput
@@ -165,7 +166,7 @@ export function ChatComposer({
           <Pressable
             onPress={handleStop}
             disabled={disabled}
-            className="h-8 w-8 items-center justify-center rounded-full bg-neutral-400 dark:bg-neutral-500 active:opacity-70"
+            className="h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500"
           >
             <Square size={14} color="white" fill="white" />
           </Pressable>
@@ -174,13 +175,17 @@ export function ChatComposer({
             onPress={handleSend}
             disabled={!canSend}
             className={`h-8 w-8 items-center justify-center rounded-full active:opacity-70 ${
-              canSend ? 'bg-[#005FFF]' : 'bg-[#DBDBDB] dark:bg-neutral-800'
+              canSend ? 'bg-accent-soft' : 'bg-muted'
             }`}
           >
-            <ArrowUp size={18} color="white" strokeWidth={2.5} />
+            <ArrowUp
+              size={18}
+              color={canSend ? colors.accentSoftForeground : colors.mutedForeground}
+              strokeWidth={2.5}
+            />
           </Pressable>
         )}
       </View>
-    </View>
+    </BlurBar>
   );
 }

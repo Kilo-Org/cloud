@@ -30,8 +30,8 @@ const POLICY_OPTIONS: PolicyOption[] = [
     iconColor: '#10b981',
     label: 'Always Ask',
     description: 'Confirm every command before execution. Most secure.',
-    security: 'ask',
-    ask: 'true',
+    security: 'allowlist',
+    ask: 'on-miss',
   },
   {
     id: 'never-ask',
@@ -39,8 +39,8 @@ const POLICY_OPTIONS: PolicyOption[] = [
     iconColor: '#f59e0b',
     label: 'Never Ask',
     description: 'Execute commands without confirmation. Faster but less safe.',
-    security: 'open',
-    ask: 'false',
+    security: 'full',
+    ask: 'off',
   },
 ];
 
@@ -48,10 +48,10 @@ function resolvePreset(
   execSecurity: string | null | undefined,
   execAsk: string | null | undefined
 ): ExecPreset | undefined {
-  if (execSecurity === 'ask' && execAsk === 'true') {
+  if (execSecurity === 'allowlist' && execAsk === 'on-miss') {
     return 'always-ask';
   }
-  if (execSecurity === 'open' && execAsk === 'false') {
+  if (execSecurity === 'full' && execAsk === 'off') {
     return 'never-ask';
   }
   return undefined;

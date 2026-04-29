@@ -3,7 +3,10 @@ import type { KiloClawEnv } from '../../types';
 import { buildEnvVars } from '../../gateway/env';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../../utils/env-encryption';
 import { findPepperByUserId, getWorkerDb } from '../../db';
-import { KILOCODE_API_KEY_EXPIRY_SECONDS } from '../../config';
+import {
+  KILOCODE_API_KEY_EXPIRY_SECONDS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
+} from '../../config';
 import type { InstanceMutableState } from './types';
 import { getAppKey } from './types';
 import { storageUpdate } from './state';
@@ -242,6 +245,18 @@ export async function buildUserEnvVars(
   const result: Record<string, string> = { ...plainEnv };
   for (const [name, value] of Object.entries(sensitive)) {
     result[`${ENCRYPTED_ENV_PREFIX}${name}`] = encryptEnvValue(envKey, value);
+  }
+
+  // Record the controller capabilities version this env set corresponds to.
+  // Only the first successful build per worker-version change needs to write
+  // to storage, but the persist is cheap — skip only when already matching.
+  if (state.controllerCapabilitiesVersion !== WORKER_CONTROLLER_CAPABILITIES_VERSION) {
+    state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
+    await ctx.storage.put(
+      storageUpdate({
+        controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
+      })
+    );
   }
 
   return {

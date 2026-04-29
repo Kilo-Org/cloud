@@ -2397,6 +2397,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     botNature: string | null;
     botVibe: string | null;
     botEmoji: string | null;
+    controllerCapabilitiesVersion: number | null;
   }> {
     await this.loadState();
 
@@ -2454,6 +2455,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       botNature: this.s.botNature,
       botVibe: this.s.botVibe,
       botEmoji: this.s.botEmoji,
+      controllerCapabilitiesVersion: this.s.controllerCapabilitiesVersion,
     };
   }
 

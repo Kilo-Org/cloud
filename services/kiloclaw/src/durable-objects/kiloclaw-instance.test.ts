@@ -147,6 +147,7 @@ import {
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   STALE_PROVISION_THRESHOLD_MS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
 } from '../config';
 
 // ============================================================================
@@ -1988,6 +1989,40 @@ describe('buildUserEnvVars API key refresh', () => {
     );
     expect(db.findPepperByUserId).not.toHaveBeenCalled();
     expect(gatewayEnv.buildEnvVars).not.toHaveBeenCalled();
+  });
+
+  it('persists controllerCapabilitiesVersion matching the worker constant', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      kilocodeApiKey: 'stale-key',
+      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+    });
+
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBeUndefined();
+
+    await callBuildUserEnvVars(instance);
+
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBe(
+      WORKER_CONTROLLER_CAPABILITIES_VERSION
+    );
+  });
+
+  it('skips the capabilities version write when storage already matches', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      kilocodeApiKey: 'stale-key',
+      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+      controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
+    });
+    const putSpy = vi.spyOn(storage, 'put');
+
+    await callBuildUserEnvVars(instance);
+
+    const capabilityWrites = putSpy.mock.calls.filter(call => {
+      const [arg] = call;
+      return typeof arg === 'object' && arg !== null && 'controllerCapabilitiesVersion' in arg;
+    });
+    expect(capabilityWrites).toHaveLength(0);
   });
 });
 

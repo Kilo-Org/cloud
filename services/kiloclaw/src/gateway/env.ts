@@ -2,6 +2,10 @@ import {
   ALL_SECRET_ENV_VARS,
   INTERNAL_SENSITIVE_ENV_VARS,
 } from '@kilocode/kiloclaw-secret-catalog';
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+} from '@kilocode/worker-utils/instance-id';
 import type { KiloClawEnv } from '../types';
 import type {
   EncryptedEnvelope,
@@ -227,8 +231,29 @@ export async function buildEnvVars(
   // Worker-level passthrough (non-sensitive)
   if (env.TELEGRAM_DM_POLICY) plainEnv.TELEGRAM_DM_POLICY = env.TELEGRAM_DM_POLICY;
   if (env.DISCORD_DM_POLICY) plainEnv.DISCORD_DM_POLICY = env.DISCORD_DM_POLICY;
-  if (env.OPENCLAW_ALLOWED_ORIGINS)
-    plainEnv.OPENCLAW_ALLOWED_ORIGINS = env.OPENCLAW_ALLOWED_ORIGINS;
+
+  // Control UI allowed origins. Starts from the worker-level shared list, then
+  // appends the per-instance virtual host `https://<instanceId>.kiloclaw.ai`
+  // when this is an instance-keyed sandbox. OpenClaw's origin check does
+  // exact-string matching, so each hostname must be enumerated explicitly.
+  // Legacy (non-`ki_`) sandboxes only get the shared worker-level origins.
+  const originEntries: string[] = [];
+  if (env.OPENCLAW_ALLOWED_ORIGINS) {
+    for (const raw of env.OPENCLAW_ALLOWED_ORIGINS.split(',')) {
+      const trimmed = raw.trim();
+      if (trimmed) originEntries.push(trimmed);
+    }
+  }
+  if (isInstanceKeyedSandboxId(sandboxId)) {
+    const instanceId = instanceIdFromSandboxId(sandboxId);
+    const perInstanceOrigin = `https://${instanceId}.kiloclaw.ai`;
+    if (!originEntries.includes(perInstanceOrigin)) {
+      originEntries.push(perInstanceOrigin);
+    }
+  }
+  if (originEntries.length > 0) {
+    plainEnv.OPENCLAW_ALLOWED_ORIGINS = originEntries.join(',');
+  }
   if (env.KILOCLAW_CHECKIN_URL) plainEnv.KILOCLAW_CHECKIN_URL = env.KILOCLAW_CHECKIN_URL;
   if (env.KILOCHAT_BASE_URL) plainEnv.KILOCHAT_BASE_URL = env.KILOCHAT_BASE_URL;
   plainEnv.REQUIRE_PROXY_TOKEN = env.REQUIRE_PROXY_TOKEN ?? 'false';

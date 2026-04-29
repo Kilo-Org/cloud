@@ -361,6 +361,11 @@ export const PersistedStateSchema = z.object({
   // Each entry is a feature name (e.g. "npm-global-prefix") that gates runtime behavior.
   // New instances get the current feature set; legacy instances have an empty array.
   instanceFeatures: z.array(z.string()).default([]),
+  // Version of the controller config the running machine was last provisioned
+  // with. Written every time the worker builds and applies env vars for a
+  // machine (see buildUserEnvVars). Null means legacy (treat as version 1).
+  // See WORKER_CONTROLLER_CAPABILITIES_VERSION in config.ts for semantics.
+  controllerCapabilitiesVersion: z.number().int().nullable().default(null),
   gmailNotificationsEnabled: z.boolean().default(false),
   gmailLastHistoryId: z.string().nullable().default(null),
   gmailPushOidcEmail: z.string().nullable().default(null),

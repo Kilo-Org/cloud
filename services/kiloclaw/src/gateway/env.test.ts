@@ -252,6 +252,42 @@ describe('buildEnvVars', () => {
     expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBeUndefined();
   });
 
+  it('appends per-instance origin for instance-keyed sandboxes', async () => {
+    // ki_{32 hex} — derived from a UUID with dashes stripped.
+    const instanceSandboxId = 'ki_550e8400e29b41d4a716446655440000';
+    const env = createMockEnv({
+      OPENCLAW_ALLOWED_ORIGINS: 'https://claw.kilosessions.ai,https://kilo.ai',
+    });
+
+    const result = await buildEnvVars(env, instanceSandboxId, SECRET);
+
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe(
+      'https://claw.kilosessions.ai,https://kilo.ai,https://550e8400-e29b-41d4-a716-446655440000.kiloclaw.ai'
+    );
+  });
+
+  it('emits per-instance origin as the sole entry when worker env has none', async () => {
+    const instanceSandboxId = 'ki_550e8400e29b41d4a716446655440000';
+    const env = createMockEnv();
+
+    const result = await buildEnvVars(env, instanceSandboxId, SECRET);
+
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe(
+      'https://550e8400-e29b-41d4-a716-446655440000.kiloclaw.ai'
+    );
+  });
+
+  it('does not append a per-instance origin for legacy (non-ki_) sandboxes', async () => {
+    const env = createMockEnv({
+      OPENCLAW_ALLOWED_ORIGINS: 'https://claw.kilosessions.ai',
+    });
+
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe('https://claw.kilosessions.ai');
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).not.toMatch(/\.kiloclaw\.ai/);
+  });
+
   it('passes REQUIRE_PROXY_TOKEN from worker env when configured', async () => {
     const env = createMockEnv({ REQUIRE_PROXY_TOKEN: 'true' });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);

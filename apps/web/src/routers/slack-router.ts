@@ -111,16 +111,6 @@ export const slackRouter = createTRPCRouter({
     return slackService.testConnection(owner);
   }),
 
-  // Send a test message to Slack
-  sendTestMessage: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
-    if (input?.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId);
-      await requireActiveSubscriptionOrTrial(input.organizationId);
-    }
-    const owner = resolveOwner(ctx, input?.organizationId);
-    return slackService.sendTestMessage(owner);
-  }),
-
   // Update the model for Slack integration
   updateModel: baseProcedure
     .input(

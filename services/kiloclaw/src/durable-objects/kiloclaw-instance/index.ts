@@ -76,7 +76,12 @@ import {
 } from './state';
 import { nextAlarmTime, doLog, doError, doWarn, toLoggable, createReconcileContext } from './log';
 import { attemptMetadataRecovery } from './reconcile';
-import { buildUserEnvVars, resolveImageTag, resolveRuntimeImageRef } from './config';
+import {
+  buildUserEnvVars,
+  markControllerCapabilitiesApplied,
+  resolveImageTag,
+  resolveRuntimeImageRef,
+} from './config';
 import * as gateway from './gateway';
 import { buildChannelConfigPatch } from './channel-config';
 import * as pairing from './pairing';
@@ -1938,6 +1943,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       },
     });
     await this.persistProviderResult(startResult);
+    await markControllerCapabilitiesApplied(this.ctx, this.s);
 
     if (getRuntimeId(this.s)) {
       const healthy = await gateway.waitForHealthy(this.s, this.env);
@@ -3345,6 +3351,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         },
       });
       await this.persistProviderResult(restart);
+      await markControllerCapabilitiesApplied(this.ctx, this.s);
       const healthy = await gateway.waitForHealthy(this.s, this.env);
       if (!healthy) {
         console.warn(

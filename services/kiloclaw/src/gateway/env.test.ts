@@ -252,8 +252,10 @@ describe('buildEnvVars', () => {
     expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBeUndefined();
   });
 
-  it('appends per-instance origin for instance-keyed sandboxes', async () => {
-    // ki_{32 hex} — derived from a UUID with dashes stripped.
+  it('appends `i-{hex}.kiloclaw.ai` origin for instance-keyed sandboxes', async () => {
+    // ki_{32 hex} — derived from a UUID with dashes stripped. Hostname label
+    // strips the `ki_` prefix and re-prefixes with `i-` so the body stays
+    // strictly alnum (RFC 1035 compliant).
     const instanceSandboxId = 'ki_550e8400e29b41d4a716446655440000';
     const env = createMockEnv({
       OPENCLAW_ALLOWED_ORIGINS: 'https://claw.kilosessions.ai,https://kilo.ai',
@@ -262,7 +264,7 @@ describe('buildEnvVars', () => {
     const result = await buildEnvVars(env, instanceSandboxId, SECRET);
 
     expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe(
-      'https://claw.kilosessions.ai,https://kilo.ai,https://550e8400-e29b-41d4-a716-446655440000.kiloclaw.ai'
+      'https://claw.kilosessions.ai,https://kilo.ai,https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai'
     );
   });
 
@@ -273,16 +275,38 @@ describe('buildEnvVars', () => {
     const result = await buildEnvVars(env, instanceSandboxId, SECRET);
 
     expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe(
-      'https://550e8400-e29b-41d4-a716-446655440000.kiloclaw.ai'
+      'https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai'
     );
   });
 
-  it('does not append a per-instance origin for legacy (non-ki_) sandboxes', async () => {
+  it('appends `u-{body}.kiloclaw.ai` origin for legacy sandboxes', async () => {
+    // SANDBOX_ID is "test-sandbox-id" which contains `-`. The hostname-label
+    // helper rejects that (hyphen not in alnum body), so for this test we use
+    // a safe alnum sandboxId value representative of a base64url-encoded
+    // ASCII userId.
+    const legacySandboxId = 'dGVzdHVzZXJhYmMxMjM'; // base64url("testuserabc123")
     const env = createMockEnv({
       OPENCLAW_ALLOWED_ORIGINS: 'https://claw.kilosessions.ai',
     });
 
-    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+    const result = await buildEnvVars(env, legacySandboxId, SECRET);
+
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe(
+      `https://claw.kilosessions.ai,https://u-${legacySandboxId}.kiloclaw.ai`
+    );
+  });
+
+  it('skips per-instance origin when the sandboxId cannot be safely labelled', async () => {
+    // Sandboxes containing `-` or `_` in their base64url body fall through the
+    // label safety check. This is a defensive path — production userIds don't
+    // produce these characters in base64url output — but we must not emit an
+    // RFC-invalid hostname in the allowlist.
+    const unsafeSandboxId = 'test-sandbox-id';
+    const env = createMockEnv({
+      OPENCLAW_ALLOWED_ORIGINS: 'https://claw.kilosessions.ai',
+    });
+
+    const result = await buildEnvVars(env, unsafeSandboxId, SECRET);
 
     expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe('https://claw.kilosessions.ai');
     expect(result.env.OPENCLAW_ALLOWED_ORIGINS).not.toMatch(/\.kiloclaw\.ai/);

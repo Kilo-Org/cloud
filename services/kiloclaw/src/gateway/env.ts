@@ -2,10 +2,6 @@ import {
   ALL_SECRET_ENV_VARS,
   INTERNAL_SENSITIVE_ENV_VARS,
 } from '@kilocode/kiloclaw-secret-catalog';
-import {
-  isInstanceKeyedSandboxId,
-  instanceIdFromSandboxId,
-} from '@kilocode/worker-utils/instance-id';
 import type { KiloClawEnv } from '../types';
 import type {
   EncryptedEnvelope,
@@ -15,6 +11,7 @@ import type {
   KiloExaSearchMode,
 } from '../schemas/instance-config';
 import { deriveGatewayToken } from '../auth/gateway-token';
+import { hostnameLabelFromSandboxId } from '../auth/hostname-label';
 import {
   mergeEnvVarsWithSecrets,
   decryptChannelTokens,
@@ -232,11 +229,14 @@ export async function buildEnvVars(
   if (env.TELEGRAM_DM_POLICY) plainEnv.TELEGRAM_DM_POLICY = env.TELEGRAM_DM_POLICY;
   if (env.DISCORD_DM_POLICY) plainEnv.DISCORD_DM_POLICY = env.DISCORD_DM_POLICY;
 
-  // Control UI allowed origins. Starts from the worker-level shared list, then
-  // appends the per-instance virtual host `https://<instanceId>.kiloclaw.ai`
-  // when this is an instance-keyed sandbox. OpenClaw's origin check does
-  // exact-string matching, so each hostname must be enumerated explicitly.
-  // Legacy (non-`ki_`) sandboxes only get the shared worker-level origins.
+  // Control UI allowed origins. Starts from the worker-level shared list,
+  // then appends a per-instance virtual host `https://<label>.kiloclaw.ai`
+  // derived from the sandboxId. Two label shapes, distinguishable by prefix:
+  //   instance-keyed: `i-{32hex}`   (ki_{32hex} sandboxId)
+  //   legacy:         `u-{body}`    (base64url-encoded userId)
+  // OpenClaw's origin check does exact-string matching, so each hostname
+  // must be enumerated explicitly — this covers both instance-keyed and
+  // legacy sandboxes with a single per-instance origin.
   const originEntries: string[] = [];
   if (env.OPENCLAW_ALLOWED_ORIGINS) {
     for (const raw of env.OPENCLAW_ALLOWED_ORIGINS.split(',')) {
@@ -244,9 +244,9 @@ export async function buildEnvVars(
       if (trimmed) originEntries.push(trimmed);
     }
   }
-  if (isInstanceKeyedSandboxId(sandboxId)) {
-    const instanceId = instanceIdFromSandboxId(sandboxId);
-    const perInstanceOrigin = `https://${instanceId}.kiloclaw.ai`;
+  const perInstanceLabel = hostnameLabelFromSandboxId(sandboxId);
+  if (perInstanceLabel) {
+    const perInstanceOrigin = `https://${perInstanceLabel}.kiloclaw.ai`;
     if (!originEntries.includes(perInstanceOrigin)) {
       originEntries.push(perInstanceOrigin);
     }

@@ -1991,7 +1991,12 @@ describe('buildUserEnvVars API key refresh', () => {
     expect(gatewayEnv.buildEnvVars).not.toHaveBeenCalled();
   });
 
-  it('persists controllerCapabilitiesVersion matching the worker constant', async () => {
+  it('does NOT persist controllerCapabilitiesVersion during env build', async () => {
+    // The capabilities version must only be bumped after the provider
+    // confirms the new env/config has been applied — persisting here would
+    // let the DO report a version the running machine may not actually have
+    // yet if the subsequent provider update fails. See
+    // markControllerCapabilitiesApplied for the post-success write site.
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       kilocodeApiKey: 'stale-key',
@@ -2002,27 +2007,35 @@ describe('buildUserEnvVars API key refresh', () => {
 
     await callBuildUserEnvVars(instance);
 
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBeUndefined();
+  });
+});
+
+describe('markControllerCapabilitiesApplied', () => {
+  it('persists the worker version on first call', async () => {
+    const { markControllerCapabilitiesApplied } = await import('./kiloclaw-instance/config');
+    const storage = createFakeStorage();
+    const ctx = { storage } as unknown as DurableObjectState;
+    const state = { controllerCapabilitiesVersion: null as number | null };
+
+    await markControllerCapabilitiesApplied(ctx, state);
+
+    expect(state.controllerCapabilitiesVersion).toBe(WORKER_CONTROLLER_CAPABILITIES_VERSION);
     expect(storage._store.get('controllerCapabilitiesVersion')).toBe(
       WORKER_CONTROLLER_CAPABILITIES_VERSION
     );
   });
 
-  it('skips the capabilities version write when storage already matches', async () => {
-    const { instance, storage } = createInstance();
-    await seedProvisioned(storage, {
-      kilocodeApiKey: 'stale-key',
-      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
-      controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
-    });
+  it('is idempotent when already at the current version', async () => {
+    const { markControllerCapabilitiesApplied } = await import('./kiloclaw-instance/config');
+    const storage = createFakeStorage();
+    const ctx = { storage } as unknown as DurableObjectState;
+    const state = { controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION };
     const putSpy = vi.spyOn(storage, 'put');
 
-    await callBuildUserEnvVars(instance);
+    await markControllerCapabilitiesApplied(ctx, state);
 
-    const capabilityWrites = putSpy.mock.calls.filter(call => {
-      const [arg] = call;
-      return typeof arg === 'object' && arg !== null && 'controllerCapabilitiesVersion' in arg;
-    });
-    expect(capabilityWrites).toHaveLength(0);
+    expect(putSpy).not.toHaveBeenCalled();
   });
 });
 

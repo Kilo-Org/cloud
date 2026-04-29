@@ -12,7 +12,11 @@ import {
   storageUpdate,
   syncProviderStateForStorage,
 } from './state';
-import { buildUserEnvVars, resolveRuntimeImageRef } from './config';
+import {
+  buildUserEnvVars,
+  markControllerCapabilitiesApplied,
+  resolveRuntimeImageRef,
+} from './config';
 import * as gateway from './gateway';
 import * as flyMachines from './fly-machines';
 import { buildFlyMachineConfig } from './fly-machines';
@@ -446,6 +450,7 @@ export async function runUnexpectedStopRecoveryInBackground(
           })
         )
       );
+      await markControllerCapabilitiesApplied(ctx, state);
     } catch (err) {
       const isStartupTimeout = err instanceof fly.FlyApiError && err.status === 408;
       if (!isStartupTimeout || !state.flyMachineId) {

@@ -14,8 +14,12 @@ import {
   useRemoveReaction,
   useExecuteAction,
 } from '../hooks/useMessages';
-import { kiloclawConversationContext } from '@kilocode/event-service';
+import {
+  kiloclawConversationContext,
+  presenceContextForConversation,
+} from '@kilocode/event-service';
 import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
+import { useDocumentVisible } from '@/hooks/useDocumentVisible';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
 import {
   useConversationDetail,
@@ -76,10 +80,18 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const [isRenamingTitle, setIsRenamingTitle] = useState(false);
   const [renameText, setRenameText] = useState('');
 
+  const visible = useDocumentVisible();
+
   // Subscribe to this conversation's events via the event-service WebSocket
   usePresenceSubscription(
     sandboxId && conversationId ? kiloclawConversationContext(sandboxId, conversationId) : '',
     Boolean(sandboxId && conversationId)
+  );
+
+  // Subscribe to presence for this conversation while the tab is visible.
+  usePresenceSubscription(
+    sandboxId && conversationId ? presenceContextForConversation(sandboxId, conversationId) : '',
+    Boolean(sandboxId && conversationId) && visible
   );
 
   // Event Service delivers subscribed contexts to every handler, so each

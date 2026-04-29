@@ -121,6 +121,7 @@ export const PullRequestPayloadSchema = z.object({
     body: z.string().nullable().optional(),
     state: z.string(),
     draft: z.boolean().optional(),
+    merged: z.boolean().nullable().optional(),
     html_url: z.string().optional(),
     user: z.object({
       id: z.number(),
@@ -133,6 +134,8 @@ export const PullRequestPayloadSchema = z.object({
       repo: z
         .object({
           full_name: z.string(),
+          clone_url: z.string().optional(),
+          html_url: z.string().optional(),
         })
         .nullable()
         .optional(),

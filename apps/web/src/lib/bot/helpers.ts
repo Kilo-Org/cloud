@@ -19,14 +19,18 @@ export function isChannelLevelMessage(thread: Thread, message: Message): boolean
 export type SlackWebApiPlatformError = {
   code: 'slack_webapi_platform_error';
   data: {
-    ok: false;
-    error: string;
+    ok?: false;
+    error?: unknown;
+    needed?: unknown;
+    provided?: unknown;
+    response_metadata?: unknown;
+  };
+};
+
+export type SlackMissingScopeError = SlackWebApiPlatformError & {
+  data: SlackWebApiPlatformError['data'] & {
+    error: 'missing_scope';
     needed: string;
-    provided: string;
-    response_metadata: {
-      scopes: string[];
-      acceptedScopes: string[];
-    };
   };
 };
 
@@ -35,7 +39,18 @@ export function isSlackWebApiPlatformError(error: unknown): error is SlackWebApi
     !!error &&
     typeof error === 'object' &&
     'code' in error &&
-    error.code === 'slack_webapi_platform_error'
+    error.code === 'slack_webapi_platform_error' &&
+    'data' in error &&
+    !!error.data &&
+    typeof error.data === 'object'
+  );
+}
+
+export function isSlackMissingScopeError(error: unknown): error is SlackMissingScopeError {
+  return (
+    isSlackWebApiPlatformError(error) &&
+    error.data.error === 'missing_scope' &&
+    typeof error.data.needed === 'string'
   );
 }
 

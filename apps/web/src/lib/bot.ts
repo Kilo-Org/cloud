@@ -3,7 +3,7 @@ import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
 import type { HomeView } from '@slack/types';
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
-import { isSlackWebApiPlatformError, postSlackReinstallInstruction } from '@/lib/bot/helpers';
+import { isSlackMissingScopeError, postSlackReinstallInstruction } from '@/lib/bot/helpers';
 import {
   getPlatformIdentity,
   getPlatformIntegration,
@@ -219,7 +219,7 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
         ASSISTANT_PROMPTS_TITLE
       );
     } catch (error) {
-      if (isSlackWebApiPlatformError(error)) {
+      if (isSlackMissingScopeError(error)) {
         const platformIntegration = await getPlatformIntegrationByBotUserId(
           event.adapter.name,
           event.adapter.botUserId

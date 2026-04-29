@@ -31,7 +31,7 @@ jest.mock('@slack/web-api', () => ({
 }));
 
 import type { Owner } from '@/lib/integrations/core/types';
-import { testConnection, uninstallApp } from './slack-service';
+import { getMissingSlackScopes, SLACK_SCOPES, testConnection, uninstallApp } from './slack-service';
 
 const owner = { type: 'user', id: 'user-1' } satisfies Owner;
 
@@ -170,5 +170,17 @@ describe('slack-service testConnection', () => {
       success: false,
       error: 'network down',
     });
+  });
+});
+
+describe('getMissingSlackScopes', () => {
+  it('returns scopes required by the app but missing from the installation', () => {
+    const [missingScope, ...installedScopes] = SLACK_SCOPES;
+
+    expect(getMissingSlackScopes(installedScopes)).toEqual([missingScope]);
+  });
+
+  it('returns an empty list when all required scopes are installed', () => {
+    expect(getMissingSlackScopes([...SLACK_SCOPES])).toEqual([]);
   });
 });

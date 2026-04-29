@@ -45,6 +45,11 @@ export const SLACK_SCOPES = [
   'users:read.email',
 ];
 
+export function getMissingSlackScopes(installedScopes: string[] | null): string[] {
+  const installedScopeSet = new Set(installedScopes ?? []);
+  return SLACK_SCOPES.filter(scope => !installedScopeSet.has(scope));
+}
+
 const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
 
 type SlackUninstallOptions = {

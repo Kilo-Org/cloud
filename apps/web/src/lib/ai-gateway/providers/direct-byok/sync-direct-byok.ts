@@ -63,29 +63,19 @@ type ProviderFetcher = {
   fetch(): Promise<RawModel[]>;
 };
 
-const FETCHERS: ReadonlyArray<ProviderFetcher> = [
-  {
-    providerId: 'neuralwatt',
+function openAICompatibleFetcher(options: {
+  providerId: DirectUserByokInferenceProviderId;
+  label: string;
+  url: string;
+}): ProviderFetcher {
+  return {
+    providerId: options.providerId,
     async fetch() {
-      const response = await fetch('https://api.neuralwatt.com/v1/models');
+      const response = await fetch(options.url);
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch Neuralwatt models: ${response.status} ${response.statusText}`
+          `Failed to fetch ${options.label} models: ${response.status} ${response.statusText}`
         );
-      }
-      const parsed = OpenAICompatibleModelsResponseSchema.parse(await response.json());
-      return parsed.data.map(model => ({
-        id: model.id,
-        context_length: model.max_model_len,
-      }));
-    },
-  },
-  {
-    providerId: 'chutes-byok',
-    async fetch() {
-      const response = await fetch('https://llm.chutes.ai/v1/models');
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Chutes models: ${response.status} ${response.statusText}`);
       }
       const parsed = OpenAICompatibleModelsResponseSchema.parse(await response.json());
       return parsed.data.map(model => ({
@@ -95,7 +85,20 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
         input_modalities: model.input_modalities,
       }));
     },
-  },
+  };
+}
+
+const FETCHERS: ReadonlyArray<ProviderFetcher> = [
+  openAICompatibleFetcher({
+    providerId: 'neuralwatt',
+    label: 'Neuralwatt',
+    url: 'https://api.neuralwatt.com/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'chutes-byok',
+    label: 'Chutes',
+    url: 'https://llm.chutes.ai/v1/models',
+  }),
   {
     providerId: 'zai-coding',
     async fetch() {

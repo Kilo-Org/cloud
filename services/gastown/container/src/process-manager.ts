@@ -1463,6 +1463,13 @@ export async function refreshTokenForAllAgents(): Promise<
     const oldInstance = sdkInstances.get(agent.workdir);
     const oldSessionId = agent.sessionId;
     const oldPort = agent.serverPort;
+    // Track the pending ensureSDKServer promise separately so the timeout
+    // path can clean up an orphan server if the spawn eventually resolves
+    // after we've already given up. withTimeout races the promise with a
+    // timer but cannot cancel the underlying spawn — the serialised SDK
+    // server creation may still install an instance into sdkInstances
+    // after we've restored the old one, leaking the fresh kilo serve child.
+    let pendingEnsure: Promise<{ client: KiloClient; port: number }> | null = null;
     try {
       const hotSwapEnv = buildLiveHotSwapEnv(agent);
 
@@ -1474,11 +1481,14 @@ export async function refreshTokenForAllAgents(): Promise<
       // server is the only way to propagate the fresh token.
       sdkInstances.delete(agent.workdir);
 
+      pendingEnsure = ensureSDKServer(agent.workdir, hotSwapEnv);
       const { client, port } = await withTimeout(
-        ensureSDKServer(agent.workdir, hotSwapEnv),
+        pendingEnsure,
         REFRESH_AGENT_TIMEOUT_MS,
         `ensureSDKServer for ${agent.agentId}`
       );
+      // Spawn completed within the timeout — no orphan to clean up.
+      pendingEnsure = null;
       agent.serverPort = port;
 
       // Resume the existing session. kilo.db is on disk and survives
@@ -1575,6 +1585,42 @@ export async function refreshTokenForAllAgents(): Promise<
         sdkInstances.set(agent.workdir, oldInstance);
         agent.serverPort = oldPort;
         agent.sessionId = oldSessionId;
+      }
+      // If ensureSDKServer is still in flight, attach a reaper: when it
+      // finally resolves it will have registered a fresh SDK instance
+      // under agent.workdir, clobbering the restored old one. We evict
+      // and close that orphan so we don't leak a kilo serve process or
+      // leave the agent pointing at an un-subscribed server.
+      if (pendingEnsure) {
+        const reapWorkdir = agent.workdir;
+        const reapAgentId = agent.agentId;
+        const reapOldInstance = oldInstance;
+        pendingEnsure.then(
+          ({ port: orphanPort }) => {
+            const orphan = sdkInstances.get(reapWorkdir);
+            if (!orphan || orphan === reapOldInstance) return;
+            sdkInstances.delete(reapWorkdir);
+            if (reapOldInstance) {
+              sdkInstances.set(reapWorkdir, reapOldInstance);
+            }
+            try {
+              orphan.server.close();
+            } catch (closeErr) {
+              log.warn('refresh_token.orphan_close_failed', {
+                agentId: reapAgentId,
+                error: closeErr instanceof Error ? closeErr.message : String(closeErr),
+              });
+            }
+            log.warn('refresh_token.orphan_reaped', {
+              agentId: reapAgentId,
+              orphanPort,
+            });
+          },
+          () => {
+            // ensureSDKServer itself rejected — nothing was installed, so
+            // nothing to reap. The original timeout error already logged.
+          }
+        );
       }
       log.error('refresh_token.agent_restarted', {
         agentId: agent.agentId,

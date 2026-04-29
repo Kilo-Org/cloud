@@ -135,7 +135,7 @@ async function readPreviousModels(
 
 async function syncProvider(
   fetcher: ProviderFetcher,
-  openrouterDescriptions: ReadonlyMap<string, string>
+  fallbackDescriptions: ReadonlyMap<string, string>
 ): Promise<number> {
   const previous = await readPreviousModels(fetcher.providerId);
   const previousById = new Map(previous.map(model => [model.id, model]));
@@ -146,9 +146,9 @@ async function syncProvider(
   for (const raw of fetched) {
     const prior = previousById.get(raw.id);
     const name = raw.name ?? stripVendorPrefix(raw.id);
-    const openrouterDescription = openrouterDescriptions.get(stripVendorPrefixLowerCased(raw.id));
+    const fallbackDescription = fallbackDescriptions.get(stripVendorPrefixLowerCased(raw.id));
     const description =
-      openrouterDescription ?? prior?.description ?? (await generateDescription(raw.id, name));
+      fallbackDescription ?? prior?.description ?? (await generateDescription(raw.id, name));
     const context_length = raw.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
     const max_completion_tokens = Math.min(
       raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,

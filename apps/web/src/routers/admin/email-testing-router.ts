@@ -6,6 +6,7 @@ import { verifyEmail } from '@/lib/email-neverbounce';
 import {
   subjects,
   creditsVars,
+  buildCreditsTopUpReceiptSection,
   renderTemplate,
   type RawHtml,
   type TemplateName,
@@ -114,8 +115,26 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'accountDeletionRequest':
       return { email: 'user@example.com' };
+    case 'creditsTopUp':
+      return {
+        heading: 'Thanks for your top-up',
+        intro:
+          'Your Kilo credit top-up has been processed and the credits are now available on your account.',
+        amount_usd: '10.00',
+        credits_usd: '10.00',
+        purchase_date: formatDate(new Date()),
+        credits_url: `${NEXTAUTH_URL}/credits`,
+        receipt_section: buildCreditsTopUpReceiptSection(null),
+      };
+    case 'kiloClawSubscriptionStarted':
+      return {
+        plan_name: 'KiloClaw Standard',
+        price_usd: '29.00',
+        billing_period: 'Monthly',
+        next_billing_date: formatDate(new Date(Date.now() + 30 * 86_400_000)),
+        manage_url: `${NEXTAUTH_URL}/claw`,
+      };
   }
-  throw new Error(`Unknown template: ${template}`);
 }
 
 export const emailTestingRouter = createTRPCRouter({

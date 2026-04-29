@@ -167,18 +167,24 @@ async function syncProvider(
 }
 
 export async function syncDirectByokModels(
-  openrouterData: Record<string, StoredModel>
+  openrouterData: Record<string, StoredModel>,
+  vercelData: Record<string, StoredModel>
 ): Promise<Partial<Record<DirectUserByokInferenceProviderId, number>>> {
-  const openrouterDescriptions = new Map<string, string>();
+  const fallbackDescriptions = new Map<string, string>();
+  for (const model of Object.values(vercelData)) {
+    const id = stripVendorPrefix(model.id);
+    if (!model.description || fallbackDescriptions.has(id)) continue;
+    fallbackDescriptions.set(id, model.description);
+  }
   for (const model of Object.values(openrouterData)) {
-    if (model.description) {
-      openrouterDescriptions.set(stripVendorPrefix(model.id), model.description);
-    }
+    const id = stripVendorPrefix(model.id);
+    if (!model.description || fallbackDescriptions.has(id)) continue;
+    fallbackDescriptions.set(id, model.description);
   }
   const entries = await Promise.all(
     FETCHERS.map(
       async fetcher =>
-        [fetcher.providerId, await syncProvider(fetcher, openrouterDescriptions)] as const
+        [fetcher.providerId, await syncProvider(fetcher, fallbackDescriptions)] as const
     )
   );
   return Object.fromEntries(entries);

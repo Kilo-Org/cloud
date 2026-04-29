@@ -48,7 +48,11 @@ export class EventServiceClient {
   private ws: WebSocket | null = null;
   private connected = false;
   private eventHandlers = new Map<string, Set<(context: string, payload: unknown) => void>>();
-  private activeContexts = new Set<string>();
+  // Refcounted so multiple consumers can independently subscribe to and
+  // unsubscribe from the same context without trampling each other. The wire
+  // `context.subscribe`/`context.unsubscribe` messages are only sent on the
+  // 0↔1 transitions; intermediate refcount churn stays client-side.
+  private activeContexts = new Map<string, number>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
   private reconnectAttempts = 0;
@@ -215,20 +219,31 @@ export class EventServiceClient {
   }
 
   subscribe(contexts: string[]): void {
+    const newlyActive: string[] = [];
     for (const ctx of contexts) {
-      this.activeContexts.add(ctx);
+      const next = (this.activeContexts.get(ctx) ?? 0) + 1;
+      this.activeContexts.set(ctx, next);
+      if (next === 1) newlyActive.push(ctx);
     }
-    if (this.isConnected()) {
-      this.send({ type: 'context.subscribe', contexts });
+    if (newlyActive.length > 0 && this.isConnected()) {
+      this.send({ type: 'context.subscribe', contexts: newlyActive });
     }
   }
 
   unsubscribe(contexts: string[]): void {
+    const released: string[] = [];
     for (const ctx of contexts) {
-      this.activeContexts.delete(ctx);
+      const current = this.activeContexts.get(ctx);
+      if (current === undefined) continue;
+      if (current <= 1) {
+        this.activeContexts.delete(ctx);
+        released.push(ctx);
+      } else {
+        this.activeContexts.set(ctx, current - 1);
+      }
     }
-    if (this.isConnected()) {
-      this.send({ type: 'context.unsubscribe', contexts });
+    if (released.length > 0 && this.isConnected()) {
+      this.send({ type: 'context.unsubscribe', contexts: released });
     }
   }
 
@@ -311,7 +326,7 @@ export class EventServiceClient {
     if (this.activeContexts.size > 0) {
       this.send({
         type: 'context.subscribe',
-        contexts: Array.from(this.activeContexts),
+        contexts: Array.from(this.activeContexts.keys()),
       });
     }
   }

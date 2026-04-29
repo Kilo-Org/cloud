@@ -99,7 +99,7 @@ export const BALANCED_QWEN_MODEL: ResolvedAutoModel = {
 
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   id: 'kilo-auto/frontier',
-  name: 'Kilo Auto Frontier',
+  name: 'Auto Frontier',
   description: 'Highest performance and capability for any task.',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
@@ -117,9 +117,9 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
 
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
-  name: 'Kilo Auto Free',
+  name: 'Auto Free',
   description:
-    'Free with limited capability. No credits required. Note: prompts may be logged by the upstream provider and used to improve their services.',
+    'Rotates through available free models. Limited capability and no credits required. Note: prompts may be logged by the upstream provider and used to improve their services.',
   context_length: 256_000,
   max_completion_tokens: 10_000,
   prompt_price: '0',
@@ -133,7 +133,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
 
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
-  name: 'Kilo Auto Balanced',
+  name: 'Auto Balanced',
   description: 'Great balance of price and capability.',
   context_length: 1_000_000,
   max_completion_tokens: 65_536,
@@ -150,7 +150,7 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
 
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   id: 'kilo-auto/small',
-  name: 'Kilo Auto Small',
+  name: 'Auto Small',
   description: 'Automatically routes your request to a small model.',
   context_length: 262144,
   max_completion_tokens: 32768,

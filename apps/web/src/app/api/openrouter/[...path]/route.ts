@@ -21,7 +21,7 @@ import {
   openRouterRequest,
 } from '@/lib/ai-gateway/providers';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
@@ -40,6 +40,7 @@ import {
   featureExclusiveModelResponse,
   invalidPathResponse,
   invalidRequestResponse,
+  malformedJsonResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
@@ -191,11 +192,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed = { kind: 'responses', body };
     }
   } catch (e) {
-    captureException(e, {
-      extra: { requestBodyText },
-      tags: { source: 'openrouter-proxy' },
-    });
-    return invalidRequestResponse();
+    return malformedJsonResponse(e);
   }
 
   delete requestBodyParsed.body.models; // OpenRouter specific field we do not support

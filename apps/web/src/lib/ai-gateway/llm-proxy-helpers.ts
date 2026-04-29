@@ -67,6 +67,18 @@ export function invalidRequestResponse() {
   );
 }
 
+export function malformedJsonResponse(parseError: unknown) {
+  const detail = parseError instanceof Error ? parseError.message : String(parseError);
+  return NextResponse.json(
+    {
+      error: 'Malformed JSON',
+      error_type: ProxyErrorType.invalid_request,
+      message: `Request body is not valid JSON: ${detail}`,
+    },
+    { status: 400 }
+  );
+}
+
 export function temporarilyUnavailableResponse() {
   return NextResponse.json(
     {

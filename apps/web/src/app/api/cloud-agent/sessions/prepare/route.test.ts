@@ -86,6 +86,7 @@ function createMockUser(overrides: Partial<User> = {}): User {
     api_token_pepper: 'test-pepper',
     web_session_pepper: null,
     auto_top_up_enabled: false,
+    kiloclaw_early_access: false,
     stripe_customer_id: 'cus_test123',
     microdollars_used: 0,
     kilo_pass_threshold: null,

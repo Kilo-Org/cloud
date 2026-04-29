@@ -11,11 +11,31 @@ import {
 import { eq } from 'drizzle-orm';
 
 // Mock KiloClawInternalClient so tests don't require KILOCLAW_API_URL.
-// getLatestVersion returns null (no latest set) so disable-latest guard passes.
+// The mock factory is hoisted above the imports below, but each
+// mockImplementation runs only when the mocked method is called — by which
+// time the regular ES imports (db, schema, eq) at the top of the file have
+// been resolved and are safe to reference.
+//
+// disableImageAndClearRollout mimics the kiloclaw service's atomic SQL write
+// so the post-call re-read in updateVersionStatus sees the disabled state.
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn().mockImplementation(() => ({
     getLatestVersion: jest.fn().mockResolvedValue(null),
     listVersions: jest.fn().mockResolvedValue([]),
+    disableImageAndClearRollout: jest
+      .fn()
+      .mockImplementation(async (imageTag: string, updatedBy: string) => {
+        await db
+          .update(kiloclaw_image_catalog)
+          .set({
+            status: 'disabled',
+            rollout_percent: 0,
+            updated_by: updatedBy,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(kiloclaw_image_catalog.image_tag, imageTag));
+        return { ok: true };
+      }),
   })),
   KiloClawApiError: class extends Error {
     readonly statusCode: number;

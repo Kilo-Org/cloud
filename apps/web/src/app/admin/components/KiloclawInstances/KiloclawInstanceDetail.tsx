@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   User,
@@ -54,6 +55,7 @@ import {
   ArrowUpDown,
   RefreshCw,
   Pin,
+  Rocket,
   Stethoscope,
   CheckCircle2,
   XCircle,
@@ -189,7 +191,90 @@ function CopySshCommandButton({
   );
 }
 
-function VersionPinCard({ userId, instanceId }: { userId: string; instanceId: string }) {
+function EarlyAccessSection({
+  userId,
+  initialValue,
+  isPinned,
+}: {
+  userId: string;
+  initialValue: boolean;
+  /** When true, the user's pin takes precedence and Early Access has no effect for this instance. */
+  isPinned: boolean;
+}) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [optimistic, setOptimistic] = useState(initialValue);
+
+  // Keep the toggle in sync if the parent's data refreshes out-of-band (e.g.,
+  // another admin toggles the same flag, or React Query cache invalidates).
+  // useState's initializer only runs on mount; without this we'd render stale
+  // state after a refetch.
+  useEffect(() => {
+    setOptimistic(initialValue);
+  }, [initialValue]);
+
+  const { mutateAsync, isPending } = useMutation(
+    trpc.admin.kiloclawInstances.setEarlyAccess.mutationOptions({
+      onSuccess: result => {
+        toast.success(
+          result.earlyAccess
+            ? 'Early Access enabled for this user'
+            : 'Early Access disabled for this user'
+        );
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
+        });
+      },
+      onError: err => {
+        setOptimistic(initialValue);
+        toast.error(`Failed to update Early Access: ${err.message}`);
+      },
+    })
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Rocket className="h-5 w-5" />
+        <h3 className="text-base font-semibold">Early Access</h3>
+      </div>
+      <p className="text-muted-foreground text-sm">
+        Offers this user the newest available image (including any in-flight rollout candidate)
+        across all of their instances — personal and org. Used for staff dogfooding and designated
+        beta testers. Per instance pins still take precedence.
+      </p>
+      <div className="flex items-center gap-3">
+        <Switch
+          checked={optimistic}
+          disabled={isPending}
+          onCheckedChange={next => {
+            setOptimistic(next);
+            void mutateAsync({ userId, value: next });
+          }}
+          aria-label="Early Access"
+        />
+        <span className="text-sm">
+          {isPending ? (
+            <span className="text-muted-foreground">Saving…</span>
+          ) : optimistic ? (
+            <span className="font-medium text-green-500">Enabled</span>
+          ) : (
+            <span className="text-muted-foreground">Disabled</span>
+          )}
+        </span>
+      </div>
+      {isPinned && optimistic && (
+        <p className="flex items-start gap-1 text-xs text-amber-500">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          This instance is pinned, so Early Access has no effect here. Other instances owned by this
+          user (without a pin) will still get early access.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function VersionPinSection({ userId, instanceId }: { userId: string; instanceId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [selectedTag, setSelectedTag] = useState<string>('');
@@ -243,107 +328,53 @@ function VersionPinCard({ userId, instanceId }: { userId: string; instanceId: st
   );
 
   return (
-    <Card>
-      <CardHeader>
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Pin className="h-5 w-5" />
+        <h3 className="text-base font-semibold">Version Pin</h3>
+      </div>
+      <p className="text-muted-foreground text-sm">
+        Pin this user to a specific KiloClaw image tag.
+      </p>
+      {pinLoading ? (
         <div className="flex items-center gap-2">
-          <Pin className="h-5 w-5" />
-          <CardTitle>Version Pin</CardTitle>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-muted-foreground text-sm">Loading pin status...</span>
         </div>
-        <CardDescription>Pin this user to a specific KiloClaw image tag</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {pinLoading ? (
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-muted-foreground text-sm">Loading pin status...</span>
+      ) : pinData ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-4">
+            <DetailField label="Pinned Image Tag">
+              <Badge className="bg-blue-600 font-mono text-xs">{pinData.image_tag}</Badge>
+            </DetailField>
+            <DetailField label="OpenClaw Version">{pinData.openclaw_version ?? '—'}</DetailField>
+            <DetailField label="Variant">{pinData.variant ?? 'default'}</DetailField>
+            <DetailField label="Pinned By">
+              {pinData.pinned_by_email ?? pinData.pinned_by}
+            </DetailField>
+            {pinData.reason && <DetailField label="Reason">{pinData.reason}</DetailField>}
           </div>
-        ) : pinData ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <DetailField label="Pinned Image Tag">
-                <Badge className="bg-blue-600 font-mono text-xs">{pinData.image_tag}</Badge>
-              </DetailField>
-              <DetailField label="OpenClaw Version">{pinData.openclaw_version ?? '—'}</DetailField>
-              <DetailField label="Variant">{pinData.variant ?? 'default'}</DetailField>
-              <DetailField label="Pinned By">
-                {pinData.pinned_by_email ?? pinData.pinned_by}
-              </DetailField>
-              {pinData.reason && <DetailField label="Reason">{pinData.reason}</DetailField>}
-            </div>
-            <div className="space-y-2 pt-2">
-              <div className="flex items-center gap-2">
-                <Select value={selectedTag} onValueChange={setSelectedTag}>
-                  <SelectTrigger className="w-[250px]">
-                    <SelectValue placeholder="Change image tag..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {versionsData?.items.map(v => (
-                      <SelectItem key={v.image_tag} value={v.image_tag}>
-                        {v.image_tag} (OpenClaw {v.openclaw_version})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder="Reason (optional)"
-                  value={reason}
-                  onChange={e => setReason(e.target.value)}
-                  className="w-[200px]"
-                />
-                {selectedTag && (
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      void setPin({
-                        userId,
-                        instanceId,
-                        imageTag: selectedTag,
-                        reason: reason || undefined,
-                      })
-                    }
-                    disabled={isPinning}
-                  >
-                    {isPinning ? 'Updating...' : 'Update Pin'}
-                  </Button>
-                )}
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => void removePin({ instanceId })}
-                  disabled={isUnpinning}
-                >
-                  {isUnpinning ? 'Unpinning...' : 'Unpin'}
-                </Button>
-              </div>
-              <p className="flex items-center gap-1 text-xs text-red-400">
-                <AlertTriangle className="h-3 w-3 shrink-0" />
-                Reason is visible to the end user.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-muted-foreground text-sm">Following latest available version</p>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Select value={selectedTag} onValueChange={setSelectedTag}>
-                  <SelectTrigger className="w-[250px]">
-                    <SelectValue placeholder="Select image tag to pin..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {versionsData?.items.map(v => (
-                      <SelectItem key={v.image_tag} value={v.image_tag}>
-                        {v.image_tag} (OpenClaw {v.openclaw_version})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder="Reason (optional)"
-                  value={reason}
-                  onChange={e => setReason(e.target.value)}
-                  className="w-[200px]"
-                />
+          <div className="space-y-2 pt-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={selectedTag} onValueChange={setSelectedTag}>
+                <SelectTrigger className="w-full max-w-[260px]">
+                  <SelectValue placeholder="Change image tag..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {versionsData?.items.map(v => (
+                    <SelectItem key={v.image_tag} value={v.image_tag}>
+                      {v.image_tag} (OpenClaw {v.openclaw_version})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Reason (optional)"
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                className="w-full max-w-[200px]"
+              />
+              {selectedTag && (
                 <Button
                   size="sm"
                   onClick={() =>
@@ -354,18 +385,119 @@ function VersionPinCard({ userId, instanceId }: { userId: string; instanceId: st
                       reason: reason || undefined,
                     })
                   }
-                  disabled={!selectedTag || isPinning}
+                  disabled={isPinning}
                 >
-                  {isPinning ? 'Pinning...' : 'Pin Version'}
+                  {isPinning ? 'Updating...' : 'Update Pin'}
                 </Button>
-              </div>
-              <p className="flex items-center gap-1 text-xs text-red-400">
-                <AlertTriangle className="h-3 w-3 shrink-0" />
-                Reason is visible to the end user.
-              </p>
+              )}
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => void removePin({ instanceId })}
+                disabled={isUnpinning}
+              >
+                {isUnpinning ? 'Unpinning...' : 'Unpin'}
+              </Button>
             </div>
+            <p className="flex items-center gap-1 text-xs text-red-400">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              Reason is visible to the end user.
+            </p>
           </div>
-        )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-muted-foreground text-sm">Following latest available version.</p>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={selectedTag} onValueChange={setSelectedTag}>
+                <SelectTrigger className="w-full max-w-[260px]">
+                  <SelectValue placeholder="Select image tag to pin..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {versionsData?.items.map(v => (
+                    <SelectItem key={v.image_tag} value={v.image_tag}>
+                      {v.image_tag} (OpenClaw {v.openclaw_version})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Reason (optional)"
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                className="w-full max-w-[200px]"
+              />
+              <Button
+                size="sm"
+                onClick={() =>
+                  void setPin({
+                    userId,
+                    instanceId,
+                    imageTag: selectedTag,
+                    reason: reason || undefined,
+                  })
+                }
+                disabled={!selectedTag || isPinning}
+              >
+                {isPinning ? 'Pinning...' : 'Pin Version'}
+              </Button>
+            </div>
+            <p className="flex items-center gap-1 text-xs text-red-400">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              Reason is visible to the end user.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Combined Version Management card: per-instance version pin (left) and per-user
+ * Early Access toggle (right). Side-by-side because they're complementary
+ * controls for "what version this instance runs":
+ *  - Pin overrides everything (always wins, per instance).
+ *  - Early Access (user-scoped) opts the user into seeing rollout candidates
+ *    across all of their instances; pins still override per instance.
+ */
+function VersionManagementCard({
+  userId,
+  instanceId,
+  earlyAccessInitial,
+}: {
+  userId: string;
+  instanceId: string;
+  earlyAccessInitial: boolean;
+}) {
+  const trpc = useTRPC();
+  // Same query VersionPinSection uses — React Query dedupes on the key, so
+  // this is a free read that lets EarlyAccessSection know if the pin is set
+  // (pin overrides Early Access for this specific instance).
+  const { data: pinData } = useQuery(
+    trpc.admin.kiloclawVersions.getUserPin.queryOptions({ userId, instanceId })
+  );
+  const isPinned = !!pinData;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Version Management</CardTitle>
+        <CardDescription>
+          Per instance overrides (pin) and per user opt-ins (Early Access) for which KiloClaw image
+          this user runs.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <VersionPinSection userId={userId} instanceId={instanceId} />
+          <EarlyAccessSection
+            userId={userId}
+            initialValue={earlyAccessInitial}
+            isPinned={isPinned}
+          />
+        </div>
       </CardContent>
     </Card>
   );
@@ -3203,8 +3335,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           </Card>
         )}
 
-        {/* Version Pin Card */}
-        <VersionPinCard userId={data.user_id} instanceId={data.id} />
+        {/* Combined version management — pin (left) + rollout auto-enroll (right). */}
+        <VersionManagementCard
+          userId={data.user_id}
+          instanceId={data.id}
+          earlyAccessInitial={data.user_kiloclaw_early_access}
+        />
 
         {/* Workspace File Editor */}
         {!data.destroyed_at && (

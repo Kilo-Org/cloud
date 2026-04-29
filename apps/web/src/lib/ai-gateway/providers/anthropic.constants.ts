@@ -19,7 +19,6 @@ export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
   max_completion_tokens: 128_000,
   gateway: 'openrouter',
   flags: ['reasoning', 'vision'],
-  inference_provider: null,
   pricing: null,
   exclusive_to: [],
 };

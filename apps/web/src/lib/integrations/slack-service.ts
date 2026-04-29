@@ -36,7 +36,6 @@ export const SLACK_SCOPES = [
   'groups:read',
   'im:history',
   'im:read',
-  'im:write',
   'mpim:history',
   'mpim:read',
   'reactions:read',
@@ -300,112 +299,6 @@ export async function testConnection(owner: Owner): Promise<{ success: boolean; 
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
-  }
-}
-
-/**
- * Send a test message to verify the Slack integration is working
- * Uses the incoming webhook channel if available, otherwise tries to find a general channel
- */
-export async function sendTestMessage(
-  owner: Owner
-): Promise<{ success: boolean; error?: string; channel?: string }> {
-  const integration = await getInstallation(owner);
-
-  if (!integration) {
-    return { success: false, error: 'No Slack installation found' };
-  }
-
-  const metadata = integration.metadata as {
-    access_token?: string;
-    model_slug?: string;
-    incoming_webhook?: { channel: string; channelId: string; url: string };
-  } | null;
-
-  if (!metadata?.access_token) {
-    return { success: false, error: 'No access token found' };
-  }
-
-  // Build the test message including the configured model
-  const modelInfo = metadata.model_slug
-    ? `\n📊 Configured model: \`${metadata.model_slug}\``
-    : '\n⚠️ No model configured yet';
-  const testMessage = `🎉 Test message from Kilo Code! Your Slack integration is working correctly.${modelInfo}`;
-
-  // If we have an incoming webhook URL, use it directly (doesn't require channel membership)
-  if (metadata.incoming_webhook?.url) {
-    try {
-      const response = await fetch(metadata.incoming_webhook.url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: testMessage,
-        }),
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        return { success: false, error: `Webhook failed: ${text}` };
-      }
-
-      return { success: true, channel: metadata.incoming_webhook.channel };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: `Webhook error: ${errorMessage}` };
-    }
-  }
-
-  // Fall back to using the API (requires bot to be in channel)
-  try {
-    const client = new WebClient(metadata.access_token);
-
-    // Try to find a general or random channel to post to
-    const channelsResult = await client.conversations.list({
-      types: 'public_channel',
-      limit: 100,
-    });
-
-    const generalChannel = channelsResult.channels?.find(
-      c => c.name === 'general' || c.name === 'random'
-    );
-
-    let channel: string | undefined;
-    if (generalChannel?.id) {
-      channel = generalChannel.id;
-    } else if (channelsResult.channels?.[0]?.id) {
-      channel = channelsResult.channels[0].id;
-    }
-
-    if (!channel) {
-      return { success: false, error: 'No channel found to send test message' };
-    }
-
-    const result = await client.chat.postMessage({
-      channel,
-      text: testMessage,
-    });
-
-    if (!result.ok) {
-      return { success: false, error: result.error || 'Unknown error' };
-    }
-
-    return { success: true, channel: result.channel };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    // Provide more helpful error messages for common issues
-    if (errorMessage.includes('not_in_channel')) {
-      return {
-        success: false,
-        error: 'Bot is not in the channel. Please invite the Kilo Code bot to a channel first.',
-      };
-    }
-    if (errorMessage.includes('channel_not_found')) {
-      return {
-        success: false,
-        error: 'Channel not found. Please make sure the channel exists and is accessible.',
-      };
-    }
     return { success: false, error: errorMessage };
   }
 }

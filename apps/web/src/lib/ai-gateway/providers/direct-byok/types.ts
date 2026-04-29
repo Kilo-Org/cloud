@@ -1,18 +1,26 @@
+import * as z from 'zod';
+import { OpenCodeVariantSchema } from '@kilocode/db/schema-types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
-import type { CustomLlmProvider, OpenCodeVariant } from '@kilocode/db';
+import type { CustomLlmProvider } from '@kilocode/db';
 
-export type DirectByokModelFlag = 'recommended' | 'vision';
+export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision']);
 
-export type DirectByokModel = {
-  id: string;
-  name: string;
-  flags: ReadonlyArray<DirectByokModelFlag>;
-  description: string;
-  context_length: number;
-  max_completion_tokens: number;
-  variants: Record<string, OpenCodeVariant> | null;
-};
+export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
+
+export const DirectByokModelSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  flags: z.array(DirectByokModelFlagSchema).readonly(),
+  description: z.string(),
+  context_length: z.number(),
+  max_completion_tokens: z.number(),
+  variants: z.record(z.string(), OpenCodeVariantSchema).nullable(),
+});
+
+export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
+
+export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
 
 export type DirectByokProvider = {
   id: DirectUserByokInferenceProviderId;

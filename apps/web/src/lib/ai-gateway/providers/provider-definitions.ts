@@ -25,8 +25,8 @@ export default {
       addCacheBreakpoints(context.request);
     },
   },
-  BYTEDANCE: {
-    id: 'bytedance',
+  SEED: {
+    id: 'seed',
     apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/v3',
     apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
     // Prompt caching is not supported on the responses API for Bytedance; enabling it is therefore dangerous.

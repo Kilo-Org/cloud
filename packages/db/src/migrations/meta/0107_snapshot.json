@@ -3903,6 +3903,21 @@
           "method": "btree",
           "with": {}
         },
+        "cli_sessions_v2_git_branch_idx": {
+          "name": "cli_sessions_v2_git_branch_idx",
+          "columns": [
+            {
+              "expression": "git_branch",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "UQ_cli_sessions_v2_session_id": {
           "name": "UQ_cli_sessions_v2_session_id",
           "columns": [

@@ -24,6 +24,7 @@ import {
   handlePullRequest,
   handleIssue,
   handlePRReviewComment,
+  upsertCliSessionPullRequestsFromWebhook,
 } from '@/lib/integrations/platforms/github/webhook-handlers';
 import { PLATFORM, GITHUB_EVENT, GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
@@ -391,7 +392,17 @@ export async function handleGitHubWebhook(
 
       const action = parseResult.data.action;
 
-      // Filter out closed events - we don't log or process them
+      // Side-effect: upsert the PR summary onto any cloud-agent-next sessions
+      // whose (git_url, git_branch) matches. This runs BEFORE the closed
+      // early-return and BEFORE webhook deduplication so that `closed`/`merged`
+      // events reach it (which is the only signal we get for terminal state)
+      // and so duplicate deliveries still converge the stored state.
+      // Errors are caught and logged internally — failure here must not block
+      // the code-review flow.
+      await upsertCliSessionPullRequestsFromWebhook(parseResult.data);
+
+      // Filter out closed events - we don't log or process them through the
+      // code-review pipeline. (The upsert above runs regardless.)
       if (action === GITHUB_ACTION.CLOSED) {
         return NextResponse.json({ message: 'Event received' }, { status: 200 });
       }

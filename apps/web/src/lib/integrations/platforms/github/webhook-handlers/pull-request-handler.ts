@@ -25,7 +25,6 @@ import {
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { updateCheckRunId } from '@/lib/code-reviews/db/code-reviews';
 import { resolvePullRequestCheckoutRef } from './pull-request-checkout-ref';
-import { upsertCliSessionPullRequestsFromWebhook } from './upsert-cli-session-pull-requests';
 import { APP_URL } from '@/lib/constants';
 
 /**
@@ -495,13 +494,6 @@ export async function handlePullRequest(
   integration: PlatformIntegration
 ) {
   const { action } = payload;
-
-  // Side-effect: upsert the PR summary onto any cloud-agent-next sessions
-  // whose (git_url, git_branch) matches. Runs for the upsert-tracked
-  // actions (opened, reopened, edited, synchronize, closed) independently
-  // of the code-review routing below. Caught-and-logged internally — a
-  // failure here must not block the code-review flow.
-  await upsertCliSessionPullRequestsFromWebhook(payload);
 
   switch (action) {
     case GITHUB_ACTION.OPENED:

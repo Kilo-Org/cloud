@@ -2653,6 +2653,10 @@ export const cli_sessions_v2 = pgTable(
     index('IDX_cli_sessions_v2_created_at').on(table.created_at),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
+    // Branch-leading index supports the pull_request webhook upsert's slow path,
+    // which looks up all sessions by git_branch before JS-normalizing their git_url.
+    // Without this, common branch names like 'main' force a seq scan on every PR webhook.
+    index('cli_sessions_v2_git_branch_idx').on(table.git_branch),
     uniqueIndex('UQ_cli_sessions_v2_session_id').on(table.session_id),
   ]
 );

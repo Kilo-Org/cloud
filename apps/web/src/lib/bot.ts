@@ -5,6 +5,7 @@ import { captureException } from '@sentry/nextjs';
 import type { HomeView } from '@slack/types';
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
 import { getPlatformIdentity, getPlatformIntegration } from '@/lib/bot/platform-helpers';
+import { promptInstallIntegration } from '@/lib/bot/install-integration';
 import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-account';
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
@@ -149,9 +150,7 @@ function createKiloBot(
     ]);
 
     if (!platformIntegration) {
-      captureException(new Error('No active platform integration found'), {
-        extra: { platform: identity.platform, teamId: identity.teamId },
-      });
+      await promptInstallIntegration(thread, message, identity);
       return;
     }
 

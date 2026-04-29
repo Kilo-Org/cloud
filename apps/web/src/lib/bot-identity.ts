@@ -32,6 +32,8 @@ export type PlatformIdentity = {
   teamId: string;
   /** Platform-specific user ID (e.g. Slack's "U123ABC") */
   userId: string;
+  /** Human-readable workspace / tenant name, when the platform provides one. */
+  teamName?: string;
 };
 
 /**
@@ -160,6 +162,7 @@ export function verifyLinkToken(token: string): PlatformIdentity | null {
       platform?: string;
       teamId?: string;
       userId?: string;
+      teamName?: string;
       iat?: number;
       nonce?: string;
     };
@@ -172,13 +175,22 @@ export function verifyLinkToken(token: string): PlatformIdentity | null {
       return null;
     }
 
+    if (data.teamName !== undefined && typeof data.teamName !== 'string') {
+      return null;
+    }
+
     if (typeof data.iat !== 'number') return null;
     const age = Math.floor(Date.now() / 1000) - data.iat;
     if (age < 0 || age > TOKEN_TTL_SECONDS) return null;
 
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
 
-    return { platform: data.platform, teamId: data.teamId, userId: data.userId };
+    return {
+      platform: data.platform,
+      teamId: data.teamId,
+      userId: data.userId,
+      ...(data.teamName ? { teamName: data.teamName } : {}),
+    };
   } catch {
     return null;
   }

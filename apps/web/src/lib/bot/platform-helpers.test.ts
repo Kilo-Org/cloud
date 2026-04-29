@@ -13,7 +13,7 @@ jest.mock('@/lib/drizzle', () => ({
 }));
 
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { getPlatformIntegration } from './platform-helpers';
+import { getPlatformIdentity, getPlatformIntegration } from './platform-helpers';
 
 describe('platform helpers', () => {
   beforeEach(() => {
@@ -51,5 +51,44 @@ describe('platform helpers', () => {
     );
 
     expect(result).toBeNull();
+  });
+
+  it('extracts Teams identity from tenant metadata', () => {
+    const result = getPlatformIdentity(
+      { id: 'teams:conversation:service' } as Parameters<typeof getPlatformIdentity>[0],
+      {
+        raw: {
+          conversation: { tenantId: 'tenant-1' },
+          channelData: { team: { name: 'Example Team' } },
+        },
+        author: { userId: '29:user' },
+      } as Parameters<typeof getPlatformIdentity>[1]
+    );
+
+    expect(result).toEqual({
+      platform: 'teams',
+      teamId: 'tenant-1',
+      userId: '29:user',
+      teamName: 'Example Team',
+    });
+  });
+
+  it('returns the canonical Teams platform integration for a Teams tenant', async () => {
+    const integration = {
+      id: 'pi_teams',
+      platform: PLATFORM.TEAMS,
+      platform_installation_id: 'tenant-1',
+    };
+    mockLimit.mockResolvedValue([integration]);
+
+    const result = await getPlatformIntegration(
+      { id: 'teams:conversation:service' } as Parameters<typeof getPlatformIntegration>[0],
+      {
+        raw: { channelData: { tenant: { id: 'tenant-1' } } },
+        author: { userId: '29:user' },
+      } as Parameters<typeof getPlatformIntegration>[1]
+    );
+
+    expect(result).toBe(integration);
   });
 });

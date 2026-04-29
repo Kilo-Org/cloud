@@ -5,8 +5,10 @@ import { db } from '@/lib/drizzle';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
 import { platform_integrations } from '@kilocode/db';
-import { PLATFORM } from '@/lib/integrations/core/constants';
+import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { and, eq } from 'drizzle-orm';
+
+const LINKABLE_PLATFORMS = new Set<string>([PLATFORM.SLACK, PLATFORM.TEAMS]);
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -28,15 +30,20 @@ function errorPage(title: string, message: string, status: number): Response {
  * an org member; for user-owned integrations only the owner may link.
  */
 async function verifyIntegrationAccess(
+  platform: string,
   teamId: string,
   kiloUserId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!LINKABLE_PLATFORMS.has(platform)) {
+    return { ok: false, error: 'This chat platform cannot be linked from this page.' };
+  }
+
   const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
-        eq(platform_integrations.platform, PLATFORM.SLACK),
+        eq(platform_integrations.platform, platform),
         eq(platform_integrations.platform_installation_id, teamId)
       )
     )
@@ -44,6 +51,10 @@ async function verifyIntegrationAccess(
 
   if (!integration) {
     return { ok: false, error: 'No matching integration found for this workspace.' };
+  }
+
+  if (integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
+    return { ok: false, error: 'This workspace integration is not active.' };
   }
 
   if (integration.owned_by_organization_id) {
@@ -106,7 +117,7 @@ export async function GET(request: Request) {
   }
 
   // Verify the user is allowed to link to this integration
-  const access = await verifyIntegrationAccess(identity.teamId, user.id);
+  const access = await verifyIntegrationAccess(identity.platform, identity.teamId, user.id);
   if (!access.ok) {
     return errorPage('Access Denied', access.error, 403);
   }

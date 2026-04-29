@@ -29,6 +29,8 @@ import {
   type BotAgentMessageLike,
 } from '@/lib/bot/agent-runner';
 import { findUserById } from '@/lib/user';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import type { Adapter, Message } from 'chat';
 
 type ExecutionCallbackPayload = {
   sessionId: string;
@@ -42,6 +44,8 @@ type ExecutionCallbackPayload = {
 };
 
 type TerminalCallbackStatus = ExecutionCallbackPayload['status'];
+
+type BotRequestRow = NonNullable<Awaited<ReturnType<typeof getBotRequest>>>;
 
 async function getBotRequest(botRequestId: string) {
   const [request] = await db
@@ -160,7 +164,7 @@ async function failBotRequest(params: {
 
 async function failBotRequestForCallbackProcessingError(params: {
   botRequestId: string;
-  requestRow: NonNullable<Awaited<ReturnType<typeof getBotRequest>>>;
+  requestRow: BotRequestRow;
   startedAt: number;
   errorMessage: string;
   logMessage: string;
@@ -181,59 +185,110 @@ async function failBotRequestForCallbackProcessingError(params: {
     return;
   }
 
-  await postSlackThreadMessage({
-    threadId: params.requestRow.platform_thread_id,
+  await postBotThreadMessage({
+    requestRow: params.requestRow,
     markdown: params.errorMessage,
+  });
+}
+
+async function getAdapterForBotRequest(requestRow: BotRequestRow): Promise<Adapter> {
+  await bot.initialize();
+
+  switch (requestRow.platform) {
+    case PLATFORM.SLACK:
+      return bot.getAdapter('slack');
+    case PLATFORM.TEAMS:
+      return bot.getAdapter('teams');
+    default:
+      throw new Error(`PlatformNotSupported: ${requestRow.platform}`);
+  }
+}
+
+async function withBotRequestAdapter<T>(
+  requestRow: BotRequestRow,
+  fn: (adapter: Adapter) => Promise<T>
+): Promise<T> {
+  const adapter = await getAdapterForBotRequest(requestRow);
+
+  if (requestRow.platform !== PLATFORM.SLACK) {
+    return await fn(adapter);
+  }
+
+  const botToken = await getSlackBotToken(requestRow.platform_integration_id);
+  const slackAdapter = bot.getAdapter('slack');
+
+  return await slackAdapter.withBotToken(botToken, async () => await fn(slackAdapter));
+}
+
+async function startTyping({ requestRow }: { requestRow: BotRequestRow }): Promise<void> {
+  await withBotRequestAdapter(requestRow, async adapter => {
+    await adapter.startTyping(requestRow.platform_thread_id, 'Processing Cloud Agent result...');
+  });
+}
+
+async function postBotThreadMessage(params: {
+  requestRow: BotRequestRow;
+  markdown: string;
+}): Promise<void> {
+  logCallback('Posting bot thread message', {
+    threadId: params.requestRow.platform_thread_id,
+    markdownLength: params.markdown.length,
+    platform: params.requestRow.platform,
     platformIntegrationId: params.requestRow.platform_integration_id,
   });
-}
 
-async function startTyping({
-  threadId,
-  platformIntegrationId,
-}: {
-  threadId: string;
-  platformIntegrationId: string | null;
-}): Promise<void> {
-  const botToken = await getSlackBotToken(platformIntegrationId);
-
-  await bot.initialize();
-  const slackAdapter = bot.getAdapter('slack');
-
-  await slackAdapter.withBotToken(botToken, async () => {
-    await slackAdapter.startTyping(threadId, 'Processing Cloud Agent result...');
-  });
-}
-
-async function postSlackThreadMessage(params: {
-  threadId: string;
-  markdown: string;
-  platformIntegrationId: string | null;
-}): Promise<void> {
-  logCallback('Posting Slack thread message', {
-    threadId: params.threadId,
-    markdownLength: params.markdown.length,
-    platformIntegrationId: params.platformIntegrationId,
-  });
-
-  const botToken = await getSlackBotToken(params.platformIntegrationId);
-
-  await bot.initialize();
-  const slackAdapter = bot.getAdapter('slack');
-
-  const posted = await slackAdapter.withBotToken(
-    botToken,
-    async () => await slackAdapter.postMessage(params.threadId, { markdown: params.markdown })
+  const posted = await withBotRequestAdapter(
+    params.requestRow,
+    async adapter =>
+      await adapter.postMessage(params.requestRow.platform_thread_id, { markdown: params.markdown })
   );
-  logCallback('Slack thread message posted', {
-    threadId: params.threadId,
+  logCallback('Bot thread message posted', {
+    threadId: params.requestRow.platform_thread_id,
     messageId: posted.id,
+    platform: params.requestRow.platform,
   });
+}
+
+function buildFallbackCallbackMessage(params: {
+  requestRow: BotRequestRow;
+  botRequestId: string;
+  continuationPrompt: string;
+}): BotAgentMessageLike {
+  return {
+    author: {
+      fullName: 'Cloud Agent Callback',
+      isBot: false,
+      isMe: false,
+      userId: params.requestRow.created_by,
+      userName: 'cloud-agent-callback',
+    },
+    id: `${params.botRequestId}:callback`,
+    text: params.continuationPrompt,
+  };
+}
+
+async function fetchOriginalMessageForContinuation(params: {
+  adapter: Adapter;
+  requestRow: BotRequestRow;
+}): Promise<Message | null> {
+  if (!params.requestRow.platform_message_id || !params.adapter.fetchMessage) {
+    return null;
+  }
+
+  try {
+    return await params.adapter.fetchMessage(
+      params.requestRow.platform_thread_id,
+      params.requestRow.platform_message_id
+    );
+  } catch (error) {
+    console.warn('[BotSessionCallback] Failed to fetch original bot message:', error);
+    return null;
+  }
 }
 
 async function continueBotAgentAfterCallback(params: {
   botRequestId: string;
-  requestRow: NonNullable<Awaited<ReturnType<typeof getBotRequest>>>;
+  requestRow: BotRequestRow;
   continuationPrompt: string;
   completedStepCount: number;
 }) {
@@ -254,42 +309,25 @@ async function continueBotAgentAfterCallback(params: {
 
   await bot.initialize();
   bot.registerSingleton();
-  const slackAdapter = bot.getAdapter('slack');
-  const botToken = await getSlackBotToken(params.requestRow.platform_integration_id);
 
-  return await slackAdapter.withBotToken(botToken, async () => {
-    const [threadInfo, originalMessage] = await Promise.all([
-      slackAdapter.fetchThread(params.requestRow.platform_thread_id),
-      params.requestRow.platform_message_id
-        ? slackAdapter
-            .fetchMessage(
-              params.requestRow.platform_thread_id,
-              params.requestRow.platform_message_id
-            )
-            .catch(error => {
-              console.warn('[BotSessionCallback] Failed to fetch original Slack message:', error);
-              return null;
-            })
-        : null,
+  return await withBotRequestAdapter(params.requestRow, async adapter => {
+    const [originalMessage] = await Promise.all([
+      fetchOriginalMessageForContinuation({ adapter, requestRow: params.requestRow }),
     ]);
     const thread = createSyntheticThread({
-      threadId: threadInfo.id,
-      adapterName: 'slack',
-      channelId: threadInfo.channelId,
-      isDM: threadInfo.isDM ?? false,
+      threadId: params.requestRow.platform_thread_id,
+      adapterName: adapter.name,
+      channelId: adapter.channelIdFromThreadId(params.requestRow.platform_thread_id),
+      isDM: adapter.isDM?.(params.requestRow.platform_thread_id) ?? false,
     });
 
-    const callbackMessage: BotAgentMessageLike = {
-      author: originalMessage?.author ?? {
-        fullName: 'Cloud Agent Callback',
-        isBot: false,
-        isMe: false,
-        userId: params.requestRow.created_by,
-        userName: 'cloud-agent-callback',
-      },
-      id: `${params.botRequestId}:callback`,
-      text: params.continuationPrompt,
-    };
+    const callbackMessage = originalMessage
+      ? {
+          author: originalMessage.author,
+          id: `${params.botRequestId}:callback`,
+          text: params.continuationPrompt,
+        }
+      : buildFallbackCallbackMessage(params);
 
     return await runBotAgent({
       thread,
@@ -467,7 +505,7 @@ async function handleCompletedCallback(
   botRequestId: string,
   payload: ExecutionCallbackPayload,
   startedAt: number,
-  requestRow: NonNullable<Awaited<ReturnType<typeof getBotRequest>>>,
+  requestRow: BotRequestRow,
   completedStepCount: number,
   trackedCallbackSession: BotRequestCloudAgentSession | undefined
 ) {
@@ -547,8 +585,7 @@ async function handleCompletedCallback(
     }
 
     await startTyping({
-      threadId: requestRow.platform_thread_id,
-      platformIntegrationId: requestRow.platform_integration_id,
+      requestRow,
     });
 
     const failedSessions = readiness.sessions.filter(session => session.status !== 'completed');
@@ -567,10 +604,9 @@ async function handleCompletedCallback(
       });
 
       if (updated) {
-        await postSlackThreadMessage({
-          threadId: requestRow.platform_thread_id,
+        await postBotThreadMessage({
+          requestRow,
           markdown: errorMessage,
-          platformIntegrationId: requestRow.platform_integration_id,
         });
       }
       return;
@@ -594,10 +630,9 @@ async function handleCompletedCallback(
       });
 
       if (updated) {
-        await postSlackThreadMessage({
-          threadId: requestRow.platform_thread_id,
+        await postBotThreadMessage({
+          requestRow,
           markdown: errorMessage,
-          platformIntegrationId: requestRow.platform_integration_id,
         });
       }
       return;
@@ -639,10 +674,9 @@ async function handleCompletedCallback(
       });
 
       if (updated) {
-        await postSlackThreadMessage({
-          threadId: requestRow.platform_thread_id,
+        await postBotThreadMessage({
+          requestRow,
           markdown: errorMessage,
-          platformIntegrationId: requestRow.platform_integration_id,
         });
       }
       return;
@@ -673,7 +707,7 @@ async function handleCompletedCallback(
     });
 
     if (!updated) {
-      logCallback('Skipping Slack post because step-limit completed update returned no row', {
+      logCallback('Skipping bot post because step-limit completed update returned no row', {
         botRequestId,
         requestStatus: requestRow.status,
         storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
@@ -682,10 +716,9 @@ async function handleCompletedCallback(
       return;
     }
 
-    await postSlackThreadMessage({
-      threadId: requestRow.platform_thread_id,
+    await postBotThreadMessage({
+      requestRow,
       markdown: cloudAgentResultsForSlack,
-      platformIntegrationId: requestRow.platform_integration_id,
     });
 
     return;
@@ -733,7 +766,7 @@ ${cloudAgentResultsForPrompt}`;
   });
 
   if (!updated) {
-    logCallback('Skipping Slack post because completed update returned no row', {
+    logCallback('Skipping bot post because completed update returned no row', {
       botRequestId,
       requestStatus: requestRow.status,
       storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
@@ -742,10 +775,9 @@ ${cloudAgentResultsForPrompt}`;
     return;
   }
 
-  await postSlackThreadMessage({
-    threadId: requestRow.platform_thread_id,
+  await postBotThreadMessage({
+    requestRow,
     markdown: continuation.finalText,
-    platformIntegrationId: requestRow.platform_integration_id,
   });
 }
 
@@ -753,7 +785,7 @@ async function handleFailedCallback(
   botRequestId: string,
   payload: ExecutionCallbackPayload,
   startedAt: number,
-  requestRow: NonNullable<Awaited<ReturnType<typeof getBotRequest>>>,
+  requestRow: BotRequestRow,
   trackedCallbackSession: BotRequestCloudAgentSession | undefined
 ) {
   let errorMessage = formatFailureMessage(payload);
@@ -819,7 +851,7 @@ async function handleFailedCallback(
   });
 
   if (!updated) {
-    logCallback('Skipping Slack post because failed update returned no row', {
+    logCallback('Skipping bot post because failed update returned no row', {
       botRequestId,
       requestStatus: requestRow.status,
       storedCloudAgentSessionId: requestRow.cloud_agent_session_id,
@@ -828,10 +860,9 @@ async function handleFailedCallback(
     return;
   }
 
-  await postSlackThreadMessage({
-    threadId: requestRow.platform_thread_id,
+  await postBotThreadMessage({
+    requestRow,
     markdown: errorMessage,
-    platformIntegrationId: requestRow.platform_integration_id,
   });
 }
 

@@ -17,6 +17,7 @@ import {
   writeUserProfileFile,
   writeUserProfileTimezoneFile,
   ensureWeatherSkillInstalled,
+  remediateGatewayClientDeviceScopes,
   updateToolsMdSection,
   GOG_SECTION_CONFIG,
   KILO_CLI_SECTION_CONFIG,
@@ -1031,6 +1032,107 @@ describe('runOnboardOrDoctor', () => {
       tools?: { web?: { search?: { provider?: string } } };
     };
     expect(config.tools?.web?.search?.provider).toBeUndefined();
+  });
+});
+
+// ---- gateway-client paired device remediation ----
+
+describe('remediateGatewayClientDeviceScopes', () => {
+  it('updates gateway-client approved baseline and operator token scopes', () => {
+    const harness = fakeDeps();
+    const pairedPath = '/root/.openclaw/devices/paired.json';
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === pairedPath
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === pairedPath) {
+        return JSON.stringify({
+          gatewayDevice: {
+            deviceId: 'gatewayDevice',
+            publicKey: 'public-key',
+            clientId: 'gateway-client',
+            scopes: ['operator.read'],
+            approvedScopes: ['operator.read'],
+            tokens: {
+              operator: {
+                token: 'secret-token',
+                role: 'operator',
+                scopes: ['operator.read'],
+                createdAtMs: 1,
+              },
+            },
+          },
+          otherDevice: {
+            deviceId: 'otherDevice',
+            clientId: 'openclaw-ios',
+            scopes: ['operator.read'],
+            approvedScopes: ['operator.read'],
+            tokens: {
+              operator: { token: 'other-token', role: 'operator', scopes: ['operator.read'] },
+            },
+          },
+        });
+      }
+      return '{}';
+    });
+
+    const result = remediateGatewayClientDeviceScopes(harness.deps);
+
+    expect(result).toEqual({ checked: 1, updated: 1 });
+    const rename = harness.renameCalls.find(call => call.to === pairedPath);
+    if (!rename) throw new Error('expected a rename into paired.json');
+    const tempWrite = harness.writeCalls.find(call => call.path === rename.from);
+    if (!tempWrite) throw new Error('expected a paired.json temp write');
+
+    const full = [
+      'operator.read',
+      'operator.admin',
+      'operator.approvals',
+      'operator.pairing',
+      'operator.write',
+    ];
+    const rewritten = JSON.parse(tempWrite.data) as Record<string, Record<string, unknown>>;
+    expect(rewritten.gatewayDevice?.scopes).toEqual(full);
+    expect(rewritten.gatewayDevice?.approvedScopes).toEqual(full);
+    expect(rewritten.gatewayDevice?.tokens).toEqual({
+      operator: {
+        token: 'secret-token',
+        role: 'operator',
+        scopes: full,
+        createdAtMs: 1,
+      },
+    });
+    expect(rewritten.otherDevice?.scopes).toEqual(['operator.read']);
+  });
+
+  it('does not rewrite when gateway-client scope state is already remediated', () => {
+    const harness = fakeDeps();
+    const pairedPath = '/root/.openclaw/devices/paired.json';
+    const full = [
+      'operator.read',
+      'operator.admin',
+      'operator.approvals',
+      'operator.pairing',
+      'operator.write',
+    ];
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === pairedPath
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({
+        gatewayDevice: {
+          clientId: 'gateway-client',
+          scopes: full,
+          approvedScopes: full,
+          tokens: { operator: { role: 'operator', scopes: full } },
+        },
+      })
+    );
+
+    const result = remediateGatewayClientDeviceScopes(harness.deps);
+
+    expect(result).toEqual({ checked: 1, updated: 0 });
+    expect(harness.renameCalls).toHaveLength(0);
   });
 });
 

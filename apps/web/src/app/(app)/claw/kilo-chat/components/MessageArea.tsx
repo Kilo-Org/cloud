@@ -82,15 +82,18 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
 
   const visible = useDocumentVisible();
 
-  // Subscribe to this conversation's events via the event-service WebSocket
+  // Subscribe to this conversation's chat-event stream while the conversation
+  // is open. Not gated on visibility — we want incoming messages to land in
+  // the cache even when the tab is hidden.
   usePresenceSubscription(
-    sandboxId && conversationId ? kiloclawConversationContext(sandboxId, conversationId) : '',
+    sandboxId && conversationId ? kiloclawConversationContext(sandboxId, conversationId) : null,
     Boolean(sandboxId && conversationId)
   );
 
-  // Subscribe to presence for this conversation while the tab is visible.
+  // Signal our own presence on this conversation. Gated on visibility so we
+  // only appear "viewing" while the tab is actually in the foreground.
   usePresenceSubscription(
-    sandboxId && conversationId ? presenceContextForConversation(sandboxId, conversationId) : '',
+    sandboxId && conversationId ? presenceContextForConversation(sandboxId, conversationId) : null,
     Boolean(sandboxId && conversationId) && visible
   );
 

@@ -7,7 +7,7 @@ const KILO_CHAT_TOKEN_TTL_S = 60 * 60;
 
 export const kiloChatRouter = createTRPCRouter({
   getToken: baseProcedure
-    .output(z.object({ token: z.string(), expiresAt: z.string() }))
+    .output(z.object({ token: z.string(), expiresAt: z.iso.datetime() }))
     .query(({ ctx }) => {
       const token = generateApiToken(
         ctx.user,

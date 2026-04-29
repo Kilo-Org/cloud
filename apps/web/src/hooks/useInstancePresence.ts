@@ -8,7 +8,7 @@ import { usePresenceSubscription } from './usePresenceSubscription';
 export function useInstancePresence(sandboxId: string | undefined, enabled = true) {
   const visible = useDocumentVisible();
   usePresenceSubscription(
-    sandboxId ? presenceContextForInstance(sandboxId) : '',
+    sandboxId ? presenceContextForInstance(sandboxId) : null,
     Boolean(sandboxId) && enabled && visible
   );
 }

@@ -45,7 +45,10 @@ export function KiloChatLayout({
   const router = useRouter();
 
   const { eventService, kiloChatClient } = useEventServiceClient();
-  usePresenceSubscription(sandboxId ? kiloclawInstanceContext(sandboxId) : '', Boolean(sandboxId));
+  usePresenceSubscription(
+    sandboxId ? kiloclawInstanceContext(sandboxId) : null,
+    Boolean(sandboxId)
+  );
 
   const queryClient = useQueryClient();
   const params = useParams<{ conversationId?: string }>();

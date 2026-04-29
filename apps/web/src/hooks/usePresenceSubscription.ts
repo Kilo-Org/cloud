@@ -11,10 +11,10 @@ import { useEventServiceClient } from '@/contexts/EventServiceContext';
  * Reads the global `EventServiceClient` from `EventServiceProvider`, mounted
  * in `(app)/layout.tsx` for every authenticated route.
  */
-export function usePresenceSubscription(context: string, active: boolean) {
+export function usePresenceSubscription(context: string | null, active: boolean) {
   const { eventService } = useEventServiceClient();
   useEffect(() => {
-    if (!active || !context) return;
+    if (!active || context === null) return;
     eventService.subscribe([context]);
     return () => {
       eventService.unsubscribe([context]);

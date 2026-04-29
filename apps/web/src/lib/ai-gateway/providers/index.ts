@@ -45,6 +45,7 @@ import {
   injectReasoningIntoContent,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isStepFunModel } from '@/lib/ai-gateway/providers/stepfun';
+import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 
 function inferSupportedChatApis(
@@ -256,6 +257,12 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isStepFunModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
+  }
+  if (isDeepseekModel(requestedModel)) {
+    return [
+      OpenRouterInferenceProviderIdSchema.enum.deepseek,
+      OpenRouterInferenceProviderIdSchema.enum.novita,
+    ];
   }
   if (isZaiModel(requestedModel)) {
     return [

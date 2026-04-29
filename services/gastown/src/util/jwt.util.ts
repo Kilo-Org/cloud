@@ -99,3 +99,40 @@ export function verifyContainerJWT(
     return { success: false, error: 'Token validation failed' };
   }
 }
+
+/**
+ * Verify a container-scoped JWT, tolerating expired tokens.
+ *
+ * Used exclusively by endpoints whose purpose is to mint a replacement
+ * token for a container whose current one has expired. The signature
+ * still has to be valid, so this only accepts tokens we previously
+ * issued — an attacker cannot forge a fresh payload.
+ */
+export function verifyContainerJWTAllowExpired(
+  token: string,
+  secret: string
+):
+  | { success: true; payload: ContainerJWTPayload; expired: boolean }
+  | {
+      success: false;
+      error: string;
+    } {
+  try {
+    const raw = jwt.verify(token, secret, {
+      algorithms: ['HS256'],
+      ignoreExpiration: true,
+    });
+    const parsed = ContainerJWTPayload.safeParse(raw);
+    if (!parsed.success) {
+      return { success: false, error: 'Invalid container token payload' };
+    }
+    const decoded = jwt.decode(token) as { exp?: number } | null;
+    const expired = typeof decoded?.exp === 'number' && decoded.exp * 1000 < Date.now();
+    return { success: true, payload: parsed.data, expired };
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return { success: false, error: 'Invalid token signature' };
+    }
+    return { success: false, error: 'Token validation failed' };
+  }
+}

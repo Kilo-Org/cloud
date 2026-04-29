@@ -7,7 +7,7 @@ import { pushDataSchema } from './push-data';
 export const sendPushForConversationInputSchema = z.object({
   conversationId: z.string().min(1),
   sandboxId: z.string().min(1),
-  senderUserId: z.string().nullable(),
+  senderUserId: z.union([z.string().min(1), z.null()]),
   recipientUserIds: z.array(z.string().min(1)).min(1),
   title: z.string().max(200),
   bodyPreview: z.string().max(200),

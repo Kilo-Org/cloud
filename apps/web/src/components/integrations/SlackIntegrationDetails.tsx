@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle2, XCircle, MessageSquare, Settings, ExternalLink, Trash2 } from 'lucide-react';
+import { CheckCircle2, XCircle, MessageSquare, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -322,16 +322,6 @@ export function SlackIntegrationDetails({
                     state={connectionCheck}
                     onClick={handleTestConnection}
                   />
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      window.open('https://slack.com/apps/manage', '_blank');
-                    }}
-                  >
-                    <Settings className="mr-2 h-4 w-4" />
-                    Manage in Slack
-                    <ExternalLink className="ml-2 h-3 w-3" />
-                  </Button>
                   <Button
                     variant="destructive"
                     onClick={handleUninstall}

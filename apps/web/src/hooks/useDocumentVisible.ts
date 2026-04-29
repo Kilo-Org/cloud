@@ -7,9 +7,7 @@ import { useEffect, useState } from 'react';
  * SSR-safe: returns `true` when `document` is undefined.
  */
 export function useDocumentVisible(): boolean {
-  const [visible, setVisible] = useState(
-    typeof document === 'undefined' ? true : !document.hidden,
-  );
+  const [visible, setVisible] = useState(typeof document === 'undefined' ? true : !document.hidden);
 
   useEffect(() => {
     const onChange = () => setVisible(!document.hidden);

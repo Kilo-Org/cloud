@@ -248,6 +248,8 @@ async function saveDbSnapshot(
   townId: string
 ): Promise<void> {
   const MANAGER_LOG = '[process-manager]';
+  const t0 = Date.now();
+  const role = agents.get(agentId)?.role ?? null;
   try {
     const dbDir = `/tmp/agent-home-${agentId}/.local/share/kilo`;
     const dbPath = `${dbDir}/kilo.db`;
@@ -292,17 +294,42 @@ async function saveDbSnapshot(
     );
     if (!resp.ok) {
       console.warn(`${MANAGER_LOG} Failed to save DB snapshot for ${agentId}: ${resp.status}`);
+      log.error('mayor.snapshot_failed', {
+        event: 'mayor.snapshot_failed',
+        agentId,
+        role,
+        durationMs: Date.now() - t0,
+        sizeBytes: buffer.byteLength,
+        status: resp.status,
+        success: false,
+      });
       return;
     }
     console.log(
       `${MANAGER_LOG} Saved DB snapshot for agent ${agentId} (${buffer.byteLength} bytes)`
     );
+    log.info('mayor.snapshot_saved', {
+      event: 'mayor.snapshot_saved',
+      agentId,
+      role,
+      durationMs: Date.now() - t0,
+      sizeBytes: buffer.byteLength,
+      success: true,
+    });
   } catch (err) {
     if ((err as { code?: string }).code === 'ENOENT') {
       console.log(`${MANAGER_LOG} No kilo.db found for agent ${agentId}, skipping snapshot save`);
       return;
     }
     console.warn(`${MANAGER_LOG} DB snapshot save failed for agent ${agentId}:`, err);
+    log.error('mayor.snapshot_failed', {
+      event: 'mayor.snapshot_failed',
+      agentId,
+      role,
+      durationMs: Date.now() - t0,
+      error: err instanceof Error ? err.message : String(err),
+      success: false,
+    });
   }
 }
 
@@ -1271,6 +1298,18 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
 
   agent.messageCount++;
   agent.lastActivityAt = new Date().toISOString();
+
+  // Mayor-only: snapshot kilo.db immediately after the user message is
+  // accepted so the message survives a container crash mid-response.
+  // Polecats/refineries/triage have different session semantics (fresh
+  // session per dispatch) and rely on exit/drain snapshots.
+  if (agent.role === 'mayor') {
+    const apiUrl = agent.gastownApiUrl;
+    const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+    if (apiUrl && token) {
+      void saveDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
+    }
+  }
 }
 
 /**
@@ -2097,11 +2136,27 @@ export async function drainAll(): Promise<void> {
         });
       }
 
-      // 4d: Save DB snapshot
+      // 4d: Save DB snapshot — await with a 10s timeout so a slow KV
+      // write doesn't block container exit, but log loudly if it times out.
       const apiUrl = agent.gastownApiUrl;
       const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
       if (apiUrl && token) {
-        await saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+        await Promise.race([
+          saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('drain snapshot timeout')), 10_000)
+          ),
+        ]).catch(err => {
+          console.error(`${DRAIN_LOG} snapshot timeout/failure for ${agent.agentId}:`, err);
+          log.error('mayor.snapshot_failed', {
+            event: 'mayor.snapshot_failed',
+            agentId: agent.agentId,
+            role: agent.role,
+            error: err instanceof Error ? err.message : String(err),
+            phase: 'drain',
+            success: false,
+          });
+        });
       }
 
       // 4e: Report the agent as completed so the TownDO can unhook it
@@ -2151,11 +2206,28 @@ export async function stopAll(): Promise<void> {
       agent.status = 'exited';
       agent.exitReason = 'container shutdown';
 
-      // Save DB snapshot before completing shutdown
+      // Save DB snapshot before completing shutdown. Await with a 10s
+      // timeout so the container can exit promptly on a stuck KV write,
+      // but a loud error is emitted so we can observe snapshot drops.
       const apiUrl = agent.gastownApiUrl;
       const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
       if (apiUrl && token) {
-        void saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+        await Promise.race([
+          saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('stopAll snapshot timeout')), 10_000)
+          ),
+        ]).catch(err => {
+          console.error(`[stop-all] snapshot timeout/failure for ${agent.agentId}:`, err);
+          log.error('mayor.snapshot_failed', {
+            event: 'mayor.snapshot_failed',
+            agentId: agent.agentId,
+            role: agent.role,
+            error: err instanceof Error ? err.message : String(err),
+            phase: 'stopAll',
+            success: false,
+          });
+        });
       }
     }
   }

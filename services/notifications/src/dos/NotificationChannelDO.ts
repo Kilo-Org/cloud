@@ -55,10 +55,11 @@ export class NotificationChannelDO extends DurableObject<Env> {
       if (!isRetry) {
         // Mark `pending` BEFORE the increment so any later failure path
         // is gated on the marker and a retry skips the increment.
-        await this.ctx.storage.put<IdemRecord>(idemKey, {
-          stage: 'pending',
-          ts: Date.now(),
-        });
+        const ts = Date.now();
+        await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'pending', ts });
+        // Also schedule cleanup at this point — if Expo keeps failing and
+        // no future push ever lands, `pending` would otherwise leak.
+        await this.ensureCleanupAlarm(ts);
         await db
           .insert(badge_counts)
           .values({
@@ -112,16 +113,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
     }
 
     // 6. Mark `delivered` so future retries short-circuit as duplicate.
-    await this.ctx.storage.put<IdemRecord>(idemKey, {
-      stage: 'delivered',
-      ts: Date.now(),
-    });
-    // 7. Schedule cleanup only when no alarm is already pending.
-    //    `setAlarm` replaces any existing alarm; calling it on every push
-    //    would push cleanup forward indefinitely on a busy conversation.
-    if ((await this.ctx.storage.getAlarm()) === null) {
-      await this.ctx.storage.setAlarm(Date.now() + IDEM_TTL_MS);
-    }
+    const ts = Date.now();
+    await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'delivered', ts });
+    await this.ensureCleanupAlarm(ts);
 
     return { kind: 'delivered', tokenCount: tokens.length };
   }
@@ -130,9 +124,28 @@ export class NotificationChannelDO extends DurableObject<Env> {
     const now = Date.now();
     const entries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
     const expired: string[] = [];
+    let earliestRemaining: number | undefined;
     for (const [key, rec] of entries) {
-      if (now - rec.ts > IDEM_TTL_MS) expired.push(key);
+      if (now - rec.ts > IDEM_TTL_MS) {
+        expired.push(key);
+      } else if (earliestRemaining === undefined || rec.ts < earliestRemaining) {
+        earliestRemaining = rec.ts;
+      }
     }
     if (expired.length > 0) await this.ctx.storage.delete(expired);
+    // Reschedule for the earliest remaining record so a quiet conversation
+    // still gets its leftover entries pruned exactly once their TTL elapses.
+    if (earliestRemaining !== undefined) {
+      await this.ctx.storage.setAlarm(earliestRemaining + IDEM_TTL_MS);
+    }
+  }
+
+  // Schedule cleanup `IDEM_TTL_MS` from `refTs` only if no alarm is pending.
+  // `setAlarm` replaces any existing alarm; calling it unconditionally would
+  // push cleanup forward indefinitely on a busy conversation.
+  private async ensureCleanupAlarm(refTs: number): Promise<void> {
+    if ((await this.ctx.storage.getAlarm()) === null) {
+      await this.ctx.storage.setAlarm(refTs + IDEM_TTL_MS);
+    }
   }
 }

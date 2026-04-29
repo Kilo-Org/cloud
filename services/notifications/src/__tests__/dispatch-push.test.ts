@@ -164,6 +164,47 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(insertSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('schedules cleanup when writing the pending marker (failed send)', async () => {
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 0 });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    vi.mocked(sendPushNotifications).mockRejectedValueOnce(new Error('boom'));
+    const stub = getDO('conv-pending-alarm');
+
+    const result = await stub.dispatchPush(baseInput({ idempotencyKey: 'k-pending-alarm' }));
+    expect(result.kind).toBe('failed');
+    // Even though delivery failed, an alarm must be set so the orphan
+    // `pending` record gets pruned after IDEM_TTL_MS.
+    const alarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    expect(alarm).not.toBeNull();
+  });
+
+  it('reschedules cleanup for younger records when alarm fires', async () => {
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 1 });
+    const stub = getDO('conv-reschedule');
+
+    const now = Date.now();
+    await runInDurableObject(stub, async (_inst, state) => {
+      await state.storage.put('idem:old', { stage: 'delivered', ts: now - 2 * 60 * 60 * 1000 });
+      await state.storage.put('idem:new', { stage: 'delivered', ts: now - 30 * 60 * 1000 });
+    });
+
+    await runInDurableObject(stub, async inst => {
+      await (inst as unknown as { alarm: () => Promise<void> }).alarm();
+    });
+
+    const remaining = await runInDurableObject(stub, async (_inst, state) => {
+      const entries = await state.storage.list({ prefix: 'idem:' });
+      return Array.from(entries.keys());
+    });
+    expect(remaining).toEqual(['idem:new']);
+
+    const alarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    expect(alarm).not.toBeNull();
+    // Should be rescheduled for the younger record's expiry, not "1h from now".
+    const expectedExpiry = now - 30 * 60 * 1000 + 60 * 60 * 1000;
+    expect(alarm).toBe(expectedExpiry);
+  });
+
   it('does not reset the alarm on every successful send', async () => {
     installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 1 });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);

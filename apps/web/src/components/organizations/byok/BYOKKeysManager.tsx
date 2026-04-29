@@ -591,8 +591,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       <Info className="h-4 w-4" />
                       <AlertDescription>
                         Once saved, your key will automatically be used whenever your client
-                        requests one of the supported models above. Note that multiple keys may
-                        apply to the same model; in that case one of them will be picked.
+                        requests one of the supported models above. If multiple keys apply to the
+                        same model, they are tried in unspecified order until one succeeds.
                       </AlertDescription>
                     </Alert>
                   );

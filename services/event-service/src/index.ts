@@ -109,4 +109,10 @@ export default class extends WorkerEntrypoint<Env> {
     const stub = this.env.USER_SESSION_DO.get(this.env.USER_SESSION_DO.idFromName(userId));
     return stub.pushEvent(context, event, payload);
   }
+
+  async isUserInContext(userId: string, context: string): Promise<boolean> {
+    logger.setTags({ userId, context });
+    const stub = this.env.USER_SESSION_DO.get(this.env.USER_SESSION_DO.idFromName(userId));
+    return stub.hasContext(context);
+  }
 }

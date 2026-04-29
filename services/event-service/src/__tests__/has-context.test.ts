@@ -1,7 +1,7 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 
-import { UserSessionDO } from '../do/user-session-do';
+import type { UserSessionDO } from '../do/user-session-do';
 
 function getStub(userId: string) {
   const id = env.USER_SESSION_DO.idFromName(userId);
@@ -10,7 +10,7 @@ function getStub(userId: string) {
 
 async function attachContexts(
   stub: ReturnType<typeof getStub>,
-  contexts: string[],
+  contexts: string[]
 ): Promise<WebSocket> {
   const res = await stub.fetch('https://do/connect', {
     headers: { Upgrade: 'websocket' },

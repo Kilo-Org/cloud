@@ -4,6 +4,7 @@ import type {
   BotStatusRequest,
   ConversationStatusRequest,
 } from '@kilocode/kilo-chat';
+import { kiloclawConversationContext, kiloclawInstanceContext } from '@kilocode/event-service';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { lookupSandboxOwnerUserId } from './sandbox-ownership';
@@ -26,7 +27,7 @@ export async function pushEventToHumanMembers<N extends KiloChatEventName>(
 ): Promise<Map<string, boolean>> {
   const es = getEventService(env);
   if (!es) return new Map();
-  const context = `/kiloclaw/${sandboxId}/${conversationId}`;
+  const context = kiloclawConversationContext(sandboxId, conversationId);
 
   const results = await Promise.allSettled(
     humanMemberIds.map(async userId => {
@@ -65,7 +66,7 @@ export async function pushInstanceEvent<N extends KiloChatEventName>(
 ): Promise<void> {
   const es = getEventService(env);
   if (!es) return;
-  const context = `/kiloclaw/${sandboxId}`;
+  const context = kiloclawInstanceContext(sandboxId);
 
   const results = await Promise.allSettled(
     humanMemberIds.map(userId => es.pushEvent(userId, context, event, payload))

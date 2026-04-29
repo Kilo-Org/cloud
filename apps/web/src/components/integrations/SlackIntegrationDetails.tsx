@@ -72,6 +72,16 @@ export function SlackIntegrationDetails({
     }
   }, [installationData?.installed]);
 
+  // Auto-reset the success state to idle after 30 seconds so the button
+  // becomes actionable again.
+  useEffect(() => {
+    if (connectionCheck.status !== 'success') return;
+    const timer = setTimeout(() => {
+      setConnectionCheck({ status: 'idle' });
+    }, 30_000);
+    return () => clearTimeout(timer);
+  }, [connectionCheck.status]);
+
   const uninstallApp = useMutation(
     trpc.slack.uninstallApp.mutationOptions({
       onSuccess: () => {
@@ -412,8 +422,8 @@ function TestConnectionButton({ isPending, state, onClick }: TestConnectionButto
     return (
       <Button
         variant="outline"
-        onClick={onClick}
-        className="border-green-600/50 text-green-600 hover:bg-green-600/10 hover:text-green-600 dark:border-green-400/50 dark:text-green-400 dark:hover:text-green-400"
+        disabled
+        className="border-green-600/50 text-green-600 disabled:opacity-100 dark:border-green-400/50 dark:text-green-400"
       >
         <CheckCircle2 className="mr-2 h-4 w-4" />
         Connection OK

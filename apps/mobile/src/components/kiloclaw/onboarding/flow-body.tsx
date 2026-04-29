@@ -10,14 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { toneColor } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type OnboardingState } from '@/lib/onboarding';
+import { type BotIdentity, type OnboardingState } from '@/lib/onboarding';
 import { cn } from '@/lib/utils';
-
-type BotIdentity = OnboardingState['botIdentity'];
 
 type FlowBodyProps = {
   state: OnboardingState;
-  onIdentityContinue: (identity: NonNullable<BotIdentity>, weatherLocation: string | null) => void;
+  onIdentityContinue: (identity: BotIdentity, weatherLocation: string | null) => void;
   onNotificationsComplete: () => void;
   onProvisioningComplete: () => void;
   onRetry: () => void;

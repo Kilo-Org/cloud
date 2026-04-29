@@ -9,15 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { type MobileOnboardingState } from '@/lib/derive-mobile-onboarding-state';
 
-type OnboardingState = MobileOnboardingState;
-
 type EmptyStateContentProps = {
-  state: OnboardingState | undefined;
+  state: MobileOnboardingState | undefined;
   foregroundColor: string;
   onCreate: () => void;
 };
 
-export function resolveAccessRequiredSubcase(state: OnboardingState): AccessRequiredSubcase | null {
+export function resolveAccessRequiredSubcase(
+  state: MobileOnboardingState
+): AccessRequiredSubcase | null {
   if (state.state === 'access_required') {
     return state.reason;
   }

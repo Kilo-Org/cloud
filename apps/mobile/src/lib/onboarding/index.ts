@@ -6,12 +6,11 @@
  * doing so risks re-introducing an import cycle with the leaf modules.
  */
 
-export { type BotIdentity, execPresetToConfig } from './shapes';
+export { type BotIdentity, type ExecPreset, execPresetToConfig } from './shapes';
 
 export {
   INITIAL_STATE,
   reduce,
-  type OnboardingEvent,
   type OnboardingState,
   type ProvisionErrorCategory,
 } from './machine';

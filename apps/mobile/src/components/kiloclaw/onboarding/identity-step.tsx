@@ -11,7 +11,6 @@ import { toast } from 'sonner-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { agentColor } from '@/lib/agent-color';
-import { debugLog } from '@/lib/debug-log';
 import { useTRPC } from '@/lib/trpc';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -213,11 +212,6 @@ export function IdentityStep({
     };
 
     const trimmedLocation = locationTextRef.current.trim();
-    debugLog('identity-step', 'Continue pressed', {
-      hasName: trimmedName.length > 0,
-      hasLocation: trimmedLocation.length > 0,
-      willValidate: trimmedLocation.length > 0 && trimmedLocation !== validatedLocation,
-    });
     if (!trimmedLocation) {
       onContinue(identity, null);
       return;
@@ -232,16 +226,12 @@ export function IdentityStep({
       { location: trimmedLocation },
       {
         onSuccess: result => {
-          debugLog('identity-step', 'validateWeatherLocation success', {
-            status: result.status,
-          });
           if (result.status === 'service_unavailable') {
             toast("wttr.in is down right now. We'll store your location as entered.");
           }
           onContinue(identity, result.location);
         },
         onError: () => {
-          debugLog('identity-step', 'validateWeatherLocation error');
           // Don't block the user if validation fails; pass the entered text.
           onContinue(identity, trimmedLocation);
         },

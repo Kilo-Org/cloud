@@ -1,8 +1,6 @@
-/* eslint-disable max-lines -- temporary debug logs inflate file size, remove with debug infra */
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 
-import { debugLog } from '@/lib/debug-log';
 import { deriveMobileOnboardingStateFromBilling } from '@/lib/derive-mobile-onboarding-state';
 import { resolveContext } from '@/lib/hooks/use-context-query';
 import { useTRPC } from '@/lib/trpc';
@@ -71,21 +69,6 @@ export function useKiloClawMobileOnboardingState(enabled = true) {
     }
     return deriveMobileOnboardingStateFromBilling(billing.data);
   }, [billing.data]);
-
-  useEffect(() => {
-    if (data) {
-      debugLog('billing', 'derived state', {
-        state: data.state,
-        hasInstance: 'instanceId' in data ? data.instanceId !== null : false,
-      });
-    }
-  }, [data]);
-
-  useEffect(() => {
-    if (billing.isError) {
-      debugLog('billing', 'getBillingStatus failed');
-    }
-  }, [billing.isError]);
 
   return {
     data,

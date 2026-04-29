@@ -3,8 +3,6 @@ import {
   type BotIdentity,
   execPresetToConfig,
   INITIAL_STATE,
-  type OnboardingEvent,
-  type OnboardingState,
   type ProvisionErrorCategory,
   reduce,
   shouldFireCompletion,
@@ -38,7 +36,6 @@ import {
   WEATHER_LOCATION_SKIPPED_EVENT,
 } from '@/lib/analytics/onboarding-events';
 import { trackEvent } from '@/lib/appsflyer';
-import { debugLog } from '@/lib/debug-log';
 import {
   useKiloClawGatewayReady,
   useKiloClawMobileOnboardingState,
@@ -87,30 +84,6 @@ function resolveUserTimezone(): string | undefined {
   }
 }
 
-function summarizeState(state: OnboardingState) {
-  return {
-    step: state.step,
-    provisionStarted: state.provisionStarted,
-    provisionSuccess: state.provisionSuccess,
-    hasSandbox: state.sandboxId !== null,
-    hasIdentity: state.botIdentity !== null,
-    errorCategory: state.errorCategory,
-    instanceStatus: state.instanceStatus,
-    gatewayReady: state.gatewayReady,
-    gatewaySettled: state.gatewaySettled,
-    gatewayStatus: state.gatewayStatus,
-    botIdentitySaved: state.botIdentitySaved,
-    execPresetSaved: state.execPresetSaved,
-  };
-}
-
-function loggingReduce(state: OnboardingState, event: OnboardingEvent): OnboardingState {
-  const next = reduce(state, event);
-  const stepChange = state.step === next.step ? state.step : `${state.step} -> ${next.step}`;
-  debugLog('reducer', `${event.type} [${stepChange}]`, summarizeState(next));
-  return next;
-}
-
 // eslint-disable-next-line max-lines-per-function -- owns the wizard state machine wiring
 export function OnboardingFlow() {
   const router = useRouter();
@@ -120,7 +93,7 @@ export function OnboardingFlow() {
   const onboardingQuery = useKiloClawMobileOnboardingState();
   const mutations = useKiloClawMutations(null);
 
-  const [state, dispatch] = useReducer(loggingReduce, INITIAL_STATE);
+  const [state, dispatch] = useReducer(reduce, INITIAL_STATE);
 
   // Faster poll during onboarding (5s) so the "setting up" screen tracks the
   // gateway-ready poll cadence. Other screens keep the 10s default.
@@ -171,7 +144,6 @@ export function OnboardingFlow() {
   // on whatever screen opened onboarding (KiloClaw tab empty state or Home).
   useEffect(() => {
     if (!state.provisionStarted && state.hasAccessWithInstance) {
-      debugLog('redirect', 'has_access+instance -> back');
       router.back();
     }
   }, [router, state.provisionStarted, state.hasAccessWithInstance]);
@@ -197,7 +169,6 @@ export function OnboardingFlow() {
     (userLocation: string | null) => {
       dispatch({ type: 'start-requested' });
       trackEvent(PROVISION_REQUESTED_EVENT);
-      debugLog('mutation:provision', 'fire', { hasLocation: userLocation !== null });
       mutations.provision.mutate(
         {
           kilocodeDefaultModel: 'kilocode/kilo-auto/balanced',
@@ -206,20 +177,11 @@ export function OnboardingFlow() {
         },
         {
           onSuccess: result => {
-            debugLog('mutation:provision', 'ok', { hasSandbox: Boolean(result.sandboxId) });
             dispatch({ type: 'provision-succeeded', sandboxId: result.sandboxId });
             trackEvent(PROVISION_SUCCEEDED_EVENT);
           },
           onError: error => {
             const category = categorizeProvisionError(error);
-            debugLog('mutation:provision', 'error', {
-              code: error.data?.code,
-              httpStatus:
-                error.data && typeof error.data === 'object' && 'httpStatus' in error.data
-                  ? (error.data as { httpStatus?: unknown }).httpStatus
-                  : undefined,
-              category,
-            });
             dispatch({ type: 'provision-failed', category });
             if (category === 'generic') {
               toast.error(GENERIC_PROVISION_ERROR_MESSAGE);
@@ -255,16 +217,8 @@ export function OnboardingFlow() {
     if (!shouldSaveBotIdentity(state) || state.botIdentity === null) {
       return;
     }
-    debugLog('mutation:patchBotIdentity', 'fire');
     dispatch({ type: 'bot-identity-saved' });
-    patchBotIdentityMutate(state.botIdentity, {
-      onSuccess: () => {
-        debugLog('mutation:patchBotIdentity', 'ok');
-      },
-      onError: () => {
-        debugLog('mutation:patchBotIdentity', 'error');
-      },
-    });
+    patchBotIdentityMutate(state.botIdentity);
   }, [state, patchBotIdentityMutate]);
 
   // Save the exec preset to the instance as soon as provision has resolved
@@ -279,16 +233,8 @@ export function OnboardingFlow() {
       return;
     }
     const config = execPresetToConfig(state.execPreset);
-    debugLog('mutation:patchExecPreset', 'fire', { execPreset: state.execPreset });
     dispatch({ type: 'exec-preset-saved' });
-    patchExecPresetMutate(config, {
-      onSuccess: () => {
-        debugLog('mutation:patchExecPreset', 'ok');
-      },
-      onError: () => {
-        debugLog('mutation:patchExecPreset', 'error');
-      },
-    });
+    patchExecPresetMutate(config);
   }, [state, patchExecPresetMutate]);
 
   // FlowBody callbacks map 1:1 to reducer events.

@@ -63,6 +63,15 @@ type StandaloneSuggestion = {
   callId?: string;
 };
 
+type AssociatedPrData = {
+  url: string;
+  number: number;
+  state: string;
+  title: string | null;
+  headSha: string | null;
+  lastSyncedAt: string;
+};
+
 type FetchedSessionData = {
   kiloSessionId: KiloSessionId;
   cloudAgentSessionId: CloudAgentSessionId | null;
@@ -79,6 +88,7 @@ type FetchedSessionData = {
   isPreparingAsync: boolean;
   prompt: string | null;
   initialMessageId: string | null;
+  associatedPr: AssociatedPrData | null;
 };
 
 type PrepareInput = {
@@ -850,5 +860,6 @@ export type {
   StandaloneSuggestion,
   StoredMessage,
   FetchedSessionData,
+  AssociatedPrData,
   PrepareInput,
 };

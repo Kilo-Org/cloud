@@ -9,12 +9,33 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ExternalLink, MoreHorizontal } from 'lucide-react';
+import { ExternalLink, Loader2, MoreHorizontal, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import { SessionInfoDialog } from './SessionInfoDialog';
 import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
-import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
+import { PrStateBadge } from './PrStateBadge';
+import { resolveGithubLink, type AssociatedPr } from './utils/github-pr-link';
+
+function extractTrpcErrorCode(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('data' in error)) return undefined;
+  const { data } = error;
+  if (typeof data !== 'object' || data === null || !('code' in data)) return undefined;
+  const { code } = data;
+  return typeof code === 'string' ? code : undefined;
+}
+
+function formatRefreshPrError(error: unknown): string {
+  const code = extractTrpcErrorCode(error);
+  if (code === 'TOO_MANY_REQUESTS') {
+    return 'Refreshed too recently. Please wait a few seconds and try again.';
+  }
+  if (code === 'BAD_REQUEST') {
+    return 'This session has no GitHub branch to look up.';
+  }
+  return 'Failed to refresh PR info.';
+}
 
 type ChatHeaderProps = {
   cloudAgentSessionId: string;
@@ -29,6 +50,14 @@ type ChatHeaderProps = {
   soundEnabled?: boolean;
   onToggleSound?: () => void;
   sessionTitle?: string;
+  associatedPr?: AssociatedPr | null;
+  /**
+   * When `kiloSessionId` is present and the session has a git branch,
+   * the caller can pass a refresh handler to enable the
+   * "Refresh PR info" menu item.
+   */
+  onRefreshPr?: () => Promise<void>;
+  isRefreshingPr?: boolean;
 };
 
 export function ChatHeader({
@@ -44,15 +73,23 @@ export function ChatHeader({
   kiloSessionId,
   organizationId,
   sessionTitle,
+  associatedPr,
+  onRefreshPr,
+  isRefreshingPr = false,
 }: ChatHeaderProps) {
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [showActionsDialog, setShowActionsDialog] = useState(false);
 
-  const browseUrl = buildRepoBrowseUrl(gitUrl);
-  const repoUrl =
-    browseUrl && branch && detectGitPlatform(gitUrl) === 'github'
-      ? `${browseUrl}/compare/${branch}?expand=1`
-      : browseUrl;
+  const githubLink = resolveGithubLink({ gitUrl, branch, associatedPr });
+
+  const handleRefreshPr = async () => {
+    if (!onRefreshPr || isRefreshingPr) return;
+    try {
+      await onRefreshPr();
+    } catch (error) {
+      toast.error(formatRefreshPrError(error));
+    }
+  };
 
   return (
     <>
@@ -64,6 +101,7 @@ export function ChatHeader({
         model={model}
         modelDisplayName={modelDisplayName}
         cost={totalCost * 1_000_000}
+        associatedPr={associatedPr ?? null}
       />
       <SessionActionsDialog
         open={showActionsDialog}
@@ -86,12 +124,27 @@ export function ChatHeader({
             <DropdownMenuItem onClick={() => setShowActionsDialog(true)}>
               Share or Fork
             </DropdownMenuItem>
-            {repoUrl && (
+            {githubLink.kind !== 'none' && (
               <DropdownMenuItem asChild>
-                <a href={repoUrl} target="_blank" rel="noopener noreferrer">
+                <a href={githubLink.href} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Open in GitHub
+                  <span className="flex-1">{githubLink.label}</span>
+                  {githubLink.kind === 'pr' && (
+                    <span className="ml-2">
+                      <PrStateBadge state={githubLink.prState} />
+                    </span>
+                  )}
                 </a>
+              </DropdownMenuItem>
+            )}
+            {onRefreshPr && (
+              <DropdownMenuItem disabled={isRefreshingPr} onClick={() => void handleRefreshPr()}>
+                {isRefreshingPr ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Refresh PR info
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />

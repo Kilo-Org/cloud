@@ -9,9 +9,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Share2 } from 'lucide-react';
+import { ExternalLink, Share2 } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { ShareSessionDialog } from './ShareSessionDialog';
 import { formatShortModelName } from '@/lib/format-model-name';
+import { PrStateBadge } from './PrStateBadge';
+import { normalizePrBadgeState, truncatePrTitle, type AssociatedPr } from './utils/github-pr-link';
 
 type SessionInfoDialogProps = {
   open: boolean;
@@ -22,6 +25,7 @@ type SessionInfoDialogProps = {
   model: string;
   modelDisplayName?: string;
   cost: number; // in microdollars
+  associatedPr?: AssociatedPr | null;
 };
 
 export function SessionInfoDialog({
@@ -32,6 +36,7 @@ export function SessionInfoDialog({
   modelDisplayName,
   cost,
   kiloSessionId,
+  associatedPr,
 }: SessionInfoDialogProps) {
   const [showShareDialog, setShowShareDialog] = useState(false);
 
@@ -87,9 +92,42 @@ export function SessionInfoDialog({
                 ${costInDollars.toFixed(4)}
               </div>
             </div>
+
+            <PullRequestRow associatedPr={associatedPr ?? null} />
           </div>
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function PullRequestRow({ associatedPr }: { associatedPr: AssociatedPr | null }) {
+  return (
+    <div>
+      <label className="text-muted-foreground mb-2 block text-sm font-medium">Pull Request</label>
+      {associatedPr ? (
+        <>
+          <a
+            href={associatedPr.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-muted hover:bg-muted/70 flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors"
+          >
+            <span className="font-mono text-xs">#{associatedPr.number}</span>
+            <span className="flex-1 truncate">{truncatePrTitle(associatedPr.title)}</span>
+            <PrStateBadge state={normalizePrBadgeState(associatedPr.state)} />
+            <ExternalLink className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+          </a>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Last checked{' '}
+            {formatDistanceToNow(new Date(associatedPr.lastSyncedAt), { addSuffix: true })}
+          </p>
+        </>
+      ) : (
+        <div className="bg-muted text-muted-foreground rounded-md px-3 py-2 text-sm">
+          No PR associated with this branch
+        </div>
+      )}
+    </div>
   );
 }

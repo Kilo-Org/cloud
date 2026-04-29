@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { ArrowDown, GitBranch } from 'lucide-react';
+import { detectGitPlatform } from './utils/git-utils';
 
 import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
@@ -107,6 +108,9 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const { mutateAsync: orgUploadUrl } = useMutation(
     trpc.organizations.cloudAgentNext.getImageUploadUrl.mutationOptions()
   );
+  const { mutateAsync: refreshAssociatedPrMutation, isPending: isRefreshingPr } = useMutation(
+    trpc.cliSessionsV2.refreshAssociatedPullRequest.mutationOptions()
+  );
   // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId');
   useEffect(() => {
@@ -136,6 +140,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
+  const setFetchedSessionData = useSetAtom(manager.atoms.fetchedSessionData);
 
   const [imageMessageUuid, setImageMessageUuid] = useState(() => crypto.randomUUID());
 
@@ -325,12 +330,35 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
         ? 'Wrapping up…'
         : 'Ask anything…';
 
+  const handleRefreshPr = useCallback(async () => {
+    if (!sessionIdFromParams) return;
+    const result = await refreshAssociatedPrMutation({ sessionId: sessionIdFromParams });
+    // Patch the fetched session data in-place so the UI reflects the refreshed
+    // PR immediately without a round-trip through getWithRuntimeState.
+    if (fetchedSessionData) {
+      setFetchedSessionData({ ...fetchedSessionData, associatedPr: result.associatedPr });
+    }
+  }, [sessionIdFromParams, refreshAssociatedPrMutation, setFetchedSessionData, fetchedSessionData]);
+
+  // Only expose the "Refresh PR info" action for sessions where the server can
+  // actually look up a PR — a persisted session with a GitHub URL + branch.
+  // Non-GitHub URLs would otherwise produce a BAD_REQUEST toast on every click.
+  const canRefreshPr =
+    Boolean(sessionIdFromParams) &&
+    Boolean(fetchedSessionData?.gitBranch) &&
+    detectGitPlatform(fetchedSessionData?.gitUrl) === 'github';
+
   const sessionActions = (
     <ChatHeader
       cloudAgentSessionId={sessionId ?? 'Starting session…'}
       kiloSessionId={sessionIdFromParams ?? undefined}
       organizationId={organizationId}
       repository={sessionConfig?.repository ?? ''}
+      branch={fetchedSessionData?.gitBranch ?? undefined}
+      gitUrl={fetchedSessionData?.gitUrl}
+      associatedPr={fetchedSessionData?.associatedPr ?? null}
+      onRefreshPr={canRefreshPr ? handleRefreshPr : undefined}
+      isRefreshingPr={isRefreshingPr}
       model={sessionConfig?.model}
       modelDisplayName={modelDisplayName}
       totalCost={totalCost}

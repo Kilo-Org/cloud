@@ -36,7 +36,7 @@ import { ensureVolume, staleProvisionAgeMs } from './fly-machines';
 import { mintFreshApiKey } from './config';
 import * as gateway from './gateway';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
-import { maybeDispatchReadyPush, maybeDispatchStartFailurePush } from '../../lib/lifecycle-push';
+import { maybeDispatchStartFailurePush } from './lifecycle-push';
 
 export type ReconcileWithFlyResult = {
   beginUnexpectedStopRecovery?: {
@@ -54,20 +54,27 @@ export type ReconcileWithFlyResult = {
   };
 };
 
-function emitStartFailedEvent(
-  env: { KILOCLAW_AE?: AnalyticsEngineDataset },
+/**
+ * Record a start-attempt failure: write the analytics event and dispatch the
+ * one-shot mobile push for this attempt. Single entry point so callers can't
+ * accidentally emit one without the other.
+ */
+async function recordStartFailure(
+  env: KiloClawEnv,
   state: InstanceMutableState,
+  ctx: DurableObjectState,
   label: string,
-  error?: string
-): void {
+  error?: string | null
+): Promise<void> {
   writeEvent(env, {
     event: 'instance.provisioning_failed',
     delivery: 'do',
     status: 'stopped',
     label,
-    error,
+    error: error ?? undefined,
     ...eventContextFromState(state),
   });
+  await maybeDispatchStartFailurePush(env, state, ctx, label, error);
 }
 
 /**
@@ -94,7 +101,6 @@ export async function reconcileWithFly(
 
   if (state.status === 'starting') {
     await reconcileStarting(flyConfig, ctx, state, env, rctx);
-    await maybeDispatchReadyPush(env, state, ctx);
     return {};
   }
 
@@ -131,9 +137,6 @@ export async function reconcileWithFly(
 
   await reconcileVolume(flyConfig, ctx, state, env, rctx);
   await reconcileApiKeyExpiry(flyConfig, ctx, state, env, rctx);
-  if (state.status === 'running') {
-    await maybeDispatchReadyPush(env, state, ctx);
-  }
   return result;
 }
 
@@ -343,19 +346,7 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
-      emitStartFailedEvent(
-        env,
-        state,
-        'starting_timeout',
-        state.lastStartErrorMessage ?? undefined
-      );
-      await maybeDispatchStartFailurePush(
-        env,
-        state,
-        ctx,
-        'starting_timeout',
-        state.lastStartErrorMessage
-      );
+      await recordStartFailure(env, state, ctx, 'starting_timeout', state.lastStartErrorMessage);
       return;
     }
     // start() hasn't persisted a machine ID yet — still in progress, wait.
@@ -399,13 +390,7 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
-      emitStartFailedEvent(
-        env,
-        state,
-        'starting_timeout_with_machine',
-        state.lastStartErrorMessage ?? undefined
-      );
-      await maybeDispatchStartFailurePush(
+      await recordStartFailure(
         env,
         state,
         ctx,
@@ -437,8 +422,7 @@ async function reconcileStarting(
           })
         )
       );
-      emitStartFailedEvent(env, state, 'starting_machine_gone', 'machine gone during start');
-      await maybeDispatchStartFailurePush(
+      await recordStartFailure(
         env,
         state,
         ctx,
@@ -468,13 +452,7 @@ async function reconcileStarting(
           healthCheckFailCount: 0,
         })
       );
-      emitStartFailedEvent(
-        env,
-        state,
-        'starting_timeout_transient_error',
-        err instanceof Error ? err.message : String(err)
-      );
-      await maybeDispatchStartFailurePush(
+      await recordStartFailure(
         env,
         state,
         ctx,
@@ -977,8 +955,7 @@ export async function syncStatusWithFly(
       })
     );
     if (wasStarting) {
-      emitStartFailedEvent(rctx.env, state, 'fly_failed_state', 'fly machine entered failed state');
-      await maybeDispatchStartFailurePush(
+      await recordStartFailure(
         rctx.env,
         state,
         ctx,

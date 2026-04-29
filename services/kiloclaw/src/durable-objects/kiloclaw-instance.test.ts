@@ -163,8 +163,6 @@ import {
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   STALE_PROVISION_THRESHOLD_MS,
-  READY_PUSH_PROBE_WINDOW_MS,
-  READY_PUSH_PROBE_CADENCE_MS,
 } from '../config';
 
 // ============================================================================
@@ -9445,163 +9443,74 @@ function createFakeNotificationsBinding(): {
   };
 }
 
-function stubReadyProbe(ready: boolean) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockImplementation((url: string) => {
-      if (typeof url === 'string' && url.includes('/_kilo/gateway/ready')) {
-        return Promise.resolve(
-          new Response(JSON.stringify({ ready }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          })
-        );
-      }
-      return Promise.resolve(new Response(null, { status: 200 }));
-    })
-  );
-}
-
 describe('instance ready push', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.useRealTimers();
-  });
-
-  it('dispatches exactly one ready push when getGatewayReady reports ready', async () => {
+  it('dispatches a ready push when tryMarkInstanceReady flips the flag', async () => {
     const env = createFakeEnv();
     const { binding, calls } = createFakeNotificationsBinding();
     Object.assign(env, { NOTIFICATIONS: binding });
 
-    const { instance, storage } = createInstance(createFakeStorage(), env);
-    await seedRunning(storage, {
-      instanceReadyPushSent: false,
-      flyAppName: 'acct-test',
-      providerState: {
-        provider: 'fly',
-        appName: 'acct-test',
-        machineId: 'machine-1',
-        volumeId: 'vol-1',
-        region: 'iad',
-      },
-    });
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
 
-    (flyClient.getMachine as Mock).mockResolvedValue({
-      id: 'machine-1',
-      state: 'started',
-      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
-    });
-    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
-    stubReadyProbe(true);
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
 
-    await instance.alarm();
-
+    expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
     expect(calls).toHaveLength(1);
     expect(calls[0].event).toBe('ready');
     expect(calls[0].userId).toBe('user-1');
     expect(calls[0].instanceId).toBe('sandbox-1');
-    expect(storage._store.get('instanceReadyPushSent')).toBe(true);
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
   });
 
-  it('does not dispatch when getGatewayReady reports not-ready', async () => {
+  it('does not dispatch when the flag is already set', async () => {
     const env = createFakeEnv();
     const { binding, calls } = createFakeNotificationsBinding();
     Object.assign(env, { NOTIFICATIONS: binding });
 
-    const { instance, storage } = createInstance(createFakeStorage(), env);
-    await seedRunning(storage, {
-      instanceReadyPushSent: false,
-      flyAppName: 'acct-test',
-      providerState: {
-        provider: 'fly',
-        appName: 'acct-test',
-        machineId: 'machine-1',
-        volumeId: 'vol-1',
-        region: 'iad',
-      },
-    });
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: true });
 
-    (flyClient.getMachine as Mock).mockResolvedValue({
-      id: 'machine-1',
-      state: 'started',
-      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
-    });
-    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
-    stubReadyProbe(false);
-
-    await instance.alarm();
+    await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
 
     expect(calls).toHaveLength(0);
-    expect(storage._store.get('instanceReadyPushSent')).toBeFalsy();
   });
 
-  it('does not dispatch a second ready push once the flag is set', async () => {
+  it('does not dispatch when provisioned > 6h ago', async () => {
     const env = createFakeEnv();
     const { binding, calls } = createFakeNotificationsBinding();
     Object.assign(env, { NOTIFICATIONS: binding });
 
-    const { instance, storage } = createInstance(createFakeStorage(), env);
-    await seedRunning(storage, {
-      instanceReadyPushSent: true,
-      flyAppName: 'acct-test',
-      providerState: {
-        provider: 'fly',
-        appName: 'acct-test',
-        machineId: 'machine-1',
-        volumeId: 'vol-1',
-        region: 'iad',
-      },
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, {
+      instanceReadyEmailSent: false,
+      provisionedAt: Date.now() - 7 * 60 * 60 * 1000,
     });
 
-    (flyClient.getMachine as Mock).mockResolvedValue({
-      id: 'machine-1',
-      state: 'started',
-      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
-    });
-    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
-    stubReadyProbe(true);
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
 
-    await instance.alarm();
-
+    expect(result.shouldNotify).toBe(false);
     expect(calls).toHaveLength(0);
+    // Flag still flips so future checkins don't keep retrying.
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
   });
 
-  it('does not dispatch once the probe window has elapsed', async () => {
+  it('no-ops cleanly when NOTIFICATIONS binding is unavailable', async () => {
     const env = createFakeEnv();
-    const { binding, calls } = createFakeNotificationsBinding();
-    Object.assign(env, { NOTIFICATIONS: binding });
+    // No NOTIFICATIONS binding assigned.
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
 
-    const { instance, storage } = createInstance(createFakeStorage(), env);
-    // lastStartedAt older than the 5-min probe window.
-    const staleStart = Date.now() - READY_PUSH_PROBE_WINDOW_MS - 1000;
-    await seedRunning(storage, {
-      instanceReadyPushSent: false,
-      lastStartedAt: staleStart,
-      flyAppName: 'acct-test',
-      providerState: {
-        provider: 'fly',
-        appName: 'acct-test',
-        machineId: 'machine-1',
-        volumeId: 'vol-1',
-        region: 'iad',
-      },
-    });
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
 
-    (flyClient.getMachine as Mock).mockResolvedValue({
-      id: 'machine-1',
-      state: 'started',
-      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
-    });
-    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
-    stubReadyProbe(true);
-
-    await instance.alarm();
-
-    expect(calls).toHaveLength(0);
-    expect(storage._store.get('instanceReadyPushSent')).toBeFalsy();
+    expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
   });
 
-  it('initializes the flag to false on initial provision()', async () => {
+  it('initializes startFailurePushSentForAttempt to false on initial provision()', async () => {
     const env = createFakeEnv();
     const { binding } = createFakeNotificationsBinding();
     Object.assign(env, { NOTIFICATIONS: binding });
@@ -9615,85 +9524,7 @@ describe('instance ready push', () => {
     await instance.provision('user-1', {});
     await Promise.all(waitUntilPromises);
 
-    // Fresh provision explicitly seeds the flag as false (same semantic as
-    // instanceReadyEmailSent) so the push probe arms for the new lifecycle.
-    expect(storage._store.get('instanceReadyPushSent')).toBe(false);
     expect(storage._store.get('startFailurePushSentForAttempt')).toBe(false);
-  });
-
-  it('clamps the running alarm cadence while the probe window is active', async () => {
-    const env = createFakeEnv();
-    const { binding } = createFakeNotificationsBinding();
-    Object.assign(env, { NOTIFICATIONS: binding });
-
-    const { instance, storage } = createInstance(createFakeStorage(), env);
-    await seedRunning(storage, {
-      instanceReadyPushSent: false,
-      flyAppName: 'acct-test',
-      providerState: {
-        provider: 'fly',
-        appName: 'acct-test',
-        machineId: 'machine-1',
-        volumeId: 'vol-1',
-        region: 'iad',
-      },
-    });
-
-    (flyClient.getMachine as Mock).mockResolvedValue({
-      id: 'machine-1',
-      state: 'started',
-      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
-    });
-    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
-    stubReadyProbe(false);
-
-    const beforeAlarm = Date.now();
-    await instance.alarm();
-    const alarm = storage._getAlarm() ?? 0;
-
-    const delay = alarm - beforeAlarm;
-    // Clamped cadence is 10s with jitter capped at the clamped interval
-    // (so up to ~2× the base) to desync concurrent instances while still
-    // staying well under the 5-min running cadence.
-    expect(delay).toBeGreaterThanOrEqual(READY_PUSH_PROBE_CADENCE_MS);
-    expect(delay).toBeLessThanOrEqual(READY_PUSH_PROBE_CADENCE_MS * 2 + 100);
-    expect(delay).toBeLessThan(ALARM_INTERVAL_RUNNING_MS);
-  });
-
-  it('reverts to the normal running cadence after the flag flips', async () => {
-    const env = createFakeEnv();
-    const { binding } = createFakeNotificationsBinding();
-    Object.assign(env, { NOTIFICATIONS: binding });
-
-    const { instance, storage } = createInstance(createFakeStorage(), env);
-    await seedRunning(storage, {
-      instanceReadyPushSent: false,
-      flyAppName: 'acct-test',
-      providerState: {
-        provider: 'fly',
-        appName: 'acct-test',
-        machineId: 'machine-1',
-        volumeId: 'vol-1',
-        region: 'iad',
-      },
-    });
-
-    (flyClient.getMachine as Mock).mockResolvedValue({
-      id: 'machine-1',
-      state: 'started',
-      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
-    });
-    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
-    stubReadyProbe(true);
-
-    const beforeAlarm = Date.now();
-    await instance.alarm();
-
-    // The probe succeeded, flag flipped, so the alarm was scheduled *after*
-    // the clamp decision with the flag already true → normal cadence.
-    expect(storage._store.get('instanceReadyPushSent')).toBe(true);
-    const alarm = storage._getAlarm() ?? 0;
-    expect(alarm - beforeAlarm).toBeGreaterThan(READY_PUSH_PROBE_CADENCE_MS);
   });
 });
 
@@ -9805,47 +9636,6 @@ describe('instance start-failed push', () => {
 describe('non-Fly lifecycle push dispatch', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-  });
-
-  it('dispatches a ready push when the docker-local alarm observes running', async () => {
-    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
-    const { binding, calls } = createFakeNotificationsBinding();
-    Object.assign(env, { NOTIFICATIONS: binding });
-
-    const { instance, storage } = createInstance(createFakeStorage(), env);
-    await seedDockerInstance(storage, {
-      status: 'starting',
-      startingAt: Date.now(),
-      lastStartedAt: null,
-      instanceReadyPushSent: false,
-    });
-
-    vi.mocked(fetch).mockImplementation(async input => {
-      const url = fetchInputUrl(input);
-      if (url.includes('/_kilo/gateway/ready')) {
-        return new Response(JSON.stringify({ ready: true }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      return new Response(
-        JSON.stringify({
-          Id: 'container-1',
-          Name: '/kiloclaw-sandbox-1',
-          State: { Running: true, Status: 'running' },
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } }
-      );
-    });
-
-    await instance.alarm();
-
-    expect(storage._store.get('status')).toBe('running');
-    expect(calls).toHaveLength(1);
-    expect(calls[0].event).toBe('ready');
-    expect(calls[0].userId).toBe('user-1');
-    expect(calls[0].instanceId).toBe('sandbox-1');
-    expect(storage._store.get('instanceReadyPushSent')).toBe(true);
   });
 
   it('dispatches a start-failed push when the docker-local alarm detects a timeout', async () => {

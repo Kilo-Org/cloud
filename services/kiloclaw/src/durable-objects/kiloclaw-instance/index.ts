@@ -94,7 +94,11 @@ import {
   markRestartSuccessful,
 } from './reconcile';
 import { restoreFromPostgres, markDestroyedInPostgresHelper } from './postgres';
-import { maybeDispatchReadyPush, maybeDispatchStartFailurePush } from '../../lib/lifecycle-push';
+import {
+  dispatchReadyPush,
+  LIFECYCLE_NOTIFICATION_RESET,
+  maybeDispatchStartFailurePush,
+} from './lifecycle-push';
 import { legacyDoKeysForIdentity } from '../../lib/instance-routing';
 import {
   beginUnexpectedStopRecovery,
@@ -153,7 +157,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   private async scheduleAlarm(): Promise<void> {
     if (!this.s.status) return;
-    await this.ctx.storage.setAlarm(nextAlarmTime(this.s.status, this.s));
+    await this.ctx.storage.setAlarm(nextAlarmTime(this.s.status));
   }
 
   private recoveryRuntime(): RecoveryRuntime {
@@ -348,8 +352,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         durationMs: startingAt ? Date.now() - startingAt : undefined,
       });
     }
-
-    await maybeDispatchReadyPush(this.env, this.s, this.ctx);
   }
 
   private async reconcileNonFlyRuntimeFromAlarm(): Promise<void> {
@@ -767,9 +769,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             pendingDestroyMachineId: null,
             pendingDestroyVolumeId: null,
             pendingPostgresMarkOnFinalize: false,
-            instanceReadyEmailSent: false,
-            instanceReadyPushSent: false,
-            startFailurePushSentForAttempt: false,
+            ...LIFECYCLE_NOTIFICATION_RESET,
           })
         )
       : syncProviderStateForStorage(
@@ -805,9 +805,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       this.s.pendingDestroyMachineId = null;
       this.s.pendingDestroyVolumeId = null;
       this.s.pendingPostgresMarkOnFinalize = false;
-      this.s.instanceReadyEmailSent = false;
-      this.s.instanceReadyPushSent = false;
-      this.s.startFailurePushSentForAttempt = false;
+      Object.assign(this.s, LIFECYCLE_NOTIFICATION_RESET);
     }
     this.s.loaded = true;
 
@@ -2042,7 +2040,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
 
     await this.scheduleAlarm();
-    await maybeDispatchReadyPush(this.env, this.s, this.ctx);
     return {
       started: true,
       previousStatus,
@@ -2600,7 +2597,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     restoreStartedAt: string | null;
     pendingRestoreVolumeId: string | null;
     instanceReadyEmailSent: boolean;
-    instanceReadyPushSent: boolean;
     startFailurePushSentForAttempt: boolean;
     // --- env key diagnostics ---
     envKeyAppDOKey: string | null;
@@ -2687,7 +2683,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       restoreStartedAt: this.s.restoreStartedAt,
       pendingRestoreVolumeId: this.s.pendingRestoreVolumeId,
       instanceReadyEmailSent: this.s.instanceReadyEmailSent,
-      instanceReadyPushSent: this.s.instanceReadyPushSent,
       startFailurePushSentForAttempt: this.s.startFailurePushSentForAttempt,
       envKeyAppDOKey,
       envKeyAppDOFlyAppName: envKeyDiag?.flyAppName ?? null,
@@ -2727,7 +2722,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   /**
    * Atomically check-and-set the instance ready flag. Returns shouldNotify: true
    * on the first call per provision lifecycle, false on all subsequent calls.
-   * Used by the controller checkin handler to trigger a one-time "instance ready" email.
+   * Used by the controller checkin handler to trigger the one-time "instance
+   * ready" email and mobile push.
    */
   async tryMarkInstanceReady(): Promise<{ shouldNotify: boolean; userId: string | null }> {
     await this.loadState();
@@ -2738,10 +2734,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.instanceReadyEmailSent = true;
     await this.persist({ instanceReadyEmailSent: true });
 
-    // If the instance was provisioned more than 6 hours ago, don't send the email
+    // If the instance was provisioned more than 6 hours ago, don't notify.
     if (this.s.provisionedAt && this.s.provisionedAt < Date.now() - 1000 * 60 * 60 * 6) {
       return { shouldNotify: false, userId: this.s.userId };
     }
+
+    // Mobile push fires fire-and-forget so the checkin response isn't blocked
+    // on the notifications RPC. Email dispatch happens via the controller route.
+    this.ctx.waitUntil(dispatchReadyPush(this.env, this.s));
 
     return { shouldNotify: true, userId: this.s.userId };
   }
@@ -3558,9 +3558,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           );
         } else {
           await this.reconcileNonFlyRuntimeFromAlarm();
-          if (this.s.status === 'running') {
-            await maybeDispatchReadyPush(this.env, this.s, this.ctx);
-          }
         }
         if (this.s.status) {
           await this.scheduleAlarm();

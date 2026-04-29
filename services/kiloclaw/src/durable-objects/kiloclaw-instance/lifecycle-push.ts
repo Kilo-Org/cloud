@@ -3,7 +3,7 @@
  * KiloClawInstance DO via the NOTIFICATIONS service binding.
  *
  * Two events are supported:
- *  - `ready`         — OpenClaw gateway is accepting requests
+ *  - `ready`         — first low-load checkin has reported the instance is up
  *  - `start_failed`  — a starting attempt timed out or the machine failed
  *
  * Each dispatch is gated by a DO-persisted flag so the network call only
@@ -14,12 +14,20 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 
-import { READY_PUSH_PROBE_WINDOW_MS } from '../config';
-import type { KiloClawEnv } from '../types';
-import type { InstanceMutableState } from '../durable-objects/kiloclaw-instance/types';
-import { storageUpdate } from '../durable-objects/kiloclaw-instance/state';
-import { doWarn, toLoggable } from '../durable-objects/kiloclaw-instance/log';
-import * as gateway from '../durable-objects/kiloclaw-instance/gateway';
+import type { KiloClawEnv } from '../../types';
+import type { InstanceMutableState } from './types';
+import { storageUpdate } from './state';
+import { doWarn, toLoggable } from './log';
+
+/**
+ * Reset shape for the lifecycle notification flags. Spread this into storage
+ * updates / mutable-state factories so the flag set never drifts apart across
+ * the provision, wipe, and create-from-scratch code paths.
+ */
+export const LIFECYCLE_NOTIFICATION_RESET = {
+  instanceReadyEmailSent: false,
+  startFailurePushSentForAttempt: false,
+} as const;
 
 export type StartFailureLabel =
   | 'starting_timeout'
@@ -45,15 +53,6 @@ const GENERIC_START_FAILURE_BODY = 'Start failed.';
  */
 export function formatStartFailureReason(label: string): string {
   return START_FAILURE_BODIES[label as StartFailureLabel] ?? GENERIC_START_FAILURE_BODY;
-}
-
-/** True while the DO should keep polling `getGatewayReady` for the ready-push dispatch. */
-export function readyPushProbeActive(state: InstanceMutableState, now = Date.now()): boolean {
-  if (state.instanceReadyPushSent) return false;
-  if (state.status !== 'starting' && state.status !== 'running') return false;
-  const windowStart = state.lastStartedAt ?? state.startingAt;
-  if (windowStart === null) return false;
-  return now - windowStart < READY_PUSH_PROBE_WINDOW_MS;
 }
 
 /**
@@ -90,36 +89,16 @@ async function lookupInstanceName(
 }
 
 /**
- * Dispatch a one-shot "instance ready" push when `getGatewayReady` first
- * reports the gateway is serving. Flips the DO flag before the outbound
- * RPC so a crash mid-dispatch cannot cause a duplicate on the next alarm.
+ * Dispatch the one-shot "instance ready" push. The caller (tryMarkInstanceReady)
+ * is responsible for the flag check-and-set; this helper only performs the
+ * outbound dispatch. Safe to invoke via `ctx.waitUntil` so the originating
+ * checkin response isn't blocked on the notifications RPC.
  */
-export async function maybeDispatchReadyPush(
+export async function dispatchReadyPush(
   env: KiloClawEnv,
-  state: InstanceMutableState,
-  ctx: DurableObjectState
+  state: InstanceMutableState
 ): Promise<void> {
-  if (!readyPushProbeActive(state)) return;
-
-  let result: Record<string, unknown> | null;
-  try {
-    result = await gateway.getGatewayReady(state, env);
-  } catch (err) {
-    doWarn(state, 'ready push probe failed (non-fatal)', {
-      error: toLoggable(err),
-    });
-    return;
-  }
-  if (!result || result.ready !== true) return;
-
-  // Check dispatch preconditions before burning the one-shot flag. If the
-  // NOTIFICATIONS binding is briefly unavailable (e.g., mid-deploy) or the
-  // instance somehow lacks a userId/sandboxId, leave the flag unset so a
-  // later alarm can retry once conditions are met.
   if (!state.userId || !state.sandboxId || !env.NOTIFICATIONS) return;
-
-  state.instanceReadyPushSent = true;
-  await ctx.storage.put(storageUpdate({ instanceReadyPushSent: true }));
 
   const instanceName = await lookupInstanceName(env, state);
 

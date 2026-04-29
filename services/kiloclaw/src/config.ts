@@ -91,20 +91,6 @@ export const HEALTH_PROBE_TIMEOUT_SECONDS = 60;
 /** Interval between health probe retries during startup */
 export const HEALTH_PROBE_INTERVAL_MS = 3_000;
 
-/**
- * How long after `startingAt`/`lastStartedAt` the DO keeps probing
- * `getGatewayReady` to dispatch the one-shot "instance ready" push.
- * After this window expires the push is abandoned for this lifecycle.
- */
-export const READY_PUSH_PROBE_WINDOW_MS = 5 * 60 * 1000;
-
-/**
- * Alarm cadence while the ready-push probe window is active. Clamps the
- * otherwise-5-minute `running` cadence so the push lands within ~10s of
- * OpenClaw's socket opening.
- */
-export const READY_PUSH_PROBE_CADENCE_MS = 10_000;
-
 /** Auto-destroy provisioned instances that never started after this duration */
 export const STALE_PROVISION_THRESHOLD_MS = 8 * 60 * 60 * 1000; // 8 hours
 

@@ -131,7 +131,6 @@ export type InstanceMutableState = {
   preRestoreStatus: InstanceStatus | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
-  instanceReadyPushSent: boolean;
   startFailurePushSentForAttempt: boolean;
   customSecretMeta: PersistedState['customSecretMeta'];
   // Stream Chat default channel (auto-provisioned)

@@ -60,7 +60,7 @@ export async function posthogQuery(name: string, query: string): Promise<PostHog
 }
 
 const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
-const MEMORY_CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
+const MEMORY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
   const parse = (name: string, raw: unknown): Output[] => {

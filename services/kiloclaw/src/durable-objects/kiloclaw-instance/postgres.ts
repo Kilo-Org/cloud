@@ -10,6 +10,7 @@ import {
   getInstanceById,
   getInstanceBySandboxId,
   markInstanceDestroyed,
+  syncTrackedImageTag,
 } from '../../db';
 import { appNameFromUserId, appNameFromInstanceId } from '../../fly/apps';
 import type { InstanceMutableState } from './types';
@@ -242,6 +243,31 @@ export async function restoreFromPostgres(
     }
   } catch (err) {
     doError(state, 'Postgres restore failed', { error: toLoggable(err) });
+  }
+}
+
+/**
+ * Best-effort sync of the DO's trackedImageTag to the Postgres registry row.
+ * Postgres failures are logged and swallowed so they cannot break the alarm
+ * reconciler. The UPDATE is a no-op at the SQL level when the value already
+ * matches (IS DISTINCT FROM), keeping vacuum pressure low on idle instances.
+ */
+export async function syncTrackedImageTagToPostgresHelper(
+  env: KiloClawEnv,
+  state: InstanceMutableState,
+  userId: string,
+  sandboxId: string
+): Promise<void> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return;
+
+  try {
+    const db = getWorkerDb(connectionString);
+    await syncTrackedImageTag(db, userId, sandboxId, state.trackedImageTag ?? null);
+  } catch (err) {
+    doWarn(state, 'Failed to sync tracked_image_tag to Postgres', {
+      error: toLoggable(err),
+    });
   }
 }
 

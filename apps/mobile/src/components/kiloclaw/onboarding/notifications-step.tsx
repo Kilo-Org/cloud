@@ -47,6 +47,12 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
   // The user may have flipped the setting via the system Settings app after
   // we deep-linked them there; picking that up on resume avoids stranding
   // them on the "denied" state view.
+  //
+  // When permission is already granted (pre-granted, or flipped in Settings
+  // after we deep-linked them there), we still need to fetch the Expo push
+  // token and register it with the server — otherwise onboarding completes
+  // without a server-registered token and the user never receives pushes.
+  const registerTokenMutate = registerToken.mutate;
   useEffect(() => {
     if (!isActive) {
       return undefined;
@@ -58,7 +64,19 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
         return;
       }
       if (permStatus === 'granted') {
+        const token = await registerForPushNotifications();
+        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- cancelled can change across awaits
+        if (cancelled) {
+          return;
+        }
+        if (token) {
+          registerTokenMutate({ token, platform: getPlatform() });
+        }
         await SecureStore.setItemAsync(NOTIFICATION_PROMPT_SEEN_KEY, 'true');
+        // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- cancelled can change across awaits
+        if (cancelled) {
+          return;
+        }
         onComplete();
       } else {
         setStatus(permStatus);
@@ -68,7 +86,7 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
     return () => {
       cancelled = true;
     };
-  }, [isActive, onComplete]);
+  }, [isActive, onComplete, registerTokenMutate]);
 
   const handleEnable = useCallback(async () => {
     const currentStatus = await getNotificationPermissionStatus();

@@ -73,7 +73,7 @@ checkInitialNotification();
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
   const { updateRequired, isChecking: updateChecking } = useForceUpdate();
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
     JetBrainsMono_600SemiBold,
   });
@@ -82,7 +82,18 @@ function RootLayoutNav() {
 
   useUnreadCountsInvalidation();
 
-  const isLoading = authLoading || updateChecking || !fontsLoaded;
+  useEffect(() => {
+    if (fontsError) {
+      Sentry.captureException(fontsError);
+    }
+  }, [fontsError]);
+
+  // Treat font load errors as terminal: fall back to system fonts rather
+  // than holding the app at opacity 0 forever. `useFonts` sets `error` and
+  // leaves `loaded` false on failure, so gating only on `!fontsLoaded` would
+  // keep the splash screen up indefinitely.
+  const fontsReady = fontsLoaded || fontsError !== null;
+  const isLoading = authLoading || updateChecking || !fontsReady;
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
 

@@ -165,8 +165,16 @@ export function OnboardingFlow() {
 
   // Provision fires when the user submits the identity step (not on auto-start).
   // `userLocation` is passed here because state hasn't updated yet at call time.
+  // When an instance already exists (retry after gateway/readiness stall),
+  // skip re-provisioning: the DO row is live and the subsequent `channels-skipped`
+  // step-save effects will re-apply any identity / exec-preset changes idempotently.
+  const alreadyProvisioned = state.provisionSuccess && state.sandboxId !== null;
   const handleStart = useCallback(
     (userLocation: string | null) => {
+      if (alreadyProvisioned) {
+        dispatch({ type: 'start-requested' });
+        return;
+      }
       dispatch({ type: 'start-requested' });
       trackEvent(PROVISION_REQUESTED_EVENT);
       mutations.provision.mutate(
@@ -193,7 +201,7 @@ export function OnboardingFlow() {
         }
       );
     },
-    [mutations.provision]
+    [alreadyProvisioned, mutations.provision]
   );
 
   // Save the bot identity to the instance as soon as both the user has

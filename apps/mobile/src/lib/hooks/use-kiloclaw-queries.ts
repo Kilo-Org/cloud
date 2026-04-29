@@ -70,9 +70,15 @@ export function useKiloClawMobileOnboardingState(enabled = true) {
     return deriveMobileOnboardingStateFromBilling(billing.data);
   }, [billing.data]);
 
+  // React Query keeps `isPending: true` on disabled queries with no cached
+  // data. Callers that gate skeletons on `isPending` would be stuck forever
+  // when this hook is used with `enabled=false`. Treat disabled-without-data
+  // as "not pending" so the consumer falls through to the non-loading branch.
+  const isPending = enabled ? billing.isPending : false;
+
   return {
     data,
-    isPending: billing.isPending,
+    isPending,
     isError: billing.isError,
     refetch: billing.refetch,
   };

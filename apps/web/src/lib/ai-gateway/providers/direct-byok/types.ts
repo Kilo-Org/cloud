@@ -18,6 +18,8 @@ export const DirectByokModelSchema = z.object({
   variants: z.record(z.string(), OpenCodeVariantSchema).nullable(),
 });
 
+export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
+
 export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
 
 export type DirectByokProvider = {

@@ -2,7 +2,7 @@ import { createGateway, generateText } from 'ai';
 import * as z from 'zod';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import {
-  DirectByokModelSchema,
+  DirectByokModelArraySchema,
   type DirectByokModel,
 } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -13,8 +13,6 @@ import { directByokModelsRedisKey } from '@/lib/redis-keys';
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
 const DESCRIPTION_MODEL = 'google/gemma-4-26b-a4b-it';
 
-const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
-
 const NeuralwattModelsResponseSchema = z.object({
   data: z.array(
     z.object({
@@ -24,6 +22,10 @@ const NeuralwattModelsResponseSchema = z.object({
   ),
 });
 
+const ModalitySchema = z
+  .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
+  .catch('unknown');
+
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
@@ -31,6 +33,12 @@ const ModelsDevModelSchema = z.object({
     .object({
       context: z.number().optional(),
       output: z.number().optional(),
+    })
+    .optional(),
+  modalities: z
+    .object({
+      input: z.array(ModalitySchema).optional(),
+      output: z.array(ModalitySchema).optional(),
     })
     .optional(),
 });
@@ -44,6 +52,7 @@ type RawModel = {
   name?: string;
   context_length?: number;
   max_completion_tokens?: number;
+  input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
 };
 
 type ProviderFetcher = {
@@ -88,6 +97,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
         name: model.name,
         context_length: model.limit?.context,
         max_completion_tokens: model.limit?.output,
+        input_modalities: model.modalities?.input,
       }));
     },
   },
@@ -95,7 +105,11 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
 
 function stripVendorPrefix(id: string) {
   const slash = id.lastIndexOf('/');
-  return (slash >= 0 ? id.slice(slash + 1) : id).toLowerCase();
+  return slash >= 0 ? id.slice(slash + 1) : id;
+}
+
+function stripVendorPrefixLowerCased(id: string) {
+  return stripVendorPrefix(id).toLowerCase();
 }
 
 async function generateDescription(id: string, name: string): Promise<string> {
@@ -121,7 +135,7 @@ async function readPreviousModels(
 
 async function syncProvider(
   fetcher: ProviderFetcher,
-  openrouterDescriptions: ReadonlyMap<string, string>
+  fallbackDescriptions: ReadonlyMap<string, string>
 ): Promise<number> {
   const previous = await readPreviousModels(fetcher.providerId);
   const previousById = new Map(previous.map(model => [model.id, model]));
@@ -131,24 +145,23 @@ async function syncProvider(
 
   for (const raw of fetched) {
     const prior = previousById.get(raw.id);
-    const name = raw.name ?? prior?.name ?? raw.id;
-    const openrouterDescription = openrouterDescriptions.get(stripVendorPrefix(raw.id));
+    const name = raw.name ?? stripVendorPrefix(raw.id);
+    const fallbackDescription = fallbackDescriptions.get(stripVendorPrefixLowerCased(raw.id));
     const description =
-      openrouterDescription ?? prior?.description ?? (await generateDescription(raw.id, name));
-    const context_length =
-      raw.context_length ?? prior?.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
+      fallbackDescription ?? prior?.description ?? (await generateDescription(raw.id, name));
+    const context_length = raw.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
     const max_completion_tokens = Math.min(
-      raw.max_completion_tokens ?? prior?.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
+      raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
       context_length
     );
     models.push({
       id: raw.id,
       name,
       description,
-      flags: prior?.flags ?? [],
+      flags: raw.input_modalities?.includes('image') ? ['vision'] : [],
       context_length,
       max_completion_tokens,
-      variants: prior?.variants ?? null,
+      variants: null,
     });
   }
 
@@ -156,19 +169,27 @@ async function syncProvider(
   return models.length;
 }
 
-export async function syncDirectByokModels(
-  openrouterData: Record<string, StoredModel>
-): Promise<Partial<Record<DirectUserByokInferenceProviderId, number>>> {
-  const openrouterDescriptions = new Map<string, string>();
-  for (const model of Object.values(openrouterData)) {
-    if (model.description) {
-      openrouterDescriptions.set(stripVendorPrefix(model.id), model.description);
+function buildFallbackDescriptions(sources: Record<string, StoredModel>[]): Map<string, string> {
+  const fallbackDescriptions = new Map<string, string>();
+  for (const source of sources) {
+    for (const model of Object.values(source)) {
+      const id = stripVendorPrefixLowerCased(model.id);
+      if (!model.description || fallbackDescriptions.has(id)) continue;
+      fallbackDescriptions.set(id, model.description);
     }
   }
+  return fallbackDescriptions;
+}
+
+export async function syncDirectByokModels(
+  openrouterData: Record<string, StoredModel>,
+  vercelData: Record<string, StoredModel>
+): Promise<Partial<Record<DirectUserByokInferenceProviderId, number>>> {
+  const fallbackDescriptions = buildFallbackDescriptions([vercelData, openrouterData]);
   const entries = await Promise.all(
     FETCHERS.map(
       async fetcher =>
-        [fetcher.providerId, await syncProvider(fetcher, openrouterDescriptions)] as const
+        [fetcher.providerId, await syncProvider(fetcher, fallbackDescriptions)] as const
     )
   );
   return Object.fromEntries(entries);

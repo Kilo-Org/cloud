@@ -57,6 +57,8 @@ export async function postSlackReinstallInstruction(
   await adapter.postMessage(threadId, {
     markdown:
       `Kilo Bot is missing the \`${missingScope}\` Slack scope and needs to be re-installed. ` +
-      `Open the [Slack reinstall link](${url}) to refresh the app permissions.`,
+      `Open the [Slack reinstall link](${url}) to refresh the app permissions. ` +
+      `If you are not a Slack administrator, you may need to ask one to re-install the app. ` +
+      `You can continue using Kilo Bot as usual; only features that require this new Slack permission may be unavailable until the app is re-installed.`,
   });
 }

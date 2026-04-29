@@ -186,4 +186,56 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
       .where(eq(cli_session_pull_requests.session_id, sessionId));
     expect(row.pr_state).toBe('closed');
   });
+
+  it('deduplicates redelivered pull_request webhooks before the upsert runs', async () => {
+    const sessionId = await insertSession(`https://github.com/${REPO}.git`, 'feature/dedup');
+
+    // Seed with an opened webhook.
+    const openedRequest = buildPullRequestWebhook({
+      action: 'opened',
+      prNumber: 557,
+      headRef: 'feature/dedup',
+      headSha: 'sha-557-1',
+      state: 'open',
+      deliveryId: 'delivery-opened-557',
+    });
+    await handleGitHubWebhook(openedRequest, 'standard');
+
+    // Close+merge the PR.
+    await handleGitHubWebhook(
+      buildPullRequestWebhook({
+        action: 'closed',
+        prNumber: 557,
+        headRef: 'feature/dedup',
+        headSha: 'sha-557-1',
+        state: 'closed',
+        merged: true,
+        deliveryId: 'delivery-closed-557',
+      }),
+      'standard'
+    );
+
+    // Redeliver the *same* opened webhook (same x-github-delivery id). This
+    // must be rejected as a duplicate and must NOT re-run the upsert.
+    const redelivered = buildPullRequestWebhook({
+      action: 'opened',
+      prNumber: 557,
+      headRef: 'feature/dedup',
+      headSha: 'sha-557-1',
+      state: 'open',
+      deliveryId: 'delivery-opened-557',
+    });
+    const redeliveredResponse = await handleGitHubWebhook(redelivered, 'standard');
+    expect(redeliveredResponse.status).toBe(200);
+    const body = (await redeliveredResponse.json()) as { message: string };
+    expect(body.message).toBe('Duplicate event');
+
+    const [row] = await db
+      .select()
+      .from(cli_session_pull_requests)
+      .where(eq(cli_session_pull_requests.session_id, sessionId));
+    // pr_state stays `merged` because the duplicate `opened` never reached
+    // the upsert.
+    expect(row.pr_state).toBe('merged');
+  });
 });

@@ -298,4 +298,123 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     );
     expect(updated).toBe(0);
   });
+
+  it('does not demote pr_state=merged back to open on an out-of-order redelivery', async () => {
+    const sessionId = await insertSession(
+      `https://github.com/${REPO}.git`,
+      'feature/monotonic-merged'
+    );
+
+    // Seed with opened, then close+merged.
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 200,
+        state: 'open',
+        headRef: 'feature/monotonic-merged',
+        headSha: 'sha-200-1',
+      })
+    );
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 200,
+        state: 'closed',
+        merged: true,
+        headRef: 'feature/monotonic-merged',
+        headSha: 'sha-200-1',
+      })
+    );
+
+    // Simulate a late-arriving redelivery of an earlier `synchronize` webhook
+    // (same delivery would be deduped upstream; here we model the case where
+    // dedup is absent or the event is from a different delivery id).
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'synchronize',
+        prNumber: 200,
+        state: 'open',
+        headRef: 'feature/monotonic-merged',
+        headSha: 'sha-200-late',
+      })
+    );
+
+    const [row] = await db
+      .select()
+      .from(cli_session_pull_requests)
+      .where(eq(cli_session_pull_requests.session_id, sessionId));
+    expect(row.pr_state).toBe('merged');
+    // Non-state fields still track the latest payload — only pr_state is monotonic.
+    expect(row.pr_head_sha).toBe('sha-200-late');
+  });
+
+  it('does not demote pr_state=closed back to open on an out-of-order redelivery', async () => {
+    const sessionId = await insertSession(
+      `https://github.com/${REPO}.git`,
+      'feature/monotonic-closed'
+    );
+
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 201,
+        state: 'closed',
+        merged: false,
+        headRef: 'feature/monotonic-closed',
+        headSha: 'sha-201',
+      })
+    );
+
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 201,
+        state: 'open',
+        headRef: 'feature/monotonic-closed',
+        headSha: 'sha-201',
+      })
+    );
+
+    const [row] = await db
+      .select()
+      .from(cli_session_pull_requests)
+      .where(eq(cli_session_pull_requests.session_id, sessionId));
+    expect(row.pr_state).toBe('closed');
+  });
+
+  it('still allows legitimate closed -> merged transitions', async () => {
+    const sessionId = await insertSession(
+      `https://github.com/${REPO}.git`,
+      'feature/close-then-merge'
+    );
+
+    // Some PRs emit closed(merged:false) then closed(merged:true) — the second
+    // should still be applied because we only block `open` downgrades.
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 202,
+        state: 'closed',
+        merged: false,
+        headRef: 'feature/close-then-merge',
+        headSha: 'sha-202',
+      })
+    );
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 202,
+        state: 'closed',
+        merged: true,
+        headRef: 'feature/close-then-merge',
+        headSha: 'sha-202',
+      })
+    );
+
+    const [row] = await db
+      .select()
+      .from(cli_session_pull_requests)
+      .where(eq(cli_session_pull_requests.session_id, sessionId));
+    expect(row.pr_state).toBe('merged');
+  });
 });

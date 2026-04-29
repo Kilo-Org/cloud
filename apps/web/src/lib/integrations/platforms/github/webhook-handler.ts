@@ -392,25 +392,40 @@ export async function handleGitHubWebhook(
 
       const action = parseResult.data.action;
 
+      // Log webhook event (also for `closed`, so that closed/merged deliveries
+      // are deduplicated before the upsert mutates pr_state below). Dedup has
+      // to sit above the upsert — otherwise a redelivered older
+      // `opened`/`synchronize` event could stomp a later `closed`/`merged`
+      // terminal state back to `open`.
+      const logResult = await logWebhook(integration, action);
+      if (logResult.isDuplicate) {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+
       // Side-effect: upsert the PR summary onto any cloud-agent-next sessions
-      // whose (git_url, git_branch) matches. This runs BEFORE the closed
-      // early-return and BEFORE webhook deduplication so that `closed`/`merged`
-      // events reach it (which is the only signal we get for terminal state)
-      // and so duplicate deliveries still converge the stored state.
+      // whose (git_url, git_branch) matches. Runs for all pull_request actions
+      // (including `closed`), independently of the code-review routing below.
+      // The upsert itself guards against demoting `closed`/`merged` back to
+      // `open` so that even out-of-order deliveries stay monotonic.
       // Errors are caught and logged internally — failure here must not block
       // the code-review flow.
       await upsertCliSessionPullRequestsFromWebhook(parseResult.data);
 
-      // Filter out closed events - we don't log or process them through the
-      // code-review pipeline. (The upsert above runs regardless.)
+      // `closed` events are not routed to the code-review pipeline.
       if (action === GITHUB_ACTION.CLOSED) {
+        if (logResult.webhookEventId) {
+          try {
+            await updateWebhookEvent(logResult.webhookEventId, {
+              processed: true,
+              processed_at: new Date().toISOString(),
+              handlers_triggered: ['cli_session_pr_upsert'],
+              errors: null,
+            });
+          } catch (error) {
+            logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
+          }
+        }
         return NextResponse.json({ message: 'Event received' }, { status: 200 });
-      }
-
-      // Log webhook event for both user and organization-owned integrations
-      const logResult = await logWebhook(integration, action);
-      if (logResult.isDuplicate) {
-        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
 
       const result = await handlePullRequest(parseResult.data, integration);
@@ -421,7 +436,7 @@ export async function handleGitHubWebhook(
           await updateWebhookEvent(logResult.webhookEventId, {
             processed: true,
             processed_at: new Date().toISOString(),
-            handlers_triggered: ['code_review'],
+            handlers_triggered: ['code_review', 'cli_session_pr_upsert'],
             errors: null,
           });
         } catch (error) {

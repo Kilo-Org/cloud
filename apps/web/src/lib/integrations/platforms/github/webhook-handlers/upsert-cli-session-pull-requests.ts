@@ -134,6 +134,11 @@ export async function upsertCliSessionPullRequestsFromWebhook(
       pr_head_sha: pull_request.head.sha,
     }));
 
+    // Defense-in-depth against out-of-order webhook deliveries: once a PR has
+    // reached a terminal state (`closed`/`merged`) we never demote it back to
+    // `open`. Webhook deduplication (by x-github-delivery) already blocks
+    // exact replays, but GitHub can redeliver older events after a later
+    // terminal event; this guarantees `pr_state` is monotonic.
     await db
       .insert(cli_session_pull_requests)
       .values(values)
@@ -142,7 +147,12 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         set: {
           pr_url: sql`excluded.pr_url`,
           pr_number: sql`excluded.pr_number`,
-          pr_state: sql`excluded.pr_state`,
+          pr_state: sql`CASE
+            WHEN ${cli_session_pull_requests.pr_state} IN ('closed', 'merged')
+              AND excluded.pr_state = 'open'
+            THEN ${cli_session_pull_requests.pr_state}
+            ELSE excluded.pr_state
+          END`,
           pr_title: sql`excluded.pr_title`,
           pr_head_sha: sql`excluded.pr_head_sha`,
           pr_last_synced_at: now,

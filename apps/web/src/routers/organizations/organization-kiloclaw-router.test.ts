@@ -1,7 +1,7 @@
 process.env.KILOCLAW_API_URL ||= 'https://claw.test';
 process.env.KILOCLAW_INTERNAL_API_SECRET ||= 'test-secret';
 
-import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
@@ -297,7 +297,8 @@ describe('organizations.kiloclaw.restartMachine pin consent gate', () => {
     ]);
 
     // pushPinToWorker calls into the platform API — stub fetch so the
-    // gate's DO sync side-effect doesn't network in tests.
+    // gate's DO sync side-effect doesn't network in tests. Restored in
+    // afterEach so we don't stack spies across tests in the same worker.
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -309,6 +310,10 @@ describe('organizations.kiloclaw.restartMachine pin consent gate', () => {
         { status: 200, headers: { 'content-type': 'application/json' } }
       )
     );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('plain restart (no imageTag) ignores pin state and never triggers the gate', async () => {
@@ -429,11 +434,15 @@ describe('organizations.kiloclaw.restartMachine pin consent gate', () => {
     expect(pins).toHaveLength(0);
   });
 
-  it('conditional delete: a pin replaced between SELECT and DELETE produces PIN_EXISTS', async () => {
-    // Direct DB-level simulation of the conditional-delete WHERE clause:
-    // capture the original pin's id, simulate a replacement (delete +
-    // re-insert with a new id), then attempt to delete by the original
-    // id. The delete must not match, mirroring the gate's runtime check.
+  it('conditional delete does not remove a concurrently replaced pin row', async () => {
+    // Direct DB-level test of the conditional-delete WHERE clause that
+    // the gate uses. Captures the original pin's id, simulates a
+    // replacement (delete + re-insert with a new id), then attempts to
+    // delete by the original id. The delete must not match — that empty
+    // returning() is what the runtime gate maps to PIN_EXISTS so the
+    // caller re-checks against the new pin instead of overriding it.
+    // The router-level PIN_EXISTS surface is exercised by the other
+    // tests in this suite; this one isolates the DB invariant.
     const user = await insertTestUser({
       google_user_email: `org-restart-pin-race-${crypto.randomUUID()}@example.com`,
     });
@@ -519,6 +528,10 @@ describe('organizations.kiloclaw pin metadata mutations are unrestricted by who 
         { status: 200, headers: { 'content-type': 'application/json' } }
       )
     );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('setMyPin overwrites an admin-set pin with the caller pin', async () => {

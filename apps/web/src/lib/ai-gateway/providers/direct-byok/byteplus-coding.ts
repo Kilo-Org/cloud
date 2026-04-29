@@ -7,7 +7,6 @@ import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/
 
 export default {
   id: 'byteplus-coding',
-  name: 'BytePlus Coding Plan',
   base_url: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
   ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {

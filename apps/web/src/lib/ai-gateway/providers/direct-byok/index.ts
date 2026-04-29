@@ -4,6 +4,7 @@ import {
   type DirectByokModel,
   type DirectByokProvider,
 } from '@/lib/ai-gateway/providers/direct-byok/types';
+import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
@@ -21,7 +22,7 @@ function convertModel(
   preferredIndex: number
 ) {
   const id = formatDirectByokModelId(provider, model);
-  const name = provider.name + ': ' + model.name;
+  const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
   return {
     id,
     canonical_slug: id,

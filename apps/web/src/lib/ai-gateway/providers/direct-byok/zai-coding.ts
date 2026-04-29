@@ -5,7 +5,6 @@ import { cacheEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/dir
 
 export default {
   id: 'zai-coding',
-  name: 'Z.ai Coding Plan',
   base_url: 'https://api.z.ai/api/coding/paas/v4',
   ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {

@@ -70,7 +70,12 @@ const VERCEL_BYOK_PROVIDERS = [
   { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Mistral AI (Codestral)' },
 ];
 
-const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_META, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
+const DIRECT_BYOK_PROVIDERS = Object.entries(DIRECT_BYOK_PROVIDERS_META).map(([id, name]) => ({
+  id,
+  name,
+}));
+
+const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
   a.name.localeCompare(b.name)
 );
 
@@ -560,7 +565,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
               {selectedProvider &&
                 (() => {
-                  const directProvider = DIRECT_BYOK_PROVIDERS_META.find(
+                  const directProvider = DIRECT_BYOK_PROVIDERS.find(
                     p => p.id === selectedProvider
                   );
                   return directProvider ? (

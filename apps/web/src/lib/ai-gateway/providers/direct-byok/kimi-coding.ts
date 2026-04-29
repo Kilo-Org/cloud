@@ -8,7 +8,6 @@ import { isRooCodeBasedClient } from '@/lib/utils';
 
 export default {
   id: 'kimi-coding',
-  name: 'Kimi Code',
   base_url: 'https://api.kimi.com/coding/v1',
   ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {

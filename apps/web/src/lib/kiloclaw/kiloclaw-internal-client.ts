@@ -130,17 +130,97 @@ export class KiloClawInternalClient {
     return this.request('/api/platform/versions');
   }
 
-  async getLatestVersion(): Promise<ImageVersionEntry | null> {
+  async getLatestVersion(opts?: {
+    instanceId?: string;
+    currentImageTag?: string | null;
+  }): Promise<ImageVersionEntry | null> {
+    // Note: Early Access is resolved server-side from the instance's owning
+    // user — callers do NOT pass it as a param. Trying to set it here would
+    // be ignored.
+    let path = '/api/platform/versions/latest';
+    if (opts?.instanceId) {
+      const params = new URLSearchParams({ instanceId: opts.instanceId });
+      if (opts.currentImageTag) params.set('currentImageTag', opts.currentImageTag);
+      path += `?${params.toString()}`;
+    }
     try {
-      return await this.request('/api/platform/versions/latest');
+      return await this.request(path);
     } catch (err) {
-      // Only return null for 404 (no latest version set)
-      // Re-throw other errors (network, auth, server errors) so callers can handle them
+      // 404 means "no latest version set" or "no upgrade available for this instance".
+      // Both collapse to null for callers (no banner, fall back to existing image).
       if (err instanceof KiloClawApiError && err.statusCode === 404) {
         return null;
       }
       throw err;
     }
+  }
+
+  async setRolloutPercent(
+    imageTag: string,
+    percent: number
+  ): Promise<{
+    ok: boolean;
+    imageTag: string;
+    variant: string;
+    rolloutPercent: number;
+    isLatest: boolean;
+  }> {
+    return this.request('/api/platform/versions/rollout', {
+      method: 'POST',
+      body: JSON.stringify({ imageTag, percent }),
+    });
+  }
+
+  async markImageAsLatest(
+    imageTag: string
+  ): Promise<{ ok: boolean; imageTag: string; variant: string }> {
+    return this.request('/api/platform/versions/mark-latest', {
+      method: 'POST',
+      body: JSON.stringify({ imageTag }),
+    });
+  }
+
+  async disableImageAndClearRollout(imageTag: string, updatedBy: string): Promise<{ ok: boolean }> {
+    return this.request('/api/platform/versions/disable-with-clear', {
+      method: 'POST',
+      body: JSON.stringify({ imageTag, updatedBy }),
+    });
+  }
+
+  /**
+   * Push a resolved admin pin (or clear) into the instance's DO state.
+   * Pass `imageTag = null` to clear the pin and reset to the current
+   * rollout target. Does not restart the machine.
+   */
+  async applyPinnedVersion(
+    userId: string,
+    instanceId: string,
+    imageTag: string | null
+  ): Promise<{
+    ok: boolean;
+    openclawVersion: string | null;
+    imageTag: string | null;
+    imageDigest: string | null;
+    variant: string | null;
+  }> {
+    return this.request(
+      '/api/platform/versions/apply-pin',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId, imageTag }),
+      },
+      { userId }
+    );
+  }
+
+  async setUserKiloclawEarlyAccess(
+    userId: string,
+    value: boolean
+  ): Promise<{ ok: boolean; userId: string; earlyAccess: boolean }> {
+    return this.request(`/api/platform/users/${encodeURIComponent(userId)}/kiloclaw-early-access`, {
+      method: 'POST',
+      body: JSON.stringify({ value }),
+    });
   }
 
   async provision(

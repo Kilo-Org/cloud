@@ -17,6 +17,7 @@ type WelcomeContentProps = {
   hasCredits: boolean;
   editor: EditorOption;
   isAuthenticated: boolean;
+  installTarget?: 'cli';
 };
 
 const CLI_COMMAND = 'npm install -g @kilocode/cli';
@@ -62,12 +63,13 @@ export default function WelcomeContent({
   logoSrc,
   editor,
   isAuthenticated,
+  installTarget,
 }: WelcomeContentProps) {
   // Only show credit purchase options if authenticated and needs credits
   const welcomeMessage = 'Start immediately by using free models!';
 
   const isJetBrains = editor.scheme === 'jetbrains';
-  const defaultTab = isJetBrains ? 'jetbrains' : 'vscode';
+  const defaultTab = installTarget ?? (isJetBrains ? 'jetbrains' : 'vscode');
 
   return (
     <div className="container mx-auto flex max-w-4xl flex-col items-center gap-8">

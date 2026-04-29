@@ -11,7 +11,6 @@ export const minimax_m25_free_model: KiloExclusiveModel = {
   flags: ['reasoning'],
   gateway: 'openrouter',
   internal_id: 'minimax/minimax-m2.5',
-  inference_provider: null,
   pricing: null,
   exclusive_to: [],
 };

@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 import { RefreshCw } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -13,12 +14,15 @@ type SyncResult = {
   generated_at: string;
   total_providers: number;
   total_models: number;
+  direct_byok_model_counts: Record<string, number>;
   time: number;
 };
 
 export function SyncProvidersContent() {
   const trpc = useTRPC();
   const [lastResult, setLastResult] = useState<SyncResult | null>(null);
+
+  const lastSyncQuery = useQuery(trpc.admin.syncProviders.getLastSync.queryOptions());
 
   const syncMutation = useMutation(
     trpc.admin.syncProviders.triggerSync.mutationOptions({
@@ -27,12 +31,15 @@ export function SyncProvidersContent() {
         toast.success(
           `Synced ${result.total_providers} providers with ${result.total_models} total models`
         );
+        void lastSyncQuery.refetch();
       },
       onError: error => {
         toast.error(error.message || 'Sync failed');
       },
     })
   );
+
+  const lastSync = lastSyncQuery.data;
 
   return (
     <div className="flex w-full flex-col gap-y-6">
@@ -42,9 +49,19 @@ export function SyncProvidersContent() {
 
       <p className="text-muted-foreground">
         Fetches provider and model data from OpenRouter and the Vercel AI Gateway, then stores the
-        result in the database. This runs automatically via cron but can be triggered manually here.
-        Mainly intended for local development use.
+        result in the database. In production this runs automatically via cron; the manual trigger
+        below is intended for local development only.
       </p>
+
+      {lastSync && (
+        <p className="text-muted-foreground text-sm">
+          Last successful sync{' '}
+          <span title={new Date(lastSync.generated_at).toLocaleString()}>
+            {formatDistanceToNow(new Date(lastSync.generated_at), { addSuffix: true })}
+          </span>{' '}
+          — {lastSync.total_providers} providers, {lastSync.total_models} models.
+        </p>
+      )}
 
       <Card>
         <CardHeader>
@@ -53,7 +70,8 @@ export function SyncProvidersContent() {
             Manual Sync
           </CardTitle>
           <CardDescription>
-            Trigger a full sync of providers and models. This may take a minute.
+            Trigger a full sync of providers and models. This may take a minute. Use this in local
+            development only — production syncs are handled by cron.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -74,6 +92,11 @@ export function SyncProvidersContent() {
                 <li>Generated at: {new Date(lastResult.generated_at).toLocaleString()}</li>
                 <li>Providers: {lastResult.total_providers}</li>
                 <li>Models: {lastResult.total_models}</li>
+                {Object.entries(lastResult.direct_byok_model_counts).map(([provider, count]) => (
+                  <li key={provider}>
+                    Direct BYOK {provider}: {count} models
+                  </li>
+                ))}
                 <li>Duration: {(lastResult.time / 1000).toFixed(1)}s</li>
               </ul>
             </div>

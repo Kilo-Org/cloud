@@ -30,6 +30,7 @@ export function defineTestUser(userData: Partial<User> = {}): User {
     auto_top_up_enabled: false,
     default_model: null,
     is_bot: false,
+    kiloclaw_early_access: false,
     next_credit_expiration_at: null,
     cohorts: {},
     completed_welcome_form: false,

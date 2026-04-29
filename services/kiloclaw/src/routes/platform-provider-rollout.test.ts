@@ -34,7 +34,7 @@ describe('provider rollout platform routes', () => {
           enabledOrganizationIds: [],
         },
       },
-      availability: { northflank: false },
+      availability: { northflank: true },
       source: 'default',
     });
   });
@@ -67,7 +67,7 @@ describe('provider rollout platform routes', () => {
           enabledOrganizationIds: ['550e8400-e29b-41d4-a716-446655440001'],
         },
       },
-      availability: { northflank: false },
+      availability: { northflank: true },
     });
   });
 

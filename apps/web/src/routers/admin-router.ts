@@ -17,6 +17,8 @@ import {
   kiloclaw_email_log,
   kiloclaw_instances,
   organizations,
+  modelsByProvider,
+  api_request_log,
 } from '@kilocode/db/schema';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot, type SessionMessage } from '@/lib/session-ingest-client';
@@ -673,7 +675,7 @@ export const adminRouter = createTRPCRouter({
 
     getKiloClawState: adminProcedure.input(GetKiloClawStateSchema).query(async ({ input }) => {
       const user = await db.query.kilocode_users.findFirst({
-        columns: { id: true },
+        columns: { id: true, kiloclaw_early_access: true },
         where: eq(kilocode_users.id, input.userId),
       });
 
@@ -776,6 +778,7 @@ export const adminRouter = createTRPCRouter({
             }
           : null,
         activeInstanceId: activeInstance?.id ?? null,
+        kiloclawEarlyAccess: user.kiloclaw_early_access ?? false,
         billingStateError,
         needsSupportReview: billingStateError !== null,
       };
@@ -1727,6 +1730,31 @@ export const adminRouter = createTRPCRouter({
     triggerSync: adminProcedure.mutation(async () => {
       const result = await syncAndStoreProviders();
       return result;
+    }),
+    getLastSync: adminProcedure.query(async () => {
+      const [latest] = await db
+        .select({ id: modelsByProvider.id, data: modelsByProvider.data })
+        .from(modelsByProvider)
+        .orderBy(desc(modelsByProvider.id))
+        .limit(1);
+      if (!latest) return null;
+      return {
+        id: latest.id,
+        generated_at: latest.data.generated_at,
+        total_providers: latest.data.total_providers,
+        total_models: latest.data.total_models,
+      };
+    }),
+  }),
+
+  apiRequestLog: createTRPCRouter({
+    getOldestEntry: adminProcedure.query(async () => {
+      const [oldest] = await db
+        .select({ created_at: api_request_log.created_at })
+        .from(api_request_log)
+        .orderBy(asc(api_request_log.created_at))
+        .limit(1);
+      return oldest ? { created_at: oldest.created_at } : null;
     }),
   }),
 

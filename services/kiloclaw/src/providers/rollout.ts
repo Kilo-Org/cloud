@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { ProviderIdSchema, type ProviderId } from '../schemas/instance-config';
+import { rolloutBucket } from '../lib/rollout-bucket';
 
 export const PROVIDER_ROLLOUT_KV_KEY = 'provider-rollout';
-export const NORTHFLANK_ROLLOUT_AVAILABLE = false;
+export const NORTHFLANK_ROLLOUT_AVAILABLE = true;
 
 const NorthflankRolloutSchema = z.object({
   personalTrafficPercent: z.number().int().min(0).max(100),
@@ -71,11 +72,6 @@ export async function writeProviderRolloutConfig(
 ): Promise<void> {
   const parsed = ProviderRolloutConfigSchema.parse(config);
   await kv.put(PROVIDER_ROLLOUT_KV_KEY, JSON.stringify(parsed));
-}
-
-async function rolloutBucket(key: string): Promise<number> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key));
-  return new DataView(digest).getUint32(0) % 100;
 }
 
 async function selectProviderFromRollout(params: {

@@ -12,7 +12,7 @@ export type ConfigurationData = {
   allModelsAllowed: boolean;
   allProvidersEnabled: boolean;
   displayModelDenyList: string[];
-  displayProviderDenyList: string[];
+  displayProviderAllowList: string[];
   getProviderNames: (slugs: string[]) => string[];
   getModelNames: (modelIds: string[]) => string[];
 };
@@ -36,10 +36,11 @@ export function useOrganizationConfiguration(organizationId: string) {
 
   const settings = organizationData.settings;
   const modelDenyList = settings?.model_deny_list ?? [];
-  const providerDenyList = settings?.provider_deny_list ?? [];
+  const providerAllowList =
+    settings?.provider_policy_mode === 'allow' ? settings.provider_allow_list : undefined;
 
   const allModelsAllowed = modelDenyList.length === 0;
-  const allProvidersEnabled = providerDenyList.length === 0;
+  const allProvidersEnabled = providerAllowList === undefined;
 
   // Get provider names for display
   const getProviderNames = (slugs: string[]) => {
@@ -59,7 +60,7 @@ export function useOrganizationConfiguration(organizationId: string) {
     allModelsAllowed,
     allProvidersEnabled,
     displayModelDenyList: modelDenyList,
-    displayProviderDenyList: providerDenyList,
+    displayProviderAllowList: providerAllowList ?? [],
     getProviderNames,
     getModelNames,
   };

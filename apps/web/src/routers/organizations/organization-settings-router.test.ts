@@ -11,7 +11,10 @@ import type {
   OpenRouterModelsResponse,
 } from '@/lib/organizations/organization-types';
 import type { User, Organization } from '@kilocode/db/schema';
+import { organizations } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { db } from '@/lib/drizzle';
 
 jest.mock('@/lib/ai-gateway/providers/openrouter', () => {
   return {
@@ -19,18 +22,33 @@ jest.mock('@/lib/ai-gateway/providers/openrouter', () => {
   };
 });
 
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => {
+  return {
+    getProviderSlugsForModel: jest.fn(),
+  };
+});
 
-// Test users and organizations will be created dynamically
+import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+
 let owner: User;
 let member: User;
 let testOrganization: Organization;
 let orgWithSettings: Organization;
 let orgWithModelDenyList: Organization;
+const mockedGetEnhancedOpenRouterModels =
+  getEnhancedOpenRouterModels as unknown as jest.MockedFunction<typeof getEnhancedOpenRouterModels>;
+const mockedGetProviderSlugsForModel = getProviderSlugsForModel as unknown as jest.MockedFunction<
+  typeof getProviderSlugsForModel
+>;
 
 describe('organizations settings trpc router', () => {
+  beforeEach(() => {
+    mockedGetProviderSlugsForModel.mockReset();
+    mockedGetEnhancedOpenRouterModels.mockReset();
+  });
+
   beforeAll(async () => {
-    // Create test users using the helper function
     owner = await insertTestUser({
       google_user_email: 'owner-settings@example.com',
       google_user_name: 'Owner Settings User',
@@ -43,77 +61,102 @@ describe('organizations settings trpc router', () => {
       is_admin: false,
     });
 
-    // Create test organization with no settings and require_seats = false
     testOrganization = await createTestOrganization('No Settings', owner.id, 0, {}, false);
 
-    // Create organization with some initial settings and require_seats = false
     orgWithSettings = await createTestOrganization(
       'Org With Settings',
       owner.id,
       0,
-      { model_deny_list: ['gpt-4', 'gpt-3.5-turbo'], provider_deny_list: ['openai'] },
+      {
+        model_deny_list: ['claude-3'],
+        provider_policy_mode: 'allow',
+        provider_allow_list: ['openai'],
+      },
       false
     );
 
-    // Create organization with model deny list for validation tests and require_seats = false
     orgWithModelDenyList = await createTestOrganization(
       'Model Deny List',
       owner.id,
       0,
-      { model_deny_list: ['gpt-3.5-turbo', 'claude-3'] },
+      { model_deny_list: ['gpt-3.5-turbo'] },
       false
     );
 
-    // Add member to all organizations
     await addUserToOrganization(testOrganization.id, member.id, 'member');
     await addUserToOrganization(orgWithSettings.id, member.id, 'member');
     await addUserToOrganization(orgWithModelDenyList.id, member.id, 'member');
   });
 
+  afterAll(async () => {
+    for (const organization of [testOrganization, orgWithSettings, orgWithModelDenyList]) {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
   describe('updateAllowLists procedure', () => {
-    it('should update organization deny lists for organization owner', async () => {
+    it('should update provider allow list and model deny list for organization owner', async () => {
       const caller = await createCallerForUser(owner.id);
 
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: testOrganization.id,
         model_deny_list: ['gpt-4', 'gpt-3.5-turbo', 'claude-3'],
-        provider_deny_list: ['openai', 'anthropic'],
+        provider_policy_mode: 'allow',
+        provider_allow_list: ['openai', 'anthropic'],
       });
 
-      // Verify the result returns the updated settings
       expect(result.settings.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo', 'claude-3']);
-      expect(result.settings.provider_deny_list).toEqual(['openai', 'anthropic']);
+      expect(result.settings.provider_policy_mode).toBe('allow');
+      expect(result.settings.provider_allow_list).toEqual(['openai', 'anthropic']);
 
-      // Verify the settings were actually persisted to the database
       const updatedOrg = await getOrganizationById(testOrganization.id);
       expect(updatedOrg?.settings?.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo', 'claude-3']);
-      expect(updatedOrg?.settings?.provider_deny_list).toEqual(['openai', 'anthropic']);
+      expect(updatedOrg?.settings?.provider_policy_mode).toBe('allow');
+      expect(updatedOrg?.settings?.provider_allow_list).toEqual(['openai', 'anthropic']);
     });
 
     it('should clear default_model if it is in the new model_deny_list', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // First set a default model that's NOT denied
       await updateOrganizationSettings(orgWithSettings.id, {
         default_model: 'openai/gpt-4o',
-        model_deny_list: ['gpt-4', 'gpt-3.5-turbo'],
+        model_deny_list: [],
+        provider_policy_mode: 'allow',
+        provider_allow_list: ['openai'],
       });
 
-      // Now deny the default model
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: orgWithSettings.id,
-        model_deny_list: ['openai/gpt-4o', 'gpt-3.5-turbo'],
+        model_deny_list: ['openai/gpt-4o'],
       });
 
-      // default_model should be cleared
       expect(result.settings.default_model).toBeUndefined();
 
-      // Verify from database
       const updatedOrg = await getOrganizationById(orgWithSettings.id);
       expect(updatedOrg?.settings?.default_model).toBeUndefined();
     });
 
-    it('should not clear default_model if it is not in the new model_deny_list', async () => {
+    it('should clear default_model if its provider is removed from provider_allow_list', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await updateOrganizationSettings(orgWithSettings.id, {
+        default_model: 'openai/gpt-4o',
+        model_deny_list: [],
+        provider_policy_mode: 'allow',
+        provider_allow_list: ['openai'],
+      });
+      mockedGetProviderSlugsForModel.mockResolvedValue(new Set(['openai']));
+
+      const result = await caller.organizations.settings.updateAllowLists({
+        organizationId: orgWithSettings.id,
+        provider_policy_mode: 'allow',
+        provider_allow_list: ['anthropic'],
+      });
+
+      expect(result.settings.default_model).toBeUndefined();
+    });
+
+    it('should not clear default_model if it is not denied and provider remains allowed', async () => {
       const caller = await createCallerForUser(owner.id);
 
       const orgWithDefault = await createTestOrganization(
@@ -123,9 +166,13 @@ describe('organizations settings trpc router', () => {
         {
           default_model: 'openai/gpt-4o',
           model_deny_list: [],
+          provider_policy_mode: 'allow',
+          provider_allow_list: ['openai'],
         },
         false
       );
+
+      mockedGetProviderSlugsForModel.mockResolvedValue(new Set(['openai']));
 
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: orgWithDefault.id,
@@ -164,7 +211,6 @@ describe('organizations settings trpc router', () => {
     it('should validate input schema', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Test invalid UUID
       await expect(
         caller.organizations.settings.updateAllowLists({
           organizationId: 'invalid-uuid',
@@ -176,45 +222,42 @@ describe('organizations settings trpc router', () => {
     it('should update partial settings', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // First, set initial settings
       await updateOrganizationSettings(testOrganization.id, {
         model_deny_list: ['gpt-4', 'gpt-3.5-turbo'],
-        provider_deny_list: ['openai'],
+        provider_policy_mode: 'allow',
+        provider_allow_list: ['openai'],
       });
 
-      // Now update only provider_deny_list - this only updates the specified field
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: testOrganization.id,
-        provider_deny_list: ['openai', 'anthropic'],
+        provider_policy_mode: 'allow',
+        provider_allow_list: ['openai', 'anthropic'],
       });
 
-      // Verify provider_deny_list was updated
-      expect(result.settings.provider_deny_list).toEqual(['openai', 'anthropic']);
+      expect(result.settings.provider_policy_mode).toBe('allow');
+      expect(result.settings.provider_allow_list).toEqual(['openai', 'anthropic']);
 
-      // Verify from database that model_deny_list is still there
       const updatedOrg = await getOrganizationById(testOrganization.id);
       expect(updatedOrg?.settings?.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo']);
-      expect(updatedOrg?.settings?.provider_deny_list).toEqual(['openai', 'anthropic']);
+      expect(updatedOrg?.settings?.provider_allow_list).toEqual(['openai', 'anthropic']);
     });
 
-    it('should deduplicate model_deny_list and provider_deny_list entries', async () => {
+    it('should deduplicate model_deny_list and provider_allow_list entries', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Send arrays with duplicate entries
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: testOrganization.id,
         model_deny_list: ['gpt-4', 'gpt-4', 'gpt-3.5-turbo', 'gpt-4', 'claude-3'],
-        provider_deny_list: ['openai', 'openai', 'anthropic', 'openai'],
+        provider_policy_mode: 'allow',
+        provider_allow_list: ['openai', 'openai', 'anthropic', 'openai'],
       });
 
-      // Should be deduplicated to unique values only
       expect(result.settings.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo', 'claude-3']);
-      expect(result.settings.provider_deny_list).toEqual(['openai', 'anthropic']);
+      expect(result.settings.provider_allow_list).toEqual(['openai', 'anthropic']);
 
-      // Verify the deduplicated data was persisted to the database
       const updatedOrg = await getOrganizationById(testOrganization.id);
       expect(updatedOrg?.settings?.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo', 'claude-3']);
-      expect(updatedOrg?.settings?.provider_deny_list).toEqual(['openai', 'anthropic']);
+      expect(updatedOrg?.settings?.provider_allow_list).toEqual(['openai', 'anthropic']);
     });
   });
 
@@ -241,7 +284,7 @@ describe('organizations settings trpc router', () => {
       };
     }
 
-    it('should exclude denied models for enterprise orgs', async () => {
+    it('should exclude models in model_deny_list for enterprise orgs', async () => {
       const openRouterModelsResponse = {
         data: [
           makeOpenRouterModel('openai/gpt-4o'),
@@ -250,14 +293,13 @@ describe('organizations settings trpc router', () => {
         ],
       } satisfies OpenRouterModelsResponse;
 
-      const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
       mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);
 
       const orgWithDenyList = await createTestOrganization(
         'Model Deny List',
         owner.id,
         0,
-        { model_deny_list: ['openai/gpt-4o', 'openai/gpt-4o'] },
+        { model_deny_list: ['openai/gpt-4o'] },
         false
       );
       await addUserToOrganization(orgWithDenyList.id, member.id, 'member');
@@ -267,11 +309,94 @@ describe('organizations settings trpc router', () => {
         organizationId: orgWithDenyList.id,
       });
 
-      // openai/gpt-4o:free normalizes to openai/gpt-4o, which is on the deny list, so it's also blocked
       expect(result.data.map(model => model.id)).toEqual(['anthropic/claude-3-opus']);
     });
 
-    it('should return all models for a non-enterprise org even if model_deny_list is set', async () => {
+    it('should include new models from allowed providers when they are not denied', async () => {
+      const openRouterModelsResponse = {
+        data: [makeOpenRouterModel('openai/gpt-4o'), makeOpenRouterModel('openai/gpt-4.2')],
+      } satisfies OpenRouterModelsResponse;
+
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);
+      mockedGetProviderSlugsForModel.mockResolvedValue(new Set(['openai']));
+
+      const orgWithProviderAllowList = await createTestOrganization(
+        'Provider Allow List',
+        owner.id,
+        0,
+        {
+          provider_policy_mode: 'allow',
+          provider_allow_list: ['openai'],
+        },
+        false
+      );
+      await addUserToOrganization(orgWithProviderAllowList.id, member.id, 'member');
+
+      const caller = await createCallerForUser(member.id);
+      const result = await caller.organizations.settings.listAvailableModels({
+        organizationId: orgWithProviderAllowList.id,
+      });
+
+      expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o', 'openai/gpt-4.2']);
+    });
+
+    it('should exclude models only offered by providers absent from provider_allow_list', async () => {
+      const openRouterModelsResponse = {
+        data: [makeOpenRouterModel('openai/gpt-4o'), makeOpenRouterModel('baidu/ernie')],
+      } satisfies OpenRouterModelsResponse;
+
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);
+      mockedGetProviderSlugsForModel.mockImplementation(async modelId => {
+        if (modelId === 'openai/gpt-4o') return new Set(['openai']);
+        if (modelId === 'baidu/ernie') return new Set(['baidu-qianfan']);
+        return new Set();
+      });
+
+      const orgWithProviderAllowList = await createTestOrganization(
+        'Provider Allow List',
+        owner.id,
+        0,
+        {
+          provider_policy_mode: 'allow',
+          provider_allow_list: ['openai'],
+        },
+        false
+      );
+      await addUserToOrganization(orgWithProviderAllowList.id, member.id, 'member');
+
+      const caller = await createCallerForUser(member.id);
+      const result = await caller.organizations.settings.listAvailableModels({
+        organizationId: orgWithProviderAllowList.id,
+      });
+
+      expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o']);
+    });
+
+    it('should ignore stale provider_allow_list before provider policy marker is set', async () => {
+      const openRouterModelsResponse = {
+        data: [makeOpenRouterModel('openai/gpt-4o'), makeOpenRouterModel('baidu/ernie')],
+      } satisfies OpenRouterModelsResponse;
+
+      mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);
+
+      const orgWithStaleAllowList = await createTestOrganization(
+        'Provider Allow List',
+        owner.id,
+        0,
+        { provider_allow_list: ['openai'] },
+        false
+      );
+      await addUserToOrganization(orgWithStaleAllowList.id, member.id, 'member');
+
+      const caller = await createCallerForUser(member.id);
+      const result = await caller.organizations.settings.listAvailableModels({
+        organizationId: orgWithStaleAllowList.id,
+      });
+
+      expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o', 'baidu/ernie']);
+    });
+
+    it('should return all models for a non-enterprise org even if access settings are set', async () => {
       const openRouterModelsResponse = {
         data: [
           makeOpenRouterModel('openai/gpt-4o'),
@@ -279,15 +404,13 @@ describe('organizations settings trpc router', () => {
         ],
       } satisfies OpenRouterModelsResponse;
 
-      const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
       mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);
 
-      // requireSeats: true sets plan to 'teams'
       const teamsOrg = await createTestOrganization(
-        'Teams Org With Deny List',
+        'Teams Org With Policy',
         owner.id,
         0,
-        { model_deny_list: ['openai/gpt-4o'] },
+        { model_deny_list: ['openai/gpt-4o'], provider_allow_list: ['anthropic'] },
         true
       );
       await addUserToOrganization(teamsOrg.id, member.id, 'member');
@@ -297,7 +420,6 @@ describe('organizations settings trpc router', () => {
         organizationId: teamsOrg.id,
       });
 
-      // Teams orgs should see all models, ignoring the deny list
       expect(result.data.map(model => model.id)).toEqual([
         'openai/gpt-4o',
         'anthropic/claude-3-opus',
@@ -309,12 +431,10 @@ describe('organizations settings trpc router', () => {
     it('should update default model when it is not denied', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Set a deny list that excludes some models but not gpt-4
       await updateOrganizationSettings(orgWithSettings.id, {
-        model_deny_list: ['claude-3', 'gpt-3.5-turbo'],
+        model_deny_list: ['claude-3'],
       });
 
-      // Now set the default model
       const result = await caller.organizations.settings.updateDefaultModel({
         organizationId: orgWithSettings.id,
         default_model: 'gpt-4',
@@ -322,7 +442,6 @@ describe('organizations settings trpc router', () => {
 
       expect(result.settings.default_model).toBe('gpt-4');
 
-      // Verify from database
       const updatedOrg = await getOrganizationById(orgWithSettings.id);
       expect(updatedOrg?.settings?.default_model).toBe('gpt-4');
     });
@@ -330,7 +449,6 @@ describe('organizations settings trpc router', () => {
     it('should reject default_model if it is in the deny list', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // orgWithModelDenyList has model_deny_list: ['gpt-3.5-turbo', 'claude-3']
       await expect(
         caller.organizations.settings.updateDefaultModel({
           organizationId: orgWithModelDenyList.id,
@@ -341,15 +459,13 @@ describe('organizations settings trpc router', () => {
       );
     });
 
-    it('should allow any model when deny list is empty', async () => {
+    it('should allow any model when no access policy is configured', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // Clear the deny list
       await updateOrganizationSettings(testOrganization.id, {
-        model_deny_list: [],
+        data_collection: 'allow',
       });
 
-      // Should be able to set any model
       const result = await caller.organizations.settings.updateDefaultModel({
         organizationId: testOrganization.id,
         default_model: 'any-model',
@@ -384,7 +500,6 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.minimum_balance).toBe(100);
       expect(result.settings.minimum_balance_alert_email).toEqual(['alert@example.com']);
 
-      // Verify from database
       const updatedOrg = await getOrganizationById(testOrganization.id);
       expect(updatedOrg?.settings?.minimum_balance).toBe(100);
       expect(updatedOrg?.settings?.minimum_balance_alert_email).toEqual(['alert@example.com']);
@@ -410,7 +525,6 @@ describe('organizations settings trpc router', () => {
     it('should disable minimum balance alert and remove fields', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // First enable it
       await caller.organizations.settings.updateMinimumBalanceAlert({
         organizationId: testOrganization.id,
         enabled: true,
@@ -418,7 +532,6 @@ describe('organizations settings trpc router', () => {
         minimum_balance_alert_email: ['alert@example.com'],
       });
 
-      // Now disable it
       const result = await caller.organizations.settings.updateMinimumBalanceAlert({
         organizationId: testOrganization.id,
         enabled: false,
@@ -427,7 +540,6 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.minimum_balance).toBeUndefined();
       expect(result.settings.minimum_balance_alert_email).toBeUndefined();
 
-      // Verify from database
       const updatedOrg = await getOrganizationById(testOrganization.id);
       expect(updatedOrg?.settings?.minimum_balance).toBeUndefined();
       expect(updatedOrg?.settings?.minimum_balance_alert_email).toBeUndefined();
@@ -521,13 +633,11 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when enabling minimum balance alert', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // First set some other settings
       await updateOrganizationSettings(testOrganization.id, {
         model_deny_list: ['gpt-4'],
         data_collection: 'allow',
       });
 
-      // Now enable minimum balance alert
       const result = await caller.organizations.settings.updateMinimumBalanceAlert({
         organizationId: testOrganization.id,
         enabled: true,
@@ -535,7 +645,6 @@ describe('organizations settings trpc router', () => {
         minimum_balance_alert_email: ['alert@example.com'],
       });
 
-      // Other settings should be preserved
       expect(result.settings.model_deny_list).toEqual(['gpt-4']);
       expect(result.settings.data_collection).toBe('allow');
       expect(result.settings.minimum_balance).toBe(100);
@@ -545,7 +654,6 @@ describe('organizations settings trpc router', () => {
     it('should preserve other settings when disabling minimum balance alert', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      // First set some settings including minimum balance
       await updateOrganizationSettings(testOrganization.id, {
         model_deny_list: ['gpt-4'],
         data_collection: 'allow',
@@ -553,13 +661,11 @@ describe('organizations settings trpc router', () => {
         minimum_balance_alert_email: ['alert@example.com'],
       });
 
-      // Now disable minimum balance alert
       const result = await caller.organizations.settings.updateMinimumBalanceAlert({
         organizationId: testOrganization.id,
         enabled: false,
       });
 
-      // Other settings should be preserved, but minimum balance fields removed
       expect(result.settings.model_deny_list).toEqual(['gpt-4']);
       expect(result.settings.data_collection).toBe('allow');
       expect(result.settings.minimum_balance).toBeUndefined();

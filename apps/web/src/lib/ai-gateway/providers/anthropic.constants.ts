@@ -1,4 +1,5 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 
 export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
 
@@ -18,7 +19,14 @@ export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
   max_completion_tokens: 128_000,
   gateway: 'openrouter',
   flags: ['reasoning', 'vision'],
-  inference_provider: null,
   pricing: null,
   exclusive_to: [],
 };
+
+export function isAnthropicModel(requestedModel: string) {
+  return modelStartsWith(requestedModel, 'anthropic/');
+}
+
+export function isHaikuModel(requestedModel: string) {
+  return modelStartsWith(requestedModel, 'anthropic/claude-haiku');
+}

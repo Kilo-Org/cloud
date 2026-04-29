@@ -5101,6 +5101,43 @@ describe('enrollWithCredits', () => {
     );
   });
 
+  it('enrollWithCredits with no instanceId after destroy does NOT produce duplicate_enrollment', async () => {
+    const instance = await createInstance(user.id);
+    await giveUserCredits(user.id, 50_000_000);
+    const now = new Date();
+    const periodKey = now.toISOString().slice(0, 7);
+
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: user.id,
+      instance_id: instance.id,
+      payment_source: 'credits',
+      plan: 'standard',
+      status: 'active',
+      current_period_start: now.toISOString(),
+      current_period_end: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+      credit_renewal_at: new Date(now.getTime() + 30 * 86_400_000).toISOString(),
+      cancel_at_period_end: false,
+    });
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: -4_000_000,
+      is_free: false,
+      description: 'KiloClaw standard enrollment',
+      credit_category: `kiloclaw-subscription:${instance.id}:${periodKey}`,
+      check_category_uniqueness: true,
+      original_baseline_microdollars_used: 0,
+    });
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: new Date(now.getTime() + 60_000).toISOString() })
+      .where(eq(kiloclaw_instances.id, instance.id));
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
+      'active subscription already exists'
+    );
+  });
+
   it('enrolls returning subscriber at full price for standard plan', async () => {
     const instance = await createInstance(user.id);
     await giveUserCredits(user.id, 50_000_000);

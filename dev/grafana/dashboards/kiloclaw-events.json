@@ -1208,12 +1208,258 @@
       "type": "table"
     },
     {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 50
+      },
+      "description": "Sample-corrected count of instance.stopped DO events with label trial_inactivity in the selected dashboard time range.",
+      "id": 16,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity'",
+          "rawSql": "SELECT SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity'",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Trial Inactivity Stops",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 35,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 54
+      },
+      "description": "Sample-corrected trial inactivity stops bucketed by Grafana's automatic interval in the selected dashboard time range.",
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "hidden",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, 'stops' AS label, SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'stops' AS label, SUM(_sample_interval) AS stops FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' GROUP BY t ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Trial Stops by Interval",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "instance_id" },
+            "properties": [{ "id": "custom.width", "value": 280 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "fly_machine_id" },
+            "properties": [{ "id": "custom.width", "value": 220 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "machine_uptime_ms" },
+            "properties": [{ "id": "unit", "value": "ms" }]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 18,
+        "x": 6,
+        "y": 50
+      },
+      "description": "Recent instance.stopped DO events with label trial_inactivity in the selected dashboard time range. double2 is machine uptime before stop. Limited to 100 rows.",
+      "id": 17,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT timestamp, blob2 AS user_id, blob15 AS instance_id, blob6 AS fly_app_name, blob7 AS fly_machine_id, blob8 AS sandbox_id, blob9 AS status, blob13 AS stop_reason, double2 AS machine_uptime_ms FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' ORDER BY timestamp DESC LIMIT 100",
+          "rawSql": "SELECT timestamp, blob2 AS user_id, blob15 AS instance_id, blob6 AS fly_app_name, blob7 AS fly_machine_id, blob8 AS sandbox_id, blob9 AS status, blob13 AS stop_reason, double2 AS machine_uptime_ms FROM kiloclaw_events WHERE $timeFilter AND index1 = 'instance.stopped' AND blob3 = 'do' AND blob13 = 'trial_inactivity' ORDER BY timestamp DESC LIMIT 100",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_events",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Recent Trial Inactivity Stops",
+      "type": "table"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 60
       },
       "id": 104,
       "panels": [],
@@ -1278,7 +1524,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 61
       },
       "id": 14,
       "options": {

@@ -51,7 +51,7 @@ import { getSandbox } from '@cloudflare/sandbox';
 import { generateSessionId, fetchSessionMetadata } from './session-service.js';
 import { sessionIdSchema, envVarsSchema } from './types.js';
 import { appRouter } from './router.js';
-import type { TRPCContext, SessionId } from './types.js';
+import type { Env, TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
 
 type MockSessionStub = {
@@ -306,6 +306,7 @@ describe('router sessionId validation', () => {
                 fetch: vi.fn(),
               } as unknown as TRPCContext['env']['SESSION_INGEST'],
               R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+              GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
               NEXTAUTH_SECRET: 'test-secret',
               INTERNAL_API_SECRET_PROD: {
                 get: vi.fn().mockResolvedValue('test-secret'),
@@ -676,6 +677,7 @@ describe('router sessionId validation', () => {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+            GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
             NEXTAUTH_SECRET: 'test-secret',
             INTERNAL_API_SECRET_PROD: {
               get: vi.fn().mockResolvedValue('test-secret'),
@@ -929,6 +931,7 @@ describe('router sessionId validation', () => {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+            GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
             NEXTAUTH_SECRET: 'test-secret',
             INTERNAL_API_SECRET_PROD: {
               get: vi.fn().mockResolvedValue('test-secret'),

@@ -8,6 +8,14 @@ export type ImageVersionEntry = {
   imageTag: string;
   imageDigest: string | null;
   publishedAt: string;
+  /**
+   * Per-image rollout slider (0..100). 0 = not exposed. 0 < x < 100 = staged
+   * candidate (instance offered the upgrade when its bucket falls below x).
+   * Independent of `isLatest`.
+   */
+  rolloutPercent: number;
+  /** True if this image is the production `:latest` for its variant. */
+  isLatest: boolean;
 };
 
 /** Input to POST /api/platform/provision */

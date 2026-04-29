@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, Loader2, RotateCw, Terminal } from 'lucide-react';
 import { toast } from 'sonner';
+import { TRPCClientError } from '@trpc/client';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useKiloClawMyPin } from '@/hooks/useKiloClaw';
+import { useOrgKiloClawMyPin } from '@/hooks/useOrgKiloClaw';
 import type { PlatformStatusResponse } from '@/lib/kiloclaw/types';
 import { useClawContext } from './ClawContext';
 import { AnimatedDots } from './AnimatedDots';
@@ -48,6 +51,17 @@ export function StartKiloCliRunDialog({
   const startMutation = mutations.startKiloCliRun;
   const redeployMutation = mutations.restartMachine;
 
+  // Pin state surfaced inline on the redeploy prompt so the user knows
+  // their pin will be cleared. Only the active context queries (org vs
+  // personal) so we don't fire an org getMyPin with an empty
+  // organizationId.
+  const personalPin = useKiloClawMyPin({ enabled: !organizationId });
+  const orgPin = useOrgKiloClawMyPin(organizationId ?? '', {
+    enabled: !!organizationId,
+  });
+  const pin = organizationId ? orgPin.data : personalPin.data;
+  const pinnedImageTag = pin?.image_tag ?? null;
+
   const needsRedeploy = startMutation.isError && isNeedsRedeployError(startMutation.error);
   const machineReady = machineStatus === 'running';
 
@@ -76,13 +90,32 @@ export function StartKiloCliRunDialog({
   };
 
   const handleRedeploy = () => {
+    // Only ack what the warning actually rendered. If pinnedImageTag is
+    // null (no pin notice shown in the amber warning), send false; the
+    // backend gate catches any pin that appeared between render and
+    // click and surfaces PIN_EXISTS so the user can retry.
     redeployMutation.mutate(
-      { imageTag: 'latest' },
+      { imageTag: 'latest', acknowledgePinRemoval: !!pinnedImageTag },
       {
         onSuccess: () => {
           startMutation.reset();
         },
-        onError: err => toast.error(err.message, { duration: 10000 }),
+        onError: err => {
+          if (
+            err instanceof TRPCClientError &&
+            err.data?.code === 'PRECONDITION_FAILED' &&
+            err.message === 'PIN_EXISTS'
+          ) {
+            if (organizationId) void orgPin.refetch();
+            else void personalPin.refetch();
+            toast.error(
+              'A version pin was set on this instance. Review the warning and try again.',
+              { duration: 10000 }
+            );
+            return;
+          }
+          toast.error(err.message, { duration: 10000 });
+        },
       }
     );
   };
@@ -120,6 +153,13 @@ export function StartKiloCliRunDialog({
               <p className="text-sm text-amber-200">
                 Your KiloClaw instance is running an older version that doesn&apos;t support the
                 recovery agent. Upgrade to the latest version to use this feature.
+                {pinnedImageTag && (
+                  <>
+                    {' '}
+                    This will also remove your version pin to{' '}
+                    <code className="text-xs">{pinnedImageTag}</code>.
+                  </>
+                )}
               </p>
             </div>
             <DialogFooter>

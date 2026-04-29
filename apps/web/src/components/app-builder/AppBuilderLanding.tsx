@@ -652,7 +652,7 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
     // reset to an allowed model
     const isCurrentModelAvailable = modelOptions.some(m => m.id === model);
     if (!isCurrentModelAvailable || !model || !isModelUserSelected) {
-      // Prefer the default model if it's in the allow list, otherwise use the first available
+      // Prefer the default model if it is available under org policy, otherwise use the first available.
       const defaultModel = defaultsData?.defaultModel;
       const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
       const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;

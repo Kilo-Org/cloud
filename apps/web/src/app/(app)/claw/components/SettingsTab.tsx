@@ -76,6 +76,7 @@ import { AnimatedDots } from './AnimatedDots';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PairingSection } from './PairingSection';
 import { VersionPinCard } from './VersionPinCard';
+import { EarlyAccessCard } from './EarlyAccessCard';
 import { WorkspaceFileEditor } from './WorkspaceFileEditor';
 import { PermissionPresetCards } from './PermissionPresetCards';
 import { CustomSecretsSection } from './CustomSecretsSection';
@@ -1305,7 +1306,6 @@ export function SettingsTab({
   onSecretsChanged,
   dirtySecrets,
   onRedeploy,
-  onUpgrade,
   onRequestUpgrade,
   organizationName,
 }: {
@@ -1314,9 +1314,7 @@ export function SettingsTab({
   onSecretsChanged?: (entryId: string) => void;
   dirtySecrets: Set<string>;
   onRedeploy?: () => void;
-  /** Callback that triggers an image upgrade (pull latest) instead of a plain restart. */
-  onUpgrade?: () => void;
-  /** Callback that requests an upgrade via the InstanceControls dialog. */
+  /** Callback that opens the focused upgrade confirmation flow. */
   onRequestUpgrade?: () => void;
   /** Present in organization context; required in the destroy confirmation phrase. */
   organizationName?: string;
@@ -1614,14 +1612,15 @@ export function SettingsTab({
           </Button>
         </div>
 
-        {/* Expandable version pinning */}
+        {/* Expandable Manage Version section: pinning + Early Access opt in. */}
         {manageVersionOpen && (
-          <div className="mt-4 border-t pt-4">
+          <div className="mt-4 space-y-6 border-t pt-4">
             <VersionPinCard
               trackedImageTag={status.trackedImageTag}
               latestImageTag={variantsMatch ? (latestVersion?.imageTag ?? null) : null}
               mutations={mutations}
             />
+            <EarlyAccessCard />
           </div>
         )}
       </div>
@@ -1879,7 +1878,7 @@ export function SettingsTab({
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
-                  onRedeploy={onUpgrade ?? onRedeploy}
+                  onRedeploy={onRequestUpgrade ?? onRedeploy}
                   redeployLabel="Upgrade"
                   actionRowExtra={<AgentCardSetupGuide />}
                 />

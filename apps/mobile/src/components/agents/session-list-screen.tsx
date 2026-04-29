@@ -1,6 +1,6 @@
-import { Plus, Search, SlidersHorizontal } from 'lucide-react-native';
+import { Plus, SlidersHorizontal } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
@@ -52,6 +52,15 @@ export function AgentSessionListScreen() {
       setSearchQuery(text.trim());
     }, 300);
   }, []);
+
+  useEffect(
+    () => () => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+      }
+    },
+    []
+  );
 
   const createdOnPlatform = useMemo(
     () => (platformFilter.length > 0 ? expandPlatformFilter(platformFilter) : undefined),
@@ -186,7 +195,9 @@ export function AgentSessionListScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title="Agents"
+        size="large"
         showBackButton={false}
+        className="px-[22px]"
         headerRight={
           <View className="flex-row items-center gap-4">
             <Pressable
@@ -217,18 +228,6 @@ export function AgentSessionListScreen() {
           </View>
         }
       />
-      <View className="mx-4 my-2 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-2">
-        <Search size={16} color={colors.mutedForeground} />
-        <TextInput
-          className="flex-1 text-sm leading-5 text-foreground"
-          placeholder="Search sessions..."
-          placeholderTextColor={colors.mutedForeground}
-          onChangeText={handleSearchChange}
-          returnKeyType="search"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
       <Animated.View layout={LinearTransition}>
         <SessionFilterChips
           platformFilter={platformFilter}
@@ -246,10 +245,12 @@ export function AgentSessionListScreen() {
         <AgentSessionListContent
           sections={sections}
           storedSessions={storedSessions}
+          hasAnySessions={storedSessions.length > 0 || activeSessions.length > 0}
           isLoading={isLoading || !ready}
           isError={isError}
           refetch={refetch}
           onSessionPress={navigateToSession}
+          onSearchChange={handleSearchChange}
         />
       </Animated.View>
       {showFilterModal && (

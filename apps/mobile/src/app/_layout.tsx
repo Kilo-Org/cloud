@@ -2,10 +2,15 @@ import '../global.css';
 import '@/lib/cloud-agent-runtime';
 
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
+import {
+  JetBrainsMono_500Medium,
+  JetBrainsMono_600SemiBold,
+} from '@expo-google-fonts/jetbrains-mono';
 import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { isRunningInExpoGo } from 'expo';
+import { useFonts } from 'expo-font';
 import { type Href, Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -25,6 +30,7 @@ import {
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
+import { useUnreadCountsInvalidation } from '@/lib/hooks/use-unread-counts-invalidation';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
@@ -67,10 +73,27 @@ checkInitialNotification();
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
   const { updateRequired, isChecking: updateChecking } = useForceUpdate();
+  const [fontsLoaded, fontsError] = useFonts({
+    JetBrainsMono_500Medium,
+    JetBrainsMono_600SemiBold,
+  });
   const segments = useSegments();
   const router = useRouter();
 
-  const isLoading = authLoading || updateChecking;
+  useUnreadCountsInvalidation();
+
+  useEffect(() => {
+    if (fontsError) {
+      Sentry.captureException(fontsError);
+    }
+  }, [fontsError]);
+
+  // Treat font load errors as terminal: fall back to system fonts rather
+  // than holding the app at opacity 0 forever. `useFonts` sets `error` and
+  // leaves `loaded` false on failure, so gating only on `!fontsLoaded` would
+  // keep the splash screen up indefinitely.
+  const fontsReady = fontsLoaded || fontsError !== null;
+  const isLoading = authLoading || updateChecking || !fontsReady;
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
 

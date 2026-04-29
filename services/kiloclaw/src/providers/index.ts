@@ -4,22 +4,14 @@ import type { KiloClawEnv } from '../types';
 import type { InstanceProviderAdapter } from './types';
 import { flyProviderAdapter } from './fly';
 import { dockerLocalProviderAdapter } from './docker-local';
-
-function notImplementedProviderError(
-  provider: Exclude<ProviderId, 'fly' | 'docker-local'>
-): Error & { status: number } {
-  return Object.assign(new Error(`Provider ${provider} is not implemented yet`), {
-    status: 501,
-  });
-}
+import { northflankProviderAdapter } from './northflank';
 
 export function assertImplementedProvider(provider: ProviderId): void {
   switch (provider) {
     case 'fly':
     case 'docker-local':
-      return;
     case 'northflank':
-      throw notImplementedProviderError(provider);
+      return;
   }
 }
 
@@ -35,6 +27,23 @@ export function assertAvailableProvider(env: KiloClawEnv, provider: ProviderId):
   assertImplementedProvider(provider);
   if (provider === 'docker-local' && !isDevelopmentWorker(env)) {
     throw invalidProviderConfiguration('Provider docker-local is only available in development');
+  }
+  if (provider === 'northflank') {
+    const requiredNorthflankKeys = [
+      'NF_API_TOKEN',
+      'NF_REGION',
+      'NF_DEPLOYMENT_PLAN',
+      'NF_EDGE_HEADER_NAME',
+      'NF_EDGE_HEADER_VALUE',
+      'NF_IMAGE_PATH_TEMPLATE',
+    ] satisfies Array<keyof KiloClawEnv>;
+    const missing = requiredNorthflankKeys.filter(key => !env[key]);
+    if (missing.length > 0) {
+      throw invalidProviderConfiguration(
+        `Provider northflank is not configured; missing ${missing.join(', ')}`,
+        503
+      );
+    }
   }
 }
 
@@ -56,6 +65,6 @@ export function getProviderAdapter(
     case 'docker-local':
       return dockerLocalProviderAdapter;
     case 'northflank':
-      throw notImplementedProviderError(state.provider);
+      return northflankProviderAdapter;
   }
 }

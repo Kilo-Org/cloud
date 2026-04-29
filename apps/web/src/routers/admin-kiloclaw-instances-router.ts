@@ -6,6 +6,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
+  kiloclaw_version_pins,
   kilocode_users,
 } from '@kilocode/db/schema';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
@@ -15,6 +16,7 @@ import {
 } from '@/lib/kiloclaw/inbound-email-alias';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
+import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import {
   getActiveInstance,
   getInstanceById,
@@ -317,6 +319,11 @@ export type AdminKiloclawInstance = {
   user_email: string | null;
   subscription_id: string | null;
   subscription_status: KiloClawSubscriptionStatus | null;
+  /**
+   * The owning user's `kiloclaw_early_access` flag. Sourced from
+   * `kilocode_users` (per user, applies across all of their instances).
+   */
+  user_kiloclaw_early_access: boolean;
 };
 
 export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
@@ -331,6 +338,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .select({
         instance: kiloclaw_instances,
         user_email: kilocode_users.google_user_email,
+        user_kiloclaw_early_access: kilocode_users.kiloclaw_early_access,
         suspended_at: kiloclaw_subscriptions.suspended_at,
         subscription_id: kiloclaw_subscriptions.id,
         subscription_status: kiloclaw_subscriptions.status,
@@ -366,6 +374,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       user_email: result.user_email,
       subscription_id: result.subscription_id ?? null,
       subscription_status: result.subscription_status ?? null,
+      user_kiloclaw_early_access: result.user_kiloclaw_early_access ?? false,
     };
 
     const inboundEmailAddress = await getInboundEmailAddressForInstance(instance.id);
@@ -501,6 +510,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       .select({
         instance: kiloclaw_instances,
         user_email: kilocode_users.google_user_email,
+        user_kiloclaw_early_access: kilocode_users.kiloclaw_early_access,
         suspended_at: kiloclaw_subscriptions.suspended_at,
         subscription_id: kiloclaw_subscriptions.id,
         subscription_status: kiloclaw_subscriptions.status,
@@ -547,6 +557,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       user_email: row.user_email,
       subscription_id: row.subscription_id ?? null,
       subscription_status: row.subscription_status ?? null,
+      user_kiloclaw_early_access: row.user_kiloclaw_early_access ?? false,
     }));
 
     return {
@@ -1200,6 +1211,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             'Image tag must be alphanumeric with dots, hyphens, or underscores'
           )
           .optional(),
+        // When true, the admin has confirmed they are intentionally
+        // overriding any pin set on the instance (user-set or admin-set).
+        // The override deletes the pin row before redeploying. No
+        // replacement pin is written so the user retains the ability to
+        // re-pin afterward (Decision: encourage adoption of new releases).
+        acknowledgeOverride: z.boolean().default(false),
       })
     )
     .mutation(async ({ input }) => {
@@ -1218,6 +1235,50 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
       if (!row) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+
+      // Pin consent gate: an admin redeploy with a specific imageTag
+      // (whether forward-upgrading, downgrading, or switching variants)
+      // overrides whatever pin is currently set on the instance. The DO
+      // does not consult the pin table on restart, so the gate lives at
+      // the web layer where authorization context exists.
+      if (input.imageTag) {
+        const [pin] = await db
+          .select({
+            image_tag: kiloclaw_version_pins.image_tag,
+            pinned_by: kiloclaw_version_pins.pinned_by,
+          })
+          .from(kiloclaw_version_pins)
+          .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
+          .limit(1);
+
+        if (pin && !input.acknowledgeOverride) {
+          // Frontend uses its existing getUserPin query for pin details
+          // (current tag, set by user vs admin) to render the override
+          // confirmation dialog. Re-call with acknowledgeOverride: true
+          // proceeds.
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'PIN_EXISTS',
+          });
+        }
+
+        if (pin) {
+          // Admin override deletes the existing pin (whether user-set or
+          // admin-set). No replacement pin written — once the consent
+          // gate has been spent, the user is free to re-establish their
+          // own pin if they want to block the next change.
+          await db
+            .delete(kiloclaw_version_pins)
+            .where(eq(kiloclaw_version_pins.instance_id, input.instanceId));
+
+          // Sync the cleared pin into DO state. The follow-up restartMachine
+          // call overwrites trackedImageTag anyway, but pushing the clear
+          // keeps DB and DO state consistent if the restart fails after
+          // this point. Mirrors the removeMyPin / removePin pattern.
+          // Failures are logged inside pushPinToWorker.
+          await pushPinToWorker(row.user.id, input.instanceId, null);
+        }
       }
 
       const token = generateApiToken(row.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });
@@ -1876,5 +1937,24 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
 
       return { success: true };
+    }),
+
+  setEarlyAccess: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        value: z.boolean(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const client = new KiloClawInternalClient();
+      try {
+        return await client.setUserKiloclawEarlyAccess(input.userId, input.value);
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 404) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
+        throw err;
+      }
     }),
 });

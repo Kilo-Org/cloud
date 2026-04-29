@@ -15,7 +15,10 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
 import { ImagePreviewStrip } from '@/components/shared/ImagePreviewStrip';
 import { useImageUpload, type UseImageUploadOptions } from '@/hooks/useImageUpload';
-import { CLOUD_AGENT_IMAGE_MAX_COUNT } from '@/lib/cloud-agent/constants';
+import {
+  CLOUD_AGENT_IMAGE_MAX_COUNT,
+  CLOUD_AGENT_PROMPT_MAX_LENGTH,
+} from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import type { AgentMode } from './types';
 
@@ -138,6 +141,7 @@ export function ChatInput({
     async (message: string) => {
       const trimmed = message.trim();
       if (!trimmed || disabled) return false;
+      if (trimmed.length > CLOUD_AGENT_PROMPT_MAX_LENGTH) return false;
       if (imageUpload.hasUploadingImages) return false;
 
       const imagesData = imageUpload.getImagesData();
@@ -317,6 +321,7 @@ export function ChatInput({
               onPaste={handlePaste}
               placeholder={placeholder}
               disabled={disabled}
+              maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
               className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent p-4 pb-2 text-base focus:ring-0 focus:outline-none md:text-sm"
               rows={1}
               role="combobox"
@@ -365,6 +370,20 @@ export function ChatInput({
             </Command>
           </PopoverContent>
         </Popover>
+
+        {value.length >= CLOUD_AGENT_PROMPT_MAX_LENGTH * 0.9 && (
+          <p
+            className={cn(
+              'px-4 pb-1 text-xs',
+              value.length >= CLOUD_AGENT_PROMPT_MAX_LENGTH
+                ? 'text-red-400'
+                : 'text-muted-foreground'
+            )}
+          >
+            {value.length.toLocaleString()} / {CLOUD_AGENT_PROMPT_MAX_LENGTH.toLocaleString()}{' '}
+            characters
+          </p>
+        )}
 
         {imageUpload.images.length > 0 && (
           <div className="px-3 pb-1">
@@ -461,7 +480,12 @@ export function ChatInput({
               variant="primary"
               size="icon"
               onClick={handleSend}
-              disabled={disabled || !value.trim() || imageUpload.hasUploadingImages}
+              disabled={
+                disabled ||
+                !value.trim() ||
+                value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH ||
+                imageUpload.hasUploadingImages
+              }
               className="h-8 w-8 rounded-lg"
             >
               <Send className="h-4 w-4" />

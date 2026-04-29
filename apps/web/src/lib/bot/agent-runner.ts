@@ -23,6 +23,7 @@ import { buildSessionUrl } from '@/lib/cloud-agent-next/session-url';
 import { APP_URL } from '@/lib/constants';
 import { FEATURE_HEADER } from '@/lib/feature-detection';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
+import type { Images } from '@/lib/images-schema';
 import {
   formatGitHubRepositoriesForPrompt,
   getGitHubRepositoryContext,
@@ -60,6 +61,8 @@ type RunBotAgentParams = {
   user: User;
   botRequestId: string | undefined;
   prompt: string;
+  /** Pre-uploaded image attachments from the user's message (already in R2). */
+  images?: Images;
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];
   onSessionReady?: (params: {
@@ -110,7 +113,7 @@ async function buildSystemPrompt(
 - If the user's request is ambiguous, ask 1-2 clarifying questions instead of guessing.
 
 ## Answering questions about Kilo Bot
-- When users ask what you can do, how you work, or for general help, include a link to the Bot documentation: https://kilo.ai/docs/advanced-usage/slackbot
+- When users ask what you can do, how you work, or for general help, include a link to the Bot documentation: https://kilo.ai/docs/code-with-ai/platforms/slack
 - Provide the docs link along with your answer so users can learn more.
 
 ## Context you may receive
@@ -123,6 +126,9 @@ ${formatGitHubRepositoriesForPrompt(githubContext)}
 ${formatGitLabRepositoriesForPrompt(gitlabContext)}
 
 Treat this context as authoritative. Prefer selecting a repo from the provided repository list. If the user requests work on a repo that isn't in the list, ask them to confirm the exact owner/repo (or group/project for GitLab) and ensure it's accessible to the integration. Never invent repository names.
+
+## Cloud Agent tool
+If the user asks you to analyze or act on an attached image, you must use the spawnCloudAgentSession tool to start a Cloud Agent session that will analyze the image.
 
 ## Accuracy & safety
 - Don't claim you ran tools, changed code, or created a PR/MR unless the tool results confirm it.
@@ -262,11 +268,16 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
       spawnCloudAgentSession: tool({
         description: `Spawn a Cloud Agent session to perform coding tasks on a GitHub repository or GitLab project. The agent can make code changes, fix bugs, implement features, review/analyze code, run tests, or open PRs/MRs. Do NOT use it for questions you can answer directly.
 
+If the user attached images to their message, those images are automatically forwarded to the Cloud Agent session — you do not need to describe or re-upload them. Reference them in the prompt if relevant (e.g. "implement the design shown in the attached screenshot").
+
 This tool returns an acknowledgement immediately. The final Cloud Agent result will be posted later in the same thread after the async session completes.`,
         inputSchema: spawnCloudAgentInputSchema,
         execute: async args => {
           let resolvedCloudAgentSessionId: string | undefined;
           let resolvedKiloSessionId: string | undefined;
+
+          await params.thread.startTyping('Spawning Cloud Agent session...');
+
           const currentStep = getNextBotCallbackStep({
             completedStepCount,
             completedStepsInCurrentRun: collectedSteps.length,
@@ -298,6 +309,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               prSignature,
               chatPlatform,
               currentStep,
+              images: params.images,
             }
           );
 
@@ -332,7 +344,13 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
     },
   });
 
-  const result = await agent.generate({ prompt: params.prompt });
+  const imageCount = params.images?.files.length ?? 0;
+  const promptWithImageContext =
+    imageCount > 0
+      ? `${params.prompt}\n\n[The user attached ${imageCount} image${imageCount > 1 ? 's' : ''} to this message. The image${imageCount > 1 ? 's are' : ' is'} automatically forwarded to any Cloud Agent session you spawn.]`
+      : params.prompt;
+
+  const result = await agent.generate({ prompt: promptWithImageContext });
 
   return {
     finalText: result.text,

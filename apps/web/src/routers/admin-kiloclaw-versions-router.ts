@@ -9,7 +9,8 @@ import {
 import { eq, desc, sql, or, ilike, inArray, and, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { TRPCError } from '@trpc/server';
-import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 
 /**
  * Resolve a user's active personal instance, throwing NOT_FOUND if none exists.
@@ -35,6 +36,30 @@ async function requireActivePersonalInstance(userId: string) {
   }
   return instance;
 }
+
+/**
+ * Look up the owner userId for an instance. Falls back to `fallbackUserId`
+ * if provided and the row is not found — keeps set/removePin usable even
+ * for instance rows that have been hard-deleted (shouldn't happen for
+ * pin flows, but defensive).
+ */
+async function resolveInstanceOwnerUserId(
+  instanceId: string,
+  fallbackUserId?: string
+): Promise<string> {
+  const [row] = await db
+    .select({ user_id: kiloclaw_instances.user_id })
+    .from(kiloclaw_instances)
+    .where(eq(kiloclaw_instances.id, instanceId))
+    .limit(1);
+  if (row?.user_id) return row.user_id;
+  if (fallbackUserId) return fallbackUserId;
+  throw new TRPCError({
+    code: 'NOT_FOUND',
+    message: `Instance ${instanceId} has no owner userId`,
+  });
+}
+
 import * as z from 'zod';
 
 const ListVersionsSchema = z.object({
@@ -105,75 +130,63 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
   updateVersionStatus: adminProcedure
     .input(UpdateVersionStatusSchema)
     .mutation(async ({ input, ctx }) => {
-      // Prevent disabling the :latest version — it would break all unpinned users.
+      // Disabling: route through the kiloclaw service so status='disabled' AND
+      // rollout_percent=0 land atomically along with a KV pointer refresh. The
+      // service is the only place that can keep KV pointers consistent without
+      // races.
       if (input.status === 'disabled') {
+        // Refuse to disable the row currently marked :latest. The service
+        // enforces this too, but doing the check here gives a cleaner error.
+        const [row] = await db
+          .select({ is_latest: kiloclaw_image_catalog.is_latest })
+          .from(kiloclaw_image_catalog)
+          .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag))
+          .limit(1);
+        if (!row) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Version not found' });
+        }
+        if (row.is_latest) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'Cannot disable the current :latest image. Promote a replacement first.',
+          });
+        }
+
         const client = new KiloClawInternalClient();
         try {
-          const latestTagBefore = (await client.getLatestVersion())?.imageTag;
-          if (latestTagBefore === input.imageTag) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'Cannot disable the current :latest version. Push a new image first.',
-            });
-          }
-
-          const [updated] = await db
-            .update(kiloclaw_image_catalog)
-            .set({
-              status: input.status,
-              updated_by: ctx.user.id,
-              updated_at: new Date().toISOString(),
-            })
-            .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag))
-            .returning();
-
-          if (!updated) {
-            throw new TRPCError({ code: 'NOT_FOUND', message: 'Version not found' });
-          }
-
-          // Re-verify after update to catch race condition where :latest changed
-          const latestTagAfter = (await client.getLatestVersion())?.imageTag;
-          if (latestTagAfter === input.imageTag) {
-            // Rollback the disable - this version became :latest during the operation
-            try {
-              await db
-                .update(kiloclaw_image_catalog)
-                .set({
-                  status: 'available',
-                  updated_by: ctx.user.id,
-                  updated_at: new Date().toISOString(),
-                })
-                .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag));
-            } catch (rollbackErr) {
-              console.error(
-                `Failed to rollback disable for ${input.imageTag}:`,
-                rollbackErr instanceof Error ? rollbackErr.message : rollbackErr
-              );
-              // Still throw the precondition error so the caller knows the operation failed
-            }
-
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: 'This version became :latest during the operation. Cannot disable.',
-            });
-          }
-
-          return updated;
+          await client.disableImageAndClearRollout(input.imageTag, ctx.user.id);
         } catch (err) {
-          // If it's already a TRPCError, re-throw it
-          if (err instanceof TRPCError) {
-            throw err;
+          if (err instanceof KiloClawApiError && err.statusCode === 404) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: `Image not found: ${input.imageTag}`,
+            });
           }
-          // Only catch unexpected errors (network, service unavailable, etc.)
+          if (err instanceof KiloClawApiError && err.statusCode === 400) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+          }
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to verify latest version status',
+            message: 'Failed to disable image',
             cause: err,
           });
         }
+
+        const [updated] = await db
+          .select()
+          .from(kiloclaw_image_catalog)
+          .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag))
+          .limit(1);
+        if (!updated) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Version not found after disable',
+          });
+        }
+        return updated;
       }
 
-      // For non-disable status changes, no :latest check needed
+      // Re-enabling (status: 'available') is a plain catalog update — no KV impact.
       const [updated] = await db
         .update(kiloclaw_image_catalog)
         .set({
@@ -189,6 +202,51 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       }
 
       return updated;
+    }),
+
+  setRolloutPercent: adminProcedure
+    .input(
+      z.object({
+        imageTag: z.string().min(1),
+        percent: z.number().int().min(0).max(100),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const client = new KiloClawInternalClient();
+      try {
+        return await client.setRolloutPercent(input.imageTag, input.percent);
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 404) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `Image not found or not available: ${input.imageTag}`,
+          });
+        }
+        if (err instanceof KiloClawApiError && err.statusCode === 400) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+        }
+        throw err;
+      }
+    }),
+
+  markLatest: adminProcedure
+    .input(z.object({ imageTag: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const client = new KiloClawInternalClient();
+      try {
+        return await client.markImageAsLatest(input.imageTag);
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 404) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `Image not found: ${input.imageTag}`,
+          });
+        }
+        if (err instanceof KiloClawApiError && err.statusCode === 400) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+        }
+        throw err;
+      }
     }),
 
   listPins: adminProcedure.input(ListPinsSchema).query(async ({ input }) => {
@@ -307,35 +365,76 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
     }
 
-    return result;
+    // Push the resolved pin into DO state so the next redeploy boots the
+    // pinned image. Failures are logged but do NOT roll back the DB row —
+    // the pin is the intent of record; the DO will converge on next
+    // provision if this sync fails.
+    const ownerUserId = await resolveInstanceOwnerUserId(resolvedInstanceId, input.userId);
+    const workerSync = await pushPinToWorker(ownerUserId, resolvedInstanceId, input.imageTag);
+
+    return { ...result, worker_sync: workerSync };
   }),
 
   removePin: adminProcedure.input(RemovePinSchema).mutation(async ({ input }) => {
+    // Look up the owner before deleting so we can still push the clear to
+    // the worker after the row is gone.
+    const ownerUserId = await resolveInstanceOwnerUserId(input.instanceId);
+
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
       .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
       .returning();
 
-    if (!deleted) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'No pin found for this user' });
-    }
+    // Idempotent clear: always push null to the DO, even if no row
+    // existed. This makes `removePin` safe to retry after a failed
+    // worker sync — the DB row is already gone but a stale
+    // `trackedImageTag` in the DO can still be cleaned up by calling
+    // removePin again.
+    const workerSync = await pushPinToWorker(ownerUserId, input.instanceId, null);
 
-    return { success: true };
+    return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
   getLatestTag: adminProcedure.query(async () => {
-    const client = new KiloClawInternalClient();
-    try {
-      const latest = await client.getLatestVersion();
-      return latest?.imageTag ?? null;
-    } catch (err) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to fetch latest version',
-        cause: err,
-      });
-    }
+    // Catalog-driven: the :latest badge tracks the is_latest column directly,
+    // not a KV pointer (which can be stale or out of sync with the catalog).
+    const [row] = await db
+      .select({ image_tag: kiloclaw_image_catalog.image_tag })
+      .from(kiloclaw_image_catalog)
+      .where(
+        and(
+          eq(kiloclaw_image_catalog.is_latest, true),
+          eq(kiloclaw_image_catalog.status, 'available')
+        )
+      )
+      .limit(1);
+    return row?.image_tag ?? null;
   }),
+
+  /**
+   * Returns the variant's :latest and active candidate rows independent of
+   * the paginated catalog list. The Versions admin page uses this for the
+   * hero panel and for the StartRolloutButton's "clear existing candidate"
+   * logic — both must reflect global state, not just whatever's on the
+   * current page of `listVersions`.
+   */
+  getActiveRollout: adminProcedure
+    .input(z.object({ variant: z.string().default('default') }))
+    .query(async ({ input }) => {
+      const rows = await db
+        .select()
+        .from(kiloclaw_image_catalog)
+        .where(
+          and(
+            eq(kiloclaw_image_catalog.variant, input.variant),
+            eq(kiloclaw_image_catalog.status, 'available')
+          )
+        );
+
+      const latest = rows.find(r => r.is_latest) ?? null;
+      const candidate = rows.find(r => !r.is_latest && r.rollout_percent > 0) ?? null;
+      return { latest, candidate };
+    }),
 
   syncCatalog: adminProcedure.mutation(async () => {
     const client = new KiloClawInternalClient();

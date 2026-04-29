@@ -16,6 +16,10 @@ case "${1:-}" in
   *) echo "Unknown option: $1" >&2; exit 1 ;;
 esac
 
+# Exclude the root package so the recursive workspace typecheck does not invoke
+# this script again.
+workspace_typecheck_filters=(--filter '!kilocode-monorepo' --filter '!web' --filter '!@kilocode/trpc')
+
 base=""
 if $changes_only; then
   base=$(git merge-base origin/main HEAD 2>/dev/null || true)
@@ -44,7 +48,7 @@ tsgo --noEmit -p apps/web/tsconfig.json
 # 3. Workspace typecheck
 if ! $changes_only; then
   echo "[typecheck] checking all workspace packages"
-  pnpm -r --filter '!web' --filter '!@kilocode/trpc' run typecheck
+  pnpm -r "${workspace_typecheck_filters[@]}" run typecheck
   exit 0
 fi
 
@@ -54,7 +58,7 @@ fi
 if git diff --name-only "$base" -- pnpm-workspace.yaml | grep -q .; then
   echo "[typecheck] pnpm-workspace.yaml changed, rebuilding trpc and running full workspace typecheck"
   pnpm --filter @kilocode/trpc run build
-  pnpm -r --filter '!web' --filter '!@kilocode/trpc' run typecheck
+  pnpm -r "${workspace_typecheck_filters[@]}" run typecheck
   exit 0
 fi
 
@@ -86,4 +90,4 @@ if [ ${#pnpm_filters[@]} -eq 0 ]; then
 fi
 
 echo "[typecheck] checking affected packages: ${pnpm_filters[*]}"
-pnpm -r "${pnpm_filters[@]}" --filter '!web' --filter '!@kilocode/trpc' run typecheck
+pnpm -r "${pnpm_filters[@]}" "${workspace_typecheck_filters[@]}" run typecheck

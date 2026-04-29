@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +18,7 @@ import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
 import { setLastActiveInstance } from '@/lib/last-active-instance';
-import { type NotificationData, setActiveChatInstance } from '@/lib/notifications';
+import { parseNotificationData, setActiveChatInstance } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
 
 type KiloClawChatProps = {
@@ -27,6 +27,8 @@ type KiloClawChatProps = {
   enabled: boolean;
   organizationId?: string | null;
 };
+
+type UnreadCountsData = { channelId: string; badgeCount: number }[];
 
 export function KiloClawChat({
   instanceId,
@@ -39,13 +41,30 @@ export function KiloClawChat({
   const { isActive } = useAppLifecycle();
   const isFocusedRef = useRef(false);
 
+  const queryClient = useQueryClient();
+  const unreadCountsKey = useMemo(() => trpc.user.getUnreadCounts.queryOptions().queryKey, [trpc]);
+
   const { mutate: markChatRead } = useMutation(
     trpc.user.markChatRead.mutationOptions({
+      onMutate: async ({ channelId }) => {
+        await queryClient.cancelQueries({ queryKey: unreadCountsKey });
+        const previous = queryClient.getQueryData<UnreadCountsData>(unreadCountsKey);
+        queryClient.setQueryData<UnreadCountsData>(unreadCountsKey, old =>
+          (old ?? []).filter(row => row.channelId !== channelId)
+        );
+        return { previous };
+      },
       onSuccess: ({ badgeCount }) => {
         void Notifications.setBadgeCountAsync(badgeCount);
       },
-      onError: (err: { message: string }) => {
+      onError: (err: { message: string }, _input, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData<UnreadCountsData>(unreadCountsKey, context.previous);
+        }
         toast.error(err.message || 'Failed to update badge count');
+      },
+      onSettled: () => {
+        void queryClient.invalidateQueries({ queryKey: unreadCountsKey });
       },
     })
   );
@@ -61,7 +80,7 @@ export function KiloClawChat({
       // visually suppressed, but the DO still incremented the server-side count. Clear
       // it immediately so the badge never drifts above 0 while the user is reading.
       const subscription = Notifications.addNotificationReceivedListener(notification => {
-        const data = notification.request.content.data as NotificationData | undefined;
+        const data = parseNotificationData(notification.request.content.data);
         if (data?.type === 'chat' && data.instanceId === instanceId) {
           markChatRead({ channelId: instanceId });
         }

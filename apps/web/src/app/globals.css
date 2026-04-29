@@ -78,6 +78,7 @@
   --color-kilo-gray: var(--color-kilo-gray);
   --color-kilo-gray-lighter: var(--color-kilo-gray-lighter);
   --color-brand-primary: var(--brand-primary);
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 /*

@@ -11,11 +11,46 @@ import {
 import { eq } from 'drizzle-orm';
 
 // Mock KiloClawInternalClient so tests don't require KILOCLAW_API_URL.
-// getLatestVersion returns null (no latest set) so disable-latest guard passes.
+// The mock factory is hoisted above the imports below, but each
+// mockImplementation runs only when the mocked method is called — by which
+// time the regular ES imports (db, schema, eq) at the top of the file have
+// been resolved and are safe to reference.
+//
+// disableImageAndClearRollout mimics the kiloclaw service's atomic SQL write
+// so the post-call re-read in updateVersionStatus sees the disabled state.
 jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn().mockImplementation(() => ({
     getLatestVersion: jest.fn().mockResolvedValue(null),
     listVersions: jest.fn().mockResolvedValue([]),
+    disableImageAndClearRollout: jest
+      .fn()
+      .mockImplementation(async (imageTag: string, updatedBy: string) => {
+        await db
+          .update(kiloclaw_image_catalog)
+          .set({
+            status: 'disabled',
+            rollout_percent: 0,
+            updated_by: updatedBy,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(kiloclaw_image_catalog.image_tag, imageTag));
+        return { ok: true };
+      }),
+    // The DO-side behavior of applyPinnedVersion is covered in
+    // services/kiloclaw/src/durable-objects/kiloclaw-instance.test.ts.
+    // Here we just need the client to resolve successfully so setPin /
+    // removePin don't surface a sync failure.
+    applyPinnedVersion: jest
+      .fn()
+      .mockImplementation(async (_userId: string, _instanceId: string, imageTag: string | null) => {
+        return {
+          ok: true,
+          openclawVersion: imageTag ? '2026.2.9' : null,
+          imageTag,
+          imageDigest: imageTag ? 'sha256:abc123' : null,
+          variant: imageTag ? 'default' : null,
+        };
+      }),
   })),
   KiloClawApiError: class extends Error {
     readonly statusCode: number;
@@ -221,6 +256,21 @@ describe('admin.kiloclawVersions pin operations', () => {
         })
       ).rejects.toThrow();
     });
+
+    it('reports worker_sync ok alongside the DB row', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.admin.kiloclawVersions.setPin({
+        userId: targetUser.id,
+        imageTag: catalogEntry.image_tag,
+      });
+
+      expect(result.image_tag).toBe(catalogEntry.image_tag);
+      expect(result.worker_sync).toEqual({
+        ok: true,
+        openclawVersion: '2026.2.9',
+        imageTag: catalogEntry.image_tag,
+      });
+    });
   });
 
   describe('getUserPin', () => {
@@ -293,11 +343,30 @@ describe('admin.kiloclawVersions pin operations', () => {
       expect(pin).toBeNull();
     });
 
-    it('throws NOT_FOUND when no pin exists', async () => {
+    it('is idempotent when no pin exists — still pushes clear to DO so failed syncs are retryable', async () => {
       const caller = await createCallerForUser(adminUser.id);
-      await expect(
-        caller.admin.kiloclawVersions.removePin({ instanceId: targetInstanceId })
-      ).rejects.toThrow('No pin found for this user');
+      const result = await caller.admin.kiloclawVersions.removePin({
+        instanceId: targetInstanceId,
+      });
+      expect(result.success).toBe(true);
+      expect(result.deleted).toBe(false);
+      expect(result.worker_sync).toEqual({ ok: true, openclawVersion: null, imageTag: null });
+    });
+
+    it('reports deleted=true and worker_sync ok on successful clear', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.admin.kiloclawVersions.setPin({
+        userId: targetUser.id,
+        imageTag: catalogEntry.image_tag,
+      });
+
+      const result = await caller.admin.kiloclawVersions.removePin({
+        instanceId: targetInstanceId,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.deleted).toBe(true);
+      expect(result.worker_sync).toEqual({ ok: true, openclawVersion: null, imageTag: null });
     });
   });
 });

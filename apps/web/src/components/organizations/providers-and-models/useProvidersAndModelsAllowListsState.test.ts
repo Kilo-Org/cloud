@@ -11,8 +11,8 @@ describe('providersAndModelsAllowListsReducer', () => {
 
     state = providersAndModelsAllowListsReducer(state, {
       type: 'INIT_FROM_SERVER',
-      modelDenyList: ['openai/gpt-4.1'],
-      providerDenyList: [],
+      modelDenyList: ['anthropic/claude-3-opus'],
+      providerAllowList: ['openai'],
     });
 
     if (state.status !== 'ready') {
@@ -22,7 +22,7 @@ describe('providersAndModelsAllowListsReducer', () => {
     state = providersAndModelsAllowListsReducer(state, {
       type: 'TOGGLE_MODEL',
       modelId: 'anthropic/claude-3-opus',
-      nextAllowed: false,
+      nextAllowed: true,
     });
 
     state = providersAndModelsAllowListsReducer(state, { type: 'RESET_TO_INITIAL' });
@@ -32,7 +32,7 @@ describe('providersAndModelsAllowListsReducer', () => {
     }
 
     expect(state.draftModelDenyList).toEqual(state.initialModelDenyList);
-    expect(state.draftProviderDenyList).toEqual(state.initialProviderDenyList);
+    expect(state.draftProviderAllowList).toEqual(state.initialProviderAllowList);
   });
 
   test('init -> toggle -> mark saved marks clean (draft becomes initial)', () => {
@@ -41,7 +41,7 @@ describe('providersAndModelsAllowListsReducer', () => {
     state = providersAndModelsAllowListsReducer(state, {
       type: 'INIT_FROM_SERVER',
       modelDenyList: [],
-      providerDenyList: [],
+      providerAllowList: ['openai'],
     });
 
     if (state.status !== 'ready') {
@@ -60,7 +60,7 @@ describe('providersAndModelsAllowListsReducer', () => {
       throw new Error('expected ready state');
     }
 
-    expect(state.initialProviderDenyList).toEqual(state.draftProviderDenyList);
+    expect(state.initialProviderAllowList).toEqual(state.draftProviderAllowList);
     expect(state.initialModelDenyList).toEqual(state.draftModelDenyList);
   });
 });

@@ -2191,6 +2191,7 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
                ${agent_metadata.last_event_type},
                ${agent_metadata.last_event_at},
                ${agent_metadata.active_tools},
+               ${agent_metadata.stalled_at},
                b.${beads.columns.rig_id}
         FROM ${agent_metadata}
         LEFT JOIN ${beads} b ON b.${beads.columns.bead_id} = ${agent_metadata.bead_id}
@@ -2218,17 +2219,22 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
     // applyAction('transition_agent') ignores `from`, so action order
     // decides the final state.
     //
-    // Mirror reconcileAgents' auto-idle eligibility check against
-    // last_activity_at. If last_event_at is stale but heartbeats keep
-    // refreshing last_activity_at, reconcileAgents won't idle the row yet —
-    // skipping GUPP handling in that case would leave the row stuck stalled
-    // while the alarm keeps firing.
-    if (
-      agent.status === 'stalled' &&
-      agent.last_activity_at &&
-      Date.now() - new Date(agent.last_activity_at).getTime() > STALLED_AUTO_IDLE_MS
-    ) {
-      continue;
+    // Mirror reconcileAgents' auto-idle eligibility check, which measures
+    // from `stalled_at` (when the agent entered `stalled`), not from
+    // heartbeats. Heartbeats keep arriving after GUPP force-stops a
+    // container, so `last_activity_at` stays fresh and wouldn't trigger
+    // this skip — leaving GUPP to re-stall an agent that reconcileAgents
+    // is about to auto-idle in the same pass. Fall back to
+    // `last_activity_at` only for rows from before `stalled_at` was
+    // populated, so legacy stalled rows can still escape this loop.
+    if (agent.status === 'stalled') {
+      const stalledSince = agent.stalled_at ?? agent.last_activity_at;
+      if (
+        stalledSince &&
+        Date.now() - new Date(stalledSince).getTime() > STALLED_AUTO_IDLE_MS
+      ) {
+        continue;
+      }
     }
 
     if (elapsed > GUPP_FORCE_STOP_MS) {

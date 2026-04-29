@@ -1297,18 +1297,12 @@ importers:
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.13.0(typescript@5.9.3))(hono@4.12.8)
-      '@kilocode/db':
-        specifier: workspace:*
-        version: link:../../packages/db
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
-      '@octokit/auth-app':
-        specifier: 'catalog:'
-        version: 8.2.0
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.13.0(typescript@5.9.3)

@@ -84,6 +84,46 @@ export type InterruptResult = {
   processesFound: boolean;
 };
 
+type GetTokenForRepoResult =
+  | {
+      success: true;
+      token: string;
+      installationId: string;
+      accountLogin: string;
+      appType: 'standard' | 'lite';
+    }
+  | {
+      success: false;
+      reason:
+        | 'database_not_configured'
+        | 'invalid_repo_format'
+        | 'no_installation_found'
+        | 'invalid_org_id';
+    };
+
+type GetGitLabTokenResult =
+  | { success: true; token: string; instanceUrl: string }
+  | {
+      success: false;
+      reason:
+        | 'database_not_configured'
+        | 'no_integration_found'
+        | 'invalid_org_id'
+        | 'no_token'
+        | 'token_refresh_failed'
+        | 'token_expired_no_refresh';
+    };
+
+export type GitTokenService = {
+  getTokenForRepo(params: {
+    githubRepo: string;
+    userId: string;
+    orgId?: string;
+  }): Promise<GetTokenForRepoResult>;
+  getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
+  getGitLabToken(params: { userId: string; orgId?: string }): Promise<GetGitLabTokenResult>;
+};
+
 export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for per-session sandbox containers (standard-2, experimental) */
@@ -98,16 +138,8 @@ export type Env = {
   R2_BUCKET: R2Bucket;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
-  /** KV namespace for caching GitHub installation tokens */
-  GITHUB_TOKEN_CACHE?: KVNamespace;
-  /** GitHub App ID for token generation */
-  GITHUB_APP_ID?: string;
-  /** GitHub App private key (PEM format) for token generation */
-  GITHUB_APP_PRIVATE_KEY?: string;
-  /** GitHub Lite App ID for read-only token generation */
-  GITHUB_LITE_APP_ID?: string;
-  /** GitHub Lite App private key (PEM format) for read-only token generation */
-  GITHUB_LITE_APP_PRIVATE_KEY?: string;
+  /** Service binding for centralized git token generation */
+  GIT_TOKEN_SERVICE: GitTokenService;
   /** GitHub Lite App slug for git commit attribution (e.g., 'kiloconnect-lite') */
   GITHUB_LITE_APP_SLUG?: string;
   /** GitHub Lite App bot user ID for git commit email */
@@ -139,11 +171,6 @@ export type Env = {
    * Required when using encryptedSecrets feature. PEM format (base64-encoded).
    */
   AGENT_ENV_VARS_PRIVATE_KEY?: string;
-  /**
-   * Hyperdrive binding for PostgreSQL connection pooling.
-   * Used for looking up GitHub installation IDs from the database.
-   */
-  HYPERDRIVE?: { connectionString: string };
   /** GitHub App slug for git commit attribution (e.g., 'kiloconnect') */
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */

@@ -35,6 +35,58 @@ async function requireActivePersonalInstance(userId: string) {
   }
   return instance;
 }
+
+/**
+ * Look up the owner userId for an instance. Falls back to `fallbackUserId`
+ * if provided and the row is not found — keeps set/removePin usable even
+ * for instance rows that have been hard-deleted (shouldn't happen for
+ * pin flows, but defensive).
+ */
+async function resolveInstanceOwnerUserId(
+  instanceId: string,
+  fallbackUserId?: string
+): Promise<string> {
+  const [row] = await db
+    .select({ user_id: kiloclaw_instances.user_id })
+    .from(kiloclaw_instances)
+    .where(eq(kiloclaw_instances.id, instanceId))
+    .limit(1);
+  if (row?.user_id) return row.user_id;
+  if (fallbackUserId) return fallbackUserId;
+  throw new TRPCError({
+    code: 'NOT_FOUND',
+    message: `Instance ${instanceId} has no owner userId`,
+  });
+}
+
+type WorkerPinSync =
+  | { ok: true; openclawVersion: string | null; imageTag: string | null }
+  | { ok: false; error: string };
+
+async function pushPinToWorker(
+  userId: string,
+  instanceId: string,
+  imageTag: string | null
+): Promise<WorkerPinSync> {
+  try {
+    const client = new KiloClawInternalClient();
+    const applied = await client.applyPinnedVersion(userId, instanceId, imageTag);
+    return {
+      ok: true,
+      openclawVersion: applied.openclawVersion,
+      imageTag: applied.imageTag,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[admin-kiloclaw-versions] Failed to push pin to worker', {
+      userId,
+      instanceId,
+      imageTag,
+      error: message,
+    });
+    return { ok: false, error: message };
+  }
+}
 import * as z from 'zod';
 
 const ListVersionsSchema = z.object({
@@ -340,10 +392,21 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
     }
 
-    return result;
+    // Push the resolved pin into DO state so the next redeploy boots the
+    // pinned image. Failures are logged but do NOT roll back the DB row —
+    // the pin is the intent of record; the DO will converge on next
+    // provision if this sync fails.
+    const ownerUserId = await resolveInstanceOwnerUserId(resolvedInstanceId, input.userId);
+    const workerSync = await pushPinToWorker(ownerUserId, resolvedInstanceId, input.imageTag);
+
+    return { ...result, worker_sync: workerSync };
   }),
 
   removePin: adminProcedure.input(RemovePinSchema).mutation(async ({ input }) => {
+    // Look up the owner before deleting so we can still push the clear to
+    // the worker after the row is gone.
+    const ownerUserId = await resolveInstanceOwnerUserId(input.instanceId);
+
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
       .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
@@ -353,7 +416,11 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       throw new TRPCError({ code: 'NOT_FOUND', message: 'No pin found for this user' });
     }
 
-    return { success: true };
+    // Reset the DO to the current rollout target. Same failure policy as
+    // setPin — log and continue.
+    const workerSync = await pushPinToWorker(ownerUserId, input.instanceId, null);
+
+    return { success: true, worker_sync: workerSync };
   }),
 
   getLatestTag: adminProcedure.query(async () => {

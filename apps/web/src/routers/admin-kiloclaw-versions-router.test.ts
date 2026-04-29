@@ -36,6 +36,21 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
           .where(eq(kiloclaw_image_catalog.image_tag, imageTag));
         return { ok: true };
       }),
+    // The DO-side behavior of applyPinnedVersion is covered in
+    // services/kiloclaw/src/durable-objects/kiloclaw-instance.test.ts.
+    // Here we just need the client to resolve successfully so setPin /
+    // removePin don't surface a sync failure.
+    applyPinnedVersion: jest
+      .fn()
+      .mockImplementation(async (_userId: string, _instanceId: string, imageTag: string | null) => {
+        return {
+          ok: true,
+          openclawVersion: imageTag ? '2026.2.9' : null,
+          imageTag,
+          imageDigest: imageTag ? 'sha256:abc123' : null,
+          variant: imageTag ? 'default' : null,
+        };
+      }),
   })),
   KiloClawApiError: class extends Error {
     readonly statusCode: number;
@@ -241,6 +256,21 @@ describe('admin.kiloclawVersions pin operations', () => {
         })
       ).rejects.toThrow();
     });
+
+    it('reports worker_sync ok alongside the DB row', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.admin.kiloclawVersions.setPin({
+        userId: targetUser.id,
+        imageTag: catalogEntry.image_tag,
+      });
+
+      expect(result.image_tag).toBe(catalogEntry.image_tag);
+      expect(result.worker_sync).toEqual({
+        ok: true,
+        openclawVersion: '2026.2.9',
+        imageTag: catalogEntry.image_tag,
+      });
+    });
   });
 
   describe('getUserPin', () => {
@@ -318,6 +348,21 @@ describe('admin.kiloclawVersions pin operations', () => {
       await expect(
         caller.admin.kiloclawVersions.removePin({ instanceId: targetInstanceId })
       ).rejects.toThrow('No pin found for this user');
+    });
+
+    it('reports worker_sync ok on successful clear', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.admin.kiloclawVersions.setPin({
+        userId: targetUser.id,
+        imageTag: catalogEntry.image_tag,
+      });
+
+      const result = await caller.admin.kiloclawVersions.removePin({
+        instanceId: targetInstanceId,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.worker_sync).toEqual({ ok: true, openclawVersion: null, imageTag: null });
     });
   });
 });

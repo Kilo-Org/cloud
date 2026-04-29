@@ -42,23 +42,33 @@ import {
   DirectUserByokInferenceProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
+  type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import * as z from 'zod';
 
-// Hardcoded BYOK providers list
+// Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
+// clause forces new entries here whenever a provider is added to
+// VercelUserByokInferenceProviderIdSchema.
+const VERCEL_BYOK_PROVIDER_NAMES = {
+  anthropic: 'Anthropic',
+  bedrock: 'AWS Bedrock',
+  openai: 'OpenAI',
+  inception: 'Inception',
+  fireworks: 'Fireworks',
+  google: 'Google AI Studio',
+  minimax: 'MiniMax',
+  mistral: 'Mistral AI (other models)',
+  moonshotai: 'Moonshot AI',
+  novita: 'Novita',
+  xai: 'xAI',
+  zai: 'Z.ai (pay as you go)',
+} satisfies Record<VercelUserByokInferenceProviderId, string>;
+
 const VERCEL_BYOK_PROVIDERS = [
-  { id: VercelUserByokInferenceProviderIdSchema.enum.anthropic, name: 'Anthropic' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.bedrock, name: 'AWS Bedrock' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.openai, name: 'OpenAI' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.inception, name: 'Inception' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.google, name: 'Google AI Studio' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.minimax, name: 'MiniMax' },
+  ...Object.entries(VERCEL_BYOK_PROVIDER_NAMES).map(([id, name]) => ({ id, name })),
   { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Mistral AI (Codestral)' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.mistral, name: 'Mistral AI (other models)' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.xai, name: 'xAI' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.zai, name: 'Z.ai (pay as you go)' },
-] as const;
+];
 
 const DIRECT_BYOK_PROVIDERS_LIST = DIRECT_BYOK_PROVIDERS.map(plan => ({
   id: plan.id,

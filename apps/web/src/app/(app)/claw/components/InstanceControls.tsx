@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { TRPCClientError } from '@trpc/client';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useKiloClawMyPin } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawMyPin } from '@/hooks/useOrgKiloClaw';
@@ -73,12 +74,13 @@ export function InstanceControls({
   const gatewayUrl = useGatewayUrl(status);
   const { organizationId } = useClawContext();
 
-  // Pin state for the upgrade-confirmation dialogs (inline confirm + the
-  // separate UpgradeKiloClawDialog). The dialog click is the user's
-  // consent — sending acknowledgePinRemoval: true unconditionally on
-  // upgrade lets the backend gate clear any existing pin and proceed.
-  const personalPin = useKiloClawMyPin();
-  const orgPin = useOrgKiloClawMyPin(organizationId ?? '');
+  // Pin state for the upgrade-confirmation dialogs. Only the active
+  // context queries (org vs personal) so we don't fire an org getMyPin
+  // with an empty organizationId.
+  const personalPin = useKiloClawMyPin({ enabled: !organizationId });
+  const orgPin = useOrgKiloClawMyPin(organizationId ?? '', {
+    enabled: !!organizationId,
+  });
   const pin = organizationId ? orgPin.data : personalPin.data;
   const pinnedImageTag = pin?.image_tag ?? null;
   const isRunning = status.status === 'running';
@@ -142,20 +144,46 @@ export function InstanceControls({
       instance_status: status.status,
       redeploy_mode: 'upgrade',
     });
-    // Dialog click is the consent — acknowledgePinRemoval lets backend
-    // clear any existing pin and proceed.
+    // Only ack what was actually rendered to the user. If pinnedImageTag
+    // is null (no warning shown), send false; the backend gate catches
+    // any pin that appeared between render and click and returns
+    // PIN_EXISTS so the user can retry with fresh data.
     mutations.restartMachine.mutate(
-      { imageTag: 'latest', acknowledgePinRemoval: true },
+      { imageTag: 'latest', acknowledgePinRemoval: !!pinnedImageTag },
       {
         onSuccess: () => {
           toast.success('Upgrading KiloClaw');
           setConfirmUpgrade(false);
           onRedeploySuccess?.();
         },
-        onError: err => toast.error(err.message, { duration: 10000 }),
+        onError: err => {
+          if (
+            err instanceof TRPCClientError &&
+            err.data?.code === 'PRECONDITION_FAILED' &&
+            err.message === 'PIN_EXISTS'
+          ) {
+            if (organizationId) void orgPin.refetch();
+            else void personalPin.refetch();
+            toast.error(
+              'A version pin was set on this instance. Review the warning and try again.',
+              { duration: 10000 }
+            );
+            return;
+          }
+          toast.error(err.message, { duration: 10000 });
+        },
       }
     );
-  }, [mutations.restartMachine, onRedeploySuccess, posthog, status.status]);
+  }, [
+    mutations.restartMachine,
+    onRedeploySuccess,
+    pinnedImageTag,
+    posthog,
+    status.status,
+    organizationId,
+    orgPin,
+    personalPin,
+  ]);
 
   const showUpgradeBanner =
     isFlyProvider && updateAvailable && !isDismissedInStorage && !manuallyDismissed;
@@ -463,11 +491,14 @@ export function InstanceControls({
                   instance_status: status.status,
                   redeploy_mode: redeployMode,
                 });
-                // For the upgrade path, the dialog click is the consent —
-                // pass acknowledgePinRemoval so the backend can clear any
-                // existing pin and proceed. Plain redeploy (no imageTag)
-                // never triggers the gate.
-                const input = imageTag ? { imageTag, acknowledgePinRemoval: true } : undefined;
+                // For the upgrade path, only ack what the dialog actually
+                // rendered. If no pin warning was shown (pinnedImageTag
+                // null), send false and let the backend gate catch any
+                // pin that appeared between render and click. Plain
+                // redeploy (no imageTag) never triggers the gate.
+                const input = imageTag
+                  ? { imageTag, acknowledgePinRemoval: !!pinnedImageTag }
+                  : undefined;
                 mutations.restartMachine.mutate(input, {
                   onSuccess: () => {
                     toast.success(
@@ -476,7 +507,22 @@ export function InstanceControls({
                     setConfirmRedeploy(false);
                     onRedeploySuccess?.();
                   },
-                  onError: err => toast.error(err.message, { duration: 10000 }),
+                  onError: err => {
+                    if (
+                      err instanceof TRPCClientError &&
+                      err.data?.code === 'PRECONDITION_FAILED' &&
+                      err.message === 'PIN_EXISTS'
+                    ) {
+                      if (organizationId) void orgPin.refetch();
+                      else void personalPin.refetch();
+                      toast.error(
+                        'A version pin was set on this instance. Review the warning and try again.',
+                        { duration: 10000 }
+                      );
+                      return;
+                    }
+                    toast.error(err.message, { duration: 10000 });
+                  },
                 });
               }}
               disabled={mutations.restartMachine.isPending || isRestarting || isRecovering}

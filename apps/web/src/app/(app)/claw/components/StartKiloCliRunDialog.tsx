@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle, Loader2, RotateCw, Terminal } from 'lucide-react';
 import { toast } from 'sonner';
+import { TRPCClientError } from '@trpc/client';
 import {
   Dialog,
   DialogContent,
@@ -50,10 +51,14 @@ export function StartKiloCliRunDialog({
   const startMutation = mutations.startKiloCliRun;
   const redeployMutation = mutations.restartMachine;
 
-  // Pin state — surfaced inline on the redeploy prompt so the user knows
-  // their pin will be cleared when they click Upgrade & Redeploy here.
-  const personalPin = useKiloClawMyPin();
-  const orgPin = useOrgKiloClawMyPin(organizationId ?? '');
+  // Pin state surfaced inline on the redeploy prompt so the user knows
+  // their pin will be cleared. Only the active context queries (org vs
+  // personal) so we don't fire an org getMyPin with an empty
+  // organizationId.
+  const personalPin = useKiloClawMyPin({ enabled: !organizationId });
+  const orgPin = useOrgKiloClawMyPin(organizationId ?? '', {
+    enabled: !!organizationId,
+  });
   const pin = organizationId ? orgPin.data : personalPin.data;
   const pinnedImageTag = pin?.image_tag ?? null;
 
@@ -85,17 +90,32 @@ export function StartKiloCliRunDialog({
   };
 
   const handleRedeploy = () => {
-    // The "needs redeploy" prompt the user just clicked is itself the
-    // consent — pass acknowledgePinRemoval so the backend gate clears any
-    // existing pin and proceeds. Backend ignores the flag when no pin
-    // exists. (See kiloclaw.restartMachine consent gate.)
+    // Only ack what the warning actually rendered. If pinnedImageTag is
+    // null (no pin notice shown in the amber warning), send false; the
+    // backend gate catches any pin that appeared between render and
+    // click and surfaces PIN_EXISTS so the user can retry.
     redeployMutation.mutate(
-      { imageTag: 'latest', acknowledgePinRemoval: true },
+      { imageTag: 'latest', acknowledgePinRemoval: !!pinnedImageTag },
       {
         onSuccess: () => {
           startMutation.reset();
         },
-        onError: err => toast.error(err.message, { duration: 10000 }),
+        onError: err => {
+          if (
+            err instanceof TRPCClientError &&
+            err.data?.code === 'PRECONDITION_FAILED' &&
+            err.message === 'PIN_EXISTS'
+          ) {
+            if (organizationId) void orgPin.refetch();
+            else void personalPin.refetch();
+            toast.error(
+              'A version pin was set on this instance. Review the warning and try again.',
+              { duration: 10000 }
+            );
+            return;
+          }
+          toast.error(err.message, { duration: 10000 });
+        },
       }
     );
   };

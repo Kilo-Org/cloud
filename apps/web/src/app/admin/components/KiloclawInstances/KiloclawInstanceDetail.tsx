@@ -1619,6 +1619,21 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         });
       },
       onError: err => {
+        // PIN_EXISTS comes back when a pin appeared (or was stale) between
+        // dialog render and click. Refetch so the dialog re-renders with
+        // the current pin warning, and surface a clearer message than the
+        // raw upstream code.
+        if (
+          err instanceof TRPCClientError &&
+          err.data?.code === 'PRECONDITION_FAILED' &&
+          err.message === 'PIN_EXISTS'
+        ) {
+          void queryClient.invalidateQueries({
+            queryKey: trpc.admin.kiloclawVersions.getUserPin.queryKey(),
+          });
+          toast.error('A version pin was set on this instance. Review the warning and try again.');
+          return;
+        }
         toast.error(`Failed to change version: ${err.message}`);
       },
     })
@@ -3183,10 +3198,16 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               <Button
                 onClick={() => {
                   if (!data || !changeVersionSelectedTag) return;
+                  // Only ack what the dialog actually rendered. If
+                  // changeVersionPinData is null (no warning shown), send
+                  // false; the backend gate catches any pin that appeared
+                  // between render and click and surfaces PIN_EXISTS,
+                  // which the onError handler routes back through this
+                  // dialog with the warning.
                   void machineChangeVersion({
                     instanceId: data.id,
                     imageTag: changeVersionSelectedTag,
-                    acknowledgeOverride: true,
+                    acknowledgeOverride: !!changeVersionPinData,
                   });
                 }}
                 disabled={!changeVersionSelectedTag || isChangingVersion}

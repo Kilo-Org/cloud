@@ -6,6 +6,7 @@ import { PageTitleProvider } from '@/contexts/PageTitleContext';
 import { EventServiceProvider } from '@/contexts/EventServiceContext';
 import { AdminOmnibox } from '@/components/admin-omnibox';
 import { PrefetchedOrganizations } from './components/PrefetchedOrganizations';
+import { PlatformPresenceMount } from './components/PlatformPresenceMount';
 import { ImpactIdentify } from '@/components/ImpactIdentify';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -13,6 +14,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <RoleTestingProvider>
       <PageTitleProvider>
         <EventServiceProvider>
+          <PlatformPresenceMount />
           <SidebarProvider>
             <ImpactIdentify />
             <PrefetchedOrganizations>

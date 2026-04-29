@@ -826,10 +826,16 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
       // Pin consent gate. Symmetric with the personal user path: any pin
       // (set by org member or admin) requires explicit acknowledgement
-      // before a version-changing redeploy proceeds.
+      // before a version-changing redeploy proceeds. See the personal
+      // kiloclaw-router for the residual concurrency note: a pin written
+      // between this SELECT and the worker call is not consulted by the
+      // worker on restart, by design.
       if (input.imageTag) {
         const [pin] = await db
-          .select({ image_tag: kiloclaw_version_pins.image_tag })
+          .select({
+            id: kiloclaw_version_pins.id,
+            image_tag: kiloclaw_version_pins.image_tag,
+          })
           .from(kiloclaw_version_pins)
           .where(eq(kiloclaw_version_pins.instance_id, instance.id))
           .limit(1);
@@ -842,9 +848,26 @@ export const organizationKiloclawRouter = createTRPCRouter({
         }
 
         if (pin) {
-          await db
+          // Conditional delete tied to the row id we observed. If the pin
+          // was replaced between SELECT and DELETE, returning() is empty
+          // and we throw PIN_EXISTS so the caller re-checks the new pin.
+          const deleted = await db
             .delete(kiloclaw_version_pins)
-            .where(eq(kiloclaw_version_pins.instance_id, instance.id));
+            .where(
+              and(
+                eq(kiloclaw_version_pins.instance_id, instance.id),
+                eq(kiloclaw_version_pins.id, pin.id)
+              )
+            )
+            .returning({ id: kiloclaw_version_pins.id });
+
+          if (deleted.length === 0) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'PIN_EXISTS',
+            });
+          }
+
           await pushPinToWorker(ctx.user.id, instance.id, null);
         }
       }

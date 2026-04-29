@@ -173,41 +173,22 @@ export function SlackIntegrationDetails({
     }
   };
 
-  // NOTE: These mappings are coupled to the exact error strings returned by
-  // `slackService.testConnection` and the Slack Web API. If the service grows
-  // more failure modes, prefer returning a structured `code` alongside `error`.
-  const mapTestConnectionError = (rawError: string | undefined): string => {
-    if (!rawError) return 'Could not verify Slack right now. Try again later.';
-    if (rawError === 'No Slack installation found') return 'Slack is not connected yet.';
-    if (rawError === 'No access token found')
-      return 'Slack connection data is incomplete. Reconnect Slack.';
-    if (
-      rawError.includes('invalid_auth') ||
-      rawError.includes('account_inactive') ||
-      rawError.includes('token_revoked') ||
-      rawError.includes('token_expired')
-    ) {
-      return 'Slack authorization is no longer valid. Reconnect Slack and try again.';
-    }
-    return 'Could not verify Slack right now. Try again later.';
-  };
-
   const handleTestConnection = () => {
     testConnection.mutate(input, {
       onSuccess: result => {
         if (result.success) {
           setConnectionCheck({ status: 'success' });
-        } else {
+        } else if ('error' in result && result.error) {
           setConnectionCheck({
             status: 'error',
-            message: mapTestConnectionError(result.error),
+            message: result.error,
           });
         }
       },
       onError: err => {
         setConnectionCheck({
           status: 'error',
-          message: mapTestConnectionError(err.message),
+          message: err.message,
         });
       },
     });

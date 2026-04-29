@@ -13,20 +13,11 @@ import { directByokModelsRedisKey } from '@/lib/redis-keys';
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
 const DESCRIPTION_MODEL = 'google/gemma-4-26b-a4b-it';
 
-const NeuralwattModelsResponseSchema = z.object({
-  data: z.array(
-    z.object({
-      id: z.string(),
-      max_model_len: z.number().optional(),
-    })
-  ),
-});
-
 const ModalitySchema = z
   .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
   .catch('unknown');
 
-const ChutesModelsResponseSchema = z.object({
+const OpenAICompatibleModelsResponseSchema = z.object({
   data: z.array(
     z.object({
       id: z.string(),
@@ -82,7 +73,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
           `Failed to fetch Neuralwatt models: ${response.status} ${response.statusText}`
         );
       }
-      const parsed = NeuralwattModelsResponseSchema.parse(await response.json());
+      const parsed = OpenAICompatibleModelsResponseSchema.parse(await response.json());
       return parsed.data.map(model => ({
         id: model.id,
         context_length: model.max_model_len,
@@ -96,7 +87,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
       if (!response.ok) {
         throw new Error(`Failed to fetch Chutes models: ${response.status} ${response.statusText}`);
       }
-      const parsed = ChutesModelsResponseSchema.parse(await response.json());
+      const parsed = OpenAICompatibleModelsResponseSchema.parse(await response.json());
       return parsed.data.map(model => ({
         id: model.id,
         context_length: model.context_length ?? model.max_model_len,

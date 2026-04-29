@@ -14,13 +14,13 @@ export default {
     providerId: 'ollama-cloud',
     recommendedModels: [
       {
-        id: 'gpt-oss:120b',
-        name: 'GPT-OSS 120B',
+        id: 'kimi-k2.6:cloud',
+        name: 'Kimi K2.6',
         description:
-          "gpt-oss-120b is OpenAI's open-weight, 117B-parameter Mixture-of-Experts (MoE) language model designed for high-reasoning, agentic, and general-purpose production use cases. It activates 5.1B parameters per forward pass.",
-        flags: [],
-        context_length: 131072,
-        max_completion_tokens: 131072,
+          "Kimi K2.6 is Moonshot AI's next-generation multimodal model, designed for long-horizon coding, coding-driven UI/UX generation, and multi-agent orchestration.",
+        flags: ['vision'],
+        context_length: 262144,
+        max_completion_tokens: 262144,
         variants: null,
       },
     ],

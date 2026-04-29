@@ -438,6 +438,10 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   let wasSuspended = false;
   let resolvedInstanceId: string | undefined;
   let applied = false;
+  // True only when the subscription transitions from trialing → first paid period.
+  // Renewals (before.status === 'active') and reactivations must not trigger the
+  // "subscription started" email; existing paid subscribers have no log row yet.
+  let isFirstPaidPeriod = false;
 
   await db.transaction(async tx => {
     const user = await tx.query.kilocode_users.findFirst({
@@ -605,6 +609,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       .from(kiloclaw_subscriptions)
       .where(eq(kiloclaw_subscriptions.id, targetRow.id))
       .limit(1);
+    isFirstPaidPeriod = before?.status === 'trialing';
     const [after] = await tx
       .update(kiloclaw_subscriptions)
       .set(updateSet)
@@ -645,7 +650,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     });
   }
 
-  if (resolvedInstanceId && amountMicrodollars > 0) {
+  if (resolvedInstanceId && amountMicrodollars > 0 && isFirstPaidPeriod) {
     await maybeSendKiloClawSubscriptionStartedEmail({
       userId,
       instanceId: resolvedInstanceId,

@@ -2,7 +2,7 @@ import { createGateway, generateText } from 'ai';
 import * as z from 'zod';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import {
-  DirectByokModelSchema,
+  DirectByokModelArraySchema,
   type DirectByokModel,
 } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -13,8 +13,6 @@ import { directByokModelsRedisKey } from '@/lib/redis-keys';
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
 const DESCRIPTION_MODEL = 'google/gemma-4-26b-a4b-it';
 
-const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
-
 const NeuralwattModelsResponseSchema = z.object({
   data: z.array(
     z.object({
@@ -24,6 +22,10 @@ const NeuralwattModelsResponseSchema = z.object({
   ),
 });
 
+const ModalitySchema = z
+  .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
+  .catch('unknown');
+
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
@@ -31,6 +33,12 @@ const ModelsDevModelSchema = z.object({
     .object({
       context: z.number().optional(),
       output: z.number().optional(),
+    })
+    .optional(),
+  modalities: z
+    .object({
+      input: z.array(ModalitySchema).optional(),
+      output: z.array(ModalitySchema).optional(),
     })
     .optional(),
 });

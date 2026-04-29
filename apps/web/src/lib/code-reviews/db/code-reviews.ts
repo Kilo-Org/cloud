@@ -40,6 +40,7 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
         head_sha: params.headSha,
         platform: params.platform ?? 'github',
         platform_project_id: params.platformProjectId ?? null,
+        agent_version: 'v2',
         status: 'pending',
       })
       .returning({ id: cloud_agent_code_reviews.id });
@@ -488,6 +489,39 @@ export async function updateCheckRunId(reviewId: string, checkRunId: number): Pr
     captureException(error, {
       tags: { operation: 'updateCheckRunId' },
       extra: { reviewId, checkRunId },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Repoints an in-flight review at a new head SHA (and optionally a new check
+ * run). Used when a merge commit arrives for a PR with a preserved review:
+ * the review keeps running on the prior feature-branch content, but its
+ * eventual completion needs to update the gate on the new HEAD (which is
+ * what branch-protection evaluates) rather than the abandoned prior SHA.
+ *
+ * Pass `checkRunId = null` for GitLab, whose commit statuses are keyed by
+ * (sha, name) rather than by an opaque ID.
+ */
+export async function updateReviewHeadShaAndCheckRun(
+  reviewId: string,
+  headSha: string,
+  checkRunId: number | null
+): Promise<void> {
+  try {
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        head_sha: headSha,
+        check_run_id: checkRunId,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updateReviewHeadShaAndCheckRun' },
+      extra: { reviewId, headSha, checkRunId },
     });
     throw error;
   }

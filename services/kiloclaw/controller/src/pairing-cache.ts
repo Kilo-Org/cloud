@@ -56,6 +56,8 @@ type PairingCacheOptions = {
   readChannelPairingImpl?: ReadChannelPairingImpl;
   readDevicePairingImpl?: ReadDevicePairingImpl;
   nowMsImpl?: () => number;
+  /** Auto-approve pending device pairings from the gateway's own exec client. */
+  autoApproveGatewayClient?: boolean;
 };
 
 export const PERIODIC_INTERVAL_MS = 120_000;
@@ -63,7 +65,11 @@ export const DEBOUNCE_DELAY_MS = 2_000;
 
 export const FAILURE_RETRY_BASE_MS = 30_000;
 export const FAILURE_RETRY_MAX_MS = 300_000;
-export const APPROVE_TIMEOUT_MS = 45_000;
+// TEMPORARY: bumped from 45_000 to 180_000 because openclaw 2026.4.15 CLI
+// startup takes ~65s (CPU profile shows ~55% in jiti normalizeAliases/createJiti
+// from per-plugin loader churn). Revert to 45_000 once openclaw upstream
+// reduces startup time. Tracking: <openclaw issue link TBD>.
+export const APPROVE_TIMEOUT_MS = 180_000;
 export const CONFIG_PATH = '/root/.openclaw/openclaw.json';
 
 // TTL constants — exact matches to openclaw source
@@ -213,6 +219,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       return JSON.parse(await fs.promises.readFile(filePath, 'utf8')) as unknown;
     },
     nowMsImpl = () => Date.now(),
+    autoApproveGatewayClient = false,
   } = options ?? {};
 
   let channelCache: CacheEntry<ChannelPairingRequest> = { requests: [], lastUpdated: '' };
@@ -348,6 +355,23 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
         deviceCache = { requests, lastUpdated: nowImpl() };
       }
       console.log(`[pairing-cache] devices: read ok, ${requests.length} pending`);
+
+      if (autoApproveGatewayClient) {
+        const gatewayRequests = requests.filter(r => r.clientId === 'gateway-client');
+        for (const req of gatewayRequests) {
+          console.log(`[pairing-cache] auto-approving gateway-client device ${req.requestId}`);
+          try {
+            await execImpl(OPENCLAW_BIN, ['devices', 'approve', req.requestId]);
+          } catch (err) {
+            console.error(`[pairing-cache] auto-approve failed for ${req.requestId}:`, err);
+          }
+        }
+        if (gatewayRequests.length > 0) {
+          // Re-read after approvals so the cache reflects the updated state.
+          await refreshDevicePairingInternal();
+        }
+      }
+
       return true;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {

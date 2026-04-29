@@ -205,8 +205,6 @@ export function ReviewConfigForm({
   const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
-  const isCloudAgentNextEnabled = configData?.isCloudAgentNextEnabled ?? false;
-  const isPrGateEnabled = configData?.isPrGateEnabled ?? false;
   const [repositorySelectionMode, setRepositorySelectionMode] = useState<'all' | 'selected'>('all');
   const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>([]);
   // Repositories added from search results (for GitLab where pagination limits initial results)
@@ -551,8 +549,8 @@ export function ReviewConfigForm({
               helperText="Choose the AI model to use for code reviews"
             />
 
-            {/* Thinking Effort — only shown when cloud-agent-next is available and the model supports variants */}
-            {availableVariants.length > 0 && isCloudAgentNextEnabled && (
+            {/* Thinking Effort — only shown when the model supports variants */}
+            {availableVariants.length > 0 && (
               <div className="space-y-2">
                 <Label>Thinking Effort</Label>
                 <Select
@@ -577,29 +575,26 @@ export function ReviewConfigForm({
               </div>
             )}
 
-            {/* PR Gate Threshold — only shown when PR gate feature flag is enabled */}
-            {isPrGateEnabled && (
-              <div className="space-y-2">
-                <Label>PR Gate Threshold</Label>
-                <Select
-                  value={gateThreshold}
-                  onValueChange={v => setGateThreshold(v as 'off' | 'all' | 'warning' | 'critical')}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="off">Off</SelectItem>
-                    <SelectItem value="all">All findings</SelectItem>
-                    <SelectItem value="warning">Warnings and above</SelectItem>
-                    <SelectItem value="critical">Critical issues only</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-muted-foreground text-sm">
-                  Controls when the PR status check reports a failure based on review findings
-                </p>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>PR Gate Threshold</Label>
+              <Select
+                value={gateThreshold}
+                onValueChange={v => setGateThreshold(v as 'off' | 'all' | 'warning' | 'critical')}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="off">Off</SelectItem>
+                  <SelectItem value="all">All findings</SelectItem>
+                  <SelectItem value="warning">Warnings and above</SelectItem>
+                  <SelectItem value="critical">Critical issues only</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-sm">
+                Controls when the PR status check reports a failure based on review findings
+              </p>
+            </div>
 
             {/* Review Style */}
             <div className="space-y-3">

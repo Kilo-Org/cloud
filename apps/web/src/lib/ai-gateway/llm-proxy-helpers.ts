@@ -67,6 +67,18 @@ export function invalidRequestResponse() {
   );
 }
 
+export function malformedJsonResponse(parseError: unknown) {
+  const detail = parseError instanceof Error ? parseError.message : String(parseError);
+  return NextResponse.json(
+    {
+      error: 'Malformed JSON',
+      error_type: ProxyErrorType.invalid_request,
+      message: `Request body is not valid JSON: ${detail}`,
+    },
+    { status: 400 }
+  );
+}
+
 export function temporarilyUnavailableResponse() {
   return NextResponse.json(
     {
@@ -339,8 +351,8 @@ export type OrganizationRestrictionResult = {
 /**
  * Checks organization-level restrictions for model and provider access.
  *
- * Model allow list restrictions only apply to Enterprise plans.
- * Provider allow list and data collection settings apply to all plans.
+ * Provider allow list and model deny list restrictions only apply to Enterprise plans.
+ * Data collection settings apply to all organization plans.
  *
  * @param params.modelId - The model ID being requested
  * @param params.settings - Organization settings (may be undefined for non-org users)
@@ -356,25 +368,29 @@ export function checkOrganizationModelRestrictions(params: {
 
   const normalizedModelId = normalizeModelId(params.modelId);
 
-  // Model deny list restrictions only apply to Enterprise plans
-  // Teams plans should allow all models by default
+  // Model/provider access restrictions only apply to Enterprise plans.
   if (params.organizationPlan === 'enterprise') {
     const modelDenyList = params.settings.model_deny_list;
-    if (
-      modelDenyList &&
-      modelDenyList.some(entry => normalizeModelId(entry) === normalizedModelId)
-    ) {
+    if (modelDenyList?.some(entry => normalizeModelId(entry) === normalizedModelId)) {
       return { error: modelNotAllowedResponse() };
     }
   }
 
+  const providerAllowList =
+    params.settings.provider_policy_mode === 'allow'
+      ? params.settings.provider_allow_list
+      : undefined;
   const providerDenyList = params.settings.provider_deny_list;
   const dataCollection = params.settings.data_collection;
 
   const providerConfig: OpenRouterProviderConfig = {};
 
-  if (params.organizationPlan === 'enterprise' && providerDenyList && providerDenyList.length > 0) {
-    providerConfig.ignore = providerDenyList;
+  if (params.organizationPlan === 'enterprise') {
+    if (providerAllowList !== undefined) {
+      providerConfig.only = providerAllowList;
+    } else if (providerDenyList && providerDenyList.length > 0) {
+      providerConfig.ignore = providerDenyList;
+    }
   }
 
   // Setting this only if it's set as an override on the organization settings

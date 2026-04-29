@@ -39,9 +39,12 @@ import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,
 } from '@kilocode/worker-utils/instance-id';
-import { resolveLatestVersion, resolveVersionByTag } from '../../lib/image-version';
+import { resolveVersionByTag } from '../../lib/image-version';
 import { lookupCatalogVersion } from '../../lib/catalog-registration';
+import { selectImageVersionForInstance } from '../../lib/version-rollout';
+import { lookupKiloclawEarlyAccess } from '../../lib/user-flags';
 import { ImageVariantSchema } from '../../schemas/image-version';
+import type { ImageVariant } from '../../schemas/image-version';
 import {
   LIVE_CHECK_THROTTLE_MS,
   OPENCLAW_BUILTIN_DEFAULT_MODEL,
@@ -620,6 +623,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
                 imageTag: catalogEntry.imageTag,
                 imageDigest: catalogEntry.imageDigest,
                 publishedAt: catalogEntry.publishedAt,
+                // Pinned instances bypass rollout gating entirely; defaults
+                // are placeholders. The :latest / candidate state of the
+                // pinned tag is irrelevant to selection.
+                rolloutPercent: 0,
+                isLatest: false,
               };
               console.debug(
                 '[DO] Resolved pinned tag from Postgres catalog:',
@@ -650,19 +658,44 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         this.s.trackedImageDigest = null;
       }
     } else {
-      const variant = 'default';
-      const latest = await resolveLatestVersion(this.env.KV_CLAW_CACHE, variant);
-      if (latest) {
-        this.s.openclawVersion = latest.openclawVersion;
-        this.s.imageVariant = latest.variant;
-        this.s.trackedImageTag = latest.imageTag;
-        this.s.trackedImageDigest = latest.imageDigest;
+      const variant: ImageVariant = 'default';
+      // Per-user early-access opt-in: when set, the user is offered the
+      // current candidate (if any) for every instance they own — personal or
+      // org. The flag lives on kilocode_users, not on the instance.
+      let autoEnroll = false;
+      if (this.env.HYPERDRIVE?.connectionString) {
+        try {
+          autoEnroll = await lookupKiloclawEarlyAccess(
+            this.env.HYPERDRIVE.connectionString,
+            userId
+          );
+        } catch (err) {
+          doWarn(this.s, 'Failed to look up kiloclaw_early_access; treating as false', {
+            error: toLoggable(err),
+          });
+        }
+      }
+      const selected = await selectImageVersionForInstance({
+        kv: this.env.KV_CLAW_CACHE,
+        variant,
+        instanceId: opts?.instanceId ?? userId,
+        currentImageTag: this.s.trackedImageTag,
+        autoEnroll,
+      });
+      if (selected) {
+        this.s.openclawVersion = selected.openclawVersion;
+        this.s.imageVariant = selected.variant;
+        this.s.trackedImageTag = selected.imageTag;
+        this.s.trackedImageDigest = selected.imageDigest;
       } else if (isNew) {
         this.s.openclawVersion = null;
         this.s.imageVariant = null;
         this.s.trackedImageTag = null;
         this.s.trackedImageDigest = null;
       }
+      // Existing-instance redeploys with no eligible upgrade keep their
+      // current trackedImageTag — already true in this branch since we only
+      // overwrite when `selected` is non-null.
     }
 
     const previousUserTimezone = this.s.userTimezone ?? null;
@@ -2022,6 +2055,26 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error('Cannot start: instance is restarting');
     }
 
+    // Duplicate-provision guard: if another recent startAsync call is still
+    // in flight we must not schedule a second background start(). The
+    // startInProgress flag in start() only protects against *concurrent*
+    // re-entry — two startAsyncs that fire their waitUntils back-to-back
+    // can still run start() sequentially after the first finishes,
+    // producing a redundant provider.startRuntime (e.g. a second Northflank
+    // deployment PATCH). reconcileStarting takes over when startingAt goes
+    // stale past STARTING_TIMEOUT_MS, so a stale starting state falls
+    // through to a fresh attempt.
+    if (this.s.status === 'starting' && this.s.startingAt !== null) {
+      const startAge = Date.now() - this.s.startingAt;
+      if (startAge < STARTING_TIMEOUT_MS) {
+        doWarn(this.s, 'startAsync: already starting within fresh window, skipping duplicate', {
+          startingAt: this.s.startingAt,
+          ageMs: startAge,
+        });
+        return;
+      }
+    }
+
     // Mark as starting so the UI can show a polling state immediately.
     // Record startingAt so reconcileStarting() can time out after STARTING_TIMEOUT_MS.
     this.s.status = 'starting';
@@ -2226,6 +2279,23 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         );
       } catch (err) {
         doWarn(this.s, 'Stream Chat user deactivation failed (non-fatal)', {
+          error: toLoggable(err),
+        });
+      }
+    }
+
+    // Best-effort: clean up kilo-chat data (conversations, messages, memberships)
+    // for this sandbox. Failure is non-fatal — orphaned data is unreachable.
+    if (this.env.KILO_CHAT && this.s.sandboxId) {
+      try {
+        const result = await this.env.KILO_CHAT.destroySandboxData(this.s.sandboxId);
+        if (!result.ok) {
+          doWarn(this.s, 'kilo-chat sandbox cleanup partially failed (non-fatal)', {
+            failedConversations: result.failedConversations,
+          });
+        }
+      } catch (err) {
+        doWarn(this.s, 'kilo-chat sandbox cleanup failed (non-fatal)', {
           error: toLoggable(err),
         });
       }
@@ -3139,7 +3209,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     });
 
     try {
-      if (this.s.provider !== 'fly' && options?.imageTag) {
+      // Image tag overrides are only meaningful for providers that pull from
+      // a registry. docker-local always runs the locally built image
+      // (resolveRuntimeImageRef hardcodes to env.DOCKER_LOCAL_IMAGE), but we
+      // still allow the trackedImageTag state update so the banner clears and
+      // local-dev exercises the full upgrade UX. The actual local container
+      // is unchanged.
+      if (this.s.provider !== 'fly' && this.s.provider !== 'docker-local' && options?.imageTag) {
         return {
           success: false,
           error: `Provider ${this.s.provider} does not support image tag overrides`,
@@ -3148,8 +3224,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       if (options?.imageTag) {
         if (options.imageTag === 'latest') {
-          const variant = 'default';
-          const latest = await resolveLatestVersion(this.env.KV_CLAW_CACHE, variant);
+          const variant: ImageVariant = 'default';
+          const instanceIdForBucket =
+            this.s.sandboxId && isInstanceKeyedSandboxId(this.s.sandboxId)
+              ? instanceIdFromSandboxId(this.s.sandboxId)
+              : (this.s.userId ?? '');
+          let autoEnroll = false;
+          if (this.s.userId && this.env.HYPERDRIVE?.connectionString) {
+            try {
+              autoEnroll = await lookupKiloclawEarlyAccess(
+                this.env.HYPERDRIVE.connectionString,
+                this.s.userId
+              );
+            } catch (err) {
+              doWarn(this.s, 'Failed to look up kiloclaw_early_access on upgrade', {
+                error: toLoggable(err),
+              });
+            }
+          }
+          const latest = await selectImageVersionForInstance({
+            kv: this.env.KV_CLAW_CACHE,
+            variant,
+            instanceId: instanceIdForBucket,
+            currentImageTag: this.s.trackedImageTag,
+            autoEnroll,
+          });
           if (latest) {
             this.s.openclawVersion = latest.openclawVersion;
             this.s.imageVariant = latest.variant;

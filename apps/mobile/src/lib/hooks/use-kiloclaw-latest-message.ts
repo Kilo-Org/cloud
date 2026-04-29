@@ -6,7 +6,7 @@ const STREAM_CHAT_API_BASE = 'https://chat.stream-io-api.com';
 
 type LatestMessage = {
   text: string;
-  senderName: string;
+  isFromMe: boolean;
   created_at: string;
 };
 
@@ -21,7 +21,7 @@ type ChannelQueryResponse = {
   messages?: {
     text?: string;
     created_at?: string;
-    user?: { id?: string; name?: string };
+    user?: { id?: string };
   }[];
 };
 
@@ -58,7 +58,7 @@ async function fetchLatestMessage(creds: StreamChatCredentials): Promise<LatestM
 
   return {
     text: message.text ?? '',
-    senderName: message.user?.name ?? message.user?.id ?? '',
+    isFromMe: message.user?.id === creds.userId,
     created_at: message.created_at,
   };
 }

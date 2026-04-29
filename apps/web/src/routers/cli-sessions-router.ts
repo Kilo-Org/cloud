@@ -130,7 +130,7 @@ const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),
   limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
   createdOnPlatform: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
-  orderBy: z.enum(['created_at', 'updated_at']).optional().default('created_at'),
+  orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
   organizationId: z.uuid().nullable().optional(),
 });
 

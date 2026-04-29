@@ -32,7 +32,7 @@ if [ -n "$base" ]; then
 fi
 
 # Read workspace dirs using pnpm (handles glob expansion in pnpm-workspace.yaml)
-workspace_dirs=$(pnpm ls --json -r --depth -1 | node -e "
+workspace_dirs=$(pnpm ls --json -r --depth -1 2>/dev/null | node -e "
   const pkgs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
   for (const p of pkgs) {
     if (!p.path) continue;
@@ -60,7 +60,9 @@ for dir in $workspace_dirs; do
   [ -n "$has_test" ] || continue
 
   # Skip workspaces whose test script exists but has no test files.
-  # Use -print -quit to avoid SIGPIPE failures from find|head under pipefail.
+  # `-print -quit` stops find after the first match and prints it, avoiding
+  # a `find | head -1` pipeline — on Linux that produces SIGPIPE on find,
+  # which under `set -o pipefail` propagates as a non-zero pipeline exit.
   test_file_count=$(find "$dir" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.test.js' -o -name '*.test.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.spec.js' -o -name '*.spec.jsx' \) -not -path '*/node_modules/*' -print -quit 2>/dev/null)
   [ -n "$test_file_count" ] || continue
 

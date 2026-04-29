@@ -38,6 +38,7 @@ import { StartKiloCliRunDialog } from './StartKiloCliRunDialog';
 import { AnimatedDots } from './AnimatedDots';
 import { OpenClawButton } from './OpenClawButton';
 import { KiloClawUpdateAvailableBanner } from './KiloClawUpdateAvailableBanner';
+import { UpgradeKiloClawDialog } from './UpgradeKiloClawDialog';
 
 const VOLUME_SIZE_GB = 10;
 // Default machine spec fallback (matches kiloclaw DEFAULT_MACHINE_GUEST)
@@ -54,15 +55,13 @@ export function InstanceControls({
   status,
   mutations,
   onRedeploySuccess,
-  upgradeRequested,
-  onUpgradeHandled,
+  onRequestUpgrade,
   gatewayReady,
 }: {
   status: KiloClawDashboardStatus;
   mutations: ClawMutations;
   onRedeploySuccess?: () => void;
-  upgradeRequested?: boolean;
-  onUpgradeHandled?: () => void;
+  onRequestUpgrade?: () => void;
   gatewayReady?: boolean;
 }) {
   const posthog = usePostHog();
@@ -84,6 +83,7 @@ export function InstanceControls({
   const [kiloRunOpen, setKiloRunOpen] = useState(false);
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [confirmRedeploy, setConfirmRedeploy] = useState(false);
+  const [confirmUpgrade, setConfirmUpgrade] = useState(false);
   const [redeployMode, setRedeployMode] = useState<'redeploy' | 'upgrade'>('redeploy');
 
   const { updateAvailable, catalogNewerThanImage, latestAvailableVersion, latestVersion } =
@@ -113,6 +113,33 @@ export function InstanceControls({
     setManuallyDismissed(true);
   }, [dismissKey]);
 
+  const openUpgradeConfirmation = useCallback(() => {
+    if (onRequestUpgrade) {
+      onRequestUpgrade();
+      return;
+    }
+
+    setConfirmUpgrade(true);
+  }, [onRequestUpgrade]);
+
+  const handleUpgradeConfirm = useCallback(() => {
+    posthog?.capture('claw_redeploy_clicked', {
+      instance_status: status.status,
+      redeploy_mode: 'upgrade',
+    });
+    mutations.restartMachine.mutate(
+      { imageTag: 'latest' },
+      {
+        onSuccess: () => {
+          toast.success('Upgrading KiloClaw');
+          setConfirmUpgrade(false);
+          onRedeploySuccess?.();
+        },
+        onError: err => toast.error(err.message, { duration: 10000 }),
+      }
+    );
+  }, [mutations.restartMachine, onRedeploySuccess, posthog, status.status]);
+
   const showUpgradeBanner =
     isFlyProvider && updateAvailable && !isDismissedInStorage && !manuallyDismissed;
 
@@ -131,18 +158,6 @@ export function InstanceControls({
       }
     );
   };
-
-  // Toggle-flag pattern: parent sets upgradeRequested=true, we open the dialog
-  // with "upgrade" preselected, then immediately reset via onUpgradeHandled.
-  // Safe for single-click flows; won't re-fire if already true (no state change).
-  useEffect(() => {
-    if (!upgradeRequested) return;
-    if (isFlyProvider) {
-      setRedeployMode('upgrade');
-      setConfirmRedeploy(true);
-    }
-    onUpgradeHandled?.();
-  }, [upgradeRequested, isFlyProvider, onUpgradeHandled]);
 
   return (
     <div>
@@ -216,10 +231,7 @@ export function InstanceControls({
         <KiloClawUpdateAvailableBanner
           className="mb-4"
           catalogNewerThanImage={catalogNewerThanImage}
-          onUpgrade={() => {
-            setRedeployMode('upgrade');
-            setConfirmRedeploy(true);
-          }}
+          onUpgrade={openUpgradeConfirmation}
           onDismiss={dismissBanner}
         />
       )}
@@ -458,6 +470,16 @@ export function InstanceControls({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <UpgradeKiloClawDialog
+        open={confirmUpgrade}
+        onOpenChange={open => {
+          if (mutations.restartMachine.isPending) return;
+          if (!open) posthog?.capture('claw_redeploy_cancelled');
+          setConfirmUpgrade(open);
+        }}
+        isPending={mutations.restartMachine.isPending}
+        onConfirm={handleUpgradeConfirm}
+      />
       <RunDoctorDialog
         open={doctorOpen}
         onOpenChange={setDoctorOpen}

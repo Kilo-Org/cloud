@@ -6,7 +6,7 @@ import { atomicWrite } from '../atomic-write';
 import { timingSafeTokenEqual } from '../auth';
 import type { Supervisor } from '../supervisor';
 import { backupConfigFile, writeBaseConfig } from '../config-writer';
-import { GOG_SECTION_CONFIG, updateToolsMdSection } from '../bootstrap';
+import { GOG_SECTION_CONFIG, seedExecApprovalsDefaults, updateToolsMdSection } from '../bootstrap';
 import { getBearerToken } from './gateway';
 
 const ReplaceConfigBodySchema = z.object({
@@ -196,6 +196,24 @@ export function registerConfigRoutes(
       const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
       const config = JSON.parse(raw);
       deepMerge(config, patch as Record<string, unknown>);
+
+      // Sync exec-approvals.json BEFORE writing openclaw.json so the host
+      // layer is already correct when the gateway's file watcher triggers a
+      // reload from the openclaw.json change. Without this, the gateway
+      // takes the more restrictive intersection and ignores the config.
+      const mergedExec = (config.tools as Record<string, unknown> | undefined)?.exec as
+        | Record<string, unknown>
+        | undefined;
+      if (
+        mergedExec &&
+        (typeof mergedExec.security === 'string' || typeof mergedExec.ask === 'string')
+      ) {
+        seedExecApprovalsDefaults({
+          KILOCLAW_EXEC_SECURITY: mergedExec.security as string,
+          KILOCLAW_EXEC_ASK: mergedExec.ask as string,
+        });
+      }
+
       const serialized = JSON.stringify(config, null, 2);
       atomicWrite(CONFIG_PATH, serialized, undefined, { mode: 0o600 });
       console.log('[controller] Config patched:', JSON.stringify(patch));

@@ -21,6 +21,7 @@ import type { AuthProfilesMigrationDeps } from './auth-profiles-migration';
 
 const CONFIG_DIR = '/root/.openclaw';
 const CONFIG_PATH = '/root/.openclaw/openclaw.json';
+const EXEC_APPROVALS_PATH = '/root/.openclaw/exec-approvals.json';
 const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
@@ -288,11 +289,18 @@ export function writeBotIdentityFile(
   > = defaultDeps
 ): void {
   deps.mkdirSync(path.dirname(IDENTITY_MD_DEST), { recursive: true });
-  atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
-    writeFileSync: deps.writeFileSync,
-    renameSync: deps.renameSync,
-    unlinkSync: deps.unlinkSync,
-  });
+
+  // Only seed IDENTITY.md on the initial boot. After that it's agent/user-owned
+  // content — we must not clobber edits on subsequent reboots. Bot-identity env
+  // var changes (KILOCLAW_BOT_NAME etc.) therefore only take effect on a fresh
+  // instance; existing instances keep whatever IDENTITY.md currently contains.
+  if (!deps.existsSync(IDENTITY_MD_DEST)) {
+    atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
+      writeFileSync: deps.writeFileSync,
+      renameSync: deps.renameSync,
+      unlinkSync: deps.unlinkSync,
+    });
+  }
 
   for (const legacyPath of LEGACY_BOT_IDENTITY_DESTS) {
     if (!deps.existsSync(legacyPath)) continue;
@@ -605,6 +613,7 @@ function toConfigWriterDeps(deps: BootstrapDeps): ConfigWriterDeps {
     renameSync: deps.renameSync,
     chmodSync: deps.chmodSync,
     copyFileSync: deps.copyFileSync,
+    mkdirSync: (p, opts) => deps.mkdirSync(p, { recursive: opts?.recursive ?? false }),
     readdirSync: deps.readdirSync,
     unlinkSync: deps.unlinkSync,
     existsSync: deps.existsSync,
@@ -670,6 +679,13 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     env.KILOCLAW_FRESH_INSTALL = 'false';
   }
 
+  // Seed exec-approvals.json defaults to match the config's exec policy.
+  // The gateway resolves effective exec policy as maxAsk(config, approvals).
+  // If exec-approvals.json has empty defaults, the host layer inherits the
+  // config fallback — but some openclaw versions require explicit defaults
+  // in exec-approvals.json to fully suppress interactive approval prompts.
+  seedExecApprovalsDefaults(env, deps);
+
   // Migrate any legacy plaintext kilocode keys in auth-profiles.json to
   // env-backed keyRefs. No-op on fresh installs (onboard writes keyRefs
   // directly thanks to --secret-input-mode ref) and on instances already
@@ -689,6 +705,42 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
   writeBotIdentityFile(env, deps);
   writeUserProfileFile(env, deps);
   ensureWeatherSkillInstalled(env, deps);
+}
+
+// ---- exec-approvals.json seeder ----
+
+export function seedExecApprovalsDefaults(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
+  const security = env.KILOCLAW_EXEC_SECURITY || 'allowlist';
+  const ask = env.KILOCLAW_EXEC_ASK || 'on-miss';
+
+  try {
+    let file: Record<string, unknown>;
+    if (deps.existsSync(EXEC_APPROVALS_PATH)) {
+      file = JSON.parse(deps.readFileSync(EXEC_APPROVALS_PATH, 'utf8')) as Record<string, unknown>;
+    } else {
+      file = { version: 1 };
+    }
+
+    const defaults = (file.defaults ?? {}) as Record<string, unknown>;
+    defaults.security = security;
+    defaults.ask = ask;
+    defaults.askFallback = 'full';
+    file.defaults = defaults;
+
+    atomicWrite(
+      EXEC_APPROVALS_PATH,
+      JSON.stringify(file, null, 2) + '\n',
+      {
+        writeFileSync: deps.writeFileSync,
+        renameSync: deps.renameSync,
+        unlinkSync: deps.unlinkSync,
+        chmodSync: deps.chmodSync,
+      },
+      { mode: 0o600 }
+    );
+  } catch (err) {
+    console.warn('[controller] Failed to seed exec-approvals.json defaults:', err);
+  }
 }
 
 // ---- TOOLS.md bounded-section helper ----

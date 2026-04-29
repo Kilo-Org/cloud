@@ -137,27 +137,34 @@ export class AppDbDO extends DurableObject<Env> {
   }
 
   /**
+   * Internal tables excluded from schema exports:
+   * - `sqlite_*`   : SQLite-managed tables (sqlite_sequence, etc.)
+   * - `_cf_*`      : Cloudflare DO KV-API backing tables (e.g. `_cf_KV`)
+   * - `__drizzle_migrations` : drizzle migration bookkeeping
+   */
+  private static isInternalTableName(name: string): boolean {
+    return name.startsWith('sqlite_') || name.startsWith('_cf_') || name === '__drizzle_migrations';
+  }
+
+  private static isInternalIndexName(name: string): boolean {
+    return name.startsWith('sqlite_');
+  }
+
+  /**
    * Get database schema (tables and indexes, excluding internal tables)
    */
   getSchema(): SchemaResponse {
-    // Get all tables excluding internal ones
     const tables = this.sql<TableInfo>`
       SELECT name, type, sql FROM sqlite_master
-      WHERE type = 'table'
-      AND name NOT LIKE '__\_%' ESCAPE '\\'
-      AND name NOT LIKE 'sqlite_%'
-      AND sql IS NOT NULL
+      WHERE type = 'table' AND sql IS NOT NULL
       ORDER BY name
-    `;
+    `.filter(t => !AppDbDO.isInternalTableName(t.name));
 
-    // Get all indexes excluding internal ones
     const indexes = this.sql<IndexInfo>`
       SELECT name, sql FROM sqlite_master
-      WHERE type = 'index'
-      AND name NOT LIKE 'sqlite_%'
-      AND sql IS NOT NULL
+      WHERE type = 'index' AND sql IS NOT NULL
       ORDER BY name
-    `;
+    `.filter(i => !AppDbDO.isInternalIndexName(i.name));
 
     return {
       tables: tables.map(t => ({ name: t.name, sql: t.sql })),

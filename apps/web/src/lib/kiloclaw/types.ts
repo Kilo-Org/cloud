@@ -8,6 +8,14 @@ export type ImageVersionEntry = {
   imageTag: string;
   imageDigest: string | null;
   publishedAt: string;
+  /**
+   * Per-image rollout slider (0..100). 0 = not exposed. 0 < x < 100 = staged
+   * candidate (instance offered the upgrade when its bucket falls below x).
+   * Independent of `isLatest`.
+   */
+  rolloutPercent: number;
+  /** True if this image is the production `:latest` for its variant. */
+  isLatest: boolean;
 };
 
 /** Input to POST /api/platform/provision */
@@ -408,6 +416,30 @@ export type MorningBriefingSourceReadiness = {
   summary: string;
 };
 
+export type MorningBriefingDeliveryResult = {
+  channel: 'telegram' | 'discord' | 'slack';
+  status: 'sent' | 'skipped' | 'failed';
+  target?: string;
+  accountId?: string;
+  reason?: 'missing_target' | 'ambiguous_target' | 'send_failed' | 'config_unavailable';
+  error?: string;
+};
+
+export type MorningBriefingStatusLite = Pick<
+  MorningBriefingStatusResponse,
+  | 'enabled'
+  | 'desiredEnabled'
+  | 'observedEnabled'
+  | 'reconcileState'
+  | 'lastReconcileAction'
+  | 'code'
+  | 'cron'
+  | 'timezone'
+  | 'lastGeneratedDate'
+  | 'sourceReadiness'
+  | 'lastDelivery'
+>;
+
 export type MorningBriefingStatusResponse = {
   ok: boolean;
   enabled?: boolean;
@@ -427,6 +459,7 @@ export type MorningBriefingStatusResponse = {
     linear: MorningBriefingSourceReadiness;
     web: MorningBriefingSourceReadiness;
   };
+  lastDelivery?: MorningBriefingDeliveryResult[];
   code?: string;
   retryAfterSec?: number;
   error?: string;
@@ -441,6 +474,7 @@ export type MorningBriefingActionResponse = {
   date?: string;
   filePath?: string;
   failures?: string[];
+  delivery?: MorningBriefingDeliveryResult[];
   code?: string;
   retryAfterSec?: number;
   error?: string;

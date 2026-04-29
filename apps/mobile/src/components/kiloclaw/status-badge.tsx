@@ -1,45 +1,70 @@
 import { View } from 'react-native';
 
+import { StatusDot, type StatusDotTone } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import { type GatewayState, type InstanceStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { cn } from '@/lib/utils';
+
 type StatusValue = InstanceStatus | GatewayState | null | undefined;
 
-const STATUS_COLORS: Record<string, string> = {
-  running: 'bg-green-500',
-  stopped: 'bg-gray-400',
-  provisioned: 'bg-gray-400',
-  starting: 'bg-yellow-500',
-  restarting: 'bg-yellow-500',
-  stopping: 'bg-yellow-500',
-  destroying: 'bg-red-500',
-  crashed: 'bg-red-500',
-  shutting_down: 'bg-yellow-500',
+const STATUS_TONES: Record<string, StatusDotTone> = {
+  running: 'good',
+  stopped: 'muted',
+  provisioned: 'muted',
+  starting: 'warn',
+  restarting: 'warn',
+  stopping: 'warn',
+  destroying: 'danger',
+  crashed: 'danger',
+  shutting_down: 'warn',
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  running: 'Running',
-  stopped: 'Stopped',
-  provisioned: 'Provisioned',
-  starting: 'Starting',
-  restarting: 'Restarting',
-  stopping: 'Stopping',
-  destroying: 'Destroying',
-  crashed: 'Crashed',
-  shutting_down: 'Shutting Down',
+  running: 'RUNNING',
+  stopped: 'STOPPED',
+  provisioned: 'PROVISIONED',
+  starting: 'STARTING',
+  restarting: 'RESTARTING',
+  stopping: 'STOPPING',
+  destroying: 'DESTROYING',
+  crashed: 'CRASHED',
+  shutting_down: 'SHUTTING DOWN',
 };
+
+const TRANSITIONAL_STATUSES = new Set<string>([
+  'starting',
+  'restarting',
+  'stopping',
+  'shutting_down',
+  'provisioned',
+  'destroying',
+]);
+
+export function isTransitionalStatus(status: StatusValue | string): boolean {
+  return status != null && TRANSITIONAL_STATUSES.has(status);
+}
+
+export function statusTone(status: StatusValue | string): StatusDotTone {
+  return STATUS_TONES[status ?? ''] ?? 'muted';
+}
+
+export function statusLabel(status: StatusValue | string): string {
+  return STATUS_LABELS[status ?? ''] ?? 'UNKNOWN';
+}
 
 export function StatusBadge({
   status,
   className,
 }: Readonly<{ status: StatusValue; className?: string }>) {
-  const dotColor = STATUS_COLORS[status ?? ''] ?? 'bg-gray-400';
-  const label = STATUS_LABELS[status ?? ''] ?? 'Unknown';
+  const tone = statusTone(status);
+  const label = statusLabel(status);
 
   return (
     <View className={cn('flex-row items-center gap-1.5', className)}>
-      <View className={cn('h-2 w-2 rounded-full', dotColor)} />
-      <Text className="text-xs font-medium text-muted-foreground">{label}</Text>
+      <StatusDot tone={tone} glow />
+      <Text variant="mono" className="text-[10px] uppercase tracking-[1px] text-muted-foreground">
+        {label}
+      </Text>
     </View>
   );
 }

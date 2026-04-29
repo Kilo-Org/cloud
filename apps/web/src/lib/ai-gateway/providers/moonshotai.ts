@@ -1,7 +1,8 @@
+import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 export function isMoonshotModel(model: string) {
-  return model.startsWith('moonshotai/');
+  return modelStartsWith(model, 'moonshotai/');
 }
 
 export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {

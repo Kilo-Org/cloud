@@ -290,10 +290,19 @@ export const organizationKiloclawRouter = createTRPCRouter({
     }
   }),
 
-  latestVersion: organizationMemberProcedure.query(async () => {
-    const client = new KiloClawInternalClient();
-    return client.getLatestVersion();
-  }),
+  latestVersion: organizationMemberProcedure
+    .input(z.object({ currentImageTag: z.string().min(1).optional() }))
+    .query(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
+      if (!instance) return client.getLatestVersion();
+      // Early Access is resolved server-side via the platform endpoint
+      // (instance → owner → kiloclaw_early_access lookup), not passed by us.
+      return client.getLatestVersion({
+        instanceId: instance.id,
+        currentImageTag: input.currentImageTag ?? null,
+      });
+    }),
 
   // ── Instance status ───────────────────────────────────────────
 

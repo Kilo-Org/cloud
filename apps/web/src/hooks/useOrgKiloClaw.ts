@@ -215,6 +215,15 @@ export function useOrgKiloClawMutations(
     });
   };
 
+  const clearGatewayAndMorningBriefingCaches = () => {
+    queryClient.removeQueries({
+      queryKey: trpc.organizations.kiloclaw.gatewayReady.queryKey({ organizationId }),
+    });
+    queryClient.removeQueries({
+      queryKey: trpc.organizations.kiloclaw.getMorningBriefingStatus.queryKey({ organizationId }),
+    });
+  };
+
   // Helper: wrap a raw org mutation so mutate/mutateAsync inject organizationId.
   // The `any` types are unavoidable here — we're wrapping tRPC mutations generically
   // to pre-bind organizationId. The final return uses `satisfies` to catch missing keys.
@@ -237,7 +246,12 @@ export function useOrgKiloClawMutations(
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   const rawStart = useMutation(
-    trpc.organizations.kiloclaw.start.mutationOptions({ onSuccess: invalidateStatus })
+    trpc.organizations.kiloclaw.start.mutationOptions({
+      onSuccess: async () => {
+        clearGatewayAndMorningBriefingCaches();
+        await invalidateStatus();
+      },
+    })
   );
   const rawStop = useMutation(
     trpc.organizations.kiloclaw.stop.mutationOptions({ onSuccess: invalidateStatus })
@@ -246,7 +260,12 @@ export function useOrgKiloClawMutations(
     trpc.organizations.kiloclaw.destroy.mutationOptions({ onSuccess: resetAllInstanceState })
   );
   const rawProvision = useMutation(
-    trpc.organizations.kiloclaw.provision.mutationOptions({ onSuccess: invalidateStatus })
+    trpc.organizations.kiloclaw.provision.mutationOptions({
+      onSuccess: async () => {
+        clearGatewayAndMorningBriefingCaches();
+        await invalidateStatus();
+      },
+    })
   );
   const rawCycleInboundEmailAddress = useMutation(
     trpc.organizations.kiloclaw.cycleInboundEmailAddress.mutationOptions({
@@ -287,6 +306,7 @@ export function useOrgKiloClawMutations(
   const rawRestartMachine = useMutation(
     trpc.organizations.kiloclaw.restartMachine.mutationOptions({
       onSuccess: async () => {
+        clearGatewayAndMorningBriefingCaches();
         await invalidateStatus();
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.gatewayStatus.queryKey({ organizationId }),
@@ -297,6 +317,7 @@ export function useOrgKiloClawMutations(
   const rawRestartOpenClaw = useMutation(
     trpc.organizations.kiloclaw.restartOpenClaw.mutationOptions({
       onSuccess: async () => {
+        clearGatewayAndMorningBriefingCaches();
         await invalidateStatus();
         await queryClient.invalidateQueries({
           queryKey: trpc.organizations.kiloclaw.gatewayStatus.queryKey({ organizationId }),

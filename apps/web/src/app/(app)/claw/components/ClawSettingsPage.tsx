@@ -11,6 +11,7 @@ import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawInstanceOverview } from './ClawInstanceOverview';
 import { SettingsTab } from './SettingsTab';
+import { UpgradeKiloClawDialog } from './UpgradeKiloClawDialog';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,6 +34,7 @@ function ClawSettingsInner({
   const mutations = organizationId ? orgMutations : personalMutations;
 
   const [dirtySecrets, setDirtySecrets] = useState<Set<string>>(new Set());
+  const [confirmUpgrade, setConfirmUpgrade] = useState(false);
   const onSecretsChanged = useCallback((entryId: string) => {
     setDirtySecrets(prev => new Set([...prev, entryId]));
   }, []);
@@ -53,12 +55,17 @@ function ClawSettingsInner({
     });
   }, [mutations.restartMachine, onRedeploySuccess]);
 
-  const onUpgrade = useCallback(() => {
+  const onRequestUpgrade = useCallback(() => {
+    setConfirmUpgrade(true);
+  }, []);
+
+  const onConfirmUpgrade = useCallback(() => {
     mutations.restartMachine.mutate(
       { imageTag: 'latest' },
       {
         onSuccess: () => {
-          toast.success('Upgrading to latest image');
+          toast.success('Upgrading KiloClaw');
+          setConfirmUpgrade(false);
           onRedeploySuccess();
         },
         onError: err => {
@@ -68,21 +75,32 @@ function ClawSettingsInner({
     );
   }, [mutations.restartMachine, onRedeploySuccess]);
 
-  const onRequestUpgrade = useCallback(() => {
-    onUpgrade();
-  }, [onUpgrade]);
-
   return (
-    <SettingsTab
-      status={status}
-      mutations={mutations}
-      onSecretsChanged={onSecretsChanged}
-      dirtySecrets={dirtySecrets}
-      onRedeploy={onRedeploy}
-      onUpgrade={onUpgrade}
-      onRequestUpgrade={onRequestUpgrade}
-      organizationName={organizationName}
-    />
+    <>
+      <ClawInstanceOverview
+        status={status}
+        onRedeploySuccess={onRedeploySuccess}
+        onRequestUpgrade={onRequestUpgrade}
+      />
+      <SettingsTab
+        status={status}
+        mutations={mutations}
+        onSecretsChanged={onSecretsChanged}
+        dirtySecrets={dirtySecrets}
+        onRedeploy={onRedeploy}
+        onRequestUpgrade={onRequestUpgrade}
+        organizationName={organizationName}
+      />
+      <UpgradeKiloClawDialog
+        open={confirmUpgrade}
+        onOpenChange={open => {
+          if (mutations.restartMachine.isPending) return;
+          setConfirmUpgrade(open);
+        }}
+        isPending={mutations.restartMachine.isPending}
+        onConfirm={onConfirmUpgrade}
+      />
+    </>
   );
 }
 
@@ -139,7 +157,6 @@ function ClawSettingsWithStatus({
   const settingsContent = (
     <div className="flex flex-col gap-6">
       <ClawConfigServiceBanner status={status} />
-      <ClawInstanceOverview status={status} />
       <ClawSettingsInner status={status} organizationName={organizationName} />
     </div>
   );

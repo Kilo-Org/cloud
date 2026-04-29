@@ -104,7 +104,7 @@ async function getSessionWithOwnerCheck(sessionId: string, userId: string) {
 const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),
   limit: z.number().min(1).max(RECENT_DAYS_LIMIT).optional().default(PAGE_SIZE),
-  orderBy: z.enum(['created_at', 'updated_at']).optional().default('created_at'),
+  orderBy: z.enum(['created_at', 'updated_at']).optional().default('updated_at'),
   includeChildren: z.boolean().optional().default(false),
   createdOnPlatform: z
     .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])

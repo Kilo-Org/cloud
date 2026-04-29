@@ -3,10 +3,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { LockableContainer } from '../LockableContainer';
-import {
-  useUpdateDefaultModel,
-  useUpdateOrganizationSettings,
-} from '@/app/api/organizations/hooks';
+import { useUpdateDefaultModel } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,7 +45,6 @@ export function DefaultModelDialog({
 
   const { data: openRouterModels, isLoading: modelsLoading } = useModelSelectorList(organizationId);
   const updateDefaultModelMutation = useUpdateDefaultModel();
-  const updateSettingsMutation = useUpdateOrganizationSettings();
 
   const organizationDefaultModel = organizationSettings?.default_model;
   const availableModels = openRouterModels?.data ?? [];
@@ -78,7 +74,7 @@ export function DefaultModelDialog({
 
   const handleClearDefaultModel = async () => {
     try {
-      // Clear by updating allow lists without the default model
+      // Clear only the default model; provider/model access policy stays unchanged.
       await updateDefaultModelMutation.mutateAsync({
         organizationId,
         default_model: null,
@@ -138,11 +134,7 @@ export function DefaultModelDialog({
               <Select
                 value={selectedModel}
                 onValueChange={setSelectedModel}
-                disabled={
-                  updateDefaultModelMutation.isPending ||
-                  updateSettingsMutation.isPending ||
-                  modelsLoading
-                }
+                disabled={updateDefaultModelMutation.isPending || modelsLoading}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Choose a model..." />
@@ -174,7 +166,7 @@ export function DefaultModelDialog({
               <Button
                 variant="outline"
                 onClick={handleClearDefaultModel}
-                disabled={updateSettingsMutation.isPending}
+                disabled={updateDefaultModelMutation.isPending}
               >
                 Clear Default
               </Button>

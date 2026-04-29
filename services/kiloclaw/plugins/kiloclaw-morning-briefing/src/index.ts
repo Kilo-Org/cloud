@@ -4,6 +4,15 @@ import { Type } from '@sinclair/typebox';
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 import { buildBriefingMarkdown, offsetDateKey, resolveBriefingPath } from './briefing-utils';
 import {
+  type BriefingDeliveryResult,
+  deliverBriefingToConfiguredChannels,
+  formatDeliverySummary,
+  logDeliveryOutcomeEvents,
+  parseStoredDelivery,
+} from './delivery-utils';
+import { DELIVERY_CHANNELS } from './delivery-constants';
+import { CommandExecutionError, runCommand } from './command-utils';
+import {
   filterEnabledBriefingJobs,
   pickCanonicalCronJobId,
   selectMorningBriefingJobs,
@@ -41,6 +50,7 @@ type StoredStatus = {
   lastPath: string | null;
   sourceSummary: Array<{ source: string; configured: boolean; ok: boolean; summary: string }>;
   failures: string[];
+  lastDelivery: BriefingDeliveryResult[];
   observedEnabled: boolean | null;
   reconcileState: 'idle' | 'in_progress' | 'succeeded' | 'failed';
   lastReconcileAt: string | null;
@@ -131,30 +141,6 @@ async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
   await fs.writeFile(filePath, JSON.stringify(value, null, 2), 'utf8');
 }
 
-async function runCommand(
-  api: {
-    runtime: {
-      system: {
-        runCommandWithTimeout: (
-          argv: string[],
-          options: { timeoutMs: number; cwd?: string }
-        ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
-      };
-    };
-  },
-  argv: string[],
-  timeoutMs = 30_000
-): Promise<{ stdout: string; stderr: string }> {
-  const result = await api.runtime.system.runCommandWithTimeout(argv, {
-    timeoutMs,
-  });
-  if (result.code !== 0) {
-    const message = result.stderr.trim() || result.stdout.trim() || 'Command failed';
-    throw new Error(`${argv.join(' ')} failed: ${message}`);
-  }
-  return { stdout: result.stdout, stderr: result.stderr };
-}
-
 async function runCronJson(
   api: {
     runtime: {
@@ -169,11 +155,24 @@ async function runCronJson(
   argv: string[]
 ): Promise<Record<string, unknown>> {
   const [subcommand = ''] = argv;
-  const jsonUnsupported = subcommand === 'disable';
+  const jsonUnsupported = subcommand === 'disable' || subcommand === 'edit';
   const command = jsonUnsupported
     ? ['openclaw', 'cron', ...argv]
     : ['openclaw', 'cron', ...argv, '--json'];
-  const { stdout } = await runCommand(api, command, 60_000);
+  let stdout: string;
+  try {
+    ({ stdout } = await runCommand(api, command, 60_000));
+  } catch (error) {
+    if (
+      !jsonUnsupported &&
+      error instanceof CommandExecutionError &&
+      error.stderr.includes("unknown option '--json'")
+    ) {
+      ({ stdout } = await runCommand(api, ['openclaw', 'cron', ...argv], 60_000));
+    } else {
+      throw error;
+    }
+  }
   try {
     return asObject(JSON.parse(stdout));
   } catch {
@@ -228,7 +227,7 @@ async function removeDuplicateBriefingCronJobs(
         ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
       };
     };
-    logger: { warn?: (message: string) => void };
+    logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   canonicalId: string
 ): Promise<void> {
@@ -268,7 +267,7 @@ function resolveDefaults(api: {
 }
 
 function resolveEffectiveTimezone(
-  api: { logger: { warn?: (message: string) => void } },
+  api: { logger: { info?: (message: string) => void; warn?: (message: string) => void } },
   timezone: string,
   context: 'enable' | 'schedule' | 'date'
 ): string {
@@ -329,6 +328,7 @@ async function readStoredStatus(paths: { statusPath: string }): Promise<StoredSt
       lastPath: null,
       sourceSummary: [],
       failures: [],
+      lastDelivery: [],
       observedEnabled: null,
       reconcileState: 'idle',
       lastReconcileAt: null,
@@ -348,6 +348,7 @@ async function readStoredStatus(paths: { statusPath: string }): Promise<StoredSt
     failures: Array.isArray(existing.failures)
       ? existing.failures.filter(value => typeof value === 'string')
       : [],
+    lastDelivery: parseStoredDelivery(existing.lastDelivery),
     observedEnabled:
       typeof existing.observedEnabled === 'boolean' ? existing.observedEnabled : null,
     reconcileState:
@@ -408,7 +409,7 @@ async function ensureCronJob(
         ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
       };
     };
-    logger: { warn?: (message: string) => void };
+    logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   config: StoredConfig
 ): Promise<{ cronJobId: string; cron: string; timezone: string }> {
@@ -669,13 +670,7 @@ async function collectWebSearch(api: {
       configured: true,
       ok: true,
       summary: `Fetched ${results.length} web results (${response.provider})`,
-      sectionLines: results
-        .slice(0, 6)
-        .map(item =>
-          item.summary.length > 0
-            ? `- [${item.title}](${item.url}) - ${item.summary}`
-            : `- [${item.title}](${item.url})`
-        ),
+      sectionLines: results.slice(0, 6).map(item => `- [${item.title}](${item.url})`),
     };
   } catch (error) {
     return {
@@ -793,6 +788,7 @@ async function generateBriefing(
       };
     };
     config: unknown;
+    logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   dateKey: string
 ): Promise<{
@@ -801,6 +797,7 @@ async function generateBriefing(
   markdown: string;
   sources: SourceCollectionResult[];
   failures: string[];
+  delivery: BriefingDeliveryResult[];
 }> {
   const paths = getStatePaths(api);
   await ensureStorage(paths);
@@ -841,6 +838,20 @@ async function generateBriefing(
 
   const filePath = resolveBriefingPath(paths.briefingsDir, dateKey);
   await fs.writeFile(filePath, markdown, 'utf8');
+  let delivery: BriefingDeliveryResult[];
+  try {
+    delivery = await deliverBriefingToConfiguredChannels(api, markdown);
+  } catch (error) {
+    const errorText = error instanceof Error ? error.message : String(error);
+    api.logger.warn?.(`Morning briefing delivery failed unexpectedly: ${errorText}`);
+    delivery = DELIVERY_CHANNELS.map(channel => ({
+      channel,
+      status: 'failed',
+      reason: 'config_unavailable',
+      error: errorText,
+    }));
+  }
+  logDeliveryOutcomeEvents(api, delivery);
 
   await patchStoredStatus(paths, {
     lastGeneratedDate: dateKey,
@@ -853,6 +864,7 @@ async function generateBriefing(
       summary: source.summary,
     })),
     failures,
+    lastDelivery: delivery,
   });
 
   return {
@@ -861,6 +873,7 @@ async function generateBriefing(
     markdown,
     sources,
     failures,
+    delivery,
   };
 }
 
@@ -900,7 +913,7 @@ async function resolveDateKeyForOffset(
       };
     };
     pluginConfig?: Record<string, unknown>;
-    logger: { warn?: (message: string) => void };
+    logger: { info?: (message: string) => void; warn?: (message: string) => void };
   },
   offset: number
 ): Promise<string> {
@@ -944,6 +957,7 @@ async function getStatusSnapshot(api: {
     linear: { configured: boolean; summary: string };
     web: { configured: boolean; summary: string };
   };
+  lastDelivery: BriefingDeliveryResult[];
   reconcileState: 'idle' | 'in_progress' | 'succeeded' | 'failed';
   lastReconcileAt: string | null;
   lastReconcileError: string | null;
@@ -971,6 +985,7 @@ async function getStatusSnapshot(api: {
       linear,
       web,
     },
+    lastDelivery: status.lastDelivery,
     reconcileState: status.reconcileState,
     lastReconcileAt: status.lastReconcileAt,
     lastReconcileError: status.lastReconcileError,
@@ -1218,6 +1233,7 @@ export default definePluginEntry({
           `Generated briefing for ${result.dateKey}.`,
           `- file: ${result.filePath}`,
           ...result.failures.map(failure => `- note: ${failure}`),
+          ...formatDeliverySummary(result.delivery),
         ].join('\n');
       }
 
@@ -1322,6 +1338,7 @@ export default definePluginEntry({
                 `Morning briefing generated for ${result.dateKey}.`,
                 `Saved to ${result.filePath}.`,
                 ...result.failures.map(failure => `Note: ${failure}`),
+                ...formatDeliverySummary(result.delivery).map(line => line.replace(/^- /, '')),
               ].join('\n'),
             },
           ],
@@ -1468,6 +1485,7 @@ export default definePluginEntry({
             date: result.dateKey,
             filePath: result.filePath,
             failures: result.failures,
+            delivery: result.delivery,
           });
         } catch (error) {
           sendJson(res, 500, {

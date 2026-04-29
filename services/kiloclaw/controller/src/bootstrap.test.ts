@@ -597,6 +597,25 @@ describe('writeBotIdentityFile', () => {
       ['/root/.openclaw/workspace/BOOTSTRAP.md'],
     ]);
   });
+
+  it('does not overwrite an existing workspace/IDENTITY.md', () => {
+    const harness = fakeDeps();
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === '/root/.openclaw/workspace/IDENTITY.md'
+    );
+
+    writeBotIdentityFile(
+      { KILOCLAW_BOT_NAME: 'Milo', KILOCLAW_BOT_NATURE: 'Operator' },
+      harness.deps
+    );
+
+    expect(harness.writeCalls.some(call => call.path.endsWith('/workspace/IDENTITY.md'))).toBe(
+      false
+    );
+    expect(
+      harness.renameCalls.some(call => call.to === '/root/.openclaw/workspace/IDENTITY.md')
+    ).toBe(false);
+  });
 });
 
 // ---- user profile file ----
@@ -871,9 +890,11 @@ describe('runOnboardOrDoctor', () => {
 
   it('runs doctor when config exists', () => {
     const harness = fakeDeps();
-    // Make config exist
+    // Make config and IDENTITY.md exist — simulates a reboot of a provisioned
+    // instance. IDENTITY.md must not be clobbered on the doctor path.
     (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
       if (p.endsWith('openclaw.json')) return true;
+      if (p.endsWith('/workspace/IDENTITY.md')) return true;
       return false;
     });
     (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
@@ -895,7 +916,9 @@ describe('runOnboardOrDoctor', () => {
     expect(doctorCall?.args).toContain('--fix');
     expect(doctorCall?.args).toContain('--non-interactive');
     expect(env.KILOCLAW_FRESH_INSTALL).toBe('false');
-    expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/IDENTITY.md'))).toBe(true);
+    expect(harness.renameCalls.some(call => call.to.endsWith('/workspace/IDENTITY.md'))).toBe(
+      false
+    );
   });
 
   it('migrates legacy plaintext kilocode key in auth-profiles.json to a keyRef', () => {

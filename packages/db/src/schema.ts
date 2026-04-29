@@ -268,6 +268,14 @@ export const kilocode_users = pgTable(
     web_session_pepper: text(),
     auto_top_up_enabled: boolean().default(false).notNull(),
     is_bot: boolean().default(false).notNull(),
+    /**
+     * When true, this user opts in to KiloClaw early access — their instances
+     * will be offered the newest available image (including in-flight rollout
+     * candidates) at provision and upgrade time, regardless of bucket. Used for
+     * staff dogfooding and designated beta testers. Applies across all of the
+     * user's instances (personal + every org instance they own). Pins still win.
+     */
+    kiloclaw_early_access: boolean().default(false).notNull(),
 
     /** @deprecated */
     default_model: text(),
@@ -3963,10 +3971,39 @@ export const kiloclaw_image_catalog = pgTable(
     synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    // Per-image staggered rollout slider. 0 = not exposed.
+    // 0 < x < 100 = staged candidate (offered to instances whose bucket falls
+    // below x). Independent of `is_latest` — promoting an image to ":latest" is
+    // an explicit, separate action.
+    rollout_percent: integer().notNull().default(0),
+    // Marks this row as the production ":latest" for its variant. New instances
+    // and unpinned upgrades fall back to whichever row has this set. At most
+    // one row per variant should have this true at a time (enforced in the
+    // mutation layer, not by a DB constraint, so an in-flight migration can't
+    // wedge the system).
+    is_latest: boolean().notNull().default(false),
   },
   table => [
     index('IDX_kiloclaw_image_catalog_status').on(table.status),
     index('IDX_kiloclaw_image_catalog_variant').on(table.variant),
+    // Enforce "at most one :latest per variant" at the DB layer. Without this
+    // partial UNIQUE, two concurrent markImageAsLatest transactions could each
+    // clear the old :latest and then set different rows to true. Matches the
+    // codebase pattern for single-row-per-key invariants (see UQ_kilo_pass_*,
+    // UQ_kilocode_users_* in this file).
+    uniqueIndex('UQ_kiloclaw_image_catalog_one_latest_per_variant')
+      .on(table.variant)
+      .where(sql`${table.is_latest} = true`),
+    // Enforce "at most one in-flight candidate per variant" at the DB layer.
+    // The candidate is any available, non-:latest row with a non-zero rollout
+    // percent. Prevents two concurrent setRolloutPercent calls from each
+    // creating a candidate, which refreshPointersForVariant would otherwise
+    // resolve by published_at and silently hide one from instances.
+    uniqueIndex('UQ_kiloclaw_image_catalog_one_candidate_per_variant')
+      .on(table.variant)
+      .where(
+        sql`${table.is_latest} = false AND ${table.rollout_percent} > 0 AND ${table.status} = 'available'`
+      ),
   ]
 );
 

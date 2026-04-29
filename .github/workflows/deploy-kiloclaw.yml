@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   deploy:
@@ -48,6 +49,7 @@ jobs:
       #   - controller/        (COPY controller/ → compiled to controller.js)
       #   - container/         (COPY container/TOOLS.md → /usr/local/share/kiloclaw/)
       #   - plugins/kiloclaw-customizer/ (COPY plugin package for image install)
+      #   - plugins/kilo-chat/         (COPY plugin package for image install)
       #   - openclaw-pairing-list.js, openclaw-device-pairing-list.js (COPY)
       #   - skills/            (COPY skills/ → /root/clawd/skills/)
       #
@@ -60,7 +62,7 @@ jobs:
         working-directory: services/kiloclaw
         run: |
           # Validate all expected paths exist before hashing
-          for path in Dockerfile controller container plugins/kiloclaw-customizer plugins/kiloclaw-morning-briefing skills \
+          for path in Dockerfile controller container plugins/kiloclaw-customizer plugins/kilo-chat plugins/kiloclaw-morning-briefing skills \
                       openclaw-pairing-list.js openclaw-device-pairing-list.js; do
             if [ ! -e "$path" ]; then
               echo "::error::Required path not found: $path"
@@ -69,7 +71,7 @@ jobs:
           done
 
           CONTENT_HASH=$(
-            find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ plugins/kiloclaw-morning-briefing/ skills/ \
+            find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ plugins/kilo-chat/ plugins/kiloclaw-morning-briefing/ skills/ \
               openclaw-pairing-list.js openclaw-device-pairing-list.js \
               -type f \
               | sort \
@@ -99,6 +101,16 @@ jobs:
           registry: registry.fly.io
           username: x
           password: ${{ secrets.FLY_API_TOKEN }}
+
+      # GHCR is the image source for the Northflank provider
+      # (NF_IMAGE_PATH_TEMPLATE=ghcr.io/kilo-org/kiloclaw:{tag}). We dual-push
+      # so every prod content-hash tag is available to both Fly and Northflank.
+      - name: Login to GHCR
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # ── Check if image tag already exists in registry ───────────
       # Looks up by TAG NAME, not by digest comparison. If we previously
@@ -139,8 +151,46 @@ jobs:
           tags: |
             registry.fly.io/kiloclaw-machines:${{ steps.image-hash.outputs.tag }}
             registry.fly.io/kiloclaw-machines:latest
+            ghcr.io/kilo-org/kiloclaw:${{ steps.image-hash.outputs.tag }}
+            ghcr.io/kilo-org/kiloclaw:sha-${{ github.sha }}
           build-args: |
             CONTROLLER_COMMIT=${{ github.sha }}
+
+      # ── Ensure GHCR has the tag when the build was skipped ──────
+      # When check-image finds the tag already in Fly registry, the build is
+      # skipped — but GHCR may still be missing the tag (e.g. first prod run
+      # after Northflank rollout, or a GHCR push that previously failed).
+      # Copy the existing Fly image to GHCR so Northflank can pull it.
+      - name: Check GHCR for image tag
+        id: check-ghcr
+        if: steps.check-image.outputs.exists == 'true'
+        run: |
+          IMAGE="ghcr.io/kilo-org/kiloclaw:${{ steps.image-hash.outputs.tag }}"
+          if timeout 15 docker manifest inspect "${IMAGE}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "✅ GHCR already has ${IMAGE}"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "🔁 GHCR missing ${IMAGE}, will copy from Fly"
+          fi
+
+      - name: Copy Fly image to GHCR
+        if: steps.check-image.outputs.exists == 'true' && steps.check-ghcr.outputs.exists != 'true'
+        run: |
+          FLY_IMAGE="registry.fly.io/kiloclaw-machines:${{ steps.image-hash.outputs.tag }}"
+          GHCR_IMAGE="ghcr.io/kilo-org/kiloclaw:${{ steps.image-hash.outputs.tag }}"
+          GHCR_SHA_IMAGE="ghcr.io/kilo-org/kiloclaw:sha-${{ github.sha }}"
+
+          echo "Pulling ${FLY_IMAGE}..."
+          docker pull "${FLY_IMAGE}"
+
+          echo "Tagging as ${GHCR_IMAGE} and ${GHCR_SHA_IMAGE}..."
+          docker tag "${FLY_IMAGE}" "${GHCR_IMAGE}"
+          docker tag "${FLY_IMAGE}" "${GHCR_SHA_IMAGE}"
+
+          echo "Pushing to GHCR..."
+          docker push "${GHCR_IMAGE}"
+          docker push "${GHCR_SHA_IMAGE}"
 
       # ── Resolve image digest ────────────────────────────────────
       # Gets the Docker digest from whichever source is available:

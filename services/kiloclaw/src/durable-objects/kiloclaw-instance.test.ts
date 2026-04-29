@@ -65,6 +65,21 @@ vi.mock('../lib/image-version', async () => {
   };
 });
 
+// -- Mock version-rollout (the DO now uses selectImageVersionForInstance for
+//    rollout-aware "latest" resolution; see lib/version-rollout.ts) --
+vi.mock('../lib/version-rollout', async () => {
+  const actual = await vi.importActual('../lib/version-rollout');
+  return {
+    ...actual,
+    selectImageVersionForInstance: vi.fn().mockResolvedValue(null),
+  };
+});
+
+// -- Mock user-flags (early-access lookup, called from DO provision/restart) --
+vi.mock('../lib/user-flags', () => ({
+  lookupKiloclawEarlyAccess: vi.fn().mockResolvedValue(false),
+}));
+
 // -- Mock db --
 vi.mock('../db', () => ({
   getWorkerDb: vi.fn(() => ({})),
@@ -133,6 +148,7 @@ import * as db from '../db';
 import * as gatewayEnv from '../gateway/env';
 import * as regions from './regions';
 import { resolveLatestVersion } from '../lib/image-version';
+import { selectImageVersionForInstance } from '../lib/version-rollout';
 import { setupDefaultStreamChatChannel } from '../stream-chat/client';
 import { verifyKiloToken } from '@kilocode/worker-utils';
 import {
@@ -219,10 +235,11 @@ function createFakeAppStub() {
   };
 }
 
-function createFakeEnv() {
+function createFakeEnv(opts: { includeNorthflank?: boolean } = {}) {
+  const { includeNorthflank = true } = opts;
   const appStub = createFakeAppStub();
   const writeDataPoint = vi.fn();
-  return {
+  const base = {
     FLY_API_TOKEN: 'test-token',
     FLY_APP_NAME: 'test-app',
     FLY_REGION: 'eu,us',
@@ -244,6 +261,23 @@ function createFakeEnv() {
     KILOCLAW_AE: {
       writeDataPoint,
     } as unknown,
+    KILO_CHAT: {
+      destroySandboxData: vi
+        .fn()
+        .mockResolvedValue({ ok: true, conversationsDeleted: 0, failedConversations: [] }),
+    } as unknown,
+  };
+  if (!includeNorthflank) {
+    return base;
+  }
+  return {
+    ...base,
+    NF_API_TOKEN: 'nf-test-token',
+    NF_REGION: 'us-central',
+    NF_DEPLOYMENT_PLAN: 'nf-compute-10',
+    NF_EDGE_HEADER_NAME: 'X-KC-Edge',
+    NF_EDGE_HEADER_VALUE: 'edge-test-secret',
+    NF_IMAGE_PATH_TEMPLATE: 'registry.example.com/kiloclaw:{tag}',
   };
 }
 
@@ -382,6 +416,38 @@ async function seedDockerInstance(
     flyVolumeId: null,
     flyRegion: null,
     providerState: dockerProviderState(),
+    ...overrides,
+  });
+}
+
+function northflankProviderState(overrides: Record<string, unknown> = {}) {
+  return {
+    provider: 'northflank',
+    projectId: 'project-1',
+    projectName: 'kc-ki-test',
+    serviceId: 'service-1',
+    serviceName: 'kc-ki-test',
+    volumeId: 'volume-1',
+    volumeName: 'kc-ki-test',
+    secretId: 'secret-1',
+    secretName: 'kc-ki-test',
+    secretContentHash: null,
+    ingressHost: 'kc-ki-test.code.run',
+    region: 'us-central',
+    ...overrides,
+  };
+}
+
+async function seedNorthflankInstance(
+  storage: ReturnType<typeof createFakeStorage>,
+  overrides: Record<string, unknown> = {}
+) {
+  await seedProvisioned(storage, {
+    provider: 'northflank',
+    flyMachineId: null,
+    flyVolumeId: null,
+    flyRegion: null,
+    providerState: northflankProviderState(),
     ...overrides,
   });
 }
@@ -528,6 +594,36 @@ describe('two-phase destroy', () => {
 
     // Both treated as success → full cleanup
     expect(storage._store.size).toBe(0);
+  });
+
+  it('calls KILO_CHAT.destroySandboxData during destroy', async () => {
+    const env = createFakeEnv();
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage);
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    await instance.destroy();
+
+    expect((env.KILO_CHAT as { destroySandboxData: Mock }).destroySandboxData).toHaveBeenCalledWith(
+      'sandbox-1'
+    );
+  });
+
+  it('destroy succeeds even when KILO_CHAT.destroySandboxData throws', async () => {
+    const env = createFakeEnv();
+    (env.KILO_CHAT as { destroySandboxData: Mock }).destroySandboxData.mockRejectedValue(
+      new Error('kilo-chat unavailable')
+    );
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedRunning(storage);
+
+    (flyClient.destroyMachine as Mock).mockResolvedValue(undefined);
+    (flyClient.deleteVolume as Mock).mockResolvedValue(undefined);
+
+    // Should not throw — kilo-chat failure is non-fatal
+    await expect(instance.destroy()).resolves.toBeDefined();
   });
 
   it('alarm retries pending destroy to completion', async () => {
@@ -5152,7 +5248,7 @@ describe('controller-first pairing', () => {
     fetchSpy.mockRestore();
   });
 
-  it('channel approve returns redeploy-required when non-Fly controller route is unavailable', async () => {
+  it('channel approve returns controller-unavailable message when non-Fly controller route is missing', async () => {
     const { instance, storage } = createInstance();
     await seedDockerInstance(storage, { status: 'running' });
 
@@ -5706,6 +5802,149 @@ describe('controller-first pairing', () => {
 });
 
 // ============================================================================
+// Pairing + runDoctor on non-Fly providers
+// ============================================================================
+
+describe('non-Fly pairing + runDoctor behavior', () => {
+  it('listPairingRequests on Northflank returns empty when controller route is unavailable, does not fly-exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.listPairingRequests();
+
+    expect(result).toEqual({ requests: [] });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('approvePairingRequest on Northflank returns controller-unavailable message when controller route is missing', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('listDevicePairingRequests on Northflank returns empty when controller route is unavailable, does not fly-exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.listDevicePairingRequests();
+
+    expect(result).toEqual({ requests: [] });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('approveDevicePairingRequest on Northflank returns controller-unavailable message when controller route is missing', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.approveDevicePairingRequest(
+      '11111111-1111-4111-8111-111111111111'
+    );
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('runDoctor on Northflank returns not-yet-wired-up without invoking fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({
+      success: false,
+      output: 'Run doctor is not yet wired up for this instance',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+  });
+
+  it('runDoctor on docker-local returns not-yet-wired-up without invoking fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({
+      success: false,
+      output: 'Run doctor is not yet wired up for this instance',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+  });
+
+  it('runDoctor on Fly running instance still invokes fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: 'doctor ok',
+      stderr: '',
+    });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({ success: true, output: 'doctor ok' });
+    expect(flyClient.execCommand).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'acct-test' },
+      'machine-1',
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'doctor', '--fix', '--non-interactive'],
+      60
+    );
+  });
+
+  it('runDoctor on non-running instance returns Instance is not running regardless of provider', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'stopped' });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({ success: false, output: 'Instance is not running' });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
 // Kilo CLI run controller routing
 // ============================================================================
 
@@ -6179,11 +6418,15 @@ describe('provision: auto-start after fresh provision', () => {
     });
   });
 
-  it('does not leave the hot DO on an unsupported provider after failed provision', async () => {
-    const { instance, storage, waitUntilPromises } = createInstance();
+  it('does not leave the hot DO on a misconfigured provider after failed provision', async () => {
+    const envWithoutNorthflank = createFakeEnv({ includeNorthflank: false });
+    const { instance, storage, waitUntilPromises } = createInstance(
+      createFakeStorage(),
+      envWithoutNorthflank
+    );
 
     await expect(instance.provision('user-1', {}, { provider: 'northflank' })).rejects.toThrow(
-      'Provider northflank is not implemented yet'
+      /^Provider northflank is not configured; missing /
     );
 
     expect(storage._store.get('userId')).toBeUndefined();
@@ -6875,7 +7118,7 @@ describe('restartMachine image tag override', () => {
     expect(storage._store.get('trackedImageTag')).toBe('old-tag-123');
   });
 
-  it('fetches latest from KV when imageTag is "latest"', async () => {
+  it('resolves the rollout selector when imageTag is "latest"', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, {
       trackedImageTag: 'old-tag',
@@ -6883,33 +7126,35 @@ describe('restartMachine image tag override', () => {
       imageVariant: 'default',
     });
 
-    (resolveLatestVersion as Mock).mockResolvedValueOnce({
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
       openclawVersion: '2.0.0',
       variant: 'default',
       imageTag: 'new-tag-from-kv',
       imageDigest: null,
       publishedAt: new Date().toISOString(),
+      rolloutPercent: 0,
+      isLatest: true,
     });
 
     const result = await instance.restartMachine({ imageTag: 'latest' });
 
     expect(result.success).toBe(true);
-    expect(resolveLatestVersion).toHaveBeenCalledOnce();
+    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
     expect(storage._store.get('trackedImageTag')).toBe('new-tag-from-kv');
     expect(storage._store.get('openclawVersion')).toBe('2.0.0');
     expect(storage._store.get('imageVariant')).toBe('default');
   });
 
-  it('falls back gracefully when "latest" but KV is empty', async () => {
+  it('falls back gracefully when "latest" but selector returns null', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { trackedImageTag: 'old-tag' });
 
-    (resolveLatestVersion as Mock).mockResolvedValueOnce(null);
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce(null);
 
     const result = await instance.restartMachine({ imageTag: 'latest' });
 
     expect(result.success).toBe(true);
-    expect(resolveLatestVersion).toHaveBeenCalledOnce();
+    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
     // trackedImageTag unchanged — resolveImageTag will use existing value
     expect(storage._store.get('trackedImageTag')).toBe('old-tag');
   });
@@ -7243,6 +7488,48 @@ describe("status guards: 'starting'", () => {
     await expect(instance.startAsync()).rejects.toThrow(
       'Cannot start: instance is being destroyed'
     );
+  });
+
+  it('startAsync() short-circuits a duplicate call within the fresh starting window', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    const originalStartingAt = Date.now();
+    await seedProvisioned(storage, {
+      status: 'starting',
+      startingAt: originalStartingAt,
+    });
+
+    await instance.startAsync();
+
+    // No duplicate waitUntil scheduled, startingAt unchanged.
+    expect(waitUntilPromises).toHaveLength(0);
+    expect(storage._store.get('startingAt')).toBe(originalStartingAt);
+  });
+
+  it('startAsync() falls through to a fresh attempt when starting state is stale', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    const staleStartingAt = Date.now() - STARTING_TIMEOUT_MS - 1_000;
+    await seedProvisioned(storage, {
+      status: 'starting',
+      startingAt: staleStartingAt,
+    });
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.startAsync('user-1');
+
+    // Fresh attempt: startingAt is updated synchronously in startAsync before
+    // scheduling the background start(); a new waitUntil was scheduled. Check
+    // before awaiting waitUntilPromises, since the background start() will
+    // transition out of 'starting' and clear startingAt.
+    const persisted = storage._store.get('startingAt');
+    expect(typeof persisted).toBe('number');
+    expect(persisted).toBeGreaterThan(staleStartingAt);
+    expect(waitUntilPromises).toHaveLength(1);
+
+    await Promise.all(waitUntilPromises);
   });
 
   it('background start() aborts if instance was destroyed while starting', async () => {

@@ -2259,10 +2259,32 @@ export const kiloclawRouter = createTRPCRouter({
     return fetchKiloClawServiceDegraded();
   }),
 
-  latestVersion: baseProcedure.query(async () => {
-    const client = new KiloClawInternalClient();
-    return client.getLatestVersion();
-  }),
+  latestVersion: baseProcedure
+    .input(z.object({ currentImageTag: z.string().min(1).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      // Pass instance + currentImageTag through; Early Access is resolved
+      // server-side from the instance's owning user (the platform endpoint
+      // does the kilocode_users lookup itself, so callers can't fake it).
+      const [instance] = await db
+        .select({ id: kiloclaw_instances.id })
+        .from(kiloclaw_instances)
+        .where(
+          and(
+            eq(kiloclaw_instances.user_id, ctx.user.id),
+            isNull(kiloclaw_instances.organization_id),
+            isNull(kiloclaw_instances.destroyed_at)
+          )
+        )
+        .limit(1);
+
+      const client = new KiloClawInternalClient();
+      if (!instance) return client.getLatestVersion();
+
+      return client.getLatestVersion({
+        instanceId: instance.id,
+        currentImageTag: input?.currentImageTag ?? null,
+      });
+    }),
 
   validateWeatherLocation: baseProcedure
     .input(weatherLocationInputSchema)

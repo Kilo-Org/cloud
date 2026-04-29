@@ -272,18 +272,24 @@ export function useClawMyPin() {
   return organizationId ? org : personal;
 }
 
-export function useClawLatestVersion() {
+export function useClawLatestVersion(currentImageTag?: string | null) {
   const trpc = useTRPC();
   const { organizationId } = useClawContext();
 
+  // Pass currentImageTag to the resolver so it can suppress false upgrade
+  // offers when the instance is already on the candidate (or otherwise on
+  // the resolver's chosen image). Without this the banner can surface a
+  // downgrade after a slider rollback.
+  const input = currentImageTag ? { currentImageTag } : undefined;
+
   const personal = useQuery({
-    ...trpc.kiloclaw.latestVersion.queryOptions(undefined, { staleTime: 60_000 }),
+    ...trpc.kiloclaw.latestVersion.queryOptions(input, { staleTime: 60_000 }),
     enabled: !organizationId,
   });
 
   const org = useQuery({
     ...trpc.organizations.kiloclaw.latestVersion.queryOptions(
-      { organizationId: organizationId ?? '' },
+      { organizationId: organizationId ?? '', currentImageTag: currentImageTag ?? undefined },
       { staleTime: 60_000 }
     ),
     enabled: !!organizationId,

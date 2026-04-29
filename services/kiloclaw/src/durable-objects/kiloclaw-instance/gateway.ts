@@ -509,7 +509,6 @@ export async function getMorningBriefingStatus(
     if (isMorningBriefingWarmupControllerError(error)) {
       return {
         ok: true,
-        enabled: false,
         reconcileState: 'in_progress',
         error: 'Gateway warming up, retrying shortly.',
         code: 'gateway_warming_up',
@@ -572,7 +571,8 @@ export async function runMorningBriefing(
       '/_kilo/morning-briefing/run',
       'POST',
       MorningBriefingActionResponseSchema,
-      {}
+      {},
+      { timeoutMs: 120_000 }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

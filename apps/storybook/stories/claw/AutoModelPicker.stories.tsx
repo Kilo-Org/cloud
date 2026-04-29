@@ -5,8 +5,8 @@ import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const SAMPLE_MODELS: ModelOption[] = [
-  { id: 'kilo-auto/frontier', name: 'Kilo Auto Frontier' },
-  { id: 'kilo-auto/balanced', name: 'Kilo Auto Balanced' },
+  { id: 'kilo-auto/frontier', name: 'Auto Frontier' },
+  { id: 'kilo-auto/balanced', name: 'Auto Balanced' },
   { id: 'anthropic/claude-opus-4.6', name: 'Anthropic: Claude Opus 4.6' },
   { id: 'anthropic/claude-sonnet-4.5', name: 'Anthropic: Claude Sonnet 4.5' },
   { id: 'openai/gpt-5.2', name: 'OpenAI: GPT-5.2' },

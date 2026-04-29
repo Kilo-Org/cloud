@@ -3,7 +3,10 @@ import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import type { NextRequest } from 'next/server';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { createAllowPredicateFromDenyList } from '@/lib/model-allow.server';
+import {
+  createAllowPredicateFromRestrictions,
+  hasActiveModelRestrictions,
+} from '@/lib/model-allow.server';
 import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
@@ -28,9 +31,9 @@ export async function GET(
   // Get organization's default model setting
   let defaultModel = organization.settings?.default_model;
 
-  const { modelDenyList, providerDenyList } = getEffectiveModelRestrictions(organization);
+  const restrictions = getEffectiveModelRestrictions(organization);
 
-  const isAllowed = createAllowPredicateFromDenyList(modelDenyList, providerDenyList);
+  const isAllowed = createAllowPredicateFromRestrictions(restrictions);
 
   const findFirstAllowedModel = async (modelIds: readonly string[]) => {
     for (const modelId of modelIds) {
@@ -72,7 +75,7 @@ export async function GET(
 
   // Fallback to global default if no organization default is set or it's not allowed
   if (!defaultModel) {
-    if (modelDenyList.length === 0 && providerDenyList.length === 0) {
+    if (!hasActiveModelRestrictions(restrictions)) {
       // No restrictions - use PRIMARY_DEFAULT_MODEL directly
       defaultModel = PRIMARY_DEFAULT_MODEL;
     } else {
@@ -90,7 +93,7 @@ export async function GET(
         return NextResponse.json(
           {
             error:
-              "No valid models are available — all models are blocked by this organization's deny list.",
+              "No valid models are available — all models are blocked by this organization's policy.",
           },
           { status: 409 }
         );

@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Hono } from 'hono';
-import { registerHealthRoute, parseOpenclawVersion } from './health';
+import { registerHealthRoute, parseOpenclawVersion, startKiloChatHealthProbe } from './health';
+import type { KiloChatHealthProbe } from './health';
 import type { Supervisor } from '../supervisor';
 import type { ControllerStateRef } from '../bootstrap';
 
@@ -255,5 +256,110 @@ describe('GET /_kilo/version', () => {
 
     const body = (await resp.json()) as { gateway: null };
     expect(body.gateway).toBeNull();
+  });
+});
+
+describe('startKiloChatHealthProbe', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('reports ok on HTTP 200', async () => {
+    const mockFetch = vi.fn<typeof fetch>().mockResolvedValue(new Response('OK', { status: 200 }));
+    const probe = startKiloChatHealthProbe({
+      kiloChatBaseUrl: 'https://chat.example.com',
+      intervalMs: 60_000, // long interval so only the initial check runs
+      timeoutMs: 5_000,
+      fetchImpl: mockFetch,
+    });
+
+    // Wait for the initial async check to complete
+    await vi.waitFor(() => {
+      expect(probe.getHealth().lastCheckedAt).toBeGreaterThan(0);
+    });
+
+    expect(probe.getHealth().status).toBe('ok');
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://chat.example.com/health',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    probe.stop();
+  });
+
+  it('reports degraded on non-200 response', async () => {
+    const mockFetch = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('Server Error', { status: 500 }));
+    const probe = startKiloChatHealthProbe({
+      kiloChatBaseUrl: 'https://chat.example.com',
+      intervalMs: 60_000,
+      timeoutMs: 5_000,
+      fetchImpl: mockFetch,
+    });
+
+    await vi.waitFor(() => {
+      expect(probe.getHealth().lastCheckedAt).toBeGreaterThan(0);
+    });
+
+    expect(probe.getHealth().status).toBe('degraded');
+    probe.stop();
+  });
+
+  it('reports unreachable on fetch error', async () => {
+    const mockFetch = vi.fn<typeof fetch>().mockRejectedValue(new Error('Connection refused'));
+    const probe = startKiloChatHealthProbe({
+      kiloChatBaseUrl: 'https://chat.example.com',
+      intervalMs: 60_000,
+      timeoutMs: 5_000,
+      fetchImpl: mockFetch,
+    });
+
+    await vi.waitFor(() => {
+      expect(probe.getHealth().lastCheckedAt).toBeGreaterThan(0);
+    });
+
+    expect(probe.getHealth().status).toBe('unreachable');
+    probe.stop();
+  });
+});
+
+describe('GET /_kilo/version with kiloChatHealth', () => {
+  it('includes kiloChatHealth when probe is provided', async () => {
+    const app = new Hono();
+    const mockFetch = vi.fn<typeof fetch>().mockResolvedValue(new Response('OK', { status: 200 }));
+    const probe = startKiloChatHealthProbe({
+      kiloChatBaseUrl: 'https://chat.example.com',
+      intervalMs: 60_000,
+      timeoutMs: 5_000,
+      fetchImpl: mockFetch,
+    });
+
+    await vi.waitFor(() => {
+      expect(probe.getHealth().lastCheckedAt).toBeGreaterThan(0);
+    });
+
+    registerHealthRoute(app, null, undefined, undefined, probe);
+
+    const resp = await app.request('/_kilo/version');
+    expect(resp.status).toBe(200);
+
+    const body = (await resp.json()) as {
+      kiloChatHealth: { status: string; lastCheckedAt: number };
+    };
+    expect(body.kiloChatHealth).toBeDefined();
+    expect(body.kiloChatHealth.status).toBe('ok');
+    expect(body.kiloChatHealth.lastCheckedAt).toBeGreaterThan(0);
+    probe.stop();
+  });
+
+  it('omits kiloChatHealth when no probe is configured', async () => {
+    const app = new Hono();
+    registerHealthRoute(app, null);
+
+    const resp = await app.request('/_kilo/version');
+    expect(resp.status).toBe(200);
+
+    const body = (await resp.json()) as Record<string, unknown>;
+    expect(body).not.toHaveProperty('kiloChatHealth');
   });
 });

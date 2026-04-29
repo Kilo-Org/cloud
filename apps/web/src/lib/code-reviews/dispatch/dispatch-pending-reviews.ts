@@ -10,7 +10,11 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { cloud_agent_code_reviews, type CloudAgentCodeReview } from '@kilocode/db/schema';
+import {
+  cloud_agent_code_reviews,
+  kilocode_users,
+  type CloudAgentCodeReview,
+} from '@kilocode/db/schema';
 import { eq, and, or, count, gte, lt, sql } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareReviewPayload } from '../triggers/prepare-review-payload';
@@ -18,21 +22,47 @@ import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { updateCodeReviewStatus } from '../db/code-reviews';
 import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import type { CodeReviewPlatform } from '../core/schemas';
 
-const MAX_CONCURRENT_REVIEWS_PER_OWNER = 20;
+const MAX_CONCURRENT_REVIEWS_PER_ORG = 20;
+const MAX_CONCURRENT_REVIEWS_PER_FUNDED_USER = 3;
+const MAX_CONCURRENT_REVIEWS_PER_DEFAULT_USER = 1;
+const FUNDED_USER_BALANCE_THRESHOLD_MICRODOLLARS = 5_000_000;
 
 // Reviews claimed (queued) but not picked up by the worker within this
 // window are considered abandoned (e.g. process crashed after claim) and
 // become eligible for re-dispatch.
 const STALE_CLAIM_MINUTES = 5;
+const STALE_RUNNING_MINUTES = 90;
 
-export interface DispatchResult {
+export type DispatchResult = {
   dispatched: number;
   pending: number;
   activeCount: number;
+};
+
+async function getMaxConcurrentReviewsForOwner(owner: Owner): Promise<number> {
+  if (owner.type === 'org') return MAX_CONCURRENT_REVIEWS_PER_ORG;
+
+  const [user] = await db
+    .select({
+      totalMicrodollarsAcquired: kilocode_users.total_microdollars_acquired,
+      microdollarsUsed: kilocode_users.microdollars_used,
+    })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, owner.id))
+    .limit(1);
+
+  if (!user) {
+    logExceptInTest('[getMaxConcurrentReviewsForOwner] User owner not found', { owner });
+    return MAX_CONCURRENT_REVIEWS_PER_DEFAULT_USER;
+  }
+
+  const balanceMicrodollars = user.totalMicrodollarsAcquired - user.microdollarsUsed;
+  return balanceMicrodollars > FUNDED_USER_BALANCE_THRESHOLD_MICRODOLLARS
+    ? MAX_CONCURRENT_REVIEWS_PER_FUNDED_USER
+    : MAX_CONCURRENT_REVIEWS_PER_DEFAULT_USER;
 }
 
 /**
@@ -43,10 +73,11 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
   try {
     logExceptInTest(`[tryDispatchPendingReviews] Starting dispatch check`, { owner });
 
-    const staleCutoff = sql`now() - interval '${sql.raw(String(STALE_CLAIM_MINUTES))} minutes'`;
+    const staleQueuedCutoff = sql`now() - interval '${sql.raw(String(STALE_CLAIM_MINUTES))} minutes'`;
+    const staleRunningCutoff = sql`now() - interval '${sql.raw(String(STALE_RUNNING_MINUTES))} minutes'`;
 
     // 1. Get active review count for this owner.
-    //    Stale queued rows are excluded so abandoned claims do not block recovery.
+    //    Stale queued and running rows are excluded so abandoned work does not block recovery.
     const activeCountResult = await db
       .select({ count: count() })
       .from(cloud_agent_code_reviews)
@@ -56,21 +87,30 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
             ? eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id)
             : eq(cloud_agent_code_reviews.owned_by_user_id, owner.id),
           or(
-            eq(cloud_agent_code_reviews.status, 'running'),
+            and(
+              eq(cloud_agent_code_reviews.status, 'running'),
+              sql`COALESCE(
+                ${cloud_agent_code_reviews.started_at},
+                ${cloud_agent_code_reviews.updated_at},
+                ${cloud_agent_code_reviews.created_at}
+              ) >= ${staleRunningCutoff}`
+            ),
             and(
               eq(cloud_agent_code_reviews.status, 'queued'),
-              gte(cloud_agent_code_reviews.updated_at, staleCutoff)
+              gte(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
             )
           )
         )
       );
 
     const activeCount = activeCountResult[0]?.count || 0;
-    const availableSlots = MAX_CONCURRENT_REVIEWS_PER_OWNER - activeCount;
+    const maxConcurrentReviews = await getMaxConcurrentReviewsForOwner(owner);
+    const availableSlots = maxConcurrentReviews - activeCount;
 
     logExceptInTest('[tryDispatchPendingReviews] Active count check', {
       owner,
       activeCount,
+      maxConcurrentReviews,
       availableSlots,
     });
 
@@ -95,7 +135,7 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
             eq(cloud_agent_code_reviews.status, 'pending'),
             and(
               eq(cloud_agent_code_reviews.status, 'queued'),
-              lt(cloud_agent_code_reviews.updated_at, staleCutoff)
+              lt(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
             )
           )
         )
@@ -116,7 +156,7 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
 
     // 5. Dispatch all pending reviews in parallel
     const results = await Promise.allSettled(
-      pendingReviews.map(review => dispatchReview(review, owner, staleCutoff))
+      pendingReviews.map(review => dispatchReview(review, owner, staleQueuedCutoff))
     );
 
     let dispatched = 0;
@@ -181,7 +221,7 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
 async function dispatchReview(
   review: CloudAgentCodeReview,
   owner: Owner,
-  staleCutoff: ReturnType<typeof sql>
+  staleQueuedCutoff: ReturnType<typeof sql>
 ): Promise<boolean> {
   // Get platform from review (defaults to 'github' for backward compatibility)
   const platform = (review.platform || 'github') as CodeReviewPlatform;
@@ -201,18 +241,7 @@ async function dispatchReview(
     );
   }
 
-  // 2. Evaluate feature flag: use cloud-agent-next?
-  const useCloudAgentNext =
-    process.env.NODE_ENV === 'development' ||
-    (await isFeatureFlagEnabled('code-review-cloud-agent-next', owner.userId));
-
-  logExceptInTest('[dispatchReview] Feature flag evaluated', {
-    reviewId: review.id,
-    userId: owner.userId,
-    useCloudAgentNext,
-  });
-
-  // 3. Prepare complete payload for cloud agent
+  // 2. Prepare complete payload for cloud agent
   const payload = await prepareReviewPayload({
     reviewId: review.id,
     owner,
@@ -220,7 +249,7 @@ async function dispatchReview(
     platform,
   });
 
-  // 4. Atomically claim the review to prevent concurrent dispatchers from
+  // 3. Atomically claim the review to prevent concurrent dispatchers from
   //    picking the same review. Done as late as possible (after all prep work)
   //    to minimise the crash window between claim and dispatch.
   //    Accepts 'pending' (normal) or stale 'queued' (abandoned claim recovery).
@@ -234,7 +263,7 @@ async function dispatchReview(
           eq(cloud_agent_code_reviews.status, 'pending'),
           and(
             eq(cloud_agent_code_reviews.status, 'queued'),
-            lt(cloud_agent_code_reviews.updated_at, staleCutoff)
+            lt(cloud_agent_code_reviews.updated_at, staleQueuedCutoff)
           )
         )
       )
@@ -248,11 +277,11 @@ async function dispatchReview(
     return false;
   }
 
-  // 5. Dispatch to Cloudflare Worker to create CodeReviewOrchestrator DO.
+  // 4. Dispatch to Cloudflare Worker to create CodeReviewOrchestrator DO.
   //    If this fails, keep the claim in `queued` and rely on stale-claim
   //    recovery. A transport failure is ambiguous: the worker may have
   //    created the DO even if this request did not observe the response.
-  const agentVersion = useCloudAgentNext ? 'v2' : 'v1';
+  const agentVersion = 'v2';
   try {
     await codeReviewWorkerClient.dispatchReview({
       ...payload,
@@ -271,7 +300,7 @@ async function dispatchReview(
     return false;
   }
 
-  // 6. Record which agent version was dispatched without rewriting status.
+  // 5. Record which agent version was dispatched without rewriting status.
   //    The worker may already have advanced the review to running/completed.
   try {
     await db

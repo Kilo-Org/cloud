@@ -69,7 +69,7 @@ export function buildBriefingMarkdown(params: {
 
   if (params.failures.length > 0) {
     lines.push('');
-    lines.push('## Failures / Skipped');
+    lines.push('## Failures');
     for (const failure of params.failures) {
       lines.push(`- ${failure}`);
     }
@@ -87,4 +87,91 @@ export function buildBriefingMarkdown(params: {
   lines.push('');
 
   return lines.join('\n');
+}
+
+function expandMarkdownLinks(line: string): string {
+  let result = '';
+  let i = 0;
+
+  while (i < line.length) {
+    const labelStart = line.indexOf('[', i);
+    if (labelStart < 0) {
+      result += line.slice(i);
+      break;
+    }
+
+    const labelEnd = line.indexOf(']', labelStart + 1);
+    if (labelEnd < 0 || line[labelEnd + 1] !== '(') {
+      result += line.slice(i, labelStart + 1);
+      i = labelStart + 1;
+      continue;
+    }
+
+    let urlEnd = labelEnd + 2;
+    let depth = 1;
+    while (urlEnd < line.length && depth > 0) {
+      const char = line[urlEnd];
+      if (char === '(') {
+        depth += 1;
+      } else if (char === ')') {
+        depth -= 1;
+      }
+      urlEnd += 1;
+    }
+
+    if (depth !== 0) {
+      result += line.slice(i, labelStart + 1);
+      i = labelStart + 1;
+      continue;
+    }
+
+    const label = line.slice(labelStart + 1, labelEnd);
+    const url = line.slice(labelEnd + 2, urlEnd - 1);
+
+    result += line.slice(i, labelStart);
+    result += `${label} - ${url}`;
+    i = urlEnd;
+  }
+
+  return result;
+}
+
+function convertInlineMarkdownToText(line: string): string {
+  const withLinksExpanded = expandMarkdownLinks(line);
+  return withLinksExpanded
+    .replace(/\[(ok|error|skipped)\]/gi, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1');
+}
+
+export function formatBriefingMarkdownForMessage(markdown: string): string {
+  const transformedLines = markdown.split(/\r?\n/).map(rawLine => {
+    const heading = /^#{1,2}\s+(.+)$/.exec(rawLine);
+    if (heading) {
+      return heading[1]?.trim() ?? '';
+    }
+
+    if (/^_.*_$/.test(rawLine.trim())) {
+      return rawLine.trim().slice(1, -1);
+    }
+
+    if (rawLine.startsWith('- ')) {
+      return `• ${convertInlineMarkdownToText(rawLine.slice(2))}`;
+    }
+
+    return convertInlineMarkdownToText(rawLine);
+  });
+
+  const compacted: string[] = [];
+  let previousBlank = false;
+  for (const line of transformedLines) {
+    const blank = line.trim().length === 0;
+    if (blank && previousBlank) {
+      continue;
+    }
+    compacted.push(line);
+    previousBlank = blank;
+  }
+
+  return compacted.join('\n').trim();
 }

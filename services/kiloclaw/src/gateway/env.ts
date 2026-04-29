@@ -230,6 +230,7 @@ export async function buildEnvVars(
   if (env.OPENCLAW_ALLOWED_ORIGINS)
     plainEnv.OPENCLAW_ALLOWED_ORIGINS = env.OPENCLAW_ALLOWED_ORIGINS;
   if (env.KILOCLAW_CHECKIN_URL) plainEnv.KILOCLAW_CHECKIN_URL = env.KILOCLAW_CHECKIN_URL;
+  if (env.KILOCHAT_BASE_URL) plainEnv.KILOCHAT_BASE_URL = env.KILOCHAT_BASE_URL;
   plainEnv.REQUIRE_PROXY_TOKEN = env.REQUIRE_PROXY_TOKEN ?? 'false';
 
   // Layer 5: Reserved system vars (cannot be overridden by any user config)

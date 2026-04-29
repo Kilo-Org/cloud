@@ -3,15 +3,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   CheckCircle2,
   XCircle,
   MessageSquare,
-  Settings,
-  ExternalLink,
-  Send,
   Trash2,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
@@ -43,8 +42,10 @@ export function SlackIntegrationDetails({
     refetch,
   } = useQuery(trpc.slack.getInstallation.queryOptions(input));
 
-  // Get OAuth URL for installation
-  const { data: oauthUrlData } = useQuery(trpc.slack.getOAuthUrl.queryOptions(input));
+  // Get OAuth URL only when the user clicks Connect so the signed state is fresh.
+  const { refetch: refetchOAuthUrl, isFetching: isFetchingOAuthUrl } = useQuery(
+    trpc.slack.getOAuthUrl.queryOptions(input, { enabled: false })
+  );
 
   // Fetch models for the model selector
   const { data: openRouterModels, isLoading: isLoadingModels } =
@@ -56,6 +57,13 @@ export function SlackIntegrationDetails({
 
   // Track selected model
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [isStartingSlackConnection, setIsStartingSlackConnection] = useState(false);
+
+  type ConnectionCheckState =
+    | { status: 'idle' }
+    | { status: 'success' }
+    | { status: 'error'; message: string };
+  const [connectionCheck, setConnectionCheck] = useState<ConnectionCheckState>({ status: 'idle' });
 
   // Initialize selected model from installation data
   useEffect(() => {
@@ -63,6 +71,23 @@ export function SlackIntegrationDetails({
       setSelectedModel(installationData.installation.modelSlug);
     }
   }, [installationData?.installation?.modelSlug]);
+
+  // Reset the connection check state when the installation disappears
+  useEffect(() => {
+    if (!installationData?.installed) {
+      setConnectionCheck({ status: 'idle' });
+    }
+  }, [installationData?.installed]);
+
+  // Auto-reset the success state to idle after 30 seconds so the button
+  // becomes actionable again.
+  useEffect(() => {
+    if (connectionCheck.status !== 'success') return;
+    const timer = setTimeout(() => {
+      setConnectionCheck({ status: 'idle' });
+    }, 30_000);
+    return () => clearTimeout(timer);
+  }, [connectionCheck.status]);
 
   const uninstallApp = useMutation(
     trpc.slack.uninstallApp.mutationOptions({
@@ -75,8 +100,6 @@ export function SlackIntegrationDetails({
   );
 
   const testConnection = useMutation(trpc.slack.testConnection.mutationOptions());
-
-  const sendTestMessage = useMutation(trpc.slack.sendTestMessage.mutationOptions());
 
   const updateModel = useMutation(
     trpc.slack.updateModel.mutationOptions({
@@ -108,9 +131,18 @@ export function SlackIntegrationDetails({
     }
   }, [success, error]);
 
-  const handleInstall = () => {
-    if (oauthUrlData?.url) {
-      window.location.href = oauthUrlData.url;
+  const handleInstall = async () => {
+    setIsStartingSlackConnection(true);
+    const result = await refetchOAuthUrl();
+    if (result.data?.url) {
+      window.location.href = result.data.url;
+    } else if (result.error) {
+      setIsStartingSlackConnection(false);
+      toast.error('Failed to start Slack connection', {
+        description: result.error.message,
+      });
+    } else {
+      setIsStartingSlackConnection(false);
     }
   };
 
@@ -152,37 +184,18 @@ export function SlackIntegrationDetails({
     testConnection.mutate(input, {
       onSuccess: result => {
         if (result.success) {
-          toast.success('Connection test successful!');
-        } else {
-          toast.error('Connection test failed', {
-            description: result.error,
+          setConnectionCheck({ status: 'success' });
+        } else if ('error' in result && result.error) {
+          setConnectionCheck({
+            status: 'error',
+            message: result.error,
           });
         }
       },
       onError: err => {
-        toast.error('Connection test failed', {
-          description: err.message,
-        });
-      },
-    });
-  };
-
-  const handleSendTestMessage = () => {
-    sendTestMessage.mutate(input, {
-      onSuccess: result => {
-        if (result.success) {
-          toast.success('Test message sent!', {
-            description: 'Check your Slack workspace for the message.',
-          });
-        } else {
-          toast.error('Failed to send test message', {
-            description: result.error,
-          });
-        }
-      },
-      onError: err => {
-        toast.error('Failed to send test message', {
-          description: err.message,
+        setConnectionCheck({
+          status: 'error',
+          message: err.message,
         });
       },
     });
@@ -226,9 +239,31 @@ export function SlackIntegrationDetails({
 
   const isInstalled = installationData?.installed;
   const installation = installationData?.installation;
+  const missingScopes = installation?.missingScopes ?? [];
 
   return (
     <div className="space-y-6">
+      {isInstalled && missingScopes.length > 0 && (
+        <Alert variant="warning">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Slack permissions need to be refreshed</AlertTitle>
+          <AlertDescription className="gap-3">
+            <p>
+              This Slack installation is missing required permissions. Re-install the Slack app to
+              refresh its scopes.
+            </p>
+            <Button
+              onClick={handleInstall}
+              disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+              className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install'}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Installation Status Card */}
       <Card>
         <CardHeader>
@@ -299,51 +334,57 @@ export function SlackIntegrationDetails({
                 />
               </div>
 
-              {/* Actions */}
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handleTestConnection}
-                  disabled={testConnection.isPending}
-                >
-                  {testConnection.isPending ? 'Testing...' : 'Test Connection'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleSendTestMessage}
-                  disabled={sendTestMessage.isPending}
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  {sendTestMessage.isPending ? 'Sending...' : 'Send Test Message'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    window.open('https://slack.com/apps/manage', '_blank');
-                  }}
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  Manage in Slack
-                  <ExternalLink className="ml-2 h-3 w-3" />
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleUninstall}
-                  disabled={uninstallApp.isPending}
-                >
-                  {uninstallApp.isPending ? 'Disconnecting...' : 'Disconnect'}
-                </Button>
-                {IS_DEVELOPMENT && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-3">
                   <Button
                     variant="outline"
-                    onClick={handleDevRemoveDbRowOnly}
-                    disabled={devRemoveDbRowOnly.isPending}
-                    className="border-yellow-500 text-yellow-500 hover:bg-yellow-500/10"
-                    title="Dev only: Remove DB row without revoking Slack token"
+                    onClick={handleInstall}
+                    disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+                    title="Re-run the Slack OAuth flow to refresh scopes and permissions"
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    {devRemoveDbRowOnly.isPending ? 'Removing...' : 'Dev: Remove DB Only'}
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install'}
                   </Button>
+                  <TestConnectionButton
+                    isPending={testConnection.isPending}
+                    state={connectionCheck}
+                    onClick={handleTestConnection}
+                  />
+                  <Button
+                    variant="destructive"
+                    onClick={handleUninstall}
+                    disabled={uninstallApp.isPending}
+                  >
+                    {uninstallApp.isPending ? 'Disconnecting...' : 'Disconnect'}
+                  </Button>
+                  {IS_DEVELOPMENT && (
+                    <Button
+                      variant="outline"
+                      onClick={handleDevRemoveDbRowOnly}
+                      disabled={devRemoveDbRowOnly.isPending}
+                      className="border-yellow-500 text-yellow-500 hover:bg-yellow-500/10"
+                      title="Dev only: Remove DB row without revoking Slack token"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {devRemoveDbRowOnly.isPending ? 'Removing...' : 'Dev: Remove DB Only'}
+                    </Button>
+                  )}
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  This verifies Kilo can authenticate with Slack. To use Kilo in a channel, invite
+                  or mention Kilo in Slack.
+                </p>
+                {connectionCheck.status === 'success' && (
+                  <p className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Slack authorization is valid.
+                  </p>
+                )}
+                {connectionCheck.status === 'error' && (
+                  <p className="text-destructive flex items-center gap-2 text-sm">
+                    <XCircle className="h-4 w-4" />
+                    {connectionCheck.message}
+                  </p>
                 )}
               </div>
             </>
@@ -363,14 +404,67 @@ export function SlackIntegrationDetails({
                 </ul>
               </div>
 
-              <Button onClick={handleInstall} size="lg" className="w-full">
+              <Button
+                onClick={handleInstall}
+                size="lg"
+                className="w-full"
+                disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+              >
                 <MessageSquare className="mr-2 h-4 w-4" />
-                Connect Slack
+                {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Connect Slack'}
               </Button>
             </>
           )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+type TestConnectionButtonProps = {
+  isPending: boolean;
+  state: { status: 'idle' | 'success' } | { status: 'error'; message: string };
+  onClick: () => void;
+};
+
+function TestConnectionButton({ isPending, state, onClick }: TestConnectionButtonProps) {
+  if (isPending) {
+    return (
+      <Button variant="outline" disabled>
+        Testing...
+      </Button>
+    );
+  }
+
+  if (state.status === 'success') {
+    return (
+      <Button
+        variant="outline"
+        disabled
+        className="border-green-600/50 text-green-600 disabled:opacity-100 dark:border-green-400/50 dark:text-green-400"
+      >
+        <CheckCircle2 className="mr-2 h-4 w-4" />
+        Connection OK
+      </Button>
+    );
+  }
+
+  if (state.status === 'error') {
+    return (
+      <Button
+        variant="outline"
+        onClick={onClick}
+        className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+      >
+        <XCircle className="mr-2 h-4 w-4" />
+        Connection Failed
+      </Button>
+    );
+  }
+
+  return (
+    <Button variant="outline" onClick={onClick}>
+      Test Connection
+    </Button>
   );
 }

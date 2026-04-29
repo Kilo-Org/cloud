@@ -52,6 +52,7 @@ type RawModel = {
   name?: string;
   context_length?: number;
   max_completion_tokens?: number;
+  input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
 };
 
 type ProviderFetcher = {
@@ -96,6 +97,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
         name: model.name,
         context_length: model.limit?.context,
         max_completion_tokens: model.limit?.output,
+        input_modalities: model.modalities?.input,
       }));
     },
   },
@@ -153,7 +155,7 @@ async function syncProvider(
       id: raw.id,
       name,
       description,
-      flags: prior?.flags ?? [],
+      flags: raw.input_modalities?.includes('image') ? ['vision'] : [],
       context_length,
       max_completion_tokens,
       variants: prior?.variants ?? null,

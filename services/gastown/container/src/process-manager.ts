@@ -1405,6 +1405,33 @@ function buildLiveHotSwapEnv(agent: ManagedAgent): Record<string, string> {
   return env;
 }
 
+// Per-agent timeout for the `ensureSDKServer` step of a token refresh.
+// Server startup normally takes ~1-2s; anything beyond 6s means the
+// spawn is stuck and we'd rather fall back to the old instance than
+// block the caller. The TownDO alarm path has a 10s outer timeout, so
+// each agent must finish well under that even with queuing effects
+// from the sdkServerLock.
+const REFRESH_AGENT_TIMEOUT_MS = 6_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const handle = setTimeout(
+      () => reject(new Error(`timeout after ${ms}ms: ${label}`)),
+      ms
+    );
+    promise.then(
+      value => {
+        clearTimeout(handle);
+        resolve(value);
+      },
+      err => {
+        clearTimeout(handle);
+        reject(err);
+      }
+    );
+  });
+}
+
 /**
  * Restart every running agent's SDK server so a newly-refreshed
  * `GASTOWN_CONTAINER_TOKEN` (or any other LIVE_ENV_KEYS value in
@@ -1424,11 +1451,18 @@ export async function refreshTokenForAllAgents(): Promise<
   const snapshot = [...agents.values()].filter(
     a => a.status === 'running' || a.status === 'starting'
   );
-  const results: Array<{ agentId: string; success: boolean; durationMs: number; error?: string }> =
-    [];
 
-  for (const agent of snapshot) {
+  // Restart agents in parallel. Each agent has its own workdir (and
+  // therefore its own sdkInstances key), so the Map mutations don't
+  // collide. Running serially would easily blow past the caller's
+  // 10s timeout once we have more than a couple of agents.
+  const restartAgent = async (
+    agent: ManagedAgent
+  ): Promise<{ agentId: string; success: boolean; durationMs: number; error?: string }> => {
     const t0 = Date.now();
+    const oldInstance = sdkInstances.get(agent.workdir);
+    const oldSessionId = agent.sessionId;
+    const oldPort = agent.serverPort;
     try {
       const hotSwapEnv = buildLiveHotSwapEnv(agent);
 
@@ -1438,12 +1472,13 @@ export async function refreshTokenForAllAgents(): Promise<
       // window still has somewhere to land — but process.env changes
       // are only visible to *new* child processes, so restarting the
       // server is the only way to propagate the fresh token.
-      const oldInstance = sdkInstances.get(agent.workdir);
-      const oldSessionId = agent.sessionId;
-      const oldPort = agent.serverPort;
       sdkInstances.delete(agent.workdir);
 
-      const { client, port } = await ensureSDKServer(agent.workdir, hotSwapEnv);
+      const { client, port } = await withTimeout(
+        ensureSDKServer(agent.workdir, hotSwapEnv),
+        REFRESH_AGENT_TIMEOUT_MS,
+        `ensureSDKServer for ${agent.agentId}`
+      );
       agent.serverPort = port;
 
       // Resume the existing session. kilo.db is on disk and survives
@@ -1451,7 +1486,11 @@ export async function refreshTokenForAllAgents(): Promise<
       let newSessionId = oldSessionId;
       let resumed = false;
       try {
-        const existing = await client.session.list();
+        const existing = await withTimeout(
+          client.session.list(),
+          2_000,
+          `session.list for ${agent.agentId}`
+        );
         const sessions = (existing.data ?? []) as Array<{
           id: string;
           time?: { updated?: number };
@@ -1523,10 +1562,20 @@ export async function refreshTokenForAllAgents(): Promise<
         success: true,
         durationMs,
       });
-      results.push({ agentId: agent.agentId, success: true, durationMs });
+      return { agentId: agent.agentId, success: true, durationMs };
     } catch (err) {
       const durationMs = Date.now() - t0;
       const message = err instanceof Error ? err.message : String(err);
+      // Restore the old SDK instance in the map so the agent keeps
+      // pointing at a tracked server. The old kilo serve child still
+      // has the stale token, but having SOME server is strictly better
+      // than having none: session.prompt still works, and the next
+      // refresh / model swap will pick it up again.
+      if (oldInstance && !sdkInstances.has(agent.workdir)) {
+        sdkInstances.set(agent.workdir, oldInstance);
+        agent.serverPort = oldPort;
+        agent.sessionId = oldSessionId;
+      }
       log.error('refresh_token.agent_restarted', {
         agentId: agent.agentId,
         role: agent.role,
@@ -1535,11 +1584,11 @@ export async function refreshTokenForAllAgents(): Promise<
         durationMs,
         error: message,
       });
-      results.push({ agentId: agent.agentId, success: false, durationMs, error: message });
+      return { agentId: agent.agentId, success: false, durationMs, error: message };
     }
-  }
+  };
 
-  return results;
+  return Promise.all(snapshot.map(restartAgent));
 }
 
 /**
@@ -2082,9 +2131,9 @@ export async function bootHydration(): Promise<void> {
   const LOG = '[boot-hydration]';
   const apiUrl = process.env.GASTOWN_API_URL;
   const townId = process.env.GASTOWN_TOWN_ID;
-  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+  const initialToken = process.env.GASTOWN_CONTAINER_TOKEN;
 
-  if (!apiUrl || !townId || !token) {
+  if (!apiUrl || !townId || !initialToken) {
     console.log(
       `${LOG} Missing GASTOWN_API_URL, GASTOWN_TOWN_ID, or GASTOWN_CONTAINER_TOKEN — skipping boot hydration`
     );
@@ -2097,6 +2146,11 @@ export async function bootHydration(): Promise<void> {
   // worker call. The refresh endpoint tolerates tokens that have just
   // expired so this covers the cold-restart case too.
   await refreshTokenIfNearExpiry();
+
+  // Re-read the token AFTER the potential refresh so subsequent calls
+  // (registry fetch, and the env maps we hand to hydrated agents) use
+  // the fresh value.
+  const token = process.env.GASTOWN_CONTAINER_TOKEN ?? initialToken;
 
   console.log(`${LOG} Fetching container registry for town=${townId}`);
   let registry: unknown;
@@ -2133,9 +2187,14 @@ export async function bootHydration(): Promise<void> {
       continue;
     }
 
+    // Registry entries were written with the token snapshot at dispatch
+    // time. If we just refreshed, overlay the fresh value so the hydrated
+    // kilo serve child inherits the current token.
+    const hydratedEnv = { ...env, GASTOWN_CONTAINER_TOKEN: token };
+
     console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
     try {
-      await startAgent(agentRequest, workdir, env);
+      await startAgent(agentRequest, workdir, hydratedEnv);
       console.log(`${LOG} Agent ${agentId} resumed`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

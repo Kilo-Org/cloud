@@ -1476,6 +1476,48 @@ describe('formatError', () => {
     );
   });
 
+  it('handles SERVICE_UNAVAILABLE code', () => {
+    expect(formatError({ data: { code: 'SERVICE_UNAVAILABLE' } })).toBe(
+      'Service is temporarily unavailable. Please retry in a moment.'
+    );
+  });
+
+  it('handles 503 httpStatus', () => {
+    expect(formatError({ data: { httpStatus: 503 } })).toBe(
+      'Service is temporarily unavailable. Please retry in a moment.'
+    );
+  });
+
+  it('handles TRPCClientError-shaped Error instance with CONFLICT code', () => {
+    const err = Object.assign(new Error('Execution exc_123 is in progress'), {
+      data: { code: 'CONFLICT', httpStatus: 409 },
+    });
+    expect(formatError(err)).toBe('Previous task is still finishing up. Please wait a moment.');
+  });
+
+  it('handles TRPCClientError-shaped Error instance with 402 httpStatus', () => {
+    const err = Object.assign(new Error('Payment required'), {
+      data: { httpStatus: 402 },
+    });
+    expect(formatError(err)).toBe(
+      'Insufficient credits. Please add at least $1 to continue using Cloud Agent.'
+    );
+  });
+
+  it('handles TRPCClientError-shaped Error instance with SERVICE_UNAVAILABLE', () => {
+    const err = Object.assign(new Error('upstream handshake failed'), {
+      data: { code: 'SERVICE_UNAVAILABLE', httpStatus: 503 },
+    });
+    expect(formatError(err)).toBe('Service is temporarily unavailable. Please retry in a moment.');
+  });
+
+  it('handles TRPCClientError-shaped Error instance with unmapped code', () => {
+    const err = Object.assign(new Error('boom'), {
+      data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
+    });
+    expect(formatError(err)).toBe('Something went wrong. Please retry in a moment.');
+  });
+
   it('handles unknown errors', () => {
     expect(formatError('just a string')).toBe('Something went wrong. Please retry in a moment.');
     expect(formatError(null)).toBe('Something went wrong. Please retry in a moment.');

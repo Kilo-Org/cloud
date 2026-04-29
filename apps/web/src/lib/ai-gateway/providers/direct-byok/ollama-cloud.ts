@@ -1,10 +1,6 @@
 import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
 
-// Ollama Cloud exposes an OpenAI-compatible API at https://ollama.com/v1.
-// See https://docs.ollama.com/api/openai-compatibility and https://docs.ollama.com/cloud
-// The model list is synced dynamically from https://models.dev/api.json
-// ("ollama-cloud" entry) via sync-direct-byok.ts.
 export default {
   id: 'ollama-cloud',
   base_url: 'https://ollama.com/v1',

@@ -7,7 +7,3 @@ Custom LLM models ([`custom-llm/`](./custom-llm)) and direct BYOK models ([`prov
 ## Forbidden free models
 
 When a free Kilo-exclusive model is removed, add its public ID to `forbiddenFreeModelIds` in [`forbidden-free-models.ts`](./forbidden-free-models.ts) so stale clients cannot keep invoking it directly.
-
-## `exclusive_to` is not a security control
-
-The `exclusive_to` field on a `KiloExclusiveModel` is a soft product-routing hint identified by a client-sent header. Do not rely on it to keep sensitive or expensive models off a given surface.

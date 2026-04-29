@@ -6,11 +6,15 @@ import {
   PERIODIC_INTERVAL_MS,
   FAILURE_RETRY_BASE_MS,
   FAILURE_RETRY_MAX_MS,
+  GATEWAY_CLIENT_OPERATOR_SCOPES,
   type ReadChannelPairingImpl,
   type ReadDevicePairingImpl,
+  widenGatewayClientPendingRequestScopes,
 } from './pairing-cache';
 
 type ExecImpl = (command: string, args: string[]) => Promise<{ stdout: string; stderr: string }>;
+type ReadTextFileImpl = (filePath: string) => Promise<string>;
+type WriteTextFileAtomicImpl = (filePath: string, data: string) => Promise<void>;
 
 // Epoch-ms equivalent of the nowImpl ISO string, for TTL comparisons
 const NOW_MS = new Date('2026-03-12T00:00:00.000Z').getTime();
@@ -22,6 +26,8 @@ function createTestHarness(overrides?: {
   readConfigImpl?: () => unknown;
   readChannelPairingImpl?: ReadChannelPairingImpl;
   readDevicePairingImpl?: ReadDevicePairingImpl;
+  readTextFileImpl?: ReadTextFileImpl;
+  writeTextFileAtomicImpl?: WriteTextFileAtomicImpl;
 }) {
   const execImpl = overrides?.execImpl ?? vi.fn<ExecImpl>();
   const readConfigImpl =
@@ -37,6 +43,10 @@ function createTestHarness(overrides?: {
     vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] });
   const readDevicePairingImpl =
     overrides?.readDevicePairingImpl ?? vi.fn<ReadDevicePairingImpl>().mockResolvedValue({});
+  const readTextFileImpl =
+    overrides?.readTextFileImpl ?? vi.fn<ReadTextFileImpl>().mockResolvedValue('{}');
+  const writeTextFileAtomicImpl =
+    overrides?.writeTextFileAtomicImpl ?? vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue();
   const nowImpl = vi.fn(() => '2026-03-12T00:00:00.000Z');
   const nowMsImpl = vi.fn(() => NOW_MS);
 
@@ -45,6 +55,8 @@ function createTestHarness(overrides?: {
     readConfigImpl,
     readChannelPairingImpl,
     readDevicePairingImpl,
+    readTextFileImpl,
+    writeTextFileAtomicImpl,
     nowImpl,
     nowMsImpl,
   });
@@ -55,6 +67,8 @@ function createTestHarness(overrides?: {
     readConfigImpl,
     readChannelPairingImpl,
     readDevicePairingImpl,
+    readTextFileImpl,
+    writeTextFileAtomicImpl,
     nowImpl,
     nowMsImpl,
   };
@@ -71,6 +85,83 @@ afterEach(() => {
 });
 
 describe('createPairingCache', () => {
+  describe('widenGatewayClientPendingRequestScopes', () => {
+    it('widens gateway-client operator pending request scopes before approval', async () => {
+      const readTextFile = vi.fn<ReadTextFileImpl>().mockResolvedValue(
+        JSON.stringify({
+          'req-1': {
+            requestId: 'req-1',
+            deviceId: 'dev1',
+            publicKey: 'public-key',
+            clientId: 'gateway-client',
+            clientMode: 'backend',
+            role: 'operator',
+            roles: ['operator'],
+            scopes: ['operator.read'],
+            ts: RECENT_TS,
+          },
+          'req-2': {
+            requestId: 'req-2',
+            deviceId: 'dev2',
+            publicKey: 'public-key-2',
+            clientId: 'openclaw-ios',
+            role: 'operator',
+            scopes: ['operator.read'],
+            ts: RECENT_TS,
+          },
+        })
+      );
+      const writeTextFileAtomic = vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue();
+
+      const result = await widenGatewayClientPendingRequestScopes({
+        requestId: 'req-1',
+        pendingPath: '/tmp/pending.json',
+        readTextFile,
+        writeTextFileAtomic,
+      });
+
+      expect(result).toEqual({ changed: true, missing: false });
+      expect(writeTextFileAtomic).toHaveBeenCalledTimes(1);
+      const written = JSON.parse(writeTextFileAtomic.mock.calls[0]?.[1] ?? '{}') as Record<
+        string,
+        Record<string, unknown>
+      >;
+      expect(written['req-1']?.scopes).toEqual(GATEWAY_CLIENT_OPERATOR_SCOPES);
+      expect(written['req-2']?.scopes).toEqual(['operator.read']);
+    });
+
+    it('does not rewrite missing or non-gateway pending requests', async () => {
+      const readTextFile = vi.fn<ReadTextFileImpl>().mockResolvedValue(
+        JSON.stringify({
+          'req-1': {
+            requestId: 'req-1',
+            deviceId: 'dev1',
+            clientId: 'openclaw-ios',
+            role: 'operator',
+            scopes: ['operator.read'],
+          },
+        })
+      );
+      const writeTextFileAtomic = vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue();
+
+      await expect(
+        widenGatewayClientPendingRequestScopes({
+          requestId: 'req-1',
+          readTextFile,
+          writeTextFileAtomic,
+        })
+      ).resolves.toEqual({ changed: false, missing: false });
+      await expect(
+        widenGatewayClientPendingRequestScopes({
+          requestId: 'req-missing',
+          readTextFile,
+          writeTextFileAtomic,
+        })
+      ).resolves.toEqual({ changed: false, missing: true });
+      expect(writeTextFileAtomic).not.toHaveBeenCalled();
+    });
+  });
+
   describe('channel pairing list', () => {
     it('merges requests from multiple channels', async () => {
       const readChannelPairingImpl = vi.fn<ReadChannelPairingImpl>().mockImplementation(channel => {
@@ -542,14 +633,32 @@ describe('createPairingCache', () => {
   describe('autoApproveGatewayClient', () => {
     it('auto-approves pending gateway-client devices on refresh', async () => {
       const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const readTextFileImpl = vi.fn<ReadTextFileImpl>().mockResolvedValue(
+        JSON.stringify({
+          'a1b2c3d4-e5f6-7890-abcd-ef1234567890': {
+            requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            deviceId: 'dev1',
+            publicKey: 'public-key',
+            clientId: 'gateway-client',
+            clientMode: 'backend',
+            role: 'operator',
+            roles: ['operator'],
+            scopes: ['operator.read'],
+            ts: RECENT_TS,
+          },
+        })
+      );
+      const writeTextFileAtomicImpl = vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue();
       const readDevicePairingImpl = vi
         .fn<ReadDevicePairingImpl>()
         .mockResolvedValueOnce({
-          'req-1': {
+          'a1b2c3d4-e5f6-7890-abcd-ef1234567890': {
             requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
             deviceId: 'dev1',
             clientId: 'gateway-client',
+            clientMode: 'backend',
             role: 'operator',
+            roles: ['operator'],
             ts: RECENT_TS,
           },
         })
@@ -561,6 +670,8 @@ describe('createPairingCache', () => {
         readConfigImpl: () => ({ channels: {} }),
         readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
         readDevicePairingImpl,
+        readTextFileImpl,
+        writeTextFileAtomicImpl,
         nowImpl: () => '2026-03-12T00:00:00.000Z',
         nowMsImpl: () => NOW_MS,
         autoApproveGatewayClient: true,
@@ -573,11 +684,21 @@ describe('createPairingCache', () => {
         'approve',
         'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       ]);
+      expect(writeTextFileAtomicImpl).toHaveBeenCalledTimes(1);
+      const written = JSON.parse(writeTextFileAtomicImpl.mock.calls[0]?.[1] ?? '{}') as Record<
+        string,
+        Record<string, unknown>
+      >;
+      expect(written['a1b2c3d4-e5f6-7890-abcd-ef1234567890']?.scopes).toEqual(
+        GATEWAY_CLIENT_OPERATOR_SCOPES
+      );
       expect(cache.getDevicePairing().requests).toEqual([]);
     });
 
     it('does not auto-approve non-gateway-client devices', async () => {
       const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const readTextFileImpl = vi.fn<ReadTextFileImpl>().mockResolvedValue('{}');
+      const writeTextFileAtomicImpl = vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue();
       const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockResolvedValue({
         'req-1': {
           requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -593,6 +714,8 @@ describe('createPairingCache', () => {
         readConfigImpl: () => ({ channels: {} }),
         readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
         readDevicePairingImpl,
+        readTextFileImpl,
+        writeTextFileAtomicImpl,
         nowImpl: () => '2026-03-12T00:00:00.000Z',
         nowMsImpl: () => NOW_MS,
         autoApproveGatewayClient: true,
@@ -601,7 +724,81 @@ describe('createPairingCache', () => {
       await cache.refreshDevicePairing();
 
       expect(execImpl).not.toHaveBeenCalled();
+      expect(readTextFileImpl).not.toHaveBeenCalled();
+      expect(writeTextFileAtomicImpl).not.toHaveBeenCalled();
       expect(cache.getDevicePairing().requests).toHaveLength(1);
+    });
+
+    it('does not auto-approve gateway-client requests without operator role', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const readTextFileImpl = vi.fn<ReadTextFileImpl>().mockResolvedValue('{}');
+      const writeTextFileAtomicImpl = vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue();
+      const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockResolvedValue({
+        'req-1': {
+          requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          deviceId: 'dev1',
+          clientId: 'gateway-client',
+          role: 'node',
+          roles: ['node'],
+          ts: RECENT_TS,
+        },
+      });
+
+      const cache = createPairingCache({
+        execImpl,
+        readConfigImpl: () => ({ channels: {} }),
+        readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
+        readDevicePairingImpl,
+        readTextFileImpl,
+        writeTextFileAtomicImpl,
+        nowImpl: () => '2026-03-12T00:00:00.000Z',
+        nowMsImpl: () => NOW_MS,
+        autoApproveGatewayClient: true,
+      });
+
+      await cache.refreshDevicePairing();
+
+      expect(execImpl).not.toHaveBeenCalled();
+      expect(readTextFileImpl).not.toHaveBeenCalled();
+      expect(writeTextFileAtomicImpl).not.toHaveBeenCalled();
+      expect(cache.getDevicePairing().requests).toHaveLength(1);
+    });
+
+    it('skips auto-approval when pending request disappears before widening', async () => {
+      const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const readTextFileImpl = vi.fn<ReadTextFileImpl>().mockResolvedValue('{}');
+      const writeTextFileAtomicImpl = vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue();
+      const readDevicePairingImpl = vi
+        .fn<ReadDevicePairingImpl>()
+        .mockResolvedValueOnce({
+          'a1b2c3d4-e5f6-7890-abcd-ef1234567890': {
+            requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            deviceId: 'dev1',
+            clientId: 'gateway-client',
+            role: 'operator',
+            roles: ['operator'],
+            ts: RECENT_TS,
+          },
+        })
+        .mockResolvedValue({});
+
+      const cache = createPairingCache({
+        execImpl,
+        readConfigImpl: () => ({ channels: {} }),
+        readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
+        readDevicePairingImpl,
+        readTextFileImpl,
+        writeTextFileAtomicImpl,
+        nowImpl: () => '2026-03-12T00:00:00.000Z',
+        nowMsImpl: () => NOW_MS,
+        autoApproveGatewayClient: true,
+      });
+
+      await cache.refreshDevicePairing();
+
+      expect(execImpl).not.toHaveBeenCalled();
+      expect(writeTextFileAtomicImpl).not.toHaveBeenCalled();
+      expect(cache.getDevicePairing().requests).toEqual([]);
     });
 
     it('does not auto-approve when option is disabled', async () => {

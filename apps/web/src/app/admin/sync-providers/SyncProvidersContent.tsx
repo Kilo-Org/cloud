@@ -31,7 +31,7 @@ export function SyncProvidersContent() {
         toast.success(
           `Synced ${result.total_providers} providers with ${result.total_models} total models`
         );
-        lastSyncQuery.refetch();
+        void lastSyncQuery.refetch();
       },
       onError: error => {
         toast.error(error.message || 'Sync failed');

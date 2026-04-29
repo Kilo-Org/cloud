@@ -10,7 +10,11 @@
  */
 
 import { db } from '@/lib/drizzle';
-import { cloud_agent_code_reviews, type CloudAgentCodeReview } from '@kilocode/db/schema';
+import {
+  cloud_agent_code_reviews,
+  kilocode_users,
+  type CloudAgentCodeReview,
+} from '@kilocode/db/schema';
 import { eq, and, or, count, gte, lt, sql } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareReviewPayload } from '../triggers/prepare-review-payload';
@@ -21,7 +25,10 @@ import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import type { CodeReviewPlatform } from '../core/schemas';
 
-const MAX_CONCURRENT_REVIEWS_PER_OWNER = 20;
+const MAX_CONCURRENT_REVIEWS_PER_ORG = 20;
+const MAX_CONCURRENT_REVIEWS_PER_FUNDED_USER = 3;
+const MAX_CONCURRENT_REVIEWS_PER_DEFAULT_USER = 1;
+const FUNDED_USER_BALANCE_THRESHOLD_MICRODOLLARS = 5_000_000;
 
 // Reviews claimed (queued) but not picked up by the worker within this
 // window are considered abandoned (e.g. process crashed after claim) and
@@ -29,10 +36,33 @@ const MAX_CONCURRENT_REVIEWS_PER_OWNER = 20;
 const STALE_CLAIM_MINUTES = 5;
 const STALE_RUNNING_MINUTES = 90;
 
-export interface DispatchResult {
+export type DispatchResult = {
   dispatched: number;
   pending: number;
   activeCount: number;
+};
+
+async function getMaxConcurrentReviewsForOwner(owner: Owner): Promise<number> {
+  if (owner.type === 'org') return MAX_CONCURRENT_REVIEWS_PER_ORG;
+
+  const [user] = await db
+    .select({
+      totalMicrodollarsAcquired: kilocode_users.total_microdollars_acquired,
+      microdollarsUsed: kilocode_users.microdollars_used,
+    })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, owner.id))
+    .limit(1);
+
+  if (!user) {
+    logExceptInTest('[getMaxConcurrentReviewsForOwner] User owner not found', { owner });
+    return MAX_CONCURRENT_REVIEWS_PER_DEFAULT_USER;
+  }
+
+  const balanceMicrodollars = user.totalMicrodollarsAcquired - user.microdollarsUsed;
+  return balanceMicrodollars > FUNDED_USER_BALANCE_THRESHOLD_MICRODOLLARS
+    ? MAX_CONCURRENT_REVIEWS_PER_FUNDED_USER
+    : MAX_CONCURRENT_REVIEWS_PER_DEFAULT_USER;
 }
 
 /**
@@ -74,11 +104,13 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
       );
 
     const activeCount = activeCountResult[0]?.count || 0;
-    const availableSlots = MAX_CONCURRENT_REVIEWS_PER_OWNER - activeCount;
+    const maxConcurrentReviews = await getMaxConcurrentReviewsForOwner(owner);
+    const availableSlots = maxConcurrentReviews - activeCount;
 
     logExceptInTest('[tryDispatchPendingReviews] Active count check', {
       owner,
       activeCount,
+      maxConcurrentReviews,
       availableSlots,
     });
 

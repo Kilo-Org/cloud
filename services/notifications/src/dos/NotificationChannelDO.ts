@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
 import { badge_counts, kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
+import { badgeBucketForInstance } from '@kilocode/notifications';
 import { and, eq, inArray, isNull, sql, sum } from 'drizzle-orm';
 import type { Event } from 'stream-chat';
 
@@ -135,13 +136,14 @@ export class NotificationChannelDO extends DurableObject<Env> {
       return;
     }
 
-    // Increment the badge count for this channel and return the new total across all channels.
+    // Increment the badge count for this bucket and return the new total across all buckets.
     // Done before the token guard so unread state is always persisted even if the user
     // temporarily has no registered push tokens (e.g. between reinstalls).
-    // Uses UPSERT so the row is created on first notification for this channel.
+    // Uses UPSERT so the row is created on first notification for this bucket.
+    const badgeBucket = badgeBucketForInstance(sandboxId);
     await db
       .insert(badge_counts)
-      .values({ user_id: instance.user_id, badge_bucket: sandboxId, badge_count: 1 })
+      .values({ user_id: instance.user_id, badge_bucket: badgeBucket, badge_count: 1 })
       .onConflictDoUpdate({
         target: [badge_counts.user_id, badge_counts.badge_bucket],
         set: { badge_count: sql`${badge_counts.badge_count} + 1` },

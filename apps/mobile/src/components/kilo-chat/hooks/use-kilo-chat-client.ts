@@ -1,5 +1,5 @@
-import type { EventServiceClient } from '@kilocode/event-service';
-import type { KiloChatClient } from '@kilocode/kilo-chat';
+import { type EventServiceClient } from '@kilocode/event-service';
+import { type KiloChatClient } from '@kilocode/kilo-chat';
 
 import { useKiloChatContext } from '../kilo-chat-provider';
 

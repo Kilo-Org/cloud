@@ -10,7 +10,7 @@ export const seed_20_code_free_model: KiloExclusiveModel = {
   status: 'disabled',
   flags: ['reasoning', 'vision'],
   gateway: 'seed',
-  internal_id: 'seed-2-0-code-260328',
+  internal_id: 'seed-2-0-code-preview-260328',
   pricing: null,
   exclusive_to: [],
 };

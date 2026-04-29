@@ -5,9 +5,7 @@ import { presenceContextForPlatform } from '@kilocode/event-service';
 import { usePresenceSubscription } from './usePresenceSubscription';
 
 export function usePlatformPresence() {
-  const [visible, setVisible] = useState(
-    typeof document === 'undefined' ? true : !document.hidden,
-  );
+  const [visible, setVisible] = useState(typeof document === 'undefined' ? true : !document.hidden);
 
   useEffect(() => {
     const onChange = () => setVisible(!document.hidden);

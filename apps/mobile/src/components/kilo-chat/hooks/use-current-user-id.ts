@@ -13,20 +13,27 @@ export function useCurrentUserId(): string | null {
   useEffect(() => {
     let cancelled = false;
 
-    getToken()
-      .then(token => {
-        if (cancelled) return;
+    async function fetchUserId() {
+      try {
+        const token = await getToken();
+        if (cancelled) {
+          return;
+        }
         const parts = token.split('.');
-        if (parts.length < 2 || !parts[1]) return;
+        if (parts.length < 2 || !parts[1]) {
+          return;
+        }
         const payload = parts[1];
-        const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+        const decoded = atob(payload.replaceAll('-', '+').replaceAll('_', '/'));
         const parsed = JSON.parse(decoded) as Record<string, unknown>;
         const sub = typeof parsed.sub === 'string' ? parsed.sub : null;
         setUserId(sub);
-      })
-      .catch(() => {
+      } catch {
         // Leave userId as null on failure
-      });
+      }
+    }
+
+    void fetchUserId();
 
     return () => {
       cancelled = true;

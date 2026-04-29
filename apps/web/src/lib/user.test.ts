@@ -142,10 +142,10 @@ describe('User', () => {
       expect(result.user.signup_ip).toBe('203.0.113.25');
     });
 
-    it('rejects new signups after the per-IP threshold (5)', async () => {
+    it('rejects new signups after the per-IP burst threshold (100/24h)', async () => {
       const signupIp = '203.0.113.50';
-      for (let i = 1; i <= 5; i++) {
-        await insertTestUser({ id: `ip-limit-${i}`, signup_ip: signupIp });
+      for (let i = 1; i <= 100; i++) {
+        await insertTestUser({ id: `ip-burst-${i}`, signup_ip: signupIp });
       }
 
       const result = await createOrUpdateUser(
@@ -165,6 +165,98 @@ describe('User', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('SIGNUP-RATE-LIMITED');
+    });
+
+    it('allows up to 99 signups in 24h from a single IP (burst below threshold)', async () => {
+      const signupIp = '203.0.113.51';
+      for (let i = 1; i <= 99; i++) {
+        await insertTestUser({ id: `ip-burst-ok-${i}`, signup_ip: signupIp });
+      }
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'burst-ok@example.com',
+          google_user_name: 'Burst OK',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-burst-ok',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': signupIp })
+      );
+
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects new signups after the per-IP sustained threshold (150/30d)', async () => {
+      const signupIp = '203.0.113.52';
+      const now = Date.now();
+      // 99 signups yesterday — under the 24h burst threshold.
+      const yesterday = new Date(now - 2 * 60 * 60 * 1000).toISOString();
+      for (let i = 1; i <= 99; i++) {
+        await insertTestUser({
+          id: `ip-sustained-recent-${i}`,
+          signup_ip: signupIp,
+          created_at: yesterday,
+        });
+      }
+      // 51 more signups 10 days ago — outside the 24h window, inside 30d.
+      const tenDaysAgo = new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString();
+      for (let i = 1; i <= 51; i++) {
+        await insertTestUser({
+          id: `ip-sustained-old-${i}`,
+          signup_ip: signupIp,
+          created_at: tenDaysAgo,
+        });
+      }
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'sustained-limited@example.com',
+          google_user_name: 'Sustained Limited',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-sustained-limited',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': signupIp })
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('SIGNUP-RATE-LIMITED');
+    });
+
+    it('ignores signups older than 30 days when evaluating the sustained limit', async () => {
+      const signupIp = '203.0.113.53';
+      const longAgo = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
+      for (let i = 1; i <= 200; i++) {
+        await insertTestUser({
+          id: `ip-sustained-expired-${i}`,
+          signup_ip: signupIp,
+          created_at: longAgo,
+        });
+      }
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'sustained-expired@example.com',
+          google_user_name: 'Sustained Expired',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-sustained-expired',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': signupIp })
+      );
+
+      expect(result.success).toBe(true);
     });
 
     it('rejects new signups whose normalized_email is already in use', async () => {

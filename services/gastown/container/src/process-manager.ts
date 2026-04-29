@@ -240,6 +240,88 @@ async function createSessionWithStaleDbFallback(
   return retryParsed.data.id;
 }
 
+/**
+ * Run `PRAGMA wal_checkpoint(TRUNCATE)` against kilo.db and return true
+ * only if the WAL is fully drained into the main db file.
+ *
+ * The pragma returns `(busy, log, checkpointed)` as a row:
+ *   busy=0 AND log == checkpointed  → WAL fully merged into main db
+ *   anything else                    → main db is stale vs the WAL
+ *
+ * Returning true on an incomplete checkpoint would cause the caller to
+ * upload a kilo.db that's missing recent writes (e.g. the just-accepted
+ * mayor turn), overwriting the remote snapshot with stale state.
+ */
+async function runWalCheckpoint(dbPath: string, agentId: string): Promise<boolean> {
+  try {
+    const checkpoint = Bun.spawn(
+      [
+        'bun',
+        '-e',
+        `const db = new (require("bun:sqlite").Database)(process.argv[1]);
+         const row = db.query("PRAGMA wal_checkpoint(TRUNCATE)").get();
+         process.stdout.write(JSON.stringify(row ?? null));`,
+        dbPath,
+      ],
+      { stdout: 'pipe', stderr: 'pipe' }
+    );
+    const exitCode = await checkpoint.exited;
+    const stdout = await new Response(checkpoint.stdout).text();
+    const stderr = await new Response(checkpoint.stderr).text();
+
+    if (exitCode !== 0) {
+      console.warn(`${MANAGER_LOG} WAL checkpoint exited ${exitCode} for ${agentId}: ${stderr}`);
+      return false;
+    }
+
+    // bun:sqlite returns the pragma row as an object. Accept snake_case,
+    // camelCase, or bare positional keys (`0`, `1`, `2`) defensively.
+    const parsed: unknown = stdout.trim() ? JSON.parse(stdout) : null;
+    if (!parsed || typeof parsed !== 'object') {
+      console.warn(`${MANAGER_LOG} WAL checkpoint returned no row for ${agentId}: ${stdout}`);
+      return false;
+    }
+    const row: Record<string, unknown> = { ...parsed };
+    const busy = Number(row.busy ?? row['0'] ?? 0);
+    const logFrames = Number(row.log ?? row['1'] ?? 0);
+    const checkpointed = Number(row.checkpointed ?? row['2'] ?? 0);
+
+    if (busy !== 0 || logFrames !== checkpointed) {
+      console.warn(
+        `${MANAGER_LOG} WAL checkpoint incomplete for ${agentId}: busy=${busy} log=${logFrames} checkpointed=${checkpointed}`
+      );
+      return false;
+    }
+    console.log(
+      `${MANAGER_LOG} WAL checkpoint succeeded for ${agentId} (frames=${checkpointed})`
+    );
+    return true;
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} WAL checkpoint failed for ${agentId}:`, err);
+    return false;
+  }
+}
+
+/**
+ * Race a promise against a timeout, always clearing the timer so it
+ * doesn't keep the event loop (and `ref`'d timer state) alive after
+ * the underlying work finishes. Returns the resolved value or throws
+ * a timeout Error after `timeoutMs`.
+ */
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timeout`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 async function saveDbSnapshot(
   agentId: string,
   apiUrl: string,
@@ -259,25 +341,30 @@ async function saveDbSnapshot(
     // checkpoint the WAL into the main DB file before snapshotting so the
     // snapshot contains all data. Use bun's built-in SQLite to run PRAGMA
     // wal_checkpoint(TRUNCATE) which merges the WAL and truncates it.
-    try {
-      const checkpoint = Bun.spawn(
-        [
-          'bun',
-          '-e',
-          `new (require("bun:sqlite").Database)(process.argv[1]).run("PRAGMA wal_checkpoint(TRUNCATE)")`,
-          dbPath,
-        ],
-        { stdout: 'pipe', stderr: 'pipe' }
+    //
+    // `PRAGMA wal_checkpoint(TRUNCATE)` returns a row `(busy, log, checkpointed)`:
+    //   - busy=1 means another writer is holding the WAL and the checkpoint
+    //     was blocked. The main kilo.db is then stale relative to the WAL.
+    //   - log != checkpointed means the checkpoint only partially drained
+    //     the WAL, so again the main db file is missing recent writes.
+    //
+    // Either case means uploading kilo.db would overwrite the remote
+    // snapshot with a stale copy missing the messages this path is meant
+    // to preserve. Skip the upload in that case.
+    const checkpointOk = await runWalCheckpoint(dbPath, agentId);
+    if (!checkpointOk) {
+      console.warn(
+        `${MANAGER_LOG} Skipping DB snapshot for ${agentId}: WAL not fully checkpointed`
       );
-      const exitCode = await checkpoint.exited;
-      if (exitCode === 0) {
-        console.log(`${MANAGER_LOG} WAL checkpoint succeeded for ${agentId}`);
-      } else {
-        const stderr = await new Response(checkpoint.stderr).text();
-        console.warn(`${MANAGER_LOG} WAL checkpoint exited ${exitCode} for ${agentId}: ${stderr}`);
-      }
-    } catch (err) {
-      console.warn(`${MANAGER_LOG} WAL checkpoint failed for ${agentId}:`, err);
+      log.error('mayor.snapshot_failed', {
+        event: 'mayor.snapshot_failed',
+        agentId,
+        role,
+        durationMs: Date.now() - t0,
+        error: 'wal_checkpoint_incomplete',
+        success: false,
+      });
+      return;
     }
 
     const buffer = await fs.readFile(dbPath);
@@ -2138,15 +2225,16 @@ export async function drainAll(): Promise<void> {
 
       // 4d: Save DB snapshot — await with a 10s timeout so a slow KV
       // write doesn't block container exit, but log loudly if it times out.
+      // withTimeout clears the timer on success so we don't leave a ref'd
+      // setTimeout keeping the process alive after drain finishes.
       const apiUrl = agent.gastownApiUrl;
       const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
       if (apiUrl && token) {
-        await Promise.race([
+        await withTimeout(
           saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('drain snapshot timeout')), 10_000)
-          ),
-        ]).catch(err => {
+          10_000,
+          'drain snapshot'
+        ).catch(err => {
           console.error(`${DRAIN_LOG} snapshot timeout/failure for ${agent.agentId}:`, err);
           log.error('mayor.snapshot_failed', {
             event: 'mayor.snapshot_failed',
@@ -2209,15 +2297,16 @@ export async function stopAll(): Promise<void> {
       // Save DB snapshot before completing shutdown. Await with a 10s
       // timeout so the container can exit promptly on a stuck KV write,
       // but a loud error is emitted so we can observe snapshot drops.
+      // withTimeout clears the timer on success so stopAll doesn't return
+      // with a still-ref'd setTimeout delaying container exit.
       const apiUrl = agent.gastownApiUrl;
       const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
       if (apiUrl && token) {
-        await Promise.race([
+        await withTimeout(
           saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('stopAll snapshot timeout')), 10_000)
-          ),
-        ]).catch(err => {
+          10_000,
+          'stopAll snapshot'
+        ).catch(err => {
           console.error(`[stop-all] snapshot timeout/failure for ${agent.agentId}:`, err);
           log.error('mayor.snapshot_failed', {
             event: 'mayor.snapshot_failed',

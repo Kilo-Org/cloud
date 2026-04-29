@@ -26,6 +26,18 @@ const ModalitySchema = z
   .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
   .catch('unknown');
 
+const ChutesModelsResponseSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      context_length: z.number().optional(),
+      max_model_len: z.number().optional(),
+      max_output_length: z.number().optional(),
+      input_modalities: z.array(ModalitySchema).optional(),
+    })
+  ),
+});
+
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
@@ -74,6 +86,24 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
       return parsed.data.map(model => ({
         id: model.id,
         context_length: model.max_model_len,
+      }));
+    },
+  },
+  {
+    providerId: 'chutes-byok',
+    async fetch() {
+      const response = await fetch('https://llm.chutes.ai/v1/models');
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch Chutes models: ${response.status} ${response.statusText}`
+        );
+      }
+      const parsed = ChutesModelsResponseSchema.parse(await response.json());
+      return parsed.data.map(model => ({
+        id: model.id,
+        context_length: model.context_length ?? model.max_model_len,
+        max_completion_tokens: model.max_output_length,
+        input_modalities: model.input_modalities,
       }));
     },
   },

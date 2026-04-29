@@ -2,10 +2,10 @@
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
   "manifestVersion": "1.16",
   "version": "1.0.0",
-  "id": "10e87660-8c95-4136-bd51-e6c9287d6887",
-  "packageName": "com.yourcompany.chatbot",
+  "id": "c13c1718-edbf-47a0-9f34-4780e6bb1d03",
+  "packageName": "com.kilo.chatbot",
   "developer": {
-    "name": "Your Company",
+    "name": "Kilo",
     "websiteUrl": "https://kilo.ai",
     "privacyUrl": "https://kilo.ai/privacy",
     "termsOfUseUrl": "https://kilo.ai/terms"
@@ -25,7 +25,7 @@
   "accentColor": "#FFFFFF",
   "bots": [
     {
-      "botId": "10e87660-8c95-4136-bd51-e6c9287d6887",
+      "botId": "c13c1718-edbf-47a0-9f34-4780e6bb1d03",
       "scopes": ["personal", "team", "groupchat"],
       "supportsFiles": false,
       "isNotificationOnly": false

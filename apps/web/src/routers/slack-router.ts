@@ -55,6 +55,7 @@ export const slackRouter = createTRPCRouter({
         teamId: integration.platform_account_id,
         teamName: integration.platform_account_login,
         scopes: integration.scopes,
+        missingScopes: slackService.getMissingSlackScopes(integration.scopes),
         installedAt: integration.installed_at,
         modelSlug: metadata?.model_slug || null,
       },

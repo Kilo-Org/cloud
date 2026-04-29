@@ -2,8 +2,10 @@ import { dirname } from 'node:path';
 import { logger } from '../logger.js';
 import { SANDBOX_SLEEP_AFTER_SECONDS } from '../core/lease.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
-import { GitHubTokenService } from '../services/github-token-service.js';
-import { InstallationLookupService } from '../services/installation-lookup-service.js';
+import {
+  resolveGitHubTokenForRepo,
+  resolveManagedGitLabToken,
+} from '../services/git-token-service-client.js';
 import { getSandbox } from '@cloudflare/sandbox';
 import {
   checkDiskAndCleanBeforeSetup,
@@ -34,6 +36,8 @@ export type PreparationStepsResult = {
   kiloSessionId: string;
   resolvedInstallationId: string | undefined;
   resolvedGithubAppType: 'standard' | 'lite' | undefined;
+  resolvedGitToken: string | undefined;
+  gitlabTokenManaged: boolean;
 };
 
 /**
@@ -56,30 +60,43 @@ export async function executePreparationSteps(
   let resolvedGithubAppType: 'standard' | 'lite' | undefined;
 
   if (input.githubRepo && !input.githubToken) {
-    const lookupService = new InstallationLookupService(env);
-    if (lookupService.isConfigured()) {
-      const result = await lookupService.findInstallationId({
-        githubRepo: input.githubRepo,
-        userId: input.userId,
-        orgId: input.orgId,
-      });
-      if (result) {
-        resolvedInstallationId = result.installationId;
-        resolvedGithubAppType = result.githubAppType;
-        const tokenService = new GitHubTokenService(env);
-        resolvedGithubToken = await tokenService.getToken(
-          resolvedInstallationId,
-          resolvedGithubAppType ?? 'standard'
-        );
-      }
-    }
-    if (!resolvedGithubToken) {
+    const result = await resolveGitHubTokenForRepo(env, {
+      githubRepo: input.githubRepo,
+      userId: input.userId,
+      orgId: input.orgId,
+    });
+    if (result.success) {
+      resolvedGithubToken = result.value.token;
+      resolvedInstallationId = result.value.installationId;
+      resolvedGithubAppType = result.value.appType;
+    } else {
       emitProgress(
         'failed',
-        'GitHub token or active app installation required for this repository'
+        `GitHub token or active app installation required for this repository (${result.error.reason})`
       );
       return undefined;
     }
+  }
+
+  // Resolve managed GitLab token when no client token provided
+  let resolvedGitToken = input.gitToken;
+  let gitlabTokenManaged = false;
+  if (input.gitUrl && !input.gitToken && input.platform === 'gitlab') {
+    const result = await resolveManagedGitLabToken(env, {
+      userId: input.userId,
+      orgId: input.orgId,
+    });
+    if (result.success) {
+      resolvedGitToken = result.token;
+      gitlabTokenManaged = true;
+    }
+  }
+  if (input.gitUrl && input.platform === 'gitlab' && !resolvedGitToken) {
+    emitProgress(
+      'failed',
+      'No GitLab integration found. Please connect your GitLab account first.'
+    );
+    return undefined;
   }
 
   // 2. Disk check
@@ -119,7 +136,7 @@ export async function executePreparationSteps(
     githubRepo: input.githubRepo,
     githubToken: resolvedGithubToken,
     gitUrl: input.gitUrl,
-    gitToken: input.gitToken,
+    gitToken: resolvedGitToken,
     platform: input.platform,
     upstreamBranch: input.upstreamBranch,
     botId: input.botId,
@@ -144,7 +161,7 @@ export async function executePreparationSteps(
       session,
       workspacePath,
       input.gitUrl,
-      input.gitToken,
+      resolvedGitToken,
       undefined,
       cloneOptions
     );
@@ -228,5 +245,7 @@ export async function executePreparationSteps(
     kiloSessionId: input.kiloSessionId ?? wrapperSessionId,
     resolvedInstallationId,
     resolvedGithubAppType,
+    resolvedGitToken,
+    gitlabTokenManaged,
   };
 }

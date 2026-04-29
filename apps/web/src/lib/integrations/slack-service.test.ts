@@ -2,6 +2,9 @@ process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
 process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 
 const mockLimit = jest.fn();
+const mockUpdateSet = jest.fn();
+const mockUpdateWhere = jest.fn();
+const mockUpdateReturning = jest.fn();
 const mockDeleteWhere = jest.fn();
 const mockAuthRevoke = jest.fn();
 const mockAuthTest = jest.fn();
@@ -18,6 +21,9 @@ jest.mock('@/lib/drizzle', () => ({
     delete: jest.fn(() => ({
       where: mockDeleteWhere,
     })),
+    update: jest.fn(() => ({
+      set: mockUpdateSet,
+    })),
   },
 }));
 
@@ -31,7 +37,14 @@ jest.mock('@slack/web-api', () => ({
 }));
 
 import type { Owner } from '@/lib/integrations/core/types';
-import { testConnection, uninstallApp } from './slack-service';
+import type { SlackInstallation } from '@chat-adapter/slack';
+import {
+  getMissingSlackScopes,
+  SLACK_SCOPES,
+  testConnection,
+  uninstallApp,
+  upsertSlackInstallation,
+} from './slack-service';
 
 const owner = { type: 'user', id: 'user-1' } satisfies Owner;
 
@@ -49,9 +62,15 @@ function buildSlackIntegration(overrides: Record<string, unknown> = {}) {
 describe('slack-service uninstallApp', () => {
   beforeEach(() => {
     mockLimit.mockReset();
+    mockUpdateSet.mockReset();
+    mockUpdateWhere.mockReset();
+    mockUpdateReturning.mockReset();
     mockDeleteWhere.mockReset();
     mockAuthRevoke.mockReset();
     mockAuthRevoke.mockResolvedValue({ ok: true });
+    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateReturning.mockResolvedValue([buildSlackIntegration()]);
     mockDeleteWhere.mockResolvedValue(undefined);
   });
 
@@ -170,5 +189,61 @@ describe('slack-service testConnection', () => {
       success: false,
       error: 'network down',
     });
+  });
+});
+
+describe('getMissingSlackScopes', () => {
+  it('returns scopes required by the app but missing from the installation', () => {
+    const [missingScope, ...installedScopes] = SLACK_SCOPES;
+
+    expect(getMissingSlackScopes(installedScopes)).toEqual([missingScope]);
+  });
+
+  it('returns an empty list when all required scopes are installed', () => {
+    expect(getMissingSlackScopes([...SLACK_SCOPES])).toEqual([]);
+  });
+});
+
+describe('upsertSlackInstallation', () => {
+  beforeEach(() => {
+    mockLimit.mockReset();
+    mockUpdateSet.mockReset();
+    mockUpdateWhere.mockReset();
+    mockUpdateReturning.mockReset();
+    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateReturning.mockResolvedValue([buildSlackIntegration()]);
+  });
+
+  it('preserves the selected model when refreshing an existing installation', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({
+        metadata: {
+          access_token: 'xoxb-old-token',
+          bot_user_id: 'U_OLD_BOT',
+          incoming_webhook: { channel: '#general', channelId: 'C123', url: 'https://example.com' },
+          model_slug: 'anthropic/claude-sonnet-4.5',
+        },
+      }),
+    ]);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await upsertSlackInstallation({ owner, teamId: 'T123', installation });
+
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          access_token: 'xoxb-new-token',
+          bot_user_id: 'U_NEW_BOT',
+          incoming_webhook: { channel: '#general', channelId: 'C123', url: 'https://example.com' },
+          model_slug: 'anthropic/claude-sonnet-4.5',
+        }),
+      })
+    );
   });
 });

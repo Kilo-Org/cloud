@@ -43,8 +43,6 @@
     "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
     "GITHUB_APP_SLUG": "kiloconnect",
     "GITHUB_APP_BOT_USER_ID": "240665456",
-    "GITHUB_APP_ID": "2193792",
-    "GITHUB_LITE_APP_ID": "2745442",
     "GITHUB_LITE_APP_SLUG": "kiloconnect-lite",
     "GITHUB_LITE_APP_BOT_USER_ID": "257753004",
     "WORKER_URL": "https://cloud-agent-next.kilosessions.ai",
@@ -86,6 +84,11 @@
       "binding": "SESSION_INGEST",
       "service": "session-ingest",
       "entrypoint": "SessionIngestRPC",
+    },
+    {
+      "binding": "GIT_TOKEN_SERVICE",
+      "service": "git-token-service",
+      "entrypoint": "GitTokenRPCEntrypoint",
     },
   ],
   "secrets_store_secrets": [
@@ -194,15 +197,7 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
-  /**
-   * KV Namespace Bindings
-   */
-  "kv_namespaces": [
-    {
-      "binding": "GITHUB_TOKEN_CACHE",
-      "id": "ab4d777d134a43248639044613ea29ef",
-    },
-  ],
+
   /**
    * Queue Bindings
    * https://developers.cloudflare.com/queues/configuration/configure-queues/
@@ -237,19 +232,11 @@
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],
-      "kv_namespaces": [
-        {
-          "binding": "GITHUB_TOKEN_CACHE",
-          "id": "33b5f1f1be064e919934bee83df4067c",
-        },
-      ],
       "vars": {
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
         "GITHUB_APP_SLUG": "kiloconnect-development",
         "GITHUB_APP_BOT_USER_ID": "242397087",
-        "GITHUB_APP_ID": "2245043",
-        "GITHUB_LITE_APP_ID": "",
         "GITHUB_LITE_APP_SLUG": "",
         "GITHUB_LITE_APP_BOT_USER_ID": "",
         "WORKER_URL": "http://localhost:8794",
@@ -267,6 +254,11 @@
           "binding": "SESSION_INGEST",
           "service": "session-ingest",
           "entrypoint": "SessionIngestRPC",
+        },
+        {
+          "binding": "GIT_TOKEN_SERVICE",
+          "service": "git-token-service-dev",
+          "entrypoint": "GitTokenRPCEntrypoint",
         },
       ],
       "secrets_store_secrets": [

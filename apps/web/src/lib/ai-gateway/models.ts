@@ -79,9 +79,6 @@ export function isKiloExclusiveFreeModel(model: string): boolean {
 }
 
 export const kiloExclusiveModels = [
-  // Please do not remove models from this list immediately.
-  // Instead, set status to 'disabled' first
-  // and only remove when very few users are requesting it.
   gemma_4_26b_a4b_it_free_model,
   minimax_m25_free_model,
   morph_warp_grep_free_model,

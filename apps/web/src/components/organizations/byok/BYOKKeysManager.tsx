@@ -44,7 +44,7 @@ import {
   AwsCredentialsSchema,
   type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
+import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import * as z from 'zod';
 
 // Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
@@ -70,9 +70,9 @@ const VERCEL_BYOK_PROVIDERS = [
   { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Mistral AI (Codestral)' },
 ];
 
-const DIRECT_BYOK_PROVIDERS_LIST = DIRECT_BYOK_PROVIDERS.map(plan => ({
-  id: plan.id,
-  name: plan.name,
+const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).map(([id, name]) => ({
+  id,
+  name,
 }));
 
 const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>

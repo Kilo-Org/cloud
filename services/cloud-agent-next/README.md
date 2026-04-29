@@ -832,28 +832,21 @@ This enables:
 
 #### GitHub App Token Generation
 
-For V2 routes (`sendMessageV2`, `initiateFromKilocodeSessionV2`), the cloud-agent generates GitHub App installation tokens on-demand.
+For V2 routes (`sendMessageV2`, `initiateFromKilocodeSessionV2`), the cloud-agent resolves GitHub App installation tokens via the shared `git-token-service` Worker (`GIT_TOKEN_SERVICE` service binding).
 
 **How it works:**
 
-1. **Automatic installation lookup**: The worker automatically looks up the GitHub App installation ID from the database via Hyperdrive. The lookup verifies the user has access to the repository's organization.
-2. **On-demand token generation**: When execution starts, `GitHubTokenService` generates a fresh token using `@octokit/auth-app`
-3. **KV caching**: Tokens are cached in Cloudflare KV with 30-minute TTL (tokens valid for 1 hour)
-4. **Cache key format**: `github-token:installation:{installationId}`
+1. **Delegated resolution**: The worker calls `git-token-service` RPC (see `src/services/git-token-service-client.ts`) to look up the installation ID for the repo and mint an installation access token. Token caching and GitHub App credentials live in `git-token-service`.
+2. **Managed GitLab tokens**: The same client resolves and refreshes managed GitLab tokens; `gitlabTokenManaged` is persisted in session metadata so the session DO can refresh it on `startExecutionV2`.
 
 **Configuration:**
 
-The worker requires these environment variables:
-
-- `GITHUB_APP_ID`: GitHub App ID (configured in `wrangler.jsonc`)
-- `GITHUB_APP_PRIVATE_KEY`: RSA private key for the GitHub App (set via `wrangler secret put`)
-- `GITHUB_TOKEN_CACHE`: KV namespace binding for token caching
-- `HYPERDRIVE`: Hyperdrive binding for database access (installation ID lookup)
+- `GIT_TOKEN_SERVICE`: service binding to the `git-token-service` Worker (prod) / `git-token-service-dev` (dev). Configured in `wrangler.jsonc`.
+- `GITHUB_APP_SLUG` / `GITHUB_APP_BOT_USER_ID` (and the Lite equivalents): used only for git commit author attribution — not for token generation.
 
 **Benefits:**
 
-- No need to pass `githubInstallationId` — automatically resolved from database
-- Tokens generated closer to where they're used (reduced latency)
+- No need to pass `githubInstallationId` — resolved centrally by `git-token-service`
+- GitHub App credentials and token cache kept in a single shared Worker
 - Fresh tokens on-demand rather than at session start
-- Rate limit protection via KV caching
 - No token expiry issues during long sessions

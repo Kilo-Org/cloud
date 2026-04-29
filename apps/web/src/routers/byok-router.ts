@@ -136,7 +136,7 @@ async function fetchSupportedModels() {
   }
 
   for (const provider of DIRECT_BYOK_PROVIDERS) {
-    for (const model of provider.models) {
+    for (const model of await provider.models()) {
       if (!result[provider.id]) result[provider.id] = [];
       result[provider.id].push(model.name + ' (' + formatDirectByokModelId(provider, model) + ')');
     }

@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents working in this repository.
 
 ## Project Overview
 
-Cloudflare Worker that powers Kilocode Cloud Agents. It exposes a tRPC API for session preparation and execution, streams output over WebSockets, and runs the Kilocode CLI inside Cloudflare Sandbox containers. Durable Objects track sessions; Hyperdrive is used for Postgres lookups (for example, GitHub App installation IDs). The wrapper in `wrapper/` is a core component that brokers Kilocode CLI events into the worker’s `/ingest` WebSocket and handles job lifecycle.
+Cloudflare Worker that powers Kilocode Cloud Agents. It exposes a tRPC API for session preparation and execution, streams output over WebSockets, and runs the Kilocode CLI inside Cloudflare Sandbox containers. Durable Objects track sessions; git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper in `wrapper/` is a core component that brokers Kilocode CLI events into the worker’s `/ingest` WebSocket and handles job lifecycle.
 
 ## Development Commands
 
@@ -108,7 +108,7 @@ This pattern blocks API endpoints from running for external contributors who don
 - `src/persistence/` - Durable Object schema + migrations
 - `src/websocket/` - WebSocket ingest + filters
 - `src/utils/` - Shared helpers (encryption, retries, SQL helpers)
-- `wrangler.jsonc` - Bindings: R2, Hyperdrive, KV, queues, containers
+- `wrangler.jsonc` - Bindings: R2, Hyperdrive, queues, containers, service bindings (`SESSION_INGEST`, `GIT_TOKEN_SERVICE`)
 - `vitest.config.ts` - Unit test config
 - `vitest.workers.config.ts` - Integration test config
 - `wrapper/` - Wrapper build shipped into the sandbox

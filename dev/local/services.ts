@@ -15,11 +15,22 @@ type ServiceGroup = {
 
 const groups: ServiceGroup[] = [
   { id: 'core', label: 'Core', alwaysOn: true },
-  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false, sectionBreakBefore: true },
-  { id: 'cloud-agent', label: 'Cloud Agent', alwaysOn: false },
+  {
+    id: 'git-token-service',
+    label: 'Git Tokens',
+    alwaysOn: false,
+    sectionBreakBefore: true,
+  },
+  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false },
+  {
+    id: 'cloud-agent',
+    label: 'Cloud Agent',
+    alwaysOn: false,
+    groupDependsOn: ['git-token-service'],
+  },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'gastown', label: 'Gastown', alwaysOn: false },
+  { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
     id: 'auto-triage',
     label: 'Auto Triage',
@@ -59,7 +70,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
-    dependsOn: ['postgres', 'nextjs', 'cloudflare-session-ingest'],
+    dependsOn: ['postgres', 'nextjs', 'cloudflare-session-ingest', 'cloudflare-git-token-service'],
     dir: 'services/cloud-agent-next',
     useLanIp: true,
   },
@@ -73,6 +84,12 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres'],
     dir: 'services/session-ingest',
   },
+  // git-token-service (shared by cloud-agent, app-builder, gastown)
+  'cloudflare-git-token-service': {
+    group: 'git-token-service',
+    dependsOn: ['postgres'],
+    dir: 'services/git-token-service',
+  },
   // app-builder
   'app-builder-tunnel': { group: 'app-builder', dependsOn: [] },
   'cloudflare-app-builder': {
@@ -85,11 +102,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'app-builder',
     dependsOn: ['postgres'],
     dir: 'services/db-proxy',
-  },
-  'cloudflare-git-token-service': {
-    group: 'app-builder',
-    dependsOn: ['postgres'],
-    dir: 'services/git-token-service',
   },
   // code-review
   'cloudflare-code-review-infra': {

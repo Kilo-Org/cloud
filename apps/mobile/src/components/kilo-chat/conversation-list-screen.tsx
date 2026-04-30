@@ -79,7 +79,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
 
   function handleRowPress(conversationId: string) {
     // Route lands in PR 5d (Task 47)
-    router.push(`/(app)/chat/${sandboxId}/${conversationId}` as unknown as Href);
+    router.push(`/(app)/chat/${sandboxId}/${conversationId}` as Href);
   }
 
   function handleCreateAndNavigate() {
@@ -88,7 +88,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       {
         onSuccess: result => {
           // Route lands in PR 5d (Task 47)
-          router.push(`/(app)/chat/${sandboxId}/${result.conversationId}` as unknown as Href);
+          router.push(`/(app)/chat/${sandboxId}/${result.conversationId}` as Href);
         },
       }
     );

@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import { useCallback } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -33,7 +34,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       sendMutation.mutate({
         conversationId,
         content: [{ type: 'text', text }],
-        clientId: crypto.randomUUID(),
+        clientId: Crypto.randomUUID(),
       });
     },
     [sendMutation, conversationId]

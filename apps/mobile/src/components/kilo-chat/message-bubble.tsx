@@ -1,14 +1,11 @@
-import {
-  useAddReaction,
-  useExecuteAction,
-  useKiloChatClient,
-  useRemoveReaction,
-} from '@kilocode/kilo-chat-hooks';
+import { useAddReaction, useExecuteAction, useRemoveReaction } from '@kilocode/kilo-chat-hooks';
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
-import { Button } from '@/components/ui/button';
 import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
+import { useKiloChatClient } from '@/components/kilo-chat/hooks/use-kilo-chat-client';
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
 type Props = {

@@ -139,6 +139,13 @@ export async function sendPushForConversationCore(
   return { perRecipient };
 }
 
+/**
+ * HTTP and RPC entrypoint for the notifications Worker.
+ *
+ * RPC callers authenticate implicitly via the binding topology: only Workers
+ * explicitly bound to `notifications` with `entrypoint: "NotificationsService"`
+ * can reach these methods. No shared secret is needed.
+ */
 export class NotificationsService extends WorkerEntrypoint<Env> {
   override async fetch(request: Request): Promise<Response> {
     return app.fetch(request, this.env, this.ctx);

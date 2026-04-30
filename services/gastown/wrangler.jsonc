@@ -148,7 +148,7 @@
       "services": [
         {
           "binding": "GIT_TOKEN_SERVICE",
-          "service": "git-token-service",
+          "service": "git-token-service-dev",
           "entrypoint": "GitTokenRPCEntrypoint",
         },
       ],

@@ -18,6 +18,11 @@ type TokenCache = {
 let cache: TokenCache | null = null;
 let inFlight: { authToken: string; promise: Promise<KiloChatTokenResponse> } | null = null;
 
+export function clearKiloChatTokenCache(): void {
+  cache = null;
+  inFlight = null;
+}
+
 /**
  * Returns a stable getter function that fetches a kilo-chat JWT, caching it
  * until 60 seconds before expiry. Concurrent callers share a single in-flight

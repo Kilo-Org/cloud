@@ -45,6 +45,16 @@ function encodeBase64Url(input: string): string {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+function authCheckUrl(baseUrl: string): string {
+  const url = new URL(`${baseUrl.replace(/\/$/, '')}/auth/check`);
+  if (url.protocol === 'ws:') {
+    url.protocol = 'http:';
+  } else if (url.protocol === 'wss:') {
+    url.protocol = 'https:';
+  }
+  return url.toString();
+}
+
 export class EventServiceClient {
   private readonly url: string;
   private readonly getToken: () => Promise<string>;
@@ -115,6 +125,8 @@ export class EventServiceClient {
     // disconnect() may have run while we were awaiting the token. Bail before
     // creating the socket so we don't leak a WebSocket + ping timer past
     // provider unmount (e.g. sign-out, navigation, strict-mode remount).
+    if (this.destroyed) return;
+    await this.preflightAuth(token);
     if (this.destroyed) return;
     const subprotocol = `${SUBPROTOCOL_PREFIX}${encodeBase64Url(token)}`;
 
@@ -193,6 +205,25 @@ export class EventServiceClient {
         }
       });
     });
+  }
+
+  private async preflightAuth(token: string): Promise<void> {
+    let res: Response;
+    try {
+      res = await fetch(authCheckUrl(this.url), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      throw new WebSocketConnectionError();
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new WebSocketAuthError();
+    }
+    if (!res.ok) {
+      throw new WebSocketConnectionError();
+    }
   }
 
   private clearHandshakeTimer(): void {

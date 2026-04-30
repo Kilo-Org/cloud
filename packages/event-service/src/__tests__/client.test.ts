@@ -63,6 +63,13 @@ let allMockWs: MockWebSocket[];
 
 beforeEach(() => {
   allMockWs = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+    })
+  );
   const WebSocketMock = function (url: string, protocols?: string | string[]) {
     lastMockWs = new MockWebSocket(url, protocols);
     allMockWs.push(lastMockWs);
@@ -248,6 +255,40 @@ describe('EventServiceClient', () => {
 
       await vi.advanceTimersByTimeAsync(2_000);
       expect(allMockWs).toHaveLength(2);
+      expect(client.isConnected()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fires onUnauthorized once and stops reconnecting after auth preflight rejects', async () => {
+    vi.useFakeTimers();
+    try {
+      const onUnauthorized = vi.fn();
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValueOnce({ ok: false, status: 401 })
+          .mockResolvedValue({ ok: true, status: 204 })
+      );
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken: () => Promise.resolve('h.p.s'),
+        onUnauthorized,
+      });
+
+      await client.connect();
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(allMockWs).toHaveLength(0);
+      expect(client.isConnected()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(allMockWs).toHaveLength(0);
+
+      await client.connect();
+      expect(allMockWs).toHaveLength(1);
       expect(client.isConnected()).toBe(true);
     } finally {
       vi.useRealTimers();

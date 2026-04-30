@@ -11,6 +11,7 @@ export { UserSessionDO } from './do/user-session-do';
 const app = new Hono<{ Bindings: Env }>();
 
 app.use('/connect/*', cors({ origin: ['https://kilo.ai', 'https://app.kilo.ai'] }));
+app.use('/auth/*', cors({ origin: ['https://kilo.ai', 'https://app.kilo.ai'] }));
 
 // ── Structured logging context ──────────────────────────────────────────
 app.use('*', useWorkersLogger('event-service') as unknown as MiddlewareHandler);
@@ -47,6 +48,22 @@ function decodeBase64UrlToString(encoded: string): string | null {
     return null;
   }
 }
+
+function extractBearerToken(header: string | undefined): string | null {
+  if (!header) return null;
+  const [scheme, token] = header.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer' || !token) return null;
+  return token;
+}
+
+app.get('/auth/check', async c => {
+  const auth = await authenticateToken(extractBearerToken(c.req.header('authorization')), c.env);
+  if (!auth) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  logger.setTags({ userId: auth.userId });
+  return c.body(null, 204);
+});
 
 // WebSocket connect: JWT is passed via Sec-WebSocket-Protocol as
 // "kilo.jwt.<base64url-encoded-jwt>". The server echoes the accepted

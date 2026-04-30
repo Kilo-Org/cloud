@@ -12,7 +12,6 @@ export const DirectByokModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   flags: z.array(DirectByokModelFlagSchema).readonly(),
-  description: z.string(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
   variants: z.record(z.string(), OpenCodeVariantSchema).nullable(),

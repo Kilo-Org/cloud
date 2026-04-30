@@ -18,8 +18,6 @@ export default {
       {
         id: 'glm-5.1',
         name: 'GLM-5.1',
-        description:
-          'GLM-5.1 delivers a major leap in coding capability, with particularly significant gains in handling long-horizon tasks. Unlike previous models built around minute-level interactions, GLM-5.1 can work independently and continuously on a single task for more than 8 hours—autonomously planning, executing, and improving itself throughout the process—ultimately delivering complete, engineering-grade results.',
         flags: [],
         context_length: 200000,
         max_completion_tokens: 131072,

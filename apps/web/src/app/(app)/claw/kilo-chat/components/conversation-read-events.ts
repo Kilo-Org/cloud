@@ -1,3 +1,6 @@
-export function shouldApplyConversationRead(currentUserId: string, eventMemberId: string): boolean {
-  return currentUserId !== '' && eventMemberId === currentUserId;
+export function shouldApplyConversationRead(
+  currentUserId: string | null,
+  eventMemberId: string
+): boolean {
+  return currentUserId !== null && eventMemberId === currentUserId;
 }

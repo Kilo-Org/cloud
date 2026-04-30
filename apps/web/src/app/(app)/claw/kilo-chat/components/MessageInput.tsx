@@ -12,7 +12,7 @@ type MessageInputProps = {
   replyingTo: Message | null;
   onCancelReply: () => void;
   assistantName?: string;
-  currentUserId: string;
+  currentUserId: string | null;
   canSend?: boolean;
   disabledReason?: string | null;
 };

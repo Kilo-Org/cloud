@@ -3,6 +3,7 @@
 import { useUser } from '@/hooks/useUser';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { KiloChatLayout } from './components/KiloChatLayout';
+import { currentUserIdFromUser } from './components/current-user-state';
 
 export default function KiloChatRootLayout({ children }: { children: React.ReactNode }) {
   const { data: user } = useUser();
@@ -10,7 +11,7 @@ export default function KiloChatRootLayout({ children }: { children: React.React
 
   return (
     <KiloChatLayout
-      currentUserId={user?.id ?? ''}
+      currentUserId={currentUserIdFromUser(user)}
       sandboxId={status?.sandboxId ?? null}
       basePath="/claw/kilo-chat"
       noInstanceRedirect="/claw/new"

@@ -149,6 +149,10 @@ type MutationErrorOptions = {
   onError?: (error: unknown) => void;
 };
 
+export function hasLoadedCurrentUserId(currentUserId: string | null): currentUserId is string {
+  return currentUserId !== null && currentUserId !== '';
+}
+
 export function messageFromCreatedEvent(e: MessageCreatedEvent): Message {
   return e.message;
 }
@@ -176,6 +180,25 @@ export function applyMessageCreatedEventToPages<TPageParam>(
   };
 }
 
+export function createOptimisticMessage(
+  variables: SendMessageVariables,
+  currentUserId: string | null
+): Message | null {
+  if (!hasLoadedCurrentUserId(currentUserId)) return null;
+
+  return {
+    id: `pending-${variables.clientId}`,
+    senderId: currentUserId,
+    content: variables.content,
+    inReplyToMessageId: variables.inReplyToMessageId ?? null,
+    updatedAt: null,
+    clientUpdatedAt: null,
+    deleted: false,
+    deliveryFailed: false,
+    reactions: [],
+  };
+}
+
 export function useSendMessage(
   client: KiloChatClient,
   conversationId: string | null,
@@ -186,21 +209,11 @@ export function useSendMessage(
   return useMutation({
     mutationFn: (req: SendMessageVariables) => client.sendMessage(req),
     onMutate: async (variables: SendMessageVariables) => {
-      if (!conversationId || currentUserId === null) return;
+      const optimisticMessage = createOptimisticMessage(variables, currentUserId);
+      if (!conversationId || !optimisticMessage) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const pendingId = `pending-${variables.clientId}`;
-      const optimisticMessage: Message = {
-        id: pendingId,
-        senderId: currentUserId,
-        content: variables.content,
-        inReplyToMessageId: variables.inReplyToMessageId ?? null,
-        updatedAt: null,
-        clientUpdatedAt: null,
-        deleted: false,
-        deliveryFailed: false,
-        reactions: [],
-      };
       queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         const firstPage = old.pages[0] ?? { messages: [], hasMore: false, nextCursor: null };
@@ -304,7 +317,7 @@ export function useAddReaction(
     mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
       client.addReaction(messageId, { conversationId: conversationId ?? '', emoji }),
     onMutate: async variables => {
-      if (!conversationId || currentUserId === null) return;
+      if (!conversationId || !hasLoadedCurrentUserId(currentUserId)) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
@@ -344,7 +357,7 @@ export function useRemoveReaction(
     mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
       client.removeReaction(messageId, { conversationId: conversationId ?? '', emoji }),
     onMutate: async variables => {
-      if (!conversationId || currentUserId === null) return;
+      if (!conversationId || !hasLoadedCurrentUserId(currentUserId)) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
@@ -391,7 +404,7 @@ export function useExecuteAction(
       value: ExecApprovalDecision;
     }) => client.executeAction(conversationId ?? '', messageId, { groupId, value }),
     onMutate: async variables => {
-      if (!conversationId || currentUserId === null) return;
+      if (!conversationId || !hasLoadedCurrentUserId(currentUserId)) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);

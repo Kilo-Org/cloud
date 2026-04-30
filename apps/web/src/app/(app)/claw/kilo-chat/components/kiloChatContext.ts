@@ -5,7 +5,7 @@ import type { EventServiceClient } from '@kilocode/event-service';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
 
 export type KiloChatContextValue = {
-  currentUserId: string;
+  currentUserId: string | null;
   instanceStatus: string | null;
   leavingConversationId: string | null;
   assistantName: string | null;

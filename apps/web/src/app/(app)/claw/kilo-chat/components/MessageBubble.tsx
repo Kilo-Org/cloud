@@ -43,7 +43,8 @@ type MessageBubbleProps = {
   onRemoveReaction: (messageId: string, emoji: string) => void;
   onExecuteAction: (messageId: string, groupId: string, value: ExecApprovalDecision) => void;
   actionPending?: boolean;
-  currentUserId: string;
+  currentUserId: string | null;
+  userActionsEnabled: boolean;
 };
 
 export const MessageBubble = memo(function MessageBubble({
@@ -61,6 +62,7 @@ export const MessageBubble = memo(function MessageBubble({
   onExecuteAction,
   actionPending,
   currentUserId,
+  userActionsEnabled,
 }: MessageBubbleProps) {
   const { assistantName } = useKiloChatContext();
   const [isEditing, setIsEditing] = useState(false);
@@ -81,7 +83,9 @@ export const MessageBubble = memo(function MessageBubble({
   const textContent = message.deleted ? '' : contentBlocksToText(message.content);
 
   const myReactions = new Set(
-    message.reactions.filter(r => r.memberIds.includes(currentUserId)).map(r => r.emoji)
+    currentUserId === null
+      ? []
+      : message.reactions.filter(r => r.memberIds.includes(currentUserId)).map(r => r.emoji)
   );
 
   function handleStartEdit() {
@@ -108,6 +112,7 @@ export const MessageBubble = memo(function MessageBubble({
   }
 
   function handleQuickPickSelect(emoji: string) {
+    if (!userActionsEnabled) return;
     setShowQuickPick(false);
     if (myReactions.has(emoji)) {
       onRemoveReaction(message.id, emoji);
@@ -117,6 +122,7 @@ export const MessageBubble = memo(function MessageBubble({
   }
 
   function handleFullPickerSelect(emoji: string) {
+    if (!userActionsEnabled) return;
     setShowFullPicker(false);
     setShowQuickPick(false);
     if (myReactions.has(emoji)) {
@@ -136,7 +142,8 @@ export const MessageBubble = memo(function MessageBubble({
     >
       <button
         onClick={() => setShowQuickPick(prev => !prev)}
-        className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+        disabled={!userActionsEnabled}
+        className="hover:bg-muted rounded p-1 cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         title="React"
       >
         <Smile className="h-3.5 w-3.5" />
@@ -337,7 +344,7 @@ export const MessageBubble = memo(function MessageBubble({
                       {actionsBlock.actions.map(action => (
                         <button
                           key={action.value}
-                          disabled={actionPending}
+                          disabled={actionPending || !userActionsEnabled}
                           onClick={() =>
                             onExecuteAction(message.id, actionsBlock.groupId, action.value)
                           }
@@ -381,6 +388,7 @@ export const MessageBubble = memo(function MessageBubble({
               reactions={message.reactions}
               currentUserId={currentUserId}
               isOwn={isOwn}
+              userActionsEnabled={userActionsEnabled}
               onAdd={emoji => onAddReaction(message.id, emoji)}
               onRemove={emoji => onRemoveReaction(message.id, emoji)}
             />

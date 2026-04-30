@@ -35,7 +35,7 @@ const getVercelRoutingPercentage = createCachedFetch(
     const { vercel_routing_percentage } = GatewayPercentageSchema.parse(JSON.parse(raw));
     return vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE;
   },
-  10_000,
+  600_000,
   DEFAULT_VERCEL_PERCENTAGE
 );
 
@@ -59,14 +59,18 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
+  const [routingPercentage, vercelModels] = await Promise.all([
+    getVercelRoutingPercentage(),
+    getVercelModels(),
+  ]);
+
   const passedRandomization =
-    getRandomNumber('vercel_routing_' + randomSeed, 100) < (await getVercelRoutingPercentage());
+    getRandomNumber('vercel_routing_' + randomSeed, 100) < routingPercentage;
 
   if (!passedRandomization) {
     return false;
   }
 
-  const vercelModels = await getVercelModels();
   const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);

@@ -467,7 +467,11 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
         }
       }
 
-      // Invalidate the sessions list cache so the sidebar shows the new session
+      // Invalidate the sessions list cache so the sidebar shows the new session.
+      // This legacy page goes through cloudAgent.prepareSession which writes to
+      // cli_sessions (v1), so the sidebar/list data it produces still comes from
+      // the unified router (which UNIONs v1 and v2). Invalidating cliSessionsV2.list
+      // would miss the newly-created v1 row.
       void queryClient.invalidateQueries({
         queryKey: trpc.unifiedSessions.list.queryKey({
           limit: 3,

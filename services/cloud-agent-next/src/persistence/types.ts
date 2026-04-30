@@ -72,6 +72,8 @@ export type CloudAgentSessionState = {
   gitToken?: string;
   /** Git platform type for correct token/env var handling */
   platform?: 'github' | 'gitlab';
+  /** Whether the GitLab token was auto-looked up via git-token-service (enables refresh on resume) */
+  gitlabTokenManaged?: boolean;
   /** Environment variables to inject into sandbox execution sessions (plaintext) */
   envVars?: Record<string, string>;
   /**

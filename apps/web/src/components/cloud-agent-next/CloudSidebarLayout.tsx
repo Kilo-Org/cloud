@@ -80,7 +80,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   const trpc = useTRPC();
 
   const { data: recentReposData } = useQuery({
-    ...trpc.unifiedSessions.recentRepositories.queryOptions({
+    ...trpc.cliSessionsV2.recentRepositories.queryOptions({
       organizationId,
       updatedSince: repoUpdatedSince,
     }),
@@ -135,7 +135,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
         toast.error('Failed to delete session');
       }
 
-      void queryClient.invalidateQueries(trpc.unifiedSessions.list.pathFilter());
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
       refetchSessions();
     },
     [
@@ -155,8 +155,8 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
     async (sessionId: string, title: string) => {
       await renameCliSessionV2({ session_id: sessionId, title });
       renameSessionLocally(sessionId, title);
-      void queryClient.invalidateQueries(trpc.unifiedSessions.list.pathFilter());
-      void queryClient.invalidateQueries(trpc.unifiedSessions.search.pathFilter());
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter());
       refetchSessions();
     },
     [renameCliSessionV2, renameSessionLocally, queryClient, trpc, refetchSessions]

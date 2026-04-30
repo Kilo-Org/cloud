@@ -54,7 +54,7 @@ import {
 } from '@/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
 import { computeOpenRouterCostFields, drainSseStream } from '@/lib/ai-gateway/processUsage.shared';
-import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
@@ -950,9 +950,7 @@ async function processTokenData(
 }
 
 function useAnthropicStyleTokenCounting(requestedModel: string, provider: ProviderId) {
-  return (
-    provider === 'vercel' && (isAnthropicModel(requestedModel) || isMinimaxModel(requestedModel))
-  );
+  return provider === 'vercel' && (isClaudeModel(requestedModel) || isMinimaxModel(requestedModel));
 }
 
 function useGenerationLookup(provider: ProviderId, usageStats: MicrodollarUsageStats | null) {

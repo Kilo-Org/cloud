@@ -115,6 +115,18 @@ const ListSessionsInputSchema = z.object({
   version: z.number().optional(),
 });
 
+const SearchInputSchema = z.object({
+  search_string: z.string().min(1),
+  limit: z.number().min(1).max(50).optional().default(PAGE_SIZE),
+  offset: z.number().min(0).optional().default(0),
+  createdOnPlatform: z
+    .union([createdOnPlatformField, z.array(createdOnPlatformField).min(1)])
+    .optional(),
+  organizationId: z.uuid().nullable().optional(),
+  includeChildren: z.boolean().optional().default(false),
+  gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
+});
+
 const GetSessionInputSchema = z.object({
   session_id: sessionIdField,
 });
@@ -288,6 +300,67 @@ export const cliSessionsV2Router = createTRPCRouter({
     return {
       cliSessions: resultSessions,
       nextCursor: hasMore ? nextCursor : null,
+    };
+  }),
+
+  /**
+   * Search sessions by title or session_id with ILIKE matching.
+   */
+  search: baseProcedure.input(SearchInputSchema).query(async ({ ctx, input }) => {
+    const {
+      search_string,
+      limit,
+      offset,
+      createdOnPlatform,
+      organizationId,
+      includeChildren,
+      gitUrl,
+    } = input;
+
+    const whereConditions: SQL[] = [eq(cli_sessions_v2.kilo_user_id, ctx.user.id)];
+
+    await addOrganizationCondition(whereConditions, ctx, organizationId);
+    addCreatedOnPlatformConditions(whereConditions, createdOnPlatform);
+    addGitUrlConditions(whereConditions, gitUrl);
+
+    if (!includeChildren) {
+      whereConditions.push(isNull(cli_sessions_v2.parent_session_id));
+    }
+
+    // Use position() for a case-insensitive substring match. This avoids LIKE
+    // wildcard semantics entirely, so %, _, and \ in user input are matched
+    // literally without any escaping dance.
+    const needle = search_string.toLowerCase();
+    whereConditions.push(
+      sql`(
+        position(${needle} in lower(COALESCE(${cli_sessions_v2.title}, ''))) > 0
+        OR position(${needle} in lower(${cli_sessions_v2.session_id}::text)) > 0
+      )`
+    );
+
+    const baseWhere = and(...whereConditions);
+
+    const [results, countResult] = await Promise.all([
+      db
+        .select(commonSessionFields)
+        .from(cli_sessions_v2)
+        .where(baseWhere)
+        .orderBy(desc(cli_sessions_v2.updated_at))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<string>`COUNT(*)` })
+        .from(cli_sessions_v2)
+        .where(baseWhere),
+    ]);
+
+    const total = countResult.length > 0 ? Number(countResult[0].count) : 0;
+
+    return {
+      results,
+      total,
+      limit,
+      offset,
     };
   }),
 

@@ -4,6 +4,7 @@ import { queue } from './queue-consumer';
 import { webhooks } from './routes/webhooks';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
+export { NotificationsService } from './lib/notifications-service';
 
 const app = new Hono<{ Bindings: Env }>();
 

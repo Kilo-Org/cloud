@@ -137,7 +137,7 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
   ): Promise<void> {
     const identity = getPlatformIdentity(thread, message);
     const [platformIntegration, kiloUserId] = await Promise.all([
-      getPlatformIntegration(thread, message),
+      getPlatformIntegration(identity),
       resolveKiloUserId(chatBot.getState(), identity),
     ]);
 

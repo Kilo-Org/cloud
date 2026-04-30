@@ -11,6 +11,7 @@ import { getOAuthDisplayNames } from '@/lib/user';
 import { getExtensionUrl } from '@/components/auth/getExtensionUrl';
 import { cookies } from 'next/headers';
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
+import { MessageErrorBoundary } from '@/components/cloud-agent/MessageErrorBoundary';
 
 import { Coins } from 'lucide-react';
 import { SurveyCredits } from '@/components/SurveyCredits';
@@ -85,10 +86,12 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
 
       <div className="flex w-full flex-col gap-4 xl:flex-row xl:items-stretch">
         <div className="flex-3">
-          <CreditPurchaseOptions
-            isFirstPurchase={!customerInfo.hasPaid}
-            showOrganizationWarning={customerInfo.hasOrganizations}
-          />
+          <MessageErrorBoundary>
+            <CreditPurchaseOptions
+              isFirstPurchase={!customerInfo.hasPaid}
+              showOrganizationWarning={customerInfo.hasOrganizations}
+            />
+          </MessageErrorBoundary>
         </div>
       </div>
 

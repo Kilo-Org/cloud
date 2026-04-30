@@ -29,10 +29,8 @@
   "dependencies": {
     "@cloudflare/sandbox": "0.8.9",
     "@hono/trpc-server": "^0.4.2",
-    "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
-    "@octokit/auth-app": "catalog:",
     "@trpc/server": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

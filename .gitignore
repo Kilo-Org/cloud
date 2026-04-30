@@ -64,8 +64,8 @@ yarn-error.log*
 
 # local plans & prototypes
 /plans/
-/prototypes/
-.plan/
+/.plans/
+/.plan/
 .kilo/plans
 .superpowers/
 docs/superpowers/

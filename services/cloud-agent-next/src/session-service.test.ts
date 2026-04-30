@@ -350,6 +350,105 @@ describe('SessionService', () => {
       expect(mockManageBranch).not.toHaveBeenCalled();
       expect(result.context.sessionId).toBe(sessionId);
     });
+
+    it('uses a fresh GitHub token for GH_TOKEN when metadata has no token', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, stdout: 'exists' }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const metadata = {
+        version: 123456789,
+        sessionId: 'agent_resume_fresh_gh_token',
+        orgId: 'org',
+        userId: 'user',
+        timestamp: 123456789,
+        githubRepo: 'acme/repo',
+      };
+      const { env: testEnv } = createMetadataEnv({
+        getMetadata: vi.fn().mockResolvedValue(metadata),
+      });
+
+      const service = new SessionService();
+      const result = await service.resume({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId: 'agent_resume_fresh_gh_token',
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        env: testEnv,
+        githubToken: 'fresh-github-token',
+      });
+
+      expect(result.context.githubToken).toBe('fresh-github-token');
+      expect(sandboxCreateSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          env: expect.objectContaining({
+            GH_TOKEN: 'fresh-github-token',
+          }) as unknown,
+        })
+      );
+    });
+
+    it('keeps metadata GH_TOKEN env override when a fresh GitHub token is provided', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, stdout: 'exists' }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const metadata = {
+        version: 123456789,
+        sessionId: 'agent_resume_gh_token_override',
+        orgId: 'org',
+        userId: 'user',
+        timestamp: 123456789,
+        githubRepo: 'acme/repo',
+        envVars: { GH_TOKEN: 'user-provided-token' },
+      };
+      const { env: testEnv } = createMetadataEnv({
+        getMetadata: vi.fn().mockResolvedValue(metadata),
+      });
+
+      const service = new SessionService();
+      const result = await service.resume({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId: 'agent_resume_gh_token_override',
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        env: testEnv,
+        githubToken: 'fresh-github-token',
+      });
+
+      expect(result.context.githubToken).toBe('fresh-github-token');
+      expect(sandboxCreateSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          env: expect.objectContaining({
+            GH_TOKEN: 'user-provided-token',
+          }) as unknown,
+        })
+      );
+    });
   });
 
   describe('resume with conditional reclone', () => {

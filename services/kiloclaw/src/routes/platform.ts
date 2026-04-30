@@ -3580,6 +3580,37 @@ const MarkLatestBody = z.object({
   imageTag: z.string().min(1),
 });
 
+// POST /api/platform/versions/apply-pin
+// Pushes a resolved admin pin (or pin clear) into the target instance's DO
+// state so the next redeploy/restart boots the pinned image. Does NOT
+// restart the machine — the caller triggers that separately if desired.
+const ApplyPinSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().min(1),
+  imageTag: z.string().min(1).nullable(),
+});
+
+platform.post('/versions/apply-pin', async c => {
+  const result = await parseBody(c, ApplyPinSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, instanceId, imageTag } = result.data;
+
+  try {
+    const applied = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.applyPinnedVersion(imageTag, instanceId),
+      'applyPinnedVersion'
+    );
+    return c.json({ ok: true, ...applied });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'apply-pin');
+    return jsonError(message, status);
+  }
+});
+
 platform.post('/versions/mark-latest', async c => {
   const result = await parseBody(c, MarkLatestBody);
   if ('error' in result) return result.error;

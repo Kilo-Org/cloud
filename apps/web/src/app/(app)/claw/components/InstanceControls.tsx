@@ -6,6 +6,7 @@ import {
   Cpu,
   HardDrive,
   Pencil,
+  Pin,
   Play,
   RefreshCw,
   RotateCw,
@@ -16,6 +17,7 @@ import {
 import { usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +31,11 @@ import {
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { TRPCClientError } from '@trpc/client';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
+import { useKiloClawMyPin } from '@/hooks/useKiloClaw';
+import { useOrgKiloClawMyPin } from '@/hooks/useOrgKiloClaw';
+import { useClawContext } from './ClawContext';
 import { useClawUpdateAvailable } from '../hooks/useClawUpdateAvailable';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
@@ -66,6 +72,17 @@ export function InstanceControls({
 }) {
   const posthog = usePostHog();
   const gatewayUrl = useGatewayUrl(status);
+  const { organizationId } = useClawContext();
+
+  // Pin state for the upgrade-confirmation dialogs. Only the active
+  // context queries (org vs personal) so we don't fire an org getMyPin
+  // with an empty organizationId.
+  const personalPin = useKiloClawMyPin({ enabled: !organizationId });
+  const orgPin = useOrgKiloClawMyPin(organizationId ?? '', {
+    enabled: !!organizationId,
+  });
+  const pin = organizationId ? orgPin.data : personalPin.data;
+  const pinnedImageTag = pin?.image_tag ?? null;
   const isRunning = status.status === 'running';
   const isProvisioned = status.status === 'provisioned';
   const isStarting = status.status === 'starting';
@@ -127,18 +144,46 @@ export function InstanceControls({
       instance_status: status.status,
       redeploy_mode: 'upgrade',
     });
+    // Only ack what was actually rendered to the user. If pinnedImageTag
+    // is null (no warning shown), send false; the backend gate catches
+    // any pin that appeared between render and click and returns
+    // PIN_EXISTS so the user can retry with fresh data.
     mutations.restartMachine.mutate(
-      { imageTag: 'latest' },
+      { imageTag: 'latest', acknowledgePinRemoval: !!pinnedImageTag },
       {
         onSuccess: () => {
           toast.success('Upgrading KiloClaw');
           setConfirmUpgrade(false);
           onRedeploySuccess?.();
         },
-        onError: err => toast.error(err.message, { duration: 10000 }),
+        onError: err => {
+          if (
+            err instanceof TRPCClientError &&
+            err.data?.code === 'PRECONDITION_FAILED' &&
+            err.message === 'PIN_EXISTS'
+          ) {
+            if (organizationId) void orgPin.refetch();
+            else void personalPin.refetch();
+            toast.error(
+              'A version pin was set on this instance. Review the warning and try again.',
+              { duration: 10000 }
+            );
+            return;
+          }
+          toast.error(err.message, { duration: 10000 });
+        },
       }
     );
-  }, [mutations.restartMachine, onRedeploySuccess, posthog, status.status]);
+  }, [
+    mutations.restartMachine,
+    onRedeploySuccess,
+    pinnedImageTag,
+    posthog,
+    status.status,
+    organizationId,
+    orgPin,
+    personalPin,
+  ]);
 
   const showUpgradeBanner =
     isFlyProvider && updateAvailable && !isDismissedInStorage && !manuallyDismissed;
@@ -421,6 +466,15 @@ export function InstanceControls({
               </div>
             )}
           </RadioGroup>
+          {redeployMode === 'upgrade' && pinnedImageTag && (
+            <Alert className="border-blue-500/50">
+              <Pin className="h-4 w-4 text-blue-500" />
+              <AlertDescription>
+                This instance has a version pin to <code className="text-xs">{pinnedImageTag}</code>
+                {'. Upgrading will remove the pin.'}
+              </AlertDescription>
+            </Alert>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -437,7 +491,15 @@ export function InstanceControls({
                   instance_status: status.status,
                   redeploy_mode: redeployMode,
                 });
-                mutations.restartMachine.mutate(imageTag ? { imageTag } : undefined, {
+                // For the upgrade path, only ack what the dialog actually
+                // rendered. If no pin warning was shown (pinnedImageTag
+                // null), send false and let the backend gate catch any
+                // pin that appeared between render and click. Plain
+                // redeploy (no imageTag) never triggers the gate.
+                const input = imageTag
+                  ? { imageTag, acknowledgePinRemoval: !!pinnedImageTag }
+                  : undefined;
+                mutations.restartMachine.mutate(input, {
                   onSuccess: () => {
                     toast.success(
                       redeployMode === 'upgrade' ? 'Upgrading KiloClaw' : 'Redeploying'
@@ -445,7 +507,22 @@ export function InstanceControls({
                     setConfirmRedeploy(false);
                     onRedeploySuccess?.();
                   },
-                  onError: err => toast.error(err.message, { duration: 10000 }),
+                  onError: err => {
+                    if (
+                      err instanceof TRPCClientError &&
+                      err.data?.code === 'PRECONDITION_FAILED' &&
+                      err.message === 'PIN_EXISTS'
+                    ) {
+                      if (organizationId) void orgPin.refetch();
+                      else void personalPin.refetch();
+                      toast.error(
+                        'A version pin was set on this instance. Review the warning and try again.',
+                        { duration: 10000 }
+                      );
+                      return;
+                    }
+                    toast.error(err.message, { duration: 10000 });
+                  },
                 });
               }}
               disabled={mutations.restartMachine.isPending || isRestarting || isRecovering}
@@ -479,6 +556,7 @@ export function InstanceControls({
         }}
         isPending={mutations.restartMachine.isPending}
         onConfirm={handleUpgradeConfirm}
+        pinnedImageTag={pinnedImageTag}
       />
       <RunDoctorDialog
         open={doctorOpen}

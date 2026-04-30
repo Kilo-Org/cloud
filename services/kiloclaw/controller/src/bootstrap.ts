@@ -22,6 +22,7 @@ import type { AuthProfilesMigrationDeps } from './auth-profiles-migration';
 const CONFIG_DIR = '/root/.openclaw';
 const CONFIG_PATH = '/root/.openclaw/openclaw.json';
 const EXEC_APPROVALS_PATH = '/root/.openclaw/exec-approvals.json';
+const DEVICE_PAIRED_PATH = '/root/.openclaw/devices/paired.json';
 const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
@@ -35,10 +36,21 @@ const LEGACY_BOT_IDENTITY_DESTS = ['/root/.openclaw/workspace/BOOTSTRAP.md'];
 const ENC_PREFIX = 'KILOCLAW_ENC_';
 const VALUE_PREFIX = 'enc:v1:';
 const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const GATEWAY_CLIENT_ID = 'gateway-client';
+const OPERATOR_TOKEN_ROLE = 'operator';
+const GATEWAY_CLIENT_OPERATOR_SCOPES = [
+  'operator.read',
+  'operator.admin',
+  'operator.approvals',
+  'operator.pairing',
+  'operator.write',
+];
 
 // ---- Types ----
 
 type EnvLike = Record<string, string | undefined>;
+
+type JsonRecord = Record<string, unknown>;
 
 type ExecOpts = {
   env?: NodeJS.ProcessEnv;
@@ -91,6 +103,21 @@ export type ControllerState =
   | { state: 'degraded'; error: string };
 
 export type ControllerStateRef = { current: ControllerState };
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringArrayEquals(left: unknown, right: readonly string[]): boolean {
+  if (!Array.isArray(left) || left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function setScopeList(record: JsonRecord, key: 'scopes' | 'approvedScopes'): boolean {
+  if (stringArrayEquals(record[key], GATEWAY_CLIENT_OPERATOR_SCOPES)) return false;
+  record[key] = [...GATEWAY_CLIENT_OPERATOR_SCOPES];
+  return true;
+}
 
 // ---- Step 1: Env decryption ----
 
@@ -702,6 +729,17 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     );
   }
 
+  try {
+    const remediation = remediateGatewayClientDeviceScopes(deps);
+    if (remediation.updated > 0) {
+      console.log(
+        `[controller] gateway-client device scopes remediated: ${remediation.updated}/${remediation.checked} paired device(s)`
+      );
+    }
+  } catch (err) {
+    console.warn('[controller] Failed to remediate gateway-client device scopes:', err);
+  }
+
   writeBotIdentityFile(env, deps);
   writeUserProfileFile(env, deps);
   ensureWeatherSkillInstalled(env, deps);
@@ -741,6 +779,70 @@ export function seedExecApprovalsDefaults(env: EnvLike, deps: BootstrapDeps = de
   } catch (err) {
     console.warn('[controller] Failed to seed exec-approvals.json defaults:', err);
   }
+}
+
+// ---- gateway-client paired device remediation ----
+
+export type GatewayClientDeviceScopeRemediationResult = {
+  checked: number;
+  updated: number;
+};
+
+export function remediateGatewayClientDeviceScopes(
+  deps: Pick<
+    BootstrapDeps,
+    'existsSync' | 'readFileSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'chmodSync'
+  > = defaultDeps
+): GatewayClientDeviceScopeRemediationResult {
+  if (!deps.existsSync(DEVICE_PAIRED_PATH)) {
+    return { checked: 0, updated: 0 };
+  }
+
+  const pairedFile = JSON.parse(deps.readFileSync(DEVICE_PAIRED_PATH, 'utf8')) as unknown;
+  if (!isJsonRecord(pairedFile)) {
+    console.warn('[controller] Device paired state is not an object, skipping remediation');
+    return { checked: 0, updated: 0 };
+  }
+
+  let checked = 0;
+  let updated = 0;
+
+  for (const value of Object.values(pairedFile)) {
+    if (!isJsonRecord(value) || value.clientId !== GATEWAY_CLIENT_ID) continue;
+    checked += 1;
+
+    let changed = false;
+    changed = setScopeList(value, 'scopes') || changed;
+    changed = setScopeList(value, 'approvedScopes') || changed;
+
+    const tokens = value.tokens;
+    if (isJsonRecord(tokens)) {
+      const operatorToken = tokens[OPERATOR_TOKEN_ROLE];
+      if (isJsonRecord(operatorToken)) {
+        changed = setScopeList(operatorToken, 'scopes') || changed;
+      }
+    }
+
+    if (changed) updated += 1;
+  }
+
+  if (updated === 0) {
+    return { checked, updated };
+  }
+
+  atomicWrite(
+    DEVICE_PAIRED_PATH,
+    JSON.stringify(pairedFile, null, 2) + '\n',
+    {
+      writeFileSync: deps.writeFileSync,
+      renameSync: deps.renameSync,
+      unlinkSync: deps.unlinkSync,
+      chmodSync: deps.chmodSync,
+    },
+    { mode: 0o600 }
+  );
+
+  return { checked, updated };
 }
 
 // ---- TOOLS.md bounded-section helper ----

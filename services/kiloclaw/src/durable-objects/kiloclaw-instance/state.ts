@@ -6,6 +6,7 @@ import {
   type DockerLocalProviderState,
   type NorthflankProviderState,
 } from '../../schemas/instance-config';
+import { LIFECYCLE_NOTIFICATION_RESET } from './lifecycle-push';
 import type { InstanceMutableState } from './types';
 
 /**
@@ -330,8 +331,13 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.preRestoreStatus = d.preRestoreStatus;
     s.pendingRestoreVolumeId = d.pendingRestoreVolumeId;
     // Legacy instances pre-dating this field treat absence as already-sent
-    // to avoid spurious emails after deploy.
+    // to avoid spurious emails/pushes after deploy.
     s.instanceReadyEmailSent = 'instanceReadyEmailSent' in raw ? d.instanceReadyEmailSent : true;
+    // Legacy instances with an in-flight `starting` attempt at deploy time
+    // should not emit a retroactive `start_failed` push for that attempt.
+    // startAsync() re-arms this flag for every subsequent attempt.
+    s.startFailurePushSentForAttempt =
+      'startFailurePushSentForAttempt' in raw ? d.startFailurePushSentForAttempt : true;
     s.customSecretMeta = d.customSecretMeta;
     s.streamChatApiKey = d.streamChatApiKey;
     s.streamChatBotUserId = d.streamChatBotUserId;
@@ -431,7 +437,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.restoreStartedAt = null;
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
-  s.instanceReadyEmailSent = false;
+  Object.assign(s, LIFECYCLE_NOTIFICATION_RESET);
   s.streamChatApiKey = null;
   s.streamChatBotUserId = null;
   s.streamChatBotUserToken = null;
@@ -524,7 +530,7 @@ export function createMutableState(): InstanceMutableState {
     restoreStartedAt: null,
     preRestoreStatus: null,
     pendingRestoreVolumeId: null,
-    instanceReadyEmailSent: false,
+    ...LIFECYCLE_NOTIFICATION_RESET,
     customSecretMeta: null,
     streamChatApiKey: null,
     streamChatBotUserId: null,

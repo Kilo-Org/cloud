@@ -1,4 +1,5 @@
 import type { InstanceMutableState, InstanceStatus } from './types';
+import type { KiloClawEnv } from '../../types';
 import {
   ALARM_INTERVAL_RUNNING_MS,
   ALARM_INTERVAL_STARTING_MS,
@@ -42,7 +43,7 @@ export function reconcileLog(
 
 export type ReconcileContext = {
   readonly state: InstanceMutableState;
-  readonly env: { KILOCLAW_AE?: AnalyticsEngineDataset };
+  readonly env: KiloClawEnv;
   readonly reason: string;
   /** Log a reconcile action to both console and Analytics Engine. */
   log: (action: string, details?: Record<string, unknown>) => void;
@@ -50,7 +51,7 @@ export type ReconcileContext = {
 
 export function createReconcileContext(
   state: InstanceMutableState,
-  env: { KILOCLAW_AE?: AnalyticsEngineDataset },
+  env: KiloClawEnv,
   reason: string
 ): ReconcileContext {
   return {

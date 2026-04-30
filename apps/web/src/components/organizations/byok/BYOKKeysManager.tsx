@@ -568,22 +568,34 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   const directProvider = DIRECT_BYOK_PROVIDERS_LIST.find(
                     p => p.id === selectedProvider
                   );
-                  return directProvider ? (
-                    <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  if (directProvider) {
+                    return (
+                      <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        <AlertDescription>
+                          <p className="font-medium">
+                            Important: You must use a model from{' '}
+                            <strong>{directProvider.name}</strong> to use this key
+                          </p>
+                          <p className="mt-1">
+                            In your client, select a model entry from the list above. After saving,
+                            you may need to wait a few minutes and restart your client for this
+                            entry to appear.
+                          </p>
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  }
+                  return (
+                    <Alert>
+                      <Info className="h-4 w-4" />
                       <AlertDescription>
-                        <p className="font-medium">
-                          Important: You must use a model from{' '}
-                          <strong>{directProvider.name}</strong> to use this key
-                        </p>
-                        <p className="mt-1">
-                          In your client, select a model entry from the list above. After saving,
-                          you may need to wait a few minutes and restart your client for this entry
-                          to appear.
-                        </p>
+                        Once saved, your key will automatically be used whenever your client
+                        requests one of the supported models above. If multiple keys apply to the
+                        same model, they are tried in unspecified order until one succeeds.
                       </AlertDescription>
                     </Alert>
-                  ) : null;
+                  );
                 })()}
             </div>
 

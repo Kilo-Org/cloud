@@ -12,7 +12,6 @@ import {
   pushInstanceEventToUser,
 } from './event-push';
 import { lookupSandboxOwnerUserId, userOwnsSandbox } from './sandbox-ownership';
-import { validateUserIds } from './user-lookup';
 import type { DeferCtx } from './messages';
 import type { ConversationDO, UpdateTitleIfMemberResult } from '../do/conversation-do';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
@@ -168,19 +167,6 @@ export async function createBotConversationFor(
     return { ok: false, code: 'not_found', error: 'Sandbox owner not found' };
   }
 
-  const additionalMembers = params.additionalMembers ?? [];
-  if (additionalMembers.length > 0) {
-    const { invalid } = await validateUserIds(env.HYPERDRIVE.connectionString, additionalMembers);
-    if (invalid.length > 0) {
-      return {
-        ok: false,
-        code: 'invalid_members',
-        error: `Invalid member IDs: ${invalid.join(', ')}`,
-        invalidMembers: invalid,
-      };
-    }
-  }
-
   const conversationId = ulid();
   const now = Date.now();
   const botId = `bot:kiloclaw:${params.sandboxId}`;
@@ -188,9 +174,6 @@ export async function createBotConversationFor(
   const members: Array<{ id: string; kind: 'user' | 'bot' }> = [
     { id: ownerId, kind: 'user' },
     { id: botId, kind: 'bot' },
-    ...additionalMembers
-      .filter(id => id !== ownerId) // Dedupe owner if passed in additionalMembers
-      .map(id => ({ id, kind: 'user' as const })),
   ];
 
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));

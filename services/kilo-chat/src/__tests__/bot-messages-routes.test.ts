@@ -40,6 +40,10 @@ function makeEnv(): Env {
   return { ...env, GATEWAY_TOKEN_SECRET: { get: () => Promise.resolve(SECRET) } } as unknown as Env;
 }
 
+function getMemberStub(testEnv: Env, memberId: string) {
+  return testEnv.MEMBERSHIP_DO.get(testEnv.MEMBERSHIP_DO.idFromName(memberId));
+}
+
 /** App with bot auth middleware + bot routes. Also registers conversation + message
  *  routes so we can set up test data (create conversations, messages) using user
  *  identity via a simple mock auth shortcut. */
@@ -1269,6 +1273,50 @@ describe('POST /bot/v1/sandboxes/:sandboxId/conversations', () => {
     );
 
     expect(res.status).toBe(201);
+  });
+
+  it('ignores additionalMembers until sandbox participant authorization exists', async () => {
+    const suffix = 'bot-create-conv-ignore-members';
+    const userId = `user-${suffix}`;
+    const sandboxId = `sandbox-${suffix}`;
+    const unauthorizedUserId = `user-${suffix}-unauthorized`;
+    grantSandbox(userId, sandboxId);
+
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const testEnv = {
+      ...makeEnv(),
+      EVENT_SERVICE: { pushEvent },
+    } as unknown as Env;
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: 'No arbitrary members',
+          additionalMembers: [unauthorizedUserId],
+        }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(201);
+    const { conversationId } = await res.json<{ conversationId: string }>();
+
+    const unauthorizedMembership = await getMemberStub(
+      testEnv,
+      unauthorizedUserId
+    ).listConversations();
+    expect(unauthorizedMembership.conversations).toEqual([]);
+    expect(pushEvent).not.toHaveBeenCalledWith(
+      unauthorizedUserId,
+      `/kiloclaw/${sandboxId}`,
+      'conversation.created',
+      expect.objectContaining({ conversationId })
+    );
   });
 
   it('returns 401 without auth', async () => {

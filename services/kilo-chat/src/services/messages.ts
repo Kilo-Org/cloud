@@ -224,6 +224,7 @@ async function postCommitFanOut(
         content,
         inReplyToMessageId: inReplyToMessageId ?? null,
         clientId: clientId ?? null,
+        version: message.version,
       }
     );
 
@@ -426,7 +427,12 @@ export async function editMessageFor(
       result.memberContext.sandboxId,
       result.memberContext.humanMemberIds,
       'message.updated',
-      { messageId: result.messageId, content, clientUpdatedAt: timestamp }
+      {
+        messageId: result.messageId,
+        content,
+        clientUpdatedAt: timestamp,
+        version: result.message.version,
+      }
     );
     ctx.waitUntil(pushPromise);
   }
@@ -474,7 +480,7 @@ export async function deleteMessageFor(
       result.memberContext.sandboxId,
       result.memberContext.humanMemberIds,
       'message.deleted',
-      { messageId }
+      { messageId, version: result.message.version }
     );
     ctx.waitUntil(pushPromise);
   }
@@ -531,7 +537,7 @@ export async function executeActionFor(
           convContext.sandboxId,
           convContext.humanMemberIds,
           'message.updated',
-          { messageId, content: result.content, clientUpdatedAt: null }
+          { messageId, content: result.content, clientUpdatedAt: null, version: result.version }
         );
 
         // Deliver action.executed webhook only to the bot that authored the

@@ -10,20 +10,24 @@ export const messageCreatedEventSchema = z.object({
   content: z.array(contentBlockSchema),
   inReplyToMessageId: z.string().nullable(),
   clientId: z.string().nullable(),
+  version: z.number().int().nonnegative(),
 });
 
 export const messageUpdatedEventSchema = z.object({
   messageId: z.string(),
   content: z.array(contentBlockSchema),
   clientUpdatedAt: z.number().nullable(),
+  version: z.number().int().nonnegative(),
 });
 
 export const messageDeletedEventSchema = z.object({
   messageId: z.string(),
+  version: z.number().int().nonnegative(),
 });
 
 export const messageDeliveryFailedEventSchema = z.object({
   messageId: z.string(),
+  version: z.number().int().nonnegative(),
 });
 
 export const typingEventSchema = z.object({
@@ -34,12 +38,14 @@ export const reactionAddedEventSchema = z.object({
   messageId: z.string(),
   memberId: z.string(),
   emoji: z.string(),
+  version: z.number().int().nonnegative(),
 });
 
 export const reactionRemovedEventSchema = z.object({
   messageId: z.string(),
   memberId: z.string(),
   emoji: z.string(),
+  version: z.number().int().nonnegative(),
 });
 
 export const conversationCreatedEventSchema = z.object({
@@ -80,6 +86,7 @@ export const actionDeliveryFailedEventSchema = z.object({
   conversationId: z.string(),
   messageId: z.string(),
   groupId: z.string(),
+  version: z.number().int().nonnegative(),
 });
 
 export const botStatusEventSchema = z.object({

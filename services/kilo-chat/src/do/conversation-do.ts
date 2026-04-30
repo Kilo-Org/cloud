@@ -134,7 +134,7 @@ export type ExecuteActionParams = {
 };
 
 export type ExecuteActionResult =
-  | { ok: true; content: ContentBlock[]; messageSenderId: string }
+  | { ok: true; content: ContentBlock[]; messageSenderId: string; version: number }
   | {
       ok: false;
       code: 'not_found' | 'forbidden' | 'already_resolved' | 'invalid_value';
@@ -142,7 +142,7 @@ export type ExecuteActionResult =
     };
 
 export type RevertActionResolutionResult =
-  | { ok: true }
+  | { ok: true; version: number }
   | { ok: false; code: 'not_found'; error: string };
 
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
@@ -152,6 +152,7 @@ export type AddReactionResult =
       added: true;
       id: string;
       reactions: MessageReactionSummary[];
+      version: number;
       memberContext: MemberContext;
     }
   | { ok: true; added: false; id: string; reactions: MessageReactionSummary[] }
@@ -163,6 +164,7 @@ export type RemoveReactionResult =
       removed: true;
       removed_id: string;
       reactions: MessageReactionSummary[];
+      version: number;
       memberContext: MemberContext;
     }
   | { ok: true; removed: false; reactions: MessageReactionSummary[] }
@@ -209,8 +211,23 @@ export class ConversationDO extends DurableObject<Env> {
     this.ctx.waitUntil(this.webhookChain);
   }
 
-  notifyDeliveryFailed(messageId: string): void {
-    this.db.update(messages).set({ delivery_failed: 1 }).where(eq(messages.id, messageId)).run();
+  notifyDeliveryFailed(messageId: string): MessageRow | null {
+    const row = this.db.select().from(messages).where(eq(messages.id, messageId)).get();
+    if (!row) return null;
+
+    const newVersion = row.version + 1;
+    const updatedAt = Date.now();
+    this.db
+      .update(messages)
+      .set({ delivery_failed: 1, version: newVersion, updated_at: updatedAt })
+      .where(eq(messages.id, messageId))
+      .run();
+    return this.messageFromStoredRow({
+      ...row,
+      delivery_failed: 1,
+      version: newVersion,
+      updated_at: updatedAt,
+    });
   }
 
   revertActionResolution(params: {
@@ -230,7 +247,7 @@ export class ConversationDO extends DurableObject<Env> {
     }
     // Idempotent: already unresolved is a no-op success.
     if (!actionsBlock.resolved) {
-      return { ok: true };
+      return { ok: true, version: row.version };
     }
     actionsBlock.resolved = undefined;
     const newVersion = row.version + 1;
@@ -243,7 +260,7 @@ export class ConversationDO extends DurableObject<Env> {
       })
       .where(eq(messages.id, params.messageId))
       .run();
-    return { ok: true };
+    return { ok: true, version: newVersion };
   }
 
   initialize(params: InitializeParams): { ok: true } | { ok: false; error: string } {
@@ -355,6 +372,7 @@ export class ConversationDO extends DurableObject<Env> {
       inReplyToMessageId: row.in_reply_to_message_id,
       updatedAt: row.updated_at,
       clientUpdatedAt: row.client_updated_at,
+      version: row.version,
       deleted: row.deleted === 1,
       deliveryFailed: row.delivery_failed === 1,
       reactions: reactionSummaries,
@@ -558,15 +576,21 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     const updatedAt = Date.now();
+    const newVersion = row.version + 1;
     this.db
       .update(messages)
-      .set({ deleted: 1, updated_at: updatedAt })
+      .set({ deleted: 1, version: newVersion, updated_at: updatedAt })
       .where(eq(messages.id, params.messageId))
       .run();
 
     return {
       ok: true,
-      message: this.messageFromStoredRow({ ...row, deleted: 1, updated_at: updatedAt }),
+      message: this.messageFromStoredRow({
+        ...row,
+        deleted: 1,
+        version: newVersion,
+        updated_at: updatedAt,
+      }),
       memberContext: this.getMemberContext(),
     };
   }
@@ -602,17 +626,18 @@ export class ConversationDO extends DurableObject<Env> {
     };
 
     const newVersion = row.version + 1;
+    const updatedAt = Date.now();
     this.db
       .update(messages)
       .set({
         content: JSON.stringify(content),
         version: newVersion,
-        updated_at: Date.now(),
+        updated_at: updatedAt,
       })
       .where(eq(messages.id, params.messageId))
       .run();
 
-    return { ok: true, content, messageSenderId: row.sender_id };
+    return { ok: true, content, messageSenderId: row.sender_id, version: newVersion };
   }
 
   addReaction(params: AddReactionParams): AddReactionResult {
@@ -641,23 +666,30 @@ export class ConversationDO extends DurableObject<Env> {
 
       if (!existing) {
         const id = this.nextUlid();
-        this.db
-          .insert(reactions)
-          .values({
-            message_id: params.messageId,
-            member_id: params.memberId,
-            emoji: params.emoji,
-            id,
-            added_at: now,
-            deleted_at: null,
-            removed_id: null,
-          })
-          .run();
+        const newVersion = message.version + 1;
+        this.db.transaction(tx => {
+          tx.insert(reactions)
+            .values({
+              message_id: params.messageId,
+              member_id: params.memberId,
+              emoji: params.emoji,
+              id,
+              added_at: now,
+              deleted_at: null,
+              removed_id: null,
+            })
+            .run();
+          tx.update(messages)
+            .set({ version: newVersion, updated_at: now })
+            .where(eq(messages.id, params.messageId))
+            .run();
+        });
         return {
           ok: true,
           added: true,
           id,
           reactions: this.getLiveReactionSummaries(params.messageId),
+          version: newVersion,
           memberContext: this.getMemberContext(),
         };
       }
@@ -673,22 +705,29 @@ export class ConversationDO extends DurableObject<Env> {
 
       // Dead row — re-activate.
       const id = this.nextUlid();
-      this.db
-        .update(reactions)
-        .set({ id, added_at: now, deleted_at: null, removed_id: null })
-        .where(
-          and(
-            eq(reactions.message_id, params.messageId),
-            eq(reactions.member_id, params.memberId),
-            eq(reactions.emoji, params.emoji)
+      const newVersion = message.version + 1;
+      this.db.transaction(tx => {
+        tx.update(reactions)
+          .set({ id, added_at: now, deleted_at: null, removed_id: null })
+          .where(
+            and(
+              eq(reactions.message_id, params.messageId),
+              eq(reactions.member_id, params.memberId),
+              eq(reactions.emoji, params.emoji)
+            )
           )
-        )
-        .run();
+          .run();
+        tx.update(messages)
+          .set({ version: newVersion, updated_at: now })
+          .where(eq(messages.id, params.messageId))
+          .run();
+      });
       return {
         ok: true,
         added: true,
         id,
         reactions: this.getLiveReactionSummaries(params.messageId),
+        version: newVersion,
         memberContext: this.getMemberContext(),
       };
     } catch (err) {
@@ -731,22 +770,30 @@ export class ConversationDO extends DurableObject<Env> {
       }
 
       const removedId = this.nextUlid();
-      this.db
-        .update(reactions)
-        .set({ deleted_at: Date.now(), removed_id: removedId })
-        .where(
-          and(
-            eq(reactions.message_id, params.messageId),
-            eq(reactions.member_id, params.memberId),
-            eq(reactions.emoji, params.emoji)
+      const now = Date.now();
+      const newVersion = message.version + 1;
+      this.db.transaction(tx => {
+        tx.update(reactions)
+          .set({ deleted_at: now, removed_id: removedId })
+          .where(
+            and(
+              eq(reactions.message_id, params.messageId),
+              eq(reactions.member_id, params.memberId),
+              eq(reactions.emoji, params.emoji)
+            )
           )
-        )
-        .run();
+          .run();
+        tx.update(messages)
+          .set({ version: newVersion, updated_at: now })
+          .where(eq(messages.id, params.messageId))
+          .run();
+      });
       return {
         ok: true,
         removed: true,
         removed_id: removedId,
         reactions: this.getLiveReactionSummaries(params.messageId),
+        version: newVersion,
         memberContext: this.getMemberContext(),
       };
     } catch (err) {

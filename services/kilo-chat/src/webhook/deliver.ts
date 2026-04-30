@@ -106,11 +106,12 @@ export async function notifyMessageDeliveryFailed(
     convContext?: { humanMemberIds: string[]; sandboxId: string | null };
   }
 ): Promise<void> {
-  await withDORetry(
+  const message = await withDORetry(
     () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId)),
     stub => stub.notifyDeliveryFailed(params.messageId),
     'ConversationDO.notifyDeliveryFailed'
   );
+  if (!message) return;
 
   const ctx = params.convContext ?? (await getConversationContext(env, params.conversationId));
   if (ctx?.sandboxId) {
@@ -120,7 +121,7 @@ export async function notifyMessageDeliveryFailed(
       ctx.sandboxId,
       ctx.humanMemberIds,
       'message.delivery_failed',
-      { messageId: params.messageId }
+      { messageId: params.messageId, version: message.version }
     );
   }
 }

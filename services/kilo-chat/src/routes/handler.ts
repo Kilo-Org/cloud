@@ -310,7 +310,7 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
       ctx.sandboxId,
       ctx.humanMemberIds,
       'action.delivery_failed',
-      { conversationId: convId.data, messageId, groupId: groupIdRaw }
+      { conversationId: convId.data, messageId, groupId: groupIdRaw, version: result.version }
     );
   }
   return c.json({}, 202);

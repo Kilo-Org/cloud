@@ -127,6 +127,18 @@ export function updateMessageInPages<TPageParam>(
   return old;
 }
 
+function updateMessageIfFresh<TPageParam>(
+  old: InfiniteData<MessageListResponse, TPageParam>,
+  messageId: string,
+  version: number,
+  updater: (message: Message) => Message
+): InfiniteData<MessageListResponse, TPageParam> {
+  return updateMessageInPages(old, messageId, message => {
+    if (version < message.version) return message;
+    return updater(message);
+  });
+}
+
 export function useMessages(client: KiloChatClient, conversationId: string | null) {
   return useInfiniteQuery({
     queryKey: messagesKey(conversationId),
@@ -193,10 +205,23 @@ export function createOptimisticMessage(
     inReplyToMessageId: variables.inReplyToMessageId ?? null,
     updatedAt: null,
     clientUpdatedAt: null,
+    version: 0,
     deleted: false,
     deliveryFailed: false,
     reactions: [],
   };
+}
+
+export function applyMessageUpdatedEventToPages<TPageParam>(
+  old: InfiniteData<MessageListResponse, TPageParam>,
+  e: MessageUpdatedEvent
+): InfiniteData<MessageListResponse, TPageParam> {
+  return updateMessageIfFresh(old, e.messageId, e.version, msg => ({
+    ...msg,
+    content: e.content,
+    clientUpdatedAt: e.clientUpdatedAt,
+    version: e.version,
+  }));
 }
 
 export function useSendMessage(
@@ -506,11 +531,7 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, e.messageId, msg => ({
-          ...msg,
-          content: e.content,
-          clientUpdatedAt: e.clientUpdatedAt,
-        }));
+        return applyMessageUpdatedEventToPages(old, e);
       });
     };
 
@@ -518,7 +539,11 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, e.messageId, msg => ({ ...msg, deleted: true }));
+        return updateMessageIfFresh(old, e.messageId, e.version, msg => ({
+          ...msg,
+          deleted: true,
+          version: e.version,
+        }));
       });
     };
 
@@ -526,7 +551,11 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, e.messageId, msg => ({ ...msg, deliveryFailed: true }));
+        return updateMessageIfFresh(old, e.messageId, e.version, msg => ({
+          ...msg,
+          deliveryFailed: true,
+          version: e.version,
+        }));
       });
     };
 
@@ -534,13 +563,14 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, e.messageId, msg => ({
+        return updateMessageIfFresh(old, e.messageId, e.version, msg => ({
           ...msg,
           content: msg.content.map(block => {
             if (block.type !== 'actions') return block;
             if (block.groupId !== e.groupId) return block;
             return { ...block, resolved: undefined };
           }),
+          version: e.version,
         }));
       });
       onActionFailed?.();
@@ -550,9 +580,10 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, e.messageId, msg => ({
+        return updateMessageIfFresh(old, e.messageId, e.version, msg => ({
           ...msg,
           reactions: applyReactionAdded(msg.reactions, e.emoji, e.memberId),
+          version: e.version,
         }));
       });
     };
@@ -561,9 +592,10 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, e.messageId, msg => ({
+        return updateMessageIfFresh(old, e.messageId, e.version, msg => ({
           ...msg,
           reactions: applyReactionRemoved(msg.reactions, e.emoji, e.memberId),
+          version: e.version,
         }));
       });
     };

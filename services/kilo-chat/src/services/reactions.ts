@@ -38,7 +38,12 @@ export async function addReactionFor(
         result.memberContext.sandboxId,
         result.memberContext.humanMemberIds,
         'reaction.added',
-        { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
+        {
+          messageId: params.messageId,
+          memberId: callerId,
+          emoji: params.emoji,
+          version: result.version,
+        }
       );
       ctx.waitUntil(pushPromise);
     }
@@ -81,7 +86,12 @@ export async function removeReactionFor(
         result.memberContext.sandboxId,
         result.memberContext.humanMemberIds,
         'reaction.removed',
-        { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
+        {
+          messageId: params.messageId,
+          memberId: callerId,
+          emoji: params.emoji,
+          version: result.version,
+        }
       );
       ctx.waitUntil(pushPromise);
     }

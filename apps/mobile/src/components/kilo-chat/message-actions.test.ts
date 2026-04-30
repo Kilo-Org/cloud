@@ -11,6 +11,7 @@ function message(overrides: Partial<Message> = {}): Message {
     inReplyToMessageId: null,
     updatedAt: null,
     clientUpdatedAt: null,
+    version: 1,
     deleted: false,
     deliveryFailed: false,
     reactions: [],

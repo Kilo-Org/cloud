@@ -101,6 +101,7 @@ export const messageSchema = z.object({
   inReplyToMessageId: z.string().nullable(),
   updatedAt: z.number().nullable(),
   clientUpdatedAt: z.number().nullable(),
+  version: z.number().int().nonnegative(),
   deleted: z.boolean(),
   deliveryFailed: z.boolean(),
   reactions: z.array(reactionSummarySchema),

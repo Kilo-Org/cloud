@@ -78,7 +78,6 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   useInstancePresence(sandboxId);
 
   function handleRowPress(conversationId: string) {
-    // Route lands in PR 5d (Task 47)
     router.push(`/(app)/chat/${sandboxId}/${conversationId}` as Href);
   }
 
@@ -87,7 +86,6 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       { sandboxId },
       {
         onSuccess: result => {
-          // Route lands in PR 5d (Task 47)
           router.push(`/(app)/chat/${sandboxId}/${result.conversationId}` as Href);
         },
       }

@@ -105,14 +105,13 @@ export async function dispatchReadyPush(
   try {
     const result = await env.NOTIFICATIONS.sendInstanceLifecycleNotification({
       userId: state.userId,
-      instanceId: state.sandboxId,
       sandboxId: state.sandboxId,
       event: 'ready',
       instanceName,
     });
     doLog(state, 'ready push dispatch completed', {
       event: 'ready',
-      instanceId: state.sandboxId,
+      sandboxId: state.sandboxId,
       tokenCount: result.tokenCount,
       sent: result.sent,
       staleTokens: result.staleTokens,
@@ -150,7 +149,6 @@ export async function maybeDispatchStartFailurePush(
   try {
     const result = await env.NOTIFICATIONS.sendInstanceLifecycleNotification({
       userId: state.userId,
-      instanceId: state.sandboxId,
       sandboxId: state.sandboxId,
       event: 'start_failed',
       instanceName,
@@ -158,7 +156,7 @@ export async function maybeDispatchStartFailurePush(
     });
     doLog(state, 'start failure push dispatch completed', {
       event: 'start_failed',
-      instanceId: state.sandboxId,
+      sandboxId: state.sandboxId,
       label,
       tokenCount: result.tokenCount,
       sent: result.sent,

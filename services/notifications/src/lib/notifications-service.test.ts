@@ -13,7 +13,6 @@ function baseParams(
 ): SendInstanceLifecycleNotificationParams {
   return {
     userId: 'user-1',
-    instanceId: 'sandbox-1',
     sandboxId: 'ki_deadbeef',
     event: 'ready',
     instanceName: 'My Bot',
@@ -78,7 +77,7 @@ describe('buildInstanceLifecycleMessages', () => {
     expect(m.data).toEqual({
       type: 'instance-lifecycle',
       event: 'ready',
-      instanceId: 'sandbox-1',
+      sandboxId: 'ki_deadbeef',
     });
     expect(m.sound).toBe('default');
     expect(m.priority).toBe('high');
@@ -205,12 +204,27 @@ describe('dispatchInstanceLifecyclePush', () => {
     expect(calls.sentMessages).toHaveLength(0);
   });
 
-  it('carries the chat route id through to the Expo data payload', async () => {
+  it('rejects an empty sandboxId before doing any IO', async () => {
     const { deps, calls } = fakeDeps();
 
-    await dispatchInstanceLifecyclePush(baseParams({ instanceId: 'ki_deadbeef' }), deps);
+    await expect(
+      dispatchInstanceLifecyclePush({ ...baseParams(), sandboxId: '' }, deps)
+    ).rejects.toThrow();
+
+    expect(calls.getTokenQueries).toHaveLength(0);
+    expect(calls.sentMessages).toHaveLength(0);
+  });
+
+  it('carries sandboxId as the only chat route id in the Expo data payload', async () => {
+    const { deps, calls } = fakeDeps();
+
+    await dispatchInstanceLifecyclePush(baseParams({ sandboxId: 'ki_deadbeef' }), deps);
 
     const sent = calls.sentMessages[0];
-    expect((sent[0].data as { instanceId: string }).instanceId).toBe('ki_deadbeef');
+    expect(sent[0].data).toEqual({
+      type: 'instance-lifecycle',
+      event: 'ready',
+      sandboxId: 'ki_deadbeef',
+    });
   });
 });

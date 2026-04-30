@@ -55,7 +55,7 @@ export function buildInstanceLifecycleMessages(
     data: {
       type: 'instance-lifecycle',
       event: params.event,
-      instanceId: params.instanceId,
+      sandboxId: params.sandboxId,
     },
     sound: 'default' as const,
     priority: 'high' as const,

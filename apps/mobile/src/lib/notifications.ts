@@ -5,6 +5,8 @@ import { Platform } from 'react-native';
 
 import { type PushData, pushDataSchema } from '@kilocode/notifications';
 
+import { notificationPathForData } from './notification-path';
+
 function getProjectId(): string {
   const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
   const projectId = eas?.projectId;
@@ -84,10 +86,7 @@ function instanceChatPath(data: PushData | null): string | null {
   if (!data) {
     return null;
   }
-  if (data.type === 'chat.message') {
-    return `/(app)/chat/${data.sandboxId}/${data.conversationId}`;
-  }
-  return `/(app)/chat/${data.instanceId}`;
+  return notificationPathForData(data);
 }
 
 export function setupNotificationResponseHandler() {

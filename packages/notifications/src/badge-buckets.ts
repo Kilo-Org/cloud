@@ -1,8 +1,8 @@
 /**
- * Badge-bucket key builders. The `badge_counts` table uses a free-form
- * `badge_bucket` string as part of its composite PK; producers of unread
- * counts MUST derive their bucket key via these helpers so namespaces
- * don't collide as more surfaces start emitting badge updates.
+ * Badge-bucket key builders. Per-user badge state lives in `NotificationChannelDO`
+ * storage under `bucket:${badgeBucket}`; producers of unread counts MUST derive
+ * their bucket key via these helpers so namespaces don't collide as more surfaces
+ * start emitting badge updates.
  */
 
 export const badgeBucketForConversation = (sandboxId: string, conversationId: string) =>

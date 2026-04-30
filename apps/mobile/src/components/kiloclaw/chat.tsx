@@ -9,6 +9,8 @@ import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
 import { toast } from 'sonner-native';
 
+import { badgeBucketForConversation } from '@kilocode/notifications';
+
 import { KiloClawMessageAvatar } from '@/components/kiloclaw/chat-avatar';
 import { ChatPlaceholder } from '@/components/kiloclaw/chat-placeholder';
 import { ChatHeader, ChatShell } from '@/components/kiloclaw/chat-shell';
@@ -81,7 +83,9 @@ export function KiloClawChat({
       const subscription = Notifications.addNotificationReceivedListener(notification => {
         const data = parseNotificationData(notification.request.content.data);
         if (data?.type === 'chat.message' && data.sandboxId === instanceId) {
-          markChatRead({ channelId: instanceId });
+          markChatRead({
+            badgeBucket: badgeBucketForConversation(data.sandboxId, data.conversationId),
+          });
         }
       });
 

@@ -1,7 +1,13 @@
 import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
-import type { Message, ReactionSummary, CreateMessageRequest } from '@kilocode/kilo-chat';
+import type {
+  Message,
+  ReactionSummary,
+  CreateMessageRequest,
+  EditMessageRequest,
+  ExecApprovalDecision,
+} from '@kilocode/kilo-chat';
 
 export const PAGE_SIZE = 50;
 
@@ -160,6 +166,201 @@ export function useSendMessage(
     onError: (_err, _variables, context) => {
       if (!context) return;
       removeMessageFromCache(queryClient, context.queryKey, context.pendingId);
+    },
+  });
+}
+
+export function useEditMessage(client: KiloChatClient, conversationId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, ...req }: EditMessageRequest & { messageId: string }) =>
+      client.editMessage(messageId, req),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg =>
+              msg.id === variables.messageId
+                ? { ...msg, content: variables.content, clientUpdatedAt: variables.timestamp }
+                : msg
+            )
+          ),
+        };
+      });
+      return { queryKey, snapshot };
+    },
+    onError: (_err, _variables, context) => {
+      if (!context?.snapshot) return;
+      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    },
+  });
+}
+
+export function useDeleteMessage(client: KiloChatClient, conversationId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, conversationId }: { messageId: string; conversationId: string }) =>
+      client.deleteMessage(messageId, { conversationId }),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg => (msg.id === variables.messageId ? { ...msg, deleted: true } : msg))
+          ),
+        };
+      });
+      return { queryKey, snapshot };
+    },
+    onError: (_err, _variables, context) => {
+      if (!context?.snapshot) return;
+      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    },
+  });
+}
+
+export function useAddReaction(
+  client: KiloChatClient,
+  conversationId: string | null,
+  currentUserId: string
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
+      client.addReaction(messageId, { conversationId: conversationId ?? '', emoji }),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg =>
+              msg.id !== variables.messageId
+                ? msg
+                : {
+                    ...msg,
+                    reactions: applyReactionAdded(msg.reactions, variables.emoji, currentUserId),
+                  }
+            )
+          ),
+        };
+      });
+      return { queryKey, snapshot };
+    },
+    onError: (_err, _variables, context) => {
+      if (!context?.snapshot) return;
+      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    },
+  });
+}
+
+export function useRemoveReaction(
+  client: KiloChatClient,
+  conversationId: string | null,
+  currentUserId: string
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
+      client.removeReaction(messageId, { conversationId: conversationId ?? '', emoji }),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg =>
+              msg.id !== variables.messageId
+                ? msg
+                : {
+                    ...msg,
+                    reactions: applyReactionRemoved(msg.reactions, variables.emoji, currentUserId),
+                  }
+            )
+          ),
+        };
+      });
+      return { queryKey, snapshot };
+    },
+    onError: (_err, _variables, context) => {
+      if (!context?.snapshot) return;
+      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    },
+  });
+}
+
+export function useExecuteAction(
+  client: KiloChatClient,
+  conversationId: string | null,
+  currentUserId: string
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      messageId,
+      groupId,
+      value,
+    }: {
+      messageId: string;
+      groupId: string;
+      value: ExecApprovalDecision;
+    }) => client.executeAction(conversationId ?? '', messageId, { groupId, value }),
+    onMutate: async variables => {
+      if (!conversationId) return;
+      const queryKey = ['kilo-chat', 'messages', conversationId];
+      await queryClient.cancelQueries({ queryKey });
+      const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
+      // Optimistically mark the action as resolved
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map(page =>
+            page.map(msg => {
+              if (msg.id !== variables.messageId) return msg;
+              return {
+                ...msg,
+                content: msg.content.map(block => {
+                  if (block.type !== 'actions') return block;
+                  if (block.groupId !== variables.groupId) return block;
+                  return {
+                    ...block,
+                    resolved: {
+                      value: variables.value,
+                      resolvedBy: currentUserId,
+                      resolvedAt: Date.now(),
+                    },
+                  };
+                }),
+              };
+            })
+          ),
+        };
+      });
+      return { queryKey, snapshot };
+    },
+    onError: (_err, _variables, context) => {
+      if (!context?.snapshot) return;
+      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
   });
 }

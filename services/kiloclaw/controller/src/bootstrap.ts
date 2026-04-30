@@ -45,6 +45,7 @@ const GATEWAY_CLIENT_OPERATOR_SCOPES = [
   'operator.pairing',
   'operator.write',
 ];
+export const DOCTOR_TIMEOUT_MS = 90_000;
 
 // ---- Types ----
 
@@ -56,6 +57,7 @@ type ExecOpts = {
   env?: NodeJS.ProcessEnv;
   stdio?: 'inherit' | 'pipe';
   input?: string;
+  timeout?: number;
 };
 
 export type BootstrapDeps = {
@@ -91,6 +93,7 @@ const defaultDeps: BootstrapDeps = {
       stdio: opts?.stdio ?? 'pipe',
       env: opts?.env,
       input: opts?.input,
+      timeout: opts?.timeout,
     }),
 };
 
@@ -117,6 +120,11 @@ function setScopeList(record: JsonRecord, key: 'scopes' | 'approvedScopes'): boo
   if (stringArrayEquals(record[key], GATEWAY_CLIENT_OPERATOR_SCOPES)) return false;
   record[key] = [...GATEWAY_CLIENT_OPERATOR_SCOPES];
   return true;
+}
+
+function isTimeoutError(err: unknown): boolean {
+  if (!isJsonRecord(err)) return false;
+  return err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM';
 }
 
 // ---- Step 1: Env decryption ----
@@ -683,9 +691,17 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     }
   } else {
     console.log('Using existing config, running doctor...');
-    deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {
-      stdio: 'inherit',
-    });
+    try {
+      deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {
+        stdio: 'inherit',
+        timeout: DOCTOR_TIMEOUT_MS,
+      });
+    } catch (err) {
+      if (!isTimeoutError(err)) throw err;
+      console.warn(
+        `[controller] openclaw doctor timed out after ${Math.round(DOCTOR_TIMEOUT_MS / 1000)}s; continuing with config patching`
+      );
+    }
 
     // Patch the config with env-var-derived fields
     const config = generateBaseConfig(env, CONFIG_PATH, cwDeps);
@@ -729,6 +745,14 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     );
   }
 
+  writeBotIdentityFile(env, deps);
+  writeUserProfileFile(env, deps);
+  ensureWeatherSkillInstalled(env, deps);
+}
+
+export function runGatewayClientDeviceScopeRemediation(
+  deps: BootstrapDeps = defaultDeps
+): GatewayClientDeviceScopeRemediationResult {
   try {
     const remediation = remediateGatewayClientDeviceScopes(deps);
     if (remediation.updated > 0) {
@@ -736,13 +760,11 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
         `[controller] gateway-client device scopes remediated: ${remediation.updated}/${remediation.checked} paired device(s)`
       );
     }
+    return remediation;
   } catch (err) {
     console.warn('[controller] Failed to remediate gateway-client device scopes:', err);
+    return { checked: 0, updated: 0 };
   }
-
-  writeBotIdentityFile(env, deps);
-  writeUserProfileFile(env, deps);
-  ensureWeatherSkillInstalled(env, deps);
 }
 
 // ---- exec-approvals.json seeder ----
@@ -1096,6 +1118,10 @@ export async function bootstrapNonCritical(
   const steps: BootstrapStep[] = [
     { phase: 'github', run: () => configureGitHub(env, deps) },
     { phase: 'linear', run: () => configureLinear(env) },
+    {
+      phase: 'gateway-client-device-scopes',
+      run: () => runGatewayClientDeviceScopeRemediation(deps),
+    },
     { phase: configPhase, run: () => runOnboardOrDoctor(env, deps) },
     {
       phase: 'tools-md',

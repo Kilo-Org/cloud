@@ -48,6 +48,7 @@ export type PairingCache = {
 };
 
 type ExecImpl = (command: string, args: string[]) => Promise<{ stdout: string; stderr: string }>;
+type ApproveGatewayClientDeviceImpl = (requestId: string) => Promise<void>;
 type ReadTextFileImpl = (filePath: string) => Promise<string>;
 type WriteTextFileAtomicImpl = (filePath: string, data: string) => Promise<void>;
 
@@ -56,6 +57,7 @@ export type ReadDevicePairingImpl = () => Promise<unknown>;
 
 type PairingCacheOptions = {
   execImpl?: ExecImpl;
+  approveGatewayClientDeviceImpl?: ApproveGatewayClientDeviceImpl;
   readConfigImpl?: () => unknown;
   nowImpl?: () => string;
   readChannelPairingImpl?: ReadChannelPairingImpl;
@@ -104,6 +106,7 @@ function approveFail(message: string, statusHint: 400 | 500): ApproveResult {
 }
 
 export const OPENCLAW_BIN = '/usr/local/bin/openclaw';
+export const GATEWAY_CLIENT_APPROVE_BIN = '/usr/local/bin/openclaw-gateway-client-approve.js';
 export const GATEWAY_CLIENT_ID = 'gateway-client';
 export const OPERATOR_ROLE = 'operator';
 export const GATEWAY_CLIENT_OPERATOR_SCOPES = [
@@ -113,6 +116,8 @@ export const GATEWAY_CLIENT_OPERATOR_SCOPES = [
   'operator.pairing',
   'operator.write',
 ];
+export const GATEWAY_CLIENT_APPROVE_TIMEOUT_MS = 15_000;
+export const GATEWAY_CLIENT_APPROVE_RETRY_MS = 30_000;
 
 // Mirrors resolveStateDir() / resolveOAuthDir() in openclaw/src/config/paths.ts
 // Note: openclaw's full resolveStateDir() also does filesystem-existence checks for
@@ -139,6 +144,14 @@ function defaultExecImpl(
   return execFileAsync(command, args, {
     encoding: 'utf8',
     timeout: APPROVE_TIMEOUT_MS,
+    env: { ...process.env, HOME: '/root' },
+  });
+}
+
+async function defaultApproveGatewayClientDeviceImpl(requestId: string): Promise<void> {
+  await execFileAsync(GATEWAY_CLIENT_APPROVE_BIN, [requestId], {
+    encoding: 'utf8',
+    timeout: GATEWAY_CLIENT_APPROVE_TIMEOUT_MS,
     env: { ...process.env, HOME: '/root' },
   });
 }
@@ -304,6 +317,7 @@ export function detectChannels(config: unknown): string[] {
 export function createPairingCache(options?: PairingCacheOptions): PairingCache {
   const {
     execImpl = defaultExecImpl,
+    approveGatewayClientDeviceImpl = defaultApproveGatewayClientDeviceImpl,
     readConfigImpl = defaultReadConfigImpl,
     nowImpl = () => new Date().toISOString(),
     readChannelPairingImpl = async (channel: string) => {
@@ -332,6 +346,8 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
   let nextAllowedRefreshAt = 0;
   let hasCompletedInitialRefresh = false;
   let consecutiveFailureCount = 0;
+  const gatewayClientApprovalsInFlight = new Set<string>();
+  const gatewayClientApprovalRetryAfter = new Map<string, number>();
 
   // Generation counters prevent stale concurrent refreshes from overwriting
   // newer data.  Each refresh captures the counter at start; if another
@@ -426,7 +442,9 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
     return true;
   };
 
-  const refreshDevicePairingInternal = async (): Promise<boolean> => {
+  const refreshDevicePairingInternal = async (options?: {
+    autoApprove?: boolean;
+  }): Promise<boolean> => {
     if (stopped) return false;
     const gen = ++deviceGeneration;
     try {
@@ -456,10 +474,27 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       }
       console.log(`[pairing-cache] devices: read ok, ${requests.length} pending`);
 
-      if (autoApproveGatewayClient) {
+      if (autoApproveGatewayClient && options?.autoApprove !== false) {
         const gatewayRequests = requests.filter(isGatewayClientOperatorRequest);
+        let shouldRefreshAfterApproval = false;
         for (const req of gatewayRequests) {
+          const retryAfter = gatewayClientApprovalRetryAfter.get(req.requestId) ?? 0;
+          const now = nowMsImpl();
+          if (now < retryAfter) {
+            console.log(
+              `[pairing-cache] skipping gateway-client device ${req.requestId} auto-approval (retry in ${Math.ceil((retryAfter - now) / 1000)}s)`
+            );
+            continue;
+          }
+          if (gatewayClientApprovalsInFlight.has(req.requestId)) {
+            console.log(
+              `[pairing-cache] gateway-client device ${req.requestId} auto-approval already in flight`
+            );
+            continue;
+          }
+
           console.log(`[pairing-cache] auto-approving gateway-client device ${req.requestId}`);
+          gatewayClientApprovalsInFlight.add(req.requestId);
           try {
             const widened = await widenGatewayClientPendingRequestScopes({
               requestId: req.requestId,
@@ -470,6 +505,7 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
               console.log(
                 `[pairing-cache] gateway-client pending request ${req.requestId} disappeared before approval`
               );
+              shouldRefreshAfterApproval = true;
               continue;
             }
             if (widened.changed) {
@@ -477,14 +513,22 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
                 `[pairing-cache] widened gateway-client device ${req.requestId} approval scopes`
               );
             }
-            await execImpl(OPENCLAW_BIN, ['devices', 'approve', req.requestId]);
+            await approveGatewayClientDeviceImpl(req.requestId);
+            gatewayClientApprovalRetryAfter.delete(req.requestId);
+            shouldRefreshAfterApproval = true;
           } catch (err) {
             console.error(`[pairing-cache] auto-approve failed for ${req.requestId}:`, err);
+            gatewayClientApprovalRetryAfter.set(
+              req.requestId,
+              nowMsImpl() + GATEWAY_CLIENT_APPROVE_RETRY_MS
+            );
+          } finally {
+            gatewayClientApprovalsInFlight.delete(req.requestId);
           }
         }
-        if (gatewayRequests.length > 0) {
+        if (shouldRefreshAfterApproval) {
           // Re-read after approvals so the cache reflects the updated state.
-          await refreshDevicePairingInternal();
+          await refreshDevicePairingInternal({ autoApprove: false });
         }
       }
 

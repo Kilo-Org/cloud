@@ -226,10 +226,16 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-04-24-v66-openclaw-2026.4.15-add-kilo-chat-plugin
-RUN echo "12"
+# Build cache bust: 2026-04-29-v67-gateway-client-local-approve
+RUN echo "13"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
+COPY openclaw-gateway-client-approve.js /usr/local/bin/openclaw-gateway-client-approve.js
+RUN chmod +x /usr/local/bin/openclaw-gateway-client-approve.js \
+    && node /usr/local/bin/openclaw-gateway-client-approve.js not-a-uuid >/tmp/gateway-client-approve-smoke.json \
+    && grep -q '"status":"invalid-request-id"' /tmp/gateway-client-approve-smoke.json \
+    && node --input-type=module -e 'const fs=await import("node:fs"); const path=await import("node:path"); const url=await import("node:url"); const dir="/usr/local/lib/node_modules/openclaw/dist"; const files=fs.readdirSync(dir).filter(name=>/^device-pairing-.*\\.js$/.test(name)); if (files.length !== 1) throw new Error(`expected one device-pairing chunk, got ${files.length}`); const mod=await import(url.pathToFileURL(path.join(dir, files[0])).href); if (!Object.values(mod).some(value=>typeof value === "function" && value.name === "approveDevicePairing")) throw new Error("approveDevicePairing export not found");' \
+    && rm -f /tmp/gateway-client-approve-smoke.json
 
 # Copy custom skills
 COPY skills/ /root/clawd/skills/

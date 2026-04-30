@@ -50,7 +50,7 @@ jobs:
       #   - container/         (COPY container/TOOLS.md → /usr/local/share/kiloclaw/)
       #   - plugins/kiloclaw-customizer/ (COPY plugin package for image install)
       #   - plugins/kilo-chat/         (COPY plugin package for image install)
-      #   - openclaw-pairing-list.js, openclaw-device-pairing-list.js (COPY)
+      #   - openclaw-pairing-list.js, openclaw-device-pairing-list.js, openclaw-gateway-client-approve.js (COPY)
       #   - skills/            (COPY skills/ → /root/clawd/skills/)
       #
       # NOT included (not in the image):
@@ -63,7 +63,7 @@ jobs:
         run: |
           # Validate all expected paths exist before hashing
           for path in Dockerfile controller container plugins/kiloclaw-customizer plugins/kilo-chat plugins/kiloclaw-morning-briefing skills \
-                      openclaw-pairing-list.js openclaw-device-pairing-list.js; do
+                      openclaw-pairing-list.js openclaw-device-pairing-list.js openclaw-gateway-client-approve.js; do
             if [ ! -e "$path" ]; then
               echo "::error::Required path not found: $path"
               exit 1
@@ -72,7 +72,7 @@ jobs:
 
           CONTENT_HASH=$(
             find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ plugins/kilo-chat/ plugins/kiloclaw-morning-briefing/ skills/ \
-              openclaw-pairing-list.js openclaw-device-pairing-list.js \
+              openclaw-pairing-list.js openclaw-device-pairing-list.js openclaw-gateway-client-approve.js \
               -type f \
               | sort \
               | xargs sha256sum \

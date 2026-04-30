@@ -1400,7 +1400,14 @@ describe('bootstrapNonCritical', () => {
     );
 
     expect(result).toEqual({ ok: true });
-    expect(phases).toEqual(['github', 'linear', 'onboard', 'tools-md', 'mcporter']);
+    expect(phases).toEqual([
+      'github',
+      'linear',
+      'gateway-client-device-scopes',
+      'onboard',
+      'tools-md',
+      'mcporter',
+    ]);
   });
 
   it('returns tools-md failure and stops before mcporter', async () => {
@@ -1429,7 +1436,13 @@ describe('bootstrapNonCritical', () => {
     );
 
     expect(result).toEqual({ ok: false, phase: 'tools-md', error: 'tools read failed' });
-    expect(phases).toEqual(['github', 'linear', 'onboard', 'tools-md']);
+    expect(phases).toEqual([
+      'github',
+      'linear',
+      'gateway-client-device-scopes',
+      'onboard',
+      'tools-md',
+    ]);
   });
 
   it('returns ok when doctor/onboard succeeds', async () => {
@@ -1450,7 +1463,14 @@ describe('bootstrapNonCritical', () => {
     );
 
     expect(result).toEqual({ ok: true });
-    expect(phases).toEqual(['github', 'linear', 'onboard', 'tools-md', 'mcporter']);
+    expect(phases).toEqual([
+      'github',
+      'linear',
+      'gateway-client-device-scopes',
+      'onboard',
+      'tools-md',
+      'mcporter',
+    ]);
   });
 
   it('returns a doctor failure instead of throwing', async () => {
@@ -1480,7 +1500,49 @@ describe('bootstrapNonCritical', () => {
     );
 
     expect(result).toEqual({ ok: false, phase: 'doctor', error: 'doctor exited 1' });
-    expect(phases).toEqual(['github', 'linear', 'doctor']);
+    expect(phases).toEqual(['github', 'linear', 'gateway-client-device-scopes', 'doctor']);
+  });
+
+  it('continues when doctor times out on an existing config', async () => {
+    const harness = fakeDeps();
+    const phases: string[] = [];
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p.endsWith('openclaw.json')) return true;
+      if (p.endsWith('TOOLS.md')) return true;
+      return false;
+    });
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({ gateway: { port: 3001, mode: 'local' } })
+    );
+    (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (cmd: string, args: string[], opts?: { timeout?: number }) => {
+        if (cmd === 'openclaw' && args.includes('doctor')) {
+          expect(opts?.timeout).toBe(90_000);
+          throw Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' });
+        }
+        return '';
+      }
+    );
+
+    const result = await bootstrapNonCritical(
+      {
+        KILOCODE_API_KEY: 'api-key',
+        OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+        AUTO_APPROVE_DEVICES: 'true',
+      },
+      phase => phases.push(phase),
+      harness.deps
+    );
+
+    expect(result).toEqual({ ok: true });
+    expect(phases).toEqual([
+      'github',
+      'linear',
+      'gateway-client-device-scopes',
+      'doctor',
+      'tools-md',
+      'mcporter',
+    ]);
   });
 });
 
@@ -1512,6 +1574,7 @@ describe('bootstrap', () => {
       'feature-flags',
       'github',
       'linear',
+      'gateway-client-device-scopes',
       'onboard',
       'tools-md',
       'mcporter',
@@ -1540,6 +1603,51 @@ describe('bootstrap', () => {
 
     expect(phases).toContain('doctor');
     expect(phases).not.toContain('onboard');
+  });
+
+  it('runs gateway-client paired-device remediation before doctor', async () => {
+    const phases: string[] = [];
+    const harness = fakeDeps();
+    const order: string[] = [];
+
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p.endsWith('openclaw.json')) return true;
+      if (p.endsWith('devices/paired.json')) return true;
+      return false;
+    });
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p.endsWith('devices/paired.json')) {
+        order.push('remediation-read');
+        return JSON.stringify({
+          gatewayDevice: {
+            clientId: 'gateway-client',
+            scopes: ['operator.read'],
+            approvedScopes: ['operator.read'],
+            tokens: { operator: { scopes: ['operator.read'] } },
+          },
+        });
+      }
+      return JSON.stringify({ gateway: { port: 3001, mode: 'local' } });
+    });
+    (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (cmd: string, args: string[]) => {
+        if (cmd === 'openclaw' && args.includes('doctor')) order.push('doctor');
+        return '';
+      }
+    );
+
+    await bootstrap(
+      {
+        KILOCODE_API_KEY: 'api-key',
+        OPENCLAW_GATEWAY_TOKEN: 'gw-token',
+        AUTO_APPROVE_DEVICES: 'true',
+      },
+      phase => phases.push(phase),
+      harness.deps
+    );
+
+    expect(phases).toContain('gateway-client-device-scopes');
+    expect(order).toEqual(['remediation-read', 'doctor']);
   });
 
   it('sets KILOCLAW_GATEWAY_ARGS after all steps complete', async () => {

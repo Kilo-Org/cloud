@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createPairingCache,
   OPENCLAW_BIN,
+  GATEWAY_CLIENT_APPROVE_BIN,
   DEBOUNCE_DELAY_MS,
   PERIODIC_INTERVAL_MS,
   FAILURE_RETRY_BASE_MS,
@@ -13,6 +14,7 @@ import {
 } from './pairing-cache';
 
 type ExecImpl = (command: string, args: string[]) => Promise<{ stdout: string; stderr: string }>;
+type ApproveGatewayClientDeviceImpl = (requestId: string) => Promise<void>;
 type ReadTextFileImpl = (filePath: string) => Promise<string>;
 type WriteTextFileAtomicImpl = (filePath: string, data: string) => Promise<void>;
 
@@ -23,6 +25,7 @@ const RECENT_TS = NOW_MS - 60_000;
 
 function createTestHarness(overrides?: {
   execImpl?: ExecImpl;
+  approveGatewayClientDeviceImpl?: ApproveGatewayClientDeviceImpl;
   readConfigImpl?: () => unknown;
   readChannelPairingImpl?: ReadChannelPairingImpl;
   readDevicePairingImpl?: ReadDevicePairingImpl;
@@ -30,6 +33,9 @@ function createTestHarness(overrides?: {
   writeTextFileAtomicImpl?: WriteTextFileAtomicImpl;
 }) {
   const execImpl = overrides?.execImpl ?? vi.fn<ExecImpl>();
+  const approveGatewayClientDeviceImpl =
+    overrides?.approveGatewayClientDeviceImpl ??
+    vi.fn<ApproveGatewayClientDeviceImpl>().mockResolvedValue();
   const readConfigImpl =
     overrides?.readConfigImpl ??
     vi.fn(() => ({
@@ -52,6 +58,7 @@ function createTestHarness(overrides?: {
 
   const cache = createPairingCache({
     execImpl,
+    approveGatewayClientDeviceImpl,
     readConfigImpl,
     readChannelPairingImpl,
     readDevicePairingImpl,
@@ -64,6 +71,7 @@ function createTestHarness(overrides?: {
   return {
     cache,
     execImpl,
+    approveGatewayClientDeviceImpl,
     readConfigImpl,
     readChannelPairingImpl,
     readDevicePairingImpl,
@@ -631,8 +639,11 @@ describe('createPairingCache', () => {
   });
 
   describe('autoApproveGatewayClient', () => {
-    it('auto-approves pending gateway-client devices on refresh', async () => {
+    it('auto-approves pending gateway-client devices locally on refresh', async () => {
       const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const approveGatewayClientDeviceImpl = vi
+        .fn<ApproveGatewayClientDeviceImpl>()
+        .mockResolvedValue();
       const readTextFileImpl = vi.fn<ReadTextFileImpl>().mockResolvedValue(
         JSON.stringify({
           'a1b2c3d4-e5f6-7890-abcd-ef1234567890': {
@@ -667,6 +678,7 @@ describe('createPairingCache', () => {
 
       const cache = createPairingCache({
         execImpl,
+        approveGatewayClientDeviceImpl,
         readConfigImpl: () => ({ channels: {} }),
         readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
         readDevicePairingImpl,
@@ -679,11 +691,10 @@ describe('createPairingCache', () => {
 
       await cache.refreshDevicePairing();
 
-      expect(execImpl).toHaveBeenCalledWith(OPENCLAW_BIN, [
-        'devices',
-        'approve',
-        'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      ]);
+      expect(execImpl).not.toHaveBeenCalled();
+      expect(approveGatewayClientDeviceImpl).toHaveBeenCalledWith(
+        'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+      );
       expect(writeTextFileAtomicImpl).toHaveBeenCalledTimes(1);
       const written = JSON.parse(writeTextFileAtomicImpl.mock.calls[0]?.[1] ?? '{}') as Record<
         string,
@@ -695,8 +706,15 @@ describe('createPairingCache', () => {
       expect(cache.getDevicePairing().requests).toEqual([]);
     });
 
+    it('exports the dedicated gateway-client approval helper path', () => {
+      expect(GATEWAY_CLIENT_APPROVE_BIN).toBe('/usr/local/bin/openclaw-gateway-client-approve.js');
+    });
+
     it('does not auto-approve non-gateway-client devices', async () => {
       const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const approveGatewayClientDeviceImpl = vi
+        .fn<ApproveGatewayClientDeviceImpl>()
+        .mockResolvedValue();
       const readTextFileImpl = vi.fn<ReadTextFileImpl>().mockResolvedValue('{}');
       const writeTextFileAtomicImpl = vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue();
       const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockResolvedValue({
@@ -711,6 +729,7 @@ describe('createPairingCache', () => {
 
       const cache = createPairingCache({
         execImpl,
+        approveGatewayClientDeviceImpl,
         readConfigImpl: () => ({ channels: {} }),
         readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
         readDevicePairingImpl,
@@ -724,6 +743,7 @@ describe('createPairingCache', () => {
       await cache.refreshDevicePairing();
 
       expect(execImpl).not.toHaveBeenCalled();
+      expect(approveGatewayClientDeviceImpl).not.toHaveBeenCalled();
       expect(readTextFileImpl).not.toHaveBeenCalled();
       expect(writeTextFileAtomicImpl).not.toHaveBeenCalled();
       expect(cache.getDevicePairing().requests).toHaveLength(1);
@@ -731,6 +751,9 @@ describe('createPairingCache', () => {
 
     it('does not auto-approve gateway-client requests without operator role', async () => {
       const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const approveGatewayClientDeviceImpl = vi
+        .fn<ApproveGatewayClientDeviceImpl>()
+        .mockResolvedValue();
       const readTextFileImpl = vi.fn<ReadTextFileImpl>().mockResolvedValue('{}');
       const writeTextFileAtomicImpl = vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue();
       const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockResolvedValue({
@@ -746,6 +769,7 @@ describe('createPairingCache', () => {
 
       const cache = createPairingCache({
         execImpl,
+        approveGatewayClientDeviceImpl,
         readConfigImpl: () => ({ channels: {} }),
         readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
         readDevicePairingImpl,
@@ -759,6 +783,7 @@ describe('createPairingCache', () => {
       await cache.refreshDevicePairing();
 
       expect(execImpl).not.toHaveBeenCalled();
+      expect(approveGatewayClientDeviceImpl).not.toHaveBeenCalled();
       expect(readTextFileImpl).not.toHaveBeenCalled();
       expect(writeTextFileAtomicImpl).not.toHaveBeenCalled();
       expect(cache.getDevicePairing().requests).toHaveLength(1);
@@ -766,6 +791,9 @@ describe('createPairingCache', () => {
 
     it('skips auto-approval when pending request disappears before widening', async () => {
       const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const approveGatewayClientDeviceImpl = vi
+        .fn<ApproveGatewayClientDeviceImpl>()
+        .mockResolvedValue();
       const readTextFileImpl = vi.fn<ReadTextFileImpl>().mockResolvedValue('{}');
       const writeTextFileAtomicImpl = vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue();
       const readDevicePairingImpl = vi
@@ -784,6 +812,7 @@ describe('createPairingCache', () => {
 
       const cache = createPairingCache({
         execImpl,
+        approveGatewayClientDeviceImpl,
         readConfigImpl: () => ({ channels: {} }),
         readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
         readDevicePairingImpl,
@@ -797,12 +826,16 @@ describe('createPairingCache', () => {
       await cache.refreshDevicePairing();
 
       expect(execImpl).not.toHaveBeenCalled();
+      expect(approveGatewayClientDeviceImpl).not.toHaveBeenCalled();
       expect(writeTextFileAtomicImpl).not.toHaveBeenCalled();
       expect(cache.getDevicePairing().requests).toEqual([]);
     });
 
     it('does not auto-approve when option is disabled', async () => {
       const execImpl = vi.fn<ExecImpl>().mockResolvedValue({ stdout: '{}', stderr: '' });
+      const approveGatewayClientDeviceImpl = vi
+        .fn<ApproveGatewayClientDeviceImpl>()
+        .mockResolvedValue();
       const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockResolvedValue({
         'req-1': {
           requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -815,6 +848,7 @@ describe('createPairingCache', () => {
 
       const cache = createPairingCache({
         execImpl,
+        approveGatewayClientDeviceImpl,
         readConfigImpl: () => ({ channels: {} }),
         readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
         readDevicePairingImpl,
@@ -826,6 +860,51 @@ describe('createPairingCache', () => {
       await cache.refreshDevicePairing();
 
       expect(execImpl).not.toHaveBeenCalled();
+      expect(approveGatewayClientDeviceImpl).not.toHaveBeenCalled();
+    });
+
+    it('backs off failed gateway-client auto-approval attempts', async () => {
+      const approveGatewayClientDeviceImpl = vi
+        .fn<ApproveGatewayClientDeviceImpl>()
+        .mockRejectedValueOnce(new Error('local approval failed'))
+        .mockResolvedValue();
+      const request = {
+        requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        deviceId: 'dev1',
+        clientId: 'gateway-client',
+        role: 'operator',
+        roles: ['operator'],
+        ts: RECENT_TS,
+      };
+      let nowMs = NOW_MS;
+      const readTextFileImpl = vi.fn<ReadTextFileImpl>().mockResolvedValue(
+        JSON.stringify({
+          [request.requestId]: { ...request, scopes: GATEWAY_CLIENT_OPERATOR_SCOPES },
+        })
+      );
+      const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockResolvedValue({
+        [request.requestId]: request,
+      });
+
+      const cache = createPairingCache({
+        approveGatewayClientDeviceImpl,
+        readConfigImpl: () => ({ channels: {} }),
+        readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
+        readDevicePairingImpl,
+        readTextFileImpl,
+        writeTextFileAtomicImpl: vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue(),
+        nowImpl: () => '2026-03-12T00:00:00.000Z',
+        nowMsImpl: () => nowMs,
+        autoApproveGatewayClient: true,
+      });
+
+      await cache.refreshDevicePairing();
+      await cache.refreshDevicePairing();
+      expect(approveGatewayClientDeviceImpl).toHaveBeenCalledTimes(1);
+
+      nowMs += 30_000;
+      await cache.refreshDevicePairing();
+      expect(approveGatewayClientDeviceImpl).toHaveBeenCalledTimes(2);
     });
   });
 

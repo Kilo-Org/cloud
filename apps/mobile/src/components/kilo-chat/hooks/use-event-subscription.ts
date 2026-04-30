@@ -9,15 +9,21 @@ export function useEventSubscription(
 ) {
   const eventService = useEventServiceClient();
   useEffect(() => {
-    if (!context) return undefined;
+    if (!context) {
+      return undefined;
+    }
     eventService.subscribe([context]);
     const offs = events.map(eventName =>
       eventService.on(eventName, (ctx, payload) => {
-        if (ctx === context) onEvent({ event: eventName, payload });
+        if (ctx === context) {
+          onEvent({ event: eventName, payload });
+        }
       })
     );
     return () => {
-      for (const off of offs) off();
+      for (const off of offs) {
+        off();
+      }
       eventService.unsubscribe([context]);
     };
     // events is meant to be a stable array literal at the call site;

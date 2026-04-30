@@ -23,17 +23,20 @@ export function useInstanceEventSubscription(sandboxId: string | undefined) {
         case 'conversation.left':
         case 'message.created':
         case 'message.updated':
-        case 'message.deleted':
+        case 'message.deleted': {
           // message.* invalidates the conversations list so last-message
           // preview and unread counts stay current while the user is on
           // the list (instance-level presence, not viewing a specific conv).
           void qc.invalidateQueries({ queryKey: ['conversations', sandboxId] });
           break;
-        case 'bot.status':
+        }
+        case 'bot.status': {
           void qc.invalidateQueries({ queryKey: ['bot-status', sandboxId] });
           break;
-        default:
+        }
+        default: {
           break;
+        }
       }
     },
     [qc, sandboxId]

@@ -81,14 +81,15 @@ export function useMarkRead(client: KiloChatClient) {
       }
     },
   });
+  const { mutate } = mutation;
 
   return useCallback(
     (sandboxId: string, conversationId: string) => {
-      mutation.mutate({
+      mutate({
         sandboxId,
         conversationId,
       });
     },
-    [mutation]
+    [mutate]
   );
 }

@@ -26,8 +26,6 @@ function createStoredModelsFetcher(redisKey: RedisKey, name: string) {
   );
 }
 
-// Single source of truth for each metadata record; derived views below
-// key off the returned object identity to avoid recomputation.
 export const getVercelModelsMetadata = createStoredModelsFetcher(
   GATEWAY_METADATA_REDIS_KEYS.vercelModels,
   'Vercel'
@@ -38,18 +36,12 @@ export const getOpenRouterModelsMetadata = createStoredModelsFetcher(
   'OpenRouter'
 );
 
-const languageModelIdSetCache = new WeakMap<StoredModelMap, ReadonlySet<string>>();
-
 function toLanguageModelIdSet(models: StoredModelMap): ReadonlySet<string> {
-  const cached = languageModelIdSetCache.get(models);
-  if (cached) return cached;
-  const set = new Set(
+  return new Set(
     Object.values(models)
       .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length > 0)
       .map(model => model.id)
   );
-  languageModelIdSetCache.set(models, set);
-  return set;
 }
 
 export async function getVercelModels(): Promise<ReadonlySet<string>> {

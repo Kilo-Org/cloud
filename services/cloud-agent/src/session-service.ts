@@ -167,14 +167,9 @@ export class SetupCommandFailedError extends Error {
   constructor(
     public readonly command: string,
     public readonly exitCode: number,
-    public readonly stderr: string,
-    public readonly stdout: string = ''
+    public readonly stderr: string
   ) {
-    const details = [
-      `exit code ${exitCode}`,
-      ...(stderr ? [`stderr: ${stderr.trim()}`] : []),
-      ...(stdout ? [`stdout: ${stdout.trim()}`] : []),
-    ].join(': ');
+    const details = [`exit code ${exitCode}`, ...(stderr ? [stderr.trim()] : [])].join(': ');
     super(`Setup command failed: ${command} (${details})`);
     this.name = 'SetupCommandFailedError';
   }
@@ -226,13 +221,12 @@ async function runSetupCommands(
           .withFields({
             command,
             exitCode: result.exitCode,
-            stdout: result.stdout,
             stderr: result.stderr,
           })
           .warn('Setup command failed');
 
         if (failFast) {
-          throw new SetupCommandFailedError(command, result.exitCode, result.stderr, result.stdout);
+          throw new SetupCommandFailedError(command, result.exitCode, result.stderr);
         }
       }
     } catch (error) {

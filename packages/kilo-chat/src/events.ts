@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { contentBlockSchema, conversationListItemSchema } from './schemas';
+import { contentBlockSchema, conversationListItemSchema, messageSchema } from './schemas';
 
 // ── Per-event payload schemas ───────────────────────────────────────
 
 export const messageCreatedEventSchema = z.object({
   messageId: z.string(),
+  message: messageSchema,
   senderId: z.string(),
   content: z.array(contentBlockSchema),
   inReplyToMessageId: z.string().nullable(),

@@ -6,9 +6,11 @@ import {
   createConversationResponseSchema,
   createMessageResponseSchema,
   editMessageResponseSchema,
+  deleteMessageResponseSchema,
   markConversationReadResponseSchema,
   messageListResponseSchema,
   addReactionResponseSchema,
+  removeReactionResponseSchema,
   okResponseSchema,
   getBotStatusResponseSchema,
   getConversationStatusResponseSchema,
@@ -33,6 +35,7 @@ import type {
   CreateMessageResponse,
   EditMessageRequest,
   EditMessageResponse,
+  DeleteMessageResponse,
   MarkConversationReadResponse,
   RenameConversationRequest,
   MessageListResponse,
@@ -53,6 +56,8 @@ import type {
   ConversationStatusEvent,
   GetBotStatusResponse,
   GetConversationStatusResponse,
+  AddReactionResponse,
+  RemoveReactionResponse,
 } from './types';
 
 // Accept any response body for fire-and-forget endpoints. The server may
@@ -120,11 +125,11 @@ export class KiloChatClient {
   async deleteMessage(
     messageId: string,
     req: z.input<typeof deleteMessageQuerySchema>
-  ): Promise<void> {
-    await this.httpRequest(`/v1/messages/${messageId}`, {
+  ): Promise<DeleteMessageResponse> {
+    return this.httpRequest(`/v1/messages/${messageId}`, {
       method: 'DELETE',
       query: req,
-      schema: voidSchema,
+      schema: deleteMessageResponseSchema,
     });
   }
 
@@ -178,7 +183,7 @@ export class KiloChatClient {
   async addReaction(
     messageId: string,
     req: z.input<typeof reactionRequestBodySchema>
-  ): Promise<{ id: string }> {
+  ): Promise<AddReactionResponse> {
     return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'POST',
       body: req,
@@ -189,11 +194,11 @@ export class KiloChatClient {
   async removeReaction(
     messageId: string,
     req: z.input<typeof reactionRequestBodySchema>
-  ): Promise<void> {
-    await this.httpRequest(`/v1/messages/${messageId}/reactions`, {
+  ): Promise<RemoveReactionResponse> {
+    return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'DELETE',
       query: req,
-      schema: voidSchema,
+      schema: removeReactionResponseSchema,
     });
   }
 

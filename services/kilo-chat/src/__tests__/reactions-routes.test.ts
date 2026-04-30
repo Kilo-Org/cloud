@@ -36,7 +36,7 @@ async function setup(suffix: string) {
 }
 
 describe('POST /v1/messages/:id/reactions', () => {
-  it('201 on first add, returns { id }', async () => {
+  it('201 on first add, returns id and server reaction summary', async () => {
     const { conversationId, messageId, userApp } = await setup('rx-post-1');
     const res = await userApp.request(
       `/v1/messages/${messageId}/reactions`,
@@ -48,8 +48,12 @@ describe('POST /v1/messages/:id/reactions', () => {
       env
     );
     expect(res.status).toBe(201);
-    const body = await res.json<{ id: string }>();
+    const body = await res.json<{
+      id: string;
+      reactions: Array<{ emoji: string; count: number; memberIds: string[] }>;
+    }>();
     expect(body.id).toMatch(/^[0-9A-Z]{26}$/);
+    expect(body.reactions).toEqual([{ emoji: '👍', count: 1, memberIds: ['user-rx-post-1'] }]);
   });
 
   it('200 on duplicate add with the same id', async () => {
@@ -68,8 +72,14 @@ describe('POST /v1/messages/:id/reactions', () => {
     const firstBody = await first.json<{ id: string }>();
     const second = await post({ conversationId, emoji: '👍' });
     expect(second.status).toBe(200);
-    const secondBody = await second.json<{ id: string }>();
+    const secondBody = await second.json<{
+      id: string;
+      reactions: Array<{ emoji: string; count: number; memberIds: string[] }>;
+    }>();
     expect(secondBody.id).toBe(firstBody.id);
+    expect(secondBody.reactions).toEqual([
+      { emoji: '👍', count: 1, memberIds: ['user-rx-post-2'] },
+    ]);
   });
 
   it('rejects empty emoji (400)', async () => {
@@ -136,7 +146,7 @@ describe('POST /v1/messages/:id/reactions', () => {
       { method: 'DELETE' },
       env
     );
-    expect(del.status).toBe(204);
+    expect(del.status).toBe(200);
 
     const res = await userApp.request(
       `/v1/messages/${messageId}/reactions`,
@@ -166,7 +176,7 @@ describe('POST /v1/messages/:id/reactions', () => {
 });
 
 describe('DELETE /v1/messages/:id/reactions', () => {
-  it('204 when removing a live reaction via query params', async () => {
+  it('returns the server reaction summary when removing a live reaction via query params', async () => {
     const { conversationId, messageId, userApp } = await setup('rx-del-1');
     await userApp.request(
       `/v1/messages/${messageId}/reactions`,
@@ -183,10 +193,11 @@ describe('DELETE /v1/messages/:id/reactions', () => {
       { method: 'DELETE' },
       env
     );
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ reactions: [] });
   });
 
-  it('204 even when reaction never existed (idempotent)', async () => {
+  it('returns the server reaction summary even when reaction never existed', async () => {
     const { conversationId, messageId, userApp } = await setup('rx-del-2');
     const qs = new URLSearchParams({ conversationId, emoji: '👍' });
     const res = await userApp.request(
@@ -194,7 +205,8 @@ describe('DELETE /v1/messages/:id/reactions', () => {
       { method: 'DELETE' },
       env
     );
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ reactions: [] });
   });
 
   it('404 when removing a reaction from a deleted message', async () => {
@@ -204,7 +216,7 @@ describe('DELETE /v1/messages/:id/reactions', () => {
       { method: 'DELETE' },
       env
     );
-    expect(deleteMessage.status).toBe(204);
+    expect(deleteMessage.status).toBe(200);
 
     const qs = new URLSearchParams({ conversationId, emoji: '👍' });
     const res = await userApp.request(

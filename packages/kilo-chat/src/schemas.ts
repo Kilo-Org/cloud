@@ -174,6 +174,7 @@ export const createMessageRequestSchema = z.object({
 
 export const createMessageResponseSchema = z.object({
   messageId: z.string().min(1),
+  message: messageSchema,
   clientId: z.string().optional(),
 });
 
@@ -184,7 +185,12 @@ export const editMessageRequestSchema = z.object({
 });
 
 export const editMessageResponseSchema = z.object({
-  messageId: z.string().optional(),
+  messageId: z.string(),
+  message: messageSchema,
+});
+
+export const deleteMessageResponseSchema = z.object({
+  message: messageSchema,
 });
 
 export const deleteMessageRequestSchema = z.object({
@@ -207,6 +213,11 @@ export const reactionRequestBodySchema = z.object({
 
 export const addReactionResponseSchema = z.object({
   id: z.string().min(1),
+  reactions: z.array(reactionSummarySchema),
+});
+
+export const removeReactionResponseSchema = z.object({
+  reactions: z.array(reactionSummarySchema),
 });
 
 export const conversationListResponseSchema = z.object({

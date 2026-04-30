@@ -34,6 +34,8 @@ import { conversation, members, messages, reactions } from '../db/conversation-s
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
 
+type StoredMessageRow = typeof messages.$inferSelect;
+
 export type MemberContext = {
   humanMemberIds: string[];
   sandboxId: string | null;
@@ -78,7 +80,7 @@ export type CreateMessageParams = {
 };
 
 export type CreateMessageResult =
-  | { ok: true; messageId: string; info: ConversationInfo }
+  | { ok: true; messageId: string; message: MessageRow; info: ConversationInfo }
   | { ok: false; code: 'forbidden' | 'internal'; error: string };
 
 export type ListMessagesParams = {
@@ -111,7 +113,7 @@ export type EditMessageParams = {
 };
 
 export type EditMessageResult =
-  | { ok: true; stale: false; messageId: string; memberContext: MemberContext }
+  | { ok: true; stale: false; messageId: string; message: MessageRow; memberContext: MemberContext }
   | { ok: true; stale: true; messageId: string }
   | { ok: false; code: 'not_found' | 'forbidden'; error: string };
 
@@ -121,7 +123,7 @@ export type DeleteMessageParams = {
 };
 
 export type DeleteMessageResult =
-  | { ok: true; memberContext: MemberContext }
+  | { ok: true; message: MessageRow; memberContext: MemberContext }
   | { ok: false; code: 'not_found' | 'forbidden'; error: string };
 
 export type ExecuteActionParams = {
@@ -145,13 +147,25 @@ export type RevertActionResolutionResult =
 
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
-  | { ok: true; added: true; id: string; memberContext: MemberContext }
-  | { ok: true; added: false; id: string }
+  | {
+      ok: true;
+      added: true;
+      id: string;
+      reactions: MessageReactionSummary[];
+      memberContext: MemberContext;
+    }
+  | { ok: true; added: false; id: string; reactions: MessageReactionSummary[] }
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 export type RemoveReactionParams = { messageId: string; memberId: string; emoji: string };
 export type RemoveReactionResult =
-  | { ok: true; removed: true; removed_id: string; memberContext: MemberContext }
-  | { ok: true; removed: false }
+  | {
+      ok: true;
+      removed: true;
+      removed_id: string;
+      reactions: MessageReactionSummary[];
+      memberContext: MemberContext;
+    }
+  | { ok: true; removed: false; reactions: MessageReactionSummary[] }
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export class ConversationDO extends DurableObject<Env> {
@@ -309,6 +323,44 @@ export class ConversationDO extends DurableObject<Env> {
     return { humanMemberIds, sandboxId };
   }
 
+  private getLiveReactionSummaries(messageId: string): MessageReactionSummary[] {
+    const rows = this.db
+      .select()
+      .from(reactions)
+      .where(and(eq(reactions.message_id, messageId), sql`${reactions.deleted_at} IS NULL`))
+      .orderBy(reactions.emoji, reactions.member_id)
+      .all();
+
+    const summaries: MessageReactionSummary[] = [];
+    for (const row of rows) {
+      let bucket = summaries.find(summary => summary.emoji === row.emoji);
+      if (!bucket) {
+        bucket = { emoji: row.emoji, count: 0, memberIds: [] };
+        summaries.push(bucket);
+      }
+      bucket.count += 1;
+      bucket.memberIds.push(row.member_id);
+    }
+    return summaries;
+  }
+
+  private messageFromStoredRow(
+    row: StoredMessageRow,
+    reactionSummaries = this.getLiveReactionSummaries(row.id)
+  ): MessageRow {
+    return {
+      id: row.id,
+      senderId: row.sender_id,
+      content: row.deleted === 1 ? [] : parseStoredContent(row.content, row.id),
+      inReplyToMessageId: row.in_reply_to_message_id,
+      updatedAt: row.updated_at,
+      clientUpdatedAt: row.client_updated_at,
+      deleted: row.deleted === 1,
+      deliveryFailed: row.delivery_failed === 1,
+      reactions: reactionSummaries,
+    };
+  }
+
   createMessage(params: CreateMessageParams): CreateMessageResult {
     if (!this.isMember(params.senderId)) {
       return {
@@ -341,7 +393,9 @@ export class ConversationDO extends DurableObject<Env> {
 
     const info = this.getInfo();
     if (!info) return { ok: false, code: 'internal', error: 'Conversation not initialized' };
-    return { ok: true, messageId, info };
+    const row = this.db.select().from(messages).where(eq(messages.id, messageId)).get();
+    if (!row) return { ok: false, code: 'internal', error: 'Message not found after insert' };
+    return { ok: true, messageId, message: this.messageFromStoredRow(row, []), info };
   }
 
   getMessage(messageId: string): GetMessageResult {
@@ -397,17 +451,9 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     return {
-      messages: pageRows.map(row => ({
-        id: row.id,
-        senderId: row.sender_id,
-        content: row.deleted === 1 ? [] : parseStoredContent(row.content, row.id),
-        inReplyToMessageId: row.in_reply_to_message_id,
-        updatedAt: row.updated_at,
-        clientUpdatedAt: row.client_updated_at,
-        deleted: row.deleted === 1,
-        deliveryFailed: row.delivery_failed === 1,
-        reactions: reactionsByMessage.get(row.id) ?? [],
-      })),
+      messages: pageRows.map(row =>
+        this.messageFromStoredRow(row, reactionsByMessage.get(row.id) ?? [])
+      ),
       hasMore,
       nextCursor,
     };
@@ -447,12 +493,14 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     const newVersion = row.version + 1;
+    const updatedAt = Date.now();
+    const contentJson = JSON.stringify(params.content);
     this.db
       .update(messages)
       .set({
-        content: JSON.stringify(params.content),
+        content: contentJson,
         version: newVersion,
-        updated_at: Date.now(),
+        updated_at: updatedAt,
         client_updated_at: params.clientTimestamp,
       })
       .where(eq(messages.id, params.messageId))
@@ -462,6 +510,13 @@ export class ConversationDO extends DurableObject<Env> {
       ok: true,
       stale: false,
       messageId: params.messageId,
+      message: this.messageFromStoredRow({
+        ...row,
+        content: contentJson,
+        version: newVersion,
+        updated_at: updatedAt,
+        client_updated_at: params.clientTimestamp,
+      }),
       memberContext: this.getMemberContext(),
     };
   }
@@ -495,16 +550,25 @@ export class ConversationDO extends DurableObject<Env> {
 
     // Already deleted — idempotent success (only for the original sender)
     if (row.deleted === 1) {
-      return { ok: true, memberContext: this.getMemberContext() };
+      return {
+        ok: true,
+        message: this.messageFromStoredRow(row),
+        memberContext: this.getMemberContext(),
+      };
     }
 
+    const updatedAt = Date.now();
     this.db
       .update(messages)
-      .set({ deleted: 1, updated_at: Date.now() })
+      .set({ deleted: 1, updated_at: updatedAt })
       .where(eq(messages.id, params.messageId))
       .run();
 
-    return { ok: true, memberContext: this.getMemberContext() };
+    return {
+      ok: true,
+      message: this.messageFromStoredRow({ ...row, deleted: 1, updated_at: updatedAt }),
+      memberContext: this.getMemberContext(),
+    };
   }
 
   executeAction(params: ExecuteActionParams): ExecuteActionResult {
@@ -589,11 +653,22 @@ export class ConversationDO extends DurableObject<Env> {
             removed_id: null,
           })
           .run();
-        return { ok: true, added: true, id, memberContext: this.getMemberContext() };
+        return {
+          ok: true,
+          added: true,
+          id,
+          reactions: this.getLiveReactionSummaries(params.messageId),
+          memberContext: this.getMemberContext(),
+        };
       }
 
       if (existing.deleted_at === null) {
-        return { ok: true, added: false, id: existing.id };
+        return {
+          ok: true,
+          added: false,
+          id: existing.id,
+          reactions: this.getLiveReactionSummaries(params.messageId),
+        };
       }
 
       // Dead row — re-activate.
@@ -609,7 +684,13 @@ export class ConversationDO extends DurableObject<Env> {
           )
         )
         .run();
-      return { ok: true, added: true, id, memberContext: this.getMemberContext() };
+      return {
+        ok: true,
+        added: true,
+        id,
+        reactions: this.getLiveReactionSummaries(params.messageId),
+        memberContext: this.getMemberContext(),
+      };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
         return { ok: false, code: 'internal', error: err.message };
@@ -641,7 +722,13 @@ export class ConversationDO extends DurableObject<Env> {
         )
         .get();
 
-      if (!live) return { ok: true, removed: false };
+      if (!live) {
+        return {
+          ok: true,
+          removed: false,
+          reactions: this.getLiveReactionSummaries(params.messageId),
+        };
+      }
 
       const removedId = this.nextUlid();
       this.db
@@ -659,6 +746,7 @@ export class ConversationDO extends DurableObject<Env> {
         ok: true,
         removed: true,
         removed_id: removedId,
+        reactions: this.getLiveReactionSummaries(params.messageId),
         memberContext: this.getMemberContext(),
       };
     } catch (err) {

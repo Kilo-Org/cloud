@@ -20,6 +20,20 @@ function mockFetch(status: number, body: unknown): typeof globalThis.fetch {
   });
 }
 
+function message(id: string, content = [{ type: 'text' as const, text: 'hi' }]) {
+  return {
+    id,
+    senderId: 'u1',
+    content,
+    inReplyToMessageId: null,
+    updatedAt: null,
+    clientUpdatedAt: null,
+    deleted: false,
+    deliveryFailed: false,
+    reactions: [],
+  };
+}
+
 describe('KiloChatClient', () => {
   describe('listConversations', () => {
     it('sends GET /v1/conversations with auth header', async () => {
@@ -120,19 +134,21 @@ describe('KiloChatClient', () => {
 
   describe('sendMessage', () => {
     it('sends POST /v1/messages', async () => {
-      const fetch = mockFetch(201, { messageId: 'm1' });
+      const canonical = message('m1');
+      const fetch = mockFetch(201, { messageId: 'm1', message: canonical });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.sendMessage({
         conversationId: 'c1',
         content: [{ type: 'text', text: 'hi' }],
       });
-      expect(res).toEqual({ messageId: 'm1' });
+      expect(res).toEqual({ messageId: 'm1', message: canonical });
     });
   });
 
   describe('editMessage', () => {
     it('sends PATCH /v1/messages/:id', async () => {
-      const fetch = mockFetch(200, { messageId: 'm1' });
+      const canonical = message('m1', [{ type: 'text' as const, text: 'edited' }]);
+      const fetch = mockFetch(200, { messageId: 'm1', message: canonical });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.editMessage('m1', {
         conversationId: 'c1',
@@ -143,22 +159,50 @@ describe('KiloChatClient', () => {
         'https://chat.example.com/v1/messages/m1',
         expect.objectContaining({ method: 'PATCH' })
       );
-      expect(res).toEqual({ messageId: 'm1' });
+      expect(res).toEqual({ messageId: 'm1', message: canonical });
     });
   });
 
   describe('deleteMessage', () => {
     it('sends DELETE /v1/messages/:id with conversationId query param', async () => {
-      const fetch = vi
-        .fn()
-        .mockResolvedValue({ ok: true, status: 204, json: () => Promise.resolve(null) });
+      const canonical = { ...message('m1'), content: [], deleted: true, updatedAt: 123 };
+      const fetch = mockFetch(200, { message: canonical });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.deleteMessage('m1', { conversationId: 'c1' });
       expect(fetch).toHaveBeenCalledWith(
         'https://chat.example.com/v1/messages/m1?conversationId=c1',
         expect.objectContaining({ method: 'DELETE' })
       );
-      expect(res).toBeUndefined();
+      expect(res).toEqual({ message: canonical });
+    });
+  });
+
+  describe('reactions', () => {
+    it('returns server reaction summaries on add and remove', async () => {
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 201,
+          json: () =>
+            Promise.resolve({
+              id: 'r1',
+              reactions: [{ emoji: '👍', count: 1, memberIds: ['u1'] }],
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ reactions: [] }),
+        });
+      const client = new KiloChatClient(createMockConfig(fetch));
+
+      await expect(
+        client.addReaction('m1', { conversationId: 'c1', emoji: '👍' })
+      ).resolves.toEqual({ id: 'r1', reactions: [{ emoji: '👍', count: 1, memberIds: ['u1'] }] });
+      await expect(
+        client.removeReaction('m1', { conversationId: 'c1', emoji: '👍' })
+      ).resolves.toEqual({ reactions: [] });
     });
   });
 

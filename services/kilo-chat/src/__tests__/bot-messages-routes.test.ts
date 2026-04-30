@@ -566,7 +566,7 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
 // ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId ─────────────────
 
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
-  it('soft-deletes a bot-owned message and returns 204', async () => {
+  it('soft-deletes a bot-owned message and returns the canonical message', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-del-1');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -592,7 +592,9 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
       testEnv
     );
 
-    expect(delRes.status).toBe(204);
+    expect(delRes.status).toBe(200);
+    const body = await delRes.json<{ message: { id: string; deleted: boolean } }>();
+    expect(body.message).toMatchObject({ id: messageId, deleted: true });
   });
 
   it('returns 404 for non-existent message', async () => {
@@ -935,7 +937,7 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members
 // ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions ────────
 
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', () => {
-  it('returns 204 after removing a reaction via query params', async () => {
+  it('returns the server reaction summary after removing a reaction via query params', async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-1');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -961,10 +963,11 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
       testEnv
     );
 
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ reactions: [] });
   });
 
-  it('returns 204 even when reaction never existed (idempotent)', async () => {
+  it('returns the server reaction summary even when reaction never existed', async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-idem');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -979,7 +982,8 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
       testEnv
     );
 
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ reactions: [] });
   });
 
   it('returns 403 for non-member bot', async () => {

@@ -64,7 +64,7 @@ async function createConversation(userSuffix: string) {
 const sampleContent = [{ type: 'text', text: 'Hello world' }];
 
 describe('POST /v1/messages', () => {
-  it('creates a message and returns { messageId, version }', async () => {
+  it('creates a message and returns the canonical message', async () => {
     const { conversationId, userApp } = await createConversation('msg-create-1');
 
     const res = await userApp.request(
@@ -78,9 +78,17 @@ describe('POST /v1/messages', () => {
     );
 
     expect(res.status).toBe(201);
-    const body = await res.json<{ messageId: string }>();
+    const body = await res.json<{
+      messageId: string;
+      message: { id: string; content: typeof sampleContent; reactions: unknown[] };
+    }>();
     expect(body.messageId).toBeTruthy();
     expect(typeof body.messageId).toBe('string');
+    expect(body.message).toMatchObject({
+      id: body.messageId,
+      content: sampleContent,
+      reactions: [],
+    });
   });
 
   it('returns 403 for non-member', async () => {
@@ -271,7 +279,7 @@ describe('GET /v1/conversations/:id/messages', () => {
 });
 
 describe('PATCH /v1/messages/:id', () => {
-  it('edits a message and returns { messageId, version }', async () => {
+  it('edits a message and returns the canonical message', async () => {
     const { conversationId, userApp } = await createConversation('msg-edit-1');
 
     // Create a message
@@ -301,8 +309,18 @@ describe('PATCH /v1/messages/:id', () => {
     );
 
     expect(editRes.status).toBe(200);
-    const body = await editRes.json<{ messageId: string }>();
+    const body = await editRes.json<{
+      messageId: string;
+      message: {
+        id: string;
+        content: Array<{ type: string; text?: string }>;
+        clientUpdatedAt: number | null;
+      };
+    }>();
     expect(body.messageId).toBe(messageId);
+    expect(body.message.id).toBe(messageId);
+    expect(body.message.content).toEqual([{ type: 'text', text: 'Edited content' }]);
+    expect(body.message.clientUpdatedAt).not.toBeNull();
   });
 
   it('discards stale edit (older timestamp)', async () => {
@@ -393,7 +411,7 @@ describe('PATCH /v1/messages/:id', () => {
 });
 
 describe('DELETE /v1/messages/:id', () => {
-  it('soft-deletes a message and returns 204', async () => {
+  it('soft-deletes a message and returns the canonical message', async () => {
     const { conversationId, userApp } = await createConversation('msg-delete-1');
 
     // Create a message
@@ -419,7 +437,9 @@ describe('DELETE /v1/messages/:id', () => {
       env
     );
 
-    expect(deleteRes.status).toBe(204);
+    expect(deleteRes.status).toBe(200);
+    const body = await deleteRes.json<{ message: { id: string; deleted: boolean } }>();
+    expect(body.message).toMatchObject({ id: messageId, deleted: true });
 
     // Verify message is soft-deleted (appears in list but marked deleted)
     const convStub = getConvStub(conversationId);

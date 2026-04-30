@@ -7,7 +7,7 @@
  * enqueue, and MembershipDO maintenance in one place.
  */
 
-import type { ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
+import type { ContentBlock, ExecApprovalDecision, Message } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { contentBlocksToText } from '../util/content';
@@ -53,7 +53,12 @@ export type CreateMessageParams = {
   clientId?: string;
 };
 
-export type CreateMessageOk = { ok: true; messageId: string; clientId?: string };
+export type CreateMessageOk = {
+  ok: true;
+  messageId: string;
+  message: Message;
+  clientId?: string;
+};
 export type CreateMessageErr = {
   ok: false;
   code: 'forbidden' | 'internal';
@@ -81,7 +86,7 @@ export async function createMessageFor(
     return { ok: false, code: 'internal' as const, error: result.error };
   }
 
-  const { messageId, info } = result;
+  const { messageId, message, info } = result;
 
   const fanOut = postCommitFanOut(
     env,
@@ -89,6 +94,7 @@ export async function createMessageFor(
     callerId,
     conversationId,
     messageId,
+    message,
     content,
     inReplyToMessageId,
     clientId
@@ -96,7 +102,7 @@ export async function createMessageFor(
 
   ctx.waitUntil(fanOut);
 
-  return { ok: true, messageId, clientId };
+  return { ok: true, messageId, message, clientId };
 }
 
 async function postCommitFanOut(
@@ -105,6 +111,7 @@ async function postCommitFanOut(
   callerId: string,
   conversationId: string,
   messageId: string,
+  message: Message,
   content: ContentBlock[],
   inReplyToMessageId: string | undefined,
   clientId: string | undefined
@@ -211,6 +218,7 @@ async function postCommitFanOut(
       'message.created',
       {
         messageId,
+        message,
         senderId: callerId,
         content,
         inReplyToMessageId: inReplyToMessageId ?? null,
@@ -347,6 +355,7 @@ export type EditMessageOk = {
   ok: true;
   stale: false;
   messageId: string;
+  message: Message;
 };
 export type EditMessageStale = {
   ok: true;
@@ -400,6 +409,7 @@ export async function editMessageFor(
     ok: true,
     stale: false,
     messageId: result.messageId,
+    message: result.message,
   };
 }
 
@@ -408,7 +418,7 @@ export async function editMessageFor(
 export type DeleteMessageParams = { conversationId: string; messageId: string };
 
 export type DeleteMessageResult =
-  | { ok: true }
+  | { ok: true; message: Message }
   | {
       ok: false;
       code: 'forbidden' | 'not_found' | 'internal';
@@ -443,7 +453,7 @@ export async function deleteMessageFor(
     ctx.waitUntil(pushPromise);
   }
 
-  return { ok: true };
+  return { ok: true, message: result.message };
 }
 
 // ─── executeAction ─────────────────────────────────────────────────────────

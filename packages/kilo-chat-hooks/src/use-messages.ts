@@ -150,17 +150,7 @@ type MutationErrorOptions = {
 };
 
 export function messageFromCreatedEvent(e: MessageCreatedEvent): Message {
-  return {
-    id: e.messageId,
-    senderId: e.senderId,
-    content: e.content,
-    inReplyToMessageId: e.inReplyToMessageId,
-    updatedAt: null,
-    clientUpdatedAt: null,
-    deleted: false,
-    deliveryFailed: false,
-    reactions: [],
-  };
+  return e.message;
 }
 
 export function applyMessageCreatedEventToPages<TPageParam>(
@@ -229,7 +219,7 @@ export function useSendMessage(
       const { queryKey, pendingId } = context;
       queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, pendingId, msg => ({ ...msg, id: response.messageId }));
+        return updateMessageInPages(old, pendingId, () => response.message);
       });
     },
     onError: (err, _variables, context) => {
@@ -264,6 +254,13 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
       if (!context?.snapshot) return;
       restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
+    onSuccess: (response, _variables, context) => {
+      if (!context) return;
+      queryClient.setQueryData<MessagesInfiniteData>(context.queryKey, old => {
+        if (!old) return old;
+        return updateMessageInPages(old, response.message.id, () => response.message);
+      });
+    },
   });
 }
 
@@ -286,6 +283,13 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
     onError: (_err, _variables, context) => {
       if (!context?.snapshot) return;
       restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    },
+    onSuccess: (response, _variables, context) => {
+      if (!context) return;
+      queryClient.setQueryData<MessagesInfiniteData>(context.queryKey, old => {
+        if (!old) return old;
+        return updateMessageInPages(old, response.message.id, () => response.message);
+      });
     },
   });
 }
@@ -317,6 +321,16 @@ export function useAddReaction(
       if (!context?.snapshot) return;
       restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
     },
+    onSuccess: (response, variables, context) => {
+      if (!context) return;
+      queryClient.setQueryData<MessagesInfiniteData>(context.queryKey, old => {
+        if (!old) return old;
+        return updateMessageInPages(old, variables.messageId, msg => ({
+          ...msg,
+          reactions: response.reactions,
+        }));
+      });
+    },
   });
 }
 
@@ -346,6 +360,16 @@ export function useRemoveReaction(
     onError: (_err, _variables, context) => {
       if (!context?.snapshot) return;
       restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    },
+    onSuccess: (response, variables, context) => {
+      if (!context) return;
+      queryClient.setQueryData<MessagesInfiniteData>(context.queryKey, old => {
+        if (!old) return old;
+        return updateMessageInPages(old, variables.messageId, msg => ({
+          ...msg,
+          reactions: response.reactions,
+        }));
+      });
     },
   });
 }

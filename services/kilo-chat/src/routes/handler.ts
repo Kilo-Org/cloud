@@ -26,9 +26,11 @@ import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
 import type {
   CreateMessageResponse,
+  DeleteMessageResponse,
   EditMessageResponse,
   OkResponse,
   AddReactionResponse,
+  RemoveReactionResponse,
   MessageListResponse,
   BotGetMembersResponse,
   BotListConversationsResponse,
@@ -130,7 +132,11 @@ export async function handleCreateMessage(c: HonoCtx) {
     return c.json({ error: result.error }, 500);
   }
   return c.json(
-    { messageId: result.messageId, clientId: result.clientId } satisfies CreateMessageResponse,
+    {
+      messageId: result.messageId,
+      message: result.message,
+      clientId: result.clientId,
+    } satisfies CreateMessageResponse,
     201
   );
 }
@@ -162,7 +168,10 @@ export async function handleEditMessage(c: HonoCtx) {
   if (result.stale) {
     return c.json({ error: 'Edit conflict', messageId: result.messageId }, 409);
   }
-  return c.json({ messageId: result.messageId } satisfies EditMessageResponse);
+  return c.json({
+    messageId: result.messageId,
+    message: result.message,
+  } satisfies EditMessageResponse);
 }
 
 // ─── deleteMessage ──────────────────────────────────────────────────────────
@@ -193,7 +202,7 @@ export async function handleDeleteMessage(c: HonoCtx) {
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 500);
   }
-  return new Response(null, { status: 204 });
+  return c.json({ message: result.message } satisfies DeleteMessageResponse);
 }
 
 // ─── executeAction ──────────────────────────────────────────────────────────
@@ -332,7 +341,10 @@ export async function handleAddReaction(c: HonoCtx) {
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 500);
   }
-  return c.json({ id: result.id } satisfies AddReactionResponse, result.added ? 201 : 200);
+  return c.json(
+    { id: result.id, reactions: result.reactions } satisfies AddReactionResponse,
+    result.added ? 201 : 200
+  );
 }
 
 // ─── removeReaction ──────────────────────────────────────────────────────────
@@ -365,7 +377,7 @@ export async function handleRemoveReaction(c: HonoCtx) {
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 500);
   }
-  return new Response(null, { status: 204 });
+  return c.json({ reactions: result.reactions } satisfies RemoveReactionResponse);
 }
 
 // ─── listMessages ────────────────────────────────────────────────────────────

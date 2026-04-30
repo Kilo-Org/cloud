@@ -1,5 +1,6 @@
 /** Identity-agnostic reaction operations. See services/messages.ts for rationale. */
 
+import type { ReactionSummary } from '@kilocode/kilo-chat';
 import { pushEventToHumanMembers } from './event-push';
 import type { DeferCtx } from './messages';
 
@@ -10,7 +11,7 @@ export type AddReactionParams = {
 };
 
 export type AddReactionResult =
-  | { ok: true; id: string; added: boolean }
+  | { ok: true; id: string; added: boolean; reactions: ReactionSummary[] }
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export async function addReactionFor(
@@ -43,7 +44,7 @@ export async function addReactionFor(
     }
   }
 
-  return { ok: true, id: result.id, added: result.added };
+  return { ok: true, id: result.id, added: result.added, reactions: result.reactions };
 }
 
 export type RemoveReactionParams = {
@@ -53,7 +54,7 @@ export type RemoveReactionParams = {
 };
 
 export type RemoveReactionResult =
-  | { ok: true }
+  | { ok: true; reactions: ReactionSummary[] }
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export async function removeReactionFor(
@@ -86,5 +87,5 @@ export async function removeReactionFor(
     }
   }
 
-  return { ok: true };
+  return { ok: true, reactions: result.reactions };
 }

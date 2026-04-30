@@ -53,13 +53,13 @@ describe('POST /v1/conversations', () => {
     expect(body.conversationId).toBeTruthy();
     expect(typeof body.conversationId).toBe('string');
     expect(body.conversationId).toHaveLength(26);
-    expect(body.conversationListItem).toEqual({
+    expect(body.conversationListItem).toMatchObject({
       conversationId: body.conversationId,
       title: 'My Chat',
       lastActivityAt: null,
       lastReadAt: null,
-      joinedAt: expect.any(Number),
     });
+    expect(typeof body.conversationListItem.joinedAt).toBe('number');
   });
 
   it('initializes ConversationDO and MembershipDOs on creation', async () => {

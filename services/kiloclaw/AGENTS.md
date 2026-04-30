@@ -319,15 +319,17 @@ These files are COPYed by the Dockerfile and hashed by CI (`deploy-kiloclaw.yml`
 produce the content-hash image tag. If you add or remove a COPY in the Dockerfile,
 update the `find` command in the workflow's "Compute source content hash" step to match.
 
-| Path                              | Purpose                                                 |
-| --------------------------------- | ------------------------------------------------------- |
-| `Dockerfile`                      | Base image, apt packages, npm versions                  |
-| `controller/`                     | Compiled to `kiloclaw-controller.js` (entrypoint)       |
-| `container/`                      | Runtime assets (e.g. `TOOLS.md`) staged outside `/root` |
-| `plugins/kiloclaw-customizer/`    | KiloClaw customizer plugin package installed in image   |
-| `openclaw-pairing-list.js`        | Helper script used at runtime by controller             |
-| `openclaw-device-pairing-list.js` | Helper script used at runtime by controller             |
-| `skills/`                         | Custom skills copied to `/root/clawd/skills/`           |
+| Path                                 | Purpose                                                 |
+| ------------------------------------ | ------------------------------------------------------- |
+| `Dockerfile`                         | Base image, apt packages, npm versions                  |
+| `controller/`                        | Compiled to `kiloclaw-controller.js` (entrypoint)       |
+| `container/`                         | Runtime assets (e.g. `TOOLS.md`) staged outside `/root` |
+| `plugins/kiloclaw-customizer/`       | KiloClaw customizer plugin package installed in image   |
+| `plugins/kilo-chat/`                 | Kilo Chat channel plugin package installed in image     |
+| `plugins/kiloclaw-morning-briefing/` | Morning briefing plugin package installed in image      |
+| `openclaw-pairing-list.js`           | Helper script used at runtime by controller             |
+| `openclaw-device-pairing-list.js`    | Helper script used at runtime by controller             |
+| `skills/`                            | Custom skills copied to `/root/clawd/skills/`           |
 
 ## Fly Machine Lifecycle
 

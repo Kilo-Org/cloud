@@ -1,28 +1,24 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatKiloChatError } from '@kilocode/kilo-chat';
+import { conversationsKey } from '@kilocode/kilo-chat-hooks';
 import { ConversationList } from './ConversationList';
 import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
-import { shouldApplyConversationRead } from './conversation-read-events';
-import { conversationListQueryKeyForInstanceEvent } from './conversation-list-cache';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
 import { useEventServiceClient } from '@/contexts/EventServiceContext';
-import { conversationsKey } from '@kilocode/kilo-chat-hooks';
 import {
   useConversations,
   useCreateConversation,
   useRenameConversation,
   useLeaveConversation,
-  updateConversationPages,
   filterConversationPages,
-  insertConversationOnFirstPage,
-  moveConversationToFirstPage,
   type ConversationListInfiniteData,
+  useConversationListEventUpdater,
 } from '../hooks/useConversations';
 
 // ── Layout component ────────────────────────────────────────────────
@@ -63,90 +59,7 @@ export function KiloChatLayout({
     sandboxId
   );
 
-  // Update conversation list cache in-place when activity events arrive.
-  // For cursor pagination, events targeting conversations outside page 1 are
-  // ignored by an in-place patch, so the list appears stale. Invalidate the
-  // cache so the affected conversation either appears at the top (new/active)
-  // or re-sorts correctly once refetched.
-  useEffect(() => {
-    function isOnFirstPage(queryKey: readonly unknown[], conversationId: string): boolean {
-      const entries = queryClient.getQueriesData<ConversationListInfiniteData>({ queryKey });
-      for (const [, data] of entries) {
-        const firstPage = data?.pages[0];
-        if (firstPage?.conversations.some(c => c.conversationId === conversationId)) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    const offs = [
-      kiloChatClient.onConversationCreated((ctx, e) => {
-        const queryKey = conversationListQueryKeyForInstanceEvent(ctx, sandboxId);
-        if (!queryKey) return;
-        if (e.sandboxId !== sandboxId) return;
-        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
-          insertConversationOnFirstPage(old, e.conversationListItem)
-        );
-      }),
-      kiloChatClient.onConversationRenamed((ctx, e) => {
-        const queryKey = conversationListQueryKeyForInstanceEvent(ctx, sandboxId);
-        if (!queryKey) return;
-        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
-          updateConversationPages(old, c =>
-            c.conversationId === e.conversationId ? { ...c, title: e.title } : c
-          )
-        );
-        // Also update the conversation detail cache if it's loaded
-        void queryClient.invalidateQueries({
-          queryKey: ['kilo-chat', 'conversation', e.conversationId],
-        });
-      }),
-      kiloChatClient.onConversationLeft((ctx, e) => {
-        const queryKey = conversationListQueryKeyForInstanceEvent(ctx, sandboxId);
-        if (!queryKey) return;
-        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
-          filterConversationPages(old, c => c.conversationId !== e.conversationId)
-        );
-      }),
-      kiloChatClient.onConversationRead((ctx, e) => {
-        const queryKey = conversationListQueryKeyForInstanceEvent(ctx, sandboxId);
-        if (!queryKey) return;
-        // `.read` is broadcast to every human in the conversation with the
-        // `memberId` of whose read-marker moved. Only the actual reader
-        // should see their own sidebar row's `lastReadAt` advance — without
-        // this filter, Alice marking read would also move Bob's `lastReadAt`.
-        if (!shouldApplyConversationRead(currentUserId, e.memberId)) return;
-        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
-          updateConversationPages(old, c =>
-            c.conversationId === e.conversationId ? { ...c, lastReadAt: e.lastReadAt } : c
-          )
-        );
-      }),
-      kiloChatClient.onConversationActivity((ctx, e) => {
-        const queryKey = conversationListQueryKeyForInstanceEvent(ctx, sandboxId);
-        if (!queryKey) return;
-        if (isOnFirstPage(queryKey, e.conversationId)) {
-          queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
-            moveConversationToFirstPage(old, e.conversationId, c => ({
-              ...c,
-              lastActivityAt: e.lastActivityAt,
-            }))
-          );
-          return;
-        }
-        void queryClient.invalidateQueries({ queryKey });
-      }),
-    ];
-    return () => offs.forEach(off => off());
-  }, [kiloChatClient, queryClient, currentUserId, sandboxId]);
-
-  // Refetch conversations on WebSocket reconnect (events may have been missed)
-  useEffect(() => {
-    return eventService.onReconnect(() => {
-      void queryClient.invalidateQueries({ queryKey: conversationsKey(sandboxId) });
-    });
-  }, [eventService, queryClient, sandboxId]);
+  useConversationListEventUpdater(kiloChatClient, eventService, sandboxId, currentUserId);
 
   const createConversation = useCreateConversation(kiloChatClient);
   const renameConversation = useRenameConversation(kiloChatClient);

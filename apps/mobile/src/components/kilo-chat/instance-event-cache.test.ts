@@ -1,11 +1,10 @@
-import { type ConversationListInfiniteData } from '@kilocode/kilo-chat-hooks';
-import { moveConversationToFirstPage } from '@kilocode/kilo-chat-hooks';
-import { describe, expect, it } from 'vitest';
-
 import {
+  type ConversationListInfiniteData,
   isConversationOnFirstPage,
+  moveConversationToFirstPage,
   shouldApplyConversationRead,
-} from './hooks/instance-event-cache';
+} from '@kilocode/kilo-chat-hooks';
+import { describe, expect, it } from 'vitest';
 
 function conversation(conversationId: string) {
   return {

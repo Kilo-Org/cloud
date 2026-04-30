@@ -1,7 +1,8 @@
 import type { ConversationListItem } from '@kilocode/kilo-chat';
-import { conversationsKey, moveConversationToFirstPage } from '@kilocode/kilo-chat-hooks';
-import type { ConversationListInfiniteData } from '../hooks/useConversations';
-import { conversationListQueryKeyForInstanceEvent } from './conversation-list-cache';
+import {
+  moveConversationToFirstPage,
+  type ConversationListInfiniteData,
+} from '@kilocode/kilo-chat-hooks';
 
 function conversation(
   conversationId: string,
@@ -40,22 +41,5 @@ describe('moveConversationToFirstPage', () => {
       'first',
     ]);
     expect(updated?.pages[0]?.conversations[0]?.lastActivityAt).toBe(200);
-  });
-});
-
-describe('conversationListQueryKeyForInstanceEvent', () => {
-  it('ignores events from a different kilo-chat instance context', () => {
-    expect(
-      conversationListQueryKeyForInstanceEvent('/kiloclaw/org-sandbox', 'personal-sandbox')
-    ).toBeNull();
-    expect(
-      conversationListQueryKeyForInstanceEvent('/kiloclaw/personal-sandbox', 'org-sandbox')
-    ).toBeNull();
-  });
-
-  it('uses the exact sandbox conversation key for matching instance events', () => {
-    expect(
-      conversationListQueryKeyForInstanceEvent('/kiloclaw/personal-sandbox', 'personal-sandbox')
-    ).toEqual(conversationsKey('personal-sandbox'));
   });
 });

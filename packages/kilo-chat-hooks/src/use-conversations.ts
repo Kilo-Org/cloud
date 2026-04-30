@@ -1,11 +1,14 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
+import type { EventServiceClient } from '@kilocode/event-service';
+import { kiloclawInstanceContext } from '@kilocode/event-service';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
 import type {
   CreateConversationRequest,
   ConversationListItem,
   ConversationListResponse,
 } from '@kilocode/kilo-chat';
+import { useEffect } from 'react';
 
 import { conversationKey, conversationsKey, conversationsKeyAll, messagesKey } from './query-keys';
 
@@ -172,6 +175,117 @@ export function moveConversationToFirstPage(
       ...pages.slice(1),
     ],
   };
+}
+
+export function isConversationOnFirstPage(
+  data: ConversationListInfiniteData | undefined,
+  conversationId: string
+): boolean {
+  return (
+    data?.pages[0]?.conversations.some(
+      conversation => conversation.conversationId === conversationId
+    ) ?? false
+  );
+}
+
+export function shouldApplyConversationRead(
+  currentUserId: string | null,
+  memberId: string
+): boolean {
+  return currentUserId !== null && currentUserId === memberId;
+}
+
+type ConversationListEventUpdaterOptions = {
+  onBotStatus?: () => void;
+};
+
+export function useConversationListEventUpdater(
+  client: KiloChatClient,
+  eventService: EventServiceClient,
+  sandboxId: string | null | undefined,
+  currentUserId: string | null,
+  options?: ConversationListEventUpdaterOptions
+): void {
+  const queryClient = useQueryClient();
+  const onBotStatus = options?.onBotStatus;
+
+  useEffect(() => {
+    if (!sandboxId) return;
+
+    const context = kiloclawInstanceContext(sandboxId);
+    const queryKey = conversationsKey(sandboxId);
+    eventService.subscribe([context]);
+
+    const offs = [
+      client.onConversationCreated((ctx, e) => {
+        if (ctx !== context) return;
+        if (e.sandboxId !== sandboxId) return;
+        queryClient.setQueryData<ConversationListInfiniteData>(queryKey, old =>
+          insertConversationOnFirstPage(old, e.conversationListItem)
+        );
+      }),
+      client.onConversationRenamed((ctx, e) => {
+        if (ctx !== context) return;
+        queryClient.setQueryData<ConversationListInfiniteData>(queryKey, old =>
+          updateConversationPages(old, conversation =>
+            conversation.conversationId === e.conversationId
+              ? { ...conversation, title: e.title }
+              : conversation
+          )
+        );
+        void queryClient.invalidateQueries({ queryKey: conversationKey(e.conversationId) });
+      }),
+      client.onConversationLeft((ctx, e) => {
+        if (ctx !== context) return;
+        queryClient.setQueryData<ConversationListInfiniteData>(queryKey, old =>
+          filterConversationPages(
+            old,
+            conversation => conversation.conversationId !== e.conversationId
+          )
+        );
+      }),
+      client.onConversationRead((ctx, e) => {
+        if (ctx !== context) return;
+        if (!shouldApplyConversationRead(currentUserId, e.memberId)) return;
+        queryClient.setQueryData<ConversationListInfiniteData>(queryKey, old =>
+          updateConversationPages(old, conversation =>
+            conversation.conversationId === e.conversationId
+              ? { ...conversation, lastReadAt: e.lastReadAt }
+              : conversation
+          )
+        );
+      }),
+      client.onConversationActivity((ctx, e) => {
+        if (ctx !== context) return;
+        const data = queryClient.getQueryData<ConversationListInfiniteData>(queryKey);
+        if (!isConversationOnFirstPage(data, e.conversationId)) {
+          void queryClient.invalidateQueries({ queryKey });
+          return;
+        }
+        queryClient.setQueryData<ConversationListInfiniteData>(queryKey, old =>
+          moveConversationToFirstPage(old, e.conversationId, conversation => ({
+            ...conversation,
+            lastActivityAt: e.lastActivityAt,
+          }))
+        );
+      }),
+      client.onBotStatus((ctx, e) => {
+        if (ctx !== context) return;
+        if (e.sandboxId !== sandboxId) return;
+        onBotStatus?.();
+      }),
+    ];
+
+    const offReconnect = eventService.onReconnect(() => {
+      void queryClient.invalidateQueries({ queryKey });
+    });
+
+    return () => {
+      offReconnect();
+      for (const off of offs) off();
+      eventService.unsubscribe([context]);
+    };
+  }, [client, currentUserId, eventService, onBotStatus, queryClient, sandboxId]);
 }
 
 export function useMarkConversationRead(client: KiloChatClient) {

@@ -50,6 +50,7 @@ jobs:
       #   - container/         (COPY container/TOOLS.md → /usr/local/share/kiloclaw/)
       #   - plugins/kiloclaw-customizer/ (COPY plugin package for image install)
       #   - plugins/kilo-chat/         (COPY plugin package for image install)
+      #   - plugins/kiloclaw-morning-briefing/ (COPY plugin package for image install)
       #   - openclaw-pairing-list.js, openclaw-device-pairing-list.js (COPY)
       #   - skills/            (COPY skills/ → /root/clawd/skills/)
       #

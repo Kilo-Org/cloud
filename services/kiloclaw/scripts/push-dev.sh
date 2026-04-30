@@ -134,7 +134,7 @@ fi
 
 CONTENT_HASH=$(
   cd "$KILOCLAW_DIR" \
-  && find Dockerfile controller/ container/ skills/ \
+  && find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ plugins/kilo-chat/ plugins/kiloclaw-morning-briefing/ skills/ \
        openclaw-pairing-list.js openclaw-device-pairing-list.js \
        -type f 2>/dev/null \
   | sort \

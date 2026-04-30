@@ -8,10 +8,7 @@ import { formatKiloChatError } from '@kilocode/kilo-chat';
 import { ConversationList } from './ConversationList';
 import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
 import { shouldApplyConversationRead } from './conversation-read-events';
-import {
-  conversationListQueryKeyForInstanceEvent,
-  moveConversationToFirstPage,
-} from './conversation-list-cache';
+import { conversationListQueryKeyForInstanceEvent } from './conversation-list-cache';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
 import { useEventServiceClient } from '@/contexts/EventServiceContext';
@@ -24,6 +21,7 @@ import {
   updateConversationPages,
   filterConversationPages,
   insertConversationOnFirstPage,
+  moveConversationToFirstPage,
   type ConversationListInfiniteData,
 } from '../hooks/useConversations';
 

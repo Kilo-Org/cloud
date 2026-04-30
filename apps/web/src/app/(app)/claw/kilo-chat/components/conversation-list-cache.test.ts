@@ -1,10 +1,7 @@
 import type { ConversationListItem } from '@kilocode/kilo-chat';
-import { conversationsKey } from '@kilocode/kilo-chat-hooks';
+import { conversationsKey, moveConversationToFirstPage } from '@kilocode/kilo-chat-hooks';
 import type { ConversationListInfiniteData } from '../hooks/useConversations';
-import {
-  conversationListQueryKeyForInstanceEvent,
-  moveConversationToFirstPage,
-} from './conversation-list-cache';
+import { conversationListQueryKeyForInstanceEvent } from './conversation-list-cache';
 
 function conversation(
   conversationId: string,

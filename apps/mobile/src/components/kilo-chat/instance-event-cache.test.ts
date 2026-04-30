@@ -1,4 +1,5 @@
 import { type ConversationListInfiniteData } from '@kilocode/kilo-chat-hooks';
+import { moveConversationToFirstPage } from '@kilocode/kilo-chat-hooks';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -35,5 +36,29 @@ describe('instance event cache helpers', () => {
     expect(shouldApplyConversationRead('reader', 'reader')).toBe(true);
     expect(shouldApplyConversationRead('reader', 'other')).toBe(false);
     expect(shouldApplyConversationRead(null, 'reader')).toBe(false);
+  });
+
+  it('moves a first-page conversation with activity to the top row', () => {
+    const data: ConversationListInfiniteData = {
+      pages: [
+        {
+          conversations: [conversation('first'), conversation('second')],
+          hasMore: false,
+          nextCursor: null,
+        },
+      ],
+      pageParams: [null],
+    };
+
+    const result = moveConversationToFirstPage(data, 'second', item => ({
+      ...item,
+      lastActivityAt: 123,
+    }));
+
+    expect(result?.pages[0]?.conversations.map(item => item.conversationId)).toEqual([
+      'second',
+      'first',
+    ]);
+    expect(result?.pages[0]?.conversations[0]?.lastActivityAt).toBe(123);
   });
 });

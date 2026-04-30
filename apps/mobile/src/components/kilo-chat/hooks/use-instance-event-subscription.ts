@@ -16,6 +16,7 @@ import {
   conversationsKey,
   filterConversationPages,
   insertConversationOnFirstPage,
+  moveConversationToFirstPage,
   updateConversationPages,
 } from '@kilocode/kilo-chat-hooks';
 
@@ -122,11 +123,10 @@ export function useInstanceEventSubscription(sandboxId: string | undefined) {
         return;
       }
       qc.setQueryData<ConversationListInfiniteData>(queryKey, old =>
-        updateConversationPages(old, conversation =>
-          conversation.conversationId === event.conversationId
-            ? { ...conversation, lastActivityAt: event.lastActivityAt }
-            : conversation
-        )
+        moveConversationToFirstPage(old, event.conversationId, conversation => ({
+          ...conversation,
+          lastActivityAt: event.lastActivityAt,
+        }))
       );
     },
     [qc, queryKey]

@@ -8,5 +8,6 @@ export {
   updateConversationPages,
   filterConversationPages,
   insertConversationOnFirstPage,
+  moveConversationToFirstPage,
 } from '@kilocode/kilo-chat-hooks';
 export type { ConversationListInfiniteData } from '@kilocode/kilo-chat-hooks';

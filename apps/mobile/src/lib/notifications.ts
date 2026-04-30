@@ -5,6 +5,8 @@ import { Platform } from 'react-native';
 
 import { type PushData, pushDataSchema } from '@kilocode/notifications';
 
+import { notificationPathForData } from '@/lib/notification-path';
+
 function getProjectId(): string {
   const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
   const projectId = eas?.projectId;
@@ -80,20 +82,10 @@ export function getPendingNotificationLink(): string | null {
   return link;
 }
 
-function instanceChatPath(data: PushData | null): string | null {
-  if (!data) {
-    return null;
-  }
-  if (data.type === 'chat.message') {
-    return `/(app)/chat/${data.sandboxId}/${data.conversationId}`;
-  }
-  return `/(app)/chat/${data.sandboxId}`;
-}
-
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     const data = parseNotificationData(response.notification.request.content.data);
-    const path = instanceChatPath(data);
+    const path = data ? notificationPathForData(data) : null;
     if (!path) {
       return;
     }
@@ -117,7 +109,7 @@ export function checkInitialNotification(): void {
     return;
   }
   const data = parseNotificationData(response.notification.request.content.data);
-  const path = instanceChatPath(data);
+  const path = data ? notificationPathForData(data) : null;
   if (path) {
     pendingNotificationLink = path;
   }

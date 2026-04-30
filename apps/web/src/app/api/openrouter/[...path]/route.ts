@@ -15,11 +15,9 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  applyProviderSpecificLogic,
-  getProvider,
-  openRouterRequest,
-} from '@/lib/ai-gateway/providers';
+import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
+import { openRouterRequest } from '@/lib/ai-gateway/providers/openrouter-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';

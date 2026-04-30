@@ -9,7 +9,7 @@
  * Concurrent callers share the same inflight request.
  */
 
-import { z } from 'zod';
+import { kiloChatTokenResponseSchema } from '@/lib/kilo-chat/token-schema';
 
 let cachedToken: string | null = null;
 let tokenExpiresAt: number = 0;
@@ -24,7 +24,7 @@ async function fetchToken(): Promise<string> {
     throw new Error(`Failed to fetch kilo-chat token: ${res.status} ${body}`);
   }
   const data: unknown = await res.json();
-  const parsed = z.object({ token: z.string(), expiresAt: z.string() }).parse(data);
+  const parsed = kiloChatTokenResponseSchema.parse(data);
   cachedToken = parsed.token;
   tokenExpiresAt = new Date(parsed.expiresAt).getTime();
   return parsed.token;

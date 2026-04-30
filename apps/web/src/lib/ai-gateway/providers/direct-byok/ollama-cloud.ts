@@ -1,5 +1,6 @@
 import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
+import { REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH } from '@/lib/ai-gateway/providers/model-settings';
 
 export default {
   id: 'ollama-cloud',
@@ -20,6 +21,6 @@ export default {
         variants: null,
       },
     ],
-    variants: null,
+    variants: REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH,
   }),
 } satisfies DirectByokProvider;

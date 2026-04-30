@@ -96,10 +96,11 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(messages[0].badge).toBe(1);
 
     // Bucket persisted to DO storage.
-    const stored = await runInDurableObject(stub, (_inst, state) =>
-      state.storage.get<number>('bucket:conv1')
-    );
-    expect(stored).toBe(1);
+    const stored = await runInDurableObject(stub, async (_inst, state) => ({
+      bucket: await state.storage.get<number>('bucket:conv1'),
+      total: await state.storage.get<number>('total'),
+    }));
+    expect(stored).toEqual({ bucket: 1, total: 1 });
   });
 
   it('accumulates bucket counts across deliveries and exposes total via badge', async () => {

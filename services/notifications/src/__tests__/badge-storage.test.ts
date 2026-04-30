@@ -17,9 +17,12 @@ function getDO(name: string): DOStub {
 // helper round-trips rather than exercising dispatchPush again.
 async function seedBuckets(stub: DOStub, buckets: Record<string, number>) {
   await runInDurableObject(stub, async (_inst, state) => {
+    let total = 0;
     for (const [bucket, count] of Object.entries(buckets)) {
       await state.storage.put<number>(`bucket:${bucket}`, count);
+      total += count;
     }
+    await state.storage.put<number>('total', total);
   });
 }
 
@@ -55,6 +58,11 @@ describe('NotificationChannelDO badge storage helpers', () => {
       return Array.from(entries.entries());
     });
     expect(remaining).toEqual([['bucket:conv2', 5]]);
+
+    const aggregate = await runInDurableObject(stub, (_inst, state) =>
+      state.storage.get<number>('total')
+    );
+    expect(aggregate).toBe(5);
   });
 
   it('markBucketRead is idempotent and returns the running total', async () => {

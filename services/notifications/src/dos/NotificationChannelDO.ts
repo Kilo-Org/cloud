@@ -17,6 +17,7 @@ type IdemRecord = { stage: 'pending' | 'delivered'; ts: number };
 
 const IDEM_PREFIX = 'idem:';
 const BUCKET_PREFIX = 'bucket:';
+const TOTAL_KEY = 'total';
 const IDEM_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export class NotificationChannelDO extends DurableObject<Env> {
@@ -112,8 +113,15 @@ export class NotificationChannelDO extends DurableObject<Env> {
    * marks a conversation as read.
    */
   async markBucketRead(bucket: string): Promise<number> {
-    await this.ctx.storage.delete(`${BUCKET_PREFIX}${bucket}`);
-    return this.getTotal();
+    const key = `${BUCKET_PREFIX}${bucket}`;
+    const current = (await this.ctx.storage.get<number>(key)) ?? 0;
+    const total = await this.getTotal();
+    if (current > 0) {
+      await this.ctx.storage.delete(key);
+    }
+    const nextTotal = Math.max(0, total - current);
+    await this.ctx.storage.put<number>(TOTAL_KEY, nextTotal);
+    return nextTotal;
   }
 
   /**
@@ -164,15 +172,28 @@ export class NotificationChannelDO extends DurableObject<Env> {
   // this is race-free without explicit locking.
   private async incrementBucket(bucket: string, delta: number): Promise<void> {
     const key = `${BUCKET_PREFIX}${bucket}`;
+    const total = await this.getTotal();
     const current = (await this.ctx.storage.get<number>(key)) ?? 0;
-    await this.ctx.storage.put<number>(key, current + delta);
+    const next = Math.max(0, current + delta);
+    if (next === 0) {
+      await this.ctx.storage.delete(key);
+    } else {
+      await this.ctx.storage.put<number>(key, next);
+    }
+
+    await this.ctx.storage.put<number>(TOTAL_KEY, Math.max(0, total + delta));
   }
 
-  // Sum of all bucket counters for this user.
+  // Aggregate badge count. Existing DOs without the aggregate fall back to one
+  // bucket scan and persist the total for subsequent push/read paths.
   private async getTotal(): Promise<number> {
+    const stored = await this.ctx.storage.get<number>(TOTAL_KEY);
+    if (stored !== undefined) return stored;
+
     const entries = await this.ctx.storage.list<number>({ prefix: BUCKET_PREFIX });
     let total = 0;
     for (const value of entries.values()) total += value;
+    await this.ctx.storage.put<number>(TOTAL_KEY, total);
     return total;
   }
 }

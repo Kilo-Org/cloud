@@ -20,6 +20,7 @@ import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
+import { isMimoModel } from '@/lib/ai-gateway/providers/xiaomi';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 
 function applyToolChoiceSetting(
@@ -77,6 +78,9 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
       OpenRouterInferenceProviderIdSchema.enum.novita,
       OpenRouterInferenceProviderIdSchema.enum['z-ai'],
     ];
+  }
+  if (isMimoModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum.xiaomi];
   }
   return [];
 }

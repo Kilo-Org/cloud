@@ -11,7 +11,7 @@ export { useMessages, useMessageCacheUpdater };
 export function useSendMessage(
   client: KiloChatClient,
   conversationId: string | null,
-  currentUserId: string
+  currentUserId: string | null
 ) {
   return useSharedSendMessage(client, conversationId, currentUserId, {
     onError: err => {

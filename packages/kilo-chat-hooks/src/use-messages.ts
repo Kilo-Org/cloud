@@ -184,14 +184,14 @@ export function applyMessageCreatedEventToPages<TPageParam>(
 export function useSendMessage(
   client: KiloChatClient,
   conversationId: string | null,
-  currentUserId: string,
+  currentUserId: string | null,
   options?: MutationErrorOptions
 ) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (req: SendMessageVariables) => client.sendMessage(req),
     onMutate: async (variables: SendMessageVariables) => {
-      if (!conversationId) return;
+      if (!conversationId || currentUserId === null) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const pendingId = `pending-${variables.clientId}`;
@@ -282,14 +282,14 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
 export function useAddReaction(
   client: KiloChatClient,
   conversationId: string | null,
-  currentUserId: string
+  currentUserId: string | null
 ) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
       client.addReaction(messageId, { conversationId: conversationId ?? '', emoji }),
     onMutate: async variables => {
-      if (!conversationId) return;
+      if (!conversationId || currentUserId === null) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
@@ -312,14 +312,14 @@ export function useAddReaction(
 export function useRemoveReaction(
   client: KiloChatClient,
   conversationId: string | null,
-  currentUserId: string
+  currentUserId: string | null
 ) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId, emoji }: { messageId: string; emoji: string }) =>
       client.removeReaction(messageId, { conversationId: conversationId ?? '', emoji }),
     onMutate: async variables => {
-      if (!conversationId) return;
+      if (!conversationId || currentUserId === null) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
@@ -342,7 +342,7 @@ export function useRemoveReaction(
 export function useExecuteAction(
   client: KiloChatClient,
   conversationId: string | null,
-  currentUserId: string
+  currentUserId: string | null
 ) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -356,7 +356,7 @@ export function useExecuteAction(
       value: ExecApprovalDecision;
     }) => client.executeAction(conversationId ?? '', messageId, { groupId, value }),
     onMutate: async variables => {
-      if (!conversationId) return;
+      if (!conversationId || currentUserId === null) return;
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);

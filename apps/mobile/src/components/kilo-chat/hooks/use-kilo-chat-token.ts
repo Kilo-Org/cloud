@@ -4,9 +4,11 @@ import { useCallback } from 'react';
 import { AUTH_TOKEN_KEY } from '@/lib/storage-keys';
 import { trpcClient } from '@/lib/trpc';
 
+type KiloChatTokenResponse = Awaited<ReturnType<typeof trpcClient.kiloChat.getToken.query>>;
+
 type TokenCache = {
   authToken: string;
-  token: string;
+  response: KiloChatTokenResponse;
   expiresAtMs: number;
 };
 
@@ -14,7 +16,7 @@ type TokenCache = {
 // a different sign-in within the JWT window doesn't return the previous user's
 // token. The in-flight ref is keyed the same way for the same reason.
 let cache: TokenCache | null = null;
-let inFlight: { authToken: string; promise: Promise<string> } | null = null;
+let inFlight: { authToken: string; promise: Promise<KiloChatTokenResponse> } | null = null;
 
 /**
  * Returns a stable getter function that fetches a kilo-chat JWT, caching it
@@ -27,6 +29,14 @@ let inFlight: { authToken: string; promise: Promise<string> } | null = null;
  * its next call instead of permanently capturing `undefined`.
  */
 export function useKiloChatTokenGetter(): () => Promise<string> {
+  const getTokenResponse = useKiloChatTokenResponseGetter();
+  return useCallback(async () => {
+    const response = await getTokenResponse();
+    return response.token;
+  }, [getTokenResponse]);
+}
+
+export function useKiloChatTokenResponseGetter(): () => Promise<KiloChatTokenResponse> {
   return useCallback(async () => {
     const authToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
     if (!authToken) {
@@ -34,7 +44,7 @@ export function useKiloChatTokenGetter(): () => Promise<string> {
     }
 
     if (cache && cache.authToken === authToken && cache.expiresAtMs - Date.now() > 60_000) {
-      return cache.token;
+      return cache.response;
     }
 
     if (inFlight && inFlight.authToken === authToken) {
@@ -54,8 +64,8 @@ export function useKiloChatTokenGetter(): () => Promise<string> {
   }, []);
 }
 
-async function fetchAndCacheToken(authToken: string): Promise<string> {
-  const { token, expiresAt } = await trpcClient.kiloChat.getToken.query();
-  cache = { authToken, token, expiresAtMs: new Date(expiresAt).getTime() };
-  return token;
+async function fetchAndCacheToken(authToken: string): Promise<KiloChatTokenResponse> {
+  const response = await trpcClient.kiloChat.getToken.query();
+  cache = { authToken, response, expiresAtMs: new Date(response.expiresAt).getTime() };
+  return response;
 }

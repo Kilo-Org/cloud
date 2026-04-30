@@ -14,5 +14,5 @@ export function createKiloChatTokenResponse(user: User): KiloChatTokenResponse {
     { expiresIn: KILO_CHAT_TOKEN_TTL_SECONDS }
   );
   const expiresAt = new Date(Date.now() + KILO_CHAT_TOKEN_TTL_SECONDS * 1000).toISOString();
-  return kiloChatTokenResponseSchema.parse({ token, expiresAt });
+  return kiloChatTokenResponseSchema.parse({ token, expiresAt, userId: user.id });
 }

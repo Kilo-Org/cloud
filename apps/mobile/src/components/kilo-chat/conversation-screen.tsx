@@ -33,10 +33,10 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
     }
   }, [messagesQuery]);
 
-  const sendMutation = useSendMessage(client, conversationId, currentUserId ?? '');
-  const executeAction = useExecuteAction(client, conversationId, currentUserId ?? '');
-  const addReaction = useAddReaction(client, conversationId, currentUserId ?? '');
-  const removeReaction = useRemoveReaction(client, conversationId, currentUserId ?? '');
+  const sendMutation = useSendMessage(client, conversationId, currentUserId);
+  const executeAction = useExecuteAction(client, conversationId, currentUserId);
+  const addReaction = useAddReaction(client, conversationId, currentUserId);
+  const removeReaction = useRemoveReaction(client, conversationId, currentUserId);
   const handleSend = useCallback(
     (text: string) => {
       sendMutation.mutate({

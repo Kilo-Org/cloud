@@ -25,6 +25,7 @@ describe('kiloChat router - getToken', () => {
       algorithms: ['HS256'],
     }) as jwt.JwtPayload & { kiloUserId: string; tokenSource: string; version: number };
 
+    expect(result.userId).toBe(testUser.id);
     expect(payload.kiloUserId).toBe(testUser.id);
     expect(payload.tokenSource).toBe('kilo-chat');
     expect(payload.version).toBe(JWT_TOKEN_VERSION);

@@ -20,7 +20,7 @@ import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
   user_push_tokens,
-  channel_badge_counts,
+  badge_counts,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, sql, gt, gte, sum } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -729,22 +729,22 @@ export const userRouter = createTRPCRouter({
   // count for that channel to 0 and returns the new total across all
   // channels, which the app applies as the OS badge count.
   markChatRead: baseProcedure
-    .input(z.object({ channelId: z.string().min(1) }))
+    .input(z.object({ badgeBucket: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await db
-        .update(channel_badge_counts)
+        .update(badge_counts)
         .set({ badge_count: 0 })
         .where(
           and(
-            eq(channel_badge_counts.user_id, ctx.user.id),
-            eq(channel_badge_counts.channel_id, input.channelId)
+            eq(badge_counts.user_id, ctx.user.id),
+            eq(badge_counts.badge_bucket, input.badgeBucket)
           )
         );
 
       const [totals] = await db
-        .select({ total: sum(channel_badge_counts.badge_count) })
-        .from(channel_badge_counts)
-        .where(eq(channel_badge_counts.user_id, ctx.user.id));
+        .select({ total: sum(badge_counts.badge_count) })
+        .from(badge_counts)
+        .where(eq(badge_counts.user_id, ctx.user.id));
 
       return { badgeCount: Number(totals?.total ?? 0) };
     }),
@@ -757,12 +757,10 @@ export const userRouter = createTRPCRouter({
   getUnreadCounts: baseProcedure.query(async ({ ctx }) => {
     return readDb
       .select({
-        channelId: channel_badge_counts.channel_id,
-        badgeCount: channel_badge_counts.badge_count,
+        badgeBucket: badge_counts.badge_bucket,
+        badgeCount: badge_counts.badge_count,
       })
-      .from(channel_badge_counts)
-      .where(
-        and(eq(channel_badge_counts.user_id, ctx.user.id), gt(channel_badge_counts.badge_count, 0))
-      );
+      .from(badge_counts)
+      .where(and(eq(badge_counts.user_id, ctx.user.id), gt(badge_counts.badge_count, 0)));
   }),
 });

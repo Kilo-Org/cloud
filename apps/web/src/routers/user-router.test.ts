@@ -1,6 +1,6 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { channel_badge_counts, kilocode_users } from '@kilocode/db/schema';
+import { badge_counts, kilocode_users } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
@@ -425,18 +425,16 @@ describe('user router - getUnreadCounts', () => {
     const other = await insertTestUser({
       google_user_email: `unread-counts-other-${crypto.randomUUID()}@example.com`,
     });
-    await db.insert(channel_badge_counts).values([
-      { user_id: user.id, channel_id: 'sandbox-mine', badge_count: 4 },
-      { user_id: other.id, channel_id: 'sandbox-theirs', badge_count: 9 },
+    await db.insert(badge_counts).values([
+      { user_id: user.id, badge_bucket: 'sandbox-mine', badge_count: 4 },
+      { user_id: other.id, badge_bucket: 'sandbox-theirs', badge_count: 9 },
     ]);
 
     const caller = await createCallerForUser(user.id);
     const result = await caller.user.getUnreadCounts();
 
-    expect(result).toEqual([{ channelId: 'sandbox-mine', badgeCount: 4 }]);
+    expect(result).toEqual([{ badgeBucket: 'sandbox-mine', badgeCount: 4 }]);
 
-    await db
-      .delete(channel_badge_counts)
-      .where(inArray(channel_badge_counts.user_id, [user.id, other.id]));
+    await db.delete(badge_counts).where(inArray(badge_counts.user_id, [user.id, other.id]));
   });
 });

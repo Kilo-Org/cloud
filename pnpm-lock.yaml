@@ -152,6 +152,9 @@ importers:
       '@kilocode/kilo-chat':
         specifier: workspace:*
         version: link:../../packages/kilo-chat
+      '@kilocode/kilo-chat-hooks':
+        specifier: workspace:*
+        version: link:../../packages/kilo-chat-hooks
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
@@ -514,6 +517,9 @@ importers:
       '@kilocode/kilo-chat':
         specifier: workspace:*
         version: link:../../packages/kilo-chat
+      '@kilocode/kilo-chat-hooks':
+        specifier: workspace:*
+        version: link:../../packages/kilo-chat-hooks
       '@kilocode/kiloclaw-secret-catalog':
         specifier: workspace:*
         version: link:../../packages/kiloclaw-secret-catalog
@@ -1004,6 +1010,31 @@ importers:
       vitest:
         specifier: ~3.2.4
         version: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/kilo-chat-hooks:
+    dependencies:
+      '@kilocode/event-service':
+        specifier: workspace:*
+        version: link:../event-service
+      '@kilocode/kilo-chat':
+        specifier: workspace:*
+        version: link:../kilo-chat
+    devDependencies:
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.90.21(react@19.2.4)
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260319.1
+      react:
+        specifier: ^19.2.4
+        version: 19.2.4
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
 
   packages/kiloclaw-secret-catalog:
     dependencies:

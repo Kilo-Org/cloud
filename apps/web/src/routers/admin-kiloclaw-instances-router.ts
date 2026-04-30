@@ -1404,7 +1404,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         overridePins: z.boolean().default(false),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       // 1. Validate target tag in catalog. Worker would happily redeploy a
       // disabled tag, so the explicit guard lives here.
       const [catalogEntry] = await db
@@ -1573,6 +1573,33 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             failed.push({ instanceId: target.instance_id, error: message });
           }
         }
+      }
+
+      // Audit log: bulk version changes can touch up to 500 user instances
+      // and override pins. Record the action for accountability. The audit
+      // log uses target_user_id = ctx.user.id (the actor) since the
+      // schema column is non-null and this is a multi-user action; the
+      // applied/skipped/failed instance ids land in metadata. Fire-and-
+      // forget pattern matches the rest of this router.
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.instances.bulk_change_version',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: ctx.user.id,
+          message: `Bulk version change: tag=${input.imageTag} overridePins=${input.overridePins} applied=${applied.length} skipped=${skipped.length} failed=${failed.length}`,
+          metadata: {
+            imageTag: input.imageTag,
+            overridePins: input.overridePins,
+            requestedInstanceIds: input.instanceIds,
+            appliedInstanceIds: applied,
+            skipped,
+            failed,
+          },
+        });
+      } catch (auditErr) {
+        console.error('Failed to write audit log for bulkChangeVersion:', auditErr);
       }
 
       return { applied, skipped, failed };

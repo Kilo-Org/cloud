@@ -149,8 +149,11 @@ export function BulkChangeVersionDialog({
           void queryClient.invalidateQueries({
             queryKey: trpc.admin.kiloclawInstances.list.queryKey(),
           });
-          onApplied();
         }
+        // Clear selection regardless of partition outcome — even an
+        // all-skipped/all-failed run has been "processed", and leaving
+        // selection state would force the admin to manually click Clear.
+        onApplied();
       },
     })
   );

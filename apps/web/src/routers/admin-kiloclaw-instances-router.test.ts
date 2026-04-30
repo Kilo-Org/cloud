@@ -1783,4 +1783,36 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
       failed: [],
     });
   });
+
+  it('writes an admin audit log capturing the bulk action', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await caller.admin.kiloclawInstances.bulkChangeVersion({
+      instanceIds: [unpinnedId, userPinnedId],
+      imageTag: newerTag,
+      overridePins: false,
+    });
+
+    const logs = await db
+      .select()
+      .from(kiloclaw_admin_audit_logs)
+      .where(
+        and(
+          eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+          eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.instances.bulk_change_version')
+        )
+      );
+
+    expect(logs).toHaveLength(1);
+    expect(logs[0].actor_email).toBe(adminUser.google_user_email);
+    expect(logs[0].target_user_id).toBe(adminUser.id); // multi-user action sentinels actor
+    expect(logs[0].message).toContain(`tag=${newerTag}`);
+    expect(logs[0].message).toContain('overridePins=false');
+    expect(logs[0].metadata).toMatchObject({
+      imageTag: newerTag,
+      overridePins: false,
+      appliedInstanceIds: [unpinnedId],
+    });
+    expect(logs[0].metadata).toHaveProperty('skipped');
+    expect(logs[0].metadata).toHaveProperty('failed');
+  });
 });

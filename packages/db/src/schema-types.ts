@@ -250,6 +250,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.cli_run.start',
   'kiloclaw.cli_run.cancel',
   'kiloclaw.orphan.destroy',
+  'kiloclaw.instances.bulk_change_version',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;

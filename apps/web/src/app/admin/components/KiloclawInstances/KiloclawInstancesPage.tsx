@@ -34,7 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ChevronLeft, ChevronRight, X, Bomb } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, X, Bomb } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 import { BulkChangeVersionDialog } from './BulkChangeVersionDialog';
@@ -586,7 +586,15 @@ export function KiloclawInstancesPage() {
         <DevNukeAllButton />
       </div>
 
-      {selectedIds.size > 0 && (
+      {/* Bulk action bar — always rendered so the affordance is discoverable.
+          Empty state shows a muted hint; active state shows count + buttons.
+          Mirrors the pattern on KiloclawVersionsPage. */}
+      {selectedIds.size === 0 ? (
+        <div className="text-muted-foreground border-border/60 flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs">
+          <Info className="h-3 w-3 opacity-60" />
+          <span>Use the checkboxes to select rows for bulk version changes.</span>
+        </div>
+      ) : (
         <div className="bg-muted/30 flex items-center gap-3 rounded-md border px-3 py-2">
           <span className="text-sm">
             <span className="font-medium">{selectedIds.size}</span> selected

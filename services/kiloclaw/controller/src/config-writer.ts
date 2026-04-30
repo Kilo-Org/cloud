@@ -81,6 +81,8 @@ const KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH =
 const LEGACY_STREAM_CHAT_PLUGIN_ID = 'openclaw-channel-streamchat';
 const LEGACY_STREAM_CHAT_PLUGIN_PATH =
   '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
+const KILO_CHAT_PLUGIN_ID = 'kilo-chat';
+const KILO_CHAT_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
 
 type KiloExaSearchMode = 'kilo-proxy' | 'disabled';
@@ -534,14 +536,16 @@ export function generateBaseConfig(
   config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
     ? config.plugins.load.paths
     : [];
-  const kiloChatPluginPath = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
-  if (!(config.plugins.load.paths as string[]).includes(kiloChatPluginPath)) {
-    (config.plugins.load.paths as string[]).push(kiloChatPluginPath);
+  if (!(config.plugins.load.paths as string[]).includes(KILO_CHAT_PLUGIN_PATH)) {
+    (config.plugins.load.paths as string[]).push(KILO_CHAT_PLUGIN_PATH);
+  }
+  if (Array.isArray(config.plugins.allow) && !config.plugins.allow.includes(KILO_CHAT_PLUGIN_ID)) {
+    config.plugins.allow.push(KILO_CHAT_PLUGIN_ID);
   }
 
   config.plugins.entries = config.plugins.entries ?? {};
-  config.plugins.entries['kilo-chat'] = config.plugins.entries['kilo-chat'] ?? {};
-  config.plugins.entries['kilo-chat'].enabled = true;
+  config.plugins.entries[KILO_CHAT_PLUGIN_ID] = config.plugins.entries[KILO_CHAT_PLUGIN_ID] ?? {};
+  config.plugins.entries[KILO_CHAT_PLUGIN_ID].enabled = true;
 
   // Webhook hooks configuration for controller-mediated inbound events.
   // hooks.token stays local to the machine; external Workers authenticate to

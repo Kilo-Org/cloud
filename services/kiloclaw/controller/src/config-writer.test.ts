@@ -646,7 +646,7 @@ describe('generateBaseConfig', () => {
     expect(paths.filter(p => p === morningPluginPath)).toHaveLength(1);
   });
 
-  it('adds KiloClaw customizer to an existing plugin allowlist', () => {
+  it('updates managed plugins in an existing plugin allowlist', () => {
     const existing = JSON.stringify({
       channels: {
         streamchat: { enabled: true },
@@ -675,6 +675,7 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.allow).not.toContain('openclaw-channel-streamchat');
     expect(config.plugins.allow).toContain('kiloclaw-customizer');
     expect(config.plugins.allow).toContain('kiloclaw-morning-briefing');
+    expect(config.plugins.allow).toContain('kilo-chat');
   });
 
   it('configures Telegram channel', () => {

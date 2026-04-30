@@ -461,7 +461,7 @@ describe('proxy routing target usage', () => {
     expect(input).toBe('http://127.0.0.1:45001/api/foo');
   });
 
-  it('rebuilds HTTP retry auth with the refreshed authoritative sandbox id after crash recovery', async () => {
+  it('does not start or retry the default HTTP proxy when the upstream fetch fails', async () => {
     const registryStub = {
       listInstances: vi.fn().mockResolvedValue([
         {
@@ -474,64 +474,25 @@ describe('proxy routing target usage', () => {
       ]),
     };
     const instanceStub = {
-      getStatus: vi
-        .fn()
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-old',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-old',
-          flyMachineId: 'machine-old',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-old',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-old',
-          flyMachineId: 'machine-old',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-new',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-new',
-          flyMachineId: 'machine-new',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-new',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-new',
-          flyMachineId: 'machine-new',
-          flyAppName: 'test-app',
-        }),
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'sandbox-1',
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+      }),
       start: vi.fn().mockResolvedValue({ started: true }),
-      getRoutingTarget: vi
-        .fn()
-        .mockResolvedValueOnce({
-          origin: 'https://test-app.fly.dev',
-          headers: {
-            'fly-force-instance-id': 'machine-old',
-          },
-        })
-        .mockResolvedValueOnce({
-          origin: 'https://test-app.fly.dev',
-          headers: {
-            'fly-force-instance-id': 'machine-new',
-          },
-        }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'https://test-app.fly.dev',
+        headers: {
+          'fly-force-instance-id': 'machine-1',
+        },
+      }),
     };
     const fetchMock = vi.mocked(fetch) as FetchMock;
-    fetchMock
-      .mockRejectedValueOnce(new Error('socket hang up'))
-      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+    fetchMock.mockRejectedValueOnce(new Error('socket hang up'));
 
     const response = await app.fetch(
       new Request('https://example.com/api/foo?bar=baz'),
@@ -548,25 +509,21 @@ describe('proxy routing target usage', () => {
           idFromName: vi.fn().mockReturnValue('instance-id'),
           get: vi.fn().mockReturnValue(instanceStub),
         },
-        KILOCLAW_AE: { writeDataPoint: vi.fn() },
       } as never,
       { waitUntil: vi.fn() } as never
     );
 
-    expect(response.status).toBe(200);
-
-    const retryCall = getFetchCall(fetchMock, 1);
-    if (!(retryCall.init?.headers instanceof Headers)) {
-      throw new Error('Expected retry fetch headers to be a Headers instance');
-    }
-
-    expect(retryCall.init.headers.get('fly-force-instance-id')).toBe('machine-new');
-    expect(retryCall.init.headers.get('x-kiloclaw-proxy-token')).toBe(
-      await deriveGatewayToken('sandbox-new', 'gateway-secret')
-    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not reachable',
+      hint: 'Your instance may not be running. Start it from the dashboard.',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(instanceStub.start).not.toHaveBeenCalled();
   });
 
-  it('rebuilds WebSocket retry auth with the refreshed authoritative sandbox id after crash recovery', async () => {
+  it('does not start or retry the default WebSocket proxy when the upstream fetch fails', async () => {
     const registryStub = {
       listInstances: vi.fn().mockResolvedValue([
         {
@@ -579,64 +536,25 @@ describe('proxy routing target usage', () => {
       ]),
     };
     const instanceStub = {
-      getStatus: vi
-        .fn()
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-old',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-old',
-          flyMachineId: 'machine-old',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-old',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-old',
-          flyMachineId: 'machine-old',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-new',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-new',
-          flyMachineId: 'machine-new',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-new',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-new',
-          flyMachineId: 'machine-new',
-          flyAppName: 'test-app',
-        }),
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'sandbox-1',
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+      }),
       start: vi.fn().mockResolvedValue({ started: true }),
-      getRoutingTarget: vi
-        .fn()
-        .mockResolvedValueOnce({
-          origin: 'https://test-app.fly.dev',
-          headers: {
-            'fly-force-instance-id': 'machine-old',
-          },
-        })
-        .mockResolvedValueOnce({
-          origin: 'https://test-app.fly.dev',
-          headers: {
-            'fly-force-instance-id': 'machine-new',
-          },
-        }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'https://test-app.fly.dev',
+        headers: {
+          'fly-force-instance-id': 'machine-1',
+        },
+      }),
     };
     const fetchMock = vi.mocked(fetch) as FetchMock;
-    fetchMock
-      .mockRejectedValueOnce(new Error('socket hang up'))
-      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+    fetchMock.mockRejectedValueOnce(new Error('socket hang up'));
 
     const response = await app.fetch(
       new Request('https://example.com/socket', {
@@ -655,21 +573,17 @@ describe('proxy routing target usage', () => {
           idFromName: vi.fn().mockReturnValue('instance-id'),
           get: vi.fn().mockReturnValue(instanceStub),
         },
-        KILOCLAW_AE: { writeDataPoint: vi.fn() },
       } as never,
       { waitUntil: vi.fn() } as never
     );
 
-    expect(response.status).toBe(200);
-
-    const retryCall = getFetchCall(fetchMock, 1);
-    if (!(retryCall.init?.headers instanceof Headers)) {
-      throw new Error('Expected retry fetch headers to be a Headers instance');
-    }
-
-    expect(retryCall.init.headers.get('fly-force-instance-id')).toBe('machine-new');
-    expect(retryCall.init.headers.get('x-kiloclaw-proxy-token')).toBe(
-      await deriveGatewayToken('sandbox-new', 'gateway-secret')
-    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not reachable',
+      hint: 'Your instance may not be running. Start it from the dashboard.',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(instanceStub.start).not.toHaveBeenCalled();
   });
 });

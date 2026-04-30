@@ -355,6 +355,7 @@ export const AuditLogAction = z.enum([
   'organization.user.send_invite', // ✅
   'organization.user.revoke_invite', // ✅
   'organization.settings.change', // ✅
+  'organization.settings.auto_change', // ✅ (system-initiated; null actor)
   'organization.purchase_credits', // ✅
   'organization.promo_credit_granted', // ✅
   'organization.member.remove', // ✅
@@ -692,6 +693,7 @@ export const OpenCodePromptSchema = z.enum([
   'anthropic',
   'trinity',
   'anthropic_without_todo',
+  'gpt55',
 ]);
 
 export type OpenCodePrompt = z.infer<typeof OpenCodePromptSchema>;
@@ -802,14 +804,12 @@ export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
-  description: z.string().optional(),
   type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
 });
 
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 
 export const EndpointSchema = z.object({
-  provider_name: z.string(),
   tag: z.string(),
   context_length: z.number(),
 });

@@ -1,4 +1,4 @@
-import { openRouterRequest } from '../lib/ai-gateway/providers';
+import { openRouterRequest } from '../lib/ai-gateway/providers/openrouter-request';
 import PROVIDERS from '../lib/ai-gateway/providers/provider-definitions';
 
 describe('openRouterRequest timeout', () => {

@@ -245,9 +245,14 @@ export class SetupCommandFailedError extends Error {
   constructor(
     public readonly command: string,
     public readonly exitCode: number,
-    public readonly stderr: string
+    public readonly stderr: string,
+    public readonly stdout: string = ''
   ) {
-    const details = [`exit code ${exitCode}`, ...(stderr ? [stderr.trim()] : [])].join(': ');
+    const details = [
+      `exit code ${exitCode}`,
+      ...(stderr ? [`stderr: ${stderr.trim()}`] : []),
+      ...(stdout ? [`stdout: ${stdout.trim()}`] : []),
+    ].join(': ');
     super(`Setup command failed: ${command} (${details})`);
     this.name = 'SetupCommandFailedError';
   }
@@ -299,12 +304,13 @@ export async function runSetupCommands(
           .withFields({
             command,
             exitCode: result.exitCode,
+            stdout: result.stdout,
             stderr: result.stderr,
           })
           .warn('Setup command failed');
 
         if (failFast) {
-          throw new SetupCommandFailedError(command, result.exitCode, result.stderr);
+          throw new SetupCommandFailedError(command, result.exitCode, result.stderr, result.stdout);
         }
       }
     } catch (error) {
@@ -1201,6 +1207,8 @@ export class SessionService {
     // Session home directory
 
     const metadata = await this.loadSessionMetadata(env, { userId, sessionId } as SessionContext);
+    const githubToken = freshGithubToken ?? metadata?.githubToken;
+    const gitToken = freshGitToken ?? metadata?.gitToken;
 
     const context = this.buildContext({
       sandboxId,
@@ -1212,9 +1220,9 @@ export class SessionService {
       upstreamBranch: metadata?.upstreamBranch,
       botId: metadata?.botId,
       githubRepo: metadata?.githubRepo,
-      githubToken: metadata?.githubToken,
+      githubToken,
       gitUrl: metadata?.gitUrl,
-      gitToken: metadata?.gitToken,
+      gitToken,
       platform: metadata?.platform,
     });
 

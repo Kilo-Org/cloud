@@ -12,26 +12,13 @@ import {
 import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
-import { redisGet } from '@/lib/redis';
-import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
-import { StoredModelSchema } from '@kilocode/db';
-import * as z from 'zod';
-import { createCachedFetch } from '@/lib/cached-fetch';
-
-const getVercelMetadataCached = createCachedFetch(
-  async () =>
-    z
-      .record(z.string(), StoredModelSchema)
-      .parse(JSON.parse((await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels)) ?? '{}')),
-  600_000,
-  {}
-);
+import { getVercelModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
   if (isCodestralModel(modelId)) {
     return ['codestral'];
   }
-  const vercelModelMetadata = await getVercelMetadataCached();
+  const vercelModelMetadata = await getVercelModelsMetadata();
   if (Object.keys(vercelModelMetadata).length == 0) {
     console.error('[getModelUserByokProviders] no Vercel model metadata in the database');
     return [];

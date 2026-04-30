@@ -18,7 +18,7 @@ import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
 import { setLastActiveInstance } from '@/lib/last-active-instance';
-import { parseNotificationData, setActiveChatInstance } from '@/lib/notifications';
+import { parseNotificationData } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
 
 type KiloClawChatProps = {
@@ -72,7 +72,6 @@ export function KiloClawChat({
   useFocusEffect(
     useCallback(() => {
       isFocusedRef.current = true;
-      setActiveChatInstance(instanceId);
       setLastActiveInstance(instanceId);
       markChatRead({ channelId: instanceId });
 
@@ -81,14 +80,13 @@ export function KiloClawChat({
       // it immediately so the badge never drifts above 0 while the user is reading.
       const subscription = Notifications.addNotificationReceivedListener(notification => {
         const data = parseNotificationData(notification.request.content.data);
-        if (data?.type === 'chat' && data.instanceId === instanceId) {
+        if (data?.type === 'chat.message' && data.sandboxId === instanceId) {
           markChatRead({ channelId: instanceId });
         }
       });
 
       return () => {
         isFocusedRef.current = false;
-        setActiveChatInstance(null);
         subscription.remove();
       };
     }, [instanceId, markChatRead])

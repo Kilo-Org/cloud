@@ -12,6 +12,7 @@ import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useMarkRead } from './hooks/use-mark-read';
 import { useMessages, useSendMessage } from './hooks/use-messages';
 import { useCurrentUserId } from './hooks/use-current-user-id';
+import { setActiveChatLocation } from '@/lib/notifications';
 
 type Props = { sandboxId: string; conversationId: string; conversationTitle: string };
 
@@ -46,7 +47,10 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   useFocusEffect(
     useCallback(() => {
       markRead(sandboxId, conversationId);
-      // Active-conversation suppression wiring added in PR 5d (Task 50).
+      setActiveChatLocation({ sandboxId, conversationId });
+      return () => {
+        setActiveChatLocation(null);
+      };
     }, [sandboxId, conversationId, markRead])
   );
 

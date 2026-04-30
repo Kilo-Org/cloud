@@ -4510,7 +4510,6 @@ export const security_advisor_scans = pgTable(
 );
 
 export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
-export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;
 
 // ============ SECURITY ADVISOR CONTENT ============
 // Customer-visible report content for the security advisor feature.
@@ -4598,3 +4597,5 @@ export const security_advisor_content = pgTable('security_advisor_content', {
 
 export type SecurityAdvisorContent = typeof security_advisor_content.$inferSelect;
 export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferInsert;
+
+export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

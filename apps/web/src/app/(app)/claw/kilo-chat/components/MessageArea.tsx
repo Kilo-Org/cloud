@@ -14,7 +14,12 @@ import {
   useRemoveReaction,
   useExecuteAction,
 } from '../hooks/useMessages';
-import { useConversationContext } from '../hooks/useEventService';
+import {
+  kiloclawConversationContext,
+  presenceContextForConversation,
+} from '@kilocode/event-service';
+import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
+import { useDocumentVisible } from '@/hooks/useDocumentVisible';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
 import {
   useConversationDetail,
@@ -75,13 +80,27 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const [isRenamingTitle, setIsRenamingTitle] = useState(false);
   const [renameText, setRenameText] = useState('');
 
-  // Subscribe to this conversation's events via the event-service WebSocket
-  useConversationContext(eventService, sandboxId, conversationId);
+  const visible = useDocumentVisible();
+
+  // Subscribe to this conversation's chat-event stream while the conversation
+  // is open. Not gated on visibility — we want incoming messages to land in
+  // the cache even when the tab is hidden.
+  usePresenceSubscription(
+    sandboxId && conversationId ? kiloclawConversationContext(sandboxId, conversationId) : null,
+    Boolean(sandboxId && conversationId)
+  );
+
+  // Signal our own presence on this conversation. Gated on visibility so we
+  // only appear "viewing" while the tab is actually in the foreground.
+  usePresenceSubscription(
+    sandboxId && conversationId ? presenceContextForConversation(sandboxId, conversationId) : null,
+    Boolean(sandboxId && conversationId) && visible
+  );
 
   // Event Service delivers subscribed contexts to every handler, so each
   // handler must validate the incoming `ctx` against this string before
   // applying changes to the active conversation's state.
-  const expectedContext = sandboxId ? `/kiloclaw/${sandboxId}/${conversationId}` : null;
+  const expectedContext = sandboxId ? kiloclawConversationContext(sandboxId, conversationId) : null;
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
     kiloChatClient,

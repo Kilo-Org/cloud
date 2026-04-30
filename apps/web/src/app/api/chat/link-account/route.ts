@@ -1,12 +1,9 @@
 import { bot } from '@/lib/bot';
 import { APP_URL } from '@/lib/constants';
-import { linkKiloUser, verifyLinkToken } from '@/lib/bot-identity';
-import { db } from '@/lib/drizzle';
+import { linkKiloUser, verifyLinkToken, type PlatformIdentity } from '@/lib/bot-identity';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
-import { platform_integrations } from '@kilocode/db';
-import { PLATFORM } from '@/lib/integrations/core/constants';
-import { and, eq } from 'drizzle-orm';
+import { getPlatformIntegration } from '@/lib/bot/platform-helpers';
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -28,22 +25,13 @@ function errorPage(title: string, message: string, status: number): Response {
  * an org member; for user-owned integrations only the owner may link.
  */
 async function verifyIntegrationAccess(
-  teamId: string,
+  identity: PlatformIdentity,
   kiloUserId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const [integration] = await db
-    .select()
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.SLACK),
-        eq(platform_integrations.platform_installation_id, teamId)
-      )
-    )
-    .limit(1);
+  const integration = await getPlatformIntegration(identity);
 
   if (!integration) {
-    return { ok: false, error: 'No matching integration found for this workspace.' };
+    return { ok: false, error: 'No matching integration found for this platform.' };
   }
 
   if (integration.owned_by_organization_id) {
@@ -51,12 +39,12 @@ async function verifyIntegrationAccess(
     if (!isMember) {
       return {
         ok: false,
-        error: 'You are not a member of the organization that owns this workspace integration.',
+        error: 'You are not a member of the organization that owns this integration.',
       };
     }
   } else if (integration.owned_by_user_id) {
     if (integration.owned_by_user_id !== kiloUserId) {
-      return { ok: false, error: 'You are not the owner of this workspace integration.' };
+      return { ok: false, error: 'You are not the owner of this integration.' };
     }
   } else {
     return { ok: false, error: 'This integration has invalid ownership data.' };
@@ -106,7 +94,7 @@ export async function GET(request: Request) {
   }
 
   // Verify the user is allowed to link to this integration
-  const access = await verifyIntegrationAccess(identity.teamId, user.id);
+  const access = await verifyIntegrationAccess(identity, user.id);
   if (!access.ok) {
     return errorPage('Access Denied', access.error, 403);
   }

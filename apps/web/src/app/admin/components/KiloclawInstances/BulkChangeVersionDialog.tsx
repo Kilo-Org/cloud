@@ -202,23 +202,36 @@ export function BulkChangeVersionDialog({
         {result === null ? (
           <>
             <DialogHeader>
-              <DialogTitle>Change version on {selectedIds.length} instances</DialogTitle>
+              <DialogTitle>
+                Change version on {selectedIds.length}{' '}
+                {selectedIds.length === 1 ? 'instance' : 'instances'}
+              </DialogTitle>
               <DialogDescription>
-                Applies a single version change synchronously across the selected instances.
-                Direction-agnostic — the same primitive handles upgrades and downgrades.
+                Apply a version change to the selected instances. The chosen version can be newer or
+                older than what each instance is currently running.
               </DialogDescription>
             </DialogHeader>
+
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>This runs immediately. No undo, no user notice.</AlertTitle>
+              <AlertDescription>
+                Every selected instance restarts now. End users get no notification, and any active
+                session is interrupted. Confirm the selection and target version are correct before
+                applying.
+              </AlertDescription>
+            </Alert>
 
             <div className="space-y-4 py-2">
               <div className="bg-muted/30 rounded-md border p-3 text-sm">
                 <div className="font-medium">Selection summary</div>
                 <ul className="text-muted-foreground mt-1 list-disc pl-5">
                   <li>
-                    {summary.total} instances selected
+                    {summary.total} {summary.total === 1 ? 'instance' : 'instances'} selected
                     {summary.noPreview > 0 && (
                       <span className="text-amber-400">
                         {' '}
-                        ({summary.noPreview} not on this page — preview limited)
+                        ({summary.noPreview} not on this page, preview limited)
                       </span>
                     )}
                   </li>
@@ -239,9 +252,18 @@ export function BulkChangeVersionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {targetOptions.map(v => (
-                      <SelectItem key={v.image_tag} value={v.image_tag}>
-                        {v.image_tag}
-                        {v.is_latest ? ' (latest)' : ''}
+                      <SelectItem
+                        key={v.image_tag}
+                        value={v.image_tag}
+                        textValue={`${v.openclaw_version} ${v.image_tag}${v.is_latest ? ' (latest)' : ''}`}
+                      >
+                        <span className="font-medium">{v.openclaw_version}</span>
+                        <span className="text-muted-foreground ml-2 font-mono text-xs">
+                          {v.image_tag}
+                        </span>
+                        {v.is_latest && (
+                          <span className="text-muted-foreground ml-2 text-xs">(latest)</span>
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -275,9 +297,9 @@ export function BulkChangeVersionDialog({
                       Override existing pins
                     </Label>
                     <p className="text-muted-foreground text-xs">
-                      Pins on selected instances will be deleted before the version change. Once an
-                      admin pushes through a pin, the consent gate has been spent — affected users
-                      can re-pin afterwards. No replacement admin pin is written.
+                      This removes any existing version pinning, both admin and user set. The
+                      instances keep running and keep all their data. Affected users can set a new
+                      pin afterwards if they want.
                     </p>
                   </div>
                 </div>
@@ -310,7 +332,8 @@ export function BulkChangeVersionDialog({
 
               {bulkChange.isPending && (
                 <div className="text-muted-foreground text-sm">
-                  Applying… (this may take a few seconds for {selectedIds.length} instances)
+                  Applying… (this may take a few seconds for {selectedIds.length}{' '}
+                  {selectedIds.length === 1 ? 'instance' : 'instances'})
                 </div>
               )}
             </div>
@@ -409,7 +432,7 @@ export function BulkChangeVersionDialog({
                         <span className="truncate" title={f.instanceId}>
                           {f.instanceId}
                         </span>
-                        <span className="text-muted-foreground"> — {f.error}</span>
+                        <span className="text-muted-foreground">: {f.error}</span>
                       </li>
                     ))}
                   </ul>

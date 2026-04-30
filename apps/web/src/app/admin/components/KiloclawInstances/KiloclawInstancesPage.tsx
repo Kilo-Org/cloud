@@ -490,6 +490,7 @@ export function KiloclawInstancesPage() {
   const versions = versionsData?.items || [];
 
   const allVisibleSelected = instances.length > 0 && instances.every(i => selectedIds.has(i.id));
+  const someVisibleSelected = !allVisibleSelected && instances.some(i => selectedIds.has(i.id));
 
   const toggleSelectAllVisible = () => {
     setSelectedIds(prev => {
@@ -514,6 +515,16 @@ export function KiloclawInstancesPage() {
   // for its summary panel. We only reliably have rows for the current page,
   // so the dialog operates on the intersection of selectedIds × instances.
   const selectedInstances = instances.filter(i => selectedIds.has(i.id));
+
+  // Map image_tag → openclaw_version so the Version column can pair the
+  // technical image tag with its human-meaningful semver. Built from the
+  // already-fetched listVersions data so this costs nothing extra. Tags
+  // not in the active catalog (e.g. disabled or removed) fall back to
+  // just the image_tag.
+  const openclawVersionByImageTag = useMemo(
+    () => new Map(versions.map(v => [v.image_tag, v.openclaw_version])),
+    [versions]
+  );
 
   return (
     <div className="flex w-full flex-col gap-y-6">
@@ -575,9 +586,16 @@ export function KiloclawInstancesPage() {
             <SelectItem value={IMAGE_TAG_FILTER_ALL}>All Versions</SelectItem>
             <SelectItem value={IMAGE_TAG_FILTER_UNKNOWN}>(unknown)</SelectItem>
             {versions.map(v => (
-              <SelectItem key={v.image_tag} value={v.image_tag}>
-                {v.image_tag}
-                {v.is_latest ? ' (latest)' : ''}
+              <SelectItem
+                key={v.image_tag}
+                value={v.image_tag}
+                textValue={`${v.openclaw_version} ${v.image_tag}${v.is_latest ? ' (latest)' : ''}`}
+              >
+                <span className="font-medium">{v.openclaw_version}</span>
+                <span className="text-muted-foreground ml-2 font-mono text-xs">{v.image_tag}</span>
+                {v.is_latest && (
+                  <span className="text-muted-foreground ml-2 text-xs">(latest)</span>
+                )}
               </SelectItem>
             ))}
           </SelectContent>
@@ -620,14 +638,14 @@ export function KiloclawInstancesPage() {
             <TableRow>
               <TableHead className="w-[40px]">
                 <Checkbox
-                  checked={allVisibleSelected}
+                  checked={
+                    allVisibleSelected ? true : someVisibleSelected ? 'indeterminate' : false
+                  }
                   onCheckedChange={toggleSelectAllVisible}
                   aria-label="Select all visible instances"
                 />
               </TableHead>
               <TableHead>User</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Sandbox ID</TableHead>
               <TableHead>Version</TableHead>
               <TableHead>Pin</TableHead>
               <TableHead>Subscription</TableHead>
@@ -641,6 +659,7 @@ export function KiloclawInstancesPage() {
                   <span className="ml-1">{queryStringState.sortOrder === 'asc' ? '↑' : '↓'}</span>
                 )}
               </TableHead>
+              <TableHead>Sandbox ID</TableHead>
               <TableHead
                 className="hover:bg-muted/50 cursor-pointer"
                 onClick={() => handleSort('destroyed_at')}
@@ -655,13 +674,13 @@ export function KiloclawInstancesPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center">
+                <TableCell colSpan={9} className="h-24 text-center">
                   Loading instances...
                 </TableCell>
               </TableRow>
             ) : instances.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center">
+                <TableCell colSpan={9} className="h-24 text-center">
                   No instances found.
                 </TableCell>
               </TableRow>
@@ -699,35 +718,18 @@ export function KiloclawInstancesPage() {
                       {instance.user_email || instance.user_id}
                     </Link>
                   </TableCell>
-                  <TableCell>
-                    {instance.organization_id ? (
-                      <Badge
-                        variant="outline"
-                        className="border-blue-500/30 bg-blue-500/15 text-blue-400"
-                      >
-                        Org
-                      </Badge>
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className="border-gray-500/30 bg-gray-500/10 text-gray-400"
-                      >
-                        Personal
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    <span
-                      className="block truncate"
-                      style={{ maxWidth: '200px' }}
-                      title={instance.sandbox_id}
-                    >
-                      {instance.sandbox_id}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
+                  <TableCell className="text-xs">
                     {instance.tracked_image_tag ? (
-                      <span title={instance.tracked_image_tag}>{instance.tracked_image_tag}</span>
+                      <div className="flex flex-col" title={instance.tracked_image_tag}>
+                        {openclawVersionByImageTag.get(instance.tracked_image_tag) && (
+                          <span className="font-medium">
+                            {openclawVersionByImageTag.get(instance.tracked_image_tag)}
+                          </span>
+                        )}
+                        <span className="text-muted-foreground font-mono">
+                          {instance.tracked_image_tag}
+                        </span>
+                      </div>
                     ) : (
                       <span className="text-muted-foreground">(unknown)</span>
                     )}
@@ -782,6 +784,15 @@ export function KiloclawInstancesPage() {
                     title={new Date(instance.created_at).toLocaleString()}
                   >
                     {formatRelativeTime(instance.created_at)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground font-mono text-xs">
+                    <span
+                      className="block truncate"
+                      style={{ maxWidth: '110px' }}
+                      title={instance.sandbox_id}
+                    >
+                      {instance.sandbox_id}
+                    </span>
                   </TableCell>
                   <TableCell
                     className="text-muted-foreground text-sm"

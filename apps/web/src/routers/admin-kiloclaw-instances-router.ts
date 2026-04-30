@@ -1389,6 +1389,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
   bulkChangeVersion: adminProcedure
     .input(
       z.object({
+        // Practical limit: the UI only allows per-page selection, so 500
+        // leaves ample headroom while keeping the inArray clause performant.
+        // If a future "select all across pages" feature lands, revisit.
         instanceIds: z.array(z.string().uuid()).min(1).max(500),
         imageTag: z
           .string()
@@ -1529,10 +1532,19 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             )
             .returning({ id: kiloclaw_version_pins.id });
 
-          // If the delete missed (pin changed in flight), still proceed —
-          // the worker restart is unconditional and the next user-side
-          // restart will respect whatever pin is current via the post-#2913
-          // sync path. Mirrors the lazy-recovery posture.
+          // If the delete missed (pin row was replaced in flight by a new
+          // user pin), still proceed with the restart. The DB pin row and
+          // DO state will diverge until the next user-initiated restart:
+          // the DO will run input.imageTag, but the DB still shows the
+          // user's freshly-written pin. The next user Restart resyncs both
+          // via the PR #2913 push-on-write path.
+          //
+          // We chose this over aborting because the admin explicitly opted
+          // into override at request time; the alternative (refuse to act
+          // when the pin was concurrently updated) would silently swallow
+          // a fraction of bulk applies under contention. Result rows still
+          // surface as `applied` in the partition; a follow-on TOCTOU test
+          // case would assert the persisting pin row.
           if (deleted.length > 0) {
             await pushPinToWorker(target.user_id, target.instance_id, null);
           }

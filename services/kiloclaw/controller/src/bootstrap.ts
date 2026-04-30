@@ -23,6 +23,7 @@ const CONFIG_DIR = '/root/.openclaw';
 const CONFIG_PATH = '/root/.openclaw/openclaw.json';
 const EXEC_APPROVALS_PATH = '/root/.openclaw/exec-approvals.json';
 const DEVICE_PAIRED_PATH = '/root/.openclaw/devices/paired.json';
+const DEVICE_PENDING_PATH = '/root/.openclaw/devices/pending.json';
 const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
@@ -51,6 +52,11 @@ const GATEWAY_CLIENT_OPERATOR_SCOPES = [
 type EnvLike = Record<string, string | undefined>;
 
 type JsonRecord = Record<string, unknown>;
+
+type GatewayClientScopeRepairRequest = {
+  deviceId: string;
+  scopes: string[];
+};
 
 type ExecOpts = {
   env?: NodeJS.ProcessEnv;
@@ -108,15 +114,44 @@ function isJsonRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function stringArrayEquals(left: unknown, right: readonly string[]): boolean {
+function stringArraySetEquals(left: unknown, right: readonly string[]): boolean {
   if (!Array.isArray(left) || left.length !== right.length) return false;
-  return left.every((value, index) => value === right[index]);
+  const rightSet = new Set(right);
+  return left.every(value => typeof value === 'string' && rightSet.has(value));
 }
 
-function setScopeList(record: JsonRecord, key: 'scopes' | 'approvedScopes'): boolean {
-  if (stringArrayEquals(record[key], GATEWAY_CLIENT_OPERATOR_SCOPES)) return false;
-  record[key] = [...GATEWAY_CLIENT_OPERATOR_SCOPES];
+function mergeStringLists(...lists: unknown[]): string[] {
+  const values = new Set<string>();
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const value of list) {
+      if (typeof value !== 'string') continue;
+      const trimmed = value.trim();
+      if (trimmed) values.add(trimmed);
+    }
+  }
+  return [...values];
+}
+
+function setScopeList(
+  record: JsonRecord,
+  key: 'scopes' | 'approvedScopes',
+  scopes: readonly string[]
+): boolean {
+  if (stringArraySetEquals(record[key], scopes)) return false;
+  record[key] = [...scopes];
   return true;
+}
+
+function roleList(record: JsonRecord): string[] {
+  return mergeStringLists(
+    record.roles,
+    typeof record.role === 'string' ? [record.role] : undefined
+  );
+}
+
+function hasOperatorRole(record: JsonRecord): boolean {
+  return roleList(record).includes(OPERATOR_TOKEN_ROLE);
 }
 
 // ---- Step 1: Env decryption ----
@@ -729,17 +764,6 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     );
   }
 
-  try {
-    const remediation = remediateGatewayClientDeviceScopes(deps);
-    if (remediation.updated > 0) {
-      console.log(
-        `[controller] gateway-client device scopes remediated: ${remediation.updated}/${remediation.checked} paired device(s)`
-      );
-    }
-  } catch (err) {
-    console.warn('[controller] Failed to remediate gateway-client device scopes:', err);
-  }
-
   writeBotIdentityFile(env, deps);
   writeUserProfileFile(env, deps);
   ensureWeatherSkillInstalled(env, deps);
@@ -788,6 +812,48 @@ export type GatewayClientDeviceScopeRemediationResult = {
   updated: number;
 };
 
+function hasOperatorToken(record: JsonRecord): boolean {
+  const tokens = record.tokens;
+  return isJsonRecord(tokens) && isJsonRecord(tokens[OPERATOR_TOKEN_ROLE]);
+}
+
+function readGatewayClientRepairRequests(
+  deps: Pick<BootstrapDeps, 'existsSync' | 'readFileSync'>
+): GatewayClientScopeRepairRequest[] {
+  if (!deps.existsSync(DEVICE_PENDING_PATH)) return [];
+
+  const pendingFile = JSON.parse(deps.readFileSync(DEVICE_PENDING_PATH, 'utf8')) as unknown;
+  if (!isJsonRecord(pendingFile)) return [];
+
+  const repairs: GatewayClientScopeRepairRequest[] = [];
+  for (const value of Object.values(pendingFile)) {
+    if (!isJsonRecord(value)) continue;
+    if (value.clientId !== GATEWAY_CLIENT_ID) continue;
+    if (value.isRepair !== true) continue;
+    if (!hasOperatorRole(value)) continue;
+    if (typeof value.deviceId !== 'string' || value.deviceId.trim().length === 0) continue;
+
+    const operatorScopes = mergeStringLists(value.scopes).filter(scope =>
+      scope.startsWith('operator.')
+    );
+    if (operatorScopes.length === 0) continue;
+
+    repairs.push({ deviceId: value.deviceId, scopes: operatorScopes });
+  }
+  return repairs;
+}
+
+function buildGatewayClientRepairScopesByDeviceId(
+  deps: Pick<BootstrapDeps, 'existsSync' | 'readFileSync'>
+): Map<string, string[]> {
+  const scopesByDeviceId = new Map<string, string[]>();
+  for (const repair of readGatewayClientRepairRequests(deps)) {
+    const existing = scopesByDeviceId.get(repair.deviceId);
+    scopesByDeviceId.set(repair.deviceId, mergeStringLists(existing, repair.scopes));
+  }
+  return scopesByDeviceId;
+}
+
 export function remediateGatewayClientDeviceScopes(
   deps: Pick<
     BootstrapDeps,
@@ -806,21 +872,34 @@ export function remediateGatewayClientDeviceScopes(
 
   let checked = 0;
   let updated = 0;
+  const repairScopesByDeviceId = buildGatewayClientRepairScopesByDeviceId(deps);
 
   for (const value of Object.values(pairedFile)) {
-    if (!isJsonRecord(value) || value.clientId !== GATEWAY_CLIENT_ID) continue;
+    if (!isJsonRecord(value)) continue;
+    const deviceId = typeof value.deviceId === 'string' ? value.deviceId : undefined;
+    const repairScopes = deviceId ? repairScopesByDeviceId.get(deviceId) : undefined;
+    const isGatewayClientPairing = value.clientId === GATEWAY_CLIENT_ID;
+    const shouldRepairByDeviceId =
+      Array.isArray(repairScopes) && repairScopes.length > 0 && hasOperatorToken(value);
+    if (!isGatewayClientPairing && !shouldRepairByDeviceId) continue;
     checked += 1;
 
-    let changed = false;
-    changed = setScopeList(value, 'scopes') || changed;
-    changed = setScopeList(value, 'approvedScopes') || changed;
-
     const tokens = value.tokens;
-    if (isJsonRecord(tokens)) {
-      const operatorToken = tokens[OPERATOR_TOKEN_ROLE];
-      if (isJsonRecord(operatorToken)) {
-        changed = setScopeList(operatorToken, 'scopes') || changed;
-      }
+    const operatorToken = isJsonRecord(tokens) ? tokens[OPERATOR_TOKEN_ROLE] : undefined;
+    const mergedScopes = mergeStringLists(
+      value.scopes,
+      value.approvedScopes,
+      isJsonRecord(operatorToken) ? operatorToken.scopes : undefined,
+      GATEWAY_CLIENT_OPERATOR_SCOPES,
+      repairScopes
+    );
+
+    let changed = false;
+    changed = setScopeList(value, 'scopes', mergedScopes) || changed;
+    changed = setScopeList(value, 'approvedScopes', mergedScopes) || changed;
+
+    if (isJsonRecord(operatorToken)) {
+      changed = setScopeList(operatorToken, 'scopes', mergedScopes) || changed;
     }
 
     if (changed) updated += 1;
@@ -843,6 +922,26 @@ export function remediateGatewayClientDeviceScopes(
   );
 
   return { checked, updated };
+}
+
+export function runGatewayClientDeviceScopeRemediation(
+  deps: Pick<
+    BootstrapDeps,
+    'existsSync' | 'readFileSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'chmodSync'
+  > = defaultDeps
+): GatewayClientDeviceScopeRemediationResult {
+  try {
+    const remediation = remediateGatewayClientDeviceScopes(deps);
+    if (remediation.updated > 0) {
+      console.log(
+        `[controller] gateway-client device scopes remediated: ${remediation.updated}/${remediation.checked} paired device(s)`
+      );
+    }
+    return remediation;
+  } catch (err) {
+    console.warn('[controller] Failed to remediate gateway-client device scopes:', err);
+    return { checked: 0, updated: 0 };
+  }
 }
 
 // ---- TOOLS.md bounded-section helper ----
@@ -1096,6 +1195,10 @@ export async function bootstrapNonCritical(
   const steps: BootstrapStep[] = [
     { phase: 'github', run: () => configureGitHub(env, deps) },
     { phase: 'linear', run: () => configureLinear(env) },
+    {
+      phase: 'gateway-client-device-scopes',
+      run: () => runGatewayClientDeviceScopeRemediation(deps),
+    },
     { phase: configPhase, run: () => runOnboardOrDoctor(env, deps) },
     {
       phase: 'tools-md',

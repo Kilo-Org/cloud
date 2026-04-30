@@ -10,8 +10,22 @@ import { getWorkerDb, validateAndRedeemAccessCode, findPepperByUserId } from '..
 import { signKiloToken, validateKiloToken } from '../auth/jwt';
 import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
+import { parseInstanceHost } from '../auth/hostname-label';
 import { sandboxIdFromInstanceId, isValidInstanceId } from '@kilocode/worker-utils/instance-id';
 import type { KiloClawEnv } from '../types';
+
+/**
+ * Access-gateway requests served on a per-instance virtual host (e.g.
+ * `i-<hex>.kiloclaw.ai`) don't need `KILOCLAW_ACTIVE_INSTANCE_COOKIE`:
+ * the host itself is the routing signal, and a cookie scoped to that
+ * host is self-referential. Returning true here suppresses both the
+ * positive set and the clear-cookie fallback so the host's cookie jar
+ * stays clean.
+ */
+function requestIsOnInstanceHost(c: Context<AppEnv>): boolean {
+  const host = new URL(c.req.raw.url).host;
+  return parseInstanceHost(host, c.env) !== null;
+}
 
 /**
  * Access gateway routes — unauthenticated.
@@ -316,23 +330,29 @@ async function redeemCodeAndSetCookie(
   // Track which instance the user is accessing so the catch-all proxy
   // routes WebSocket/HTTP traffic to the correct instance. The OpenClaw
   // Control UI connects to `/` without the `/i/{instanceId}/` prefix.
-  if (instanceId && isValidInstanceId(instanceId)) {
-    setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, instanceId, {
-      path: '/',
-      httpOnly: true,
-      secure: c.env.WORKER_ENV !== 'development',
-      sameSite: 'Lax',
-      maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
-    });
-  } else {
-    // Clear the cookie when opening a personal (non-instance-keyed) instance
-    setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, '', {
-      path: '/',
-      httpOnly: true,
-      secure: c.env.WORKER_ENV !== 'development',
-      sameSite: 'Lax',
-      maxAge: 0,
-    });
+  //
+  // Skip on per-instance virtual hosts — the Host header carries the same
+  // routing signal, and a cookie scoped to `<label>.kiloclaw.ai` is
+  // self-referential.
+  if (!requestIsOnInstanceHost(c)) {
+    if (instanceId && isValidInstanceId(instanceId)) {
+      setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, instanceId, {
+        path: '/',
+        httpOnly: true,
+        secure: c.env.WORKER_ENV !== 'development',
+        sameSite: 'Lax',
+        maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
+      });
+    } else {
+      // Clear the cookie when opening a personal (non-instance-keyed) instance
+      setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, '', {
+        path: '/',
+        httpOnly: true,
+        secure: c.env.WORKER_ENV !== 'development',
+        sameSite: 'Lax',
+        maxAge: 0,
+      });
+    }
   }
 
   const redirectUrl = await buildRedirectUrl(redeemedUserId, c.env, instanceId);
@@ -358,14 +378,16 @@ accessGatewayRoutes.get('/kilo-access-gateway', async c => {
         } catch {
           return c.text('Access denied', 403);
         }
-        setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, instanceId, {
-          path: '/',
-          httpOnly: true,
-          secure: c.env.WORKER_ENV !== 'development',
-          sameSite: 'Lax',
-          maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
-        });
-      } else {
+        if (!requestIsOnInstanceHost(c)) {
+          setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, instanceId, {
+            path: '/',
+            httpOnly: true,
+            secure: c.env.WORKER_ENV !== 'development',
+            sameSite: 'Lax',
+            maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
+          });
+        }
+      } else if (!requestIsOnInstanceHost(c)) {
         setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, '', {
           path: '/',
           httpOnly: true,

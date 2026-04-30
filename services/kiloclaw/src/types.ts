@@ -87,6 +87,16 @@ export type KiloClawEnv = {
   KILOCLAW_CHECKIN_URL?: string;
   REQUIRE_PROXY_TOKEN?: string;
 
+  /**
+   * Host suffix for per-instance virtual hosting. Default `.kiloclaw.ai`.
+   * Dev parity: set to `.kiloclaw.localhost:8795` (or similar) to emulate
+   * per-instance hostnames without /etc/hosts edits. See
+   * `src/auth/hostname-label.ts` for the full rationale.
+   */
+  KILOCLAW_INSTANCE_HOST_SUFFIX?: string;
+  /** URL scheme paired with `KILOCLAW_INSTANCE_HOST_SUFFIX`. Default `https`. */
+  KILOCLAW_INSTANCE_URL_SCHEME?: string;
+
   /** Base URL of the kilo-chat worker for bot HTTP routes. */
   KILOCHAT_BASE_URL?: string;
 

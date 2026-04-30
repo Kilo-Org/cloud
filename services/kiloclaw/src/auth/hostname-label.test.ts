@@ -4,6 +4,8 @@ import { sandboxIdFromInstanceId } from '@kilocode/worker-utils/instance-id';
 import {
   hostnameLabelFromSandboxId,
   sandboxIdFromHostnameLabel,
+  instanceUrl,
+  parseInstanceHost,
   MAX_HOSTNAME_LABEL_LENGTH,
 } from './hostname-label';
 
@@ -120,5 +122,70 @@ describe('sandboxIdFromHostnameLabel', () => {
     expect(sandboxIdFromHostnameLabel('u-foo.bar')).toBeNull();
     expect(sandboxIdFromHostnameLabel('u-zzzz')).toBeNull();
     expect(sandboxIdFromHostnameLabel('u-')).toBeNull();
+  });
+});
+
+describe('instanceUrl', () => {
+  it('uses the default suffix and scheme when env is empty', () => {
+    expect(instanceUrl('i-abc123', {})).toBe('https://i-abc123.kiloclaw.ai');
+  });
+
+  it('honours an explicit suffix and scheme', () => {
+    expect(
+      instanceUrl('i-abc123', {
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.localhost:8795',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'http',
+      })
+    ).toBe('http://i-abc123.kiloclaw.localhost:8795');
+  });
+
+  it('roundtrips a sandboxId through hostnameLabelFromSandboxId + instanceUrl', () => {
+    const sandboxId = sandboxIdFromInstanceId('550e8400-e29b-41d4-a716-446655440000');
+    const label = hostnameLabelFromSandboxId(sandboxId);
+    expect(label).not.toBeNull();
+    expect(instanceUrl(label ?? '', {})).toBe(
+      'https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai'
+    );
+  });
+});
+
+describe('parseInstanceHost', () => {
+  it('returns the label for a matching host', () => {
+    expect(parseInstanceHost('i-abc123.kiloclaw.ai', {})).toBe('i-abc123');
+    expect(parseInstanceHost('u-deadbeef.kiloclaw.ai', {})).toBe('u-deadbeef');
+  });
+
+  it('is case-insensitive and lowercases the returned label', () => {
+    expect(parseInstanceHost('I-ABC123.KILOCLAW.AI', {})).toBe('i-abc123');
+    expect(parseInstanceHost('I-ABC123.KiloClaw.Ai', {})).toBe('i-abc123');
+  });
+
+  it('returns null when the host does not end with the suffix', () => {
+    expect(parseInstanceHost('claw.kilosessions.ai', {})).toBeNull();
+    expect(parseInstanceHost('localhost:8795', {})).toBeNull();
+    expect(parseInstanceHost('marketing.kiloclaw.com', {})).toBeNull();
+  });
+
+  it('rejects bare suffix with no label', () => {
+    expect(parseInstanceHost('.kiloclaw.ai', {})).toBeNull();
+    expect(parseInstanceHost('kiloclaw.ai', {})).toBeNull();
+  });
+
+  it('rejects multi-label subdomains', () => {
+    expect(parseInstanceHost('foo.bar.kiloclaw.ai', {})).toBeNull();
+    expect(parseInstanceHost('a.b.c.kiloclaw.ai', {})).toBeNull();
+  });
+
+  it('works with a dev suffix including a port', () => {
+    const env = {
+      KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.localhost:8795',
+      KILOCLAW_INSTANCE_URL_SCHEME: 'http',
+    };
+    expect(parseInstanceHost('i-abc.kiloclaw.localhost:8795', env)).toBe('i-abc');
+    expect(parseInstanceHost('I-ABC.KILOCLAW.LOCALHOST:8795', env)).toBe('i-abc');
+    // Host without the port component doesn't match the port-bearing suffix.
+    expect(parseInstanceHost('i-abc.kiloclaw.localhost', env)).toBeNull();
+    // Suffix-less host stays unmatched.
+    expect(parseInstanceHost('localhost:8795', env)).toBeNull();
   });
 });

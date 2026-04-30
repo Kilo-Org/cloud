@@ -15,6 +15,7 @@ import {
   type ConversationListInfiniteData,
   conversationsKey,
   filterConversationPages,
+  insertConversationOnFirstPage,
   updateConversationPages,
 } from '@kilocode/kilo-chat-hooks';
 
@@ -41,13 +42,14 @@ export function useInstanceEventSubscription(sandboxId: string | undefined) {
         return;
       }
       const event = result.data;
-      const data = qc.getQueryData<ConversationListInfiniteData>(queryKey);
-      if (isConversationOnFirstPage(data, event.conversationId)) {
+      if (event.sandboxId !== sandboxId) {
         return;
       }
-      void qc.invalidateQueries({ queryKey });
+      qc.setQueryData<ConversationListInfiniteData>(queryKey, old =>
+        insertConversationOnFirstPage(old, event.conversationListItem)
+      );
     },
-    [qc, queryKey]
+    [qc, queryKey, sandboxId]
   );
 
   const handleLeft = useCallback(

@@ -58,7 +58,14 @@ describe('KiloChatClient', () => {
   describe('createConversation', () => {
     it('sends POST /v1/conversations with body', async () => {
       const newUlid = '01HXYZ00000ABCDEFGHJKMNPQR';
-      const fetch = mockFetch(201, { conversationId: newUlid });
+      const conversationListItem = {
+        conversationId: newUlid,
+        title: null,
+        lastActivityAt: null,
+        lastReadAt: null,
+        joinedAt: 1234,
+      };
+      const fetch = mockFetch(201, { conversationId: newUlid, conversationListItem });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.createConversation({ sandboxId: 'sb-1' });
       expect(fetch).toHaveBeenCalledWith(
@@ -69,7 +76,7 @@ describe('KiloChatClient', () => {
           headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
         })
       );
-      expect(res).toEqual({ conversationId: newUlid });
+      expect(res).toEqual({ conversationId: newUlid, conversationListItem });
     });
   });
 

@@ -26,7 +26,7 @@ function getMemberStub(memberId: string): DurableObjectStub<MembershipDO> {
 }
 
 describe('POST /v1/conversations', () => {
-  it('creates a conversation and returns conversationId', async () => {
+  it('creates a conversation and returns the list row', async () => {
     grantSandbox('user-alice', 'sandbox-123');
     const app = makeApp('user-alice', 'user');
     const res = await app.request(
@@ -40,10 +40,26 @@ describe('POST /v1/conversations', () => {
     );
 
     expect(res.status).toBe(201);
-    const body = await res.json<{ conversationId: string }>();
+    const body = await res.json<{
+      conversationId: string;
+      conversationListItem: {
+        conversationId: string;
+        title: string | null;
+        lastActivityAt: number | null;
+        lastReadAt: number | null;
+        joinedAt: number;
+      };
+    }>();
     expect(body.conversationId).toBeTruthy();
     expect(typeof body.conversationId).toBe('string');
     expect(body.conversationId).toHaveLength(26);
+    expect(body.conversationListItem).toEqual({
+      conversationId: body.conversationId,
+      title: 'My Chat',
+      lastActivityAt: null,
+      lastReadAt: null,
+      joinedAt: expect.any(Number),
+    });
   });
 
   it('initializes ConversationDO and MembershipDOs on creation', async () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  createConversationResponseSchema,
   renameConversationRequestSchema,
   createConversationRequestSchema,
   createBotConversationRequestSchema,
@@ -9,6 +10,36 @@ import {
   CONVERSATION_TITLE_MAX_CHARS,
   MESSAGE_TEXT_MAX_CHARS,
 } from '../src/schemas';
+import { conversationCreatedEventSchema } from '../src/events';
+
+const conversationListItem = {
+  conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+  title: 'Chat',
+  lastActivityAt: null,
+  lastReadAt: null,
+  joinedAt: 1234,
+};
+
+describe('conversation creation contract', () => {
+  it('requires the created conversation list row in create responses', () => {
+    const res = createConversationResponseSchema.safeParse({
+      conversationId: conversationListItem.conversationId,
+      conversationListItem,
+    });
+
+    expect(res.success).toBe(true);
+  });
+
+  it('requires sandboxId and the created conversation list row in events', () => {
+    const res = conversationCreatedEventSchema.safeParse({
+      conversationId: conversationListItem.conversationId,
+      sandboxId: 'sandbox-abc',
+      conversationListItem,
+    });
+
+    expect(res.success).toBe(true);
+  });
+});
 
 describe('title schemas — trim and reject empty', () => {
   describe('renameConversationRequestSchema', () => {

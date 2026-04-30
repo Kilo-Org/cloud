@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { contentBlockSchema } from './schemas';
+import { contentBlockSchema, conversationListItemSchema } from './schemas';
 
 // ── Per-event payload schemas ───────────────────────────────────────
 
@@ -43,6 +43,8 @@ export const reactionRemovedEventSchema = z.object({
 
 export const conversationCreatedEventSchema = z.object({
   conversationId: z.string(),
+  sandboxId: z.string(),
+  conversationListItem: conversationListItemSchema,
 });
 
 export const conversationRenamedEventSchema = z.object({

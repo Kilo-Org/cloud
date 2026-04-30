@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
-import type { CreateConversationRequest, ConversationListResponse } from '@kilocode/kilo-chat';
+import type {
+  CreateConversationRequest,
+  ConversationListItem,
+  ConversationListResponse,
+} from '@kilocode/kilo-chat';
 
 import { conversationKey, conversationsKey, conversationsKeyAll, messagesKey } from './query-keys';
 
@@ -42,8 +46,11 @@ export function useCreateConversation(client: KiloChatClient, options?: Mutation
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (req: CreateConversationRequest) => client.createConversation(req),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: conversationsKeyAll() });
+    onSuccess: (response, variables) => {
+      queryClient.setQueryData<ConversationListInfiniteData>(
+        conversationsKey(variables.sandboxId),
+        old => insertConversationOnFirstPage(old, response.conversationListItem)
+      );
     },
     onError: options?.onError,
   });
@@ -73,6 +80,35 @@ export function useLeaveConversation(client: KiloChatClient) {
 }
 
 export type ConversationListInfiniteData = InfiniteData<ConversationListResponse, string | null>;
+
+export function insertConversationOnFirstPage(
+  data: ConversationListInfiniteData | undefined,
+  item: ConversationListItem
+): ConversationListInfiniteData | undefined {
+  if (!data) return data;
+  if (
+    data.pages.some(page => page.conversations.some(c => c.conversationId === item.conversationId))
+  ) {
+    return data;
+  }
+  const firstPage = data.pages[0];
+  if (!firstPage) {
+    return {
+      ...data,
+      pages: [{ conversations: [item], hasMore: false, nextCursor: null }],
+    };
+  }
+  return {
+    ...data,
+    pages: [
+      {
+        ...firstPage,
+        conversations: [item, ...firstPage.conversations],
+      },
+      ...data.pages.slice(1),
+    ],
+  };
+}
 
 export function updateConversationPages(
   data: ConversationListInfiniteData | undefined,

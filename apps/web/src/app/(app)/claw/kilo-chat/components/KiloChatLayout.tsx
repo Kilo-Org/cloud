@@ -18,6 +18,7 @@ import {
   useLeaveConversation,
   updateConversationPages,
   filterConversationPages,
+  insertConversationOnFirstPage,
   type ConversationListInfiniteData,
 } from '../hooks/useConversations';
 
@@ -80,8 +81,10 @@ export function KiloChatLayout({
 
     const offs = [
       kiloChatClient.onConversationCreated((_ctx, e) => {
-        if (isOnFirstPage(e.conversationId)) return;
-        void queryClient.invalidateQueries({ queryKey });
+        if (e.sandboxId !== sandboxId) return;
+        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
+          insertConversationOnFirstPage(old, e.conversationListItem)
+        );
       }),
       kiloChatClient.onConversationRenamed((_ctx, e) => {
         queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
@@ -124,7 +127,7 @@ export function KiloChatLayout({
       }),
     ];
     return () => offs.forEach(off => off());
-  }, [kiloChatClient, queryClient, currentUserId]);
+  }, [kiloChatClient, queryClient, currentUserId, sandboxId]);
 
   // Refetch conversations on WebSocket reconnect (events may have been missed)
   useEffect(() => {

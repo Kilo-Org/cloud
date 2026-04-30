@@ -15,6 +15,7 @@ import { lookupSandboxOwnerUserId, userOwnsSandbox } from './sandbox-ownership';
 import { validateUserIds } from './user-lookup';
 import type { DeferCtx } from './messages';
 import type { ConversationDO, UpdateTitleIfMemberResult } from '../do/conversation-do';
+import type { ConversationListItem } from '@kilocode/kilo-chat';
 
 // ─── partial-failure rollback helpers ──────────────────────────────────────
 
@@ -76,7 +77,7 @@ export type CreateConversationParams = {
 };
 
 export type CreateConversationResult =
-  | { ok: true; conversationId: string }
+  | { ok: true; conversationId: string; conversationListItem: ConversationListItem }
   | { ok: false; code: 'forbidden' | 'internal'; error: string };
 
 export async function createConversationFor(
@@ -115,6 +116,13 @@ export async function createConversationFor(
     sandboxId: params.sandboxId,
     joinedAt: now,
   };
+  const conversationListItem = {
+    conversationId,
+    title: memberParams.title,
+    lastActivityAt: null,
+    lastReadAt: null,
+    joinedAt: now,
+  } satisfies ConversationListItem;
 
   const succeededMemberIds: string[] = [];
   try {
@@ -127,9 +135,11 @@ export async function createConversationFor(
   // Notify all human members on the instance context so their conversation list updates.
   await pushInstanceEvent(env, params.sandboxId, [userId], 'conversation.created', {
     conversationId,
+    sandboxId: params.sandboxId,
+    conversationListItem,
   });
 
-  return { ok: true, conversationId };
+  return { ok: true, conversationId, conversationListItem };
 }
 
 // ─── createBotConversation ─────────────────────────────────────────────────
@@ -141,7 +151,7 @@ export type CreateBotConversationParams = {
 };
 
 export type CreateBotConversationResult =
-  | { ok: true; conversationId: string }
+  | { ok: true; conversationId: string; conversationListItem: ConversationListItem }
   | {
       ok: false;
       code: 'not_found' | 'invalid_members' | 'internal';
@@ -202,6 +212,13 @@ export async function createBotConversationFor(
     sandboxId: params.sandboxId,
     joinedAt: now,
   };
+  const conversationListItem = {
+    conversationId,
+    title: memberParams.title,
+    lastActivityAt: null,
+    lastReadAt: null,
+    joinedAt: now,
+  } satisfies ConversationListItem;
 
   const memberIds = members.map(m => m.id);
   const succeededMemberIds: string[] = [];
@@ -215,9 +232,11 @@ export async function createBotConversationFor(
   const humanMemberIds = members.filter(m => m.kind === 'user').map(m => m.id);
   await pushInstanceEvent(env, params.sandboxId, humanMemberIds, 'conversation.created', {
     conversationId,
+    sandboxId: params.sandboxId,
+    conversationListItem,
   });
 
-  return { ok: true, conversationId };
+  return { ok: true, conversationId, conversationListItem };
 }
 
 // ─── renameConversation ────────────────────────────────────────────────────

@@ -154,6 +154,7 @@ export const createConversationRequestSchema = z.object({
 
 export const createConversationResponseSchema = z.object({
   conversationId: ulidSchema,
+  conversationListItem: conversationListItemSchema,
 });
 
 export const okResponseSchema = z.object({ ok: z.literal(true) });

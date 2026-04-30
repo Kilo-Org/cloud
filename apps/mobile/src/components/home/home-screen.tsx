@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
+import { badgeBucketForInstance } from '@kilocode/notifications';
+
 import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
 import { AgentsPromoCard } from '@/components/home/agents-promo-card';
 import { buildTimedGreeting, Greeting } from '@/components/home/greeting';
@@ -15,7 +17,6 @@ import { isTransitionalStatus } from '@/components/kiloclaw/status-badge';
 import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { badgeBucketForInstance } from '@/lib/badge-buckets';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type ClawInstance, useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useUnreadCounts } from '@/lib/hooks/use-unread-counts';

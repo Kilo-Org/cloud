@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { type BadgeCountRow, listBadgesResponseSchema } from '@kilocode/notifications';
+import {
+  badgeBucketForInstance,
+  type BadgeCountRow,
+  listBadgesResponseSchema,
+} from '@kilocode/notifications';
 
 import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
 import { useKiloChatTokenGetter } from '@/components/kilo-chat/hooks/use-kilo-chat-token';
-import { badgeBucketForInstance } from '@/lib/badge-buckets';
 import { NOTIFICATIONS_URL } from '@/lib/config';
 
 /**

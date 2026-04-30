@@ -7,3 +7,6 @@
 
 export const badgeBucketForConversation = (sandboxId: string, conversationId: string) =>
   `kiloclaw:${sandboxId}:${conversationId}` as const;
+
+export const badgeBucketForInstance = (sandboxId: string): `kiloclaw:${string}` =>
+  `kiloclaw:${sandboxId}`;

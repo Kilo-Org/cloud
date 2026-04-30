@@ -23,8 +23,10 @@ export type SendInstanceLifecycleNotificationParams = {
 };
 
 export type SendInstanceLifecycleNotificationResult = {
+  tokenCount: number;
   sent: number;
   staleTokens: number;
+  receiptCount: number;
 };
 
 export const ParamsSchema = z.object({
@@ -99,7 +101,7 @@ export async function dispatchInstanceLifecyclePush(
 
   const tokens = await deps.getTokens(parsed.userId);
   if (tokens.length === 0) {
-    return { sent: 0, staleTokens: 0 };
+    return { tokenCount: 0, sent: 0, staleTokens: 0, receiptCount: 0 };
   }
 
   const messages = buildInstanceLifecycleMessages(tokens, parsed);
@@ -113,5 +115,10 @@ export async function dispatchInstanceLifecyclePush(
     await deps.enqueueReceipts(ticketTokenPairs);
   }
 
-  return { sent: ticketTokenPairs.length, staleTokens: staleTokens.length };
+  return {
+    tokenCount: tokens.length,
+    sent: ticketTokenPairs.length,
+    staleTokens: staleTokens.length,
+    receiptCount: ticketTokenPairs.length,
+  };
 }

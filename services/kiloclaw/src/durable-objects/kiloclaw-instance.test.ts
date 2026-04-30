@@ -9436,7 +9436,7 @@ function createFakeNotificationsBinding(): {
     binding: {
       sendInstanceLifecycleNotification: async (params: LifecyclePushCall) => {
         calls.push(params);
-        return { sent: 1, staleTokens: 0 };
+        return { tokenCount: 1, sent: 1, staleTokens: 0, receiptCount: 1 };
       },
     },
     calls,

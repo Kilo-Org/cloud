@@ -20,8 +20,10 @@ export type SendInstanceLifecycleNotificationParams = {
 };
 
 export type SendInstanceLifecycleNotificationResult = {
+  tokenCount: number;
   sent: number;
   staleTokens: number;
+  receiptCount: number;
 };
 
 export type NotificationsBinding = Fetcher & {

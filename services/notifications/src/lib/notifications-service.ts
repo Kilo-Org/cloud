@@ -64,10 +64,13 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
         level: 'info',
         message: 'dispatched instance lifecycle push',
         userId: params.userId,
+        instanceId: params.instanceId,
         sandboxId: params.sandboxId,
         event: params.event,
+        tokenCount: result.tokenCount,
         sent: result.sent,
         staleTokens: result.staleTokens,
+        receiptCount: result.receiptCount,
       })
     );
 

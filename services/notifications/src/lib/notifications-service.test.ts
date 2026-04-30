@@ -138,7 +138,7 @@ describe('dispatchInstanceLifecyclePush', () => {
 
     const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
 
-    expect(result).toEqual({ sent: 2, staleTokens: 0 });
+    expect(result).toEqual({ tokenCount: 2, sent: 2, staleTokens: 0, receiptCount: 2 });
     expect(calls.getTokenQueries).toEqual(['user-1']);
     expect(calls.sentMessages).toHaveLength(1);
     expect(calls.sentMessages[0]).toHaveLength(2);
@@ -154,7 +154,7 @@ describe('dispatchInstanceLifecyclePush', () => {
 
     const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
 
-    expect(result).toEqual({ sent: 0, staleTokens: 0 });
+    expect(result).toEqual({ tokenCount: 0, sent: 0, staleTokens: 0, receiptCount: 0 });
     expect(calls.sentMessages).toHaveLength(0);
     expect(calls.enqueuedReceipts).toHaveLength(0);
     expect(calls.deletedTokens).toHaveLength(0);
@@ -175,7 +175,7 @@ describe('dispatchInstanceLifecyclePush', () => {
 
     const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
 
-    expect(result).toEqual({ sent: 1, staleTokens: 1 });
+    expect(result).toEqual({ tokenCount: 2, sent: 1, staleTokens: 1, receiptCount: 1 });
     expect(calls.deletedTokens).toEqual([['ExponentPushToken[bbb]']]);
   });
 
@@ -189,7 +189,7 @@ describe('dispatchInstanceLifecyclePush', () => {
 
     const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
 
-    expect(result).toEqual({ sent: 0, staleTokens: 2 });
+    expect(result).toEqual({ tokenCount: 2, sent: 0, staleTokens: 2, receiptCount: 0 });
     expect(calls.deletedTokens).toEqual([['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]']]);
     expect(calls.enqueuedReceipts).toHaveLength(0);
   });

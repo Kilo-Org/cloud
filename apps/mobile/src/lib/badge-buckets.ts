@@ -1,1 +1,2 @@
-export const badgeBucketForInstance = (sandboxId: string) => `kiloclaw:${sandboxId}` as const;
+export const badgeBucketForInstance = (sandboxId: string): `kiloclaw:${string}` =>
+  `kiloclaw:${sandboxId}`;

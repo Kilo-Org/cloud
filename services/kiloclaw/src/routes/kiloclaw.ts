@@ -91,32 +91,6 @@ kiloclaw.get('/status', c =>
   })
 );
 
-// GET /api/kiloclaw/chat-credentials -- Stream Chat credentials for the user's channel
-kiloclaw.get('/chat-credentials', c =>
-  instrumented(c, 'GET /api/kiloclaw/chat-credentials', async () => {
-    const userId = c.get('userId');
-    const raw = c.req.query('instanceId');
-    if (raw && !InstanceIdParam.safeParse(raw).success) {
-      return c.json({ error: 'Invalid instance ID' }, 400);
-    }
-    const instanceId = raw || undefined;
-    const doKey = instanceId ?? userId;
-    const stub = c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(doKey));
-
-    // When accessing by instanceId, verify the authenticated user owns this instance.
-    if (instanceId) {
-      const status = await stub.getStatus();
-      if (status.userId !== userId) {
-        return c.json({ error: 'Access denied' }, 403);
-      }
-    }
-
-    const creds = await stub.getStreamChatCredentials();
-
-    return c.json(creds);
-  })
-);
-
 /**
  * Derive per-entry configured status from the catalog.
  *

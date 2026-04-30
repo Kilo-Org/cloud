@@ -143,8 +143,6 @@
     "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1",
     "sonner": "^2.0.7",
-    "stream-chat": "^9.38.0",
-    "stream-chat-react": "^13.14.2",
     "stripe": "catalog:",
     "stytch": "^12.43.1",
     "tailwind-merge": "^3.5.0",

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawStatus } from '@/hooks/useOrgKiloClaw';
 import { ClawContextProvider } from './ClawContext';
-import { ChatTab } from './ChatTab';
+import ChatTab from './ChatTab';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { SetPageTitle } from '@/components/SetPageTitle';
@@ -56,13 +56,12 @@ function ClawChatWithStatus({ organizationId }: { organizationId?: string }) {
 
   if (!status || status.status === null) return null;
 
-  const isRunning = status.status === 'running';
   const chatContent = (
     <>
       <ClawConfigServiceBanner status={status} />
       <Card>
         <CardContent className="p-5">
-          <ChatTab enabled={isRunning} />
+          <ChatTab sandboxId={status.sandboxId ?? ''} />
         </CardContent>
       </Card>
     </>

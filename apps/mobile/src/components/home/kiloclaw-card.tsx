@@ -6,9 +6,7 @@ import { isTransitionalStatus, statusLabel, statusTone } from '@/components/kilo
 import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import { agentColor } from '@/lib/agent-color';
-import { useKiloClawLatestMessage } from '@/lib/hooks/use-kiloclaw-latest-message';
 import { useKiloClawStatus, useKiloClawStatusQueryKey } from '@/lib/hooks/use-kiloclaw-queries';
-import { parseTimestamp } from '@/lib/utils';
 
 type KiloClawCardProps = {
   instance: {
@@ -25,25 +23,6 @@ type CachedStatus = NonNullable<ReturnType<typeof useKiloClawStatus>['data']>;
 
 function formatUnreadCount(count: number): string {
   return count > 99 ? '99+' : String(count);
-}
-
-function formatMessagePreview(
-  message: { text: string; isFromMe: boolean },
-  botEmoji: string | null
-): string {
-  const text = message.text.length > 0 ? message.text : 'New message';
-  if (message.isFromMe) {
-    return `You: ${text}`;
-  }
-  return botEmoji ? `${botEmoji} ${text}` : text;
-}
-
-function formatClockTime(date: Date): string {
-  const hours = date.getHours();
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const displayHours = hours % 12 === 0 ? 12 : hours % 12;
-  return `${String(displayHours)}:${minutes} ${period}`;
 }
 
 function firstLetter(name: string): string {
@@ -69,7 +48,6 @@ export function KiloClawCard({ instance, unreadCount = 0 }: Readonly<KiloClawCar
     true,
     fastPoll ? 5000 : 10_000
   );
-  const { data: latest } = useKiloClawLatestMessage(instance.organizationId);
 
   const botEmoji = status?.botEmoji ?? null;
   const displayName = status?.botName ?? instance.name ?? 'KiloClaw';
@@ -79,7 +57,6 @@ export function KiloClawCard({ instance, unreadCount = 0 }: Readonly<KiloClawCar
   const tapDisabled = isTransitionalStatus(rawStatus);
 
   const hue = agentColor(displayName);
-  const lastMessageTime = latest ? formatClockTime(parseTimestamp(latest.created_at)) : null;
 
   const hasUnread = unreadCount > 0;
   const accessibilityLabel = hasUnread
@@ -118,11 +95,6 @@ export function KiloClawCard({ instance, unreadCount = 0 }: Readonly<KiloClawCar
             >
               {displayName}
             </Text>
-            {lastMessageTime ? (
-              <Text variant="eyebrow" className="shrink-0">
-                {lastMessageTime}
-              </Text>
-            ) : null}
           </View>
           <View className="mt-1 flex-row items-center gap-1.5">
             <StatusDot tone={tone} glow />
@@ -137,14 +109,6 @@ export function KiloClawCard({ instance, unreadCount = 0 }: Readonly<KiloClawCar
           </View>
         ) : null}
       </View>
-
-      {latest ? (
-        <View className="mt-3 rounded-lg bg-muted p-3">
-          <Text className="text-[13px] text-ink2" numberOfLines={2}>
-            {formatMessagePreview(latest, botEmoji)}
-          </Text>
-        </View>
-      ) : null}
     </Pressable>
   );
 }

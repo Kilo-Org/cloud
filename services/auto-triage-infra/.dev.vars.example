@@ -7,7 +7,7 @@ API_URL=http://localhost:3000
 INTERNAL_API_SECRET=your-secret-here
 
 # Backend auth token for authenticating incoming requests from backend
-# @from CODE_REVIEW_WORKER_AUTH_TOKEN
+# @from AUTO_TRIAGE_AUTH_TOKEN
 BACKEND_AUTH_TOKEN=your-backend-auth-token
 
 # Cloud agent URL for triage execution

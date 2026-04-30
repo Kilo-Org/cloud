@@ -450,7 +450,7 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
       const { shouldNotify } = await stub.tryMarkInstanceReady();
 
       if (c.env.INTERNAL_API_SECRET) {
-        console.log('[controller] instance-ready: dispatching notification', {
+        console.info('[controller] instance-ready: dispatching notification', {
           userId,
           sandboxId: data.sandboxId,
           instanceId: isInstanceKeyedSandboxId(data.sandboxId) ? doKey : null,

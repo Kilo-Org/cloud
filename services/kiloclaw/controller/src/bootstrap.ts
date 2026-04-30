@@ -848,6 +848,8 @@ function readGatewayClientRepairRequests(
     if (!hasOperatorRole(value)) continue;
     if (typeof value.deviceId !== 'string' || value.deviceId.trim().length === 0) continue;
 
+    // Trust boundary: pending.json is local OpenClaw state, not external API input.
+    // Revisit this guard if any non-OpenClaw writer starts staging device requests.
     const operatorScopes = mergeStringLists(value.scopes).filter(scope =>
       scope.startsWith('operator.')
     );

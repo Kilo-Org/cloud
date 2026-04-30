@@ -50,6 +50,6 @@ export function deepStrict<T extends z.ZodType>(schema: T): z.ZodType<z.infer<T>
       ) as unknown as z.ZodType<z.infer<T>>;
     }
     default:
-      return schema;
+      return schema as unknown as z.ZodType<z.infer<T>>;
   }
 }

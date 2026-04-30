@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { chatWebhookRpcSchema, KiloChatEventName } from '@kilocode/kilo-chat';
+import type { chatWebhookRpcSchema, KiloChatEventName, KiloChatEventOf } from '@kilocode/kilo-chat';
 import type {
   SendPushForConversationInput,
   SendPushForConversationOutput,
@@ -20,11 +20,11 @@ declare global {
       deliverChatWebhook(payload: z.infer<typeof chatWebhookRpcSchema>): Promise<void>;
     };
     EVENT_SERVICE: Fetcher & {
-      pushEvent(
+      pushEvent<N extends KiloChatEventName>(
         userId: string,
         context: string,
-        event: KiloChatEventName,
-        payload: unknown
+        event: N,
+        payload: KiloChatEventOf<N>
       ): Promise<boolean>;
     };
     NOTIFICATIONS: Fetcher & {

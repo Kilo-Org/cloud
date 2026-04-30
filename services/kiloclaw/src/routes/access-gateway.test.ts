@@ -3,12 +3,16 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../types';
 import { accessGatewayRoutes } from './access-gateway';
 import { signKiloToken } from '../auth/jwt';
+import { deriveGatewayToken } from '../auth/gateway-token';
+import { sandboxIdFromUserId } from '../auth/sandbox-id';
+import { sandboxIdFromInstanceId } from '@kilocode/worker-utils/instance-id';
 import { KILOCLAW_AUTH_COOKIE, KILOCLAW_ACTIVE_INSTANCE_COOKIE } from '../config';
 
 const NEXTAUTH_SECRET = 'test-nextauth-secret';
 const GATEWAY_TOKEN_SECRET = 'test-gateway-secret';
 const USER_ID = 'user-1';
 const INSTANCE_ID = '550e8400-e29b-41d4-a716-446655440000';
+const INSTANCE_SANDBOX_ID = sandboxIdFromInstanceId(INSTANCE_ID);
 
 function buildApp() {
   const app = new Hono<AppEnv>();
@@ -20,13 +24,21 @@ function buildInstanceBinding(ownerUserId: string) {
   const stub = {
     getStatus: vi.fn().mockResolvedValue({
       userId: ownerUserId,
-      sandboxId: `ki_${INSTANCE_ID.replaceAll('-', '')}`,
+      sandboxId: INSTANCE_SANDBOX_ID,
     }),
   };
   return {
     idFromName: vi.fn().mockReturnValue('instance-id'),
     get: vi.fn().mockReturnValue(stub),
   };
+}
+
+function extractTokenFromRedirect(response: Response): string {
+  const loc = response.headers.get('Location');
+  if (!loc) throw new Error('missing Location');
+  const hashIdx = loc.indexOf('#token=');
+  if (hashIdx === -1) throw new Error(`Location has no #token=: ${loc}`);
+  return loc.slice(hashIdx + '#token='.length);
 }
 
 async function signedAuthCookie(): Promise<string> {
@@ -137,5 +149,118 @@ describe('access-gateway cookie scoping', () => {
     expect(response.status).toBe(302);
     const cookies = parseSetCookies(response);
     expect(cookies[KILOCLAW_ACTIVE_INSTANCE_COOKIE]).toBeUndefined();
+  });
+});
+
+describe('access-gateway token derivation on per-instance hosts', () => {
+  it('mints token from host-encoded sandbox on legacy host (same user)', async () => {
+    const app = buildApp();
+    const token = await signedAuthCookie();
+    const legacySandboxId = sandboxIdFromUserId(USER_ID);
+    // Derive the legacy label from the sandboxId helper so the test stays
+    // in sync with the encoding.
+    const { hostnameLabelFromSandboxId } = await import('../auth/hostname-label');
+    const label = hostnameLabelFromSandboxId(legacySandboxId);
+    if (!label) throw new Error('Expected legacy label for user-1');
+
+    const response = await app.fetch(
+      new Request(`https://${label}.kiloclaw.ai/kilo-access-gateway?userId=${USER_ID}`, {
+        headers: { Cookie: `${KILOCLAW_AUTH_COOKIE}=${token}` },
+      }),
+      envBindings()
+    );
+
+    expect(response.status).toBe(302);
+    const actualToken = extractTokenFromRedirect(response);
+    const expectedToken = await deriveGatewayToken(legacySandboxId, GATEWAY_TOKEN_SECRET);
+    expect(actualToken).toBe(expectedToken);
+  });
+
+  it('ignores instanceId query param on per-instance host and uses host sandbox', async () => {
+    // User is on their legacy host but passes some other instanceId as a
+    // query param. The token must be for the host-encoded legacy sandbox,
+    // NOT for the query-param instance — otherwise the OpenClaw SPA would
+    // receive a token mismatched with the host its requests go to.
+    const app = buildApp();
+    const token = await signedAuthCookie();
+    const legacySandboxId = sandboxIdFromUserId(USER_ID);
+    const { hostnameLabelFromSandboxId } = await import('../auth/hostname-label');
+    const label = hostnameLabelFromSandboxId(legacySandboxId);
+    if (!label) throw new Error('Expected legacy label for user-1');
+    const otherInstanceId = '11111111-1111-1111-1111-111111111111';
+
+    const response = await app.fetch(
+      new Request(
+        `https://${label}.kiloclaw.ai/kilo-access-gateway?userId=${USER_ID}&instanceId=${otherInstanceId}`,
+        { headers: { Cookie: `${KILOCLAW_AUTH_COOKIE}=${token}` } }
+      ),
+      // Stub the DO to "own" whatever instanceId gets queried — proves the
+      // host-derived sandbox still wins regardless.
+      envBindings({ KILOCLAW_INSTANCE: buildInstanceBinding(USER_ID) })
+    );
+
+    expect(response.status).toBe(302);
+    const actualToken = extractTokenFromRedirect(response);
+    const expectedToken = await deriveGatewayToken(legacySandboxId, GATEWAY_TOKEN_SECRET);
+    const queryInstanceToken = await deriveGatewayToken(
+      sandboxIdFromInstanceId(otherInstanceId),
+      GATEWAY_TOKEN_SECRET
+    );
+    expect(actualToken).toBe(expectedToken);
+    expect(actualToken).not.toBe(queryInstanceToken);
+  });
+
+  it('mints token from instance-keyed host sandbox when authenticated user owns it', async () => {
+    const app = buildApp();
+    const token = await signedAuthCookie();
+    const label = `i-${INSTANCE_ID.replaceAll('-', '')}`;
+
+    const response = await app.fetch(
+      new Request(
+        `https://${label}.kiloclaw.ai/kilo-access-gateway?userId=${USER_ID}&instanceId=${INSTANCE_ID}`,
+        { headers: { Cookie: `${KILOCLAW_AUTH_COOKIE}=${token}` } }
+      ),
+      envBindings()
+    );
+
+    expect(response.status).toBe(302);
+    const actualToken = extractTokenFromRedirect(response);
+    const expectedToken = await deriveGatewayToken(INSTANCE_SANDBOX_ID, GATEWAY_TOKEN_SECRET);
+    expect(actualToken).toBe(expectedToken);
+  });
+
+  it('rejects instance-keyed host when another user owns the instance', async () => {
+    const app = buildApp();
+    const token = await signedAuthCookie();
+    const label = `i-${INSTANCE_ID.replaceAll('-', '')}`;
+
+    const response = await app.fetch(
+      new Request(
+        `https://${label}.kiloclaw.ai/kilo-access-gateway?userId=${USER_ID}&instanceId=${INSTANCE_ID}`,
+        { headers: { Cookie: `${KILOCLAW_AUTH_COOKIE}=${token}` } }
+      ),
+      envBindings({ KILOCLAW_INSTANCE: buildInstanceBinding('other-user') })
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('rejects legacy host that decodes to a different userId', async () => {
+    const app = buildApp();
+    const token = await signedAuthCookie();
+    // Legacy label for user-2 — authenticated user is user-1.
+    const otherLegacySandboxId = sandboxIdFromUserId('user-2');
+    const { hostnameLabelFromSandboxId } = await import('../auth/hostname-label');
+    const label = hostnameLabelFromSandboxId(otherLegacySandboxId);
+    if (!label) throw new Error('Expected legacy label for user-2');
+
+    const response = await app.fetch(
+      new Request(`https://${label}.kiloclaw.ai/kilo-access-gateway?userId=${USER_ID}`, {
+        headers: { Cookie: `${KILOCLAW_AUTH_COOKIE}=${token}` },
+      }),
+      envBindings()
+    );
+
+    expect(response.status).toBe(403);
   });
 });

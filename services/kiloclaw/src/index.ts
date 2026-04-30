@@ -798,7 +798,13 @@ async function handleHostBasedRoute(c: Context<AppEnv>): Promise<Response | null
   // to v2.
   const version = status.controllerCapabilitiesVersion ?? 1;
   if (version < WORKER_CONTROLLER_CAPABILITIES_VERSION) {
-    const legacy = new URL(`${url.pathname}${url.search}`, 'https://claw.kilosessions.ai');
+    // Build via URL setters rather than `new URL(relative, base)`: a pathname
+    // like `//evil.example/path` passed as a relative URL string would be
+    // interpreted as scheme-relative and redirect off-host. The setter
+    // treats it as the path component verbatim.
+    const legacy = new URL('https://claw.kilosessions.ai');
+    legacy.pathname = url.pathname;
+    legacy.search = url.search;
     return c.redirect(legacy.toString(), 302);
   }
 

@@ -9,9 +9,14 @@ import {
 import { getWorkerDb, validateAndRedeemAccessCode, findPepperByUserId } from '../db';
 import { signKiloToken, validateKiloToken } from '../auth/jwt';
 import { deriveGatewayToken } from '../auth/gateway-token';
-import { sandboxIdFromUserId } from '../auth/sandbox-id';
-import { parseInstanceHost } from '../auth/hostname-label';
-import { sandboxIdFromInstanceId, isValidInstanceId } from '@kilocode/worker-utils/instance-id';
+import { sandboxIdFromUserId, userIdFromSandboxId } from '../auth/sandbox-id';
+import { parseInstanceHost, sandboxIdFromHostnameLabel } from '../auth/hostname-label';
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+  sandboxIdFromInstanceId,
+  isValidInstanceId,
+} from '@kilocode/worker-utils/instance-id';
 import type { KiloClawEnv } from '../types';
 
 /**
@@ -129,29 +134,74 @@ async function resolveSandboxId(
 }
 
 /**
+ * If the request host is a per-instance virtual host, return the sandboxId
+ * it encodes — after verifying the authenticated `userId` owns that host.
+ *
+ * For instance-keyed hosts (`i-{hex}`) ownership is checked via the Instance
+ * DO's `status.userId`. For legacy hosts (`u-{base32hex}`) the decoded userId
+ * must equal the authenticated userId (the label *is* the user's identity).
+ *
+ * Returns:
+ *   - sandboxId string on success
+ *   - `null` if the request is not on a per-instance host (caller should
+ *     fall back to the existing userId/instanceId resolution)
+ *   - throws `'Instance access denied'` if the host resolves to another
+ *     user's instance
+ */
+async function resolveHostSandboxId(c: Context<AppEnv>, userId: string): Promise<string | null> {
+  const host = new URL(c.req.raw.url).host;
+  const label = parseInstanceHost(host, c.env);
+  if (!label) return null;
+
+  const hostSandboxId = sandboxIdFromHostnameLabel(label);
+  if (!hostSandboxId) {
+    throw new Error('Instance access denied');
+  }
+
+  if (isInstanceKeyedSandboxId(hostSandboxId)) {
+    const instanceId = instanceIdFromSandboxId(hostSandboxId);
+    await assertInstanceOwnership(c.env, userId, instanceId);
+    return hostSandboxId;
+  }
+
+  // Legacy: sandboxId = base64url(userId). Verify the label is for the
+  // authenticated user.
+  if (userIdFromSandboxId(hostSandboxId) !== userId) {
+    throw new Error('Instance access denied');
+  }
+  return hostSandboxId;
+}
+
+/**
  * Build the redirect URL after successful auth.
  *
- * Always redirects to /#token={token} — the catch-all proxy uses the
- * kiloclaw-active-instance cookie (set before this redirect) to route
- * requests to the correct instance. The /i/{instanceId} prefix must
- * never appear in the redirect URL because the OpenClaw SPA would use
- * it as the WebSocket base path, bypassing cookie-based routing.
+ * Always redirects to /#token={token} — the catch-all proxy chooses the
+ * target instance from either the request's `Host` header (on per-instance
+ * virtual hosts) or the active-instance cookie (on legacy hosts). The
+ * /i/{instanceId} prefix must never appear in the redirect URL because the
+ * OpenClaw SPA would use it as the WebSocket base path.
+ *
+ * On per-instance virtual hosts the token is derived from the host-encoded
+ * sandboxId (verified to belong to `userId`). Any `instanceId` query param
+ * on such a host is ignored — the URL is the routing signal, and minting a
+ * token for a query-param instance on a differently-keyed host would hand
+ * the SPA a token for the wrong sandbox. On legacy hosts the token is
+ * derived from `instanceId` (when provided) or the user's default instance.
  */
 async function buildRedirectUrl(
+  c: Context<AppEnv>,
   userId: string,
-  env: KiloClawEnv,
   instanceId?: string
 ): Promise<string> {
-  if (!env.GATEWAY_TOKEN_SECRET) return '/';
-  const sandboxId = await resolveSandboxId(userId, env, instanceId);
-  const token = await deriveGatewayToken(sandboxId, env.GATEWAY_TOKEN_SECRET);
-  // Always redirect to '/' — never include the /i/{instanceId} prefix.
-  // The kiloclaw-active-instance cookie (set before this redirect) tells
-  // the catch-all proxy which instance to route to. Exposing the prefix
-  // in the URL would leak it to the OpenClaw SPA, which would then use
-  // it as the WebSocket target — bypassing cookie-based routing entirely.
-  const basePath = '/';
-  return `${basePath}#token=${token}`;
+  if (!c.env.GATEWAY_TOKEN_SECRET) return '/';
+  const hostSandboxId = await resolveHostSandboxId(c, userId);
+  const sandboxId = hostSandboxId ?? (await resolveSandboxId(userId, c.env, instanceId));
+  const token = await deriveGatewayToken(sandboxId, c.env.GATEWAY_TOKEN_SECRET);
+  // Always redirect to '/' — the catch-all proxy routes via Host header
+  // (per-instance virtual hosts) or the active-instance cookie (legacy
+  // hosts). Exposing an /i/{instanceId}/ prefix would leak it to the
+  // OpenClaw SPA, which would then use it as the WebSocket target.
+  return `/#token=${token}`;
 }
 
 function renderPage(params: { userId: string; instanceId?: string; error?: string }) {
@@ -355,8 +405,12 @@ async function redeemCodeAndSetCookie(
     }
   }
 
-  const redirectUrl = await buildRedirectUrl(redeemedUserId, c.env, instanceId);
-  return { redirectUrl };
+  try {
+    const redirectUrl = await buildRedirectUrl(c, redeemedUserId, instanceId);
+    return { redirectUrl };
+  } catch {
+    return { error: 'Access denied', status: 401 as const };
+  }
 }
 
 accessGatewayRoutes.get('/kilo-access-gateway', async c => {
@@ -396,7 +450,12 @@ accessGatewayRoutes.get('/kilo-access-gateway', async c => {
           maxAge: 0,
         });
       }
-      const redirectUrl = await buildRedirectUrl(userId, c.env, instanceId);
+      let redirectUrl: string;
+      try {
+        redirectUrl = await buildRedirectUrl(c, userId, instanceId);
+      } catch {
+        return c.text('Access denied', 403);
+      }
       return c.redirect(redirectUrl);
     }
   }

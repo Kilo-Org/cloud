@@ -756,6 +756,43 @@ describe('host-based routing', () => {
     expect(response.headers.get('Location')).toBe('https://claw.kilosessions.ai/some/path?x=1');
   });
 
+  it('v1 fallback preserves a `//`-prefixed path literally (no open redirect)', async () => {
+    // Regression: `new URL('//evil.example/path', 'https://claw.kilosessions.ai')`
+    // resolves to `https://evil.example/path` (scheme-relative). The fix uses
+    // the URL pathname/search setters so the leading `//` stays in the path
+    // component and the host stays on claw.kilosessions.ai.
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'ki_550e8400e29b41d4a716446655440000',
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+        controllerCapabilitiesVersion: 1,
+      }),
+    };
+
+    const response = await app.fetch(
+      new Request('https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai//evil.example/path?x=1'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(302);
+    const location = response.headers.get('Location');
+    expect(location).not.toBeNull();
+    expect(new URL(location ?? '').host).toBe('claw.kilosessions.ai');
+    expect(location).toBe('https://claw.kilosessions.ai//evil.example/path?x=1');
+  });
+
   it('returns 404 for unparseable labels within the instance-host space', async () => {
     const response = await app.fetch(new Request('https://marketing.kiloclaw.ai/'), baseEnv(), {
       waitUntil: vi.fn(),

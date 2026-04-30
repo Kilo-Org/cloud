@@ -74,6 +74,27 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(sendPushNotifications).not.toHaveBeenCalled();
   });
 
+  it('rejects invalid dispatch input before checking presence or tokens', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-1', token: 'tok1' }] });
+    const presenceSpy = vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-invalid-input');
+
+    const result = await runInDurableObject(stub, async inst => {
+      try {
+        await (inst as unknown as { dispatchPush: typeof stub.dispatchPush }).dispatchPush(
+          baseInput({ userId: '', idempotencyKey: 'k-invalid-input' })
+        );
+        return 'resolved';
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+    });
+
+    expect(result).toBe('Invalid dispatchPush input');
+    expect(presenceSpy).not.toHaveBeenCalled();
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+  });
+
   it('returns no_tokens when the user has no push tokens', async () => {
     installDbMock({ tokens: [] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(false);

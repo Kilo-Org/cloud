@@ -11,7 +11,10 @@ import { presenceContextForConversation } from '@kilocode/event-service';
 import {
   badgeBucketForConversation,
   markBadgeReadInputSchema,
+  markConversationReadInputSchema,
   parseBadgeBucket,
+  sendInstanceLifecycleNotificationInputSchema,
+  sendPushForConversationInputSchema,
   type DispatchPushInput,
   type DispatchPushOutcome,
   type SendInstanceLifecycleNotificationParams,
@@ -114,6 +117,32 @@ type ReceiptCheckMessage = {
   ticketTokenPairs: TicketTokenPair[];
 };
 
+export function parseSendPushForConversationRpcInput(input: unknown): SendPushForConversationInput {
+  const result = sendPushForConversationInputSchema.safeParse(input);
+  if (!result.success) {
+    throw new Error('Invalid sendPushForConversation input');
+  }
+  return result.data;
+}
+
+export function parseMarkConversationReadRpcInput(input: unknown): MarkConversationReadInput {
+  const result = markConversationReadInputSchema.safeParse(input);
+  if (!result.success) {
+    throw new Error('Invalid markConversationRead input');
+  }
+  return result.data;
+}
+
+function parseSendInstanceLifecycleNotificationRpcInput(
+  input: unknown
+): SendInstanceLifecycleNotificationParams {
+  const result = sendInstanceLifecycleNotificationInputSchema.safeParse(input);
+  if (!result.success) {
+    throw new Error('Invalid sendInstanceLifecycleNotification input');
+  }
+  return result.data;
+}
+
 /** Pure core for unit testability. */
 export async function sendPushForConversationCore(
   input: SendPushForConversationInput,
@@ -186,7 +215,7 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   async sendPushForConversation(
     input: SendPushForConversationInput
   ): Promise<SendPushForConversationOutput> {
-    return sendPushForConversationCore(input, {
+    return sendPushForConversationCore(parseSendPushForConversationRpcInput(input), {
       getRecipientDOStub: (userId: string) =>
         this.env.NOTIFICATION_CHANNEL_DO.get(
           this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
@@ -197,11 +226,12 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   async markConversationRead(
     input: MarkConversationReadInput
   ): Promise<MarkConversationReadOutput> {
+    const inputData = parseMarkConversationReadRpcInput(input);
     const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
-      this.env.NOTIFICATION_CHANNEL_DO.idFromName(input.userId)
+      this.env.NOTIFICATION_CHANNEL_DO.idFromName(inputData.userId)
     );
     const badgeCount = await stub.markBucketRead(
-      badgeBucketForConversation(input.sandboxId, input.conversationId)
+      badgeBucketForConversation(inputData.sandboxId, inputData.conversationId)
     );
     return { badgeCount };
   }
@@ -209,9 +239,10 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   async sendInstanceLifecycleNotification(
     params: SendInstanceLifecycleNotificationParams
   ): Promise<SendInstanceLifecycleNotificationResult> {
+    const paramsData = parseSendInstanceLifecycleNotificationRpcInput(params);
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
-    return dispatchInstanceLifecyclePush(params, {
+    return dispatchInstanceLifecyclePush(paramsData, {
       getTokens: async userId => {
         const rows = await db
           .select({ token: user_push_tokens.token })

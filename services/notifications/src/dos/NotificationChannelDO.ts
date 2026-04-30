@@ -1,7 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
 import { user_push_tokens } from '@kilocode/db/schema';
-import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/notifications';
+import {
+  dispatchPushInputSchema,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+} from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-push';
@@ -22,7 +26,13 @@ const TOTAL_KEY = 'total';
 const IDEM_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export class NotificationChannelDO extends DurableObject<Env> {
-  async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
+  async dispatchPush(rawInput: DispatchPushInput): Promise<DispatchPushOutcome> {
+    const parsedInput = dispatchPushInputSchema.safeParse(rawInput);
+    if (!parsedInput.success) {
+      throw new Error('Invalid dispatchPush input');
+    }
+    const input = parsedInput.data;
+
     // 1. Idempotency. DO is single-threaded — requests for a given
     //    user serialize on this instance. A `failed` outcome leaves the
     //    record at `pending` so upstream can retry the send without

@@ -97,7 +97,7 @@ export type InstanceLifecycleEvent = z.infer<typeof instanceLifecycleEventSchema
 export const sendInstanceLifecycleNotificationInputSchema = z.object({
   userId: z.string().min(1),
   instanceId: z.string().min(1),
-  sandboxId: z.string(),
+  sandboxId: z.string().min(1),
   event: instanceLifecycleEventSchema,
   instanceName: z.string().nullable(),
   errorMessage: z.string().optional(),
@@ -129,8 +129,8 @@ export const dispatchPushInputSchema = z.object({
     })
     .nullable(),
   push: z.object({
-    title: z.string(),
-    body: z.string(),
+    title: z.string().max(200),
+    body: z.string().max(200),
     data: pushDataSchema,
     sound: z.union([z.literal('default'), z.null()]).optional(),
     priority: z.enum(['default', 'high']).optional(),

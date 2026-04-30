@@ -2,12 +2,17 @@ import { env } from 'cloudflare:test';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   DispatchPushInput,
+  MarkConversationReadInput,
   PerRecipientResult,
   SendPushForConversationInput,
 } from '@kilocode/notifications';
 
 import type * as do_module from '../dos/NotificationChannelDO';
-import { sendPushForConversationCore } from '../index';
+import {
+  parseMarkConversationReadRpcInput,
+  parseSendPushForConversationRpcInput,
+  sendPushForConversationCore,
+} from '../index';
 
 const baseInput = (
   over: Partial<SendPushForConversationInput> = {}
@@ -73,6 +78,36 @@ describe('NotificationsService.sendPushForConversation', () => {
       conversationId: 'conv1',
       messageId: 'm1',
     });
+  });
+
+  it('rejects invalid sendPushForConversation RPC input before dispatching to a DO', () => {
+    const stubSpy = vi.fn(async (_input: DispatchPushInput) => ({
+      kind: 'delivered' as const,
+      tokenCount: 1,
+    }));
+
+    expect(() =>
+      parseSendPushForConversationRpcInput({
+        ...baseInput({ recipientUserIds: ['r1'] }),
+        conversationId: '',
+      } as unknown as SendPushForConversationInput)
+    ).toThrow('Invalid sendPushForConversation input');
+
+    expect(stubSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid markConversationRead RPC input before clearing a bucket', () => {
+    const markBucketRead = vi.fn(async () => 0);
+
+    expect(() =>
+      parseMarkConversationReadRpcInput({
+        userId: 'user-1',
+        sandboxId: '',
+        conversationId: 'conv1',
+      } as unknown as MarkConversationReadInput)
+    ).toThrow('Invalid markConversationRead input');
+
+    expect(markBucketRead).not.toHaveBeenCalled();
   });
 
   it('dispatches recipients in parallel while preserving output order', async () => {

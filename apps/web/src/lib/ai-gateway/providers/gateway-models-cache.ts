@@ -42,12 +42,23 @@ export const getOpenRouterModelsMetadata = createStoredModelsFetcher(
   'OpenRouter'
 );
 
+// Memoize the derived Set on the identity of the metadata object. The
+// metadata fetcher returns the same object reference until the 10-minute
+// cache refreshes, so this avoids re-filtering hundreds of models on
+// every gateway request while still invalidating automatically whenever
+// the underlying record changes.
+const languageModelIdSetCache = new WeakMap<StoredModelMap, Set<string>>();
+
 function toLanguageModelIdSet(models: StoredModelMap): Set<string> {
-  return new Set(
+  const cached = languageModelIdSetCache.get(models);
+  if (cached) return cached;
+  const set = new Set(
     Object.values(models)
       .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length > 0)
       .map(model => model.id)
   );
+  languageModelIdSetCache.set(models, set);
+  return set;
 }
 
 export async function getVercelModels(): Promise<Set<string>> {

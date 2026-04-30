@@ -10,6 +10,7 @@ vi.mock('../lib/expo-push', () => ({
   sendPushNotifications: vi.fn(async () => ({
     ticketTokenPairs: [{ ticket: { status: 'ok', id: 't1' }, token: 'tok1' }],
     staleTokens: [],
+    ticketErrors: [],
   })),
 }));
 

@@ -53,6 +53,7 @@ function fakeDeps(overrides: Partial<LifecycleDispatchDeps> = {}): {
           token: typeof m.to === 'string' ? m.to : m.to[0],
         })),
         staleTokens: [],
+        ticketErrors: [],
       } satisfies SendResult;
     },
     enqueueReceipts: async pairs => {
@@ -171,6 +172,7 @@ describe('dispatchInstanceLifecyclePush', () => {
           },
         ],
         staleTokens: ['ExponentPushToken[bbb]'],
+        ticketErrors: [],
       }),
     });
 
@@ -185,6 +187,7 @@ describe('dispatchInstanceLifecyclePush', () => {
       sendPush: async () => ({
         ticketTokenPairs: [],
         staleTokens: ['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]'],
+        ticketErrors: [],
       }),
     });
 

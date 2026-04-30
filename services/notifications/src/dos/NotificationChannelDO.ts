@@ -4,8 +4,9 @@ import { user_push_tokens } from '@kilocode/db/schema';
 import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 
-import type { ExpoPushMessage, TicketTokenPair } from '../lib/expo-push';
+import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
+import { logger } from '../util/logger';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -79,7 +80,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
     }));
 
     const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
-    let result: { ticketTokenPairs: TicketTokenPair[]; staleTokens: string[] };
+    let result: SendResult;
     try {
       result = await sendPushNotifications(messages, accessToken);
     } catch (err) {
@@ -93,6 +94,15 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     if (result.staleTokens.length > 0) {
       await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, result.staleTokens));
+    }
+
+    if (result.ticketErrors.length > 0) {
+      logger.error('Expo returned permanent push ticket errors', {
+        userId: input.userId,
+        idempotencyKey: input.idempotencyKey,
+        errorCount: result.ticketErrors.length,
+        errors: result.ticketErrors.map(({ code, message }) => ({ code, message })),
+      });
     }
 
     if (result.ticketTokenPairs.length > 0) {

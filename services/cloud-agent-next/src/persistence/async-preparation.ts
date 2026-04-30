@@ -36,6 +36,7 @@ export type PreparationStepsResult = {
   kiloSessionId: string;
   resolvedInstallationId: string | undefined;
   resolvedGithubAppType: 'standard' | 'lite' | undefined;
+  resolvedGithubToken: string | undefined;
   resolvedGitToken: string | undefined;
   gitlabTokenManaged: boolean;
 };
@@ -78,9 +79,13 @@ export async function executePreparationSteps(
     }
   }
 
-  // Resolve managed GitLab token when no client token provided
+  // Resolve managed GitLab token when no client token provided.
+  // If the caller (e.g. session-prepare fast-path) already resolved the
+  // managed token, trust it and skip the RPC — re-resolving 1-2s later
+  // races with GitLab OAuth refresh-token rotation and can fail the
+  // second call with token_refresh_failed.
   let resolvedGitToken = input.gitToken;
-  let gitlabTokenManaged = false;
+  let gitlabTokenManaged = input.gitlabTokenManaged ?? false;
   if (input.gitUrl && !input.gitToken && input.platform === 'gitlab') {
     const result = await resolveManagedGitLabToken(env, {
       userId: input.userId,
@@ -245,6 +250,7 @@ export async function executePreparationSteps(
     kiloSessionId: input.kiloSessionId ?? wrapperSessionId,
     resolvedInstallationId,
     resolvedGithubAppType,
+    resolvedGithubToken: input.githubRepo ? resolvedGithubToken : undefined,
     resolvedGitToken,
     gitlabTokenManaged,
   };

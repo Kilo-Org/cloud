@@ -223,6 +223,11 @@ export const PreparationInputSchema = z.object({
   gitUrl: z.string().optional(),
   gitToken: z.string().optional(),
   platform: z.enum(['github', 'gitlab']).optional(),
+  // Set to true when gitToken was resolved by the caller via the managed
+  // GitLab integration (git-token-service). Signals that async prep should
+  // NOT re-resolve the token, avoiding a refresh-token rotation race
+  // between the caller and the alarm.
+  gitlabTokenManaged: z.boolean().optional(),
   // Execution params
   prompt: z.string(),
   mode: z.string(),

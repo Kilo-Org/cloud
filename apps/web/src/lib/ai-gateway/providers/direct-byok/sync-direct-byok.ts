@@ -6,18 +6,21 @@ import { directByokModelsRedisKey } from '@/lib/redis-keys';
 
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
 
-const NeuralwattModelsResponseSchema = z.object({
-  data: z.array(
-    z.object({
-      id: z.string(),
-      max_model_len: z.number().optional(),
-    })
-  ),
-});
-
 const ModalitySchema = z
   .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
   .catch('unknown');
+
+const OpenAICompatibleModelsResponseSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      context_length: z.number().optional(),
+      max_model_len: z.number().optional(),
+      max_output_length: z.number().optional(),
+      input_modalities: z.array(ModalitySchema).optional(),
+    })
+  ),
+});
 
 const ModelsDevModelSchema = z.object({
   id: z.string(),
@@ -53,23 +56,42 @@ type ProviderFetcher = {
   fetch(): Promise<RawModel[]>;
 };
 
-const FETCHERS: ReadonlyArray<ProviderFetcher> = [
-  {
-    providerId: 'neuralwatt',
+function openAICompatibleFetcher(options: {
+  providerId: DirectUserByokInferenceProviderId;
+  label: string;
+  url: string;
+}): ProviderFetcher {
+  return {
+    providerId: options.providerId,
     async fetch() {
-      const response = await fetch('https://api.neuralwatt.com/v1/models');
+      const response = await fetch(options.url);
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch Neuralwatt models: ${response.status} ${response.statusText}`
+          `Failed to fetch ${options.label} models: ${response.status} ${response.statusText}`
         );
       }
-      const parsed = NeuralwattModelsResponseSchema.parse(await response.json());
+      const parsed = OpenAICompatibleModelsResponseSchema.parse(await response.json());
       return parsed.data.map(model => ({
         id: model.id,
-        context_length: model.max_model_len,
+        context_length: model.context_length ?? model.max_model_len,
+        max_completion_tokens: model.max_output_length,
+        input_modalities: model.input_modalities,
       }));
     },
-  },
+  };
+}
+
+const FETCHERS: ReadonlyArray<ProviderFetcher> = [
+  openAICompatibleFetcher({
+    providerId: 'neuralwatt',
+    label: 'Neuralwatt',
+    url: 'https://api.neuralwatt.com/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'chutes-byok',
+    label: 'Chutes',
+    url: 'https://llm.chutes.ai/v1/models',
+  }),
   {
     providerId: 'zai-coding',
     async fetch() {

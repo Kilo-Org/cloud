@@ -18,11 +18,15 @@ export const REASONING_VARIANTS_BINARY = {
   thinking: { reasoning: { enabled: true, effort: 'medium' } },
 } as const;
 
-export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
-  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
   low: { reasoning: { enabled: true, effort: 'low' } },
   medium: { reasoning: { enabled: true, effort: 'medium' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
+} as const;
+
+export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
+  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
 } as const;
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {

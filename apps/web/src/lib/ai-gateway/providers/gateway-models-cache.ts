@@ -7,8 +7,6 @@ import type { RedisKey } from '@/lib/redis-keys';
 
 export type StoredModelMap = Record<string, StoredModel>;
 
-const EMPTY_STORED_MODELS: StoredModelMap = Object.freeze({}) as StoredModelMap;
-
 const StoredModelMapSchema = z.record(z.string(), StoredModelSchema);
 
 function createStoredModelsFetcher(redisKey: RedisKey, name: string) {
@@ -17,12 +15,12 @@ function createStoredModelsFetcher(redisKey: RedisKey, name: string) {
       const raw = JSON.parse((await redisGet(redisKey)) ?? 'null');
       if (!raw || typeof raw !== 'object' || Object.keys(raw).length === 0) {
         console.debug(`[getGatewayModels] no ${name} models found in Redis`);
-        return EMPTY_STORED_MODELS;
+        return {};
       }
       return StoredModelMapSchema.parse(raw);
     },
     600_000,
-    EMPTY_STORED_MODELS
+    {}
   );
 }
 

@@ -123,7 +123,6 @@ init({
         ...event.contexts,
         drizzle_query: {
           query: error.query,
-          params: error.params,
           wrapper_message: error.message,
         },
       };

@@ -87,7 +87,7 @@ function instanceChatPath(data: PushData | null): string | null {
   if (data.type === 'chat.message') {
     return `/(app)/chat/${data.sandboxId}/${data.conversationId}`;
   }
-  return `/(app)/chat/${data.instanceId}`;
+  return `/(app)/chat/${data.sandboxId}`;
 }
 
 export function setupNotificationResponseHandler() {

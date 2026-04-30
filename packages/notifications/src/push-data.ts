@@ -16,6 +16,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     type: z.literal('instance-lifecycle'),
     event: z.enum(['ready', 'start_failed']),
     instanceId: z.string().min(1),
+    sandboxId: z.string().min(1),
   }),
 ]);
 

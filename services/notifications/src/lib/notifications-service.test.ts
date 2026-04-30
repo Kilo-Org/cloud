@@ -79,6 +79,7 @@ describe('buildInstanceLifecycleMessages', () => {
       type: 'instance-lifecycle',
       event: 'ready',
       instanceId: 'sandbox-1',
+      sandboxId: 'ki_deadbeef',
     });
     expect(m.sound).toBe('default');
     expect(m.priority).toBe('high');

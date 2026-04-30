@@ -1080,7 +1080,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         variant: input.variant,
         kilocodeToken: input.authToken,
         githubRepo: input.githubRepo,
-        githubToken: input.githubToken,
+        githubToken: result.resolvedGithubToken ?? input.githubToken,
         githubInstallationId: result.resolvedInstallationId,
         githubAppType: result.resolvedGithubAppType,
         gitUrl: input.gitUrl,

@@ -36,6 +36,7 @@ export type PreparationStepsResult = {
   kiloSessionId: string;
   resolvedInstallationId: string | undefined;
   resolvedGithubAppType: 'standard' | 'lite' | undefined;
+  resolvedGithubToken: string | undefined;
   resolvedGitToken: string | undefined;
   gitlabTokenManaged: boolean;
 };
@@ -245,6 +246,7 @@ export async function executePreparationSteps(
     kiloSessionId: input.kiloSessionId ?? wrapperSessionId,
     resolvedInstallationId,
     resolvedGithubAppType,
+    resolvedGithubToken: input.githubRepo ? resolvedGithubToken : undefined,
     resolvedGitToken,
     gitlabTokenManaged,
   };

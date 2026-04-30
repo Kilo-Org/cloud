@@ -1201,6 +1201,8 @@ export class SessionService {
     // Session home directory
 
     const metadata = await this.loadSessionMetadata(env, { userId, sessionId } as SessionContext);
+    const githubToken = freshGithubToken ?? metadata?.githubToken;
+    const gitToken = freshGitToken ?? metadata?.gitToken;
 
     const context = this.buildContext({
       sandboxId,
@@ -1212,9 +1214,9 @@ export class SessionService {
       upstreamBranch: metadata?.upstreamBranch,
       botId: metadata?.botId,
       githubRepo: metadata?.githubRepo,
-      githubToken: metadata?.githubToken,
+      githubToken,
       gitUrl: metadata?.gitUrl,
-      gitToken: metadata?.gitToken,
+      gitToken,
       platform: metadata?.platform,
     });
 

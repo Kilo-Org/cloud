@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import {
-  badgeBucketForInstance,
   type BadgeCountRow,
   listBadgesResponseSchema,
+  parentBadgeBucketFor,
 } from '@kilocode/notifications';
 
 import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
@@ -46,9 +46,7 @@ export function useUnreadCounts() {
   const byBadgeBucket = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of query.data ?? []) {
-      const parts = row.badgeBucket.split(':');
-      const aggregateBucket =
-        parts[0] === 'kiloclaw' && parts[1] ? badgeBucketForInstance(parts[1]) : row.badgeBucket;
+      const aggregateBucket = parentBadgeBucketFor(row.badgeBucket);
       map.set(aggregateBucket, (map.get(aggregateBucket) ?? 0) + row.badgeCount);
     }
     return map;

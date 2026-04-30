@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BeadBoard } from '@/components/gastown/BeadBoard';
 import { AgentCard } from '@/components/gastown/AgentCard';
 import { ConvoyTimeline } from '@/components/gastown/ConvoyTimeline';
-import { SlingDialog } from '@/components/gastown/SlingDialog';
+import { CreateBeadDrawer } from '@/components/gastown/CreateBeadDrawer';
 import { useDrawerStack } from '@/components/gastown/DrawerStack';
 import {
   Plus,
@@ -39,7 +39,7 @@ export function RigDetailPageClient({
 }: RigDetailPageClientProps) {
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const trpc = useGastownTRPC();
-  const [isSlingOpen, setIsSlingOpen] = useState(false);
+  const [isCreateBeadOpen, setIsCreateBeadOpen] = useState(false);
   const [convoysCollapsed, setConvoysCollapsed] = useState(false);
   const { open: openDrawer } = useDrawerStack();
 
@@ -66,6 +66,16 @@ export function RigDetailPageClient({
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: trpc.gastown.listBeads.queryKey() });
         toast.success('Bead deleted');
+      },
+      onError: err => toast.error(err.message),
+    })
+  );
+
+  const startBead = useMutation(
+    trpc.gastown.startBead.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.gastown.listBeads.queryKey() });
+        toast.success('Bead started');
       },
       onError: err => toast.error(err.message),
     })
@@ -156,11 +166,11 @@ export function RigDetailPageClient({
           <Button
             variant="primary"
             size="sm"
-            onClick={() => setIsSlingOpen(true)}
+            onClick={() => setIsCreateBeadOpen(true)}
             className="gap-1.5 bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
           >
             <Plus className="size-3.5" />
-            Sling Work
+            New Bead
           </Button>
         </div>
       </div>
@@ -228,6 +238,7 @@ export function RigDetailPageClient({
                 }
               }}
               onSelectBead={bead => openDrawer({ type: 'bead', beadId: bead.bead_id, rigId })}
+              onStartBead={beadId => startBead.mutate({ rigId, beadId })}
               agentNameById={agentNameById}
             />
           </div>
@@ -285,7 +296,12 @@ export function RigDetailPageClient({
         </div>
       </div>
 
-      <SlingDialog rigId={rigId} isOpen={isSlingOpen} onClose={() => setIsSlingOpen(false)} />
+      <CreateBeadDrawer
+        rigId={rigId}
+        townId={townId}
+        isOpen={isCreateBeadOpen}
+        onClose={() => setIsCreateBeadOpen(false)}
+      />
     </div>
   );
 }

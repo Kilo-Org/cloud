@@ -1105,6 +1105,184 @@ describe('remediateGatewayClientDeviceScopes', () => {
     expect(rewritten.otherDevice?.scopes).toEqual(['operator.read']);
   });
 
+  it('repairs a CLI/probe paired device when gateway-client has a repair request for the same deviceId', () => {
+    const harness = fakeDeps();
+    const pairedPath = '/root/.openclaw/devices/paired.json';
+    const pendingPath = '/root/.openclaw/devices/pending.json';
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === pairedPath || p === pendingPath
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === pairedPath) {
+        return JSON.stringify({
+          deviceFromProbe: {
+            deviceId: 'sharedDevice',
+            publicKey: 'public-key',
+            clientId: 'cli',
+            clientMode: 'probe',
+            role: 'operator',
+            roles: ['operator'],
+            scopes: ['operator.read'],
+            approvedScopes: ['operator.read'],
+            tokens: {
+              operator: {
+                token: 'secret-token',
+                role: 'operator',
+                scopes: ['operator.read'],
+                createdAtMs: 1,
+                lastUsedAtMs: 2,
+              },
+            },
+          },
+        });
+      }
+      if (p === pendingPath) {
+        return JSON.stringify({
+          request1: {
+            requestId: 'request1',
+            deviceId: 'sharedDevice',
+            publicKey: 'public-key',
+            clientId: 'gateway-client',
+            clientMode: 'backend',
+            role: 'operator',
+            roles: ['operator'],
+            scopes: [
+              'operator.read',
+              'operator.admin',
+              'operator.approvals',
+              'operator.pairing',
+              'operator.write',
+              'operator.talk.secrets',
+            ],
+            isRepair: true,
+            silent: false,
+          },
+        });
+      }
+      return '{}';
+    });
+
+    const result = remediateGatewayClientDeviceScopes(harness.deps);
+
+    expect(result).toEqual({ checked: 1, updated: 1 });
+    const rename = harness.renameCalls.find(call => call.to === pairedPath);
+    if (!rename) throw new Error('expected a rename into paired.json');
+    const tempWrite = harness.writeCalls.find(call => call.path === rename.from);
+    if (!tempWrite) throw new Error('expected a paired.json temp write');
+
+    const rewritten = JSON.parse(tempWrite.data) as Record<string, Record<string, unknown>>;
+    const expectedScopes = [
+      'operator.read',
+      'operator.admin',
+      'operator.approvals',
+      'operator.pairing',
+      'operator.write',
+      'operator.talk.secrets',
+    ];
+    expect(rewritten.deviceFromProbe?.clientId).toBe('cli');
+    expect(rewritten.deviceFromProbe?.clientMode).toBe('probe');
+    expect(rewritten.deviceFromProbe?.scopes).toEqual(expectedScopes);
+    expect(rewritten.deviceFromProbe?.approvedScopes).toEqual(expectedScopes);
+    expect(rewritten.deviceFromProbe?.tokens).toEqual({
+      operator: {
+        token: 'secret-token',
+        role: 'operator',
+        scopes: expectedScopes,
+        createdAtMs: 1,
+        lastUsedAtMs: 2,
+      },
+    });
+  });
+
+  it('does not widen non-gateway paired devices without gateway-client repair requests', () => {
+    const harness = fakeDeps();
+    const pairedPath = '/root/.openclaw/devices/paired.json';
+    const pendingPath = '/root/.openclaw/devices/pending.json';
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === pairedPath || p === pendingPath
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === pairedPath) {
+        return JSON.stringify({
+          otherDevice: {
+            deviceId: 'otherDevice',
+            clientId: 'openclaw-ios',
+            role: 'operator',
+            roles: ['operator'],
+            scopes: ['operator.read'],
+            approvedScopes: ['operator.read'],
+            tokens: {
+              operator: { token: 'other-token', role: 'operator', scopes: ['operator.read'] },
+            },
+          },
+        });
+      }
+      if (p === pendingPath) {
+        return JSON.stringify({
+          request1: {
+            requestId: 'request1',
+            deviceId: 'otherDevice',
+            clientId: 'cli',
+            role: 'operator',
+            roles: ['operator'],
+            scopes: ['operator.admin'],
+            isRepair: true,
+          },
+        });
+      }
+      return '{}';
+    });
+
+    const result = remediateGatewayClientDeviceScopes(harness.deps);
+
+    expect(result).toEqual({ checked: 0, updated: 0 });
+    expect(harness.renameCalls).toHaveLength(0);
+  });
+
+  it('does not repair by deviceId without an existing operator token', () => {
+    const harness = fakeDeps();
+    const pairedPath = '/root/.openclaw/devices/paired.json';
+    const pendingPath = '/root/.openclaw/devices/pending.json';
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === pairedPath || p === pendingPath
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === pairedPath) {
+        return JSON.stringify({
+          deviceWithoutOperatorToken: {
+            deviceId: 'sharedDevice',
+            clientId: 'cli',
+            clientMode: 'probe',
+            role: 'operator',
+            roles: ['operator'],
+            scopes: ['operator.read'],
+            approvedScopes: ['operator.read'],
+            tokens: {},
+          },
+        });
+      }
+      if (p === pendingPath) {
+        return JSON.stringify({
+          request1: {
+            requestId: 'request1',
+            deviceId: 'sharedDevice',
+            clientId: 'gateway-client',
+            role: 'operator',
+            roles: ['operator'],
+            scopes: ['operator.admin'],
+            isRepair: true,
+          },
+        });
+      }
+      return '{}';
+    });
+
+    const result = remediateGatewayClientDeviceScopes(harness.deps);
+
+    expect(result).toEqual({ checked: 0, updated: 0 });
+    expect(harness.renameCalls).toHaveLength(0);
+  });
+
   it('does not rewrite when gateway-client scope state is already remediated', () => {
     const harness = fakeDeps();
     const pairedPath = '/root/.openclaw/devices/paired.json';
@@ -1133,6 +1311,102 @@ describe('remediateGatewayClientDeviceScopes', () => {
 
     expect(result).toEqual({ checked: 1, updated: 0 });
     expect(harness.renameCalls).toHaveLength(0);
+  });
+
+  it('rewrites duplicated scope lists that are missing required scopes', () => {
+    const harness = fakeDeps();
+    const pairedPath = '/root/.openclaw/devices/paired.json';
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === pairedPath
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({
+        gatewayDevice: {
+          clientId: 'gateway-client',
+          scopes: [
+            'operator.read',
+            'operator.read',
+            'operator.approvals',
+            'operator.pairing',
+            'operator.write',
+          ],
+          approvedScopes: [
+            'operator.read',
+            'operator.admin',
+            'operator.approvals',
+            'operator.pairing',
+            'operator.write',
+          ],
+          tokens: {
+            operator: {
+              role: 'operator',
+              scopes: [
+                'operator.read',
+                'operator.admin',
+                'operator.approvals',
+                'operator.pairing',
+                'operator.write',
+              ],
+            },
+          },
+        },
+      })
+    );
+
+    const result = remediateGatewayClientDeviceScopes(harness.deps);
+
+    expect(result).toEqual({ checked: 1, updated: 1 });
+    const rename = harness.renameCalls.find(call => call.to === pairedPath);
+    if (!rename) throw new Error('expected a rename into paired.json');
+    const tempWrite = harness.writeCalls.find(call => call.path === rename.from);
+    if (!tempWrite) throw new Error('expected a paired.json temp write');
+    const rewritten = JSON.parse(tempWrite.data) as Record<string, Record<string, unknown>>;
+    expect(rewritten.gatewayDevice?.scopes).toEqual([
+      'operator.read',
+      'operator.approvals',
+      'operator.pairing',
+      'operator.write',
+      'operator.admin',
+    ]);
+  });
+
+  it('still repairs direct gateway-client pairs when pending state is malformed', () => {
+    const harness = fakeDeps();
+    const pairedPath = '/root/.openclaw/devices/paired.json';
+    const pendingPath = '/root/.openclaw/devices/pending.json';
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === pairedPath || p === pendingPath
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === pendingPath) return '{not json';
+      if (p === pairedPath) {
+        return JSON.stringify({
+          gatewayDevice: {
+            clientId: 'gateway-client',
+            scopes: ['operator.read'],
+            approvedScopes: ['operator.read'],
+            tokens: { operator: { role: 'operator', scopes: ['operator.read'] } },
+          },
+        });
+      }
+      return '{}';
+    });
+
+    const result = remediateGatewayClientDeviceScopes(harness.deps);
+
+    expect(result).toEqual({ checked: 1, updated: 1 });
+    const rename = harness.renameCalls.find(call => call.to === pairedPath);
+    if (!rename) throw new Error('expected a rename into paired.json');
+    const tempWrite = harness.writeCalls.find(call => call.path === rename.from);
+    if (!tempWrite) throw new Error('expected a paired.json temp write');
+    const rewritten = JSON.parse(tempWrite.data) as Record<string, Record<string, unknown>>;
+    expect(rewritten.gatewayDevice?.approvedScopes).toEqual([
+      'operator.read',
+      'operator.admin',
+      'operator.approvals',
+      'operator.pairing',
+      'operator.write',
+    ]);
   });
 });
 
@@ -1400,7 +1674,14 @@ describe('bootstrapNonCritical', () => {
     );
 
     expect(result).toEqual({ ok: true });
-    expect(phases).toEqual(['github', 'linear', 'onboard', 'tools-md', 'mcporter']);
+    expect(phases).toEqual([
+      'github',
+      'linear',
+      'gateway-client-device-scopes',
+      'onboard',
+      'tools-md',
+      'mcporter',
+    ]);
   });
 
   it('returns tools-md failure and stops before mcporter', async () => {
@@ -1429,7 +1710,13 @@ describe('bootstrapNonCritical', () => {
     );
 
     expect(result).toEqual({ ok: false, phase: 'tools-md', error: 'tools read failed' });
-    expect(phases).toEqual(['github', 'linear', 'onboard', 'tools-md']);
+    expect(phases).toEqual([
+      'github',
+      'linear',
+      'gateway-client-device-scopes',
+      'onboard',
+      'tools-md',
+    ]);
   });
 
   it('returns ok when doctor/onboard succeeds', async () => {
@@ -1450,7 +1737,14 @@ describe('bootstrapNonCritical', () => {
     );
 
     expect(result).toEqual({ ok: true });
-    expect(phases).toEqual(['github', 'linear', 'onboard', 'tools-md', 'mcporter']);
+    expect(phases).toEqual([
+      'github',
+      'linear',
+      'gateway-client-device-scopes',
+      'onboard',
+      'tools-md',
+      'mcporter',
+    ]);
   });
 
   it('returns a doctor failure instead of throwing', async () => {
@@ -1480,7 +1774,7 @@ describe('bootstrapNonCritical', () => {
     );
 
     expect(result).toEqual({ ok: false, phase: 'doctor', error: 'doctor exited 1' });
-    expect(phases).toEqual(['github', 'linear', 'doctor']);
+    expect(phases).toEqual(['github', 'linear', 'gateway-client-device-scopes', 'doctor']);
   });
 });
 
@@ -1512,6 +1806,7 @@ describe('bootstrap', () => {
       'feature-flags',
       'github',
       'linear',
+      'gateway-client-device-scopes',
       'onboard',
       'tools-md',
       'mcporter',

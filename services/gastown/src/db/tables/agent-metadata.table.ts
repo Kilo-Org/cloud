@@ -35,6 +35,12 @@ export const AgentMetadataRecord = z.object({
   last_event_type: z.string().nullable().optional(),
   last_event_at: z.string().nullable().optional(),
   active_tools: z.string().nullable().optional(),
+  // Timestamp of when the agent entered `stalled`. Cleared when the
+  // agent transitions to any other status. Used by the reconciler's
+  // stalled→idle auto-transition so the recovery window is measured
+  // from the stall event, not from the last heartbeat (which can keep
+  // arriving after GUPP force-stops the container).
+  stalled_at: z.string().nullable().optional(),
 });
 
 export type AgentMetadataRecord = z.output<typeof AgentMetadataRecord>;
@@ -60,6 +66,7 @@ export function createTableAgentMetadata(): string {
     last_event_type: `text`,
     last_event_at: `text`,
     active_tools: `text default '[]'`,
+    stalled_at: `text`,
   });
 }
 
@@ -72,5 +79,6 @@ export function migrateAgentMetadata(): string[] {
     `ALTER TABLE agent_metadata ADD COLUMN last_event_type text`,
     `ALTER TABLE agent_metadata ADD COLUMN last_event_at text`,
     `ALTER TABLE agent_metadata ADD COLUMN active_tools text default '[]'`,
+    `ALTER TABLE agent_metadata ADD COLUMN stalled_at text`,
   ];
 }

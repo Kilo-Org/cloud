@@ -308,6 +308,16 @@ export type WorktreeOptions = {
   startPoint?: string;
   /** Default branch name, used as fallback start point (e.g. 'main'). */
   defaultBranch?: string;
+  /**
+   * Env vars with the current GIT_TOKEN. If passed, execWithAuthRetry
+   * mutates this in place on a 401 so subsequent operations use the fresh token.
+   */
+  envVars?: Record<string, string>;
+  /**
+   * Authenticated git URL used to rewrite the `origin` remote if the
+   * embedded token expires during a reused-worktree pull.
+   */
+  gitUrl?: string;
 };
 
 // ── Repo setup (proactive clone + browse worktree) ──────────────────────

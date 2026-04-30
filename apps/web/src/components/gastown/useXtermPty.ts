@@ -292,11 +292,14 @@ export function useXtermPty({
       if (!container) return;
 
       // Lazy-load xterm.js to avoid SSR issues and minimize bundle impact
-      const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
-        import('@xterm/xterm'),
-        import('@xterm/addon-fit'),
-        import('@xterm/addon-web-links'),
-      ]);
+      const [{ Terminal }, { FitAddon }, { WebLinksAddon }, { ClipboardAddon }] = await Promise.all(
+        [
+          import('@xterm/xterm'),
+          import('@xterm/addon-fit'),
+          import('@xterm/addon-web-links'),
+          import('@xterm/addon-clipboard'),
+        ]
+      );
 
       if (disposed) return;
 
@@ -305,6 +308,7 @@ export function useXtermPty({
 
       const fitAddon = new FitAddon();
       const webLinksAddon = new WebLinksAddon();
+      const clipboardAddon = new ClipboardAddon();
 
       const term = new Terminal({
         cursorBlink: true,
@@ -323,6 +327,7 @@ export function useXtermPty({
 
       term.loadAddon(fitAddon);
       term.loadAddon(webLinksAddon);
+      term.loadAddon(clipboardAddon);
       term.open(container);
       attachKittyEnterHandler(term, wsRef);
       fitAddon.fit();

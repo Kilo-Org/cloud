@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import * as Notifications from 'expo-notifications';
 import { useMemo } from 'react';
 
 import { type ListBadgesResponse, listBadgesResponseSchema } from '@kilocode/notifications';
@@ -6,6 +7,7 @@ import { type ListBadgesResponse, listBadgesResponseSchema } from '@kilocode/not
 import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
 import { useKiloChatTokenGetter } from '@/components/kilo-chat/hooks/use-kilo-chat-token';
 import { NOTIFICATIONS_URL } from '@/lib/config';
+import { syncDeviceBadgeCountFromBadges } from './badge-count-sync';
 
 /**
  * Fetches unread message counts for the current user from the notifications
@@ -33,7 +35,9 @@ export function useUnreadCounts() {
       if (!response.ok) {
         throw new Error(`Failed to fetch badges: ${response.status}`);
       }
-      return listBadgesResponseSchema.parse(await response.json());
+      const badges = listBadgesResponseSchema.parse(await response.json());
+      await syncDeviceBadgeCountFromBadges(badges, Notifications.setBadgeCountAsync);
+      return badges;
     },
   });
 

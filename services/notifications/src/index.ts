@@ -1,5 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 
 import { presenceContextForConversation } from '@kilocode/event-service';
 import {
@@ -11,12 +12,43 @@ import {
   type SendPushForConversationOutput,
 } from '@kilocode/notifications';
 
+import { authMiddleware, type AuthContext } from './auth';
 import { queue } from './queue-consumer';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
 
-const app = new Hono<{ Bindings: Env }>();
+const ALLOWED_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
+
+const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 app.get('/', c => c.json({ ok: true }));
+
+app.use(
+  '/v1/*',
+  cors({
+    origin: origin => (ALLOWED_ORIGINS.includes(origin) ? origin : null),
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+app.use('/v1/*', authMiddleware);
+
+app.get('/v1/badges', async c => {
+  const userId = c.get('callerId');
+  const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
+  const buckets = await stub.listNonZeroBuckets();
+  return c.json({ buckets });
+});
+
+app.post('/v1/badges/mark-read', async c => {
+  const userId = c.get('callerId');
+  const body = await c.req.json<{ badgeBucket?: string }>().catch(() => null);
+  if (!body?.badgeBucket) {
+    return c.json({ error: 'badgeBucket required' }, 400);
+  }
+  const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
+  const badgeCount = await stub.markBucketRead(body.badgeBucket);
+  return c.json({ badgeCount });
+});
 
 type RecipientDOStub = {
   dispatchPush: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;

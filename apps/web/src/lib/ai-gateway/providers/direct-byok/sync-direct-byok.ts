@@ -43,6 +43,10 @@ const ModelsDevProviderSchema = z.object({
   models: z.record(z.string(), ModelsDevModelSchema),
 });
 
+const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
+
+type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
+
 type RawModel = {
   id: string;
   name?: string;
@@ -51,9 +55,13 @@ type RawModel = {
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
 };
 
+type SyncContext = {
+  getModelsDevCatalog(): Promise<ModelsDevCatalog>;
+};
+
 type ProviderFetcher = {
   providerId: DirectUserByokInferenceProviderId;
-  fetch(): Promise<RawModel[]>;
+  fetch(ctx: SyncContext): Promise<RawModel[]>;
 };
 
 function openAICompatibleFetcher(options: {
@@ -87,14 +95,8 @@ function modelsDevFetcher(
 ): ProviderFetcher {
   return {
     providerId,
-    async fetch() {
-      const response = await fetch('https://models.dev/api.json');
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
-        );
-      }
-      const catalog = z.record(z.string(), z.unknown()).parse(await response.json());
+    async fetch(ctx) {
+      const catalog = await ctx.getModelsDevCatalog();
       const entry = catalog[catalogKey];
       if (!entry) {
         throw new Error(`models.dev catalog missing ${catalogKey} entry`);
@@ -109,6 +111,16 @@ function modelsDevFetcher(
       }));
     },
   };
+}
+
+async function fetchModelsDevCatalog(): Promise<ModelsDevCatalog> {
+  const response = await fetch('https://models.dev/api.json');
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
+    );
+  }
+  return ModelsDevCatalogSchema.parse(await response.json());
 }
 
 const FETCHERS: ReadonlyArray<ProviderFetcher> = [
@@ -126,17 +138,18 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   modelsDevFetcher('ollama-cloud', 'ollama-cloud'),
 ];
 
-function stripVendorPrefix(id: string) {
+function modelIdToDisplayName(id: string) {
   const slash = id.lastIndexOf('/');
-  return slash >= 0 ? id.slice(slash + 1) : id;
+  const withoutVendor = slash >= 0 ? id.slice(slash + 1) : id;
+  return withoutVendor.replace(/:cloud$/, '');
 }
 
-async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
-  const fetched = await fetcher.fetch();
+async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
+  const fetched = await fetcher.fetch(ctx);
   const models: DirectByokModel[] = [];
 
   for (const raw of fetched) {
-    const name = raw.name ?? stripVendorPrefix(raw.id);
+    const name = raw.name ?? modelIdToDisplayName(raw.id);
     const context_length = raw.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
     const max_completion_tokens = Math.min(
       raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
@@ -158,8 +171,15 @@ async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
 export async function syncDirectByokModels(): Promise<
   Partial<Record<DirectUserByokInferenceProviderId, number>>
 > {
+  let catalogPromise: Promise<ModelsDevCatalog> | null = null;
+  const ctx: SyncContext = {
+    getModelsDevCatalog() {
+      catalogPromise ??= fetchModelsDevCatalog();
+      return catalogPromise;
+    },
+  };
   const entries = await Promise.all(
-    FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher)] as const)
+    FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher, ctx)] as const)
   );
   return Object.fromEntries(entries);
 }

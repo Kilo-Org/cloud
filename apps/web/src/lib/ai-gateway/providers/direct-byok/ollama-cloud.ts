@@ -16,7 +16,6 @@ export default {
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 262144,
-        variants: null,
       },
     ],
     variants: REASONING_VARIANTS_NONE_LOW_MEDIUM_HIGH,

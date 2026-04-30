@@ -43,6 +43,10 @@ const ModelsDevProviderSchema = z.object({
   models: z.record(z.string(), ModelsDevModelSchema),
 });
 
+const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
+
+type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
+
 type RawModel = {
   id: string;
   name?: string;
@@ -51,9 +55,13 @@ type RawModel = {
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
 };
 
+type SyncContext = {
+  getModelsDevCatalog(): Promise<ModelsDevCatalog>;
+};
+
 type ProviderFetcher = {
   providerId: DirectUserByokInferenceProviderId;
-  fetch(): Promise<RawModel[]>;
+  fetch(ctx: SyncContext): Promise<RawModel[]>;
 };
 
 function openAICompatibleFetcher(options: {
@@ -81,6 +89,40 @@ function openAICompatibleFetcher(options: {
   };
 }
 
+function modelsDevFetcher(
+  providerId: DirectUserByokInferenceProviderId,
+  catalogKey: string
+): ProviderFetcher {
+  return {
+    providerId,
+    async fetch(ctx) {
+      const catalog = await ctx.getModelsDevCatalog();
+      const entry = catalog[catalogKey];
+      if (!entry) {
+        throw new Error(`models.dev catalog missing ${catalogKey} entry`);
+      }
+      const provider = ModelsDevProviderSchema.parse(entry);
+      return Object.values(provider.models).map(model => ({
+        id: model.id,
+        name: model.name,
+        context_length: model.limit?.context,
+        max_completion_tokens: model.limit?.output,
+        input_modalities: model.modalities?.input,
+      }));
+    },
+  };
+}
+
+async function fetchModelsDevCatalog(): Promise<ModelsDevCatalog> {
+  const response = await fetch('https://models.dev/api.json');
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
+    );
+  }
+  return ModelsDevCatalogSchema.parse(await response.json());
+}
+
 const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   openAICompatibleFetcher({
     providerId: 'neuralwatt',
@@ -92,43 +134,22 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Chutes',
     url: 'https://llm.chutes.ai/v1/models',
   }),
-  {
-    providerId: 'zai-coding',
-    async fetch() {
-      const response = await fetch('https://models.dev/api.json');
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch models.dev catalog: ${response.status} ${response.statusText}`
-        );
-      }
-      const catalog = z.record(z.string(), z.unknown()).parse(await response.json());
-      const entry = catalog['zai-coding-plan'];
-      if (!entry) {
-        throw new Error('models.dev catalog missing zai-coding-plan entry');
-      }
-      const provider = ModelsDevProviderSchema.parse(entry);
-      return Object.values(provider.models).map(model => ({
-        id: model.id,
-        name: model.name,
-        context_length: model.limit?.context,
-        max_completion_tokens: model.limit?.output,
-        input_modalities: model.modalities?.input,
-      }));
-    },
-  },
+  modelsDevFetcher('zai-coding', 'zai-coding-plan'),
 ];
 
-function stripVendorPrefix(id: string) {
+function modelIdToDisplayName(id: string) {
   const slash = id.lastIndexOf('/');
-  return slash >= 0 ? id.slice(slash + 1) : id;
+  const withoutVendor = slash >= 0 ? id.slice(slash + 1) : id;
+  const colon = withoutVendor.indexOf(':');
+  return colon >= 0 ? withoutVendor.slice(0, colon) : withoutVendor;
 }
 
-async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
-  const fetched = await fetcher.fetch();
+async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
+  const fetched = await fetcher.fetch(ctx);
   const models: DirectByokModel[] = [];
 
   for (const raw of fetched) {
-    const name = raw.name ?? stripVendorPrefix(raw.id);
+    const name = raw.name ?? modelIdToDisplayName(raw.id);
     const context_length = raw.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
     const max_completion_tokens = Math.min(
       raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
@@ -150,8 +171,15 @@ async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
 export async function syncDirectByokModels(): Promise<
   Partial<Record<DirectUserByokInferenceProviderId, number>>
 > {
+  let catalogPromise: Promise<ModelsDevCatalog> | null = null;
+  const ctx: SyncContext = {
+    getModelsDevCatalog() {
+      catalogPromise ??= fetchModelsDevCatalog();
+      return catalogPromise;
+    },
+  };
   const entries = await Promise.all(
-    FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher)] as const)
+    FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher, ctx)] as const)
   );
   return Object.fromEntries(entries);
 }

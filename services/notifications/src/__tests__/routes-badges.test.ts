@@ -105,6 +105,7 @@ describe('badge HTTP routes', () => {
         body: JSON.stringify({}),
       });
       expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'badgeBucket required' });
     });
 
     it('clears the bucket and returns the new total', async () => {

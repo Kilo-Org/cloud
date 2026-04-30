@@ -1,6 +1,8 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
+import type { MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
+import { useWorkersLogger } from 'workers-tagged-logger';
 
 import { presenceContextForConversation } from '@kilocode/event-service';
 import {
@@ -20,6 +22,13 @@ export { NotificationChannelDO } from './dos/NotificationChannelDO';
 const ALLOWED_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
 
 const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+
+// ── Structured logging context ──────────────────────────────────────────
+// Establishes AsyncLocalStorage context so all downstream logs (including
+// tags set by the auth middleware) propagate through the request.
+// Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
+app.use('*', useWorkersLogger('notifications') as unknown as MiddlewareHandler);
+
 app.get('/', c => c.json({ ok: true }));
 
 app.use(

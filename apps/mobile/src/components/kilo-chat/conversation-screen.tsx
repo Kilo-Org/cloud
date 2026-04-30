@@ -26,6 +26,7 @@ import {
   useRemoveReaction,
   useSendMessage,
 } from './hooks/use-messages';
+import { useTypingIndicator } from './hooks/use-typing-indicator';
 import { useCurrentUserId } from './hooks/use-current-user-id';
 import { setActiveChatLocation } from '@/lib/notifications';
 
@@ -54,6 +55,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const removeReaction = useRemoveReaction(client, conversationId, currentUserId);
   const editMessage = useEditMessage(client, conversationId);
   const deleteMessage = useDeleteMessage(client, conversationId);
+  const typing = useTypingIndicator({ client, sandboxId, conversationId, currentUserId });
   const handleSend = useCallback(
     (text: string) => {
       sendMutation.mutate({
@@ -179,7 +181,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           onLongPressMessage={handleLongPressMessage}
           onReactionPress={handleReactionPress}
         />
-        <TypingIndicator isTyping={false} />
+        <TypingIndicator isTyping={typing.isTyping} name={typing.name} />
         <MessageInput onSend={handleSend} disabled={sendMutation.isPending} />
       </KeyboardAvoidingView>
       <EditMessageModal

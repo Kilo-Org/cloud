@@ -9,7 +9,7 @@ import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs
 type DrizzleQueryError = Error & {
   query: string;
   params: unknown[];
-  cause?: { code?: string; message?: string };
+  cause?: { code?: string; message?: string; name?: string; constructor?: { name?: string } };
 };
 
 function isDrizzleQueryError(error: unknown): error is DrizzleQueryError {
@@ -19,6 +19,15 @@ function isDrizzleQueryError(error: unknown): error is DrizzleQueryError {
     'params' in error &&
     typeof error.query === 'string'
   );
+}
+
+function causeTypeName(cause: NonNullable<DrizzleQueryError['cause']>): string {
+  if (typeof cause.name === 'string' && cause.name.length > 0) return cause.name;
+  const ctorName = cause.constructor?.name;
+  if (typeof ctorName === 'string' && ctorName.length > 0 && ctorName !== 'Object') {
+    return ctorName;
+  }
+  return 'DatabaseError';
 }
 
 const TRPC_4XX_CODES = new Set([
@@ -74,18 +83,46 @@ if (process.env.NODE_ENV !== 'development') {
         return null;
       }
 
-      // Drizzle Queries are wrapped and that prevents Sentry from properly grouping them
+      // Drizzle wraps query errors with a `Failed query: <unique SQL>` message,
+      // which breaks Sentry grouping and hides the real root cause (e.g. a
+      // "statement timeout" on `error.cause`). Rewrite the primary exception so
+      // the reported error reflects the underlying cause, and move the failed
+      // query into a context so it stays visible on the issue without polluting
+      // the title or fingerprint.
       if (isDrizzleQueryError(error)) {
-        const pgCode = error.cause?.code;
+        const cause = error.cause;
+        const pgCode = cause?.code;
         event.fingerprint = [
           'drizzle-query-error',
           pgCode ?? 'generic',
-          error.cause?.message ?? 'generic',
+          cause?.message ?? 'generic',
         ];
         event.tags = {
           ...event.tags,
           'db.error_code': pgCode,
         };
+        event.contexts = {
+          ...event.contexts,
+          drizzle_query: {
+            query: error.query,
+            params: error.params,
+            wrapper_message: error.message,
+          },
+        };
+
+        if (cause) {
+          // `event.exception.values` is ordered oldest-to-newest; the last
+          // entry is the root exception Sentry uses for the title and
+          // grouping. Rewrite it so the title/type reflect the cause while
+          // keeping the wrapper's stack trace (which points to our code,
+          // unlike the pg-internal one).
+          const values = event.exception?.values;
+          if (values && values.length > 0) {
+            const root = values[values.length - 1];
+            root.type = causeTypeName(cause);
+            root.value = cause.message ?? 'unknown database error';
+          }
+        }
       }
       return event;
     },

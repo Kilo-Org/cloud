@@ -8,10 +8,16 @@ import { logger } from './util/logger';
 
 export { UserSessionDO } from './do/user-session-do';
 
-const app = new Hono<{ Bindings: Env }>();
+export const EVENT_SERVICE_ALLOWED_ORIGINS = [
+  'https://kilo.ai',
+  'https://app.kilo.ai',
+  'http://localhost:3000',
+];
 
-app.use('/connect/*', cors({ origin: ['https://kilo.ai', 'https://app.kilo.ai'] }));
-app.use('/auth/*', cors({ origin: ['https://kilo.ai', 'https://app.kilo.ai'] }));
+export const app = new Hono<{ Bindings: Env }>();
+
+app.use('/connect/*', cors({ origin: EVENT_SERVICE_ALLOWED_ORIGINS }));
+app.use('/auth/*', cors({ origin: EVENT_SERVICE_ALLOWED_ORIGINS }));
 
 // ── Structured logging context ──────────────────────────────────────────
 app.use('*', useWorkersLogger('event-service') as unknown as MiddlewareHandler);

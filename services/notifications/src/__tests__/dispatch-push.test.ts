@@ -15,7 +15,6 @@ vi.mock('../lib/expo-push', () => ({
 
 type DbState = {
   tokens: { user_id: string; token: string }[];
-  badgeTotal: number;
 };
 
 function installDbMock(state: DbState) {
@@ -26,8 +25,7 @@ function installDbMock(state: DbState) {
           if (getTableName(table) === 'user_push_tokens') {
             return state.tokens.map(t => ({ token: t.token }));
           }
-          // sum(badge_count) — return single row with `total`
-          return [{ total: state.badgeTotal }];
+          return [];
         },
       }),
     }),
@@ -56,7 +54,7 @@ const baseInput = (over: Partial<DispatchPushInput> = {}): DispatchPushInput => 
   ...over,
 });
 
-function getDO(name = 'conv1') {
+function getDO(name = 'user-1') {
   const id = env.NOTIFICATION_CHANNEL_DO.idFromName(name);
   return env.NOTIFICATION_CHANNEL_DO.get(id);
 }
@@ -68,7 +66,7 @@ describe('NotificationChannelDO.dispatchPush', () => {
   });
 
   it('returns suppressed_presence when EVENT_SERVICE.isUserInContext is true', async () => {
-    installDbMock({ tokens: [{ user_id: 'user-1', token: 'tok1' }], badgeTotal: 0 });
+    installDbMock({ tokens: [{ user_id: 'user-1', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(true);
     const result = await getDO().dispatchPush(baseInput());
     expect(result.kind).toBe('suppressed_presence');
@@ -76,29 +74,67 @@ describe('NotificationChannelDO.dispatchPush', () => {
   });
 
   it('returns no_tokens when the user has no push tokens', async () => {
-    installDbMock({ tokens: [], badgeTotal: 0 });
+    installDbMock({ tokens: [] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(false);
-    const result = await getDO().dispatchPush(baseInput({ userId: 'user-no-tokens' }));
+    const result = await getDO('user-no-tokens').dispatchPush(
+      baseInput({ userId: 'user-no-tokens' })
+    );
     expect(result.kind).toBe('no_tokens');
     expect(sendPushNotifications).not.toHaveBeenCalled();
   });
 
-  it('delivers, increments badge, writes idempotency key', async () => {
-    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 1 });
+  it('delivers, increments bucket in DO storage, writes idempotency key', async () => {
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(false);
-    const result = await getDO('conv-deliver').dispatchPush(
-      baseInput({ idempotencyKey: 'k-deliver' })
-    );
+    const stub = getDO('user-deliver');
+
+    const result = await stub.dispatchPush(baseInput({ idempotencyKey: 'k-deliver' }));
+
     expect(result.kind).toBe('delivered');
     expect(sendPushNotifications).toHaveBeenCalledOnce();
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
     expect(messages[0].badge).toBe(1);
+
+    // Bucket persisted to DO storage.
+    const stored = await runInDurableObject(stub, (_inst, state) =>
+      state.storage.get<number>('bucket:conv1')
+    );
+    expect(stored).toBe(1);
+  });
+
+  it('accumulates bucket counts across deliveries and exposes total via badge', async () => {
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-accumulate');
+
+    await stub.dispatchPush(baseInput({ idempotencyKey: 'k-acc-1' }));
+    await stub.dispatchPush(baseInput({ idempotencyKey: 'k-acc-2' }));
+    await stub.dispatchPush(
+      baseInput({
+        idempotencyKey: 'k-acc-3',
+        badge: { badgeBucket: 'conv2', delta: 1 },
+      })
+    );
+
+    const calls = vi.mocked(sendPushNotifications).mock.calls;
+    expect(calls[0]?.[0][0].badge).toBe(1);
+    expect(calls[1]?.[0][0].badge).toBe(2);
+    expect(calls[2]?.[0][0].badge).toBe(3);
+
+    const buckets = await runInDurableObject(stub, async (_inst, state) => {
+      const entries = await state.storage.list<number>({ prefix: 'bucket:' });
+      return Array.from(entries.entries());
+    });
+    expect(buckets.sort()).toEqual([
+      ['bucket:conv1', 2],
+      ['bucket:conv2', 1],
+    ]);
   });
 
   it('returns duplicate when the idempotency key has been seen', async () => {
-    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 1 });
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
-    const stub = getDO('conv-dup');
+    const stub = getDO('user-dup');
     const input = baseInput({ idempotencyKey: 'k-dup' });
     await stub.dispatchPush(input);
     const second = await stub.dispatchPush(input);
@@ -107,21 +143,30 @@ describe('NotificationChannelDO.dispatchPush', () => {
   });
 
   it('skips badge mutation when badge is null', async () => {
-    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 0 });
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(false);
-    const result = await getDO('conv-no-badge').dispatchPush(
+    const stub = getDO('user-no-badge');
+
+    const result = await stub.dispatchPush(
       baseInput({ badge: null, idempotencyKey: 'k-no-badge' })
     );
+
     expect(result.kind).toBe('delivered');
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
     expect(messages[0].badge).toBeUndefined();
+
+    const buckets = await runInDurableObject(stub, async (_inst, state) => {
+      const entries = await state.storage.list<number>({ prefix: 'bucket:' });
+      return Array.from(entries.keys());
+    });
+    expect(buckets).toEqual([]);
   });
 
   it('does not write idempotency key on Expo failure', async () => {
-    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 0 });
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
     vi.mocked(sendPushNotifications).mockRejectedValueOnce(new Error('boom'));
-    const stub = getDO('conv-fail');
+    const stub = getDO('user-fail');
     const input = baseInput({ idempotencyKey: 'k-fail', badge: null });
     const first = await stub.dispatchPush(input);
     expect(first.kind).toBe('failed');
@@ -129,46 +174,43 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(second.kind).not.toBe('duplicate');
   });
 
-  it('does not re-increment the badge when retrying after Expo failure', async () => {
-    const insertSpy = vi.fn().mockReturnValue({
-      values: () => ({ onConflictDoUpdate: async () => undefined }),
-    });
-    vi.spyOn(dbClient, 'getWorkerDb').mockReturnValue({
-      select: () => ({
-        from: (table: Parameters<typeof getTableName>[0]) => ({
-          where: async () => {
-            if (getTableName(table) === 'user_push_tokens') {
-              return [{ token: 'tok1' }];
-            }
-            return [{ total: 1 }];
-          },
-        }),
-      }),
-      insert: insertSpy,
-      delete: () => ({ where: async () => undefined }),
-    } as unknown as ReturnType<typeof dbClient.getWorkerDb>);
+  it('does not re-increment the bucket when retrying after Expo failure', async () => {
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
     vi.mocked(sendPushNotifications).mockRejectedValueOnce(new Error('boom'));
 
-    const stub = getDO('conv-no-double');
+    const stub = getDO('user-no-double');
     const input = baseInput({ idempotencyKey: 'k-no-double' });
 
     const first = await stub.dispatchPush(input);
     expect(first.kind).toBe('failed');
-    expect(insertSpy).toHaveBeenCalledTimes(1);
+
+    // After the failed attempt, the bucket has already been incremented once
+    // and the idem record is `pending`.
+    const afterFail = await runInDurableObject(stub, (_inst, state) =>
+      state.storage.get<number>('bucket:conv1')
+    );
+    expect(afterFail).toBe(1);
 
     const second = await stub.dispatchPush(input);
     expect(second.kind).toBe('delivered');
-    // Badge must not be incremented twice across the retry — the first
-    // attempt's `pending` marker gates the second insert out.
-    expect(insertSpy).toHaveBeenCalledTimes(1);
+
+    // Bucket must not be incremented twice across the retry — the first
+    // attempt's `pending` marker gates the second increment out.
+    const afterRetry = await runInDurableObject(stub, (_inst, state) =>
+      state.storage.get<number>('bucket:conv1')
+    );
+    expect(afterRetry).toBe(1);
+
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].badge).toBe(1);
   });
 
   it('schedules cleanup when writing the pending marker (failed send)', async () => {
-    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 0 });
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
     vi.mocked(sendPushNotifications).mockRejectedValueOnce(new Error('boom'));
-    const stub = getDO('conv-pending-alarm');
+    const stub = getDO('user-pending-alarm');
 
     const result = await stub.dispatchPush(baseInput({ idempotencyKey: 'k-pending-alarm' }));
     expect(result.kind).toBe('failed');
@@ -179,8 +221,8 @@ describe('NotificationChannelDO.dispatchPush', () => {
   });
 
   it('reschedules cleanup for younger records when alarm fires', async () => {
-    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 1 });
-    const stub = getDO('conv-reschedule');
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
+    const stub = getDO('user-reschedule');
 
     const now = Date.now();
     await runInDurableObject(stub, async (_inst, state) => {
@@ -206,9 +248,9 @@ describe('NotificationChannelDO.dispatchPush', () => {
   });
 
   it('does not reset the alarm on every successful send', async () => {
-    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }], badgeTotal: 1 });
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
-    const stub = getDO('conv-alarm');
+    const stub = getDO('user-alarm');
 
     await stub.dispatchPush(baseInput({ idempotencyKey: 'k-alarm-1' }));
     const firstAlarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());

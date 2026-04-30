@@ -22,11 +22,13 @@ const baseInput = (
 });
 
 describe('NotificationsService.sendPushForConversation', () => {
-  it('excludes sender, dedupes, fans out to remaining recipients', async () => {
+  it('excludes sender, dedupes, and routes one DO per recipient userId', async () => {
     const stubSpy = vi.fn(async (_input: DispatchPushInput) => ({
       kind: 'delivered' as const,
       tokenCount: 1,
     }));
+    // Spy on idFromName to confirm the DO is keyed by userId, not conversationId.
+    const idFromNameSpy = vi.spyOn(env.NOTIFICATION_CHANNEL_DO, 'idFromName');
     vi.spyOn(env.NOTIFICATION_CHANNEL_DO, 'get').mockReturnValue({
       dispatchPush: stubSpy,
     } as unknown as DurableObjectStub<do_module.NotificationChannelDO>);
@@ -34,6 +36,10 @@ describe('NotificationsService.sendPushForConversation', () => {
     const result = await env.SELF.sendPushForConversation(baseInput());
 
     expect(stubSpy).toHaveBeenCalledTimes(2); // r1, r2
+    const idArgs = idFromNameSpy.mock.calls.map(c => c[0]);
+    expect(idArgs).toEqual(['r1', 'r2']);
+    expect(idArgs).not.toContain('conv1');
+
     expect(result.perRecipient.map((r: PerRecipientResult) => r.userId).sort()).toEqual([
       'r1',
       'r2',

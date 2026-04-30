@@ -18,7 +18,7 @@ export { NotificationChannelDO } from './dos/NotificationChannelDO';
 const app = new Hono<{ Bindings: Env }>();
 app.get('/', c => c.json({ ok: true }));
 
-type ConversationDOStub = {
+type RecipientDOStub = {
   dispatchPush: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;
 };
 
@@ -26,7 +26,7 @@ type ConversationDOStub = {
 export async function sendPushForConversationCore(
   input: SendPushForConversationInput,
   deps: {
-    getConversationDOStub: (conversationId: string) => ConversationDOStub;
+    getRecipientDOStub: (userId: string) => RecipientDOStub;
   }
 ): Promise<SendPushForConversationOutput> {
   const recipients: string[] = [];
@@ -40,7 +40,7 @@ export async function sendPushForConversationCore(
 
   const perRecipient: PerRecipientResult[] = [];
   for (const userId of recipients) {
-    const stub = deps.getConversationDOStub(input.conversationId);
+    const stub = deps.getRecipientDOStub(userId);
     const outcome = await stub.dispatchPush({
       userId,
       presenceContext: presenceContextForConversation(input.sandboxId, input.conversationId),
@@ -80,10 +80,10 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     input: SendPushForConversationInput
   ): Promise<SendPushForConversationOutput> {
     return sendPushForConversationCore(input, {
-      getConversationDOStub: (conversationId: string) =>
+      getRecipientDOStub: (userId: string) =>
         this.env.NOTIFICATION_CHANNEL_DO.get(
-          this.env.NOTIFICATION_CHANNEL_DO.idFromName(conversationId)
-        ) as unknown as ConversationDOStub,
+          this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
+        ) as unknown as RecipientDOStub,
     });
   }
 }

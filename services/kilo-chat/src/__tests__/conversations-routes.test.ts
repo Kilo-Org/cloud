@@ -342,6 +342,69 @@ describe('POST /v1/conversations/:id/mark-read', () => {
       body.lastReadAt
     );
   });
+
+  it('keeps the persisted read marker when notification badge clearing fails', async () => {
+    grantSandbox('user-mark-read-notification-fail', 'sandbox-mark-read-notification-fail');
+    const app = makeApp('user-mark-read-notification-fail', 'user');
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const testEnv = {
+      ...env,
+      EVENT_SERVICE: { pushEvent },
+      NOTIFICATIONS: {
+        markConversationRead: vi.fn().mockRejectedValue(new Error('notifications unavailable')),
+      },
+    } as unknown as Env;
+
+    const createRes = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sandboxId: 'sandbox-mark-read-notification-fail',
+          title: 'Read through notification failure',
+        }),
+      },
+      testEnv
+    );
+    const { conversationId } = await createRes.json<{ conversationId: string }>();
+
+    const res = await app.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{
+      conversationId: string;
+      lastReadAt: number;
+      badgeCount: number | null;
+    }>();
+    expect(body.conversationId).toBe(conversationId);
+    expect(body.lastReadAt).toEqual(expect.any(Number));
+    expect(body.badgeCount).toBeNull();
+
+    const memberStub = getMemberStub('user-mark-read-notification-fail');
+    const { conversations } = await memberStub.listConversations({
+      sandboxId: 'sandbox-mark-read-notification-fail',
+    });
+    expect(conversations.find(c => c.conversationId === conversationId)?.lastReadAt).toBe(
+      body.lastReadAt
+    );
+    expect(pushEvent).toHaveBeenCalledWith(
+      'user-mark-read-notification-fail',
+      '/kiloclaw/sandbox-mark-read-notification-fail',
+      'conversation.read',
+      {
+        conversationId,
+        memberId: 'user-mark-read-notification-fail',
+        lastReadAt: body.lastReadAt,
+      }
+    );
+  });
 });
 
 describe('PATCH /v1/conversations/:id — rename', () => {

@@ -7,6 +7,7 @@ import {
   textBlockSchema,
   createMessageRequestSchema,
   editMessageRequestSchema,
+  markConversationReadResponseSchema,
   CONVERSATION_TITLE_MAX_CHARS,
   MESSAGE_TEXT_MAX_CHARS,
 } from '../src/schemas';
@@ -121,6 +122,17 @@ describe('title schemas — trim and reject empty', () => {
 
     it('accepts missing title (optional)', () => {
       const res = createBotConversationRequestSchema.safeParse({});
+      expect(res.success).toBe(true);
+    });
+  });
+
+  describe('markConversationReadResponseSchema', () => {
+    it('accepts unavailable badge count', () => {
+      const res = markConversationReadResponseSchema.safeParse({
+        conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        lastReadAt: 1234,
+        badgeCount: null,
+      });
       expect(res.success).toBe(true);
     });
   });

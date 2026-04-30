@@ -163,7 +163,7 @@ export const okResponseSchema = z.object({ ok: z.literal(true) });
 export const markConversationReadResponseSchema = z.object({
   conversationId: ulidSchema,
   lastReadAt: z.number(),
-  badgeCount: z.number().int().nonnegative(),
+  badgeCount: z.number().int().nonnegative().nullable(),
 });
 
 export const createMessageRequestSchema = z.object({

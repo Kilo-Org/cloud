@@ -4,7 +4,7 @@
  */
 
 import { ulid } from 'ulid';
-import { withDORetry } from '@kilocode/worker-utils';
+import { formatError, withDORetry } from '@kilocode/worker-utils';
 import {
   extractConversationContext,
   extractSandboxId,
@@ -12,6 +12,7 @@ import {
   pushInstanceEventToUser,
 } from './event-push';
 import { lookupSandboxOwnerUserId, userOwnsSandbox } from './sandbox-ownership';
+import { logger } from '../util/logger';
 import type { DeferCtx } from './messages';
 import type { ConversationDO, UpdateTitleIfMemberResult } from '../do/conversation-do';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
@@ -332,7 +333,7 @@ export type MarkReadParams = {
 };
 
 export type MarkReadResult =
-  | { ok: true; conversationId: string; lastReadAt: number; badgeCount: number }
+  | { ok: true; conversationId: string; lastReadAt: number; badgeCount: number | null }
   | { ok: false; code: 'forbidden'; error: string };
 
 export async function markReadFor(
@@ -361,14 +362,23 @@ export async function markReadFor(
   );
 
   const { sandboxId } = extractConversationContext(info.members);
-  let badgeCount = 0;
+  let badgeCount: number | null = null;
   if (sandboxId) {
-    const badgeResult = await env.NOTIFICATIONS.markConversationRead({
-      userId,
-      sandboxId,
-      conversationId,
-    });
-    badgeCount = badgeResult.badgeCount;
+    try {
+      const badgeResult = await env.NOTIFICATIONS.markConversationRead({
+        userId,
+        sandboxId,
+        conversationId,
+      });
+      badgeCount = badgeResult.badgeCount;
+    } catch (err) {
+      logger.error('markConversationRead failed', {
+        userId,
+        sandboxId,
+        conversationId,
+        ...formatError(err),
+      });
+    }
 
     const pushPromise = pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
       conversationId,

@@ -4,19 +4,10 @@
  *
  * Two instance shapes map to two label prefixes:
  *
- *   instance-keyed sandboxId  "ki_{32hex}"         <->  "i-{32hex}"
- *   legacy sandboxId          "{base64url-body}"   <->  "u-{body}"
+ *   instance-keyed sandboxId  "ki_{32hex}"       <->  "i-{32hex}"
+ *   legacy sandboxId          base64url(userId)   <->  "u-{base32hex(userId)}"
  *
  * Prefix disambiguates the two cases without a database lookup.
- *
- * DNS (RFC 1035) labels are `[A-Za-z0-9-]` with max length 63. base64url
- * theoretically uses `_` and `-`, but for realistic (ASCII) userIds the
- * output is alnum-only because `-` and `_` only appear in base64url when
- * the input byte stream contains bytes >= 0x3E in specific positions, and
- * no userId shape in production (UUIDs, `oauth/{provider}:{sub}`, emails,
- * Google numeric subs) contains those characters. We enforce the alnum
- * property with SAFE_LABEL_BODY_RE and fall back to "no label" for any
- * pathological outlier rather than trying to escape.
  */
 
 import { isInstanceKeyedSandboxId } from '@kilocode/worker-utils/instance-id';
@@ -24,18 +15,74 @@ import { isInstanceKeyedSandboxId } from '@kilocode/worker-utils/instance-id';
 /** RFC 1035 max label length. */
 export const MAX_HOSTNAME_LABEL_LENGTH = 63;
 
-/**
- * Characters permitted in the label body (after the `i-` or `u-` prefix).
- * Alnum-only keeps us strictly RFC 1035 compliant without worrying about
- * adjacent hyphens or leading/trailing hyphens that would break some
- * resolvers and TLS stacks.
- */
-const SAFE_LABEL_BODY_RE = /^[A-Za-z0-9]+$/;
-
+const BASE32_HEX_ALPHABET = '0123456789abcdefghijklmnopqrstuv';
 const INSTANCE_KEYED_BODY_RE = /^[0-9a-f]{32}$/;
 
 const INSTANCE_LABEL_RE = /^i-([0-9a-f]{32})$/;
-const USER_LABEL_RE = /^u-([A-Za-z0-9]+)$/;
+const USER_LABEL_RE = /^u-([0-9a-v]+)$/;
+
+function bytesToBase64url(bytes: Uint8Array): string {
+  const binString = Array.from(bytes, b => String.fromCodePoint(b)).join('');
+  return btoa(binString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64urlToBytes(encoded: string): Uint8Array | null {
+  try {
+    let b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4 !== 0) {
+      b64 += '=';
+    }
+    const binString = atob(b64);
+    const bytes = Uint8Array.from(binString, c => c.codePointAt(0) ?? 0);
+    return bytesToBase64url(bytes) === encoded ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+function bytesToBase32Hex(bytes: Uint8Array): string {
+  let output = '';
+  let buffer = 0;
+  let bits = 0;
+
+  for (const byte of bytes) {
+    buffer = (buffer << 8) | byte;
+    bits += 8;
+
+    while (bits >= 5) {
+      bits -= 5;
+      output += BASE32_HEX_ALPHABET[(buffer >> bits) & 31];
+    }
+  }
+
+  if (bits > 0) {
+    output += BASE32_HEX_ALPHABET[(buffer << (5 - bits)) & 31];
+  }
+
+  return output;
+}
+
+function base32HexToBytes(encoded: string): Uint8Array | null {
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+
+  for (const char of encoded) {
+    const value = BASE32_HEX_ALPHABET.indexOf(char);
+    if (value === -1) return null;
+
+    buffer = (buffer << 5) | value;
+    bits += 5;
+
+    while (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 255);
+    }
+  }
+
+  const decoded = Uint8Array.from(bytes);
+  return bytesToBase32Hex(decoded) === encoded ? decoded : null;
+}
 
 /**
  * Produce a DNS-safe hostname label for `<label>.kiloclaw.ai` from a
@@ -55,8 +102,10 @@ export function hostnameLabelFromSandboxId(sandboxId: string): string | null {
     return label;
   }
 
-  if (!SAFE_LABEL_BODY_RE.test(sandboxId)) return null;
-  const label = `u-${sandboxId}`;
+  const legacyUserIdBytes = base64urlToBytes(sandboxId);
+  if (!legacyUserIdBytes || legacyUserIdBytes.length === 0) return null;
+
+  const label = `u-${bytesToBase32Hex(legacyUserIdBytes)}`;
   if (label.length > MAX_HOSTNAME_LABEL_LENGTH) return null;
   return label;
 }
@@ -70,14 +119,17 @@ export function hostnameLabelFromSandboxId(sandboxId: string): string | null {
  * `<label>.kiloclaw.ai` to the owning Instance DO.
  */
 export function sandboxIdFromHostnameLabel(label: string): string | null {
-  const instanceMatch = INSTANCE_LABEL_RE.exec(label);
+  const normalized = label.toLowerCase();
+  const instanceMatch = INSTANCE_LABEL_RE.exec(normalized);
   if (instanceMatch) return `ki_${instanceMatch[1]}`;
 
-  const userMatch = USER_LABEL_RE.exec(label);
+  const userMatch = USER_LABEL_RE.exec(normalized);
   if (userMatch) {
     const body = userMatch[1];
     if (body.length + 2 > MAX_HOSTNAME_LABEL_LENGTH) return null;
-    return body;
+    const bytes = base32HexToBytes(body);
+    if (!bytes) return null;
+    return bytesToBase64url(bytes);
   }
 
   return null;

@@ -15,13 +15,14 @@ describe('hostnameLabelFromSandboxId', () => {
     expect(hostnameLabelFromSandboxId(sandboxId)).toBe('i-550e8400e29b41d4a716446655440000');
   });
 
-  it('maps a legacy UUID userId sandboxId to `u-{base64url}`', () => {
+  it('maps a legacy UUID userId sandboxId to lowercase `u-{base32hex(userId)}`', () => {
     const sandboxId = sandboxIdFromUserId('550e8400-e29b-41d4-a716-446655440000');
     const label = hostnameLabelFromSandboxId(sandboxId);
 
     expect(label).not.toBeNull();
     expect(label?.startsWith('u-')).toBe(true);
-    expect(label).toMatch(/^u-[A-Za-z0-9]+$/);
+    expect(label).toMatch(/^u-[0-9a-v]+$/);
+    expect(label).toBe(label?.toLowerCase());
   });
 
   it('maps a legacy oauth-provider userId sandboxId to a safe label', () => {
@@ -29,7 +30,8 @@ describe('hostnameLabelFromSandboxId', () => {
     const label = hostnameLabelFromSandboxId(sandboxId);
 
     expect(label).not.toBeNull();
-    expect(label).toMatch(/^u-[A-Za-z0-9]+$/);
+    expect(label).toMatch(/^u-[0-9a-v]+$/);
+    expect(label).toBe(label?.toLowerCase());
   });
 
   it('maps a legacy email-shaped userId sandboxId to a safe label', () => {
@@ -37,32 +39,28 @@ describe('hostnameLabelFromSandboxId', () => {
     const label = hostnameLabelFromSandboxId(sandboxId);
 
     expect(label).not.toBeNull();
-    expect(label).toMatch(/^u-[A-Za-z0-9]+$/);
+    expect(label).toMatch(/^u-[0-9a-v]+$/);
+    expect(label).toBe(label?.toLowerCase());
   });
 
-  it('returns null when the legacy sandboxId contains base64url `-` or `_`', () => {
-    // `>` (0x3E) at byte position 2 / 5 / … in a userId produces a `-` in the
-    // base64url encoding (group-3 value = 62). `?` (0x3F) at the same
-    // positions produces a `_`. Neither appears in production userIds but
-    // we must not emit them in a hostname label (would violate strict RFC 1035
-    // and trip some TLS/DNS stacks). Caller should skip origin injection.
+  it('maps legacy sandboxIds containing base64url `-` or `_` to safe labels', () => {
     const sandboxIdWithDash = sandboxIdFromUserId('ab>');
     expect(sandboxIdWithDash).toMatch(/-/);
-    expect(hostnameLabelFromSandboxId(sandboxIdWithDash)).toBeNull();
+    expect(hostnameLabelFromSandboxId(sandboxIdWithDash)).toBe('u-c5h3s');
 
     const sandboxIdWithUnderscore = sandboxIdFromUserId('ab?');
     expect(sandboxIdWithUnderscore).toMatch(/_/);
-    expect(hostnameLabelFromSandboxId(sandboxIdWithUnderscore)).toBeNull();
+    expect(hostnameLabelFromSandboxId(sandboxIdWithUnderscore)).toBe('u-c5h3u');
   });
 
   it('returns null when the label would exceed the DNS label length', () => {
-    // 62-char alnum sandboxId + `u-` = 64, over the 63-char limit.
-    const overlongSandboxId = 'a'.repeat(62);
+    // 39 raw bytes -> 63 base32 chars + `u-` = 65, over the 63-char limit.
+    const overlongSandboxId = sandboxIdFromUserId('a'.repeat(39));
     expect(hostnameLabelFromSandboxId(overlongSandboxId)).toBeNull();
 
-    const atLimitSandboxId = 'a'.repeat(61);
+    // 38 raw bytes -> 61 base32 chars + `u-` = 63, exactly at the limit.
+    const atLimitSandboxId = sandboxIdFromUserId('a'.repeat(38));
     const label = hostnameLabelFromSandboxId(atLimitSandboxId);
-    expect(label).toBe(`u-${atLimitSandboxId}`);
     expect(label?.length).toBe(MAX_HOSTNAME_LABEL_LENGTH);
   });
 });
@@ -93,6 +91,18 @@ describe('sandboxIdFromHostnameLabel', () => {
     }
   });
 
+  it('parses labels case-insensitively', () => {
+    const instanceSandboxId = sandboxIdFromInstanceId('550e8400-e29b-41d4-a716-446655440000');
+    expect(sandboxIdFromHostnameLabel('I-550E8400E29B41D4A716446655440000')).toBe(
+      instanceSandboxId
+    );
+
+    const legacySandboxId = sandboxIdFromUserId('oauth/google:118234567890');
+    const label = hostnameLabelFromSandboxId(legacySandboxId);
+    expect(label).not.toBeNull();
+    expect(sandboxIdFromHostnameLabel(label?.toUpperCase() ?? '')).toBe(legacySandboxId);
+  });
+
   it('rejects labels without a recognised prefix', () => {
     expect(sandboxIdFromHostnameLabel('abc123')).toBeNull();
     expect(sandboxIdFromHostnameLabel('x-deadbeef')).toBeNull();
@@ -108,6 +118,7 @@ describe('sandboxIdFromHostnameLabel', () => {
   it('rejects user labels with unsafe characters', () => {
     expect(sandboxIdFromHostnameLabel('u-foo_bar')).toBeNull();
     expect(sandboxIdFromHostnameLabel('u-foo.bar')).toBeNull();
+    expect(sandboxIdFromHostnameLabel('u-zzzz')).toBeNull();
     expect(sandboxIdFromHostnameLabel('u-')).toBeNull();
   });
 });

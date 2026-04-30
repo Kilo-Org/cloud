@@ -279,11 +279,7 @@ describe('buildEnvVars', () => {
     );
   });
 
-  it('appends `u-{body}.kiloclaw.ai` origin for legacy sandboxes', async () => {
-    // SANDBOX_ID is "test-sandbox-id" which contains `-`. The hostname-label
-    // helper rejects that (hyphen not in alnum body), so for this test we use
-    // a safe alnum sandboxId value representative of a base64url-encoded
-    // ASCII userId.
+  it('appends `u-{base32hex(userId)}.kiloclaw.ai` origin for legacy sandboxes', async () => {
     const legacySandboxId = 'dGVzdHVzZXJhYmMxMjM'; // base64url("testuserabc123")
     const env = createMockEnv({
       OPENCLAW_ALLOWED_ORIGINS: 'https://claw.kilosessions.ai',
@@ -292,16 +288,14 @@ describe('buildEnvVars', () => {
     const result = await buildEnvVars(env, legacySandboxId, SECRET);
 
     expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe(
-      `https://claw.kilosessions.ai,https://u-${legacySandboxId}.kiloclaw.ai`
+      'https://claw.kilosessions.ai,https://u-ehin6t3ledin4ob2ccoj4co.kiloclaw.ai'
     );
   });
 
   it('skips per-instance origin when the sandboxId cannot be safely labelled', async () => {
-    // Sandboxes containing `-` or `_` in their base64url body fall through the
-    // label safety check. This is a defensive path — production userIds don't
-    // produce these characters in base64url output — but we must not emit an
-    // RFC-invalid hostname in the allowlist.
-    const unsafeSandboxId = 'test-sandbox-id';
+    // Overlong legacy user IDs cannot fit in one DNS label after base32hex
+    // encoding. Those instances keep using the shared legacy origins.
+    const unsafeSandboxId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'; // base64url("i".repeat(39))
     const env = createMockEnv({
       OPENCLAW_ALLOWED_ORIGINS: 'https://claw.kilosessions.ai',
     });

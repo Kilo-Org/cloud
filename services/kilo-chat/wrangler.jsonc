@@ -42,7 +42,11 @@
   "services": [
     { "binding": "KILOCLAW", "service": "kiloclaw" },
     { "binding": "EVENT_SERVICE", "service": "event-service" },
-    { "binding": "NOTIFICATIONS", "service": "notifications", "entrypoint": "NotificationsService" },
+    {
+      "binding": "NOTIFICATIONS",
+      "service": "notifications",
+      "entrypoint": "NotificationsService",
+    },
   ],
 
   "secrets_store_secrets": [

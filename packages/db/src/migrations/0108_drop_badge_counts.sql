@@ -1,1 +1,0 @@
-DROP TABLE "badge_counts" CASCADE;

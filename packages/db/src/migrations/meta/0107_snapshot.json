@@ -1,5 +1,5 @@
 {
-  "id": "5b345e9c-de70-4377-a842-4747d863b166",
+  "id": "70c51b5f-a9b9-4573-a6fc-98667b039360",
   "prevId": "ec49ba08-673e-479f-a8a2-490c71ad9186",
   "version": "7",
   "dialect": "postgresql",
@@ -2596,67 +2596,6 @@
           "value": "\"auto_triage_tickets\".\"action_taken\" IN ('pr_created', 'comment_posted', 'closed_duplicate', 'needs_clarification')"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.badge_counts": {
-      "name": "badge_counts",
-      "schema": "",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "badge_bucket": {
-          "name": "badge_bucket",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "badge_count": {
-          "name": "badge_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "badge_counts_user_id_kilocode_users_id_fk": {
-          "name": "badge_counts_user_id_kilocode_users_id_fk",
-          "tableFrom": "badge_counts",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "badge_counts_user_id_badge_bucket_pk": {
-          "name": "badge_counts_user_id_badge_bucket_pk",
-          "columns": [
-            "user_id",
-            "badge_bucket"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.bot_request_cloud_agent_sessions": {

@@ -30,6 +30,11 @@ import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
+import {
+  releaseFailedMarkReadAttempt,
+  rememberMarkReadAttempt,
+  shouldAttemptMarkRead,
+} from './mark-read-attempts';
 import { TypingIndicator } from './TypingIndicator';
 import { BotStatus, computeBotDisplay, useNowTicker } from './BotStatus';
 import { ContextUsageRing } from './ContextUsageRing';
@@ -138,9 +143,14 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   // Mark conversation as read when opened. react-query's mutate is stable
   // across renders, so including it in deps is safe.
   useEffect(() => {
-    if (lastMarkedRef.current === conversationId) return;
-    lastMarkedRef.current = conversationId;
-    markRead.mutate(conversationId);
+    if (!shouldAttemptMarkRead(lastMarkedRef.current, conversationId)) return;
+    rememberMarkReadAttempt(lastMarkedRef, conversationId);
+    markRead.mutate(conversationId, {
+      onError: err => {
+        releaseFailedMarkReadAttempt(lastMarkedRef, conversationId);
+        toast.error(formatKiloChatError(err, 'Failed to mark conversation as read'));
+      },
+    });
   }, [conversationId, markRead.mutate]);
 
   // Register side-effect handlers that don't mutate the message cache

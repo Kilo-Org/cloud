@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { kiloclawConversationContext } from '@kilocode/event-service';
 import { messagesKey } from '@kilocode/kilo-chat-hooks';
 
+import { conversationEventSubscriptionContext } from './conversation-event-subscription-context';
+import { useAppActiveAndFocused } from './use-app-active-and-focused';
 import { useEventServiceClient } from './use-kilo-chat-client';
 
 export function useConversationEventSubscription(
@@ -12,8 +13,8 @@ export function useConversationEventSubscription(
 ) {
   const eventService = useEventServiceClient();
   const queryClient = useQueryClient();
-  const context =
-    sandboxId && conversationId ? kiloclawConversationContext(sandboxId, conversationId) : null;
+  const activeAndFocused = useAppActiveAndFocused();
+  const context = conversationEventSubscriptionContext(sandboxId, conversationId, activeAndFocused);
 
   useEffect(() => {
     if (!context) {
@@ -26,11 +27,12 @@ export function useConversationEventSubscription(
   }, [eventService, context]);
 
   useEffect(() => {
-    if (!conversationId) {
+    if (!conversationId || !activeAndFocused) {
       return undefined;
     }
+    void queryClient.invalidateQueries({ queryKey: messagesKey(conversationId) });
     return eventService.onReconnect(() => {
       void queryClient.invalidateQueries({ queryKey: messagesKey(conversationId) });
     });
-  }, [eventService, queryClient, conversationId]);
+  }, [eventService, queryClient, conversationId, activeAndFocused]);
 }

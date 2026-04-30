@@ -20,8 +20,7 @@ import {
   executeActionFor,
 } from '../services/messages';
 import { addReactionFor, removeReactionFor } from '../services/reactions';
-import { notifyMessageDeliveryFailed } from '../webhook/deliver';
-import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
+import { notifyActionDeliveryFailed, notifyMessageDeliveryFailed } from '../webhook/deliver';
 import { setTypingFor, stopTypingFor } from '../services/typing';
 import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
 import type {
@@ -295,24 +294,15 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
   const membership = await assertCallerIsMember(c, convId.data, callerId);
   if (!membership.ok) return membership.response;
 
-  const { messageId } = parsed.data;
-  const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
-  const result = await convStub.revertActionResolution({ messageId, groupId: groupIdRaw });
+  const result = await notifyActionDeliveryFailed(c.env, {
+    conversationId: convId.data,
+    messageId: parsed.data.messageId,
+    groupId: groupIdRaw,
+  });
   if (!result.ok) {
     return c.json({ error: result.error }, 404);
   }
 
-  const ctx = await getConversationContext(c.env, convId.data);
-  if (ctx?.sandboxId) {
-    await pushEventToHumanMembers(
-      c.env,
-      convId.data,
-      ctx.sandboxId,
-      ctx.humanMemberIds,
-      'action.delivery_failed',
-      { conversationId: convId.data, messageId, groupId: groupIdRaw, version: result.version }
-    );
-  }
   return c.json({}, 202);
 }
 

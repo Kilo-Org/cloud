@@ -8,6 +8,7 @@ import { formatError, withDORetry } from '@kilocode/worker-utils';
 import type { z } from 'zod';
 import { logger, withLogTags } from '../util/logger';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
+import type { ConversationDO, RevertActionResolutionResult } from '../do/conversation-do';
 
 type MessageCreatedPayload = z.infer<typeof messageCreatedWebhookSchema>;
 type ActionExecutedWebhookPayload = z.infer<typeof actionExecutedWebhookSchema>;
@@ -126,9 +127,51 @@ export async function notifyMessageDeliveryFailed(
   }
 }
 
+export type NotifyActionDeliveryFailedResult =
+  | { ok: true; version: number }
+  | { ok: false; error: string };
+
+export async function notifyActionDeliveryFailed(
+  env: Env,
+  params: {
+    conversationId: string;
+    messageId: string;
+    groupId: string;
+    convContext?: { humanMemberIds: string[]; sandboxId: string | null };
+  }
+): Promise<NotifyActionDeliveryFailedResult> {
+  const result = await withDORetry<DurableObjectStub<ConversationDO>, RevertActionResolutionResult>(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId)),
+    stub => stub.revertActionResolution({ messageId: params.messageId, groupId: params.groupId }),
+    'ConversationDO.revertActionResolution'
+  );
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  const ctx = params.convContext ?? (await getConversationContext(env, params.conversationId));
+  if (ctx?.sandboxId) {
+    await pushEventToHumanMembers(
+      env,
+      params.conversationId,
+      ctx.sandboxId,
+      ctx.humanMemberIds,
+      'action.delivery_failed',
+      {
+        conversationId: params.conversationId,
+        messageId: params.messageId,
+        groupId: params.groupId,
+        version: result.version,
+      }
+    );
+  }
+
+  return { ok: true, version: result.version };
+}
+
 /**
  * Delivers an action.executed webhook to a bot via direct RPC to kiloclaw.
- * Retries up to 2 times, then logs permanent failure.
+ * Retries up to 2 times, then reverts the action resolution.
  */
 export async function deliverActionExecutedToBot(
   env: Env,
@@ -158,5 +201,17 @@ export async function deliverActionExecutedToBot(
       }
     }
     logger.error('Action webhook permanently failed');
+    try {
+      const result = await notifyActionDeliveryFailed(env, {
+        conversationId: msg.conversationId,
+        messageId: msg.messageId,
+        groupId: msg.groupId,
+      });
+      if (!result.ok) {
+        logger.error('Failed to notify action delivery failure', { error: result.error });
+      }
+    } catch (err) {
+      logger.error('Failed to notify action delivery failure', formatError(err));
+    }
   });
 }

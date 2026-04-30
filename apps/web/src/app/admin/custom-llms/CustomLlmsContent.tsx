@@ -28,11 +28,11 @@ import {
 import { CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
-
-const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
 import { toast } from 'sonner';
 import { Plus, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';
+
+const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
 
 type EditorState = {
   open: boolean;

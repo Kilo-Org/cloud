@@ -19,8 +19,6 @@ export default {
       {
         id: 'moonshotai/Kimi-K2.6-TEE',
         name: 'Kimi-K2.6',
-        description:
-          'Kimi K2.6 demonstrates particularly strong performance in long-horizon coding tasks and produces professional-grade design with code and vision.',
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 65535,

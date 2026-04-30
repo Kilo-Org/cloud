@@ -63,16 +63,7 @@ export function restoreMessageInCache(
 ): void {
   queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
     if (!old) return old;
-    let replaced = false;
-    const pages = old.pages.map(page =>
-      page.map(msg => {
-        if (msg.id !== snapshot.id) return msg;
-        replaced = true;
-        return snapshot;
-      })
-    );
-    if (!replaced) return old;
-    return { ...old, pages };
+    return updateMessageInPages(old, snapshot.id, () => snapshot);
   });
 }
 
@@ -107,6 +98,28 @@ export function findMessageInCache(
     if (match) return match;
   }
   return undefined;
+}
+
+export function updateMessageInPages<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  messageId: string,
+  updater: (message: Message) => Message
+): InfiniteData<Message[], TPageParam> {
+  for (let pageIndex = 0; pageIndex < old.pages.length; pageIndex++) {
+    const page = old.pages[pageIndex];
+    if (!page) continue;
+    const messageIndex = page.findIndex(msg => msg.id === messageId);
+    if (messageIndex === -1) continue;
+
+    const pages = old.pages.slice();
+    const updatedPage = page.slice();
+    const message = updatedPage[messageIndex];
+    if (!message) return old;
+    updatedPage[messageIndex] = updater(message);
+    pages[pageIndex] = updatedPage;
+    return { ...old, pages };
+  }
+  return old;
 }
 
 export function useMessages(client: KiloChatClient, conversationId: string | null) {
@@ -152,22 +165,16 @@ export function applyMessageCreatedEventToPages<TPageParam>(
   old: InfiniteData<Message[], TPageParam>,
   e: MessageCreatedEvent
 ): InfiniteData<Message[], TPageParam> {
-  for (const page of old.pages) {
-    if (page.some(msg => msg.id === e.messageId)) return old;
-  }
-
   const newMessage = messageFromCreatedEvent(e);
 
   if (e.clientId) {
     const pendingId = `pending-${e.clientId}`;
-    for (const page of old.pages) {
-      if (page.some(msg => msg.id === pendingId)) {
-        return {
-          ...old,
-          pages: old.pages.map(p => p.map(msg => (msg.id === pendingId ? newMessage : msg))),
-        };
-      }
-    }
+    const replacedPending = updateMessageInPages(old, pendingId, () => newMessage);
+    if (replacedPending !== old) return replacedPending;
+  }
+
+  for (const page of old.pages) {
+    if (page.some(msg => msg.id === e.messageId)) return old;
   }
 
   const firstPage = old.pages[0] ?? [];
@@ -211,12 +218,7 @@ export function useSendMessage(
       const { queryKey, pendingId } = context;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg => (msg.id === pendingId ? { ...msg, id: response.messageId } : msg))
-          ),
-        };
+        return updateMessageInPages(old, pendingId, msg => ({ ...msg, id: response.messageId }));
       });
     },
     onError: (err, _variables, context) => {
@@ -239,16 +241,11 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg =>
-              msg.id === variables.messageId
-                ? { ...msg, content: variables.content, clientUpdatedAt: variables.timestamp }
-                : msg
-            )
-          ),
-        };
+        return updateMessageInPages(old, variables.messageId, msg => ({
+          ...msg,
+          content: variables.content,
+          clientUpdatedAt: variables.timestamp,
+        }));
       });
       return { queryKey, snapshot };
     },
@@ -271,12 +268,7 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg => (msg.id === variables.messageId ? { ...msg, deleted: true } : msg))
-          ),
-        };
+        return updateMessageInPages(old, variables.messageId, msg => ({ ...msg, deleted: true }));
       });
       return { queryKey, snapshot };
     },
@@ -303,19 +295,10 @@ export function useAddReaction(
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg =>
-              msg.id !== variables.messageId
-                ? msg
-                : {
-                    ...msg,
-                    reactions: applyReactionAdded(msg.reactions, variables.emoji, currentUserId),
-                  }
-            )
-          ),
-        };
+        return updateMessageInPages(old, variables.messageId, msg => ({
+          ...msg,
+          reactions: applyReactionAdded(msg.reactions, variables.emoji, currentUserId),
+        }));
       });
       return { queryKey, snapshot };
     },
@@ -342,19 +325,10 @@ export function useRemoveReaction(
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg =>
-              msg.id !== variables.messageId
-                ? msg
-                : {
-                    ...msg,
-                    reactions: applyReactionRemoved(msg.reactions, variables.emoji, currentUserId),
-                  }
-            )
-          ),
-        };
+        return updateMessageInPages(old, variables.messageId, msg => ({
+          ...msg,
+          reactions: applyReactionRemoved(msg.reactions, variables.emoji, currentUserId),
+        }));
       });
       return { queryKey, snapshot };
     },
@@ -389,29 +363,21 @@ export function useExecuteAction(
       // Optimistically mark the action as resolved
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg => {
-              if (msg.id !== variables.messageId) return msg;
-              return {
-                ...msg,
-                content: msg.content.map(block => {
-                  if (block.type !== 'actions') return block;
-                  if (block.groupId !== variables.groupId) return block;
-                  return {
-                    ...block,
-                    resolved: {
-                      value: variables.value,
-                      resolvedBy: currentUserId,
-                      resolvedAt: Date.now(),
-                    },
-                  };
-                }),
-              };
-            })
-          ),
-        };
+        return updateMessageInPages(old, variables.messageId, msg => ({
+          ...msg,
+          content: msg.content.map(block => {
+            if (block.type !== 'actions') return block;
+            if (block.groupId !== variables.groupId) return block;
+            return {
+              ...block,
+              resolved: {
+                value: variables.value,
+                resolvedBy: currentUserId,
+                resolvedAt: Date.now(),
+              },
+            };
+          }),
+        }));
       });
       return { queryKey, snapshot };
     },
@@ -471,20 +437,11 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg =>
-              msg.id === e.messageId
-                ? {
-                    ...msg,
-                    content: e.content,
-                    clientUpdatedAt: e.clientUpdatedAt,
-                  }
-                : msg
-            )
-          ),
-        };
+        return updateMessageInPages(old, e.messageId, msg => ({
+          ...msg,
+          content: e.content,
+          clientUpdatedAt: e.clientUpdatedAt,
+        }));
       });
     };
 
@@ -492,12 +449,7 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg => (msg.id === e.messageId ? { ...msg, deleted: true } : msg))
-          ),
-        };
+        return updateMessageInPages(old, e.messageId, msg => ({ ...msg, deleted: true }));
       });
     };
 
@@ -505,12 +457,7 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg => (msg.id === e.messageId ? { ...msg, deliveryFailed: true } : msg))
-          ),
-        };
+        return updateMessageInPages(old, e.messageId, msg => ({ ...msg, deliveryFailed: true }));
       });
     };
 
@@ -518,22 +465,14 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg => {
-              if (msg.id !== e.messageId) return msg;
-              return {
-                ...msg,
-                content: msg.content.map(block => {
-                  if (block.type !== 'actions') return block;
-                  if (block.groupId !== e.groupId) return block;
-                  return { ...block, resolved: undefined };
-                }),
-              };
-            })
-          ),
-        };
+        return updateMessageInPages(old, e.messageId, msg => ({
+          ...msg,
+          content: msg.content.map(block => {
+            if (block.type !== 'actions') return block;
+            if (block.groupId !== e.groupId) return block;
+            return { ...block, resolved: undefined };
+          }),
+        }));
       });
       onActionFailed?.();
     };
@@ -542,16 +481,10 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg =>
-              msg.id !== e.messageId
-                ? msg
-                : { ...msg, reactions: applyReactionAdded(msg.reactions, e.emoji, e.memberId) }
-            )
-          ),
-        };
+        return updateMessageInPages(old, e.messageId, msg => ({
+          ...msg,
+          reactions: applyReactionAdded(msg.reactions, e.emoji, e.memberId),
+        }));
       });
     };
 
@@ -559,19 +492,10 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return {
-          ...old,
-          pages: old.pages.map(page =>
-            page.map(msg =>
-              msg.id !== e.messageId
-                ? msg
-                : {
-                    ...msg,
-                    reactions: applyReactionRemoved(msg.reactions, e.emoji, e.memberId),
-                  }
-            )
-          ),
-        };
+        return updateMessageInPages(old, e.messageId, msg => ({
+          ...msg,
+          reactions: applyReactionRemoved(msg.reactions, e.emoji, e.memberId),
+        }));
       });
     };
 

@@ -18,6 +18,8 @@ import type {
 import { useEffect } from 'react';
 import { kiloclawConversationContext } from '@kilocode/event-service';
 
+import { messagesKey } from './query-keys';
+
 export const PAGE_SIZE = 50;
 
 export function applyReactionAdded(
@@ -109,7 +111,7 @@ export function findMessageInCache(
 
 export function useMessages(client: KiloChatClient, conversationId: string | null) {
   return useInfiniteQuery({
-    queryKey: ['kilo-chat', 'messages', conversationId],
+    queryKey: messagesKey(conversationId),
     queryFn: async ({ pageParam }) => {
       return client.listMessages(conversationId ?? '', { before: pageParam, limit: PAGE_SIZE });
     },
@@ -138,7 +140,7 @@ export function useSendMessage(
     mutationFn: (req: SendMessageVariables) => client.sendMessage(req),
     onMutate: async (variables: SendMessageVariables) => {
       if (!conversationId) return;
-      const queryKey = ['kilo-chat', 'messages', conversationId];
+      const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const pendingId = `pending-${variables.clientId}`;
       const optimisticMessage: Message = {
@@ -186,7 +188,7 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
       client.editMessage(messageId, req),
     onMutate: async variables => {
       if (!conversationId) return;
-      const queryKey = ['kilo-chat', 'messages', conversationId];
+      const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
@@ -218,7 +220,7 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
       client.deleteMessage(messageId, { conversationId }),
     onMutate: async variables => {
       if (!conversationId) return;
-      const queryKey = ['kilo-chat', 'messages', conversationId];
+      const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
@@ -250,7 +252,7 @@ export function useAddReaction(
       client.addReaction(messageId, { conversationId: conversationId ?? '', emoji }),
     onMutate: async variables => {
       if (!conversationId) return;
-      const queryKey = ['kilo-chat', 'messages', conversationId];
+      const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
@@ -289,7 +291,7 @@ export function useRemoveReaction(
       client.removeReaction(messageId, { conversationId: conversationId ?? '', emoji }),
     onMutate: async variables => {
       if (!conversationId) return;
-      const queryKey = ['kilo-chat', 'messages', conversationId];
+      const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
@@ -335,7 +337,7 @@ export function useExecuteAction(
     }) => client.executeAction(conversationId ?? '', messageId, { groupId, value }),
     onMutate: async variables => {
       if (!conversationId) return;
-      const queryKey = ['kilo-chat', 'messages', conversationId];
+      const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       // Optimistically mark the action as resolved
@@ -395,13 +397,17 @@ export function useMessageCacheUpdater(
   // end their own typing state via explicit typing.stopped, so we must not
   // clear on bot messages or the indicator disappears mid-stream.
   onHumanMessageCreated?: (ctx: string, senderId: string) => void,
-  onActionFailed?: (message: string) => void
+  // Fires when the server reports an action.delivery_failed for a message in
+  // this conversation, after the optimistic resolved-state has been rolled
+  // back. The shared package is platform-agnostic, so the user-visible
+  // message lives at the call site (web: sonner toast; mobile: native toast).
+  onActionFailed?: () => void
 ): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!conversationId || !sandboxId) return;
-    const queryKey = ['kilo-chat', 'messages', conversationId];
+    const queryKey = messagesKey(conversationId);
     const expectedContext = kiloclawConversationContext(sandboxId, conversationId);
 
     const onCreated = (ctx: string, e: MessageCreatedEvent) => {
@@ -511,7 +517,7 @@ export function useMessageCacheUpdater(
           ),
         };
       });
-      onActionFailed?.("Couldn't reach the bot — please try again");
+      onActionFailed?.();
     };
 
     const onReactionAdded = (ctx: string, e: ReactionAddedEvent) => {

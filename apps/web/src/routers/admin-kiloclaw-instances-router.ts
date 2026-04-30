@@ -6,6 +6,7 @@ import {
   kiloclaw_subscriptions,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
+  kiloclaw_version_pins,
   kilocode_users,
 } from '@kilocode/db/schema';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
@@ -15,6 +16,7 @@ import {
 } from '@/lib/kiloclaw/inbound-email-alias';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
+import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import {
   getActiveInstance,
   getInstanceById,
@@ -1209,6 +1211,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             'Image tag must be alphanumeric with dots, hyphens, or underscores'
           )
           .optional(),
+        // When true, the admin has confirmed they are intentionally
+        // overriding any pin set on the instance (user-set or admin-set).
+        // The override deletes the pin row before redeploying. No
+        // replacement pin is written so the user retains the ability to
+        // re-pin afterward (Decision: encourage adoption of new releases).
+        acknowledgeOverride: z.boolean().default(false),
       })
     )
     .mutation(async ({ input }) => {
@@ -1227,6 +1235,74 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
 
       if (!row) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      }
+
+      // Pin consent gate: an admin redeploy with a specific imageTag
+      // (whether forward-upgrading, downgrading, or switching variants)
+      // overrides whatever pin is currently set on the instance. The DO
+      // does not consult the pin table on restart, so the gate lives at
+      // the web layer where authorization context exists. See the
+      // personal kiloclaw-router for the residual concurrency note: a
+      // pin written between this SELECT and the worker call is not
+      // consulted by the worker on restart, by design.
+      if (input.imageTag) {
+        const [pin] = await db
+          .select({
+            id: kiloclaw_version_pins.id,
+            image_tag: kiloclaw_version_pins.image_tag,
+            pinned_by: kiloclaw_version_pins.pinned_by,
+            updated_at: kiloclaw_version_pins.updated_at,
+          })
+          .from(kiloclaw_version_pins)
+          .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
+          .limit(1);
+
+        if (pin && !input.acknowledgeOverride) {
+          // Frontend uses its existing getUserPin query for pin details
+          // (current tag, set by user vs admin) to render the override
+          // confirmation dialog. Re-call with acknowledgeOverride: true
+          // proceeds.
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'PIN_EXISTS',
+          });
+        }
+
+        if (pin) {
+          // Conditional delete tied to both the row id and the updated_at
+          // we observed. setMyPin uses onConflictDoUpdate which keeps the
+          // same row id but bumps updated_at, so checking id alone would
+          // miss in-place edits. Pinning updated_at catches both
+          // replacement (different id) and update (same id, newer
+          // updated_at). Empty returning() means the row changed.
+          // Admin override deletes any pin (user-set or admin-set). No
+          // replacement pin written — once the consent gate has been
+          // spent, the user is free to re-establish their own pin.
+          const deleted = await db
+            .delete(kiloclaw_version_pins)
+            .where(
+              and(
+                eq(kiloclaw_version_pins.instance_id, input.instanceId),
+                eq(kiloclaw_version_pins.id, pin.id),
+                eq(kiloclaw_version_pins.updated_at, pin.updated_at)
+              )
+            )
+            .returning({ id: kiloclaw_version_pins.id });
+
+          if (deleted.length === 0) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'PIN_EXISTS',
+            });
+          }
+
+          // Sync the cleared pin into DO state. The follow-up restartMachine
+          // call overwrites trackedImageTag anyway, but pushing the clear
+          // keeps DB and DO state consistent if the restart fails after
+          // this point. Mirrors the removeMyPin / removePin pattern.
+          // Failures are logged inside pushPinToWorker.
+          await pushPinToWorker(row.user.id, input.instanceId, null);
+        }
       }
 
       const token = generateApiToken(row.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes });

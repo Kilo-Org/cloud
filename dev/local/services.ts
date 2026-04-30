@@ -136,9 +136,14 @@ const serviceMeta: Record<string, ServiceMeta> = {
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-stripe': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
+  notifications: {
+    group: 'kiloclaw',
+    dependsOn: ['postgres'],
+    dir: 'services/notifications',
+  },
   kiloclaw: {
     group: 'kiloclaw',
-    dependsOn: ['postgres', 'kiloclaw-tunnel'],
+    dependsOn: ['postgres', 'kiloclaw-tunnel', 'notifications'],
     dir: 'services/kiloclaw',
   },
   'kiloclaw-inbound-email': {

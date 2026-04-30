@@ -229,16 +229,18 @@ async function generateTeamsTrialNotification(
   ];
 }
 
+const getByokProviderUsers = cachedPosthogQuery(
+  z.array(
+    z.tuple([z.string(), z.string()]).transform(([userId, provider]) => ({ userId, provider }))
+  )
+);
+
 async function generateByokProvidersNotification(
   user: User,
   _ctx: NotificationContext
 ): Promise<KiloNotification[]> {
   try {
-    const byokProviderUsers = await cachedPosthogQuery(
-      z.array(
-        z.tuple([z.string(), z.string()]).transform(([userId, provider]) => ({ userId, provider }))
-      )
-    )(
+    const byokProviderUsers = await getByokProviderUsers(
       'byok-provider-usage-users',
       'select id, apiProvider from notification_byok_providers_jan_19 limit 5e5'
     );

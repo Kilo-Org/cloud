@@ -76,6 +76,7 @@ import { AnimatedDots } from './AnimatedDots';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PairingSection } from './PairingSection';
 import { VersionPinCard } from './VersionPinCard';
+import { EarlyAccessCard } from './EarlyAccessCard';
 import { WorkspaceFileEditor } from './WorkspaceFileEditor';
 import { PermissionPresetCards } from './PermissionPresetCards';
 import { CustomSecretsSection } from './CustomSecretsSection';
@@ -1611,14 +1612,15 @@ export function SettingsTab({
           </Button>
         </div>
 
-        {/* Expandable version pinning */}
+        {/* Expandable Manage Version section: pinning + Early Access opt in. */}
         {manageVersionOpen && (
-          <div className="mt-4 border-t pt-4">
+          <div className="mt-4 space-y-6 border-t pt-4">
             <VersionPinCard
               trackedImageTag={status.trackedImageTag}
               latestImageTag={variantsMatch ? (latestVersion?.imageTag ?? null) : null}
               mutations={mutations}
             />
+            <EarlyAccessCard />
           </div>
         )}
       </div>

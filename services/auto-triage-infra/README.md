@@ -4,18 +4,59 @@ Cloudflare Worker that orchestrates the auto-triage process for GitHub issues us
 
 ## Architecture
 
-This worker follows the same pattern as the code review worker:
+This worker follows the same pattern as the auto-fix worker:
 
 - **HTTP API**: Receives triage requests from Next.js backend via [`index.ts`](src/index.ts:1)
 - **Durable Objects**: [`TriageOrchestrator`](src/triage-orchestrator.ts:24) manages the lifecycle of each triage ticket
 - **Fire-and-forget**: Returns 202 immediately, processes in background using `waitUntil()`
 - **Concurrency control**: Handled by Next.js dispatch system (10 concurrent per owner)
+- **Async classification**: `prepareSession` + `initiateFromPreparedSession` on cloud-agent-next, with the terminal result delivered to a callback route on this worker
+
+### Sequence
+
+```
+Next.js dispatch
+    │ POST /triage
+    ▼
+auto-triage worker  ── runTriage() ──► DO
+                                        │
+                                        │ duplicate check (Next.js)
+                                        │ if duplicate: labels + comment, done
+                                        │
+                                        │ classify-config (Next.js)
+                                        │ mint per-ticket callbackSecret
+                                        │ prepareSession  (cloud-agent-next)
+                                        │   callbackTarget.headers['X-Callback-Secret']
+                                        │     = callbackSecret
+                                        │ initiateFromPreparedSession (cloud-agent-next)
+                                        │ setAlarm(timeout + 2m)
+                                        │ RETURN
+                                        │
+              ┌─ cloud-agent-next ◄─────┘  (runs session)
+              ▼
+         callback queue
+              │  POST <SELF_URL>/tickets/:id/classification-callback
+              │    X-Callback-Secret: <minted-secret>   ← relayed verbatim
+              ▼
+auto-triage worker
+              │  waitUntil(stub.completeClassification(secret, payload))
+              │  returns 202 immediately
+              ▼
+            DO.completeClassification(providedSecret, payload)
+              │  constant-time compare providedSecret vs state.callbackSecret
+              │  verify payload.cloudAgentSessionId == state.cloudAgentSessionId
+              │  idempotency check (already terminal?)
+              │
+              ├─ parse → apply labels (Next.js)
+              ├─ post comment / mark actioned (Next.js)
+              └─ clear alarm
+```
 
 ## Features
 
 - **Duplicate Detection**: Calls Next.js API to check for similar issues using vector similarity search
-- **Issue Classification**: Uses Cloud Agent with AI models to classify issues as bug/feature/question/unclear
-- **PR Creation**: Automatically creates PRs via Cloud Agent for high-confidence actionable issues
+- **Issue Classification**: Uses cloud-agent-next with AI models to classify issues as bug/feature/question/unclear via prepare + initiate + callback
+- **Label Application**: Applies AI-selected labels plus action-tracking labels (kilo-triaged, kilo-auto-fix) via the Next.js API
 - **Status Updates**: Real-time callbacks to Next.js API for status tracking
 - **Modular Services**: Clean separation of concerns with dedicated service classes
 
@@ -93,6 +134,22 @@ Health check endpoint.
 }
 ```
 
+### POST /tickets/:ticketId/classification-callback
+
+Terminal-status callback from cloud-agent-next. Bypasses the backend-auth
+middleware; authenticated instead by a per-ticket secret in the
+`X-Callback-Secret` header, which is compared in constant time against the
+secret persisted in the Durable Object at prepare-session time.
+
+**Headers:** `X-Callback-Secret: <per-ticket UUID>`
+
+**Request body:** subset of `ExecutionCallbackPayload` from cloud-agent-next
+(`cloudAgentSessionId`, `status`, `errorMessage`, `lastAssistantMessageText`).
+
+**Response:** `202 Accepted` — the classification is processed in the
+background via `waitUntil()`; errors inside the DO are covered by the
+stuck-ticket alarm.
+
 ## How It Works
 
 ### Request Flow
@@ -102,80 +159,73 @@ Health check endpoint.
 3. **Immediate response** (202 Accepted) returned to Next.js
 4. **Background processing** starts via `waitUntil()`:
    - Duplicate check (calls Next.js API)
-   - If duplicate → update status and exit
-   - If not duplicate → classify issue (via Cloud Agent)
-   - Based on classification:
-     - **Question/Unclear** → update status (TODO: post comment)
-     - **Bug/Feature (high confidence)** → create PR via Cloud Agent async
-     - **Bug/Feature (low confidence)** → request clarification
+   - If duplicate → apply labels, post comment, update status and exit
+   - If not duplicate → prepare + initiate a classification session in cloud-agent-next and return
+5. **cloud-agent-next runs the session**, then POSTs a terminal callback to the worker at
+   `POST /tickets/:ticketId/classification-callback`
+6. **Callback route** validates the per-ticket secret, resolves the DO, and invokes
+   `completeClassification()` which parses the assistant output and acts on it:
+   - **Question/Unclear** → update status (TODO: post comment)
+   - **Bug/Feature (high confidence)** → apply `kilo-auto-fix` label so auto-fix picks it up
+   - **Bug/Feature (low confidence)** → request clarification
 
 ### Classification Process
 
-1. Worker calls Next.js to get configuration (model, GitHub token, custom instructions)
-2. [`PromptBuilder`](src/services/prompt-builder.ts:30) creates structured classification prompt
-3. [`CloudAgentClient`](src/services/cloud-agent-client.ts:30) initiates streaming session with Cloud Agent
-4. [`SSEStreamProcessor`](src/services/sse-stream-processor.ts:19) processes SSE stream and accumulates text
-5. [`ClassificationParser`](src/parsers/classification-parser.ts:14) extracts JSON classification from response
-6. Result includes: classification type, confidence score, intent summary, related files
+1. Worker calls Next.js to get configuration (model, GitHub token, custom instructions, excluded labels)
+2. Worker fetches repository labels from GitHub and filters out excluded labels
+3. [`PromptBuilder`](src/services/prompt-builder.ts:30) creates a structured classification prompt
+4. Worker mints a per-ticket `callbackSecret` (UUID) and persists it to DO state together with the available labels and classify config
+5. Worker calls `prepareSession` on cloud-agent-next with `callbackTarget.headers['X-Callback-Secret']`
+6. Worker calls `initiateFromPreparedSession` and returns
+7. cloud-agent-next runs the agent to completion and POSTs an `ExecutionCallbackPayload` to `/tickets/:ticketId/classification-callback` with the secret header relayed verbatim
+8. The callback route performs a constant-time secret compare inside the DO, verifies `cloudAgentSessionId`, and runs [`ClassificationParser`](src/parsers/classification-parser.ts:14) on `lastAssistantMessageText`
+9. Result includes: classification type, confidence score, intent summary, related files, selected labels
 
 ### PR Creation Process
 
-1. Worker calls Next.js to get PR configuration (model, branch settings, GitHub token)
-2. [`PromptBuilder`](src/services/prompt-builder.ts:80) creates PR creation prompt with issue context
-3. [`CloudAgentClient`](src/services/cloud-agent-client.ts:77) initiates async session with callback URL
-4. [`SSEStreamProcessor`](src/services/sse-stream-processor.ts:19) extracts sessionId from stream
-5. Worker updates status with sessionId and exits
-6. Cloud Agent processes PR creation in background
-7. Cloud Agent calls back to Next.js when PR is created
-8. Next.js updates triage ticket status to 'actioned'
+PR creation is not handled in this worker. When a classification is
+high-confidence, the worker applies the `kilo-auto-fix` label to the
+issue; the separate `auto-fix-infra` worker subscribes to that label
+and creates PRs independently.
 
 ### Timeouts
 
-To prevent agents from running indefinitely, the worker implements timeouts for different operations:
+Classification runs asynchronously end-to-end (prepare → initiate →
+callback), so there is no inline SSE timeout in this worker. The
+safety net is a Durable Object alarm:
 
-- **Classification Timeout**: 5 minutes
-  - Quick analysis to determine issue type
-  - Fails fast if taking too long
-  - Error: "Classification timeout - exceeded 5 minute limit"
+- **Alarm budget**: `maxClassificationTimeMinutes * 60s + 120s`
+  (default 5 min + 2 min buffer)
+- If the callback hasn't landed within the budget, the alarm fires
+  and marks the ticket `failed` with `"Triage timed out (alarm recovery)"`.
 
-- **PR Creation Timeout**: 15 minutes
-  - More complex operation involving code changes
-  - Needs more time than classification
-  - Error: "PR creation timeout - exceeded 15 minute limit"
-
-When a timeout occurs:
-
-- The triage ticket status is set to `'failed'`
-- A descriptive error message is stored
-- Detailed logs are written for debugging
-- Users can retry the operation
+Budget covers: cloud-agent-next queue latency, agent startup + run,
+callback delivery, and post-classification label/comment API calls.
 
 ### Key Design Decisions
 
 - **Fire-and-forget with `waitUntil()`**: Avoids 15-minute wall time limit on Durable Object requests
 - **Modular services**: Clean separation of concerns for parsing, API calls, and prompt building
-- **Async PR creation**: Long-running PR creation happens in Cloud Agent with callbacks
-- **Streaming classification**: Synchronous streaming for fast classification results
+- **Async classification via callback**: `prepareSession` + `initiateFromPreparedSession` return immediately; the terminal result is delivered to the worker's own callback route. No SSE stream held open across the run.
+- **Per-ticket callback secret**: Each triage mints a UUID stored in DO state and relayed via `callbackTarget.headers['X-Callback-Secret']`. Compared in constant time inside the DO. A leak from cloud-agent-next's callback queue only compromises a single ticket's in-flight callback.
 - **State persistence**: All state stored in Durable Object storage for reliability
-- **Operation-specific timeouts**: Different timeout values for classification (5 min) and PR creation (15 min)
+- **Alarm safety net**: A single DO alarm covers the full classification end-to-end so stuck tickets are recovered automatically.
 
 ## Development
 
 ## Authentication
 
-The worker uses two authentication mechanisms:
+The worker uses four authentication mechanisms:
 
-1. **Incoming requests** (from Next.js): Bearer token authentication via `BACKEND_AUTH_TOKEN`
-   - All endpoints except `/health` require `Authorization: Bearer <token>` header
-   - Implemented using Hono's [`bearerAuth`](src/index.ts:42) middleware
+1. **Incoming requests from Next.js** (POST /triage, GET /tickets/:ticketId/events): Bearer token via `BACKEND_AUTH_TOKEN`. Enforced by Hono's `backendAuthMiddleware`.
 
-2. **Outgoing callbacks** (to Next.js): Shared secret via `INTERNAL_API_SECRET`
-   - All callbacks to Next.js include `X-Internal-Secret` header
-   - Used for duplicate checks, config fetching, and status updates
+2. **Incoming classification callbacks from cloud-agent-next** (POST /tickets/:ticketId/classification-callback): per-ticket secret via `X-Callback-Secret` header. The secret is a UUID minted by the DO at `prepareSession` time and compared in constant time inside `completeClassification()`. This route is mounted BEFORE `backendAuthMiddleware` so it bypasses Bearer auth.
 
-3. **Cloud Agent requests**: Bearer token from incoming request
-   - Worker forwards the `authToken` from the triage request to Cloud Agent
-   - Enables Cloud Agent to access user's repositories and resources
+3. **Outgoing calls to Next.js** (duplicate check, classify-config, add-label, post-comment, status updates): shared secret via `INTERNAL_API_SECRET` in `X-Internal-Secret` header.
+
+4. **Outgoing calls to cloud-agent-next** (`prepareSession`, `initiateFromPreparedSession`): `Authorization: Bearer <authToken>` (user/bot auth token propagated from the triage request) plus `x-internal-api-key: <INTERNAL_API_SECRET>`.
+
+Note that `INTERNAL_API_SECRET` is intentionally _not_ used to authenticate the classification callback. A leak of the callback queue contents should only compromise a single ticket's in-flight callback, not future callbacks for every ticket.
 
 ### Prerequisites
 
@@ -203,10 +253,11 @@ cp .dev.vars.example .dev.vars
 API_URL=http://localhost:3000
 INTERNAL_API_SECRET=your-secret-here
 BACKEND_AUTH_TOKEN=your-backend-auth-token
-CLOUD_AGENT_URL=http://localhost:8788
+CLOUD_AGENT_URL=http://localhost:8794
+SELF_URL=http://localhost:8791
 ```
 
-**Note**: Ensure the secrets match between this worker and your Next.js backend configuration.
+**Note**: Ensure the secrets match between this worker and your Next.js backend configuration. `SELF_URL` must be reachable from cloud-agent-next; for local dev use a public tunnel (e.g. `ngrok http 8791`) and paste the tunnel URL here.
 
 ### Local Development
 
@@ -310,12 +361,12 @@ The [`TriageOrchestrator`](src/triage-orchestrator.ts:24) Durable Object manages
 1. **Initialization** ([`start()`](src/triage-orchestrator.ts:33)): Saves ticket state to Durable Object storage
 2. **Background Processing** ([`runTriage()`](src/triage-orchestrator.ts:52)): Executes via `waitUntil()` to avoid 15-min wall time limit
 3. **Duplicate Detection** ([`checkDuplicates()`](src/triage-orchestrator.ts:121)): Calls Next.js API for vector similarity search
-4. **Classification** ([`classifyIssue()`](src/triage-orchestrator.ts:144)): Uses Cloud Agent to analyze issue with AI
-5. **Action**: Takes appropriate action based on classification:
+4. **Classification** ([`classifyIssue()`](src/triage-orchestrator.ts:144)): Prepares + initiates a cloud-agent-next session; terminal result arrives via callback
+5. **Callback Completion** ([`completeClassification()`](src/triage-orchestrator.ts:100)): Validates callback secret, parses the assistant output, and applies labels/status based on the result:
    - **Duplicate** ([`closeDuplicate()`](src/triage-orchestrator.ts:210)): Updates status with duplicate info
    - **Question** ([`answerQuestion()`](src/triage-orchestrator.ts:227)): Posts answer comment (TODO)
    - **Unclear** ([`requestClarification()`](src/triage-orchestrator.ts:244)): Requests more info (TODO)
-   - **Bug/Feature** (high confidence) ([`createPR()`](src/triage-orchestrator.ts:262)): Creates PR via Cloud Agent async session
+   - **Bug/Feature** (high confidence): Applies `kilo-auto-fix` label for the auto-fix worker to pick up
 
 ### Service Classes
 
@@ -326,43 +377,38 @@ The orchestrator uses modular service classes for clean separation of concerns:
   - Validates classification types and confidence scores
   - Handles nested JSON and malformed responses
 
-- **[`CloudAgentClient`](src/services/cloud-agent-client.ts:21)**: Encapsulates Cloud Agent API interactions
-  - [`initiateSession()`](src/services/cloud-agent-client.ts:30): For streaming classification responses
-  - [`initiateSessionAsync()`](src/services/cloud-agent-client.ts:77): For async PR creation with callbacks
-  - Handles URL construction, authentication, and error handling
+- **`createCloudAgentNextFetchClient`** (from `@kilocode/worker-utils`):
+  Shared typed fetch client for cloud-agent-next tRPC endpoints. We use
+  `prepareSession` and `initiateFromPreparedSession` with per-call
+  `Authorization: Bearer <authToken>` and `x-internal-api-key: <INTERNAL_API_SECRET>` headers.
 
 - **[`PromptBuilder`](src/services/prompt-builder.ts:26)**: Builds AI prompts for different tasks
   - [`buildClassificationPrompt()`](src/services/prompt-builder.ts:30): Creates structured classification prompts
-  - [`buildPRPrompt()`](src/services/prompt-builder.ts:80): Creates PR creation prompts with context
   - Supports custom instructions from configuration
-
-- **[`SSEStreamProcessor`](src/services/sse-stream-processor.ts:15)**: Generic SSE stream processing
-  - Handles buffer management and line parsing
-  - Extracts sessionId, text content, and completion events
-  - Provides event-based callbacks for stream processing
 
 ## Integration with Next.js
 
 The worker calls back to Next.js for:
 
 - **Duplicate detection**: `POST /api/internal/triage/check-duplicates`
-- **Classification config**: `POST /api/internal/triage/classify-config` (gets model, GitHub token, custom instructions)
-- **PR config**: `POST /api/internal/triage/pr-config` (gets model, branch settings, GitHub token, custom instructions)
+- **Classification config**: `POST /api/internal/triage/classify-config` (gets model, GitHub token, custom instructions, excluded labels)
+- **Add label**: `POST /api/internal/triage/add-label`
+- **Post comment**: `POST /api/internal/triage/post-comment`
 - **Status updates**: `POST /api/internal/triage-status/:ticketId`
-- **PR callbacks**: `POST /api/internal/triage/pr-callback` (called by Cloud Agent when PR is created)
 
-All callbacks use the `INTERNAL_API_SECRET` for authentication via `X-Internal-Secret` header.
+All callbacks to Next.js use the `INTERNAL_API_SECRET` for authentication via `X-Internal-Secret` header.
 
 ## Environment Variables
 
 ### Public (in wrangler.jsonc)
 
-- `API_URL`: Next.js backend URL (e.g., `http://localhost:3000` or `https://api.kilocode.com`)
-- `CLOUD_AGENT_URL`: Cloud Agent URL for AI-powered classification and PR creation
+- `API_URL`: Next.js backend URL (e.g., `http://localhost:3000` or `https://app.kilo.ai`)
+- `CLOUD_AGENT_URL`: cloud-agent-next URL used for AI-powered classification
+- `SELF_URL`: public URL of this worker, used as the callback target for cloud-agent-next
 
 ### Secrets (via wrangler secret)
 
-- `INTERNAL_API_SECRET`: Shared secret for authenticating callbacks to Next.js (sent as `X-Internal-Secret` header)
+- `INTERNAL_API_SECRET`: Shared secret for authenticating callbacks to Next.js (sent as `X-Internal-Secret` header) and for the `x-internal-api-key` header on cloud-agent-next tRPC calls. **Not** used to authenticate the classification callback — that uses a per-ticket secret instead.
 - `BACKEND_AUTH_TOKEN`: Bearer token for authenticating incoming requests from Next.js
 
 ### Optional
@@ -380,9 +426,8 @@ src/
 ├── parsers/
 │   └── classification-parser.ts      # Parses AI classification responses
 └── services/
-    ├── cloud-agent-client.ts         # Cloud Agent API client
-    ├── prompt-builder.ts             # AI prompt templates
-    └── sse-stream-processor.ts       # SSE stream processing utility
+    ├── github-labels-service.ts      # Fetches repo labels from GitHub
+    └── prompt-builder.ts             # AI prompt templates
 ```
 
 ## Type System
@@ -400,14 +445,13 @@ The worker uses a comprehensive type system defined in [`types.ts`](src/types.ts
 - **[`TriageTicket`](src/types.ts:53)**: Complete state stored in Durable Object
   - Includes session input, owner info, status, classification results
   - Tracks timestamps (startedAt, completedAt, updatedAt)
-  - Stores sessionId for Cloud Agent tracking
+  - Stores `cloudAgentSessionId`, `callbackSecret`, snapshotted `availableLabels` and `classifyConfig` so the classification callback can complete without a second round-trip to Next.js
   - Contains error messages and action metadata
 
 - **[`SessionInput`](src/types.ts:30)**: Configuration for triage session
   - GitHub issue details (repo, number, title, body)
-  - Thresholds for duplicate detection and auto-PR creation
+  - Thresholds for duplicate detection and auto-fix label application
   - Model selection and custom instructions
-  - Branch configuration for PR creation
 
 - **[`ClassificationResult`](src/types.ts:106)**: AI classification output
   - Classification type and confidence score (0-1)
@@ -433,61 +477,36 @@ The worker uses a comprehensive type system defined in [`types.ts`](src/types.ts
 
 ### Timeout Monitoring
 
-Monitor timeout occurrences to identify performance issues:
+Monitor alarm-driven timeout recovery to catch stuck callbacks:
 
 ```bash
-# Check logs for timeout errors
-wrangler tail --format pretty | grep "timeout"
+# Check logs for the alarm-based recovery path
+wrangler tail --format pretty | grep "Triage timed out"
 
-# Look for specific timeout types
-wrangler tail --format pretty | grep "Classification timeout"
-wrangler tail --format pretty | grep "PR creation timeout"
+# Look for silently-missed callbacks
+wrangler tail --format pretty | grep "classification-callback"
 ```
 
 Key metrics to track:
 
-- Classification timeout rate (should be < 5%)
-- PR creation timeout rate (should be < 5%)
-- Average classification duration
-- Average PR creation duration
+- Stuck-ticket alarm firing rate (should be near zero — indicates missing callbacks)
+- Average classification wall time end-to-end
+- Callback 2xx rate from cloud-agent-next into this worker
 
 ## Troubleshooting
 
-### Classification Timeouts
+### Stuck tickets / missing callbacks
 
-If classification is timing out frequently:
+If tickets are getting marked failed with `"Triage timed out (alarm recovery)"`:
 
-1. **Check model performance**: Some models may be slower than others
-2. **Review issue complexity**: Very large issues may take longer to analyze
-3. **Check Cloud Agent health**: Ensure Cloud Agent is responding quickly
-4. **Consider increasing timeout**: If legitimate cases need more time
+1. **Check cloud-agent-next callback queue** for deliveries to `POST /tickets/:ticketId/classification-callback`
+2. **Verify `SELF_URL`** in `wrangler.jsonc` points at a publicly reachable URL (not Access-gated)
+3. **Check the agent session** completed — if it ran longer than the alarm budget the callback may have been dropped
+4. **Consider raising `maxClassificationTimeMinutes`** in the session input if legitimate runs need more time
 
-### PR Creation Timeouts
+### Callback auth failures
 
-If PR creation is timing out frequently:
+401 responses on `/tickets/:ticketId/classification-callback`:
 
-1. **Check repository size**: Large repositories take longer to clone and analyze
-2. **Review issue complexity**: Complex changes may require more time
-3. **Check Cloud Agent resources**: Ensure adequate CPU/memory for code generation
-4. **Monitor callback delivery**: Ensure callbacks are being received even after timeout
-
-### Debugging Timeout Issues
-
-When investigating timeout issues, check the logs for:
-
-```typescript
-// Timeout detection in logs
-{
-  ticketId: "uuid",
-  error: "Classification timeout - exceeded 5 minute limit",
-  isTimeout: true,
-  isClassificationTimeout: true,
-  isPRTimeout: false
-}
-```
-
-The error handling distinguishes between:
-
-- **Classification timeouts**: Issue analysis took too long
-- **PR creation timeouts**: Code generation took too long
-- **Connection errors**: Network or Cloud Agent issues
+- Ensure the `X-Callback-Secret` header is still being relayed by cloud-agent-next
+- Mismatches are logged as `"Callback secret mismatch"` inside the DO (not the HTTP layer) — search DO logs

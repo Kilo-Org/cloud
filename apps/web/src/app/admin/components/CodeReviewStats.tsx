@@ -137,8 +137,8 @@ export function CodeReviewStats({ data }: { data: StatsData }) {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Avg Duration</CardTitle>
-          <CardDescription>Completed reviews</CardDescription>
+          <CardTitle className="text-sm font-medium">Avg Run Time</CardTitle>
+          <CardDescription>Completed reviews, excludes queue wait</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="text-3xl font-bold">{formatDuration(data.avgDurationSeconds)}</div>

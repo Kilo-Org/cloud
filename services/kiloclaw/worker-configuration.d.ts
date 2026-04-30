@@ -58,6 +58,7 @@ declare namespace Cloudflare {
 		KILOCLAW_REGISTRY: DurableObjectNamespace<import("./src/index").KiloClawRegistry>;
 		KILOCLAW_BILLING: Service /* entrypoint KiloClawBillingService from kiloclaw-billing */;
 		KILO_CHAT: Service /* entrypoint KiloChatService from kilo-chat */;
+		NOTIFICATIONS: Service /* entrypoint NotificationsService from notifications */;
 	}
 }
 interface Env extends Cloudflare.Env {}

@@ -62,6 +62,16 @@ vi.mock('../lib/image-version', async () => {
   return {
     ...actual,
     resolveLatestVersion: vi.fn().mockResolvedValue(null),
+    resolveVersionByTag: vi.fn().mockResolvedValue(null),
+  };
+});
+
+// -- Mock catalog-registration (Postgres fallback for pin resolution) --
+vi.mock('../lib/catalog-registration', async () => {
+  const actual = await vi.importActual('../lib/catalog-registration');
+  return {
+    ...actual,
+    lookupCatalogVersion: vi.fn().mockResolvedValue(null),
   };
 });
 
@@ -147,7 +157,8 @@ import { FlyApiError } from '../fly/client';
 import * as db from '../db';
 import * as gatewayEnv from '../gateway/env';
 import * as regions from './regions';
-import { resolveLatestVersion } from '../lib/image-version';
+import { resolveLatestVersion, resolveVersionByTag } from '../lib/image-version';
+import { lookupCatalogVersion } from '../lib/catalog-registration';
 import { selectImageVersionForInstance } from '../lib/version-rollout';
 import { setupDefaultStreamChatChannel } from '../stream-chat/client';
 import { verifyKiloToken } from '@kilocode/worker-utils';
@@ -7178,6 +7189,185 @@ describe('restartMachine image tag override', () => {
 });
 
 // ============================================================================
+// applyPinnedVersion — admin pin push into DO state
+// ============================================================================
+
+describe('applyPinnedVersion', () => {
+  beforeEach(() => {
+    (resolveVersionByTag as Mock).mockReset().mockResolvedValue(null);
+    (lookupCatalogVersion as Mock).mockReset().mockResolvedValue(null);
+    (selectImageVersionForInstance as Mock).mockReset().mockResolvedValue(null);
+  });
+
+  it('writes resolved image fields from KV and does not restart the machine', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'old-tag',
+      openclawVersion: '1.0.0',
+      imageVariant: 'default',
+      trackedImageDigest: 'sha256:old',
+    });
+
+    (resolveVersionByTag as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.9',
+      variant: 'default',
+      imageTag: '2026-04-09',
+      imageDigest: 'sha256:new',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 0,
+      isLatest: false,
+    });
+
+    const applied = await instance.applyPinnedVersion('2026-04-09');
+
+    expect(applied).toEqual({
+      openclawVersion: '2026.4.9',
+      imageTag: '2026-04-09',
+      imageDigest: 'sha256:new',
+      variant: 'default',
+    });
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-09');
+    expect(storage._store.get('openclawVersion')).toBe('2026.4.9');
+    expect(storage._store.get('trackedImageDigest')).toBe('sha256:new');
+    expect(storage._store.get('imageVariant')).toBe('default');
+    // Machine is untouched — no Fly calls, status stays 'running'.
+    expect(flyClient.stopMachineAndWait).not.toHaveBeenCalled();
+    expect(flyClient.updateMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('falls back to the Postgres catalog when KV misses', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { trackedImageTag: 'old-tag' });
+
+    (resolveVersionByTag as Mock).mockResolvedValueOnce(null);
+    (lookupCatalogVersion as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.9',
+      variant: 'default',
+      imageTag: '2026-04-09',
+      imageDigest: 'sha256:pg',
+      publishedAt: new Date().toISOString(),
+    });
+
+    const applied = await instance.applyPinnedVersion('2026-04-09');
+
+    expect(applied.imageTag).toBe('2026-04-09');
+    expect(applied.imageDigest).toBe('sha256:pg');
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-09');
+    expect(storage._store.get('trackedImageDigest')).toBe('sha256:pg');
+    expect(lookupCatalogVersion).toHaveBeenCalledOnce();
+  });
+
+  it('stores the raw tag when neither KV nor Postgres resolves it', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'old-tag',
+      openclawVersion: '1.0.0',
+      imageVariant: 'default',
+    });
+
+    const applied = await instance.applyPinnedVersion('unknown-tag');
+
+    expect(applied.imageTag).toBe('unknown-tag');
+    expect(applied.openclawVersion).toBeNull();
+    expect(applied.variant).toBeNull();
+    expect(storage._store.get('trackedImageTag')).toBe('unknown-tag');
+    expect(storage._store.get('openclawVersion')).toBeNull();
+    expect(storage._store.get('imageVariant')).toBeNull();
+    expect(storage._store.get('trackedImageDigest')).toBeNull();
+  });
+
+  it('when cleared (imageTag=null), resolves via the rollout selector', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'pinned-old',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.15',
+      variant: 'default',
+      imageTag: '2026-04-15',
+      imageDigest: 'sha256:latest',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 100,
+      isLatest: true,
+    });
+
+    const applied = await instance.applyPinnedVersion(null);
+
+    expect(applied.imageTag).toBe('2026-04-15');
+    expect(applied.openclawVersion).toBe('2026.4.15');
+    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
+    expect(resolveVersionByTag).not.toHaveBeenCalled();
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-15');
+  });
+
+  it('when cleared, passes currentImageTag=null to the selector so non-cohort users can fall off the pinned candidate', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'candidate-tag',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    // Simulate the bug scenario: user was pinned to what happens to be the
+    // current rollout candidate, but is not in the cohort. The selector
+    // would normally return null (sticky-on-candidate). With
+    // ignoreCurrentImageTag, it should instead be invoked with
+    // currentImageTag=null and return :latest.
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.15',
+      variant: 'default',
+      imageTag: 'latest-tag',
+      imageDigest: 'sha256:latest',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 100,
+      isLatest: true,
+    });
+
+    const applied = await instance.applyPinnedVersion(null);
+
+    expect(applied.imageTag).toBe('latest-tag');
+    expect(storage._store.get('trackedImageTag')).toBe('latest-tag');
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
+      expect.objectContaining({ currentImageTag: null })
+    );
+  });
+
+  it('when cleared and no rollout target, leaves existing tracked image alone', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'pinned-old',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce(null);
+
+    const applied = await instance.applyPinnedVersion(null);
+
+    expect(applied.imageTag).toBe('pinned-old');
+    expect(storage._store.get('trackedImageTag')).toBe('pinned-old');
+    expect(storage._store.get('openclawVersion')).toBe('2026.4.9');
+  });
+
+  it('rejects when the instance has no status (fresh DO)', async () => {
+    const { instance } = createInstance();
+
+    await expect(instance.applyPinnedVersion('2026-04-09')).rejects.toThrow(/has no status/);
+  });
+
+  it('rejects when the instance is being destroyed', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'destroying' });
+
+    await expect(instance.applyPinnedVersion('2026-04-09')).rejects.toThrow(/being destroyed/);
+  });
+});
+
+// ============================================================================
 // Proactive API key refresh via reconciliation
 // ============================================================================
 
@@ -9406,5 +9596,307 @@ describe('Stream Chat backfill on restartMachine', () => {
     await Promise.all(waitUntilPromises);
 
     expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// Lifecycle push notifications
+// ============================================================================
+
+type LifecyclePushCall = {
+  userId: string;
+  instanceId: string;
+  sandboxId: string;
+  event: 'ready' | 'start_failed';
+  instanceName: string | null;
+  errorMessage?: string;
+};
+
+function createFakeNotificationsBinding(): {
+  binding: {
+    sendInstanceLifecycleNotification: (params: LifecyclePushCall) => Promise<{
+      sent: number;
+      staleTokens: number;
+    }>;
+  };
+  calls: LifecyclePushCall[];
+} {
+  const calls: LifecyclePushCall[] = [];
+  return {
+    binding: {
+      sendInstanceLifecycleNotification: async (params: LifecyclePushCall) => {
+        calls.push(params);
+        return { tokenCount: 1, sent: 1, staleTokens: 0, receiptCount: 1 };
+      },
+    },
+    calls,
+  };
+}
+
+describe('instance ready push', () => {
+  it('dispatches a ready push when tryMarkInstanceReady flips the flag', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('ready');
+    expect(calls[0].userId).toBe('user-1');
+    expect(calls[0].instanceId).toBe('sandbox-1');
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
+  });
+
+  it('does not dispatch when the flag is already set', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: true });
+
+    await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it('does not dispatch when provisioned > 6h ago', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, {
+      instanceReadyEmailSent: false,
+      provisionedAt: Date.now() - 7 * 60 * 60 * 1000,
+    });
+
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    expect(result.shouldNotify).toBe(false);
+    expect(calls).toHaveLength(0);
+    // Flag still flips so future checkins don't keep retrying.
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
+  });
+
+  it('no-ops cleanly when NOTIFICATIONS binding is unavailable', async () => {
+    const env = createFakeEnv();
+    // No NOTIFICATIONS binding assigned.
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
+  });
+
+  it('initializes startFailurePushSentForAttempt to false on initial provision()', async () => {
+    const env = createFakeEnv();
+    const { binding } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    const { instance, storage, waitUntilPromises } = createInstance(createFakeStorage(), env);
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(false);
+  });
+});
+
+describe('instance start-failed push', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('dispatches one push when start times out without a machine', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: null,
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: false,
+    });
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].instanceId).toBe('sandbox-1');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('dispatches one push when the machine is gone (404) during start', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: 'machine-1',
+      startFailurePushSentForAttempt: false,
+    });
+
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('dispatches one push when the machine enters a failed state', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: 'machine-1',
+      startFailurePushSentForAttempt: false,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'failed',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('does not dispatch a second push for the same attempt', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: null,
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: true,
+    });
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it('re-arms the flag on each startAsync attempt', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      startFailurePushSentForAttempt: true,
+      flyMachineId: null,
+    });
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.startAsync('user-1');
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(false);
+  });
+});
+
+describe('non-Fly lifecycle push dispatch', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('dispatches a start-failed push when the docker-local alarm detects a timeout', async () => {
+    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedDockerInstance(storage, {
+      status: 'starting',
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: false,
+    });
+
+    vi.mocked(fetch).mockResolvedValue(new Response('', { status: 404 }));
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].errorMessage).toBe('Start failed.');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('dispatches a start-failed push when docker-local inline start throws', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+      DOCKER_LOCAL_PORT_RANGE: '45000-45010',
+    };
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(createFakeStorage(), env);
+    await seedDockerInstance(storage, {
+      status: 'provisioned',
+      providerState: dockerProviderState({ hostPort: null }),
+      startFailurePushSentForAttempt: false,
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response(JSON.stringify({ Name: 'kiloclaw-root-sandbox-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/containers/json?all=1')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/containers/kiloclaw-sandbox-1/json')) {
+        return new Response('', { status: 404 });
+      }
+      if (url.includes('/containers/create?name=kiloclaw-sandbox-1')) {
+        return new Response('create failed', { status: 500 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    await instance.startAsync();
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].errorMessage).toBe('Start failed.');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
   });
 });

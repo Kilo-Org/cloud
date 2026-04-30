@@ -24,11 +24,20 @@ export function setActiveChatInstance(instanceId: string | null) {
   activeChatInstanceId = instanceId;
 }
 
-// Keep in sync with data field in services/notifications/src/dos/NotificationChannelDO.ts
-const notificationDataSchema = z.object({
-  type: z.literal('chat'),
-  instanceId: z.string().min(1),
-});
+// Keep in sync with the `data` payloads emitted by:
+//   - services/notifications/src/dos/NotificationChannelDO.ts (chat)
+//   - services/notifications/src/lib/notifications-service.ts (instance-lifecycle)
+const notificationDataSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('chat'),
+    instanceId: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal('instance-lifecycle'),
+    event: z.enum(['ready', 'start_failed']),
+    instanceId: z.string().min(1),
+  }),
+]);
 
 type NotificationData = z.infer<typeof notificationDataSchema>;
 
@@ -82,19 +91,29 @@ export function getPendingNotificationLink(): string | null {
   return link;
 }
 
+function instanceChatPath(data: NotificationData | null): string | null {
+  if (!data) {
+    return null;
+  }
+  // Both chat and instance-lifecycle payloads carry `instanceId` and deep-link
+  // to the same chat route.
+  return `/(app)/chat/${data.instanceId}`;
+}
+
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     const data = parseNotificationData(response.notification.request.content.data);
+    const path = instanceChatPath(data);
+    if (!path) {
+      return;
+    }
 
-    if (data) {
-      const path = `/(app)/chat/${data.instanceId}`;
-      // If the router is ready (has segments), navigate immediately.
-      // Otherwise store as pending for consumption after auth completes.
-      try {
-        router.replace(path as Href);
-      } catch {
-        pendingNotificationLink = path;
-      }
+    // If the router is ready (has segments), navigate immediately.
+    // Otherwise store as pending for consumption after auth completes.
+    try {
+      router.replace(path as Href);
+    } catch {
+      pendingNotificationLink = path;
     }
   });
 
@@ -108,8 +127,9 @@ export function checkInitialNotification(): void {
     return;
   }
   const data = parseNotificationData(response.notification.request.content.data);
-  if (data) {
-    pendingNotificationLink = `/(app)/chat/${data.instanceId}`;
+  const path = instanceChatPath(data);
+  if (path) {
+    pendingNotificationLink = path;
   }
 }
 

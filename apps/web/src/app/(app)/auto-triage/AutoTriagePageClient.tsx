@@ -2,8 +2,10 @@
 
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { useUser } from '@/hooks/useUser';
 import { AutoTriageConfigForm } from '@/components/auto-triage/AutoTriageConfigForm';
 import { AutoTriageTicketsCard } from '@/components/auto-triage/AutoTriageTicketsCard';
+import { AdminTestingCard } from '@/components/auto-triage/AdminTestingCard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +30,8 @@ export function AutoTriagePageClient({
   errorMessage,
 }: AutoTriagePageClientProps) {
   const trpc = useTRPC();
+  const { data: user } = useUser();
+  const isAdmin = user?.is_admin === true;
 
   // Fetch GitHub App installation status
   const { data: statusData, isLoading: isStatusLoading } = useQuery(
@@ -113,6 +117,7 @@ export function AutoTriagePageClient({
 
         {/* Tickets Tab */}
         <TabsContent value="tickets" className="mt-6 space-y-4">
+          {isAdmin && <AdminTestingCard owner={{ type: 'user' }} />}
           {isStatusLoading || isGitHubAppInstalled ? (
             <AutoTriageTicketsCard />
           ) : (

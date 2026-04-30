@@ -688,7 +688,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 12,
+            "fillOpacity": 18,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -732,8 +732,8 @@
         "x": 12,
         "y": 14
       },
-      "description": "Check-in volume by Fly region (blob7). Highlights regional traffic skew or outages.",
-      "id": 28,
+      "description": "Sample-corrected check-ins reporting supervisor_state = crashed. Use this to spot crash spikes.",
+      "id": 36,
       "options": {
         "legend": {
           "calcs": [],
@@ -762,8 +762,8 @@
           "interval": "",
           "intervalFactor": 1,
           "nullifySparse": false,
-          "query": "SELECT $timeSeries AS t, blob7 AS label, SUM(_sample_interval) AS checkins FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob7 != '' GROUP BY t, label ORDER BY t",
-          "rawSql": "SELECT $timeSeries AS t, blob7 AS label, SUM(_sample_interval) AS checkins FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob7 != '' GROUP BY t, label ORDER BY t",
+          "query": "SELECT $timeSeries AS t, 'crashed' AS label, SUM(_sample_interval) AS crashed_checkins FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  AND blob6 = 'crashed'\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'crashed' AS label, SUM(_sample_interval) AS crashed_checkins FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  AND blob6 = 'crashed'\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY t ORDER BY t",
           "refId": "A",
           "round": "0s",
           "showFormattedSQL": false,
@@ -773,7 +773,7 @@
           "useWindowFuncForMacros": true
         }
       ],
-      "title": "Check-ins by Fly Region",
+      "title": "Crashed Check-ins",
       "type": "timeseries"
     },
     {

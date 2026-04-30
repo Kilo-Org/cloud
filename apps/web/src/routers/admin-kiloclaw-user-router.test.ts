@@ -79,6 +79,7 @@ describe('admin.users.getKiloClawState', () => {
       accessReason: null,
       earlybird: null,
       activeInstanceId: null,
+      kiloclawEarlyAccess: false,
       billingStateError: null,
       needsSupportReview: false,
     });

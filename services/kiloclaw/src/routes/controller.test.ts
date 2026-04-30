@@ -524,7 +524,7 @@ describe('POST /checkin', () => {
     expect(tryMarkInstanceReady).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call tryMarkInstanceReady when loadAvg5m is above threshold', async () => {
+  it('does not call tryMarkInstanceReady in production when loadAvg5m is above threshold', async () => {
     const tryMarkInstanceReady = vi.fn();
     const env = makeEnv({ tryMarkInstanceReady });
     const headers = await makeAuthHeaders();
@@ -541,6 +541,25 @@ describe('POST /checkin', () => {
 
     expect(response.status).toBe(204);
     expect(tryMarkInstanceReady).not.toHaveBeenCalled();
+  });
+
+  it('calls tryMarkInstanceReady in development when loadAvg5m is above threshold', async () => {
+    const tryMarkInstanceReady = vi.fn().mockResolvedValue({ shouldNotify: false, userId: null });
+    const env = makeEnv({ tryMarkInstanceReady, workerEnv: 'development' });
+    const headers = await makeAuthHeaders();
+
+    const response = await controller.request(
+      '/checkin',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(makeBody({ loadAvg5m: 0.5 })),
+      },
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(tryMarkInstanceReady).toHaveBeenCalledTimes(1);
   });
 
   it('does not fail checkin when tryMarkInstanceReady throws', async () => {

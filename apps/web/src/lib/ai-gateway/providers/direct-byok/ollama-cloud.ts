@@ -6,7 +6,13 @@ export default {
   id: 'ollama-cloud',
   base_url: 'https://ollama.com/v1',
   ai_sdk_provider: 'openai-compatible',
-  transformRequest(_context) {},
+  transformRequest(context) {
+    const { request } = context;
+    if (request.kind !== 'chat_completions') {
+      return;
+    }
+    request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
+  },
   models: cachedEnhancedDirectByokModelList({
     providerId: 'ollama-cloud',
     recommendedModels: [

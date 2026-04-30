@@ -1,7 +1,7 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { captureException } from '@sentry/nextjs';
 import { client as stripeClient } from '@/lib/stripe-client';
@@ -69,12 +69,17 @@ export async function runBulkCancelAndRefundKiloPass({
   const results: BulkResultRow[] = [];
 
   for (const email of uniqueEmails) {
-    const user = await db.query.kilocode_users.findFirst({
-      columns: { id: true },
-      where: eq(kilocode_users.google_user_email, email),
-    });
+    // `google_user_email` stores the provider email as-is (no case normalization)
+    // and is case-sensitively unique. Look up case-insensitively so pasted
+    // `user@example.com` matches a stored `User@example.com`. If two rows
+    // differ only in case, bail out for that email rather than picking one.
+    const matchingUsers = await db
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(sql`lower(${kilocode_users.google_user_email}) = ${email}`)
+      .limit(2);
 
-    if (!user) {
+    if (matchingUsers.length === 0) {
       results.push({
         email,
         userId: null,
@@ -86,6 +91,21 @@ export async function runBulkCancelAndRefundKiloPass({
       });
       continue;
     }
+
+    if (matchingUsers.length > 1) {
+      results.push({
+        email,
+        userId: null,
+        status: 'error',
+        refundedAmountCents: null,
+        balanceResetAmountUsd: null,
+        alreadyBlocked: false,
+        error: 'Multiple accounts match this email (case-insensitive); resolve manually',
+      });
+      continue;
+    }
+
+    const user = matchingUsers[0];
 
     try {
       const result = await cancelAndRefundKiloPassForUser({

@@ -446,4 +446,61 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     });
     expect(userRow?.blocked_reason).toBe('previous-block');
   });
+
+  it('matches stored mixed-case emails case-insensitively', async () => {
+    const stripeMock = getStripeMock();
+    setupHappyPathStripe(stripeMock);
+
+    const target = await insertTestUser({
+      google_user_email: 'Bulk-MixedCase@Example.com',
+    });
+    await insertActiveKiloPass(target.id, 'sub_mixed_case');
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
+      emails: ['bulk-mixedcase@example.com'],
+      reason: 'case-insensitive',
+    });
+
+    expect(result.summary.cancelled).toBe(1);
+    expect(result.results[0].status).toBe('cancelled_and_refunded');
+    expect(result.results[0].userId).toBe(target.id);
+  });
+
+  it('errors on ambiguous case-only duplicates without touching either account', async () => {
+    const stripeMock = getStripeMock();
+    setupHappyPathStripe(stripeMock);
+
+    const u1 = await insertTestUser({ google_user_email: 'Ambiguous@example.com' });
+    const u2 = await insertTestUser({ google_user_email: 'ambiguous@example.com' });
+    await insertActiveKiloPass(u1.id, 'sub_ambig_1');
+    await insertActiveKiloPass(u2.id, 'sub_ambig_2');
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloPass.cancelAndRefundKiloPassBulk({
+      emails: ['ambiguous@example.com'],
+      reason: 'ambiguity',
+    });
+
+    expect(result.summary).toEqual({
+      total: 1,
+      cancelled: 0,
+      skipped: 0,
+      errored: 1,
+      totalRefundedCents: 0,
+    });
+    expect(result.results[0].status).toBe('error');
+    expect(result.results[0].error).toContain('Multiple accounts match');
+
+    // Neither subscription was canceled
+    const sub1 = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_ambig_1'),
+    });
+    const sub2 = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_ambig_2'),
+    });
+    expect(sub1?.status).toBe('active');
+    expect(sub2?.status).toBe('active');
+    expect(stripeMock.subscriptions.cancel).not.toHaveBeenCalled();
+  });
 });

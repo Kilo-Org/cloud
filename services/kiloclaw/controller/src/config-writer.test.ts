@@ -786,44 +786,6 @@ describe('generateBaseConfig', () => {
     expect(config.channels.slack).toBeUndefined();
   });
 
-  // ─── Stream Chat (default channel) ───────────────────────────────────────
-
-  it('configures Stream Chat channel and plugin when all three vars are set', () => {
-    const { deps } = fakeDeps();
-    const env = {
-      ...minimalEnv(),
-      STREAM_CHAT_API_KEY: 'sc-api-key',
-      STREAM_CHAT_BOT_USER_ID: 'bot-sandbox-abc',
-      STREAM_CHAT_BOT_USER_TOKEN: 'sc-bot-token',
-    };
-    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
-
-    expect(config.channels.streamchat.apiKey).toBe('sc-api-key');
-    expect(config.channels.streamchat.botUserId).toBe('bot-sandbox-abc');
-    expect(config.channels.streamchat.botUserToken).toBe('sc-bot-token');
-    expect(config.channels.streamchat.botUserName).toBe('KiloClaw');
-    expect(config.channels.streamchat.enabled).toBe(true);
-    expect(config.plugins.entries['openclaw-channel-streamchat'].enabled).toBe(true);
-    expect(config.plugins.load.paths).toContain(
-      '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'
-    );
-  });
-
-  it('does not configure Stream Chat when any of the three required vars is missing', () => {
-    const cases = [
-      { STREAM_CHAT_API_KEY: 'key', STREAM_CHAT_BOT_USER_ID: 'bot' },
-      { STREAM_CHAT_API_KEY: 'key', STREAM_CHAT_BOT_USER_TOKEN: 'token' },
-      { STREAM_CHAT_BOT_USER_ID: 'bot', STREAM_CHAT_BOT_USER_TOKEN: 'token' },
-    ];
-
-    for (const partial of cases) {
-      const { deps } = fakeDeps();
-      const env = { ...minimalEnv(), ...partial };
-      const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
-      expect(config.channels.streamchat).toBeUndefined();
-    }
-  });
-
   // ─── Kilo Chat ───────────────────────────────────────────────────────────
 
   it('always configures kilo-chat channel and plugin', () => {
@@ -859,30 +821,6 @@ describe('generateBaseConfig', () => {
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
     expect(config.session.dmScope).toBe('per-peer');
-  });
-
-  it('does not duplicate the plugin path on repeated generateBaseConfig calls', () => {
-    const existing = JSON.stringify({
-      channels: { streamchat: { apiKey: 'old-key', enabled: true } },
-      plugins: {
-        load: {
-          paths: ['/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'],
-        },
-        entries: { 'openclaw-channel-streamchat': { enabled: true } },
-      },
-    });
-    const { deps } = fakeDeps(existing);
-    const env = {
-      ...minimalEnv(),
-      STREAM_CHAT_API_KEY: 'sc-api-key',
-      STREAM_CHAT_BOT_USER_ID: 'bot-sandbox-abc',
-      STREAM_CHAT_BOT_USER_TOKEN: 'sc-bot-token',
-    };
-    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
-
-    const pluginPath = '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
-    const paths = config.plugins.load.paths as string[];
-    expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
   });
 
   it('does not set gateway auth when OPENCLAW_GATEWAY_TOKEN is missing', () => {

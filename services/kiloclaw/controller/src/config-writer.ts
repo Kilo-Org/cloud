@@ -476,34 +476,6 @@ export function generateBaseConfig(
     config.plugins.entries.slack.enabled = true;
   }
 
-  // Stream Chat default channel (auto-provisioned at provision time)
-  if (env.STREAM_CHAT_API_KEY && env.STREAM_CHAT_BOT_USER_ID && env.STREAM_CHAT_BOT_USER_TOKEN) {
-    config.channels.streamchat = config.channels.streamchat ?? {};
-    config.channels.streamchat.apiKey = env.STREAM_CHAT_API_KEY;
-    config.channels.streamchat.botUserId = env.STREAM_CHAT_BOT_USER_ID;
-    config.channels.streamchat.botUserToken = env.STREAM_CHAT_BOT_USER_TOKEN;
-    config.channels.streamchat.botUserName = 'KiloClaw';
-    config.channels.streamchat.enabled = true;
-
-    config.plugins = config.plugins ?? {};
-    config.plugins.load = config.plugins.load ?? {};
-    config.plugins.load.paths = Array.isArray(config.plugins.load.paths)
-      ? config.plugins.load.paths
-      : [];
-    const pluginPath = '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
-    if (!(config.plugins.load.paths as string[]).includes(pluginPath)) {
-      (config.plugins.load.paths as string[]).push(pluginPath);
-    }
-
-    config.plugins.entries = config.plugins.entries ?? {};
-    // Entry key must match the plugin's manifest id (openclaw.plugin.json).
-    // The fork's manifest declares id "openclaw-channel-streamchat" to align
-    // with the idHint that OpenClaw derives from the package name.
-    const scEntry = 'openclaw-channel-streamchat';
-    config.plugins.entries[scEntry] = config.plugins.entries[scEntry] ?? {};
-    config.plugins.entries[scEntry].enabled = true;
-  }
-
   // Session — default DM scope to per-channel-peer so each channel+peer
   // combination gets its own session. OpenClaw's onboard sets this for new
   // instances, but legacy instances may not have it.

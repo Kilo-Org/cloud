@@ -142,7 +142,3 @@ NEXT_PUBLIC_POSTHOG_KEY=phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z
 # In wrangler dev, it connects to the remote Postgres via the Hyperdrive service.
 # To use a local Postgres instead, add "localConnectionString" to the hyperdrive
 # config in wrangler.jsonc (see https://developers.cloudflare.com/hyperdrive/configuration/local-development/).
-
-# StreamChat API Key
-STREAM_CHAT_API_KEY=...
-STREAM_CHAT_API_SECRET=...

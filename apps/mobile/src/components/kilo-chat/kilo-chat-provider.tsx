@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 
 import { EventServiceClient } from '@kilocode/event-service';
 import { KiloChatClient } from '@kilocode/kilo-chat';
+import { KiloChatHooksProvider } from '@kilocode/kilo-chat-hooks';
 
 import { EVENT_SERVICE_URL, KILO_CHAT_URL } from '@/lib/config';
 
@@ -49,5 +50,13 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
     };
   }, [value]);
 
-  return <KiloChatContext.Provider value={value}>{children}</KiloChatContext.Provider>;
+  return (
+    <KiloChatContext.Provider value={value}>
+      <KiloChatHooksProvider
+        value={{ kiloChatClient: value.kiloChatClient, eventService: value.eventService }}
+      >
+        {children}
+      </KiloChatHooksProvider>
+    </KiloChatContext.Provider>
+  );
 }

@@ -25,6 +25,7 @@
     "@expo/react-native-action-sheet": "^4.1.1",
     "@kilocode/event-service": "workspace:*",
     "@kilocode/kilo-chat": "workspace:*",
+    "@kilocode/kilo-chat-hooks": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/trpc": "workspace:*",
     "@react-native-community/netinfo": "11.5.2",

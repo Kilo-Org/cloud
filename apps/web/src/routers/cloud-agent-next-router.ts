@@ -10,12 +10,8 @@ import {
   mergeProfileConfiguration,
   ProfileNotFoundError,
 } from '@/lib/agent/profile-session-config';
+import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import {
-  getGitHubTokenForUser,
-  fetchGitHubRepositoriesForUser,
-} from '@/lib/cloud-agent/github-integration-helpers';
-import {
-  getGitLabTokenForUser,
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
   fetchGitLabRepositoriesForUser,
@@ -80,28 +76,19 @@ export const cloudAgentNextRouter = createTRPCRouter({
           setupCommands,
         });
 
-        // Determine git source: GitLab uses gitUrl/gitToken, GitHub uses githubRepo/githubToken
+        // Determine git source: GitLab uses gitUrl, GitHub uses githubRepo.
+        // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
         let gitParams: {
           githubRepo?: string;
           gitUrl?: string;
-          gitToken?: string;
           platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
-          // GitLab flow: convert gitlabProject to gitUrl + gitToken
-          const gitToken = await getGitLabTokenForUser(ctx.user.id);
-          if (!gitToken) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'No GitLab integration found. Please connect your GitLab account first.',
-            });
-          }
           const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
+          gitParams = { gitUrl, platform: PLATFORM.GITLAB };
         } else {
-          // GitHub flow: use githubRepo (token will be fetched in cloud-agent-next)
           gitParams = { githubRepo, platform: PLATFORM.GITHUB };
         }
 
@@ -163,29 +150,10 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
-      // Determine platform to fetch the correct token
-      const session = await client.getSession(input.cloudAgentSessionId);
-      let githubToken: string | undefined;
-      let gitToken: string | undefined;
-
-      if (session.platform === 'gitlab') {
-        gitToken = await getGitLabTokenForUser(ctx.user.id);
-        if (!gitToken) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'No GitLab integration found. Please connect your GitLab account first.',
-          });
-        }
-      } else {
-        githubToken = await getGitHubTokenForUser(ctx.user.id);
-      }
-
+      // Tokens are refreshed inside cloud-agent-next (GitHub App installation
+      // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
       try {
-        return await client.sendMessage({
-          ...input,
-          githubToken,
-          gitToken,
-        });
+        return await client.sendMessage(input);
       } catch (error) {
         rethrowAsPaymentRequired(error);
         throw error;

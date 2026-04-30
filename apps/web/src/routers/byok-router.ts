@@ -23,20 +23,22 @@ import {
   UserByokTestModels,
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { StoredModelSchema } from '@/lib/ai-gateway/providers/vercel/types';
+import {
+  getVercelModelsMetadata,
+  getOpenRouterModelsMetadata,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
 import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
   formatDirectByokModelId,
 } from '@/lib/ai-gateway/providers/direct-byok';
-import { redisGet } from '@/lib/redis';
-import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
 
 const CODESTRAL_FIM_URL = 'https://codestral.mistral.ai/v1/fim/completions';
 const CODESTRAL_TEST_MODEL = 'codestral-2508';
@@ -80,40 +82,22 @@ async function testCodestralApiKey(apiKey: string): Promise<{ success: boolean; 
   }
 }
 
-async function fetchSupportedModels() {
-  const vercelModelMetadataRaw = await redisGet(GATEWAY_METADATA_REDIS_KEYS.vercelModels);
-  if (!vercelModelMetadataRaw) {
+async function fetchSupportedModels(): Promise<Record<string, string[]>> {
+  const [vercelModelMetadata, openRouterModelMetadata] = await Promise.all([
+    getVercelModelsMetadata(),
+    getOpenRouterModelsMetadata(),
+  ]);
+
+  if (Object.keys(vercelModelMetadata).length === 0) {
     throw new Error(
       'No Vercel model metadata in Redis, use the admin panel at ' + MODELS_BY_PROVIDER_ADMIN_URL
     );
   }
 
-  const vercelModelMetadata = z
-    .record(z.string(), StoredModelSchema)
-    .safeParse(JSON.parse(vercelModelMetadataRaw));
-
-  if (!vercelModelMetadata.success) {
-    throw new Error(
-      'Failed to parse Vercel model metadata:\n' + z.prettifyError(vercelModelMetadata.error)
-    );
-  }
-
-  const openRouterModelMetadataRaw = await redisGet(GATEWAY_METADATA_REDIS_KEYS.openrouterModels);
-  if (!openRouterModelMetadataRaw) {
+  if (Object.keys(openRouterModelMetadata).length === 0) {
     throw new Error(
       'No OpenRouter model metadata in Redis, use the admin panel at ' +
         MODELS_BY_PROVIDER_ADMIN_URL
-    );
-  }
-
-  const openRouterModelMetadata = z
-    .record(z.string(), StoredModelSchema)
-    .safeParse(JSON.parse(openRouterModelMetadataRaw));
-
-  if (!openRouterModelMetadata.success) {
-    throw new Error(
-      'Failed to parse OpenRouter model metadata:\n' +
-        z.prettifyError(openRouterModelMetadata.error)
     );
   }
 
@@ -121,10 +105,10 @@ async function fetchSupportedModels() {
 
   result['codestral'] = ['Codestral (mistralai/codestral-2508)'];
 
-  for (const openRouterModel of Object.values(openRouterModelMetadata.data)) {
-    const vercelModel = vercelModelMetadata.data[mapModelIdToVercel(openRouterModel.id, false)];
+  for (const openRouterModel of Object.values(openRouterModelMetadata)) {
+    const vercelModel = vercelModelMetadata[mapModelIdToVercel(openRouterModel.id, false)];
     if (!vercelModel) continue;
-    if (vercelModel.id.includes('codestral')) continue;
+    if (isCodestralModel(vercelModel.id)) continue;
     if (vercelModel.type !== 'language') continue;
     for (const endpoint of vercelModel.endpoints) {
       const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(endpoint.tag);
@@ -136,7 +120,7 @@ async function fetchSupportedModels() {
   }
 
   for (const provider of DIRECT_BYOK_PROVIDERS) {
-    for (const model of provider.models) {
+    for (const model of await provider.models()) {
       if (!result[provider.id]) result[provider.id] = [];
       result[provider.id].push(model.name + ' (' + formatDirectByokModelId(provider, model) + ')');
     }

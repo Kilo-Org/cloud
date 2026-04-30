@@ -42,27 +42,37 @@ import {
   DirectUserByokInferenceProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
   AwsCredentialsSchema,
+  type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
+import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import * as z from 'zod';
 
-// Hardcoded BYOK providers list
-const VERCEL_BYOK_PROVIDERS = [
-  { id: VercelUserByokInferenceProviderIdSchema.enum.anthropic, name: 'Anthropic' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.bedrock, name: 'AWS Bedrock' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.openai, name: 'OpenAI' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.inception, name: 'Inception' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.google, name: 'Google AI Studio' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.minimax, name: 'MiniMax' },
-  { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Mistral AI (Codestral)' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.mistral, name: 'Mistral AI (other models)' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.xai, name: 'xAI' },
-  { id: VercelUserByokInferenceProviderIdSchema.enum.zai, name: 'Z.ai (pay as you go)' },
-] as const;
+// Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
+// clause forces new entries here whenever a provider is added to
+// VercelUserByokInferenceProviderIdSchema.
+const VERCEL_BYOK_PROVIDER_NAMES = {
+  anthropic: 'Anthropic',
+  bedrock: 'AWS Bedrock',
+  openai: 'OpenAI',
+  inception: 'Inception',
+  fireworks: 'Fireworks',
+  google: 'Google AI Studio',
+  minimax: 'MiniMax',
+  mistral: 'Mistral AI (other models)',
+  moonshotai: 'Moonshot AI',
+  novita: 'Novita',
+  xai: 'xAI',
+  zai: 'Z.ai (pay as you go)',
+} satisfies Record<VercelUserByokInferenceProviderId, string>;
 
-const DIRECT_BYOK_PROVIDERS_LIST = DIRECT_BYOK_PROVIDERS.map(plan => ({
-  id: plan.id,
-  name: plan.name,
+const VERCEL_BYOK_PROVIDERS = [
+  ...Object.entries(VERCEL_BYOK_PROVIDER_NAMES).map(([id, name]) => ({ id, name })),
+  { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Mistral AI (Codestral)' },
+];
+
+const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).map(([id, name]) => ({
+  id,
+  name,
 }));
 
 const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
@@ -558,22 +568,34 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   const directProvider = DIRECT_BYOK_PROVIDERS_LIST.find(
                     p => p.id === selectedProvider
                   );
-                  return directProvider ? (
-                    <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  if (directProvider) {
+                    return (
+                      <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        <AlertDescription>
+                          <p className="font-medium">
+                            Important: You must use a model from{' '}
+                            <strong>{directProvider.name}</strong> to use this key
+                          </p>
+                          <p className="mt-1">
+                            In your client, select a model entry from the list above. After saving,
+                            you may need to wait a few minutes and restart your client for this
+                            entry to appear.
+                          </p>
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  }
+                  return (
+                    <Alert>
+                      <Info className="h-4 w-4" />
                       <AlertDescription>
-                        <p className="font-medium">
-                          Important: You must use a model from{' '}
-                          <strong>{directProvider.name}</strong> to use this key
-                        </p>
-                        <p className="mt-1">
-                          In your client, select a model entry from the list above. After saving,
-                          you may need to wait a few minutes and restart your client for this entry
-                          to appear.
-                        </p>
+                        Once saved, your key will automatically be used whenever your client
+                        requests one of the supported models above. If multiple keys apply to the
+                        same model, they are tried in unspecified order until one succeeds.
                       </AlertDescription>
                     </Alert>
-                  ) : null;
+                  );
                 })()}
             </div>
 

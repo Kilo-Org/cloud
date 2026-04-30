@@ -12,6 +12,11 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     conversationId: z.string(),
     messageId: z.string(),
   }),
+  z.object({
+    type: z.literal('instance-lifecycle'),
+    event: z.enum(['ready', 'start_failed']),
+    instanceId: z.string().min(1),
+  }),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;

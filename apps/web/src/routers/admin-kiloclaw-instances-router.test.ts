@@ -6,10 +6,12 @@ import {
   kilocode_users,
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
+  kiloclaw_image_catalog,
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
   kiloclaw_subscriptions,
+  kiloclaw_version_pins,
 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -22,6 +24,7 @@ const mockGetKiloCliRunStatus: jest.Mock<any, any> = jest.fn();
 const mockCancelKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStartKiloCliRun: jest.Mock<any, any> = jest.fn();
 const mockStart: jest.Mock<any, any> = jest.fn();
+const mockUserClientRestartMachine: jest.Mock<any, any> = jest.fn();
 const startedResponse = {
   ok: true,
   started: true,
@@ -60,6 +63,12 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
       this.responseBody = responseBody;
     }
   },
+}));
+
+jest.mock('@/lib/kiloclaw/kiloclaw-user-client', () => ({
+  KiloClawUserClient: jest.fn().mockImplementation(() => ({
+    restartMachine: mockUserClientRestartMachine,
+  })),
 }));
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -145,6 +154,8 @@ beforeEach(async () => {
   mockStartKiloCliRun.mockReset();
   mockStart.mockReset();
   mockStart.mockResolvedValue(startedResponse);
+  mockUserClientRestartMachine.mockReset();
+  mockUserClientRestartMachine.mockResolvedValue({ success: true, message: 'restarting' });
   mockKiloClawInternalClient();
 });
 
@@ -1262,5 +1273,237 @@ describe('admin.kiloclawInstances.cancelKiloCliRun', () => {
       await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, destroyedInstance.id));
       /* eslint-enable drizzle/enforce-delete-with-where */
     }
+  });
+});
+
+describe('admin.kiloclawInstances.restartMachine pin override gate', () => {
+  // The pin row has an FK to kiloclaw_image_catalog.image_tag, so we
+  // need real catalog rows for the pin inserts in these tests. The
+  // restartMachine input regex (^[a-zA-Z0-9][a-zA-Z0-9._-]*$) rejects
+  // slashes and colons, so we use docker-tag-style identifiers here even
+  // though production catalog rows use full registry URLs.
+  const newerTag = 'admin-pin-gate-newer';
+  const olderTag = 'admin-pin-gate-older';
+  let testInstanceId: string;
+
+  beforeEach(async () => {
+    await db.insert(kiloclaw_image_catalog).values([
+      {
+        openclaw_version: '2026.4.10',
+        variant: 'default',
+        image_tag: newerTag,
+        image_digest: 'sha256:newer',
+        status: 'available',
+        published_at: new Date().toISOString(),
+      },
+      {
+        openclaw_version: '2026.3.1',
+        variant: 'default',
+        image_tag: olderTag,
+        image_digest: 'sha256:older',
+        status: 'available',
+        published_at: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+      },
+    ]);
+
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    testInstanceId = instance.id;
+  });
+
+  afterEach(async () => {
+    /* eslint-disable drizzle/enforce-delete-with-where */
+    await db
+      .delete(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, testInstanceId));
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, testInstanceId));
+    await db
+      .delete(kiloclaw_image_catalog)
+      .where(inArray(kiloclaw_image_catalog.image_tag, [newerTag, olderTag]));
+    /* eslint-enable drizzle/enforce-delete-with-where */
+  });
+
+  it('throws FORBIDDEN for non-admin callers', async () => {
+    const caller = await createCallerForUser(regularUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.restartMachine({
+        instanceId: testInstanceId,
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+
+  it('plain restart with no imageTag ignores pin state and never triggers the gate', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: testInstanceId,
+      image_tag: newerTag,
+      pinned_by: regularUser.id,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.restartMachine({
+      instanceId: testInstanceId,
+    });
+
+    expect(result).toEqual({ success: true, message: 'restarting' });
+    expect(mockUserClientRestartMachine).toHaveBeenCalledWith(undefined, expect.any(Object));
+
+    // Pin must remain untouched on plain restart.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, testInstanceId));
+    expect(pins.length).toBe(1);
+  });
+
+  it('version change with no pin succeeds without acknowledgeOverride', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.restartMachine({
+      instanceId: testInstanceId,
+      imageTag: newerTag,
+    });
+
+    expect(result).toEqual({ success: true, message: 'restarting' });
+    expect(mockUserClientRestartMachine).toHaveBeenCalledWith(
+      { imageTag: newerTag },
+      expect.any(Object)
+    );
+  });
+
+  it('version change with user-set pin and no override throws PRECONDITION_FAILED', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: testInstanceId,
+      image_tag: olderTag,
+      pinned_by: regularUser.id,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.restartMachine({
+        instanceId: testInstanceId,
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'PIN_EXISTS',
+    });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+
+    // Pin remains in place after a blocked attempt.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, testInstanceId));
+    expect(pins.length).toBe(1);
+    expect(pins[0].pinned_by).toBe(regularUser.id);
+  });
+
+  it('version change with admin-set pin and no override throws PRECONDITION_FAILED', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: testInstanceId,
+      image_tag: olderTag,
+      pinned_by: adminUser.id,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.restartMachine({
+        instanceId: testInstanceId,
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'PIN_EXISTS',
+    });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
+  });
+
+  it('version change with acknowledgeOverride deletes a user-set pin and proceeds', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: testInstanceId,
+      image_tag: olderTag,
+      pinned_by: regularUser.id,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.restartMachine({
+      instanceId: testInstanceId,
+      imageTag: newerTag,
+      acknowledgeOverride: true,
+    });
+
+    expect(result).toEqual({ success: true, message: 'restarting' });
+    expect(mockUserClientRestartMachine).toHaveBeenCalledWith(
+      { imageTag: newerTag },
+      expect.any(Object)
+    );
+
+    // Pin row removed; no replacement admin pin written.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, testInstanceId));
+    expect(pins.length).toBe(0);
+  });
+
+  it('version change with acknowledgeOverride deletes an admin-set pin and proceeds', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: testInstanceId,
+      image_tag: olderTag,
+      pinned_by: adminUser.id,
+    });
+
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.restartMachine({
+      instanceId: testInstanceId,
+      imageTag: newerTag,
+      acknowledgeOverride: true,
+    });
+
+    expect(result).toEqual({ success: true, message: 'restarting' });
+
+    // Pin row removed; the override path strips any pin regardless of pinned_by.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, testInstanceId));
+    expect(pins.length).toBe(0);
+  });
+
+  it('is direction-agnostic — older imageTag works the same as newer', async () => {
+    // No pin: admin can switch to an older tag without override.
+    const caller = await createCallerForUser(adminUser.id);
+    const result = await caller.admin.kiloclawInstances.restartMachine({
+      instanceId: testInstanceId,
+      imageTag: olderTag,
+    });
+
+    expect(result).toEqual({ success: true, message: 'restarting' });
+    expect(mockUserClientRestartMachine).toHaveBeenCalledWith(
+      { imageTag: olderTag },
+      expect.any(Object)
+    );
+  });
+
+  it('NOT_FOUND when instance does not exist', async () => {
+    const caller = await createCallerForUser(adminUser.id);
+    await expect(
+      caller.admin.kiloclawInstances.restartMachine({
+        instanceId: crypto.randomUUID(),
+        imageTag: newerTag,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+    expect(mockUserClientRestartMachine).not.toHaveBeenCalled();
   });
 });

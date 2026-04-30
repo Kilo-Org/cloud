@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
 
-import { pushDataSchema } from '@kilocode/notifications';
+import { type PushData, pushDataSchema } from '@kilocode/notifications';
 
 function getProjectId(): string {
   const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
@@ -30,7 +30,7 @@ export function setActiveChatLocation(
 // Runtime-validates that an arbitrary notification `data` payload matches the
 // shape we care about. Push producers can evolve independently of the app, so
 // always parse before reading fields from the OS-provided notification content.
-export function parseNotificationData(data: unknown) {
+export function parseNotificationData(data: unknown): PushData | null {
   const parsed = pushDataSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
 }
@@ -80,19 +80,30 @@ export function getPendingNotificationLink(): string | null {
   return link;
 }
 
+function instanceChatPath(data: PushData | null): string | null {
+  if (!data) {
+    return null;
+  }
+  if (data.type === 'chat.message') {
+    return `/(app)/chat/${data.sandboxId}/${data.conversationId}`;
+  }
+  return `/(app)/chat/${data.instanceId}`;
+}
+
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
     const data = parseNotificationData(response.notification.request.content.data);
+    const path = instanceChatPath(data);
+    if (!path) {
+      return;
+    }
 
-    if (data) {
-      const path = `/(app)/chat/${data.sandboxId}/${data.conversationId}`;
-      // If the router is ready (has segments), navigate immediately.
-      // Otherwise store as pending for consumption after auth completes.
-      try {
-        router.replace(path as Href);
-      } catch {
-        pendingNotificationLink = path;
-      }
+    // If the router is ready (has segments), navigate immediately.
+    // Otherwise store as pending for consumption after auth completes.
+    try {
+      router.replace(path as Href);
+    } catch {
+      pendingNotificationLink = path;
     }
   });
 
@@ -106,8 +117,9 @@ export function checkInitialNotification(): void {
     return;
   }
   const data = parseNotificationData(response.notification.request.content.data);
-  if (data) {
-    pendingNotificationLink = `/(app)/chat/${data.sandboxId}/${data.conversationId}`;
+  const path = instanceChatPath(data);
+  if (path) {
+    pendingNotificationLink = path;
   }
 }
 

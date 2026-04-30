@@ -1,4 +1,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import { getWorkerDb } from '@kilocode/db/client';
+import { user_push_tokens } from '@kilocode/db/schema';
+import { eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
@@ -15,9 +18,21 @@ import {
 } from '@kilocode/notifications';
 
 import { authMiddleware, type AuthContext } from './auth';
+import type { TicketTokenPair } from './lib/expo-push';
+import { sendPushNotifications } from './lib/expo-push';
+import {
+  dispatchInstanceLifecyclePush,
+  type SendInstanceLifecycleNotificationParams,
+  type SendInstanceLifecycleNotificationResult,
+} from './lib/instance-lifecycle-push';
 import { queue } from './queue-consumer';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
+export type {
+  InstanceLifecycleEvent,
+  SendInstanceLifecycleNotificationParams,
+  SendInstanceLifecycleNotificationResult,
+} from './lib/instance-lifecycle-push';
 
 const ALLOWED_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
 
@@ -61,6 +76,10 @@ app.post('/v1/badges/mark-read', async c => {
 
 type RecipientDOStub = {
   dispatchPush: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;
+};
+
+type ReceiptCheckMessage = {
+  ticketTokenPairs: TicketTokenPair[];
 };
 
 /** Pure core for unit testability. */
@@ -125,6 +144,33 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
         this.env.NOTIFICATION_CHANNEL_DO.get(
           this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
         ) as unknown as RecipientDOStub,
+    });
+  }
+
+  async sendInstanceLifecycleNotification(
+    params: SendInstanceLifecycleNotificationParams
+  ): Promise<SendInstanceLifecycleNotificationResult> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+
+    return dispatchInstanceLifecyclePush(params, {
+      getTokens: async userId => {
+        const rows = await db
+          .select({ token: user_push_tokens.token })
+          .from(user_push_tokens)
+          .where(eq(user_push_tokens.user_id, userId));
+        return rows.map(r => r.token);
+      },
+      deleteStaleTokens: async tokens => {
+        await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, tokens));
+      },
+      sendPush: async messages => {
+        const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
+        return sendPushNotifications(messages, accessToken);
+      },
+      enqueueReceipts: async ticketTokenPairs => {
+        const receiptMsg: ReceiptCheckMessage = { ticketTokenPairs };
+        await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
+      },
     });
   }
 }

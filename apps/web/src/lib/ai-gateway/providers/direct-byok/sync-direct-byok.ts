@@ -1,25 +1,23 @@
-import { createGateway, generateText } from 'ai';
 import * as z from 'zod';
-import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
-import {
-  DirectByokModelSchema,
-  type DirectByokModel,
-} from '@/lib/ai-gateway/providers/direct-byok/types';
+import { type DirectByokModel } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import type { StoredModel } from '@/lib/ai-gateway/providers/vercel/types';
-import { redisGet, redisSet } from '@/lib/redis';
+import { redisSet } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
-const DESCRIPTION_MODEL = 'google/gemma-4-26b-a4b-it';
 
-const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
+const ModalitySchema = z
+  .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
+  .catch('unknown');
 
-const NeuralwattModelsResponseSchema = z.object({
+const OpenAICompatibleModelsResponseSchema = z.object({
   data: z.array(
     z.object({
       id: z.string(),
+      context_length: z.number().optional(),
       max_model_len: z.number().optional(),
+      max_output_length: z.number().optional(),
+      input_modalities: z.array(ModalitySchema).optional(),
     })
   ),
 });
@@ -33,6 +31,12 @@ const ModelsDevModelSchema = z.object({
       output: z.number().optional(),
     })
     .optional(),
+  modalities: z
+    .object({
+      input: z.array(ModalitySchema).optional(),
+      output: z.array(ModalitySchema).optional(),
+    })
+    .optional(),
 });
 
 const ModelsDevProviderSchema = z.object({
@@ -44,6 +48,7 @@ type RawModel = {
   name?: string;
   context_length?: number;
   max_completion_tokens?: number;
+  input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
 };
 
 type ProviderFetcher = {
@@ -51,23 +56,42 @@ type ProviderFetcher = {
   fetch(): Promise<RawModel[]>;
 };
 
-const FETCHERS: ReadonlyArray<ProviderFetcher> = [
-  {
-    providerId: 'neuralwatt',
+function openAICompatibleFetcher(options: {
+  providerId: DirectUserByokInferenceProviderId;
+  label: string;
+  url: string;
+}): ProviderFetcher {
+  return {
+    providerId: options.providerId,
     async fetch() {
-      const response = await fetch('https://api.neuralwatt.com/v1/models');
+      const response = await fetch(options.url);
       if (!response.ok) {
         throw new Error(
-          `Failed to fetch Neuralwatt models: ${response.status} ${response.statusText}`
+          `Failed to fetch ${options.label} models: ${response.status} ${response.statusText}`
         );
       }
-      const parsed = NeuralwattModelsResponseSchema.parse(await response.json());
+      const parsed = OpenAICompatibleModelsResponseSchema.parse(await response.json());
       return parsed.data.map(model => ({
         id: model.id,
-        context_length: model.max_model_len,
+        context_length: model.context_length ?? model.max_model_len,
+        max_completion_tokens: model.max_output_length,
+        input_modalities: model.input_modalities,
       }));
     },
-  },
+  };
+}
+
+const FETCHERS: ReadonlyArray<ProviderFetcher> = [
+  openAICompatibleFetcher({
+    providerId: 'neuralwatt',
+    label: 'Neuralwatt',
+    url: 'https://api.neuralwatt.com/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'chutes-byok',
+    label: 'Chutes',
+    url: 'https://llm.chutes.ai/v1/models',
+  }),
   {
     providerId: 'zai-coding',
     async fetch() {
@@ -88,6 +112,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
         name: model.name,
         context_length: model.limit?.context,
         max_completion_tokens: model.limit?.output,
+        input_modalities: model.modalities?.input,
       }));
     },
   },
@@ -95,60 +120,27 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
 
 function stripVendorPrefix(id: string) {
   const slash = id.lastIndexOf('/');
-  return (slash >= 0 ? id.slice(slash + 1) : id).toLowerCase();
+  return slash >= 0 ? id.slice(slash + 1) : id;
 }
 
-async function generateDescription(id: string, name: string): Promise<string> {
-  const gateway = createGateway({ apiKey: PROVIDERS.VERCEL_AI_GATEWAY.apiKey });
-  const { text } = await generateText({
-    model: gateway(DESCRIPTION_MODEL),
-    prompt:
-      `Write a concise 1-2 sentence description of the AI model "${name}" ` +
-      `(id: "${id}"), suitable for display in a model picker. ` +
-      `Output only the description with no preamble or quoting.`,
-    maxOutputTokens: 300,
-  });
-  return text.trim();
-}
-
-async function readPreviousModels(
-  providerId: DirectUserByokInferenceProviderId
-): Promise<DirectByokModel[]> {
-  const raw = await redisGet(directByokModelsRedisKey(providerId));
-  if (!raw) return [];
-  return DirectByokModelArraySchema.parse(JSON.parse(raw));
-}
-
-async function syncProvider(
-  fetcher: ProviderFetcher,
-  openrouterDescriptions: ReadonlyMap<string, string>
-): Promise<number> {
-  const previous = await readPreviousModels(fetcher.providerId);
-  const previousById = new Map(previous.map(model => [model.id, model]));
-
+async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
   const fetched = await fetcher.fetch();
   const models: DirectByokModel[] = [];
 
   for (const raw of fetched) {
-    const prior = previousById.get(raw.id);
-    const name = raw.name ?? prior?.name ?? raw.id;
-    const openrouterDescription = openrouterDescriptions.get(stripVendorPrefix(raw.id));
-    const description =
-      openrouterDescription ?? prior?.description ?? (await generateDescription(raw.id, name));
-    const context_length =
-      raw.context_length ?? prior?.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
+    const name = raw.name ?? stripVendorPrefix(raw.id);
+    const context_length = raw.context_length ?? DEFAULT_MAX_COMPLETION_TOKENS;
     const max_completion_tokens = Math.min(
-      raw.max_completion_tokens ?? prior?.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
+      raw.max_completion_tokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
       context_length
     );
     models.push({
       id: raw.id,
       name,
-      description,
-      flags: prior?.flags ?? [],
+      flags: raw.input_modalities?.includes('image') ? ['vision'] : [],
       context_length,
       max_completion_tokens,
-      variants: prior?.variants ?? null,
+      variants: null,
     });
   }
 
@@ -156,20 +148,11 @@ async function syncProvider(
   return models.length;
 }
 
-export async function syncDirectByokModels(
-  openrouterData: Record<string, StoredModel>
-): Promise<Partial<Record<DirectUserByokInferenceProviderId, number>>> {
-  const openrouterDescriptions = new Map<string, string>();
-  for (const model of Object.values(openrouterData)) {
-    if (model.description) {
-      openrouterDescriptions.set(stripVendorPrefix(model.id), model.description);
-    }
-  }
+export async function syncDirectByokModels(): Promise<
+  Partial<Record<DirectUserByokInferenceProviderId, number>>
+> {
   const entries = await Promise.all(
-    FETCHERS.map(
-      async fetcher =>
-        [fetcher.providerId, await syncProvider(fetcher, openrouterDescriptions)] as const
-    )
+    FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher)] as const)
   );
   return Object.fromEntries(entries);
 }

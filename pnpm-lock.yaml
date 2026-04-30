@@ -473,14 +473,14 @@ importers:
         specifier: ^3.1009.0
         version: 3.1009.0
       '@chat-adapter/slack':
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       '@chat-adapter/state-memory':
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       '@chat-adapter/state-redis':
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       '@emoji-mart/data':
         specifier: ^1.2.1
         version: 1.2.1
@@ -665,8 +665,8 @@ importers:
         specifier: ^7.0.1
         version: 7.0.1
       chat:
-        specifier: ^4.20.1
-        version: 4.20.1
+        specifier: ^4.26.0
+        version: 4.26.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1326,18 +1326,12 @@ importers:
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.13.0(typescript@5.9.3))(hono@4.12.8)
-      '@kilocode/db':
-        specifier: workspace:*
-        version: link:../../packages/db
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
-      '@octokit/auth-app':
-        specifier: 'catalog:'
-        version: 8.2.0
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.13.0(typescript@5.9.3)
@@ -1577,7 +1571,7 @@ importers:
         version: 7.0.0-dev.20260319.1
       jest:
         specifier: ^30.3.0
-        version: 30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4))
+        version: 30.3.0(@types/node@24.12.0)(esbuild-register@3.6.0(esbuild@0.27.4))
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -3235,17 +3229,17 @@ packages:
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
 
-  '@chat-adapter/shared@4.20.1':
-    resolution: {integrity: sha512-UawGmT7O+3vxvaU9f+lc0PVQKU+TvE0PUxa0zL43qH1rqGkosngtT3cOOhW6JOx+rxt3jox2a99xr8hnJPkshA==}
+  '@chat-adapter/shared@4.26.0':
+    resolution: {integrity: sha512-YD0MGktFXrArUqTBsyPfL5vkdD1WBS58PAWO0oVrMQAMmPxpAXfWGjBtZCkf3y8R8Svb0uVuVXiMZSForaEnMQ==}
 
-  '@chat-adapter/slack@4.20.1':
-    resolution: {integrity: sha512-DGrNKHiYCFPFd6WzWkoJmCmtK/TuHw5euUjev6i01ygYNLQ7h2JiL424iqkdZmXfkOIxnDcnVBbKDuF9uEKQlg==}
+  '@chat-adapter/slack@4.26.0':
+    resolution: {integrity: sha512-NNN47rURI6qpJf4rRK8xyeumjPTAXr7YSU4/FnViU8cFV/vKYFR4xZTzlFMVWNrYi9SmSwasUjcBmQznigK54Q==}
 
-  '@chat-adapter/state-memory@4.20.1':
-    resolution: {integrity: sha512-JtITUuz4xYwXMOSH8dCYjuxgIgtkecVH5RUVR46PT9Nh8QT4l6WRMNZvdrWkJOn9jOZToXiNS/ae0OFJHJtN+g==}
+  '@chat-adapter/state-memory@4.26.0':
+    resolution: {integrity: sha512-FsfyM/A9Bf1yFc1FWmOsK+a4YVwm5FogX25hZxFG6cEvyFb6Cd924SsbtvF06yItY/7J2UFetCsMmBPkdPKshQ==}
 
-  '@chat-adapter/state-redis@4.20.1':
-    resolution: {integrity: sha512-aAN+GXNTCKrXsSurh5arLMDGl8XbbxTspD1qLZuYXPwQBBZsuF3mPBfeFmwRJqweHuwv+3b/VofXvxFmRosR6A==}
+  '@chat-adapter/state-redis@4.26.0':
+    resolution: {integrity: sha512-NSX2E6wkDlg0AMfKFx4LPoV6cBHolL08Ht3cT+S01jss24t9GzlDw/BUsrWOeoTElwEhxZcQw5bUkStUAA7JMg==}
 
   '@chromatic-com/playwright@0.12.8':
     resolution: {integrity: sha512-2oi8ghd+2N+hDI0Y65Ac/aYfsvDTyDHvEZMNS4Ln7VzyZ6SdGLoQLOvP80IGJlekTI68K8gQpzXewRV2chUaZQ==}
@@ -8746,8 +8740,8 @@ packages:
   character-reference-invalid@2.0.1:
     resolution: {integrity: sha512-iBZ4F4wRbyORVsu0jPV7gXkOsGYjGHPmAyv+HiHG8gi5PtC9KI2j1+v8/tlibRvjoWX027ypmG/n0HtO5t7unw==}
 
-  chat@4.20.1:
-    resolution: {integrity: sha512-TwvP1bbzK2g3sYHhD94wot2watxnySCYLQkaMdYjM79T43OTybG8hSSFhOrrp/AXjLHei2sch4GCOQu+4zcfHw==}
+  chat@4.26.0:
+    resolution: {integrity: sha512-QToDnIEGpyb8yQA6YLMHOSRK30YVk4RtsyFyuWFYyB2c4jQlyIrSWtwVK7qyvmvqzQp9uDwCdJRAhS8GtCHAGQ==}
 
   check-error@2.1.3:
     resolution: {integrity: sha512-PAJdDJusoxnwm1VwW07VWwUN1sl7smmC3OKggvndJFadxxDRyFJBX/ggnu/KE4kQAB7a3Dp8f/YXC1FlUprWmA==}
@@ -16277,30 +16271,30 @@ snapshots:
 
   '@bcoe/v8-coverage@1.0.2': {}
 
-  '@chat-adapter/shared@4.20.1':
+  '@chat-adapter/shared@4.26.0':
     dependencies:
-      chat: 4.20.1
+      chat: 4.26.0
     transitivePeerDependencies:
       - supports-color
 
-  '@chat-adapter/slack@4.20.1':
+  '@chat-adapter/slack@4.26.0':
     dependencies:
-      '@chat-adapter/shared': 4.20.1
+      '@chat-adapter/shared': 4.26.0
       '@slack/web-api': 7.15.0
-      chat: 4.20.1
+      chat: 4.26.0
     transitivePeerDependencies:
       - debug
       - supports-color
 
-  '@chat-adapter/state-memory@4.20.1':
+  '@chat-adapter/state-memory@4.26.0':
     dependencies:
-      chat: 4.20.1
+      chat: 4.26.0
     transitivePeerDependencies:
       - supports-color
 
-  '@chat-adapter/state-redis@4.20.1':
+  '@chat-adapter/state-redis@4.26.0':
     dependencies:
-      chat: 4.20.1
+      chat: 4.26.0
       redis: 5.11.0
     transitivePeerDependencies:
       - '@node-rs/xxhash'
@@ -16440,7 +16434,7 @@ snapshots:
       cjs-module-lexer: 1.4.3
       esbuild: 0.27.4
       miniflare: 4.20260310.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
       wrangler: 4.72.0(@cloudflare/workers-types@4.20260313.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
@@ -21865,7 +21859,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 2.0.0
-      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
 
   '@vitest/utils@3.2.4':
     dependencies:
@@ -22721,7 +22715,7 @@ snapshots:
 
   character-reference-invalid@2.0.1: {}
 
-  chat@4.20.1:
+  chat@4.26.0:
     dependencies:
       '@workflow/serde': 4.1.0-beta.2
       mdast-util-to-string: 4.0.0
@@ -25254,25 +25248,6 @@ snapshots:
       - supports-color
       - ts-node
 
-  jest-cli@30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4)):
-    dependencies:
-      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
-      '@jest/test-result': 30.3.0
-      '@jest/types': 30.3.0
-      chalk: 4.1.2
-      exit-x: 0.2.2
-      import-local: 3.2.0
-      jest-config: 30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4))
-      jest-util: 30.3.0
-      jest-validate: 30.3.0
-      yargs: 17.7.2
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - esbuild-register
-      - supports-color
-      - ts-node
-
   jest-config@29.7.0(@types/node@24.12.0):
     dependencies:
       '@babel/core': 7.29.0
@@ -25917,19 +25892,6 @@ snapshots:
       '@jest/types': 30.3.0
       import-local: 3.2.0
       jest-cli: 30.3.0(@types/node@24.12.0)(esbuild-register@3.6.0(esbuild@0.27.4))
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - esbuild-register
-      - supports-color
-      - ts-node
-
-  jest@30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4)):
-    dependencies:
-      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
-      '@jest/types': 30.3.0
-      import-local: 3.2.0
-      jest-cli: 30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4))
     transitivePeerDependencies:
       - '@types/node'
       - babel-plugin-macros

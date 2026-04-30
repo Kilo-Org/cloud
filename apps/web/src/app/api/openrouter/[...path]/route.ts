@@ -82,7 +82,7 @@ import {
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
-import { isKiloAutoModel } from '@/lib/ai-gateway/kilo-auto';
+import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
@@ -277,7 +277,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Server-side products (cloud-agent, code-review, app-builder) rate-limit
   // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
   // All other products rate-limit per IP (fast pre-auth path).
-  if (isKiloExclusiveFreeModel(originalModelIdLowerCased)) {
+  const isRateLimitedFreeModelRequest =
+    isKiloExclusiveFreeModel(originalModelIdLowerCased) || autoModel === KILO_AUTO_FREE_MODEL.id;
+  if (isRateLimitedFreeModelRequest) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
     if (rateLimit instanceof NextResponse) return rateLimit;
 
@@ -370,7 +372,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isKiloExclusiveFreeModel(originalModelIdLowerCased)) {
+  if (isRateLimitedFreeModelRequest) {
     await logFreeModelRequest(
       ipAddress,
       originalModelIdLowerCased,

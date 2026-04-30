@@ -407,9 +407,14 @@ export const PersistedStateSchema = z.object({
   // Snapshot restore: volume ID created by the queue worker during restore.
   // Used for idempotency on retry — if set, the worker reuses this volume instead of creating another.
   pendingRestoreVolumeId: z.string().nullable().default(null),
-  // Tracks whether the "instance ready" email has been sent for this provision lifecycle.
-  // Set to true on first low-load checkin; reset on DO wipe (destroy + re-provision).
+  // Tracks whether the "instance ready" notifications (email + mobile push)
+  // have been dispatched for this provision lifecycle. Set to true on first
+  // low-load checkin; reset on DO wipe (destroy + re-provision).
   instanceReadyEmailSent: z.boolean().default(false),
+  // Tracks whether a "start failed" mobile push has been dispatched for the
+  // current starting attempt. Re-armed at the top of startAsync() so each
+  // retry can emit its own notification.
+  startFailurePushSentForAttempt: z.boolean().default(false),
   // Metadata for custom (non-catalog) secrets: env var name → { configPath? }.
   // configPath is a JSON dot-notation path for patching into openclaw.json at boot.
   customSecretMeta: z.record(z.string(), CustomSecretMetaSchema).nullable().default(null),

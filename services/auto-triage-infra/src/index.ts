@@ -8,6 +8,7 @@
 
 import { Hono, type Context } from 'hono';
 import type { Env, TriageRequest, TriageResponse } from './types';
+import { classificationCallbackPayloadSchema } from './types';
 import {
   backendAuthMiddleware,
   createErrorHandler,
@@ -24,7 +25,73 @@ export const TriageOrchestrator = TriageOrchestratorBase;
 type HonoEnv = { Bindings: Env };
 const app = new Hono<HonoEnv>();
 
-// Authentication middleware
+/**
+ * Classification callback from cloud-agent-next.
+ *
+ * Mounted BEFORE the backend-auth middleware so it can authenticate with a
+ * per-ticket secret delivered via `X-Callback-Secret` header instead of the
+ * BACKEND_AUTH_TOKEN that Next.js uses. The secret is minted by the DO at
+ * prepareSession time and relayed verbatim by cloud-agent-next's callback
+ * queue.
+ */
+app.post('/tickets/:ticketId/classification-callback', async (c: Context<HonoEnv>) => {
+  const ticketId = c.req.param('ticketId');
+  if (!ticketId) {
+    return c.json({ error: 'ticketId parameter required' }, 400);
+  }
+
+  const providedSecret = c.req.header('X-Callback-Secret');
+  if (!providedSecret) {
+    return c.json({ error: 'Missing X-Callback-Secret header' }, 401);
+  }
+
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const parsed = classificationCallbackPayloadSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    console.warn('[POST /tickets/:ticketId/classification-callback] Invalid payload', {
+      ticketId,
+      issues: parsed.error.issues,
+    });
+    return c.json({ error: 'Invalid callback payload' }, 400);
+  }
+  const payload = parsed.data;
+
+  console.log('[POST /tickets/:ticketId/classification-callback] Received', {
+    ticketId,
+    status: payload.status,
+    hasText: typeof payload.lastAssistantMessageText === 'string',
+    hasError: !!payload.errorMessage,
+  });
+
+  const id = c.env.TRIAGE_ORCHESTRATOR.idFromName(ticketId);
+  const stub = c.env.TRIAGE_ORCHESTRATOR.get(id);
+
+  // Return 202 immediately; the DO does its work in the background so we
+  // don't block the callback queue on API calls to Next.js. Secret and
+  // session-id checks happen inside the DO. Errors are caught and logged;
+  // the DO alarm is the last-resort safety net.
+  c.executionCtx.waitUntil(
+    stub.completeClassification(providedSecret, payload).catch((error: unknown) => {
+      console.error(
+        '[POST /tickets/:ticketId/classification-callback] completeClassification failed',
+        {
+          ticketId,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    })
+  );
+
+  return c.json({ accepted: true }, 202);
+});
+
+// Authentication middleware — applied to everything mounted below this line.
 app.use(
   '*',
   backendAuthMiddleware<HonoEnv>(c => c.env.BACKEND_AUTH_TOKEN)

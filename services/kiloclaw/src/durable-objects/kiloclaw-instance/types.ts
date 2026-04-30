@@ -131,6 +131,7 @@ export type InstanceMutableState = {
   preRestoreStatus: InstanceStatus | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
+  startFailurePushSentForAttempt: boolean;
   customSecretMeta: PersistedState['customSecretMeta'];
   vectorMemoryEnabled: boolean;
   vectorMemoryModel: string | null;

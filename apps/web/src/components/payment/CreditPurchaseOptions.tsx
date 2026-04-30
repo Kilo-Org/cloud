@@ -213,16 +213,15 @@ export default function CreditPurchaseOptions({
                           : ''
                       } ${animatingButton === `amount-${amount}` ? 'animate-liquid-ripple' : ''}`}
                     >
-                      {animatingButton === `amount-${amount}` && (
-                        <div
-                          className="pointer-events-none absolute inset-0"
-                          style={{
-                            background: `radial-gradient(circle at ${rippleOrigin.x}% ${rippleOrigin.y}%, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 50%, transparent 70%)`,
-                            animation: 'liquidRipple 0.6s ease-out forwards',
-                          }}
-                        />
-                      )}
-                      {buttonText}
+                      <div
+                        className="pointer-events-none absolute inset-0"
+                        style={{
+                          background: `radial-gradient(circle at ${rippleOrigin.x}% ${rippleOrigin.y}%, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 50%, transparent 70%)`,
+                          animation: 'liquidRipple 0.6s ease-out forwards',
+                          visibility: animatingButton === `amount-${amount}` ? 'visible' : 'hidden',
+                        }}
+                      />
+                      <span>{buttonText}</span>
                     </Button>
                   </form>
                 );
@@ -240,16 +239,15 @@ export default function CreditPurchaseOptions({
                     } ${animatingButton === 'custom' ? 'animate-liquid-ripple' : ''}`}
                     disabled={submitting}
                   >
-                    {animatingButton === 'custom' && (
-                      <div
-                        className="pointer-events-none absolute inset-0"
-                        style={{
-                          background: `radial-gradient(circle at ${rippleOrigin.x}% ${rippleOrigin.y}%, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 50%, transparent 70%)`,
-                          animation: 'liquidRipple 0.6s ease-out forwards',
-                        }}
-                      />
-                    )}
-                    Custom
+                    <div
+                      className="pointer-events-none absolute inset-0"
+                      style={{
+                        background: `radial-gradient(circle at ${rippleOrigin.x}% ${rippleOrigin.y}%, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 50%, transparent 70%)`,
+                        animation: 'liquidRipple 0.6s ease-out forwards',
+                        visibility: animatingButton === 'custom' ? 'visible' : 'hidden',
+                      }}
+                    />
+                    <span>Custom</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">

@@ -187,6 +187,32 @@ export class KiloClawInternalClient {
     });
   }
 
+  /**
+   * Push a resolved admin pin (or clear) into the instance's DO state.
+   * Pass `imageTag = null` to clear the pin and reset to the current
+   * rollout target. Does not restart the machine.
+   */
+  async applyPinnedVersion(
+    userId: string,
+    instanceId: string,
+    imageTag: string | null
+  ): Promise<{
+    ok: boolean;
+    openclawVersion: string | null;
+    imageTag: string | null;
+    imageDigest: string | null;
+    variant: string | null;
+  }> {
+    return this.request(
+      '/api/platform/versions/apply-pin',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId, imageTag }),
+      },
+      { userId }
+    );
+  }
+
   async setUserKiloclawEarlyAccess(
     userId: string,
     value: boolean

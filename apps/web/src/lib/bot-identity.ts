@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import type { StateAdapter } from 'chat';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { botIdentityRedisKey } from '@/lib/redis-keys';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 const CHAT_SDK_CACHE_KEY_PREFIX = 'chat-sdk:cache:';
 const REDIS_SCAN_BATCH_SIZE = 100;
@@ -27,7 +28,7 @@ function hasRedisClient(state: StateAdapter): state is StateAdapterWithRedisClie
  */
 export type PlatformIdentity = {
   /** e.g. "slack", "discord", "teams", "gchat" */
-  platform: string;
+  platform: (typeof PLATFORM)[keyof typeof PLATFORM];
   /** Workspace / team / guild / tenant ID */
   teamId: string;
   /** Platform-specific user ID (e.g. Slack's "U123ABC") */
@@ -157,7 +158,7 @@ export function verifyLinkToken(token: string): PlatformIdentity | null {
 
   try {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
-      platform?: string;
+      platform?: PlatformIdentity['platform'];
       teamId?: string;
       userId?: string;
       iat?: number;
@@ -167,7 +168,8 @@ export function verifyLinkToken(token: string): PlatformIdentity | null {
     if (
       typeof data.platform !== 'string' ||
       typeof data.teamId !== 'string' ||
-      typeof data.userId !== 'string'
+      typeof data.userId !== 'string' ||
+      !Object.values(PLATFORM).includes(data.platform)
     ) {
       return null;
     }

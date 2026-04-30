@@ -29,7 +29,7 @@ import {
   grok_code_fast_1_optimized_free_model,
   isGrok4Model,
 } from '@/lib/ai-gateway/providers/xai';
-import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
@@ -69,7 +69,7 @@ export function isFreeModel(model: string): boolean {
 }
 
 export function isPdfSupportingModel(model: string): boolean {
-  return isAnthropicModel(model) || isOpenAiModel(model) || isGrok4Model(model);
+  return isClaudeModel(model) || isOpenAiModel(model) || isGrok4Model(model);
 }
 
 export function isKiloExclusiveFreeModel(model: string): boolean {
@@ -79,9 +79,6 @@ export function isKiloExclusiveFreeModel(model: string): boolean {
 }
 
 export const kiloExclusiveModels = [
-  // Please do not remove models from this list immediately.
-  // Instead, set status to 'disabled' first
-  // and only remove when very few users are requesting it.
   gemma_4_26b_a4b_it_free_model,
   minimax_m25_free_model,
   morph_warp_grep_free_model,

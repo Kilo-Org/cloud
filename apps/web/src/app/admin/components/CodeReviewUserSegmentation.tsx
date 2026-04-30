@@ -16,6 +16,9 @@ type SegmentationData = {
     count: number;
     completed: number;
     failed: number;
+    waitStartedCount: number;
+    avgWaitSeconds: number;
+    p95WaitSeconds: number;
   }[];
   topUsers: {
     userId: string | null;
@@ -38,6 +41,18 @@ type Props = {
   onUserClick?: (userId: string, email: string | null, name: string | null) => void;
   onOrgClick?: (orgId: string, name: string | null, plan: string | null) => void;
 };
+
+function formatWaitSeconds(seconds: number | undefined): string {
+  if (seconds == null) return '-';
+  if (seconds < 1) return '0s';
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.round(seconds - minutes * 60);
+    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+  }
+  return `${(seconds / 3600).toFixed(1)}h`;
+}
 
 export function CodeReviewUserSegmentation({ data, onUserClick, onOrgClick }: Props) {
   const personal = data.ownershipBreakdown.find(o => o.type === 'personal');
@@ -70,6 +85,12 @@ export function CodeReviewUserSegmentation({ data, onUserClick, onOrgClick }: Pr
                   {personal?.completed || 0} completed / {personal?.failed || 0} failed
                 </span>
               </div>
+              {personal && personal.waitStartedCount > 0 && (
+                <div className="text-muted-foreground flex items-center justify-between text-xs">
+                  <span>Avg wait {formatWaitSeconds(personal.avgWaitSeconds)}</span>
+                  <span>P95 {formatWaitSeconds(personal.p95WaitSeconds)}</span>
+                </div>
+              )}
               <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
                 <div
                   className="h-full bg-blue-500 transition-all"
@@ -89,6 +110,12 @@ export function CodeReviewUserSegmentation({ data, onUserClick, onOrgClick }: Pr
                   {org?.completed || 0} completed / {org?.failed || 0} failed
                 </span>
               </div>
+              {org && org.waitStartedCount > 0 && (
+                <div className="text-muted-foreground flex items-center justify-between text-xs">
+                  <span>Avg wait {formatWaitSeconds(org.avgWaitSeconds)}</span>
+                  <span>P95 {formatWaitSeconds(org.p95WaitSeconds)}</span>
+                </div>
+              )}
               <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
                 <div
                   className="h-full bg-green-500 transition-all"

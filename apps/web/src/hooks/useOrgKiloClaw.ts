@@ -146,10 +146,14 @@ export function useOrgKiloClawAvailableVersions(organizationId: string, offset =
   );
 }
 
-export function useOrgKiloClawMyPin(organizationId: string) {
+export function useOrgKiloClawMyPin(organizationId: string, opts: { enabled?: boolean } = {}) {
+  const { enabled = true } = opts;
   const trpc = useTRPC();
   return useQuery(
-    trpc.organizations.kiloclaw.getMyPin.queryOptions({ organizationId }, { staleTime: 60_000 })
+    trpc.organizations.kiloclaw.getMyPin.queryOptions(
+      { organizationId },
+      { staleTime: 60_000, enabled }
+    )
   );
 }
 

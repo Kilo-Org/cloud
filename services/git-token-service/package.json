@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --env dev",
     "dev:test": "wrangler dev --config wrangler.test.jsonc",
     "deploy": "wrangler deploy",
     "typecheck": "tsgo --noEmit",

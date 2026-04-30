@@ -64,7 +64,10 @@ describe('deepStrict', () => {
 
   test('rejects unknown keys inside union members', () => {
     const schema = deepStrict(
-      z.union([z.object({ kind: z.literal('a'), foo: z.string() }), z.object({ kind: z.literal('b'), bar: z.number() })])
+      z.union([
+        z.object({ kind: z.literal('a'), foo: z.string() }),
+        z.object({ kind: z.literal('b'), bar: z.number() }),
+      ])
     );
     expect(schema.safeParse({ kind: 'a', foo: 'x', typo: 1 }).success).toBe(false);
     expect(schema.safeParse({ kind: 'a', foo: 'x' }).success).toBe(true);

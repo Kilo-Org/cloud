@@ -1,5 +1,5 @@
 import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
-import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type {
   MessageWithReasoning,
   OpenRouterChatCompletionRequest,
@@ -35,7 +35,7 @@ export function fixOpenCodeDuplicateReasoning(
         return false;
       }
       if (rd.type === ReasoningDetailType.Text) {
-        if (isClaudeModel(requestedModel) && !rd.signature) {
+        if (isAnthropicModel(requestedModel) && !rd.signature) {
           console.debug(
             `[fixOpenCodeDuplicateReasoning] removing reasoning text without signature, model: ${requestedModel}, session: ${sessionId || 'unknown'}`
           );

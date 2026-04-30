@@ -16,7 +16,7 @@ export const minimax_m25_free_model: KiloExclusiveModel = {
 };
 
 export function isMinimaxModel(model: string) {
-  return model.includes('minimax');
+  return model.startsWith('minimax/');
 }
 
 export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m2.7';

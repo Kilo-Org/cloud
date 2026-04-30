@@ -1,11 +1,12 @@
-import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
-import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
+import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
+import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
-import { isGrok4Model, isGrokModel } from '@/lib/ai-gateway/providers/xai';
-import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
+import { isGrok4Model, isXaiModel } from '@/lib/ai-gateway/providers/xai';
+import { isZaiModel } from '@/lib/ai-gateway/providers/zai';
 import type {
   CustomLlmProvider,
   OpenClawModelSettings,
@@ -26,7 +27,7 @@ export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
 } as const;
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
-  if (isOpusModel(model) && model.includes('4.7')) {
+  if (modelStartsWith(model, 'anthropic/claude-opus-4.7')) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
@@ -36,7 +37,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
     };
   }
-  if (isClaudeModel(model)) {
+  if (isAnthropicModel(model)) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
@@ -60,8 +61,8 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
     );
   }
   if (
-    isKimiModel(model) ||
-    isGlmModel(model) ||
+    isMoonshotModel(model) ||
+    isZaiModel(model) ||
     model === qwen36_plus_model.public_id ||
     isGemmaModel(model)
   ) {
@@ -102,11 +103,11 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
   }
-  if (isClaudeModel(model)) {
+  if (isAnthropicModel(model)) {
     // on Vercel AI Gateway, this is necessary to support document attachments
     return 'anthropic';
   }
-  if (isOpenAiModel(model) || isGrokModel(model)) {
+  if (isOpenAiModel(model) || isXaiModel(model)) {
     // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
     // xAI: "The Responses API is the recommended way to interact with xAI models."
     return 'openai';
@@ -122,10 +123,10 @@ export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined
 
 export function getOpenClawSettings(model: string): OpenClawModelSettings | undefined {
   // 2026-04-28: this is aspirational, the OpenClaw Kilo provider does not respect this
-  if (isClaudeModel(model)) {
+  if (isAnthropicModel(model)) {
     return { api_adapter: 'anthropic-messages' };
   }
-  if (isOpenAiModel(model) || isGrokModel(model)) {
+  if (isOpenAiModel(model) || isXaiModel(model)) {
     return { api_adapter: 'openai-responses' };
   }
   return undefined;

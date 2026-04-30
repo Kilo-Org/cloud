@@ -1,7 +1,7 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
-export function isStepModel(requestedModel: string) {
-  return requestedModel.includes('step-');
+export function isStepFunModel(requestedModel: string) {
+  return requestedModel.startsWith('stepfun/');
 }
 
 export const stepfun_35_flash_free_model: KiloExclusiveModel = {

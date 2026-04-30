@@ -6,10 +6,10 @@ import {
 } from '@/lib/ai-gateway/tool-calling';
 
 export function isMistralModel(model: string) {
-  return model.includes('mistral');
+  return model.startsWith('mistralai/');
 }
 export function isCodestralModel(model: string) {
-  return model.includes('codestral');
+  return model.startsWith('mistralai/codestral');
 }
 
 export function applyMistralModelSettings(requestToMutate: GatewayRequest) {

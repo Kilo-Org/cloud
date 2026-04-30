@@ -4510,6 +4510,7 @@ export const security_advisor_scans = pgTable(
 );
 
 export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
+export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;
 
 // ============ SECURITY ADVISOR CONTENT ============
 // Customer-visible report content for the security advisor feature.
@@ -4597,31 +4598,3 @@ export const security_advisor_content = pgTable('security_advisor_content', {
 
 export type SecurityAdvisorContent = typeof security_advisor_content.$inferSelect;
 export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferInsert;
-
-// ============ BADGE COUNTS ============
-// Per-user per-bucket unread notification counts for mobile app badge display.
-// (user_id, badge_bucket) is the composite PK — one row per user per bucket.
-// badge_bucket is a free-form string chosen by the producer (e.g. sandbox_id
-// today, conversation id later). The notification service increments badge_count
-// on each push and sums across all buckets to get the total badge count to
-// include in the push payload. The client resets a bucket's count (to 0) when
-// the user views that item.
-
-export const badge_counts = pgTable(
-  'badge_counts',
-  {
-    user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    badge_bucket: text().notNull(),
-    badge_count: integer().notNull().default(0),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [primaryKey({ columns: [table.user_id, table.badge_bucket] })]
-);
-
-export type BadgeCount = typeof badge_counts.$inferSelect;
-export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

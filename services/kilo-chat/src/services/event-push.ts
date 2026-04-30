@@ -4,6 +4,7 @@ import type {
   BotStatusRequest,
   ConversationStatusRequest,
 } from '@kilocode/kilo-chat';
+import { getKiloChatEventPayloadSchema } from '@kilocode/kilo-chat';
 import { kiloclawConversationContext, kiloclawInstanceContext } from '@kilocode/event-service';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
@@ -11,6 +12,22 @@ import { lookupSandboxOwnerUserId } from './sandbox-ownership';
 
 function getEventService(env: Env): Env['EVENT_SERVICE'] | null {
   return env.EVENT_SERVICE ?? null;
+}
+
+function isValidEventPayload<N extends KiloChatEventName>(
+  event: N,
+  payload: KiloChatEventOf<N>,
+  logContext: Record<string, unknown>
+): boolean {
+  const result = getKiloChatEventPayloadSchema(event).safeParse(payload);
+  if (result.success) return true;
+
+  logger.error('Invalid kilo-chat event payload', {
+    event,
+    ...logContext,
+    issues: result.error.issues,
+  });
+  return false;
 }
 
 /**
@@ -28,6 +45,7 @@ export async function pushEventToHumanMembers<N extends KiloChatEventName>(
   const es = getEventService(env);
   if (!es) return new Map();
   const context = kiloclawConversationContext(sandboxId, conversationId);
+  if (!isValidEventPayload(event, payload, { conversationId, sandboxId })) return new Map();
 
   const results = await Promise.allSettled(
     humanMemberIds.map(async userId => {
@@ -67,6 +85,7 @@ export async function pushInstanceEvent<N extends KiloChatEventName>(
   const es = getEventService(env);
   if (!es) return;
   const context = kiloclawInstanceContext(sandboxId);
+  if (!isValidEventPayload(event, payload, { sandboxId })) return;
 
   const results = await Promise.allSettled(
     humanMemberIds.map(userId => es.pushEvent(userId, context, event, payload))
@@ -99,6 +118,7 @@ export async function pushInstanceEventToUser<N extends KiloChatEventName>(
   const es = getEventService(env);
   if (!es) return;
   const context = kiloclawInstanceContext(sandboxId);
+  if (!isValidEventPayload(event, payload, { sandboxId, userId })) return;
 
   try {
     await es.pushEvent(userId, context, event, payload);

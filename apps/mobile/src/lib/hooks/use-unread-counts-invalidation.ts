@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 
 import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
 import { parseNotificationData } from '@/lib/notifications';
+import { unreadCountsInvalidationKeyForNotification } from './unread-counts-invalidation-cache';
 
 /**
  * Keeps the `['badges', userId]` cache in sync with real-time notification
@@ -35,9 +36,11 @@ export function useUnreadCountsInvalidation() {
 
     const received = Notifications.addNotificationReceivedListener(notification => {
       const data = parseNotificationData(notification.request.content.data);
-      if (data?.type === 'chat.message') {
-        invalidate();
+      const queryKey = unreadCountsInvalidationKeyForNotification(userId, data);
+      if (queryKey === null) {
+        return;
       }
+      void queryClient.invalidateQueries({ queryKey });
     });
 
     const appStateSubscription = AppState.addEventListener('change', state => {

@@ -5,6 +5,7 @@ import { Stack } from 'expo-router';
 import { useAppPresence } from '@/components/kilo-chat/hooks/use-app-presence';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useUnreadCountsInvalidation } from '@/lib/hooks/use-unread-counts-invalidation';
 
 export default function AppLayout() {
   const colors = useThemeColors();
@@ -84,5 +85,6 @@ export default function AppLayout() {
 
 function PresenceMount({ children }: { children: ReactNode }) {
   useAppPresence();
+  useUnreadCountsInvalidation();
   return <>{children}</>;
 }

@@ -9,6 +9,8 @@ import { type Channel as StreamChannel, StreamChat } from 'stream-chat';
 import { Channel, Chat, MessageInput, MessageList, OverlayProvider } from 'stream-chat-expo';
 import { toast } from 'sonner-native';
 
+import { badgeBucketForConversation } from '@kilocode/notifications';
+
 import { KiloClawMessageAvatar } from '@/components/kiloclaw/chat-avatar';
 import { ChatPlaceholder } from '@/components/kiloclaw/chat-placeholder';
 import { ChatHeader, ChatShell } from '@/components/kiloclaw/chat-shell';
@@ -19,11 +21,7 @@ import { badgeBucketForInstance } from '@/lib/badge-buckets';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
 import { setLastActiveInstance } from '@/lib/last-active-instance';
-import {
-  getNotificationSandboxId,
-  parseNotificationData,
-  setActiveChatInstance,
-} from '@/lib/notifications';
+import { parseNotificationData } from '@/lib/notifications';
 import { useTRPC } from '@/lib/trpc';
 
 type KiloClawChatProps = {
@@ -78,7 +76,6 @@ export function KiloClawChat({
     useCallback(() => {
       const badgeBucket = badgeBucketForInstance(instanceId);
       isFocusedRef.current = true;
-      setActiveChatInstance(instanceId);
       setLastActiveInstance(instanceId);
       markChatRead({ badgeBucket });
 
@@ -87,14 +84,15 @@ export function KiloClawChat({
       // it immediately so the badge never drifts above 0 while the user is reading.
       const subscription = Notifications.addNotificationReceivedListener(notification => {
         const data = parseNotificationData(notification.request.content.data);
-        if (data && getNotificationSandboxId(data) === instanceId) {
-          markChatRead({ badgeBucket });
+        if (data?.type === 'chat.message' && data.sandboxId === instanceId) {
+          markChatRead({
+            badgeBucket: badgeBucketForConversation(data.sandboxId, data.conversationId),
+          });
         }
       });
 
       return () => {
         isFocusedRef.current = false;
-        setActiveChatInstance(null);
         subscription.remove();
       };
     }, [instanceId, markChatRead])

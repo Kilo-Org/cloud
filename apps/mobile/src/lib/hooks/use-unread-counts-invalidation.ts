@@ -33,7 +33,7 @@ export function useUnreadCountsInvalidation() {
 
     const received = Notifications.addNotificationReceivedListener(notification => {
       const data = parseNotificationData(notification.request.content.data);
-      if (data?.type === 'chat') {
+      if (data?.type === 'chat.message') {
         invalidate();
       }
     });

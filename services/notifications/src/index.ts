@@ -11,6 +11,7 @@ import { presenceContextForConversation } from '@kilocode/event-service';
 import {
   badgeBucketForConversation,
   markBadgeReadInputSchema,
+  parseBadgeBucket,
   type DispatchPushInput,
   type DispatchPushOutcome,
   type SendInstanceLifecycleNotificationParams,
@@ -63,7 +64,32 @@ app.get('/v1/badges', async c => {
   const userId = c.get('callerId');
   const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
   const buckets = await stub.listNonZeroBuckets();
-  const response = { buckets } satisfies ListBadgesResponse;
+  const instanceCounts = new Map<string, number>();
+  const conversations: ListBadgesResponse['conversations'] = [];
+  for (const bucket of buckets) {
+    const parsed = parseBadgeBucket(bucket.badgeBucket);
+    if (parsed.kind === 'kiloclaw-conversation') {
+      conversations.push({
+        sandboxId: parsed.sandboxId,
+        conversationId: parsed.conversationId,
+        unreadCount: bucket.badgeCount,
+      });
+      instanceCounts.set(
+        parsed.sandboxId,
+        (instanceCounts.get(parsed.sandboxId) ?? 0) + bucket.badgeCount
+      );
+    } else if (parsed.kind === 'kiloclaw-instance') {
+      instanceCounts.set(
+        parsed.sandboxId,
+        (instanceCounts.get(parsed.sandboxId) ?? 0) + bucket.badgeCount
+      );
+    }
+  }
+  const instances = Array.from(instanceCounts, ([sandboxId, unreadCount]) => ({
+    sandboxId,
+    unreadCount,
+  }));
+  const response = { instances, conversations } satisfies ListBadgesResponse;
   return c.json(response);
 });
 

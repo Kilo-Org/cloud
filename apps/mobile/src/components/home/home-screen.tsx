@@ -4,8 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import { badgeBucketForInstance } from '@kilocode/notifications';
-
 import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
 import { AgentsPromoCard } from '@/components/home/agents-promo-card';
 import { buildTimedGreeting, Greeting } from '@/components/home/greeting';
@@ -81,7 +79,7 @@ export function HomeScreen() {
     isPending: instancesPending,
     isError: instancesError,
   } = useAllKiloClawInstances(pickListPollInterval);
-  const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
+  const { bySandboxId: unreadBySandboxId } = useUnreadCounts();
   const {
     storedSessions,
     activeSessions,
@@ -130,7 +128,7 @@ export function HomeScreen() {
             {renderKiloClawSlot({
               instances: instances ?? [],
               instancesError,
-              unreadByBadgeBucket,
+              unreadBySandboxId,
             })}
 
             {renderSessionsOrPromo({
@@ -153,7 +151,7 @@ export function HomeScreen() {
 function renderKiloClawSlot(params: {
   instances: ClawInstance[];
   instancesError: boolean;
-  unreadByBadgeBucket: Map<string, number>;
+  unreadBySandboxId: Map<string, number>;
 }) {
   if (params.instances.length > 0) {
     return (
@@ -164,9 +162,7 @@ function renderKiloClawSlot(params: {
             <KiloClawCard
               key={instance.sandboxId}
               instance={instance}
-              unreadCount={
-                params.unreadByBadgeBucket.get(badgeBucketForInstance(instance.sandboxId)) ?? 0
-              }
+              unreadCount={params.unreadBySandboxId.get(instance.sandboxId) ?? 0}
             />
           ))}
         </View>

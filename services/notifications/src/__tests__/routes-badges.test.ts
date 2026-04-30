@@ -44,11 +44,12 @@ describe('badge HTTP routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('returns the user buckets for a valid JWT', async () => {
+    it('returns structured unread counts for a valid JWT', async () => {
       const userId = 'user-routes-list';
       await seedBuckets(getDO(userId), {
         'kiloclaw:sb1:c1': 2,
         'kiloclaw:sb1:c2': 1,
+        'kiloclaw:sb2': 4,
       });
 
       const token = await tokenFor(userId);
@@ -57,13 +58,19 @@ describe('badge HTTP routes', () => {
       });
       expect(res.status).toBe(200);
       const body = await res.json<{
-        buckets: { badgeBucket: string; badgeCount: number }[];
+        instances: { sandboxId: string; unreadCount: number }[];
+        conversations: { sandboxId: string; conversationId: string; unreadCount: number }[];
       }>();
-      body.buckets.sort((a, b) => a.badgeBucket.localeCompare(b.badgeBucket));
+      body.instances.sort((a, b) => a.sandboxId.localeCompare(b.sandboxId));
+      body.conversations.sort((a, b) => a.conversationId.localeCompare(b.conversationId));
       expect(body).toEqual({
-        buckets: [
-          { badgeBucket: 'kiloclaw:sb1:c1', badgeCount: 2 },
-          { badgeBucket: 'kiloclaw:sb1:c2', badgeCount: 1 },
+        instances: [
+          { sandboxId: 'sb1', unreadCount: 3 },
+          { sandboxId: 'sb2', unreadCount: 4 },
+        ],
+        conversations: [
+          { sandboxId: 'sb1', conversationId: 'c1', unreadCount: 2 },
+          { sandboxId: 'sb1', conversationId: 'c2', unreadCount: 1 },
         ],
       });
     });
@@ -78,8 +85,9 @@ describe('badge HTTP routes', () => {
         headers: { authorization: `Bearer ${tokenA}` },
       });
       expect(res.status).toBe(200);
-      const body = await res.json<{ buckets: unknown[] }>();
-      expect(body.buckets).toEqual([]);
+      const body = await res.json<{ instances: unknown[]; conversations: unknown[] }>();
+      expect(body.instances).toEqual([]);
+      expect(body.conversations).toEqual([]);
     });
   });
 

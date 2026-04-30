@@ -3,21 +3,20 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import { toast } from 'sonner-native';
 
-import { badgeBucketForConversation, type BadgeCountRow } from '@kilocode/notifications';
+import { type ListBadgesResponse } from '@kilocode/notifications';
 import { type KiloChatClient, type MarkConversationReadResponse } from '@kilocode/kilo-chat';
 import { useMarkConversationRead } from '@kilocode/kilo-chat-hooks';
 
 import { useCurrentUserId } from './use-current-user-id';
 
 type MarkReadContext = {
-  previousBadges?: BadgeCountRow[];
+  previousBadges?: ListBadgesResponse;
   queryKey?: readonly ['badges', string];
 };
 
 type MarkReadInput = {
   sandboxId: string;
   conversationId: string;
-  badgeBucket: string;
 };
 
 export function useMarkRead(client: KiloChatClient) {
@@ -32,20 +31,35 @@ export function useMarkRead(client: KiloChatClient) {
       const response = await markConversationRead.mutateAsync(conversationId);
       return response;
     },
-    onMutate: async ({ badgeBucket }): Promise<MarkReadContext> => {
+    onMutate: async ({ sandboxId, conversationId }): Promise<MarkReadContext> => {
       if (userId === null) {
         return {};
       }
 
       const queryKey = ['badges', userId] as const;
       await queryClient.cancelQueries({ queryKey });
-      const previousBadges = queryClient.getQueryData<BadgeCountRow[]>(queryKey);
+      const previousBadges = queryClient.getQueryData<ListBadgesResponse>(queryKey);
 
-      queryClient.setQueryData<BadgeCountRow[]>(queryKey, badges => {
+      queryClient.setQueryData<ListBadgesResponse>(queryKey, badges => {
         if (!badges) {
           return badges;
         }
-        return badges.filter(row => row.badgeBucket !== badgeBucket);
+        const cleared =
+          badges.conversations.find(
+            row => row.sandboxId === sandboxId && row.conversationId === conversationId
+          )?.unreadCount ?? 0;
+        return {
+          conversations: badges.conversations.filter(
+            row => row.sandboxId !== sandboxId || row.conversationId !== conversationId
+          ),
+          instances: badges.instances
+            .map(row =>
+              row.sandboxId === sandboxId
+                ? { ...row, unreadCount: Math.max(0, row.unreadCount - cleared) }
+                : row
+            )
+            .filter(row => row.unreadCount > 0),
+        };
       });
 
       return { previousBadges, queryKey };
@@ -73,7 +87,6 @@ export function useMarkRead(client: KiloChatClient) {
       mutation.mutate({
         sandboxId,
         conversationId,
-        badgeBucket: badgeBucketForConversation(sandboxId, conversationId),
       });
     },
     [mutation]

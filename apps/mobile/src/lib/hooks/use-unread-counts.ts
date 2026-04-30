@@ -1,11 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import {
-  type BadgeCountRow,
-  listBadgesResponseSchema,
-  parentBadgeBucketFor,
-} from '@kilocode/notifications';
+import { type ListBadgesResponse, listBadgesResponseSchema } from '@kilocode/notifications';
 
 import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
 import { useKiloChatTokenGetter } from '@/components/kilo-chat/hooks/use-kilo-chat-token';
@@ -13,9 +9,8 @@ import { NOTIFICATIONS_URL } from '@/lib/config';
 
 /**
  * Fetches unread message counts for the current user from the notifications
- * worker and returns a Map keyed by instance badge bucket for O(1) lookup from
- * dashboard cards. Conversation buckets are summed into their parent instance
- * bucket.
+ * worker and returns a Map keyed by sandboxId for O(1) lookup from dashboard
+ * cards. The notifications worker owns aggregation across conversation rows.
  *
  * Freshness is driven by invalidations, not polling:
  *   - Foreground chat push → invalidate (see `use-unread-counts-invalidation`).
@@ -26,7 +21,7 @@ export function useUnreadCounts() {
   const userId = useCurrentUserId();
   const getToken = useKiloChatTokenGetter();
 
-  const query = useQuery<BadgeCountRow[]>({
+  const query = useQuery<ListBadgesResponse>({
     queryKey: ['badges', userId],
     enabled: userId !== null,
     staleTime: 30_000,
@@ -38,19 +33,17 @@ export function useUnreadCounts() {
       if (!response.ok) {
         throw new Error(`Failed to fetch badges: ${response.status}`);
       }
-      const body = listBadgesResponseSchema.parse(await response.json());
-      return body.buckets;
+      return listBadgesResponseSchema.parse(await response.json());
     },
   });
 
-  const byBadgeBucket = useMemo(() => {
+  const bySandboxId = useMemo(() => {
     const map = new Map<string, number>();
-    for (const row of query.data ?? []) {
-      const aggregateBucket = parentBadgeBucketFor(row.badgeBucket);
-      map.set(aggregateBucket, (map.get(aggregateBucket) ?? 0) + row.badgeCount);
+    for (const row of query.data?.instances ?? []) {
+      map.set(row.sandboxId, row.unreadCount);
     }
     return map;
   }, [query.data]);
 
-  return { byBadgeBucket, query };
+  return { bySandboxId, query };
 }

@@ -60,8 +60,22 @@ export const badgeCountRowSchema = z.object({
 });
 export type BadgeCountRow = z.infer<typeof badgeCountRowSchema>;
 
+export const instanceUnreadCountSchema = z.object({
+  sandboxId: z.string().min(1),
+  unreadCount: z.number().int().nonnegative(),
+});
+export type InstanceUnreadCount = z.infer<typeof instanceUnreadCountSchema>;
+
+export const conversationUnreadCountSchema = z.object({
+  sandboxId: z.string().min(1),
+  conversationId: z.string().min(1),
+  unreadCount: z.number().int().nonnegative(),
+});
+export type ConversationUnreadCount = z.infer<typeof conversationUnreadCountSchema>;
+
 export const listBadgesResponseSchema = z.object({
-  buckets: z.array(badgeCountRowSchema),
+  instances: z.array(instanceUnreadCountSchema),
+  conversations: z.array(conversationUnreadCountSchema),
 });
 export type ListBadgesResponse = z.infer<typeof listBadgesResponseSchema>;
 

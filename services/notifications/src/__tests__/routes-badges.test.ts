@@ -108,6 +108,21 @@ describe('badge HTTP routes', () => {
       expect(await res.json()).toEqual({ error: 'badgeBucket required' });
     });
 
+    it('returns 400 when badgeBucket is not a string', async () => {
+      const userId = 'user-routes-mark-invalid';
+      const token = await tokenFor(userId);
+      const res = await SELF.fetch('https://example.com/v1/badges/mark-read', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ badgeBucket: 123 }),
+      });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'badgeBucket required' });
+    });
+
     it('clears the bucket and returns the new total', async () => {
       const userId = 'user-routes-mark';
       await seedBuckets(getDO(userId), { conv1: 2, conv2: 5 });

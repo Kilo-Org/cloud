@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import { type BadgeCountRow, listBadgesResponseSchema } from '@kilocode/notifications';
+
 import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
 import { useKiloChatTokenGetter } from '@/components/kilo-chat/hooks/use-kilo-chat-token';
 import { badgeBucketForInstance } from '@/lib/badge-buckets';
 import { NOTIFICATIONS_URL } from '@/lib/config';
-
-type Bucket = { badgeBucket: string; badgeCount: number };
 
 /**
  * Fetches unread message counts for the current user from the notifications
@@ -23,7 +23,7 @@ export function useUnreadCounts() {
   const userId = useCurrentUserId();
   const getToken = useKiloChatTokenGetter();
 
-  const query = useQuery<Bucket[]>({
+  const query = useQuery<BadgeCountRow[]>({
     queryKey: ['badges', userId],
     enabled: userId !== null,
     staleTime: 30_000,
@@ -35,7 +35,7 @@ export function useUnreadCounts() {
       if (!response.ok) {
         throw new Error(`Failed to fetch badges: ${response.status}`);
       }
-      const body = (await response.json()) as { buckets: Bucket[] };
+      const body = listBadgesResponseSchema.parse(await response.json());
       return body.buckets;
     },
   });

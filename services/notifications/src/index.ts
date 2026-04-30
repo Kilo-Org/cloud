@@ -10,8 +10,11 @@ import { useWorkersLogger } from 'workers-tagged-logger';
 import { presenceContextForConversation } from '@kilocode/event-service';
 import {
   badgeBucketForConversation,
+  markBadgeReadInputSchema,
   type DispatchPushInput,
   type DispatchPushOutcome,
+  type ListBadgesResponse,
+  type MarkBadgeReadResponse,
   type PerRecipientResult,
   type SendPushForConversationInput,
   type SendPushForConversationOutput,
@@ -60,18 +63,21 @@ app.get('/v1/badges', async c => {
   const userId = c.get('callerId');
   const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
   const buckets = await stub.listNonZeroBuckets();
-  return c.json({ buckets });
+  const response = { buckets } satisfies ListBadgesResponse;
+  return c.json(response);
 });
 
 app.post('/v1/badges/mark-read', async c => {
   const userId = c.get('callerId');
-  const body = await c.req.json<{ badgeBucket?: string }>().catch(() => null);
-  if (!body?.badgeBucket) {
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsedBody = markBadgeReadInputSchema.safeParse(body);
+  if (!parsedBody.success) {
     return c.json({ error: 'badgeBucket required' }, 400);
   }
   const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
-  const badgeCount = await stub.markBucketRead(body.badgeBucket);
-  return c.json({ badgeCount });
+  const badgeCount = await stub.markBucketRead(parsedBody.data.badgeBucket);
+  const response = { badgeCount } satisfies MarkBadgeReadResponse;
+  return c.json(response);
 });
 
 type RecipientDOStub = {

@@ -35,6 +35,32 @@ export const sendPushForConversationOutputSchema = z.object({
 });
 export type SendPushForConversationOutput = z.infer<typeof sendPushForConversationOutputSchema>;
 
+// ── badge HTTP routes ───────────────────────────────────────────────
+
+export const badgeBucketSchema = z.string().min(1);
+export type BadgeBucket = z.infer<typeof badgeBucketSchema>;
+
+export const badgeCountRowSchema = z.object({
+  badgeBucket: badgeBucketSchema,
+  badgeCount: z.number().int().nonnegative(),
+});
+export type BadgeCountRow = z.infer<typeof badgeCountRowSchema>;
+
+export const listBadgesResponseSchema = z.object({
+  buckets: z.array(badgeCountRowSchema),
+});
+export type ListBadgesResponse = z.infer<typeof listBadgesResponseSchema>;
+
+export const markBadgeReadInputSchema = z.object({
+  badgeBucket: badgeBucketSchema,
+});
+export type MarkBadgeReadInput = z.infer<typeof markBadgeReadInputSchema>;
+
+export const markBadgeReadResponseSchema = z.object({
+  badgeCount: z.number().int().nonnegative(),
+});
+export type MarkBadgeReadResponse = z.infer<typeof markBadgeReadResponseSchema>;
+
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 
 export const dispatchPushInputSchema = z.object({

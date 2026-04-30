@@ -3778,6 +3778,11 @@ export const kiloclaw_instances = pgTable(
     inactive_trial_stopped_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     destroyed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    // Denormalized copy of the DO's trackedImageTag, populated by the per-instance alarm
+    // reconciler. Source of truth remains the DO; this column exists so admin tooling
+    // can filter populations by current running version via SQL. Up to ~30min stale on
+    // idle instances (matches the longest alarm interval).
+    tracked_image_tag: text(),
   },
   table => [
     // One active instance per user+sandbox combination.
@@ -3790,6 +3795,10 @@ export const kiloclaw_instances = pgTable(
     index('IDX_kiloclaw_instances_active_org_by_user_org')
       .on(table.user_id, table.organization_id)
       .where(sql`${table.organization_id} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
+    // Powers admin "instances on version X" filter; partial since destroyed rows are excluded.
+    index('IDX_kiloclaw_instances_tracked_image_tag')
+      .on(table.tracked_image_tag)
+      .where(isNull(table.destroyed_at)),
   ]
 );
 

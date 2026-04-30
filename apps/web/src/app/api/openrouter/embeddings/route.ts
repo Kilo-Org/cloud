@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { getEmbeddingProvider } from '@/lib/ai-gateway/providers';
+import { getEmbeddingProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';

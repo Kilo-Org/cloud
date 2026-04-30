@@ -1898,7 +1898,11 @@ describe('SessionService', () => {
           .fn()
           .mockResolvedValueOnce({ exitCode: 0, stdout: 'installed', stderr: '' }) // git checkout -b succeeds
           .mockResolvedValueOnce({ exitCode: 0, stdout: 'installed', stderr: '' }) // npm install succeeds
-          .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'ERR! 404 Not Found' }), // npm install -g fails
+          .mockResolvedValueOnce({
+            exitCode: 1,
+            stdout: 'npm output before failure',
+            stderr: 'ERR! 404 Not Found',
+          }), // npm install -g fails
         gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
         writeFile: vi.fn().mockResolvedValue(undefined),
         deleteFile: vi.fn().mockResolvedValue(undefined),
@@ -1937,6 +1941,7 @@ describe('SessionService', () => {
         command: 'npm install -g fake-package',
         exitCode: 1,
         stderr: 'ERR! 404 Not Found',
+        stdout: 'npm output before failure',
       });
 
       // Verify only three calls: git checkout -b + first setup command + second setup command that failed

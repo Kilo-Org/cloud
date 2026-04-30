@@ -1106,7 +1106,9 @@ describe('reconciliation: machine status sync', () => {
       const { instance: inst, waitUntilPromises } = createInstance(storage);
       await inst.alarm();
       if (i === SELF_HEAL_THRESHOLD - 1) {
-        expect(waitUntilPromises).toHaveLength(1);
+        // 2 = recovery launch + tracked_image_tag Postgres sync (always enqueued
+        // by alarm() when sandboxId is set; see kiloclaw-instance/index.ts).
+        expect(waitUntilPromises).toHaveLength(2);
       }
     }
 
@@ -1124,7 +1126,8 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    expect(waitUntilPromises).toHaveLength(0);
+    // 1 = tracked_image_tag Postgres sync only; no recovery launched.
+    expect(waitUntilPromises).toHaveLength(1);
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('healthCheckFailCount')).toBe(0);
     expect(storage._store.get('recoveryStartedAt')).toBeUndefined();
@@ -1138,7 +1141,8 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    expect(waitUntilPromises).toHaveLength(0);
+    // 1 = tracked_image_tag Postgres sync only; no fresh recovery launched.
+    expect(waitUntilPromises).toHaveLength(1);
   });
 
   it('does not clean up a pending recovery volume while recovery is still in progress', async () => {
@@ -6749,7 +6753,7 @@ describe('start failure analytics events', () => {
   });
 });
 
-describe('manual and crash recovery analytics events', () => {
+describe('manual lifecycle analytics events', () => {
   it('can record manual start success events through Analytics Engine payloads', () => {
     const env = createFakeEnv();
     const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
@@ -6778,37 +6782,6 @@ describe('manual and crash recovery analytics events', () => {
     expect(successEvents).toHaveLength(1);
     expect(successEvents[0].blobs).toEqual(
       expect.arrayContaining(['instance.manual_start_succeeded', 'user-1', 'http'])
-    );
-  });
-
-  it('can record crash recovery failure events through Analytics Engine payloads', () => {
-    const env = createFakeEnv();
-    const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
-
-    dataset.writeDataPoint({
-      blobs: [
-        'instance.crash_recovery_failed',
-        'user-1',
-        'http',
-        '',
-        'restart failed',
-        'acct-test',
-        'machine-1',
-        'sandbox-1',
-        'running',
-        '',
-        '',
-        '',
-        '',
-      ],
-      doubles: [34, 0],
-      indexes: ['instance.crash_recovery_failed'],
-    });
-
-    const failureEvents = analyticsEventsByName(env, 'instance.crash_recovery_failed');
-    expect(failureEvents).toHaveLength(1);
-    expect(failureEvents[0].blobs).toEqual(
-      expect.arrayContaining(['instance.crash_recovery_failed', 'user-1', 'http', 'restart failed'])
     );
   });
 });

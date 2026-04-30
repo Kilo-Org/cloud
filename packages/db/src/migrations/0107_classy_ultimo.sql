@@ -1,0 +1,2 @@
+ALTER TABLE "kiloclaw_instances" ADD COLUMN "tracked_image_tag" text;--> statement-breakpoint
+CREATE INDEX "IDX_kiloclaw_instances_tracked_image_tag" ON "kiloclaw_instances" USING btree ("tracked_image_tag") WHERE "kiloclaw_instances"."destroyed_at" is null;

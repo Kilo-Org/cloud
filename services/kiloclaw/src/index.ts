@@ -38,7 +38,6 @@ import { startingUpPage } from './pages/starting-up';
 import { buildForwardHeaders } from './utils/proxy-headers';
 import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 import { timingMiddleware } from './middleware/analytics';
-import { writeEvent } from './utils/analytics';
 import type { RegistryEntry } from './durable-objects/kiloclaw-registry';
 import type { ProviderRoutingTarget } from './providers/types';
 
@@ -535,70 +534,6 @@ async function resolveRegistryEntry(c: Context<AppEnv>) {
 }
 
 /**
- * Attempt crash recovery: if the user's instance has status 'running' but
- * the machine is dead, call start() to restart it transparently.
- */
-async function attemptCrashRecovery(c: Context<AppEnv>): Promise<boolean> {
-  const userId = c.get('userId');
-  if (!userId) return false;
-  const startedAt = performance.now();
-
-  try {
-    const resolved = await resolveRegistryEntry(c);
-    if (!resolved) return false;
-    const { entry } = resolved;
-    const getStub = () =>
-      c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(entry.doKey));
-    const status = await withDORetry(
-      getStub,
-      stub => stub.getStatus(),
-      'KiloClawInstance.getStatus'
-    );
-
-    if (status.status !== 'running') {
-      return false;
-    }
-
-    // Machine dead despite running status -- restart
-    console.log('[PROXY] Instance status is running but machine unreachable, restarting');
-    const { started } = await withDORetry(
-      getStub,
-      stub => stub.start(userId, { reason: 'crash_recovery' }),
-      'KiloClawInstance.start'
-    );
-    if (started) {
-      const freshStatus = await withDORetry(
-        getStub,
-        stub => stub.getStatus(),
-        'KiloClawInstance.getStatus'
-      );
-      writeEvent(c.env, {
-        event: 'instance.crash_recovery_succeeded',
-        delivery: 'http',
-        userId,
-        sandboxId: freshStatus.sandboxId ?? undefined,
-        flyMachineId: freshStatus.flyMachineId ?? undefined,
-        flyAppName: freshStatus.flyAppName ?? undefined,
-        status: freshStatus.status ?? undefined,
-        durationMs: performance.now() - startedAt,
-      });
-    }
-    return true;
-  } catch (err) {
-    writeEvent(c.env, {
-      event: 'instance.crash_recovery_failed',
-      delivery: 'http',
-      userId,
-      sandboxId: c.get('sandboxId') ?? undefined,
-      error: err instanceof Error ? err.message : String(err),
-      durationMs: performance.now() - startedAt,
-    });
-    console.error('[PROXY] Crash recovery failed:', err);
-  }
-  return false;
-}
-
-/**
  * Resolve the active provider runtime id, sandboxId, and status for the current user from their DO.
  * Returns null runtimeId if the instance is destroying (blocks proxy during teardown).
  * Routes through the user registry, which triggers lazy migration on first access.
@@ -911,7 +846,7 @@ app.all('*', async c => {
   if (!routingTarget) {
     return c.json({ error: 'Instance not routable' }, 503);
   }
-  let targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
+  const targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
 
   console.log('[PROXY] Handling request:', url.pathname, 'runtime:', runtimeId);
 
@@ -929,7 +864,7 @@ app.all('*', async c => {
   // This is critical: instance-keyed DOs derive sandboxId from instanceId (ki_ prefix),
   // which differs from the middleware-derived value (sandboxIdFromUserId). The gateway
   // token must match what the machine expects.
-  let forwardHeaders = await buildForwardHeaders({
+  const forwardHeaders = await buildForwardHeaders({
     requestHeaders: request.headers,
     sandboxId,
     gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
@@ -947,63 +882,13 @@ app.all('*', async c => {
       });
     } catch (err) {
       console.error('[WS] Fly Proxy fetch failed:', err);
-
-      const recovered = await attemptCrashRecovery(c);
-      if (recovered) {
-        // Machine may have been recreated — refresh the instance routing header
-        const refreshedInstance = await resolveInstance(c);
-        if (
-          !refreshedInstance.runtimeId ||
-          !refreshedInstance.doKey ||
-          !refreshedInstance.sandboxId
-        ) {
-          return c.json(
-            { error: 'Instance not reachable after restart' },
-            { status: 503, headers: { 'Retry-After': '5' } }
-          );
-        }
-        const refreshedDoKey = refreshedInstance.doKey;
-        const getRefreshedStub = () =>
-          c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(refreshedDoKey));
-        const refreshedRoutingTarget = await withDORetry(
-          getRefreshedStub,
-          stub => stub.getRoutingTarget(),
-          'KiloClawInstance.getRoutingTarget'
-        );
-        if (!refreshedRoutingTarget) {
-          return c.json(
-            { error: 'Instance not reachable after restart' },
-            { status: 503, headers: { 'Retry-After': '5' } }
-          );
-        }
-        targetUrl = routingTargetUrl(refreshedRoutingTarget, url.pathname, url.search);
-        forwardHeaders = await buildForwardHeaders({
-          requestHeaders: request.headers,
-          sandboxId: refreshedInstance.sandboxId,
-          gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
-          providerHeaders: refreshedRoutingTarget.headers,
-        });
-
-        try {
-          containerResponse = await fetch(targetUrl, {
-            headers: forwardHeaders,
-          });
-        } catch (retryErr) {
-          console.error('[WS] Retry after recovery failed:', retryErr);
-          return c.json(
-            { error: 'Instance not reachable after restart attempt' },
-            { status: 503, headers: { 'Retry-After': '5' } }
-          );
-        }
-      } else {
-        return c.json(
-          {
-            error: 'Instance not reachable',
-            hint: 'Your instance may not be running. Start it from the dashboard.',
-          },
-          { status: 503, headers: { 'Retry-After': '5' } }
-        );
-      }
+      return c.json(
+        {
+          error: 'Instance not reachable',
+          hint: 'Your instance may not be running. Start it from the dashboard.',
+        },
+        { status: 503, headers: { 'Retry-After': '5' } }
+      );
     }
     console.log('[WS] Fly Proxy response status:', containerResponse.status);
 
@@ -1121,65 +1006,13 @@ app.all('*', async c => {
     });
   } catch (err) {
     console.error('[HTTP] Fly Proxy fetch failed:', err);
-
-    const recovered = await attemptCrashRecovery(c);
-    if (recovered) {
-      // Machine may have been recreated — refresh the instance routing header
-      const refreshedInstance = await resolveInstance(c);
-      if (
-        !refreshedInstance.runtimeId ||
-        !refreshedInstance.doKey ||
-        !refreshedInstance.sandboxId
-      ) {
-        return c.json(
-          { error: 'Instance not reachable after restart' },
-          { status: 503, headers: { 'Retry-After': '5' } }
-        );
-      }
-      const refreshedHttpDoKey = refreshedInstance.doKey;
-      const getRefreshedHttpStub = () =>
-        c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(refreshedHttpDoKey));
-      const refreshedRoutingTarget = await withDORetry(
-        getRefreshedHttpStub,
-        stub => stub.getRoutingTarget(),
-        'KiloClawInstance.getRoutingTarget'
-      );
-      if (!refreshedRoutingTarget) {
-        return c.json(
-          { error: 'Instance not reachable after restart' },
-          { status: 503, headers: { 'Retry-After': '5' } }
-        );
-      }
-      targetUrl = routingTargetUrl(refreshedRoutingTarget, url.pathname, url.search);
-      forwardHeaders = await buildForwardHeaders({
-        requestHeaders: request.headers,
-        sandboxId: refreshedInstance.sandboxId,
-        gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
-        providerHeaders: refreshedRoutingTarget.headers,
-      });
-
-      try {
-        httpResponse = await fetch(targetUrl, {
-          method: request.method,
-          headers: forwardHeaders,
-          body: requestBody,
-        });
-      } catch (retryErr) {
-        console.error('[HTTP] Retry after recovery failed:', retryErr);
-        return c.json(
-          { error: 'Instance not reachable after restart attempt' },
-          { status: 503, headers: { 'Retry-After': '5' } }
-        );
-      }
-    } else {
-      return c.json(
-        {
-          error: 'Instance not reachable',
-          hint: 'Your instance may not be running. Start it from the dashboard.',
-        },
-        { status: 503, headers: { 'Retry-After': '5' } }
-      );
-    }
+    return c.json(
+      {
+        error: 'Instance not reachable',
+        hint: 'Your instance may not be running. Start it from the dashboard.',
+      },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
   }
   console.log('[HTTP] Response status:', httpResponse.status);
 

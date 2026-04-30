@@ -93,7 +93,11 @@ import {
   reconcileMachineMount,
   markRestartSuccessful,
 } from './reconcile';
-import { restoreFromPostgres, markDestroyedInPostgresHelper } from './postgres';
+import {
+  restoreFromPostgres,
+  markDestroyedInPostgresHelper,
+  syncTrackedImageTagToPostgresHelper,
+} from './postgres';
 import {
   dispatchReadyPush,
   LIFECYCLE_NOTIFICATION_RESET,
@@ -3590,6 +3594,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.status) return;
+
+    // Best-effort denormalize trackedImageTag → kiloclaw_instances.tracked_image_tag so
+    // admin tooling can filter populations by current running version via SQL. Fire-and-
+    // forget; Postgres failures must never break alarm reconciliation. Skipped when the
+    // sandbox isn't set yet (pre-provision).
+    if (this.s.sandboxId) {
+      this.ctx.waitUntil(
+        syncTrackedImageTagToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
+      );
+    }
 
     // Skip reconciliation during restore — the queue worker owns the lifecycle.
     // Detect stuck restores: if restoreStartedAt is set and older than 30 min,

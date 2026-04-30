@@ -1130,39 +1130,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
     return { success: true };
   }),
 
-  // ── Stream Chat ────────────────────────────────────────────────
-
-  getStreamChatCredentials: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-    const client = new KiloClawInternalClient();
-    return client.getStreamChatCredentials(ctx.user.id, workerInstanceId(instance));
-  }),
-
-  sendChatMessage: organizationMemberMutationProcedure
-    .input(z.object({ organizationId: z.uuid(), message: z.string().min(1).max(32_000) }))
-    .mutation(async ({ ctx, input }) => {
-      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
-      const client = new KiloClawInternalClient();
-      try {
-        return await client.sendChatMessage(ctx.user.id, input.message, instance.id);
-      } catch (err) {
-        if (err instanceof KiloClawApiError) {
-          const { message } = getKiloClawApiErrorPayload(err);
-          const code =
-            err.statusCode === 404
-              ? 'NOT_FOUND'
-              : err.statusCode === 503
-                ? 'PRECONDITION_FAILED'
-                : 'INTERNAL_SERVER_ERROR';
-          throw new TRPCError({
-            code,
-            message: message ?? 'Failed to send chat message',
-          });
-        }
-        throw err;
-      }
-    }),
-
   getMorningBriefingStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const client = new KiloClawInternalClient();

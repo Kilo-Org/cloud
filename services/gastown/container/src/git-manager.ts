@@ -221,13 +221,10 @@ export async function refreshGitToken(rigId: string): Promise<string | null> {
   }
 
   try {
-    const resp = await fetch(
-      `${apiUrl}/api/towns/${townId}/rigs/${rigId}/refresh-git-token`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    const resp = await fetch(`${apiUrl}/api/towns/${townId}/rigs/${rigId}/refresh-git-token`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!resp.ok) {
       const body = await resp.text().catch(() => '(unreadable)');
       console.warn(
@@ -554,11 +551,12 @@ async function cloneRepoInner(
       ],
       dir
     );
-    await execWithAuthRetry(
-      'git',
-      () => ['push', 'origin', `HEAD:${options.defaultBranch}`],
-      { cwd: dir, rigId: options.rigId, envVars: options.envVars, gitUrl: options.gitUrl }
-    );
+    await execWithAuthRetry('git', () => ['push', 'origin', `HEAD:${options.defaultBranch}`], {
+      cwd: dir,
+      rigId: options.rigId,
+      envVars: options.envVars,
+      gitUrl: options.gitUrl,
+    });
     // Best-effort: set remote HEAD so future operations know the default branch
     await exec('git', ['remote', 'set-head', 'origin', options.defaultBranch], dir).catch(() => {});
     // Fetch so origin/<defaultBranch> ref is available locally

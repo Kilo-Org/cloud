@@ -2229,10 +2229,7 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
     // populated, so legacy stalled rows can still escape this loop.
     if (agent.status === 'stalled') {
       const stalledSince = agent.stalled_at ?? agent.last_activity_at;
-      if (
-        stalledSince &&
-        Date.now() - new Date(stalledSince).getTime() > STALLED_AUTO_IDLE_MS
-      ) {
+      if (stalledSince && Date.now() - new Date(stalledSince).getTime() > STALLED_AUTO_IDLE_MS) {
         continue;
       }
     }

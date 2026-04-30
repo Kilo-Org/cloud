@@ -922,6 +922,65 @@ describe('runOnboardOrDoctor', () => {
     );
   });
 
+  it('removes stale Stream Chat config before running doctor', () => {
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({
+        channels: {
+          streamchat: { enabled: true },
+        },
+        plugins: {
+          load: {
+            paths: [
+              '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat',
+              '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer',
+            ],
+          },
+          allow: ['openclaw-channel-streamchat', 'telegram'],
+          entries: {
+            'openclaw-channel-streamchat': { enabled: true },
+          },
+        },
+      })
+    );
+
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_KEY: 'test-key',
+      OPENCLAW_GATEWAY_TOKEN: 'test-token',
+      AUTO_APPROVE_DEVICES: 'true',
+    };
+
+    runOnboardOrDoctor(env, harness.deps);
+
+    const doctorCallIndex = (
+      harness.deps.execFileSync as ReturnType<typeof vi.fn>
+    ).mock.calls.findIndex(([_cmd, args]) => Array.isArray(args) && args.includes('doctor'));
+    expect(doctorCallIndex).not.toBe(-1);
+    const doctorCallOrder = (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[doctorCallIndex];
+
+    const preDoctorWriteIndex = (
+      harness.deps.writeFileSync as ReturnType<typeof vi.fn>
+    ).mock.invocationCallOrder.findIndex(order => order < doctorCallOrder);
+    expect(preDoctorWriteIndex).not.toBe(-1);
+
+    const preDoctorConfig = JSON.parse(harness.writeCalls[preDoctorWriteIndex].data) as {
+      channels?: Record<string, unknown>;
+      plugins?: {
+        load?: { paths?: string[] };
+        allow?: string[];
+        entries?: Record<string, unknown>;
+      };
+    };
+    expect(preDoctorConfig.channels).not.toHaveProperty('streamchat');
+    expect(preDoctorConfig.plugins?.load?.paths).not.toContain(
+      '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'
+    );
+    expect(preDoctorConfig.plugins?.allow).not.toContain('openclaw-channel-streamchat');
+    expect(preDoctorConfig.plugins?.entries).not.toHaveProperty('openclaw-channel-streamchat');
+  });
+
   it('migrates legacy plaintext kilocode key in auth-profiles.json to a keyRef', () => {
     // Integration check: runOnboardOrDoctor must drive the auth-profiles
     // migration. On a legacy doctor boot, a plaintext key in

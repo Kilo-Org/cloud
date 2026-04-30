@@ -78,6 +78,9 @@ const KILOCLAW_CUSTOMIZER_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/k
 const KILOCLAW_MORNING_BRIEFING_PLUGIN_ID = 'kiloclaw-morning-briefing';
 const KILOCLAW_MORNING_BRIEFING_PLUGIN_PATH =
   '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing';
+const LEGACY_STREAM_CHAT_PLUGIN_ID = 'openclaw-channel-streamchat';
+const LEGACY_STREAM_CHAT_PLUGIN_PATH =
+  '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
 
 type KiloExaSearchMode = 'kilo-proxy' | 'disabled';
@@ -103,6 +106,39 @@ function resolveKiloExaSearchMode(value: string | undefined): KiloExaSearchModeS
 type ConfigObject = Record<string, any>;
 
 type EnvLike = Record<string, string | undefined>;
+
+export function sanitizeLegacyStreamChatConfig(config: ConfigObject): void {
+  if (config.channels && typeof config.channels === 'object' && !Array.isArray(config.channels)) {
+    delete config.channels.streamchat;
+  }
+
+  if (config.plugins && typeof config.plugins === 'object' && !Array.isArray(config.plugins)) {
+    if (
+      config.plugins.load &&
+      typeof config.plugins.load === 'object' &&
+      !Array.isArray(config.plugins.load) &&
+      Array.isArray(config.plugins.load.paths)
+    ) {
+      config.plugins.load.paths = config.plugins.load.paths.filter(
+        (pluginPath: unknown) => pluginPath !== LEGACY_STREAM_CHAT_PLUGIN_PATH
+      );
+    }
+
+    if (
+      config.plugins.entries &&
+      typeof config.plugins.entries === 'object' &&
+      !Array.isArray(config.plugins.entries)
+    ) {
+      delete config.plugins.entries[LEGACY_STREAM_CHAT_PLUGIN_ID];
+    }
+
+    if (Array.isArray(config.plugins.allow)) {
+      config.plugins.allow = config.plugins.allow.filter(
+        (pluginId: unknown) => pluginId !== LEGACY_STREAM_CHAT_PLUGIN_ID
+      );
+    }
+  }
+}
 
 const INBOUND_EMAIL_HOOK_ID = 'cloudflare-email-inbound';
 
@@ -198,6 +234,8 @@ export function generateBaseConfig(
     }
     console.log('No existing config file, starting with empty config');
   }
+
+  sanitizeLegacyStreamChatConfig(config);
 
   config.gateway = config.gateway ?? {};
   config.channels = config.channels ?? {};

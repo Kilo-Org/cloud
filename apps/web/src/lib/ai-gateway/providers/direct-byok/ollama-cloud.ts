@@ -13,8 +13,6 @@ export default {
       {
         id: 'kimi-k2.6:cloud',
         name: 'kimi-k2.6',
-        description:
-          'A high-performance cloud-based model optimized for advanced reasoning, complex instruction following, and sophisticated multilingual tasks.',
         flags: ['vision'],
         context_length: 262144,
         max_completion_tokens: 262144,

@@ -115,9 +115,15 @@ function isJsonRecord(value: unknown): value is JsonRecord {
 }
 
 function stringArraySetEquals(left: unknown, right: readonly string[]): boolean {
-  if (!Array.isArray(left) || left.length !== right.length) return false;
+  if (!Array.isArray(left)) return false;
   const rightSet = new Set(right);
-  return left.every(value => typeof value === 'string' && rightSet.has(value));
+  const leftSet = new Set<string>();
+  for (const value of left) {
+    if (typeof value !== 'string') return false;
+    leftSet.add(value);
+  }
+  if (leftSet.size !== rightSet.size) return false;
+  return [...rightSet].every(value => leftSet.has(value));
 }
 
 function mergeStringLists(...lists: unknown[]): string[] {

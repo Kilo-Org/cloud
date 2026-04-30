@@ -1312,6 +1312,63 @@ describe('remediateGatewayClientDeviceScopes', () => {
     expect(result).toEqual({ checked: 1, updated: 0 });
     expect(harness.renameCalls).toHaveLength(0);
   });
+
+  it('rewrites duplicated scope lists that are missing required scopes', () => {
+    const harness = fakeDeps();
+    const pairedPath = '/root/.openclaw/devices/paired.json';
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === pairedPath
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({
+        gatewayDevice: {
+          clientId: 'gateway-client',
+          scopes: [
+            'operator.read',
+            'operator.read',
+            'operator.approvals',
+            'operator.pairing',
+            'operator.write',
+          ],
+          approvedScopes: [
+            'operator.read',
+            'operator.admin',
+            'operator.approvals',
+            'operator.pairing',
+            'operator.write',
+          ],
+          tokens: {
+            operator: {
+              role: 'operator',
+              scopes: [
+                'operator.read',
+                'operator.admin',
+                'operator.approvals',
+                'operator.pairing',
+                'operator.write',
+              ],
+            },
+          },
+        },
+      })
+    );
+
+    const result = remediateGatewayClientDeviceScopes(harness.deps);
+
+    expect(result).toEqual({ checked: 1, updated: 1 });
+    const rename = harness.renameCalls.find(call => call.to === pairedPath);
+    if (!rename) throw new Error('expected a rename into paired.json');
+    const tempWrite = harness.writeCalls.find(call => call.path === rename.from);
+    if (!tempWrite) throw new Error('expected a paired.json temp write');
+    const rewritten = JSON.parse(tempWrite.data) as Record<string, Record<string, unknown>>;
+    expect(rewritten.gatewayDevice?.scopes).toEqual([
+      'operator.read',
+      'operator.approvals',
+      'operator.pairing',
+      'operator.write',
+      'operator.admin',
+    ]);
+  });
 });
 
 // ---- updateToolsMdSection ----

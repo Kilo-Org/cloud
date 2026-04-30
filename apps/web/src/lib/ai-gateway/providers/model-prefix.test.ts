@@ -1,6 +1,6 @@
 import { modelStartsWith, stripModelTilde } from './model-prefix';
 import { isClaudeModel, isHaikuModel, isOpusModel } from './anthropic.constants';
-import { isGptModel, isGptOssModel } from './openai';
+import { isOpenAiModel, isGptOssModel } from './openai';
 import { isGeminiModel, isGemmaModel, isGemini3Model } from './google';
 import { isKimiModel } from './moonshotai';
 import { isGrokModel, isGrok4Model } from './xai';
@@ -47,11 +47,13 @@ describe('provider predicates match substrings, regardless of prefix', () => {
     expect(isOpusModel('claude-opus-4-7')).toBe(true);
   });
 
-  test('isGptModel / isGptOssModel', () => {
-    expect(isGptModel('~openai/gpt-5-nano')).toBe(true);
-    expect(isGptModel('openai/gpt-5-nano')).toBe(true);
-    expect(isGptModel('gpt-5.5')).toBe(true);
-    expect(isGptModel('~openai/gpt-oss')).toBe(false);
+  test('isOpenAiModel / isGptOssModel', () => {
+    expect(isOpenAiModel('~openai/gpt-5-nano')).toBe(true);
+    expect(isOpenAiModel('openai/gpt-5-nano')).toBe(true);
+    expect(isOpenAiModel('openai/o3')).toBe(true);
+    expect(isOpenAiModel('openai/codex-mini')).toBe(true);
+    expect(isOpenAiModel('gpt-5.5')).toBe(true);
+    expect(isOpenAiModel('~openai/gpt-oss')).toBe(false);
     expect(isGptOssModel('~openai/gpt-oss')).toBe(true);
     expect(isGptOssModel('gpt-oss-20b')).toBe(true);
   });

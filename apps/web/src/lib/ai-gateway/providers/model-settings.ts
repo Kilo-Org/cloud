@@ -1,7 +1,7 @@
 import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
-import { isGptModel } from '@/lib/ai-gateway/providers/openai';
+import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrok4Model, isGrokModel } from '@/lib/ai-gateway/providers/xai';
@@ -52,7 +52,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
         .map(effort => [effort, { reasoning: { enabled: true, effort } }])
     );
   }
-  if (isGptModel(model)) {
+  if (isOpenAiModel(model)) {
     return Object.fromEntries(
       ReasoningEffortSchema.options
         .filter(e => e !== 'minimal')
@@ -106,7 +106,7 @@ function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
     // on Vercel AI Gateway, this is necessary to support document attachments
     return 'anthropic';
   }
-  if (isGptModel(model) || isGrokModel(model)) {
+  if (isOpenAiModel(model) || isGrokModel(model)) {
     // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
     // xAI: "The Responses API is the recommended way to interact with xAI models."
     return 'openai';
@@ -125,7 +125,7 @@ export function getOpenClawSettings(model: string): OpenClawModelSettings | unde
   if (isClaudeModel(model)) {
     return { api_adapter: 'anthropic-messages' };
   }
-  if (isGptModel(model) || isGrokModel(model)) {
+  if (isOpenAiModel(model) || isGrokModel(model)) {
     return { api_adapter: 'openai-responses' };
   }
   return undefined;

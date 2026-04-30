@@ -30,7 +30,7 @@ import {
   isGrok4Model,
 } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { isGptModel } from '@/lib/ai-gateway/providers/openai';
+import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
@@ -69,7 +69,7 @@ export function isFreeModel(model: string): boolean {
 }
 
 export function isPdfSupportingModel(model: string): boolean {
-  return isClaudeModel(model) || isGptModel(model) || isGrok4Model(model);
+  return isClaudeModel(model) || isOpenAiModel(model) || isGrok4Model(model);
 }
 
 export function isKiloExclusiveFreeModel(model: string): boolean {

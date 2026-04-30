@@ -950,9 +950,7 @@ async function processTokenData(
 }
 
 function useAnthropicStyleTokenCounting(requestedModel: string, provider: ProviderId) {
-  return (
-    provider === 'vercel' && (isClaudeModel(requestedModel) || isMinimaxModel(requestedModel))
-  );
+  return provider === 'vercel' && (isClaudeModel(requestedModel) || isMinimaxModel(requestedModel));
 }
 
 function useGenerationLookup(provider: ProviderId, usageStats: MicrodollarUsageStats | null) {

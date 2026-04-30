@@ -29,7 +29,7 @@ import { eq } from 'drizzle-orm';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
-import { isGptModel } from '@/lib/ai-gateway/providers/openai';
+import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
@@ -45,6 +45,7 @@ import {
   injectReasoningIntoContent,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
+import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 
 function inferSupportedChatApis(
@@ -226,7 +227,7 @@ function applyToolChoiceSetting(
     (requestToMutate.reasoning?.max_tokens ?? 0) > 0;
   if (
     isGrokModel(requestedModel) ||
-    isGptModel(requestedModel) ||
+    isOpenAiModel(requestedModel) ||
     isGeminiModel(requestedModel) ||
     (isHaikuModel(requestedModel) && !isReasoningEnabled)
   ) {
@@ -257,6 +258,12 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
   }
+  if (isDeepseekModel(requestedModel)) {
+    return [
+      OpenRouterInferenceProviderIdSchema.enum.deepseek,
+      OpenRouterInferenceProviderIdSchema.enum.novita,
+    ];
+  }
   if (isGlmModel(requestedModel)) {
     return [
       OpenRouterInferenceProviderIdSchema.enum.novita,
@@ -267,12 +274,20 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
 }
 
 function applyPreferredProvider(
+  provider: Provider,
   requestedModel: string,
   requestToMutate:
     | OpenRouterChatCompletionRequest
     | GatewayResponsesRequest
     | GatewayMessagesRequest
 ) {
+  // OpenRouter's `provider.order` field is only respected by OpenRouter itself
+  // and the Vercel AI Gateway (which mirrors the OpenRouter contract). Skipping
+  // other providers avoids leaking an OpenRouter-shaped field into e.g. direct
+  // BYOK requests, where it could be forwarded to an upstream that rejects it.
+  if (provider.id !== 'openrouter' && provider.id !== 'vercel') {
+    return;
+  }
   const preferredProviderOrder = getPreferredProviderOrder(requestedModel);
   if (preferredProviderOrder.length === 0) {
     return;
@@ -316,7 +331,7 @@ export function applyProviderSpecificLogic(
     applyToolChoiceSetting(requestedModel, requestToMutate.body);
   }
 
-  applyPreferredProvider(requestedModel, requestToMutate.body);
+  applyPreferredProvider(provider, requestedModel, requestToMutate.body);
 
   if (isGrokModel(requestedModel)) {
     applyXaiModelSettings(requestToMutate, extraHeaders);

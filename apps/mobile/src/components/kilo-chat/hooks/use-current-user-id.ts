@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react';
 import { useKiloChatTokenGetter } from './use-kilo-chat-token';
 
 /**
- * Decodes the `sub` claim from the kilo-chat JWT and returns it as the current
- * user's ID. Returns `null` while loading or if the token cannot be decoded.
+ * Decodes the `kiloUserId` claim from the kilo-chat JWT and returns it as the
+ * current user's ID. Returns `null` while loading or if the token cannot be
+ * decoded. The token is minted by `generateApiToken`, which writes the user id
+ * as `kiloUserId` (not the standard JWT `sub` claim).
  */
 export function useCurrentUserId(): string | null {
   const getToken = useKiloChatTokenGetter();
@@ -26,8 +28,8 @@ export function useCurrentUserId(): string | null {
         const payload = parts[1];
         const decoded = atob(payload.replaceAll('-', '+').replaceAll('_', '/'));
         const parsed = JSON.parse(decoded) as Record<string, unknown>;
-        const sub = typeof parsed.sub === 'string' ? parsed.sub : null;
-        setUserId(sub);
+        const kiloUserId = typeof parsed.kiloUserId === 'string' ? parsed.kiloUserId : null;
+        setUserId(kiloUserId);
       } catch {
         // Leave userId as null on failure
       }

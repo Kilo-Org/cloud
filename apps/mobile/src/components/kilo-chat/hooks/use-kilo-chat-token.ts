@@ -1,17 +1,19 @@
 import { useCallback } from 'react';
 
+import { useAuth } from '@/lib/auth/auth-context';
 import { trpcClient } from '@/lib/trpc';
 
 type TokenCache = {
+  authToken: string;
   token: string;
   expiresAtMs: number;
 };
 
-// Module-level singletons so all useKiloChatTokenGetter() instances share the
-// same cache and in-flight dedup. Auth token is a per-app singleton (one
-// logged-in user), so process-wide state is correct.
+// Module-level cache keyed on the user's auth token, so a sign-out followed by
+// a different sign-in within the JWT window doesn't return the previous user's
+// token. The in-flight ref is keyed the same way for the same reason.
 let cache: TokenCache | null = null;
-let inFlight: Promise<string> | null = null;
+let inFlight: { authToken: string; promise: Promise<string> } | null = null;
 
 /**
  * Returns a stable getter function that fetches a kilo-chat JWT, caching it
@@ -19,36 +21,35 @@ let inFlight: Promise<string> | null = null;
  * fetch via a module-level dedup ref.
  */
 export function useKiloChatTokenGetter(): () => Promise<string> {
+  const { token: authToken } = useAuth();
   return useCallback(async () => {
-    if (cache && cache.expiresAtMs - Date.now() > 60_000) {
+    if (!authToken) {
+      throw new Error('Cannot fetch kilo-chat token: not authenticated');
+    }
+
+    if (cache && cache.authToken === authToken && cache.expiresAtMs - Date.now() > 60_000) {
       return cache.token;
     }
 
-    if (inFlight) {
-      return inFlight;
+    if (inFlight && inFlight.authToken === authToken) {
+      return inFlight.promise;
     }
 
-    // Create a shared promise and set inFlight before awaiting so concurrent
-    // callers share this fetch rather than starting duplicate requests.
-    let resolveShared: (token: string) => void = () => undefined;
-    let rejectShared: (err: unknown) => void = () => undefined;
-    const sharedPromise = new Promise<string>((resolve, reject) => {
-      resolveShared = resolve;
-      rejectShared = reject;
-    });
-    inFlight = sharedPromise;
-
+    const slot = { authToken, promise: fetchAndCacheToken(authToken) };
+    inFlight = slot;
     try {
-      const { token, expiresAt } = await trpcClient.kiloChat.getToken.query();
-      const expiresAtMs = new Date(expiresAt).getTime();
-      cache = { token, expiresAtMs };
-      resolveShared(token);
-      return token;
-    } catch (error) {
-      rejectShared(error);
-      throw error;
+      return await slot.promise;
     } finally {
-      inFlight = null;
+      // Only clear the slot if a concurrent caller hasn't replaced it.
+      if (inFlight === slot) {
+        inFlight = null;
+      }
     }
-  }, []);
+  }, [authToken]);
+}
+
+async function fetchAndCacheToken(authToken: string): Promise<string> {
+  const { token, expiresAt } = await trpcClient.kiloChat.getToken.query();
+  cache = { authToken, token, expiresAtMs: new Date(expiresAt).getTime() };
+  return token;
 }

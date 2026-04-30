@@ -58,22 +58,6 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
       },
     });
 
-    console.log(
-      JSON.stringify({
-        tag: 'notifications_service',
-        level: 'info',
-        message: 'dispatched instance lifecycle push',
-        userId: params.userId,
-        instanceId: params.instanceId,
-        sandboxId: params.sandboxId,
-        event: params.event,
-        tokenCount: result.tokenCount,
-        sent: result.sent,
-        staleTokens: result.staleTokens,
-        receiptCount: result.receiptCount,
-      })
-    );
-
     return result;
   }
 }

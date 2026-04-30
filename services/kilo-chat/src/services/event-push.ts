@@ -85,6 +85,34 @@ export async function pushInstanceEvent<N extends KiloChatEventName>(
 }
 
 /**
+ * Pushes an event on the instance-level context to one user. Used for
+ * user-specific events such as read markers where other members must ignore
+ * the payload.
+ */
+export async function pushInstanceEventToUser<N extends KiloChatEventName>(
+  env: Env,
+  sandboxId: string,
+  userId: string,
+  event: N,
+  payload: KiloChatEventOf<N>
+): Promise<void> {
+  const es = getEventService(env);
+  if (!es) return;
+  const context = kiloclawInstanceContext(sandboxId);
+
+  try {
+    await es.pushEvent(userId, context, event, payload);
+  } catch (err) {
+    logger.error('event-service pushEvent failed for instance user', {
+      userId,
+      sandboxId,
+      event,
+      ...formatError(err),
+    });
+  }
+}
+
+/**
  * Resolves the sandbox owner, persists the heartbeat to `SandboxStatusDO`, and
  * pushes a `bot.status` event to the owner on the instance-level context.
  * Returns `ownerUserId: null` when no active owner exists. Note: this does not

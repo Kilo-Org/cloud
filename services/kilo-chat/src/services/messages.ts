@@ -15,6 +15,7 @@ import {
   extractConversationContext,
   pushEventToHumanMembers,
   pushInstanceEvent,
+  pushInstanceEventToUser,
 } from './event-push';
 import { fetchSandboxLabel } from './sandbox-lookup';
 import type { ConversationInfo } from '../do/conversation-do';
@@ -283,9 +284,8 @@ async function postCommitFanOut(
     // event so their sidebar row's `lastActivityAt` advances across tabs.
     // Independently, anyone who has "read" this message (the sender, who
     // authored it, or a recipient whose WS subscribed to the conversation
-    // context and delivered `message.created`) gets a `conversation.read`
-    // with their own `memberId`. The client filters `.read` by memberId so
-    // Alice's read marker never leaks into Bob's sidebar.
+    // context and delivered `message.created`) gets a targeted
+    // `conversation.read` with their own `memberId`.
     instanceEvents.push(
       pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.activity', {
         conversationId,
@@ -297,7 +297,7 @@ async function postCommitFanOut(
       const present = deliveryMap.get(userId) === true;
       if (!isSender && !present) continue;
       instanceEvents.push(
-        pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
+        pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
           conversationId,
           memberId: userId,
           lastReadAt: now,

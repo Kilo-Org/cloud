@@ -5,7 +5,12 @@
 
 import { ulid } from 'ulid';
 import { withDORetry } from '@kilocode/worker-utils';
-import { extractConversationContext, extractSandboxId, pushInstanceEvent } from './event-push';
+import {
+  extractConversationContext,
+  extractSandboxId,
+  pushInstanceEvent,
+  pushInstanceEventToUser,
+} from './event-push';
 import { lookupSandboxOwnerUserId, userOwnsSandbox } from './sandbox-ownership';
 import { validateUserIds } from './user-lookup';
 import type { DeferCtx } from './messages';
@@ -351,9 +356,9 @@ export async function markReadFor(
     'MembershipDO.markRead'
   );
 
-  const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
+  const { sandboxId } = extractConversationContext(info.members);
   if (sandboxId) {
-    const pushPromise = pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
+    const pushPromise = pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
       conversationId,
       memberId: userId,
       lastReadAt: now,

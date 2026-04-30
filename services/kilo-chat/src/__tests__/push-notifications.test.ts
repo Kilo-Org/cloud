@@ -10,6 +10,10 @@ vi.mock('../services/sandbox-lookup', () => ({
 }));
 
 const sampleContent = [{ type: 'text', text: 'hello there' }];
+const messageCreatedContext = (sandboxId: string, conversationId: string) =>
+  `/kiloclaw/${sandboxId}/${conversationId}`;
+const presenceContext = (sandboxId: string, conversationId: string) =>
+  `/presence${messageCreatedContext(sandboxId, conversationId)}`;
 
 async function waitForCalls(spy: { mock: { calls: unknown[][] } }, timeoutMs = 2000) {
   const deadline = Date.now() + timeoutMs;
@@ -17,6 +21,31 @@ async function waitForCalls(spy: { mock: { calls: unknown[][] } }, timeoutMs = 2
     if (spy.mock.calls.length > 0) return;
     await new Promise(r => setTimeout(r, 10));
   }
+}
+
+function getMembershipDO(userId: string) {
+  return env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId));
+}
+
+async function createConversation(userSuffix: string) {
+  const userId = `user-${userSuffix}`;
+  const sandboxId = `sandbox-${userSuffix}`;
+  const botId = `bot:kiloclaw:${sandboxId}`;
+  const userApp = makeApp(userId, 'user');
+  const botApp = makeApp(botId, 'bot');
+
+  const createRes = await userApp.request(
+    '/v1/conversations',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sandboxId, title: `Chat ${userSuffix}` }),
+    },
+    env
+  );
+  expect(createRes.status).toBe(201);
+  const { conversationId } = await createRes.json<{ conversationId: string }>();
+  return { conversationId, userId, botId, sandboxId, userApp, botApp };
 }
 
 describe('kilo-chat publishes push on message.created', () => {
@@ -169,5 +198,75 @@ describe('kilo-chat publishes push on message.created', () => {
     expect(sendRes.status).toBe(201);
     const body = await sendRes.json<{ messageId: string }>();
     expect(body.messageId).toBeTruthy();
+  });
+
+  it('does not mark a recipient read when only the hidden conversation subscription receives the event', async () => {
+    const sendSpy = vi
+      .spyOn(env.NOTIFICATIONS, 'sendPushForConversation')
+      .mockResolvedValue({ perRecipient: [] });
+    const pushEventSpy = vi.spyOn(env.EVENT_SERVICE, 'pushEvent').mockResolvedValue(true);
+    vi.spyOn(
+      env.EVENT_SERVICE as typeof env.EVENT_SERVICE & {
+        isUserInContext(userId: string, context: string): Promise<boolean>;
+      },
+      'isUserInContext'
+    ).mockResolvedValue(false);
+
+    const { conversationId, userId, botApp, sandboxId } =
+      await createConversation('presence-hidden');
+    const sendRes = await botApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      env
+    );
+    expect(sendRes.status).toBe(201);
+
+    const conversations = await getMembershipDO(userId).listConversations({ sandboxId });
+    const row = conversations.conversations.find(c => c.conversationId === conversationId);
+    expect(row?.lastActivityAt).not.toBeNull();
+    expect(row?.lastReadAt).toBeNull();
+    expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({ recipientUserIds: [userId] }));
+    expect(pushEventSpy).not.toHaveBeenCalledWith(
+      userId,
+      `/kiloclaw/${sandboxId}`,
+      'conversation.read',
+      expect.anything()
+    );
+  });
+
+  it('marks a recipient read when their conversation presence is active', async () => {
+    vi.spyOn(env.NOTIFICATIONS, 'sendPushForConversation').mockResolvedValue({ perRecipient: [] });
+    vi.spyOn(env.EVENT_SERVICE, 'pushEvent').mockResolvedValue(true);
+    const presenceSpy = vi
+      .spyOn(
+        env.EVENT_SERVICE as typeof env.EVENT_SERVICE & {
+          isUserInContext(userId: string, context: string): Promise<boolean>;
+        },
+        'isUserInContext'
+      )
+      .mockResolvedValue(true);
+
+    const { conversationId, userId, botApp, sandboxId } =
+      await createConversation('presence-active');
+    const sendRes = await botApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      env
+    );
+    expect(sendRes.status).toBe(201);
+
+    const conversations = await getMembershipDO(userId).listConversations({ sandboxId });
+    const row = conversations.conversations.find(c => c.conversationId === conversationId);
+    expect(row?.lastActivityAt).not.toBeNull();
+    expect(row?.lastReadAt).toBe(row?.lastActivityAt);
+    expect(presenceSpy).toHaveBeenCalledWith(userId, presenceContext(sandboxId, conversationId));
   });
 });

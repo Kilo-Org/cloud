@@ -28,6 +28,7 @@ declare global {
         event: N,
         payload: KiloChatEventOf<N>
       ): Promise<boolean>;
+      isUserInContext(userId: string, context: string): Promise<boolean>;
     };
     NOTIFICATIONS: Fetcher & {
       markConversationRead(input: MarkConversationReadInput): Promise<MarkConversationReadOutput>;

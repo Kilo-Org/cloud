@@ -57,6 +57,9 @@ export default defineWorkersConfig({
                   async pushEvent(userId, context, event, payload) {
                     return false;
                   }
+                  async isUserInContext(userId, context) {
+                    return false;
+                  }
                 }
               `,
             },

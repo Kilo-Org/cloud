@@ -8,6 +8,7 @@
  */
 
 import type { ContentBlock, ExecApprovalDecision, Message } from '@kilocode/kilo-chat';
+import { presenceContextForConversation } from '@kilocode/event-service';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { contentBlocksToText } from '../util/content';
@@ -206,11 +207,11 @@ async function postCommitFanOut(
     }
   };
 
-  // ── Block B: Push message.created + typing.stop; returns delivery map ─
-  const pushMessageEvents = async (): Promise<Map<string, boolean>> => {
-    if (!sandboxId) return new Map();
+  // ── Block B: Push message.created + typing.stop ─────────────────────
+  const pushMessageEvents = async (): Promise<void> => {
+    if (!sandboxId) return;
 
-    const deliveryMap = await pushEventToHumanMembers(
+    await pushEventToHumanMembers(
       env,
       conversationId,
       sandboxId,
@@ -231,17 +232,43 @@ async function postCommitFanOut(
         memberId: callerId,
       });
     }
+  };
 
-    return deliveryMap;
+  const queryConversationPresence = async (): Promise<Map<string, boolean>> => {
+    if (!sandboxId) return new Map();
+
+    const context = presenceContextForConversation(sandboxId, conversationId);
+    const results = await Promise.allSettled(
+      humanMemberIds.map(async userId => {
+        const present = await env.EVENT_SERVICE.isUserInContext(userId, context);
+        return [userId, present] as const;
+      })
+    );
+
+    const presentMap = new Map<string, boolean>();
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (r.status === 'fulfilled') {
+        presentMap.set(r.value[0], r.value[1]);
+      } else {
+        logger.error('event-service isUserInContext failed for conversation member', {
+          userId: humanMemberIds[i],
+          conversationId,
+          ...formatError(r.reason),
+        });
+      }
+    }
+    return presentMap;
   };
 
   // Run webhook delivery, ConversationDO title write, and event push in
-  // parallel; the MembershipDO fan-out needs the delivery map, so it runs
-  // after pushMessageEvents resolves.
-  const [, , deliveryMap] = await Promise.all([
+  // parallel; the MembershipDO fan-out needs the presence map, so it runs
+  // after the presence query resolves.
+  const [, , , presentMap] = await Promise.all([
     webhookDelivery(),
     conversationDoTitleWrite(),
     pushMessageEvents(),
+    queryConversationPresence(),
   ]);
 
   // ── Block C: Single MembershipDO RPC per member ──────────────────────
@@ -250,14 +277,14 @@ async function postCommitFanOut(
   // Per-member semantics:
   // - title      : autoTitle string for every member when auto-titling applied.
   // - activityAt : always `now`.
-  // - markRead   : true when the member's own WS received the event
-  //                (sender for human-sent messages, or a human recipient with
-  //                an active WS for the delivered message.created event).
+  // - markRead   : true for the human sender, or for a human recipient with
+  //                active conversation presence. Hidden web tabs may still
+  //                receive events, but do not count as read intent.
   const postCommitUpdates = await Promise.allSettled(
     info.members.map(member => {
       const isSender = isSenderHuman && member.id === callerId;
-      const delivered = deliveryMap.get(member.id) === true;
-      const markRead = isSender || delivered;
+      const present = presentMap.get(member.id) === true;
+      const markRead = isSender || present;
       return withDORetry(
         () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
         stub =>
@@ -291,9 +318,8 @@ async function postCommitFanOut(
     // Every member — including the sender — gets a `conversation.activity`
     // event so their sidebar row's `lastActivityAt` advances across tabs.
     // Independently, anyone who has "read" this message (the sender, who
-    // authored it, or a recipient whose WS subscribed to the conversation
-    // context and delivered `message.created`) gets a targeted
-    // `conversation.read` with their own `memberId`.
+    // authored it, or a recipient with active conversation presence) gets a
+    // targeted `conversation.read` with their own `memberId`.
     instanceEvents.push(
       pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.activity', {
         conversationId,
@@ -302,7 +328,7 @@ async function postCommitFanOut(
     );
     for (const userId of humanMemberIds) {
       const isSender = userId === callerId;
-      const present = deliveryMap.get(userId) === true;
+      const present = presentMap.get(userId) === true;
       if (!isSender && !present) continue;
       instanceEvents.push(
         pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {

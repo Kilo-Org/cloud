@@ -387,4 +387,102 @@ describe('EventServiceClient', () => {
     expect(err).toBeInstanceOf(Error);
     expect(err.name).toBe('HandshakeTimeoutError');
   });
+
+  describe('subscribe/unsubscribe refcounting', () => {
+    function sentMessages() {
+      return lastMockWs.sent.map(s => JSON.parse(s) as unknown);
+    }
+
+    it('only sends one wire context.subscribe when two consumers subscribe to the same context', async () => {
+      const client = makeClient();
+      await client.connect();
+      lastMockWs.sent = [];
+
+      client.subscribe(['room:1']);
+      client.subscribe(['room:1']);
+
+      expect(sentMessages()).toEqual([{ type: 'context.subscribe', contexts: ['room:1'] }]);
+    });
+
+    it('keeps the subscription alive when one of two consumers unsubscribes', async () => {
+      const client = makeClient();
+      await client.connect();
+      lastMockWs.sent = [];
+
+      client.subscribe(['room:1']);
+      client.subscribe(['room:1']);
+      client.unsubscribe(['room:1']);
+
+      // Only the initial 0→1 subscribe should have been sent. No unsubscribe yet
+      // because the second consumer is still holding a ref.
+      expect(sentMessages()).toEqual([{ type: 'context.subscribe', contexts: ['room:1'] }]);
+    });
+
+    it('sends context.unsubscribe only when the last consumer drops the ref (1→0)', async () => {
+      const client = makeClient();
+      await client.connect();
+      lastMockWs.sent = [];
+
+      client.subscribe(['room:1']);
+      client.subscribe(['room:1']);
+      client.unsubscribe(['room:1']);
+      client.unsubscribe(['room:1']);
+
+      expect(sentMessages()).toEqual([
+        { type: 'context.subscribe', contexts: ['room:1'] },
+        { type: 'context.unsubscribe', contexts: ['room:1'] },
+      ]);
+    });
+
+    it('handles a mixed batch: only newly-active contexts get sent', async () => {
+      const client = makeClient();
+      await client.connect();
+      client.subscribe(['room:1']);
+      lastMockWs.sent = [];
+
+      // room:1 already at refcount 1, room:2 is new. Only room:2 should hit the wire.
+      client.subscribe(['room:1', 'room:2']);
+
+      expect(sentMessages()).toEqual([{ type: 'context.subscribe', contexts: ['room:2'] }]);
+    });
+
+    it('extra unsubscribes for an unknown context are no-ops', async () => {
+      const client = makeClient();
+      await client.connect();
+      lastMockWs.sent = [];
+
+      // Never subscribed — must not crash and must not emit a wire message.
+      client.unsubscribe(['ghost']);
+
+      expect(sentMessages()).toEqual([]);
+    });
+
+    it('resubscribe-on-reconnect deduplicates by context (one entry per active context)', async () => {
+      vi.useFakeTimers();
+      const client = makeClient();
+      await client.connect();
+
+      // Two consumers hold the same context.
+      client.subscribe(['room:1']);
+      client.subscribe(['room:1']);
+
+      // Drop the connection — auto-reconnect kicks in.
+      lastMockWs.triggerClose();
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(allMockWs.length).toBe(2);
+      // The second mock socket also auto-triggers open via the global stub.
+      await vi.advanceTimersByTimeAsync(0);
+
+      const resubMessages = allMockWs[1].sent
+        .map(s => JSON.parse(s) as { type: string; contexts?: string[] })
+        .filter(m => m.type === 'context.subscribe');
+
+      // Exactly one resubscribe message containing the context exactly once,
+      // regardless of how many consumers hold the ref.
+      expect(resubMessages).toHaveLength(1);
+      expect(resubMessages[0]?.contexts).toEqual(['room:1']);
+
+      vi.useRealTimers();
+    });
+  });
 });

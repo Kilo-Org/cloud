@@ -17,6 +17,8 @@ import {
   type SendInstanceLifecycleNotificationResult,
   type ListBadgesResponse,
   type MarkBadgeReadResponse,
+  type MarkConversationReadInput,
+  type MarkConversationReadOutput,
   type PerRecipientResult,
   type SendPushForConversationInput,
   type SendPushForConversationOutput,
@@ -164,6 +166,18 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
           this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
         ) as unknown as RecipientDOStub,
     });
+  }
+
+  async markConversationRead(
+    input: MarkConversationReadInput
+  ): Promise<MarkConversationReadOutput> {
+    const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
+      this.env.NOTIFICATION_CHANNEL_DO.idFromName(input.userId)
+    );
+    const badgeCount = await stub.markBucketRead(
+      badgeBucketForConversation(input.sandboxId, input.conversationId)
+    );
+    return { badgeCount };
   }
 
   async sendInstanceLifecycleNotification(

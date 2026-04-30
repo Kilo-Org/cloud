@@ -174,6 +174,21 @@ describe('KiloChatClient', () => {
     });
   });
 
+  describe('markConversationRead', () => {
+    it('returns the read timestamp and badge count', async () => {
+      const conversationId = '01HXYZ00000ABCDEFGHJKMNPQR';
+      const body = { conversationId, lastReadAt: 1234, badgeCount: 3 };
+      const fetch = mockFetch(200, body);
+      const client = new KiloChatClient(createMockConfig(fetch));
+      const res = await client.markConversationRead(conversationId);
+      expect(fetch).toHaveBeenCalledWith(
+        `https://chat.example.com/v1/conversations/${conversationId}/mark-read`,
+        expect.objectContaining({ method: 'POST' })
+      );
+      expect(res).toEqual(body);
+    });
+  });
+
   describe('error handling', () => {
     it('throws KiloChatApiError on non-ok response', async () => {
       const fetch = mockFetch(403, { error: 'Forbidden' });

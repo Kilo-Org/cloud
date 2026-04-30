@@ -163,5 +163,14 @@ export function useMarkConversationRead(client: KiloChatClient) {
         }
       }
     },
+    onSuccess: (response, conversationId) => {
+      queryClient.setQueriesData<ConversationListInfiniteData>(
+        { queryKey: conversationsKeyAll() },
+        old =>
+          updateConversationPages(old, c =>
+            c.conversationId === conversationId ? { ...c, lastReadAt: response.lastReadAt } : c
+          )
+      );
+    },
   });
 }

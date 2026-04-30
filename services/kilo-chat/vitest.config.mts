@@ -72,6 +72,9 @@ export default defineWorkersConfig({
                   async sendPushForConversation(input) {
                     return { perRecipient: [] };
                   }
+                  async markConversationRead(input) {
+                    return { badgeCount: 0 };
+                  }
                 }
               `,
             },

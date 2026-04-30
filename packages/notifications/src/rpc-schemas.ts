@@ -35,6 +35,20 @@ export const sendPushForConversationOutputSchema = z.object({
 });
 export type SendPushForConversationOutput = z.infer<typeof sendPushForConversationOutputSchema>;
 
+// ── markConversationRead ───────────────────────────────────────────
+
+export const markConversationReadInputSchema = z.object({
+  userId: z.string().min(1),
+  sandboxId: z.string().min(1),
+  conversationId: z.string().min(1),
+});
+export type MarkConversationReadInput = z.infer<typeof markConversationReadInputSchema>;
+
+export const markConversationReadOutputSchema = z.object({
+  badgeCount: z.number().int().nonnegative(),
+});
+export type MarkConversationReadOutput = z.infer<typeof markConversationReadOutputSchema>;
+
 // ── badge HTTP routes ───────────────────────────────────────────────
 
 export const badgeBucketSchema = z.string().min(1);

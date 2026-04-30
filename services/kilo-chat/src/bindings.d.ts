@@ -1,6 +1,8 @@
 import type { z } from 'zod';
 import type { chatWebhookRpcSchema, KiloChatEventName, KiloChatEventOf } from '@kilocode/kilo-chat';
 import type {
+  MarkConversationReadInput,
+  MarkConversationReadOutput,
   SendPushForConversationInput,
   SendPushForConversationOutput,
 } from '@kilocode/notifications';
@@ -28,6 +30,7 @@ declare global {
       ): Promise<boolean>;
     };
     NOTIFICATIONS: Fetcher & {
+      markConversationRead(input: MarkConversationReadInput): Promise<MarkConversationReadOutput>;
       sendPushForConversation(
         input: SendPushForConversationInput
       ): Promise<SendPushForConversationOutput>;

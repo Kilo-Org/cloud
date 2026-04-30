@@ -6,6 +6,7 @@ import {
   createConversationResponseSchema,
   createMessageResponseSchema,
   editMessageResponseSchema,
+  markConversationReadResponseSchema,
   messageListResponseSchema,
   addReactionResponseSchema,
   okResponseSchema,
@@ -32,6 +33,7 @@ import type {
   CreateMessageResponse,
   EditMessageRequest,
   EditMessageResponse,
+  MarkConversationReadResponse,
   RenameConversationRequest,
   MessageListResponse,
   MessageCreatedEvent,
@@ -166,10 +168,10 @@ export class KiloChatClient {
     });
   }
 
-  async markConversationRead(conversationId: string): Promise<void> {
-    await this.httpRequest(`/v1/conversations/${conversationId}/mark-read`, {
+  async markConversationRead(conversationId: string): Promise<MarkConversationReadResponse> {
+    return this.httpRequest(`/v1/conversations/${conversationId}/mark-read`, {
       method: 'POST',
-      schema: voidSchema,
+      schema: markConversationReadResponseSchema,
     });
   }
 

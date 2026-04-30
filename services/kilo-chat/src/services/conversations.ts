@@ -348,7 +348,9 @@ export type MarkReadParams = {
   conversationId: string;
 };
 
-export type MarkReadResult = { ok: true } | { ok: false; code: 'forbidden'; error: string };
+export type MarkReadResult =
+  | { ok: true; conversationId: string; lastReadAt: number; badgeCount: number }
+  | { ok: false; code: 'forbidden'; error: string };
 
 export async function markReadFor(
   env: Env,
@@ -376,7 +378,15 @@ export async function markReadFor(
   );
 
   const { sandboxId } = extractConversationContext(info.members);
+  let badgeCount = 0;
   if (sandboxId) {
+    const badgeResult = await env.NOTIFICATIONS.markConversationRead({
+      userId,
+      sandboxId,
+      conversationId,
+    });
+    badgeCount = badgeResult.badgeCount;
+
     const pushPromise = pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
       conversationId,
       memberId: userId,
@@ -385,5 +395,5 @@ export async function markReadFor(
     ctx.waitUntil(pushPromise);
   }
 
-  return { ok: true };
+  return { ok: true, conversationId, lastReadAt: now, badgeCount };
 }

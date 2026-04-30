@@ -293,6 +293,57 @@ describe('GET /v1/conversations/:id', () => {
   });
 });
 
+describe('POST /v1/conversations/:id/mark-read', () => {
+  it('marks the membership read and clears the notification badge bucket', async () => {
+    grantSandbox('user-mark-read-route', 'sandbox-mark-read-route');
+    const app = makeApp('user-mark-read-route', 'user');
+    const createRes = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-mark-read-route', title: 'Read me' }),
+      },
+      env
+    );
+    const { conversationId } = await createRes.json<{ conversationId: string }>();
+    const markNotifications = vi
+      .spyOn(env.NOTIFICATIONS, 'markConversationRead')
+      .mockResolvedValue({ badgeCount: 7 });
+
+    const res = await app.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+      },
+      env
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{
+      conversationId: string;
+      lastReadAt: number;
+      badgeCount: number;
+    }>();
+    expect(body.conversationId).toBe(conversationId);
+    expect(body.lastReadAt).toEqual(expect.any(Number));
+    expect(body.badgeCount).toBe(7);
+    expect(markNotifications).toHaveBeenCalledWith({
+      userId: 'user-mark-read-route',
+      sandboxId: 'sandbox-mark-read-route',
+      conversationId,
+    });
+
+    const memberStub = getMemberStub('user-mark-read-route');
+    const { conversations } = await memberStub.listConversations({
+      sandboxId: 'sandbox-mark-read-route',
+    });
+    expect(conversations.find(c => c.conversationId === conversationId)?.lastReadAt).toBe(
+      body.lastReadAt
+    );
+  });
+});
+
 describe('PATCH /v1/conversations/:id — rename', () => {
   async function createAsUser(userId: string, sandboxId: string, title: string) {
     grantSandbox(userId, sandboxId);

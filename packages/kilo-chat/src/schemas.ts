@@ -159,6 +159,12 @@ export const createConversationResponseSchema = z.object({
 
 export const okResponseSchema = z.object({ ok: z.literal(true) });
 
+export const markConversationReadResponseSchema = z.object({
+  conversationId: ulidSchema,
+  lastReadAt: z.number(),
+  badgeCount: z.number().int().nonnegative(),
+});
+
 export const createMessageRequestSchema = z.object({
   conversationId: ulidSchema,
   content: z.array(contentBlockSchema).min(1).max(20),

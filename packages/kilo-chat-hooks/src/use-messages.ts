@@ -130,10 +130,55 @@ export function useMessages(client: KiloChatClient, conversationId: string | nul
 
 export type SendMessageVariables = CreateMessageRequest & { clientId: string };
 
+type MutationErrorOptions = {
+  onError?: (error: unknown) => void;
+};
+
+export function messageFromCreatedEvent(e: MessageCreatedEvent): Message {
+  return {
+    id: e.messageId,
+    senderId: e.senderId,
+    content: e.content,
+    inReplyToMessageId: e.inReplyToMessageId,
+    updatedAt: null,
+    clientUpdatedAt: null,
+    deleted: false,
+    deliveryFailed: false,
+    reactions: [],
+  };
+}
+
+export function applyMessageCreatedEventToPages<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  e: MessageCreatedEvent
+): InfiniteData<Message[], TPageParam> {
+  for (const page of old.pages) {
+    if (page.some(msg => msg.id === e.messageId)) return old;
+  }
+
+  const newMessage = messageFromCreatedEvent(e);
+
+  if (e.clientId) {
+    const pendingId = `pending-${e.clientId}`;
+    for (const page of old.pages) {
+      if (page.some(msg => msg.id === pendingId)) {
+        return {
+          ...old,
+          pages: old.pages.map(p => p.map(msg => (msg.id === pendingId ? newMessage : msg))),
+        };
+      }
+    }
+  }
+
+  const firstPage = old.pages[0] ?? [];
+  return { ...old, pages: [[newMessage, ...firstPage], ...old.pages.slice(1)] };
+}
+
 export function useSendMessage(
   client: KiloChatClient,
   conversationId: string | null,
-  currentUserId: string
+  currentUserId: string,
+  options?: MutationErrorOptions
 ) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -174,9 +219,10 @@ export function useSendMessage(
         };
       });
     },
-    onError: (_err, _variables, context) => {
+    onError: (err, _variables, context) => {
       if (!context) return;
       removeMessageFromCache(queryClient, context.queryKey, context.pendingId);
+      options?.onError?.(err);
     },
   });
 }
@@ -415,37 +461,9 @@ export function useMessageCacheUpdater(
       if (!e.senderId.startsWith('bot:')) {
         onHumanMessageCreated?.(ctx, e.senderId);
       }
-      const newMessage: Message = {
-        id: e.messageId,
-        senderId: e.senderId,
-        content: e.content,
-        inReplyToMessageId: e.inReplyToMessageId,
-        updatedAt: null,
-        clientUpdatedAt: null,
-        deleted: false,
-        deliveryFailed: false,
-        reactions: [],
-      };
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        // Skip if this messageId already exists
-        for (const page of old.pages) {
-          if (page.some(msg => msg.id === e.messageId)) return old;
-        }
-        // Replace the matching pending optimistic message if clientId correlates
-        if (e.clientId) {
-          const pendingId = `pending-${e.clientId}`;
-          for (const page of old.pages) {
-            if (page.some(msg => msg.id === pendingId)) {
-              return {
-                ...old,
-                pages: old.pages.map(p => p.map(msg => (msg.id === pendingId ? newMessage : msg))),
-              };
-            }
-          }
-        }
-        const firstPage = old.pages[0] ?? [];
-        return { ...old, pages: [[newMessage, ...firstPage], ...old.pages.slice(1)] };
+        return applyMessageCreatedEventToPages(old, e);
       });
     };
 

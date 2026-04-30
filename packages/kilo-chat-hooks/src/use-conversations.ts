@@ -7,6 +7,10 @@ import { conversationKey, conversationsKey, conversationsKeyAll, messagesKey } f
 
 const CONVERSATIONS_PAGE_SIZE = 50;
 
+type MutationErrorOptions = {
+  onError?: (error: unknown) => void;
+};
+
 export function useConversations(client: KiloChatClient, sandboxId: string | null) {
   return useInfiniteQuery({
     queryKey: conversationsKey(sandboxId),
@@ -34,13 +38,14 @@ export function useConversationDetail(client: KiloChatClient, conversationId: st
   });
 }
 
-export function useCreateConversation(client: KiloChatClient) {
+export function useCreateConversation(client: KiloChatClient, options?: MutationErrorOptions) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (req: CreateConversationRequest) => client.createConversation(req),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: conversationsKeyAll() });
     },
+    onError: options?.onError,
   });
 }
 

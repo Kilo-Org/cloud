@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { formatKiloChatError } from '@kilocode/kilo-chat';
 import { ConversationList } from './ConversationList';
 import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
+import { shouldApplyConversationRead } from './conversation-read-events';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
 import { useEventServiceClient } from '@/contexts/EventServiceContext';
@@ -103,7 +104,7 @@ export function KiloChatLayout({
         // `memberId` of whose read-marker moved. Only the actual reader
         // should see their own sidebar row's `lastReadAt` advance — without
         // this filter, Alice marking read would also move Bob's `lastReadAt`.
-        if (e.memberId !== currentUserId) return;
+        if (!shouldApplyConversationRead(currentUserId, e.memberId)) return;
         queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
           updateConversationPages(old, c =>
             c.conversationId === e.conversationId ? { ...c, lastReadAt: e.lastReadAt } : c
@@ -123,7 +124,7 @@ export function KiloChatLayout({
       }),
     ];
     return () => offs.forEach(off => off());
-  }, [kiloChatClient, queryClient]);
+  }, [kiloChatClient, queryClient, currentUserId]);
 
   // Refetch conversations on WebSocket reconnect (events may have been missed)
   useEffect(() => {

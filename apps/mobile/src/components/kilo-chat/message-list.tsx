@@ -5,6 +5,8 @@ import { View } from 'react-native';
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
 import { Skeleton } from '@/components/ui/skeleton';
 
+import { getFlashListMessages } from './message-list-order';
+
 type Props = {
   messages: Message[];
   conversationId: string;
@@ -22,11 +24,10 @@ export function MessageList({
   hasOlder,
   onLongPressMessage,
 }: Props) {
-  // useMessages returns messages newest-first (result of .reverse() in the hook).
+  // useMessages returns messages oldest-to-newest.
   // FlashList v2 does not support `inverted`; instead we use maintainVisibleContentPosition
-  // with startRenderingFromBottom. That requires data in chronological order (oldest first),
-  // so we reverse once to get oldest→newest.
-  const chronological = messages.toReversed();
+  // with startRenderingFromBottom, which expects chronological order.
+  const chronological = getFlashListMessages(messages);
 
   return (
     <FlashList

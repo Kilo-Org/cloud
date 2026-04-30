@@ -1,10 +1,12 @@
 'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-export default function ChatTab({ sandboxId }: { sandboxId: string }) {
+import { buildKiloChatRedirect } from './chat-redirect';
+
+export default function ChatTab({ sandboxId, basePath }: { sandboxId: string; basePath: string }) {
   const router = useRouter();
   useEffect(() => {
-    router.replace(`/claw/kilo-chat?sandboxId=${sandboxId}`);
-  }, [router, sandboxId]);
+    router.replace(buildKiloChatRedirect(basePath, sandboxId));
+  }, [router, sandboxId, basePath]);
   return null;
 }

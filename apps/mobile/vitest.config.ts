@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     name: 'mobile-onboarding',
     environment: 'node',
-    include: ['src/lib/onboarding/**/*.test.ts'],
+    include: ['src/lib/onboarding/**/*.test.ts', 'src/components/**/*.test.ts'],
   },
 });

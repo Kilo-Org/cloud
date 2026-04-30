@@ -56,12 +56,15 @@ function ClawChatWithStatus({ organizationId }: { organizationId?: string }) {
 
   if (!status || status.status === null) return null;
 
+  const kiloChatBasePath = organizationId
+    ? `/organizations/${organizationId}/claw/kilo-chat`
+    : '/claw/kilo-chat';
   const chatContent = (
     <>
       <ClawConfigServiceBanner status={status} />
       <Card>
         <CardContent className="p-5">
-          <ChatTab sandboxId={status.sandboxId ?? ''} />
+          <ChatTab sandboxId={status.sandboxId ?? ''} basePath={kiloChatBasePath} />
         </CardContent>
       </Card>
     </>

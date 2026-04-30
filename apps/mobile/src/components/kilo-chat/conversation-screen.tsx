@@ -2,15 +2,17 @@ import * as Crypto from 'expo-crypto';
 import { useCallback } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
+import { toast } from 'sonner-native';
 
 import { ConversationHeader } from './conversation-header';
 import { MessageInput } from './message-input';
 import { MessageList } from './message-list';
 import { TypingIndicator } from './typing-indicator';
 import { useConversationPresence } from './hooks/use-conversation-presence';
+import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useMarkRead } from './hooks/use-mark-read';
-import { useMessages, useSendMessage } from './hooks/use-messages';
+import { useMessageCacheUpdater, useMessages, useSendMessage } from './hooks/use-messages';
 import { useCurrentUserId } from './hooks/use-current-user-id';
 import { setActiveChatLocation } from '@/lib/notifications';
 
@@ -42,8 +44,13 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   );
 
   useConversationPresence(sandboxId, conversationId);
+  useConversationEventSubscription(sandboxId, conversationId);
+  const handleActionFailed = useCallback(() => {
+    toast.error("Couldn't reach the bot — please try again");
+  }, []);
+  useMessageCacheUpdater(client, sandboxId, conversationId, undefined, handleActionFailed);
 
-  const markRead = useMarkRead();
+  const markRead = useMarkRead(client);
   useFocusEffect(
     useCallback(() => {
       markRead(sandboxId, conversationId);

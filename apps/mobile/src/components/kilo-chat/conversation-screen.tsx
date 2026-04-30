@@ -1,3 +1,5 @@
+import { useAddReaction, useExecuteAction, useRemoveReaction } from '@kilocode/kilo-chat-hooks';
+import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
 import * as Crypto from 'expo-crypto';
 import { useCallback } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
@@ -32,6 +34,9 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   }, [messagesQuery]);
 
   const sendMutation = useSendMessage(client, conversationId, currentUserId ?? '');
+  const executeAction = useExecuteAction(client, conversationId, currentUserId ?? '');
+  const addReaction = useAddReaction(client, conversationId, currentUserId ?? '');
+  const removeReaction = useRemoveReaction(client, conversationId, currentUserId ?? '');
   const handleSend = useCallback(
     (text: string) => {
       sendMutation.mutate({
@@ -41,6 +46,27 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       });
     },
     [sendMutation, conversationId]
+  );
+  const handleReactionPress = useCallback(
+    (message: Message, emoji: string) => {
+      if (!currentUserId) {
+        return;
+      }
+      const hasReacted =
+        message.reactions.find(r => r.emoji === emoji)?.memberIds.includes(currentUserId) ?? false;
+      if (hasReacted) {
+        removeReaction.mutate({ messageId: message.id, emoji });
+      } else {
+        addReaction.mutate({ messageId: message.id, emoji });
+      }
+    },
+    [addReaction, currentUserId, removeReaction]
+  );
+  const handleExecuteAction = useCallback(
+    (message: Message, groupId: string, value: ExecApprovalDecision) => {
+      executeAction.mutate({ messageId: message.id, groupId, value });
+    },
+    [executeAction]
   );
 
   useConversationPresence(sandboxId, conversationId);
@@ -70,10 +96,12 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       >
         <MessageList
           messages={messages}
-          conversationId={conversationId}
           currentUserId={currentUserId}
           fetchOlder={fetchOlder}
           hasOlder={hasOlder}
+          isExecutingAction={executeAction.isPending}
+          onExecuteAction={handleExecuteAction}
+          onReactionPress={handleReactionPress}
         />
         <TypingIndicator isTyping={false} />
         <MessageInput onSend={handleSend} disabled={sendMutation.isPending} />

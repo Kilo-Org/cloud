@@ -1,18 +1,19 @@
-import { useAddReaction, useExecuteAction, useRemoveReaction } from '@kilocode/kilo-chat-hooks';
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
+import { memo } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
-import { useKiloChatClient } from '@/components/kilo-chat/hooks/use-kilo-chat-client';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
 type Props = {
   message: Message;
-  conversationId: string;
+  currentUserId: string | null;
   isFromMe: boolean;
   showAuthor: boolean;
+  isExecutingAction: boolean;
+  onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
+  onReactionPress: (message: Message, emoji: string) => void;
   onLongPress?: (m: Message) => void;
 };
 
@@ -32,39 +33,25 @@ function actionStyleToVariant(
   return 'default';
 }
 
-export function MessageBubble({
+function MessageBubbleComponent({
   message,
-  conversationId,
+  currentUserId,
   isFromMe,
   showAuthor,
+  isExecutingAction,
+  onExecuteAction,
+  onReactionPress,
   onLongPress,
 }: Props) {
-  const client = useKiloChatClient();
-  const currentUserId = useCurrentUserId();
-
-  const executeAction = useExecuteAction(client, conversationId, currentUserId ?? '');
-  const addReaction = useAddReaction(client, conversationId, currentUserId ?? '');
-  const removeReaction = useRemoveReaction(client, conversationId, currentUserId ?? '');
-
   const isPending = message.id.startsWith('pending-');
   const timestamp = message.clientUpdatedAt ?? message.updatedAt;
 
   function handleReactionPress(emoji: string) {
-    if (!currentUserId) {
-      return;
-    }
-    const hasReacted = message.reactions
-      .find(r => r.emoji === emoji)
-      ?.memberIds.includes(currentUserId);
-    if (hasReacted) {
-      removeReaction.mutate({ messageId: message.id, emoji });
-    } else {
-      addReaction.mutate({ messageId: message.id, emoji });
-    }
+    onReactionPress(message, emoji);
   }
 
   function handleExecuteAction(groupId: string, value: ExecApprovalDecision) {
-    executeAction.mutate({ messageId: message.id, groupId, value });
+    onExecuteAction(message, groupId, value);
   }
 
   const textColor = isFromMe ? 'text-primary-foreground' : 'text-foreground';
@@ -126,7 +113,7 @@ export function MessageBubble({
                       key={action.value}
                       variant={actionStyleToVariant(action.style)}
                       size="sm"
-                      disabled={executeAction.isPending}
+                      disabled={isExecutingAction}
                       onPress={() => {
                         handleExecuteAction(block.groupId, action.value);
                       }}
@@ -189,3 +176,5 @@ export function MessageBubble({
     </Pressable>
   );
 }
+
+export const MessageBubble = memo(MessageBubbleComponent);

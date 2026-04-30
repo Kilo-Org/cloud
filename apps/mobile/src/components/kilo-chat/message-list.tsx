@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { type Message } from '@kilocode/kilo-chat';
+import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
 import { View } from 'react-native';
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
@@ -9,19 +9,23 @@ import { getFlashListMessages } from './message-list-order';
 
 type Props = {
   messages: Message[];
-  conversationId: string;
   currentUserId: string | null;
   fetchOlder?: () => void;
   hasOlder?: boolean;
+  isExecutingAction: boolean;
+  onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
+  onReactionPress: (message: Message, emoji: string) => void;
   onLongPressMessage?: (m: Message) => void;
 };
 
 export function MessageList({
   messages,
-  conversationId,
   currentUserId,
   fetchOlder,
   hasOlder,
+  isExecutingAction,
+  onExecuteAction,
+  onReactionPress,
   onLongPressMessage,
 }: Props) {
   // useMessages returns messages oldest-to-newest.
@@ -42,9 +46,12 @@ export function MessageList({
         return (
           <MessageBubble
             message={item}
-            conversationId={conversationId}
+            currentUserId={currentUserId}
             isFromMe={currentUserId !== null && item.senderId === currentUserId}
             showAuthor={showAuthor}
+            isExecutingAction={isExecutingAction}
+            onExecuteAction={onExecuteAction}
+            onReactionPress={onReactionPress}
             onLongPress={onLongPressMessage}
           />
         );

@@ -5,5 +5,7 @@
  * don't collide as more surfaces start emitting badge updates.
  */
 
+export const badgeBucketForInstance = (sandboxId: string) => `kiloclaw:${sandboxId}` as const;
+
 export const badgeBucketForConversation = (sandboxId: string, conversationId: string) =>
   `kiloclaw:${sandboxId}:${conversationId}` as const;

@@ -104,39 +104,43 @@ type OverviewData = {
 
 function StatPill({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="flex flex-col">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="font-semibold">{value}</span>
-      {hint && <span className="text-muted-foreground text-[10px]">{hint}</span>}
+    <div className="flex flex-1 flex-col gap-0.5">
+      <span className="text-muted-foreground text-[11px] font-semibold tracking-[0.06em] uppercase">
+        {label}
+      </span>
+      <span className="text-2xl font-bold tabular-nums">{value}</span>
+      {hint && <span className="text-muted-foreground text-xs">{hint}</span>}
     </div>
   );
 }
 
 function OverviewStatsCards({ data }: { data: OverviewData }) {
   return (
-    <div className="bg-muted/30 flex flex-wrap items-start gap-x-8 gap-y-3 rounded-md border px-4 py-3 text-sm">
-      <StatPill
-        label="Total"
-        value={data.totalInstances.toLocaleString()}
-        hint={`+${data.last24hCreated} 24h · +${data.last7dCreated} 7d`}
-      />
-      <StatPill
-        label="Active"
-        value={data.activeInstances.toLocaleString()}
-        hint={`${data.destroyedInstances.toLocaleString()} destroyed`}
-      />
-      <StatPill
-        label="Inactive trial"
-        value={data.inactiveTrialStoppedInstances.toLocaleString()}
-      />
-      <StatPill label="Suspended" value={data.suspendedInstances.toLocaleString()} />
-      <StatPill
-        label="Unique users"
-        value={data.uniqueUsers.toLocaleString()}
-        hint={`${data.activeUsers7d} active 7d`}
-      />
-      <StatPill label="Avg lifespan" value={formatLifespan(data.avgLifespanMinutes)} />
-    </div>
+    <Card>
+      <CardContent className="flex flex-wrap gap-x-8 gap-y-4 py-4">
+        <StatPill
+          label="Total"
+          value={data.totalInstances.toLocaleString()}
+          hint={`+${data.last24hCreated} 24h · +${data.last7dCreated} 7d`}
+        />
+        <StatPill
+          label="Active"
+          value={data.activeInstances.toLocaleString()}
+          hint={`${data.destroyedInstances.toLocaleString()} destroyed`}
+        />
+        <StatPill
+          label="Inactive trial"
+          value={data.inactiveTrialStoppedInstances.toLocaleString()}
+        />
+        <StatPill label="Suspended" value={data.suspendedInstances.toLocaleString()} />
+        <StatPill
+          label="Unique users"
+          value={data.uniqueUsers.toLocaleString()}
+          hint={`${data.activeUsers7d} active 7d`}
+        />
+        <StatPill label="Avg lifespan" value={formatLifespan(data.avgLifespanMinutes)} />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -512,22 +516,12 @@ export function KiloclawInstancesPage() {
   const selectedInstances = instances.filter(i => selectedIds.has(i.id));
 
   return (
-    <div className="flex w-full flex-col gap-y-4">
-      {/* Dashboard Section — KPI strip + collapsible chart */}
+    <div className="flex w-full flex-col gap-y-6">
+      {/* Dashboard Section */}
       {statsData && (
-        <div className="space-y-2">
+        <div className="space-y-4">
           <OverviewStatsCards data={statsData.overview} />
-          {statsData.dailyChart.length > 0 && (
-            <details className="group">
-              <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs select-none">
-                <span className="group-open:hidden">▸ Show daily chart</span>
-                <span className="hidden group-open:inline">▾ Hide daily chart</span>
-              </summary>
-              <div className="mt-2">
-                <DailyChart data={statsData.dailyChart} />
-              </div>
-            </details>
-          )}
+          {statsData.dailyChart.length > 0 && <DailyChart data={statsData.dailyChart} />}
         </div>
       )}
 
@@ -552,7 +546,7 @@ export function KiloclawInstancesPage() {
               </button>
             )}
           </div>
-          <Button type="submit" disabled={isFetching}>
+          <Button type="submit" variant="secondary" disabled={isFetching}>
             Search
           </Button>
         </form>
@@ -736,8 +730,8 @@ export function KiloclawInstancesPage() {
                         variant="outline"
                         className={
                           instance.pin.is_admin_pin
-                            ? 'border-purple-500/30 bg-purple-500/15 text-purple-400'
-                            : 'border-cyan-500/30 bg-cyan-500/15 text-cyan-400'
+                            ? 'border-transparent bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/20'
+                            : 'border-transparent bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/20'
                         }
                         title={`Pinned to ${instance.pin.image_tag} by ${
                           instance.pin.is_admin_pin ? 'admin' : 'user'

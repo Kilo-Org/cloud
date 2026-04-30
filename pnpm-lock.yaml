@@ -1910,6 +1910,9 @@ importers:
       '@kilocode/kiloclaw-secret-catalog':
         specifier: workspace:*
         version: link:../../packages/kiloclaw-secret-catalog
+      '@kilocode/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

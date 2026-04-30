@@ -3,19 +3,20 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { user_push_tokens } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
+import type {
+  SendInstanceLifecycleNotificationParams,
+  SendInstanceLifecycleNotificationResult,
+} from '@kilocode/notifications';
+
 import type { TicketTokenPair } from './expo-push';
 import { sendPushNotifications } from './expo-push';
-import {
-  dispatchInstanceLifecyclePush,
-  type SendInstanceLifecycleNotificationParams,
-  type SendInstanceLifecycleNotificationResult,
-} from './instance-lifecycle-push';
+import { dispatchInstanceLifecyclePush } from './instance-lifecycle-push';
 
 export type {
   InstanceLifecycleEvent,
   SendInstanceLifecycleNotificationParams,
   SendInstanceLifecycleNotificationResult,
-} from './instance-lifecycle-push';
+} from '@kilocode/notifications';
 
 type ReceiptCheckMessage = {
   ticketTokenPairs: TicketTokenPair[];
@@ -28,8 +29,7 @@ type ReceiptCheckMessage = {
  * explicitly bound to `notifications` with `entrypoint: "NotificationsService"`
  * can reach these methods. No shared secret is needed.
  *
- * Keep `data.type` values in sync with `NotificationData` in
- * `apps/mobile/src/lib/notifications.ts`.
+ * Push data is parsed by the shared `pushDataSchema` in `@kilocode/notifications`.
  */
 export class NotificationsService extends WorkerEntrypoint<Env> {
   async sendInstanceLifecycleNotification(

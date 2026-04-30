@@ -4,39 +4,20 @@
  * pulling in the Hyperdrive/pg client chain.
  */
 
-import { z } from 'zod';
+import {
+  sendInstanceLifecycleNotificationInputSchema,
+  type InstanceLifecycleEvent,
+  type SendInstanceLifecycleNotificationParams,
+  type SendInstanceLifecycleNotificationResult,
+} from '@kilocode/notifications';
 
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from './expo-push';
 
-export type InstanceLifecycleEvent = 'ready' | 'start_failed';
-
-export type SendInstanceLifecycleNotificationParams = {
-  userId: string;
-  /** Chat route id surfaced on the device. Currently this is the instance sandboxId. */
-  instanceId: string;
-  /** Included for worker-side logs only. */
-  sandboxId: string;
-  event: InstanceLifecycleEvent;
-  instanceName: string | null;
-  /** Failure body only. Caller is expected to keep this short (~100 chars). */
-  errorMessage?: string;
-};
-
-export type SendInstanceLifecycleNotificationResult = {
-  tokenCount: number;
-  sent: number;
-  staleTokens: number;
-  receiptCount: number;
-};
-
-export const ParamsSchema = z.object({
-  userId: z.string().min(1),
-  instanceId: z.string().min(1),
-  sandboxId: z.string(),
-  event: z.enum(['ready', 'start_failed']),
-  instanceName: z.string().nullable(),
-  errorMessage: z.string().optional(),
-});
+export type {
+  InstanceLifecycleEvent,
+  SendInstanceLifecycleNotificationParams,
+  SendInstanceLifecycleNotificationResult,
+} from '@kilocode/notifications';
 
 const BODY_MAX_LENGTH = 100;
 
@@ -71,7 +52,6 @@ export function buildInstanceLifecycleMessages(
     to: token,
     title,
     body,
-    // Keep in sync with NotificationData in apps/mobile/src/lib/notifications.ts
     data: {
       type: 'instance-lifecycle',
       event: params.event,
@@ -97,7 +77,7 @@ export async function dispatchInstanceLifecyclePush(
   params: SendInstanceLifecycleNotificationParams,
   deps: LifecycleDispatchDeps
 ): Promise<SendInstanceLifecycleNotificationResult> {
-  const parsed = ParamsSchema.parse(params);
+  const parsed = sendInstanceLifecycleNotificationInputSchema.parse(params);
 
   const tokens = await deps.getTokens(parsed.userId);
   if (tokens.length === 0) {

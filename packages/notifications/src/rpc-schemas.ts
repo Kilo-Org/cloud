@@ -61,6 +61,33 @@ export const markBadgeReadResponseSchema = z.object({
 });
 export type MarkBadgeReadResponse = z.infer<typeof markBadgeReadResponseSchema>;
 
+// ── sendInstanceLifecycleNotification ───────────────────────────────
+
+export const instanceLifecycleEventSchema = z.enum(['ready', 'start_failed']);
+export type InstanceLifecycleEvent = z.infer<typeof instanceLifecycleEventSchema>;
+
+export const sendInstanceLifecycleNotificationInputSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().min(1),
+  sandboxId: z.string(),
+  event: instanceLifecycleEventSchema,
+  instanceName: z.string().nullable(),
+  errorMessage: z.string().optional(),
+});
+export type SendInstanceLifecycleNotificationParams = z.infer<
+  typeof sendInstanceLifecycleNotificationInputSchema
+>;
+
+export const sendInstanceLifecycleNotificationOutputSchema = z.object({
+  tokenCount: z.number().int().nonnegative(),
+  sent: z.number().int().nonnegative(),
+  staleTokens: z.number().int().nonnegative(),
+  receiptCount: z.number().int().nonnegative(),
+});
+export type SendInstanceLifecycleNotificationResult = z.infer<
+  typeof sendInstanceLifecycleNotificationOutputSchema
+>;
+
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 
 export const dispatchPushInputSchema = z.object({

@@ -13,6 +13,8 @@ import {
   markBadgeReadInputSchema,
   type DispatchPushInput,
   type DispatchPushOutcome,
+  type SendInstanceLifecycleNotificationParams,
+  type SendInstanceLifecycleNotificationResult,
   type ListBadgesResponse,
   type MarkBadgeReadResponse,
   type PerRecipientResult,
@@ -23,11 +25,7 @@ import {
 import { authMiddleware, type AuthContext } from './auth';
 import type { TicketTokenPair } from './lib/expo-push';
 import { sendPushNotifications } from './lib/expo-push';
-import {
-  dispatchInstanceLifecyclePush,
-  type SendInstanceLifecycleNotificationParams,
-  type SendInstanceLifecycleNotificationResult,
-} from './lib/instance-lifecycle-push';
+import { dispatchInstanceLifecyclePush } from './lib/instance-lifecycle-push';
 import { queue } from './queue-consumer';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
@@ -35,7 +33,7 @@ export type {
   InstanceLifecycleEvent,
   SendInstanceLifecycleNotificationParams,
   SendInstanceLifecycleNotificationResult,
-} from './lib/instance-lifecycle-push';
+} from '@kilocode/notifications';
 
 const ALLOWED_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
 

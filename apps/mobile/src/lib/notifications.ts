@@ -24,11 +24,18 @@ export function setActiveChatInstance(instanceId: string | null) {
   activeChatInstanceId = instanceId;
 }
 
-// Keep in sync with data field in services/notifications/src/dos/NotificationChannelDO.ts
-const notificationDataSchema = z.object({
-  type: z.literal('chat'),
-  instanceId: z.string().min(1),
-});
+const notificationDataSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('chat'),
+    instanceId: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal('chat.message'),
+    sandboxId: z.string().min(1),
+    conversationId: z.string().min(1),
+    messageId: z.string().min(1),
+  }),
+]);
 
 type NotificationData = z.infer<typeof notificationDataSchema>;
 
@@ -38,6 +45,10 @@ type NotificationData = z.infer<typeof notificationDataSchema>;
 export function parseNotificationData(data: unknown): NotificationData | null {
   const parsed = notificationDataSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
+}
+
+export function getNotificationSandboxId(data: NotificationData): string {
+  return data.type === 'chat' ? data.instanceId : data.sandboxId;
 }
 
 const shown = {
@@ -63,7 +74,7 @@ export function setupNotificationHandler() {
       const data = parseNotificationData(notification.request.content.data);
 
       // Suppress only if the user is already viewing this exact chat
-      if (data && data.instanceId === activeChatInstanceId) {
+      if (data && getNotificationSandboxId(data) === activeChatInstanceId) {
         return suppressed;
       }
 
@@ -87,7 +98,7 @@ export function setupNotificationResponseHandler() {
     const data = parseNotificationData(response.notification.request.content.data);
 
     if (data) {
-      const path = `/(app)/chat/${data.instanceId}`;
+      const path = `/(app)/chat/${getNotificationSandboxId(data)}`;
       // If the router is ready (has segments), navigate immediately.
       // Otherwise store as pending for consumption after auth completes.
       try {
@@ -109,7 +120,7 @@ export function checkInitialNotification(): void {
   }
   const data = parseNotificationData(response.notification.request.content.data);
   if (data) {
-    pendingNotificationLink = `/(app)/chat/${data.instanceId}`;
+    pendingNotificationLink = `/(app)/chat/${getNotificationSandboxId(data)}`;
   }
 }
 

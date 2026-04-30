@@ -15,6 +15,7 @@ import { isTransitionalStatus } from '@/components/kiloclaw/status-badge';
 import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
+import { badgeBucketForInstance } from '@/lib/badge-buckets';
 import { useAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type ClawInstance, useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useUnreadCounts } from '@/lib/hooks/use-unread-counts';
@@ -79,7 +80,7 @@ export function HomeScreen() {
     isPending: instancesPending,
     isError: instancesError,
   } = useAllKiloClawInstances(pickListPollInterval);
-  const { byChannel: unreadByChannel } = useUnreadCounts();
+  const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
   const {
     storedSessions,
     activeSessions,
@@ -128,7 +129,7 @@ export function HomeScreen() {
             {renderKiloClawSlot({
               instances: instances ?? [],
               instancesError,
-              unreadByChannel,
+              unreadByBadgeBucket,
             })}
 
             {renderSessionsOrPromo({
@@ -151,7 +152,7 @@ export function HomeScreen() {
 function renderKiloClawSlot(params: {
   instances: ClawInstance[];
   instancesError: boolean;
-  unreadByChannel: Map<string, number>;
+  unreadByBadgeBucket: Map<string, number>;
 }) {
   if (params.instances.length > 0) {
     return (
@@ -162,7 +163,9 @@ function renderKiloClawSlot(params: {
             <KiloClawCard
               key={instance.sandboxId}
               instance={instance}
-              unreadCount={params.unreadByChannel.get(instance.sandboxId) ?? 0}
+              unreadCount={
+                params.unreadByBadgeBucket.get(badgeBucketForInstance(instance.sandboxId)) ?? 0
+              }
             />
           ))}
         </View>

@@ -277,10 +277,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Server-side products (cloud-agent, code-review, app-builder) rate-limit
   // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
   // All other products rate-limit per IP (fast pre-auth path).
-  //
-  // The gate also covers `kilo-auto/free`: it resolves to a rotating pool that
-  // mixes Kilo-exclusive models with arbitrary OpenRouter `:free` models, and
-  // we want the limit to apply uniformly regardless of which one was picked.
   const isRateLimitedFreeModelRequest =
     isKiloExclusiveFreeModel(originalModelIdLowerCased) || autoModel === KILO_AUTO_FREE_MODEL.id;
   if (isRateLimitedFreeModelRequest) {

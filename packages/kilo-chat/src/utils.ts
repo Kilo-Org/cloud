@@ -1,4 +1,7 @@
 import { decodeTime } from 'ulid';
+import type { z } from 'zod';
+
+import { conversationCursorSchema } from './schemas';
 
 /** Extract the millisecond timestamp encoded in a ULID. */
 export function ulidToTimestamp(ulid: string): number {
@@ -14,7 +17,7 @@ export function ulidToTimestamp(ulid: string): number {
  * `coalesce(last_activity_at, joined_at)`. `c` is the conversation_id
  * (ULID) tie-breaker.
  */
-export type ConversationCursor = { t: number; c: string };
+export type ConversationCursor = z.infer<typeof conversationCursorSchema>;
 
 function base64urlEncode(bytes: Uint8Array): string {
   let binary = '';
@@ -40,18 +43,8 @@ export function decodeConversationCursor(encoded: string): ConversationCursor | 
   try {
     const json = new TextDecoder().decode(base64urlDecode(encoded));
     const parsed: unknown = JSON.parse(json);
-    if (
-      parsed !== null &&
-      typeof parsed === 'object' &&
-      't' in parsed &&
-      'c' in parsed &&
-      typeof (parsed as { t: unknown }).t === 'number' &&
-      typeof (parsed as { c: unknown }).c === 'string'
-    ) {
-      const { t, c } = parsed as { t: number; c: string };
-      return { t, c };
-    }
-    return null;
+    const cursor = conversationCursorSchema.safeParse(parsed);
+    return cursor.success ? cursor.data : null;
   } catch {
     return null;
   }

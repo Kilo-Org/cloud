@@ -234,36 +234,54 @@ describe('MembershipDO', () => {
   describe('cursor pagination', () => {
     it('returns nextCursor when more rows are available and resumes with it', async () => {
       const stub = getStub('user-cursor-1');
-      for (let i = 0; i < 5; i++) {
+      const conversationIds = [
+        '01ARZ3NDEKTSV4RRFFQ69G5FA0',
+        '01ARZ3NDEKTSV4RRFFQ69G5FA1',
+        '01ARZ3NDEKTSV4RRFFQ69G5FA2',
+        '01ARZ3NDEKTSV4RRFFQ69G5FA3',
+        '01ARZ3NDEKTSV4RRFFQ69G5FA4',
+      ];
+      for (let i = 0; i < conversationIds.length; i++) {
         await stub.addConversation({
-          conversationId: `conv-${i}`,
+          conversationId: conversationIds[i],
           title: `Chat ${i}`,
           sandboxId: 'sandbox-1',
           joinedAt: 1000 + i,
         });
-        await stub.updateLastActivity(`conv-${i}`, 10_000 + i);
+        await stub.updateLastActivity(conversationIds[i], 10_000 + i);
       }
 
       const page1 = await stub.listConversations({ limit: 2 });
       expect(page1.hasMore).toBe(true);
       expect(page1.nextCursor).toBeTruthy();
-      expect(page1.conversations.map(c => c.conversationId)).toEqual(['conv-4', 'conv-3']);
+      expect(page1.conversations.map(c => c.conversationId)).toEqual([
+        conversationIds[4],
+        conversationIds[3],
+      ]);
 
       const page2 = await stub.listConversations({ limit: 2, cursor: decode(page1.nextCursor!) });
       expect(page2.hasMore).toBe(true);
-      expect(page2.conversations.map(c => c.conversationId)).toEqual(['conv-2', 'conv-1']);
+      expect(page2.conversations.map(c => c.conversationId)).toEqual([
+        conversationIds[2],
+        conversationIds[1],
+      ]);
 
       const page3 = await stub.listConversations({ limit: 2, cursor: decode(page2.nextCursor!) });
       expect(page3.hasMore).toBe(false);
       expect(page3.nextCursor).toBeNull();
-      expect(page3.conversations.map(c => c.conversationId)).toEqual(['conv-0']);
+      expect(page3.conversations.map(c => c.conversationId)).toEqual([conversationIds[0]]);
     });
 
     it('paginates consistently when last_activity_at is null (falls back to joined_at)', async () => {
       const stub = getStub('user-cursor-2');
-      for (let i = 0; i < 3; i++) {
+      const conversationIds = [
+        '01BRZ3NDEKTSV4RRFFQ69G5FA0',
+        '01BRZ3NDEKTSV4RRFFQ69G5FA1',
+        '01BRZ3NDEKTSV4RRFFQ69G5FA2',
+      ];
+      for (let i = 0; i < conversationIds.length; i++) {
         await stub.addConversation({
-          conversationId: `conv-null-${i}`,
+          conversationId: conversationIds[i],
           title: null,
           sandboxId: 'sandbox-1',
           joinedAt: 1000 + i,
@@ -271,14 +289,14 @@ describe('MembershipDO', () => {
       }
 
       const page1 = await stub.listConversations({ limit: 1 });
-      expect(page1.conversations[0].conversationId).toBe('conv-null-2');
+      expect(page1.conversations[0].conversationId).toBe(conversationIds[2]);
       expect(page1.hasMore).toBe(true);
 
       const page2 = await stub.listConversations({ limit: 1, cursor: decode(page1.nextCursor!) });
-      expect(page2.conversations[0].conversationId).toBe('conv-null-1');
+      expect(page2.conversations[0].conversationId).toBe(conversationIds[1]);
 
       const page3 = await stub.listConversations({ limit: 1, cursor: decode(page2.nextCursor!) });
-      expect(page3.conversations[0].conversationId).toBe('conv-null-0');
+      expect(page3.conversations[0].conversationId).toBe(conversationIds[0]);
       expect(page3.hasMore).toBe(false);
     });
   });

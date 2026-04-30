@@ -132,6 +132,11 @@ export const conversationListItemSchema = z.object({
   joinedAt: z.number(),
 });
 
+export const conversationCursorSchema = z.object({
+  t: z.number().int().nonnegative(),
+  c: ulidSchema,
+});
+
 export const conversationDetailSchema = z.object({
   id: z.string(),
   title: z.string().nullable(),

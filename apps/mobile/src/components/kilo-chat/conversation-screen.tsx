@@ -1,11 +1,14 @@
+import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
 import * as Crypto from 'expo-crypto';
-import { useCallback } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import { ConversationHeader } from './conversation-header';
+import { EditMessageModal } from './edit-message-modal';
+import { canEditOrDeleteMessage, editableTextForMessage } from './message-actions';
 import { MessageInput } from './message-input';
 import { MessageList } from './message-list';
 import { TypingIndicator } from './typing-indicator';
@@ -15,6 +18,8 @@ import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useMarkRead } from './hooks/use-mark-read';
 import {
   useAddReaction,
+  useDeleteMessage,
+  useEditMessage,
   useExecuteAction,
   useMessageCacheUpdater,
   useMessages,
@@ -27,8 +32,12 @@ import { setActiveChatLocation } from '@/lib/notifications';
 type Props = { sandboxId: string; conversationId: string; conversationTitle: string };
 
 export function ConversationScreen({ sandboxId, conversationId, conversationTitle }: Props) {
+  const { showActionSheetWithOptions } = useActionSheet();
   const client = useKiloChatClient();
   const currentUserId = useCurrentUserId();
+  const [editingMessage, setEditingMessage] = useState<{ message: Message; text: string } | null>(
+    null
+  );
 
   const messagesQuery = useMessages(client, conversationId);
   const messages = messagesQuery.data?.messages ?? [];
@@ -43,6 +52,8 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const executeAction = useExecuteAction(client, conversationId, currentUserId);
   const addReaction = useAddReaction(client, conversationId, currentUserId);
   const removeReaction = useRemoveReaction(client, conversationId, currentUserId);
+  const editMessage = useEditMessage(client, conversationId);
+  const deleteMessage = useDeleteMessage(client, conversationId);
   const handleSend = useCallback(
     (text: string) => {
       sendMutation.mutate({
@@ -73,6 +84,64 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       executeAction.mutate({ messageId: message.id, groupId, value });
     },
     [executeAction]
+  );
+  const handleLongPressMessage = useCallback(
+    (message: Message) => {
+      if (!canEditOrDeleteMessage(message, currentUserId)) {
+        return;
+      }
+
+      const editableText = editableTextForMessage(message);
+      const options = editableText === null ? ['Delete', 'Cancel'] : ['Edit', 'Delete', 'Cancel'];
+      const deleteIndex = editableText === null ? 0 : 1;
+      const cancelButtonIndex = options.length - 1;
+
+      showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex,
+          destructiveButtonIndex: deleteIndex,
+        },
+        selectedIndex => {
+          if (selectedIndex === undefined || selectedIndex === cancelButtonIndex) {
+            return;
+          }
+          if (editableText !== null && selectedIndex === 0) {
+            setEditingMessage({ message, text: editableText });
+            return;
+          }
+          if (selectedIndex === deleteIndex) {
+            Alert.alert('Delete message?', 'This cannot be undone.', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: () => {
+                  deleteMessage.mutate({ messageId: message.id, conversationId });
+                },
+              },
+            ]);
+          }
+        }
+      );
+    },
+    [conversationId, currentUserId, deleteMessage, showActionSheetWithOptions]
+  );
+
+  const handleSaveEdit = useCallback(
+    (text: string) => {
+      if (!editingMessage) {
+        return;
+      }
+      editMessage.mutate({
+        messageId: editingMessage.message.id,
+        conversationId,
+        content: [{ type: 'text', text }],
+        timestamp: Date.now(),
+      });
+      setEditingMessage(null);
+    },
+    [conversationId, editMessage, editingMessage]
   );
 
   useConversationPresence(sandboxId, conversationId);
@@ -107,11 +176,20 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           hasOlder={hasOlder}
           isExecutingAction={executeAction.isPending}
           onExecuteAction={handleExecuteAction}
+          onLongPressMessage={handleLongPressMessage}
           onReactionPress={handleReactionPress}
         />
         <TypingIndicator isTyping={false} />
         <MessageInput onSend={handleSend} disabled={sendMutation.isPending} />
       </KeyboardAvoidingView>
+      <EditMessageModal
+        visible={editingMessage !== null}
+        initialText={editingMessage?.text ?? ''}
+        onCancel={() => {
+          setEditingMessage(null);
+        }}
+        onSave={handleSaveEdit}
+      />
     </View>
   );
 }

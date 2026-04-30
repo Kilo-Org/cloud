@@ -243,7 +243,11 @@ export function useSendMessage(
   });
 }
 
-export function useEditMessage(client: KiloChatClient, conversationId: string | null) {
+export function useEditMessage(
+  client: KiloChatClient,
+  conversationId: string | null,
+  options?: MutationErrorOptions
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId, ...req }: EditMessageRequest & { messageId: string }) =>
@@ -263,9 +267,11 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
       });
       return { queryKey, snapshot };
     },
-    onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
-      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    onError: (err, _variables, context) => {
+      if (context?.snapshot) {
+        restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+      }
+      options?.onError?.(err);
     },
     onSuccess: (response, _variables, context) => {
       if (!context) return;
@@ -277,7 +283,11 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
   });
 }
 
-export function useDeleteMessage(client: KiloChatClient, conversationId: string | null) {
+export function useDeleteMessage(
+  client: KiloChatClient,
+  conversationId: string | null,
+  options?: MutationErrorOptions
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ messageId, conversationId }: { messageId: string; conversationId: string }) =>
@@ -293,9 +303,11 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
       });
       return { queryKey, snapshot };
     },
-    onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
-      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    onError: (err, _variables, context) => {
+      if (context?.snapshot) {
+        restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+      }
+      options?.onError?.(err);
     },
     onSuccess: (response, _variables, context) => {
       if (!context) return;

@@ -1,9 +1,11 @@
 import { formatKiloChatError, type KiloChatClient } from '@kilocode/kilo-chat';
 import {
-  useAddReaction as useSharedAddReaction,
-  useExecuteAction as useSharedExecuteAction,
   useMessageCacheUpdater,
   useMessages,
+  useAddReaction as useSharedAddReaction,
+  useDeleteMessage as useSharedDeleteMessage,
+  useEditMessage as useSharedEditMessage,
+  useExecuteAction as useSharedExecuteAction,
   useRemoveReaction as useSharedRemoveReaction,
   useSendMessage as useSharedSendMessage,
 } from '@kilocode/kilo-chat-hooks';
@@ -31,6 +33,22 @@ export function useAddReaction(
   return useSharedAddReaction(client, conversationId, currentUserId, {
     onError: err => {
       toast.error(formatKiloChatError(err, 'Failed to add reaction'));
+    },
+  });
+}
+
+export function useEditMessage(client: KiloChatClient, conversationId: string | null) {
+  return useSharedEditMessage(client, conversationId, {
+    onError: err => {
+      toast.error(formatKiloChatError(err, 'Failed to edit message'));
+    },
+  });
+}
+
+export function useDeleteMessage(client: KiloChatClient, conversationId: string | null) {
+  return useSharedDeleteMessage(client, conversationId, {
+    onError: err => {
+      toast.error(formatKiloChatError(err, 'Failed to delete message'));
     },
   });
 }

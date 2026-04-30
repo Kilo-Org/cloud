@@ -11,10 +11,10 @@ export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
 export const DirectByokModelSchema = z.object({
   id: z.string(),
   name: z.string(),
-  flags: z.array(DirectByokModelFlagSchema).readonly(),
+  flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
-  variants: z.record(z.string(), OpenCodeVariantSchema).nullable(),
+  variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);

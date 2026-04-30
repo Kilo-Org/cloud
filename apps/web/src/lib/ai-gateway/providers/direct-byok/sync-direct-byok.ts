@@ -115,10 +115,9 @@ async function syncProvider(fetcher: ProviderFetcher): Promise<number> {
     models.push({
       id: raw.id,
       name,
-      flags: raw.input_modalities?.includes('image') ? ['vision'] : [],
+      flags: raw.input_modalities?.includes('image') ? ['vision'] : undefined,
       context_length,
       max_completion_tokens,
-      variants: null,
     });
   }
 

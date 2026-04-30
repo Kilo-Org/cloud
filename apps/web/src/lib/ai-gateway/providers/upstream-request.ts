@@ -9,7 +9,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 
-export async function openRouterRequest({
+export async function upstreamRequest({
   path,
   search,
   method,

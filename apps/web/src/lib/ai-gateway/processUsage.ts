@@ -9,7 +9,7 @@ import type {
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
 } from './providers/openrouter/types';
-import { fetchGeneration } from './providers/openrouter-request';
+import { fetchGeneration } from './providers/upstream-request';
 import PROVIDERS from './providers/provider-definitions';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';

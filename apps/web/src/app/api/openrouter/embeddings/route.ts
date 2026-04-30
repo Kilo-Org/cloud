@@ -53,7 +53,7 @@ async function embeddingProxyRequest(params: {
   headers.set('Content-Type', 'application/json');
   headers.set('Authorization', `Bearer ${provider.apiKey}`);
 
-  // OpenRouter needs these identification headers (same as openRouterRequest)
+  // OpenRouter needs these identification headers (same as upstreamRequest)
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
     headers.set('HTTP-Referer', 'https://kilocode.ai');
     headers.set('X-Title', 'Kilo Code');

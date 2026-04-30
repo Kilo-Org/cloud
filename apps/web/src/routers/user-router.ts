@@ -20,9 +20,8 @@ import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
   user_push_tokens,
-  badge_counts,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, inArray, sql, gt, gte, sum } from 'drizzle-orm';
+import { eq, and, isNull, inArray, sql, gte } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
@@ -721,46 +720,5 @@ export const userRouter = createTRPCRouter({
       })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));
-  }),
-
-  // ─── Badge Counts ──────────────────────────────────────────────────
-
-  // Called by the mobile app when the user opens a chat. Resets the badge
-  // count for that channel to 0 and returns the new total across all
-  // channels, which the app applies as the OS badge count.
-  markChatRead: baseProcedure
-    .input(z.object({ badgeBucket: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) => {
-      await db
-        .update(badge_counts)
-        .set({ badge_count: 0 })
-        .where(
-          and(
-            eq(badge_counts.user_id, ctx.user.id),
-            eq(badge_counts.badge_bucket, input.badgeBucket)
-          )
-        );
-
-      const [totals] = await db
-        .select({ total: sum(badge_counts.badge_count) })
-        .from(badge_counts)
-        .where(eq(badge_counts.user_id, ctx.user.id));
-
-      return { badgeCount: Number(totals?.total ?? 0) };
-    }),
-
-  // Per-channel unread counts for showing badges on the mobile dashboard. For
-  // kiloclaw chats, `channelId` equals `sandbox_id` (see NotificationChannelDO).
-  // Destroyed instances are filtered implicitly on the client — the dashboard only
-  // renders cards for instances returned by `listAllInstances`, which already
-  // excludes destroyed ones.
-  getUnreadCounts: baseProcedure.query(async ({ ctx }) => {
-    return readDb
-      .select({
-        badgeBucket: badge_counts.badge_bucket,
-        badgeCount: badge_counts.badge_count,
-      })
-      .from(badge_counts)
-      .where(and(eq(badge_counts.user_id, ctx.user.id), gt(badge_counts.badge_count, 0)));
   }),
 });

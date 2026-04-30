@@ -309,7 +309,7 @@ export function OnboardingFlow() {
   ]);
 
   const onOpenInstance = useCallback(() => {
-    // Dismiss the onboarding modal, then open the chat. `chat/[instance-id]`
+    // Dismiss the onboarding modal, then open the chat. `chat/[sandbox-id]`
     // is at the (app) layer, so it renders above the tab bar once the modal
     // closes.
     router.back();

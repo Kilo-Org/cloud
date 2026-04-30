@@ -21,7 +21,6 @@ export default function AppLayout() {
           }}
         >
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="chat/[instance-id]" />
           <Stack.Screen
             name="chat/instance-picker"
             options={{

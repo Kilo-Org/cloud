@@ -906,6 +906,61 @@ describe('createPairingCache', () => {
       await cache.refreshDevicePairing();
       expect(approveGatewayClientDeviceImpl).toHaveBeenCalledTimes(2);
     });
+
+    it('prunes retry backoff for disappeared gateway-client requests', async () => {
+      const approveGatewayClientDeviceImpl = vi
+        .fn<ApproveGatewayClientDeviceImpl>()
+        .mockRejectedValueOnce(new Error('local approval failed'))
+        .mockResolvedValue();
+      const oldRequest = {
+        requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        deviceId: 'dev1',
+        clientId: 'gateway-client',
+        role: 'operator',
+        roles: ['operator'],
+        ts: RECENT_TS,
+      };
+      const newRequest = {
+        requestId: 'b1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        deviceId: 'dev1',
+        clientId: 'gateway-client',
+        role: 'operator',
+        roles: ['operator'],
+        ts: RECENT_TS,
+      };
+      let currentRequest = oldRequest;
+      const readTextFileImpl = vi.fn<ReadTextFileImpl>().mockImplementation(async () =>
+        JSON.stringify({
+          [currentRequest.requestId]: {
+            ...currentRequest,
+            scopes: GATEWAY_CLIENT_OPERATOR_SCOPES,
+          },
+        })
+      );
+      const readDevicePairingImpl = vi.fn<ReadDevicePairingImpl>().mockImplementation(async () => ({
+        [currentRequest.requestId]: currentRequest,
+      }));
+
+      const cache = createPairingCache({
+        approveGatewayClientDeviceImpl,
+        readConfigImpl: () => ({ channels: {} }),
+        readChannelPairingImpl: vi.fn<ReadChannelPairingImpl>().mockResolvedValue({ requests: [] }),
+        readDevicePairingImpl,
+        readTextFileImpl,
+        writeTextFileAtomicImpl: vi.fn<WriteTextFileAtomicImpl>().mockResolvedValue(),
+        nowImpl: () => '2026-03-12T00:00:00.000Z',
+        nowMsImpl: () => NOW_MS,
+        autoApproveGatewayClient: true,
+      });
+
+      await cache.refreshDevicePairing();
+      expect(approveGatewayClientDeviceImpl).toHaveBeenCalledWith(oldRequest.requestId);
+      currentRequest = newRequest;
+      await cache.refreshDevicePairing();
+
+      expect(approveGatewayClientDeviceImpl).toHaveBeenCalledTimes(2);
+      expect(approveGatewayClientDeviceImpl).toHaveBeenLastCalledWith(newRequest.requestId);
+    });
   });
 
   describe('error handling', () => {

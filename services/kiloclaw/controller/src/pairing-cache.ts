@@ -474,6 +474,13 @@ export function createPairingCache(options?: PairingCacheOptions): PairingCache 
       }
       console.log(`[pairing-cache] devices: read ok, ${requests.length} pending`);
 
+      const currentRequestIds = new Set(requests.map(req => req.requestId));
+      for (const requestId of gatewayClientApprovalRetryAfter.keys()) {
+        if (!currentRequestIds.has(requestId)) {
+          gatewayClientApprovalRetryAfter.delete(requestId);
+        }
+      }
+
       if (autoApproveGatewayClient && options?.autoApprove !== false) {
         const gatewayRequests = requests.filter(isGatewayClientOperatorRequest);
         let shouldRefreshAfterApproval = false;

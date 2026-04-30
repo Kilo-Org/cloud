@@ -3,11 +3,11 @@ import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
+import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
 import { parseNotificationData } from '@/lib/notifications';
-import { useTRPC } from '@/lib/trpc';
 
 /**
- * Keeps the `user.getUnreadCounts` cache in sync with real-time notification
+ * Keeps the `['badges', userId]` cache in sync with real-time notification
  * traffic so per-instance badges on the dashboard reflect pushes received while
  * the app is open or resumed from background.
  *
@@ -20,14 +20,16 @@ import { useTRPC } from '@/lib/trpc';
  */
 export function useUnreadCountsInvalidation() {
   const queryClient = useQueryClient();
-  const trpc = useTRPC();
+  const userId = useCurrentUserId();
 
   useEffect(() => {
-    // `trpc` is stable (memoized inside TRPCProvider) but `queryKey()` returns
-    // a fresh array on each call, so we resolve it inside each invalidation.
+    if (userId === null) {
+      return undefined;
+    }
+
     const invalidate = () => {
       void queryClient.invalidateQueries({
-        queryKey: trpc.user.getUnreadCounts.queryKey(),
+        queryKey: ['badges', userId],
       });
     };
 
@@ -48,5 +50,5 @@ export function useUnreadCountsInvalidation() {
       received.remove();
       appStateSubscription.remove();
     };
-  }, [queryClient, trpc]);
+  }, [queryClient, userId]);
 }

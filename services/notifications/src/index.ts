@@ -1,5 +1,8 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
+import type { MiddlewareHandler } from 'hono';
+import { cors } from 'hono/cors';
+import { useWorkersLogger } from 'workers-tagged-logger';
 
 import { presenceContextForConversation } from '@kilocode/event-service';
 import {
@@ -11,14 +14,52 @@ import {
   type SendPushForConversationOutput,
 } from '@kilocode/notifications';
 
+import { authMiddleware, type AuthContext } from './auth';
 import { queue } from './queue-consumer';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
 
-const app = new Hono<{ Bindings: Env }>();
+const ALLOWED_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
+
+const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+
+// ── Structured logging context ──────────────────────────────────────────
+// Establishes AsyncLocalStorage context so all downstream logs (including
+// tags set by the auth middleware) propagate through the request.
+// Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
+app.use('*', useWorkersLogger('notifications') as unknown as MiddlewareHandler);
+
 app.get('/', c => c.json({ ok: true }));
 
-type ConversationDOStub = {
+app.use(
+  '/v1/*',
+  cors({
+    origin: origin => (ALLOWED_ORIGINS.includes(origin) ? origin : null),
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+app.use('/v1/*', authMiddleware);
+
+app.get('/v1/badges', async c => {
+  const userId = c.get('callerId');
+  const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
+  const buckets = await stub.listNonZeroBuckets();
+  return c.json({ buckets });
+});
+
+app.post('/v1/badges/mark-read', async c => {
+  const userId = c.get('callerId');
+  const body = await c.req.json<{ badgeBucket?: string }>().catch(() => null);
+  if (!body?.badgeBucket) {
+    return c.json({ error: 'badgeBucket required' }, 400);
+  }
+  const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
+  const badgeCount = await stub.markBucketRead(body.badgeBucket);
+  return c.json({ badgeCount });
+});
+
+type RecipientDOStub = {
   dispatchPush: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;
 };
 
@@ -26,7 +67,7 @@ type ConversationDOStub = {
 export async function sendPushForConversationCore(
   input: SendPushForConversationInput,
   deps: {
-    getConversationDOStub: (conversationId: string) => ConversationDOStub;
+    getRecipientDOStub: (userId: string) => RecipientDOStub;
   }
 ): Promise<SendPushForConversationOutput> {
   const recipients: string[] = [];
@@ -40,7 +81,7 @@ export async function sendPushForConversationCore(
 
   const perRecipient: PerRecipientResult[] = [];
   for (const userId of recipients) {
-    const stub = deps.getConversationDOStub(input.conversationId);
+    const stub = deps.getRecipientDOStub(userId);
     const outcome = await stub.dispatchPush({
       userId,
       presenceContext: presenceContextForConversation(input.sandboxId, input.conversationId),
@@ -80,10 +121,10 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     input: SendPushForConversationInput
   ): Promise<SendPushForConversationOutput> {
     return sendPushForConversationCore(input, {
-      getConversationDOStub: (conversationId: string) =>
+      getRecipientDOStub: (userId: string) =>
         this.env.NOTIFICATION_CHANNEL_DO.get(
-          this.env.NOTIFICATION_CHANNEL_DO.idFromName(conversationId)
-        ) as unknown as ConversationDOStub,
+          this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
+        ) as unknown as RecipientDOStub,
     });
   }
 }

@@ -1,8 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { badge_counts, user_push_tokens } from '@kilocode/db/schema';
+import { user_push_tokens } from '@kilocode/db/schema';
 import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/notifications';
-import { eq, inArray, sql, sum } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 import type { ExpoPushMessage, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
@@ -16,14 +16,15 @@ type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 type IdemRecord = { stage: 'pending' | 'delivered'; ts: number };
 
 const IDEM_PREFIX = 'idem:';
+const BUCKET_PREFIX = 'bucket:';
 const IDEM_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export class NotificationChannelDO extends DurableObject<Env> {
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
     // 1. Idempotency. DO is single-threaded — requests for a given
-    //    conversation serialize on this instance. A `failed` outcome
-    //    leaves the record at `pending` so upstream can retry the send
-    //    without re-incrementing the badge.
+    //    user serialize on this instance. A `failed` outcome leaves the
+    //    record at `pending` so upstream can retry the send without
+    //    re-incrementing the badge.
     const idemKey = `${IDEM_PREFIX}${input.idempotencyKey}`;
     const existing = await this.ctx.storage.get<IdemRecord>(idemKey);
     if (existing?.stage === 'delivered') return { kind: 'duplicate' };
@@ -60,23 +61,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
         // Also schedule cleanup at this point — if Expo keeps failing and
         // no future push ever lands, `pending` would otherwise leak.
         await this.ensureCleanupAlarm(ts);
-        await db
-          .insert(badge_counts)
-          .values({
-            user_id: input.userId,
-            badge_bucket: input.badge.badgeBucket,
-            badge_count: input.badge.delta,
-          })
-          .onConflictDoUpdate({
-            target: [badge_counts.user_id, badge_counts.badge_bucket],
-            set: { badge_count: sql`${badge_counts.badge_count} + ${input.badge.delta}` },
-          });
+        await this.incrementBucket(input.badge.badgeBucket, input.badge.delta);
       }
-      const [totals] = await db
-        .select({ total: sum(badge_counts.badge_count) })
-        .from(badge_counts)
-        .where(eq(badge_counts.user_id, input.userId));
-      badgeTotal = Number(totals?.total ?? 0);
+      badgeTotal = await this.getTotal();
     }
 
     // 5. Send via Expo
@@ -120,6 +107,30 @@ export class NotificationChannelDO extends DurableObject<Env> {
     return { kind: 'delivered', tokenCount: tokens.length };
   }
 
+  /**
+   * Clear a bucket and return the user's new total. Called when a user
+   * marks a conversation as read.
+   */
+  async markBucketRead(bucket: string): Promise<number> {
+    await this.ctx.storage.delete(`${BUCKET_PREFIX}${bucket}`);
+    return this.getTotal();
+  }
+
+  /**
+   * Return all non-zero buckets for this user, used to hydrate clients on
+   * cold start.
+   */
+  async listNonZeroBuckets(): Promise<{ badgeBucket: string; badgeCount: number }[]> {
+    const entries = await this.ctx.storage.list<number>({ prefix: BUCKET_PREFIX });
+    const out: { badgeBucket: string; badgeCount: number }[] = [];
+    for (const [key, count] of entries) {
+      if (count > 0) {
+        out.push({ badgeBucket: key.slice(BUCKET_PREFIX.length), badgeCount: count });
+      }
+    }
+    return out;
+  }
+
   override async alarm(): Promise<void> {
     const now = Date.now();
     const entries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
@@ -133,8 +144,8 @@ export class NotificationChannelDO extends DurableObject<Env> {
       }
     }
     if (expired.length > 0) await this.ctx.storage.delete(expired);
-    // Reschedule for the earliest remaining record so a quiet conversation
-    // still gets its leftover entries pruned exactly once their TTL elapses.
+    // Reschedule for the earliest remaining record so a quiet user still
+    // gets its leftover entries pruned exactly once their TTL elapses.
     if (earliestRemaining !== undefined) {
       await this.ctx.storage.setAlarm(earliestRemaining + IDEM_TTL_MS);
     }
@@ -142,10 +153,26 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
   // Schedule cleanup `IDEM_TTL_MS` from `refTs` only if no alarm is pending.
   // `setAlarm` replaces any existing alarm; calling it unconditionally would
-  // push cleanup forward indefinitely on a busy conversation.
+  // push cleanup forward indefinitely on a busy user.
   private async ensureCleanupAlarm(refTs: number): Promise<void> {
     if ((await this.ctx.storage.getAlarm()) === null) {
       await this.ctx.storage.setAlarm(refTs + IDEM_TTL_MS);
     }
+  }
+
+  // Read-modify-write of a bucket counter. The DO is single-threaded, so
+  // this is race-free without explicit locking.
+  private async incrementBucket(bucket: string, delta: number): Promise<void> {
+    const key = `${BUCKET_PREFIX}${bucket}`;
+    const current = (await this.ctx.storage.get<number>(key)) ?? 0;
+    await this.ctx.storage.put<number>(key, current + delta);
+  }
+
+  // Sum of all bucket counters for this user.
+  private async getTotal(): Promise<number> {
+    const entries = await this.ctx.storage.list<number>({ prefix: BUCKET_PREFIX });
+    let total = 0;
+    for (const value of entries.values()) total += value;
+    return total;
   }
 }

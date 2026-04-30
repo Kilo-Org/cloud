@@ -1,26 +1,44 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
+import { useKiloChatTokenGetter } from '@/components/kilo-chat/hooks/use-kilo-chat-token';
 import { badgeBucketForInstance } from '@/lib/badge-buckets';
-import { useTRPC } from '@/lib/trpc';
+import { NOTIFICATIONS_URL } from '@/lib/config';
+
+type Bucket = { badgeBucket: string; badgeCount: number };
 
 /**
- * Fetches unread message counts for the current user and returns a Map keyed by
- * instance badge bucket for O(1) lookup from dashboard cards. Conversation
- * buckets are summed into their parent instance bucket.
+ * Fetches unread message counts for the current user from the notifications
+ * worker and returns a Map keyed by instance badge bucket for O(1) lookup from
+ * dashboard cards. Conversation buckets are summed into their parent instance
+ * bucket.
  *
  * Freshness is driven by invalidations, not polling:
  *   - Foreground chat push → invalidate (see `use-unread-counts-invalidation`).
  *   - App returns to active → invalidate.
- *   - `markChatRead` optimistically clears the relevant row.
+ *   - `useMarkRead` optimistically clears the relevant row.
  */
 export function useUnreadCounts() {
-  const trpc = useTRPC();
-  const query = useQuery(
-    trpc.user.getUnreadCounts.queryOptions(undefined, {
-      staleTime: 30_000,
-    })
-  );
+  const userId = useCurrentUserId();
+  const getToken = useKiloChatTokenGetter();
+
+  const query = useQuery<Bucket[]>({
+    queryKey: ['badges', userId],
+    enabled: userId !== null,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const token = await getToken();
+      const response = await fetch(`${NOTIFICATIONS_URL}/v1/badges`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch badges: ${response.status}`);
+      }
+      const body = (await response.json()) as { buckets: Bucket[] };
+      return body.buckets;
+    },
+  });
 
   const byBadgeBucket = useMemo(() => {
     const map = new Map<string, number>();

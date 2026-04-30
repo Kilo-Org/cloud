@@ -757,6 +757,13 @@
       "when": 1777476540389,
       "tag": "0107_dapper_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1777554058793,
+      "tag": "0108_drop_badge_counts",
+      "breakpoints": true
     }
   ]
 }

@@ -28,6 +28,7 @@
     "drizzle-orm": "catalog:",
     "expo-server-sdk": "^6.1.0",
     "hono": "catalog:",
+    "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   }
 }

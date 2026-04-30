@@ -4,6 +4,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { type SlackEvent } from '@chat-adapter/slack';
 import { platform_integrations } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 export function getSlackTeamId(message: Message<SlackEvent>): string {
   const teamId = message.raw.team_id ?? message.raw.team;
@@ -21,7 +22,7 @@ export function getPlatformIdentity(thread: Thread, message: Message): PlatformI
   switch (platform) {
     case 'slack': {
       const teamId = getSlackTeamId(message as Message<SlackEvent>);
-      return { platform: 'slack', teamId, userId: message.author.userId };
+      return { platform: PLATFORM.SLACK, teamId, userId: message.author.userId };
     }
     default:
       throw new Error(`PlatformNotSupported: ${platform}`);

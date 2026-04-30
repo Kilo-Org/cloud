@@ -274,20 +274,12 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
 }
 
 function applyPreferredProvider(
-  provider: Provider,
   requestedModel: string,
   requestToMutate:
     | OpenRouterChatCompletionRequest
     | GatewayResponsesRequest
     | GatewayMessagesRequest
 ) {
-  // OpenRouter's `provider.order` field is only respected by OpenRouter itself
-  // and the Vercel AI Gateway (which mirrors the OpenRouter contract). Skipping
-  // other providers avoids leaking an OpenRouter-shaped field into e.g. direct
-  // BYOK requests, where it could be forwarded to an upstream that rejects it.
-  if (provider.id !== 'openrouter' && provider.id !== 'vercel') {
-    return;
-  }
   const preferredProviderOrder = getPreferredProviderOrder(requestedModel);
   if (preferredProviderOrder.length === 0) {
     return;
@@ -331,7 +323,9 @@ export function applyProviderSpecificLogic(
     applyToolChoiceSetting(requestedModel, requestToMutate.body);
   }
 
-  applyPreferredProvider(provider, requestedModel, requestToMutate.body);
+  if (provider.id === 'openrouter' || provider.id === 'vercel') {
+    applyPreferredProvider(requestedModel, requestToMutate.body);
+  }
 
   if (isGrokModel(requestedModel)) {
     applyXaiModelSettings(requestToMutate, extraHeaders);

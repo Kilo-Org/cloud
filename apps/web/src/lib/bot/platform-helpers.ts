@@ -84,9 +84,8 @@ export async function getPlatformIntegrationByBotUserId(
 
 export function getBotDocumentationUrl(platform: string): string {
   switch (platform) {
-    case PLATFORM.SLACK:
-      return 'https://kilo.ai/docs/code-with-ai/platforms/slack';
+    //TODO(remon): Update when we have specific docs pages for other platforms
     default:
-      return 'https://kilo.ai/docs/code-with-ai';
+      return 'https://kilo.ai/docs/code-with-ai/platforms/slack';
   }
 }

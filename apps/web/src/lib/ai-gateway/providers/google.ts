@@ -1,14 +1,13 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { modelStartsWith } from '@/lib/ai-gateway/providers/model-prefix';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
 export function isGeminiModel(model: string) {
-  return modelStartsWith(model, 'google/gemini');
+  return model.includes('gemini');
 }
 
 export function isGemmaModel(model: string) {
-  return modelStartsWith(model, 'google/gemma');
+  return model.includes('gemma');
 }
 
 export const GEMMA_4_31B_IT_ID = 'google/gemma-4-31b-it';
@@ -29,7 +28,7 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
 };
 
 export function isGemini3Model(model: string) {
-  return modelStartsWith(model, 'google/gemini-3');
+  return model.includes('gemini-3');
 }
 
 type ReadFileParametersSchema = {

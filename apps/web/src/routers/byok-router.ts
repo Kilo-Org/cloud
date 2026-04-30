@@ -30,6 +30,7 @@ import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/pr
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
 import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
@@ -124,7 +125,7 @@ async function fetchSupportedModels() {
   for (const openRouterModel of Object.values(openRouterModelMetadata.data)) {
     const vercelModel = vercelModelMetadata.data[mapModelIdToVercel(openRouterModel.id, false)];
     if (!vercelModel) continue;
-    if (vercelModel.id.includes('codestral')) continue;
+    if (isCodestralModel(vercelModel.id)) continue;
     if (vercelModel.type !== 'language') continue;
     for (const endpoint of vercelModel.endpoints) {
       const providerParsed = VercelUserByokInferenceProviderIdSchema.safeParse(endpoint.tag);

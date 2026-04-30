@@ -9,12 +9,12 @@ import type {
   GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
-import { applyXaiModelSettings, isXaiModel } from '@/lib/ai-gateway/providers/xai';
+import { applyXaiModelSettings, isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
-import { isAnthropicModel, isHaikuModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel, isHaikuModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
@@ -26,11 +26,11 @@ import { hasAttemptCompletionTool } from '@/lib/ai-gateway/tool-calling';
 import { applyGoogleModelSettings, isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
-import { applyMoonshotModelSettings, isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
+import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
-import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { isZaiModel } from '@/lib/ai-gateway/providers/zai';
+import { isGptModel } from '@/lib/ai-gateway/providers/openai';
+import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { BYOKResult, GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
@@ -44,7 +44,7 @@ import {
   addCacheBreakpoints,
   injectReasoningIntoContent,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import { isStepFunModel } from '@/lib/ai-gateway/providers/stepfun';
+import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import type { FraudDetectionHeaders } from '@/lib/utils';
 
 function inferSupportedChatApis(
@@ -225,8 +225,8 @@ function applyToolChoiceSetting(
     (requestToMutate.reasoning?.effort ?? 'none') !== 'none' ||
     (requestToMutate.reasoning?.max_tokens ?? 0) > 0;
   if (
-    isXaiModel(requestedModel) ||
-    isOpenAiModel(requestedModel) ||
+    isGrokModel(requestedModel) ||
+    isGptModel(requestedModel) ||
     isGeminiModel(requestedModel) ||
     (isHaikuModel(requestedModel) && !isReasoningEnabled)
   ) {
@@ -236,7 +236,7 @@ function applyToolChoiceSetting(
 }
 
 function getPreferredProviderOrder(requestedModel: string): string[] {
-  if (isAnthropicModel(requestedModel)) {
+  if (isClaudeModel(requestedModel)) {
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,
@@ -248,16 +248,16 @@ function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isMistralModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.mistral];
   }
-  if (isMoonshotModel(requestedModel)) {
+  if (isKimiModel(requestedModel)) {
     return [
       OpenRouterInferenceProviderIdSchema.enum.moonshotai,
       OpenRouterInferenceProviderIdSchema.enum.novita,
     ];
   }
-  if (isStepFunModel(requestedModel)) {
+  if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
   }
-  if (isZaiModel(requestedModel)) {
+  if (isGlmModel(requestedModel)) {
     return [
       OpenRouterInferenceProviderIdSchema.enum.novita,
       OpenRouterInferenceProviderIdSchema.enum['z-ai'],
@@ -308,7 +308,7 @@ export function applyProviderSpecificLogic(
     }
   }
 
-  if (isAnthropicModel(requestedModel)) {
+  if (isClaudeModel(requestedModel)) {
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
   }
 
@@ -318,7 +318,7 @@ export function applyProviderSpecificLogic(
 
   applyPreferredProvider(requestedModel, requestToMutate.body);
 
-  if (isXaiModel(requestedModel)) {
+  if (isGrokModel(requestedModel)) {
     applyXaiModelSettings(requestToMutate, extraHeaders);
   }
 
@@ -326,7 +326,7 @@ export function applyProviderSpecificLogic(
     applyGoogleModelSettings(provider.id, requestToMutate);
   }
 
-  if (isMoonshotModel(requestedModel)) {
+  if (isKimiModel(requestedModel)) {
     applyMoonshotModelSettings(requestToMutate);
   }
 

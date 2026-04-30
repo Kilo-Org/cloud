@@ -16,12 +16,12 @@ export const grok_code_fast_1_optimized_free_model: KiloExclusiveModel = {
   exclusive_to: [],
 };
 
-export function isXaiModel(requestedModel: string) {
-  return requestedModel.startsWith('x-ai/');
+export function isGrokModel(requestedModel: string) {
+  return requestedModel.includes('grok');
 }
 
 export function isGrok4Model(model: string) {
-  return model.startsWith('x-ai/grok-4');
+  return model.includes('grok-4');
 }
 
 export function applyXaiModelSettings(

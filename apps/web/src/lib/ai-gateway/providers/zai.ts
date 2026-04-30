@@ -1,3 +1,3 @@
-export function isZaiModel(model: string) {
-  return model.startsWith('z-ai/');
+export function isGlmModel(model: string) {
+  return model.includes('glm');
 }

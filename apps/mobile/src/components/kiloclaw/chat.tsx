@@ -17,6 +17,7 @@ import { ChatHeader, ChatShell } from '@/components/kiloclaw/chat-shell';
 import { useBotOnlineStatus } from '@/components/kiloclaw/chat-hooks';
 import { NotificationPrompt } from '@/components/kiloclaw/notification-prompt';
 import { useStreamChatTheme } from '@/components/kiloclaw/chat-theme';
+import { badgeBucketForInstance } from '@/lib/badge-buckets';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useStreamChatCredentials } from '@/lib/hooks/use-kiloclaw-queries';
 import { setLastActiveInstance } from '@/lib/last-active-instance';
@@ -30,7 +31,7 @@ type KiloClawChatProps = {
   organizationId?: string | null;
 };
 
-type UnreadCountsData = { channelId: string; badgeCount: number }[];
+type UnreadCountsData = { badgeBucket: string; badgeCount: number }[];
 
 export function KiloClawChat({
   instanceId,
@@ -48,11 +49,11 @@ export function KiloClawChat({
 
   const { mutate: markChatRead } = useMutation(
     trpc.user.markChatRead.mutationOptions({
-      onMutate: async ({ channelId }) => {
+      onMutate: async ({ badgeBucket }) => {
         await queryClient.cancelQueries({ queryKey: unreadCountsKey });
         const previous = queryClient.getQueryData<UnreadCountsData>(unreadCountsKey);
         queryClient.setQueryData<UnreadCountsData>(unreadCountsKey, old =>
-          (old ?? []).filter(row => row.channelId !== channelId)
+          (old ?? []).filter(row => row.badgeBucket !== badgeBucket)
         );
         return { previous };
       },
@@ -73,9 +74,10 @@ export function KiloClawChat({
 
   useFocusEffect(
     useCallback(() => {
+      const badgeBucket = badgeBucketForInstance(instanceId);
       isFocusedRef.current = true;
       setLastActiveInstance(instanceId);
-      markChatRead({ channelId: instanceId });
+      markChatRead({ badgeBucket });
 
       // If a notification for this chat arrives while the screen is already open it is
       // visually suppressed, but the DO still incremented the server-side count. Clear
@@ -102,7 +104,7 @@ export function KiloClawChat({
   // not an app-state one), so without this the badge stays stuck after backgrounding.
   useEffect(() => {
     if (isActive && isFocusedRef.current) {
-      markChatRead({ channelId: instanceId });
+      markChatRead({ badgeBucket: badgeBucketForInstance(instanceId) });
     }
   }, [isActive, instanceId, markChatRead]);
 

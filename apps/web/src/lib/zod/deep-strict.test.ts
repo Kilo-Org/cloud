@@ -95,4 +95,33 @@ describe('deepStrict', () => {
     expect(schema.safeParse({ n: 'not-a-number' }).success).toBe(false);
     expect(schema.safeParse({ n: 5 }).success).toBe(true);
   });
+
+  test('passes recognised leaves through unchanged', () => {
+    const leaves = [
+      z.string(),
+      z.number(),
+      z.boolean(),
+      z.date(),
+      z.literal('x'),
+      z.enum(['a', 'b']),
+      z.any(),
+      z.unknown(),
+      z.bigint(),
+    ];
+    for (const leaf of leaves) {
+      expect(() => deepStrict(leaf)).not.toThrow();
+    }
+  });
+
+  test('throws on unsupported wrappers so new Zod types surface loudly', () => {
+    expect(() =>
+      deepStrict(z.intersection(z.object({ a: z.string() }), z.object({ b: z.number() })))
+    ).toThrow(/deepStrict: unsupported Zod type 'intersection'/);
+    expect(() => deepStrict(z.tuple([z.string(), z.number()]))).toThrow(
+      /deepStrict: unsupported Zod type 'tuple'/
+    );
+    expect(() => deepStrict(z.string().transform(s => s.length))).toThrow(
+      /deepStrict: unsupported Zod type/
+    );
+  });
 });

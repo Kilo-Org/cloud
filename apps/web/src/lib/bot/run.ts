@@ -20,7 +20,7 @@ export async function processMessage({
 }) {
   const startedAt = Date.now();
 
-  // Extract and upload any image attachments from the Slack message to R2.
+  // Extract and upload any image attachments from the chat message to R2.
   // This runs before the agent loop so the images are ready when a Cloud Agent
   // session is spawned. Failures are non-fatal — we log and continue without images.
   let images: Awaited<ReturnType<typeof extractAndUploadImages>>;

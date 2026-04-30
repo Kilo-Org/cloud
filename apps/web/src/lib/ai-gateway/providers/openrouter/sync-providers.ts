@@ -27,11 +27,7 @@ import { EndpointsSchema, ModelsSchema } from '@/lib/ai-gateway/providers/vercel
 import { redisSet } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
-
-const ATTRIBUTION_HEADERS = {
-  'HTTP-Referer': 'https://kilocode.ai',
-  'X-Title': 'Kilo Code',
-} as const;
+import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent

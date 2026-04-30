@@ -14,13 +14,17 @@ export function useInstancePresence(sandboxId: string | undefined) {
     const sub = AppState.addEventListener('change', state => {
       setAppActive(state === 'active');
     });
-    return () => sub.remove();
+    return () => {
+      sub.remove();
+    };
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
-      return () => setFocused(false);
+      return () => {
+        setFocused(false);
+      };
     }, [])
   );
 

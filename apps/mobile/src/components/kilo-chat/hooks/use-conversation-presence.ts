@@ -17,20 +17,22 @@ export function useConversationPresence(
     const sub = AppState.addEventListener('change', state => {
       setAppActive(state === 'active');
     });
-    return () => sub.remove();
+    return () => {
+      sub.remove();
+    };
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
-      return () => setFocused(false);
+      return () => {
+        setFocused(false);
+      };
     }, [])
   );
 
   usePresenceSubscription(
-    sandboxId && conversationId
-      ? presenceContextForConversation(sandboxId, conversationId)
-      : null,
+    sandboxId && conversationId ? presenceContextForConversation(sandboxId, conversationId) : null,
     Boolean(sandboxId && conversationId) && appActive && focused
   );
 }

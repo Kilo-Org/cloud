@@ -12,7 +12,9 @@ export function useAppPresence() {
     const sub = AppState.addEventListener('change', state => {
       setActive(state === 'active');
     });
-    return () => sub.remove();
+    return () => {
+      sub.remove();
+    };
   }, []);
 
   usePresenceSubscription(presenceContextForPlatform('app'), active);

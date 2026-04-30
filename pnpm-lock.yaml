@@ -173,6 +173,9 @@ importers:
       '@sentry/react-native':
         specifier: ~7.11.0
         version: 7.11.0(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
+      '@shopify/flash-list':
+        specifier: 2.0.2
+        version: 2.0.2(@babel/runtime@7.29.2)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       '@tailwindcss/postcss':
         specifier: ^4.2.2
         version: 4.2.2
@@ -328,7 +331,7 @@ importers:
         version: 9.38.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       stream-chat-expo:
         specifier: ^8.13.7
-        version: 8.13.7(f3af0588b693ec71c0fc67ae0290618e)
+        version: 8.13.7(e673e8bffb1896cc06607271df6a38dc)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -1601,7 +1604,7 @@ importers:
         version: 7.0.0-dev.20260319.1
       jest:
         specifier: ^30.3.0
-        version: 30.3.0(@types/node@24.12.0)(esbuild-register@3.6.0(esbuild@0.27.4))
+        version: 30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4))
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -6813,6 +6816,13 @@ packages:
     engines: {node: '>= 18'}
     peerDependencies:
       webpack: '>=5.0.0'
+
+  '@shopify/flash-list@2.0.2':
+    resolution: {integrity: sha512-zhlrhA9eiuEzja4wxVvotgXHtqd3qsYbXkQ3rsBfOgbFA9BVeErpDE/yEwtlIviRGEqpuFj/oU5owD6ByaNX+w==}
+    peerDependencies:
+      '@babel/runtime': '*'
+      react: '*'
+      react-native: '*'
 
   '@sideway/address@4.1.5':
     resolution: {integrity: sha512-IqO/DUQHUkPeixNQ8n0JA6102hT9CmaljNTPmQ1u8MEhBo/R4Q8eKLN/vGZxuebwOroDB4cbpjheD4+/sKFK4Q==}
@@ -20523,6 +20533,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@shopify/flash-list@2.0.2(@babel/runtime@7.29.2)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)':
+    dependencies:
+      '@babel/runtime': 7.29.2
+      react: 19.2.0
+      react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
+      tslib: 2.8.1
+
   '@sideway/address@4.1.5':
     dependencies:
       '@hapi/hoek': 9.3.0
@@ -25729,6 +25746,25 @@ snapshots:
       - supports-color
       - ts-node
 
+  jest-cli@30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4)):
+    dependencies:
+      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
+      '@jest/test-result': 30.3.0
+      '@jest/types': 30.3.0
+      chalk: 4.1.2
+      exit-x: 0.2.2
+      import-local: 3.2.0
+      jest-config: 30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4))
+      jest-util: 30.3.0
+      jest-validate: 30.3.0
+      yargs: 17.7.2
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - esbuild-register
+      - supports-color
+      - ts-node
+
   jest-config@29.7.0(@types/node@24.12.0):
     dependencies:
       '@babel/core': 7.29.0
@@ -26373,6 +26409,19 @@ snapshots:
       '@jest/types': 30.3.0
       import-local: 3.2.0
       jest-cli: 30.3.0(@types/node@24.12.0)(esbuild-register@3.6.0(esbuild@0.27.4))
+    transitivePeerDependencies:
+      - '@types/node'
+      - babel-plugin-macros
+      - esbuild-register
+      - supports-color
+      - ts-node
+
+  jest@30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4)):
+    dependencies:
+      '@jest/core': 30.3.0(esbuild-register@3.6.0(esbuild@0.27.4))
+      '@jest/types': 30.3.0
+      import-local: 3.2.0
+      jest-cli: 30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.27.4))
     transitivePeerDependencies:
       - '@types/node'
       - babel-plugin-macros
@@ -29668,12 +29717,12 @@ snapshots:
 
   stream-buffers@2.2.0: {}
 
-  stream-chat-expo@8.13.7(f3af0588b693ec71c0fc67ae0290618e):
+  stream-chat-expo@8.13.7(e673e8bffb1896cc06607271df6a38dc):
     dependencies:
       expo: 55.0.12(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@55.0.9)(bufferutil@4.1.0)(expo-router@55.0.11)(react-dom@19.2.4(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       expo-image-manipulator: 55.0.14(expo@55.0.12)
       mime: 4.1.0
-      stream-chat-react-native-core: 8.13.7(patch_hash=6fa2fe7a3ddb0ab3312ee1adc4e07d3fc9c46f7bc5bb861675bef4078808b8c0)(ab8a9f6f835746e18b11cebeae560e08)
+      stream-chat-react-native-core: 8.13.7(patch_hash=6fa2fe7a3ddb0ab3312ee1adc4e07d3fc9c46f7bc5bb861675bef4078808b8c0)(f6393708cf819e255e90d2b806f318a8)
     optionalDependencies:
       expo-audio: 55.0.12(expo-asset@55.0.13(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3))(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       expo-clipboard: 55.0.12(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
@@ -29702,7 +29751,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  stream-chat-react-native-core@8.13.7(patch_hash=6fa2fe7a3ddb0ab3312ee1adc4e07d3fc9c46f7bc5bb861675bef4078808b8c0)(ab8a9f6f835746e18b11cebeae560e08):
+  stream-chat-react-native-core@8.13.7(patch_hash=6fa2fe7a3ddb0ab3312ee1adc4e07d3fc9c46f7bc5bb861675bef4078808b8c0)(f6393708cf819e255e90d2b806f318a8):
     dependencies:
       '@gorhom/bottom-sheet': 5.1.8(patch_hash=c5eaae9a28f5662f32d66e0129609680309eddc44720d6a2b1e02bbc2b5dd11f)(@types/react@19.2.14)(react-native-gesture-handler@2.30.0(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0))(react-native-reanimated@4.2.1(react-native-worklets@0.7.2(@babel/core@7.29.0)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       '@react-native-community/netinfo': 11.5.2(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
@@ -29726,6 +29775,7 @@ snapshots:
       use-sync-external-store: 1.6.0(react@19.2.0)
     optionalDependencies:
       '@emoji-mart/data': 1.2.1
+      '@shopify/flash-list': 2.0.2(@babel/runtime@7.29.2)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       emoji-mart: 5.6.0
     transitivePeerDependencies:
       - '@types/react'

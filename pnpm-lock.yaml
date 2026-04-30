@@ -146,6 +146,15 @@ importers:
       '@expo/react-native-action-sheet':
         specifier: ^4.1.1
         version: 4.1.1(@types/react@19.2.14)(react@19.2.0)
+      '@kilocode/event-service':
+        specifier: workspace:*
+        version: link:../../packages/event-service
+      '@kilocode/kilo-chat':
+        specifier: workspace:*
+        version: link:../../packages/kilo-chat
+      '@kilocode/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@kilocode/trpc':
         specifier: workspace:*
         version: link:../../packages/trpc

@@ -13,15 +13,20 @@ const SUBPROTOCOL_PREFIX = 'kilo.jwt.';
 
 /**
  * Thrown (and surfaced via {@link EventServiceConfig.onUnauthorized}) when the
- * Event Service rejects the WebSocket upgrade with 401/403. Browsers do not
- * expose the HTTP status of a failed WebSocket handshake, so the client
- * treats any pre-open 'error' event as a potential auth failure and relies on
- * the callback to trigger token refresh/sign-out.
+ * Event Service can distinguish an auth failure from a transient connection
+ * failure.
  */
 export class WebSocketAuthError extends Error {
   constructor(message = 'WebSocket authentication failed') {
     super(message);
     this.name = 'WebSocketAuthError';
+  }
+}
+
+export class WebSocketConnectionError extends Error {
+  constructor() {
+    super('WebSocket connection failed before open');
+    this.name = 'WebSocketConnectionError';
   }
 }
 
@@ -180,12 +185,11 @@ export class EventServiceClient {
       ws.addEventListener('error', () => {
         if (this.ws !== ws) return;
         // error is always followed by close, so we only need to reject the
-        // connect promise here if we never opened. The browser does not
-        // expose the HTTP status of a failed upgrade, so treat pre-open
-        // errors as potential auth failures and surface them via
-        // onUnauthorized. Callers can refresh the token and reconnect.
+        // connect promise here if we never opened. Browser and React Native
+        // WebSocket APIs do not expose the HTTP status of a failed upgrade,
+        // so a pre-open error is retried like any other connection failure.
         if (!this.connected) {
-          settleReject(new WebSocketAuthError());
+          settleReject(new WebSocketConnectionError());
         }
       });
     });

@@ -210,18 +210,24 @@ describe('EventServiceClient', () => {
     expect(allMockWs).toHaveLength(2);
   });
 
-  it('error before open calls onUnauthorized and stops reconnecting', async () => {
+  it('retries initial pre-open socket errors without treating them as auth failures', async () => {
     vi.useFakeTimers();
     try {
       const onUnauthorized = vi.fn();
+      let wsCount = 0;
       const WebSocketMock = function (url: string, protocols?: string | string[]) {
         lastMockWs = new MockWebSocket(url, protocols);
         allMockWs.push(lastMockWs);
-        lastMockWs.readyState = 0; // CONNECTING
-        void Promise.resolve().then(() => {
-          lastMockWs.triggerError();
-          lastMockWs.triggerClose();
-        });
+        wsCount++;
+        if (wsCount === 1) {
+          lastMockWs.readyState = 0; // CONNECTING
+          void Promise.resolve().then(() => {
+            lastMockWs.triggerError();
+            lastMockWs.triggerClose();
+          });
+        } else {
+          void Promise.resolve().then(() => lastMockWs.triggerOpen());
+        }
         return lastMockWs;
       };
       WebSocketMock.OPEN = 1;
@@ -237,12 +243,12 @@ describe('EventServiceClient', () => {
 
       await client.connect();
 
-      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(onUnauthorized).not.toHaveBeenCalled();
       expect(client.isConnected()).toBe(false);
 
-      // No reconnect should be scheduled — advancing time keeps the count at 1.
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(allMockWs).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(allMockWs).toHaveLength(2);
+      expect(client.isConnected()).toBe(true);
     } finally {
       vi.useRealTimers();
     }

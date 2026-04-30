@@ -141,7 +141,8 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
 function modelIdToDisplayName(id: string) {
   const slash = id.lastIndexOf('/');
   const withoutVendor = slash >= 0 ? id.slice(slash + 1) : id;
-  return withoutVendor.replace(/:cloud$/, '');
+  const colon = withoutVendor.indexOf(':');
+  return colon >= 0 ? withoutVendor.slice(0, colon) : withoutVendor;
 }
 
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {

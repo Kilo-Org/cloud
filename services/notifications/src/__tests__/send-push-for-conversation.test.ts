@@ -7,6 +7,7 @@ import type {
 } from '@kilocode/notifications';
 
 import type * as do_module from '../dos/NotificationChannelDO';
+import { sendPushForConversationCore } from '../index';
 
 const baseInput = (
   over: Partial<SendPushForConversationInput> = {}
@@ -72,5 +73,41 @@ describe('NotificationsService.sendPushForConversation', () => {
       conversationId: 'conv1',
       messageId: 'm1',
     });
+  });
+
+  it('dispatches recipients in parallel while preserving output order', async () => {
+    const dispatches = new Map<
+      string,
+      (outcome: { kind: 'delivered'; tokenCount: number }) => void
+    >();
+    const dispatchOrder: string[] = [];
+    const resultPromise = sendPushForConversationCore(
+      baseInput({ recipientUserIds: ['r1', 'r2', 'r3'], senderUserId: null }),
+      {
+        getRecipientDOStub: userId => ({
+          dispatchPush: async () => {
+            dispatchOrder.push(userId);
+            return new Promise(resolve => {
+              dispatches.set(userId, resolve);
+            });
+          },
+        }),
+      }
+    );
+
+    await Promise.resolve();
+
+    expect(dispatchOrder).toEqual(['r1', 'r2', 'r3']);
+
+    dispatches.get('r2')?.({ kind: 'delivered', tokenCount: 1 });
+    dispatches.get('r1')?.({ kind: 'delivered', tokenCount: 1 });
+    dispatches.get('r3')?.({ kind: 'delivered', tokenCount: 1 });
+
+    const result = await resultPromise;
+    expect(result.perRecipient).toEqual([
+      { userId: 'r1', outcome: 'delivered' },
+      { userId: 'r2', outcome: 'delivered' },
+      { userId: 'r3', outcome: 'delivered' },
+    ]);
   });
 });

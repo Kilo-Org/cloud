@@ -102,32 +102,40 @@ export async function sendPushForConversationCore(
     recipients.push(id);
   }
 
-  const perRecipient: PerRecipientResult[] = [];
-  for (const userId of recipients) {
-    const stub = deps.getRecipientDOStub(userId);
-    const outcome = await stub.dispatchPush({
-      userId,
-      presenceContext: presenceContextForConversation(input.sandboxId, input.conversationId),
-      idempotencyKey: `chat:${input.messageId}:${userId}`,
-      badge: {
-        badgeBucket: badgeBucketForConversation(input.sandboxId, input.conversationId),
-        delta: 1,
-      },
-      push: {
-        title: input.title,
-        body: input.bodyPreview,
-        data: {
-          type: 'chat.message',
-          sandboxId: input.sandboxId,
-          conversationId: input.conversationId,
-          messageId: input.messageId,
+  const results = await Promise.allSettled(
+    recipients.map(async userId => {
+      const stub = deps.getRecipientDOStub(userId);
+      const outcome = await stub.dispatchPush({
+        userId,
+        presenceContext: presenceContextForConversation(input.sandboxId, input.conversationId),
+        idempotencyKey: `chat:${input.messageId}:${userId}`,
+        badge: {
+          badgeBucket: badgeBucketForConversation(input.sandboxId, input.conversationId),
+          delta: 1,
         },
-        sound: 'default',
-        priority: 'high',
-      },
-    });
-    perRecipient.push({ userId, outcome: outcome.kind });
-  }
+        push: {
+          title: input.title,
+          body: input.bodyPreview,
+          data: {
+            type: 'chat.message',
+            sandboxId: input.sandboxId,
+            conversationId: input.conversationId,
+            messageId: input.messageId,
+          },
+          sound: 'default',
+          priority: 'high',
+        },
+      });
+      return outcome.kind;
+    })
+  );
+  const perRecipient: PerRecipientResult[] = recipients.map((userId, index) => {
+    const result = results[index];
+    return {
+      userId,
+      outcome: result?.status === 'fulfilled' ? result.value : 'failed',
+    };
+  });
   return { perRecipient };
 }
 

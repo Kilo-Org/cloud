@@ -17,7 +17,6 @@ import { NOTIFICATIONS_URL } from '@/lib/config';
 
 import { useCurrentUserId } from './use-current-user-id';
 import { useKiloChatTokenGetter } from './use-kilo-chat-token';
-import { markConversationAndBadgeRead } from './mark-read-actions';
 
 type MarkReadContext = {
   previousBadges?: BadgeCountRow[];
@@ -41,28 +40,21 @@ export function useMarkRead(client: KiloChatClient) {
       conversationId,
       badgeBucket,
     }: MarkReadInput): Promise<MarkBadgeReadResponse> => {
-      const result = await markConversationAndBadgeRead({
-        conversationId,
-        badgeBucket,
-        markConversationRead: markConversationRead.mutateAsync,
-        markBadgeRead: async bucket => {
-          const token = await getToken();
-          const input = { badgeBucket: bucket } satisfies MarkBadgeReadInput;
-          const response = await fetch(`${NOTIFICATIONS_URL}/v1/badges/mark-read`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(input),
-          });
-          if (!response.ok) {
-            throw new Error(`Failed to mark badge read: ${response.status}`);
-          }
-          return markBadgeReadResponseSchema.parse(await response.json());
+      await markConversationRead.mutateAsync(conversationId);
+      const token = await getToken();
+      const input = { badgeBucket } satisfies MarkBadgeReadInput;
+      const response = await fetch(`${NOTIFICATIONS_URL}/v1/badges/mark-read`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify(input),
       });
-      return result;
+      if (!response.ok) {
+        throw new Error(`Failed to mark badge read: ${response.status}`);
+      }
+      return markBadgeReadResponseSchema.parse(await response.json());
     },
     onMutate: async ({ badgeBucket }): Promise<MarkReadContext> => {
       if (userId === null) {

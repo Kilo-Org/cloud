@@ -195,7 +195,7 @@ export function toInsertableDbUsageRecord(
     message_id: usageStats.messageId ?? '<missing>',
     upstream_id: usageStats.upstream_id,
     finish_reason: usageStats.finish_reason,
-    latency: ttfb_ms,
+    latency: usageStats.latency ?? ttfb_ms,
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
     is_byok: usageStats.is_byok,

@@ -14,7 +14,10 @@ export const DirectByokModelSchema = z.object({
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
-  variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
+  variants: z
+    .record(z.string(), OpenCodeVariantSchema)
+    .nullish()
+    .transform(v => v ?? undefined),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);

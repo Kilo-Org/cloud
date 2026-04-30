@@ -59,9 +59,6 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  // Both fetchers are in-process SWR caches, so this is effectively free on
-  // the warm path; parallelizing only matters on cold start, where it halves
-  // latency versus the previous sequential awaits.
   const [routingPercentage, vercelModels] = await Promise.all([
     getVercelRoutingPercentage(),
     getVercelModels(),

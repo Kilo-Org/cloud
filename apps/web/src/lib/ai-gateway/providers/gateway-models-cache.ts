@@ -26,27 +26,18 @@ function createStoredModelsFetcher(redisKey: RedisKey, name: string) {
   );
 }
 
-/**
- * Cached fetcher for the full Vercel model metadata record. This is the
- * single source of truth for Vercel model metadata in-process; all other
- * Vercel-model views derive from it to avoid duplicate Redis reads.
- */
+// Single source of truth for each metadata record; derived views below
+// key off the returned object identity to avoid recomputation.
 export const getVercelModelsMetadata = createStoredModelsFetcher(
   GATEWAY_METADATA_REDIS_KEYS.vercelModels,
   'Vercel'
 );
 
-/** Cached fetcher for the full OpenRouter model metadata record. */
 export const getOpenRouterModelsMetadata = createStoredModelsFetcher(
   GATEWAY_METADATA_REDIS_KEYS.openrouterModels,
   'OpenRouter'
 );
 
-// Memoize the derived Set on the identity of the metadata object. The
-// metadata fetcher returns the same object reference until the 10-minute
-// cache refreshes, so this avoids re-filtering hundreds of models on
-// every gateway request while still invalidating automatically whenever
-// the underlying record changes.
 const languageModelIdSetCache = new WeakMap<StoredModelMap, ReadonlySet<string>>();
 
 function toLanguageModelIdSet(models: StoredModelMap): ReadonlySet<string> {

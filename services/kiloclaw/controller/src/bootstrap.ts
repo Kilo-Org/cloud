@@ -45,7 +45,7 @@ const GATEWAY_CLIENT_OPERATOR_SCOPES = [
   'operator.pairing',
   'operator.write',
 ];
-export const DOCTOR_TIMEOUT_MS = 90_000;
+export const DOCTOR_TIMEOUT_MS = 120_000;
 
 // ---- Types ----
 

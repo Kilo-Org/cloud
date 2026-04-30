@@ -1517,7 +1517,7 @@ describe('bootstrapNonCritical', () => {
     (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mockImplementation(
       (cmd: string, args: string[], opts?: { timeout?: number }) => {
         if (cmd === 'openclaw' && args.includes('doctor')) {
-          expect(opts?.timeout).toBe(90_000);
+          expect(opts?.timeout).toBe(120_000);
           throw Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' });
         }
         return '';

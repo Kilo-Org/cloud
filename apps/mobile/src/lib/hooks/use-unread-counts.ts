@@ -4,9 +4,8 @@ import { useMemo } from 'react';
 import { useTRPC } from '@/lib/trpc';
 
 /**
- * Fetches per-channel unread message counts for the current user and returns
- * a Map keyed by channelId for O(1) lookup from dashboard cards. For kiloclaw
- * chats, `channelId` equals the instance's `sandboxId`.
+ * Fetches unread message counts for the current user and returns a Map keyed
+ * by badge bucket for O(1) lookup from dashboard cards.
  *
  * Freshness is driven by invalidations, not polling:
  *   - Foreground chat push → invalidate (see `use-unread-counts-invalidation`).
@@ -21,13 +20,13 @@ export function useUnreadCounts() {
     })
   );
 
-  const byChannel = useMemo(() => {
+  const byBadgeBucket = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of query.data ?? []) {
-      map.set(row.channelId, row.badgeCount);
+      map.set(row.badgeBucket, row.badgeCount);
     }
     return map;
   }, [query.data]);
 
-  return { byChannel, query };
+  return { byBadgeBucket, query };
 }

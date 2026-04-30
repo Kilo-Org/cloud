@@ -1,210 +1,151 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
-import { badge_counts, kiloclaw_instances, user_push_tokens } from '@kilocode/db/schema';
-import { badgeBucketForInstance } from '@kilocode/notifications';
-import { and, eq, inArray, isNull, sql, sum } from 'drizzle-orm';
-import type { Event } from 'stream-chat';
+import { badge_counts, user_push_tokens } from '@kilocode/db/schema';
+import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/notifications';
+import { eq, inArray, sql, sum } from 'drizzle-orm';
 
 import type { ExpoPushMessage, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
 
-type ReceiptCheckMessage = {
-  ticketTokenPairs: TicketTokenPair[];
-};
+type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
-type PendingMessage = {
-  messageId: string;
-  senderId: string;
-  text: string;
-  notified: boolean;
-  createdAt: number;
-  updatedAt: string; // ISO timestamp from Stream Chat payload
-};
+// Two-stage idempotency record. `pending` means the badge was incremented
+// for this idempotency key but the Expo send did not (yet) succeed; on
+// retry we must skip the increment to avoid double-counting. `delivered`
+// means the send succeeded; further attempts are duplicates.
+type IdemRecord = { stage: 'pending' | 'delivered'; ts: number };
 
-const DEDUP_PREFIX = 'dedup:';
-const MSG_PREFIX = 'msg:';
-const DEDUP_TTL_MS = 60 * 60 * 1000; // 1 hour
-const DEBOUNCE_MS = 10_000; // 10 seconds
+const IDEM_PREFIX = 'idem:';
+const IDEM_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export class NotificationChannelDO extends DurableObject<Env> {
-  async processWebhook(payload: Event, webhookId: string): Promise<Response> {
-    // Webhook-level dedup (prevents reprocessing the same delivery)
-    const existing = await this.ctx.storage.get<number>(`${DEDUP_PREFIX}${webhookId}`);
-    if (existing) {
-      return Response.json({ ok: true, deduplicated: true });
-    }
-    await this.markWebhookSeen(webhookId);
+  async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
+    // 1. Idempotency. DO is single-threaded — requests for a given
+    //    conversation serialize on this instance. A `failed` outcome
+    //    leaves the record at `pending` so upstream can retry the send
+    //    without re-incrementing the badge.
+    const idemKey = `${IDEM_PREFIX}${input.idempotencyKey}`;
+    const existing = await this.ctx.storage.get<IdemRecord>(idemKey);
+    if (existing?.stage === 'delivered') return { kind: 'duplicate' };
+    const isRetry = existing?.stage === 'pending';
 
-    const messageId = payload.message?.id;
-    const senderId = payload.message?.user?.id;
-    const messageText = payload.message?.text ?? '';
-    const messageUpdatedAt = payload.message?.updated_at ?? payload.created_at ?? '';
+    // 2. Presence
+    const inContext = await this.env.EVENT_SERVICE.isUserInContext(
+      input.userId,
+      input.presenceContext
+    );
+    if (inContext) return { kind: 'suppressed_presence' };
 
-    if (!messageId || !senderId?.startsWith('bot-')) {
-      return Response.json({ ok: true });
-    }
-
-    const msgKey = `${MSG_PREFIX}${messageId}`;
-    const pendingMessage = await this.ctx.storage.get<PendingMessage>(msgKey);
-
-    if (pendingMessage?.notified) {
-      return Response.json({ ok: true });
-    }
-
-    if (pendingMessage) {
-      // Only accept if this event is newer than what we have
-      if (messageUpdatedAt <= pendingMessage.updatedAt) {
-        return Response.json({ ok: true });
-      }
-      if (messageText) {
-        pendingMessage.text = messageText;
-      }
-      pendingMessage.updatedAt = messageUpdatedAt;
-      await this.ctx.storage.put(msgKey, pendingMessage);
-      await this.scheduleAlarm(DEBOUNCE_MS);
-    } else {
-      // First event for this message (could be message.new or a late message.updated)
-      const pending: PendingMessage = {
-        messageId,
-        senderId,
-        text: messageText,
-        notified: false,
-        createdAt: Date.now(),
-        updatedAt: messageUpdatedAt,
-      };
-      await this.ctx.storage.put(msgKey, pending);
-      await this.scheduleAlarm(DEBOUNCE_MS);
-    }
-
-    return Response.json({ ok: true });
-  }
-
-  override async alarm(): Promise<void> {
-    // Prune expired dedup entries
-    const dedupEntries = await this.ctx.storage.list<number>({ prefix: DEDUP_PREFIX });
-    const now = Date.now();
-    const expired: string[] = [];
-    for (const [key, timestamp] of dedupEntries) {
-      if (now - timestamp > DEDUP_TTL_MS) {
-        expired.push(key);
-      }
-    }
-    if (expired.length > 0) {
-      await this.ctx.storage.delete(expired);
-    }
-
-    // Process pending messages that have debounced
-    const pendingEntries = await this.ctx.storage.list<PendingMessage>({ prefix: MSG_PREFIX });
-    for (const [key, msg] of pendingEntries) {
-      if (msg.notified) {
-        // Clean up old notified messages
-        if (now - msg.createdAt > DEDUP_TTL_MS) {
-          await this.ctx.storage.delete(key);
-        }
-        continue;
-      }
-
-      if (!msg.text) {
-        // No text — nothing to notify about, discard
-        await this.ctx.storage.delete(key);
-        continue;
-      }
-
-      await this.sendNotification(msg);
-      msg.notified = true;
-      await this.ctx.storage.put(key, msg);
-    }
-  }
-
-  private async sendNotification(msg: PendingMessage): Promise<void> {
-    const sandboxId = msg.senderId.slice(4);
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
-    const [instance] = await db
-      .select({
-        id: kiloclaw_instances.id,
-        user_id: kiloclaw_instances.user_id,
-        name: kiloclaw_instances.name,
-      })
-      .from(kiloclaw_instances)
-      .where(
-        and(eq(kiloclaw_instances.sandbox_id, sandboxId), isNull(kiloclaw_instances.destroyed_at))
-      )
-      .limit(1);
-
-    if (!instance) {
-      return;
-    }
-
-    // Increment the badge count for this bucket and return the new total across all buckets.
-    // Done before the token guard so unread state is always persisted even if the user
-    // temporarily has no registered push tokens (e.g. between reinstalls).
-    // Uses UPSERT so the row is created on first notification for this bucket.
-    const badgeBucket = badgeBucketForInstance(sandboxId);
-    await db
-      .insert(badge_counts)
-      .values({ user_id: instance.user_id, badge_bucket: badgeBucket, badge_count: 1 })
-      .onConflictDoUpdate({
-        target: [badge_counts.user_id, badge_counts.badge_bucket],
-        set: { badge_count: sql`${badge_counts.badge_count} + 1` },
-      });
-
-    const [totals] = await db
-      .select({ total: sum(badge_counts.badge_count) })
-      .from(badge_counts)
-      .where(eq(badge_counts.user_id, instance.user_id));
-
-    const badgeCount = Number(totals?.total ?? 0);
-
+    // 3. Tokens
     const tokens = await db
       .select({ token: user_push_tokens.token })
       .from(user_push_tokens)
-      .where(eq(user_push_tokens.user_id, instance.user_id));
+      .where(eq(user_push_tokens.user_id, input.userId));
 
-    if (tokens.length === 0) {
-      return;
+    if (tokens.length === 0) return { kind: 'no_tokens' };
+
+    // 4. Badge math. On a retry the badge was already incremented during
+    //    the prior attempt; re-applying the delta would double-count.
+    //    The total is recomputed in either case (other writers may have
+    //    advanced it).
+    let badgeTotal: number | undefined;
+    if (input.badge) {
+      if (!isRetry) {
+        // Mark `pending` BEFORE the increment so any later failure path
+        // is gated on the marker and a retry skips the increment.
+        const ts = Date.now();
+        await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'pending', ts });
+        // Also schedule cleanup at this point — if Expo keeps failing and
+        // no future push ever lands, `pending` would otherwise leak.
+        await this.ensureCleanupAlarm(ts);
+        await db
+          .insert(badge_counts)
+          .values({
+            user_id: input.userId,
+            badge_bucket: input.badge.badgeBucket,
+            badge_count: input.badge.delta,
+          })
+          .onConflictDoUpdate({
+            target: [badge_counts.user_id, badge_counts.badge_bucket],
+            set: { badge_count: sql`${badge_counts.badge_count} + ${input.badge.delta}` },
+          });
+      }
+      const [totals] = await db
+        .select({ total: sum(badge_counts.badge_count) })
+        .from(badge_counts)
+        .where(eq(badge_counts.user_id, input.userId));
+      badgeTotal = Number(totals?.total ?? 0);
     }
 
-    const truncatedMessage = msg.text.length > 100 ? msg.text.slice(0, 97) + '...' : msg.text;
-
+    // 5. Send via Expo
     const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
       to: token,
-      title: instance.name ?? 'KiloClaw',
-      body: truncatedMessage,
-      // Keep in sync with NotificationData in apps/mobile/src/lib/notifications.ts
-      data: { type: 'chat', instanceId: sandboxId },
-      badge: badgeCount,
-      sound: 'default' as const,
-      priority: 'high' as const,
+      title: input.push.title,
+      body: input.push.body,
+      data: input.push.data,
+      ...(badgeTotal !== undefined && { badge: badgeTotal }),
+      sound: input.push.sound ?? undefined,
+      priority: input.push.priority ?? 'default',
     }));
 
     const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
-    const { ticketTokenPairs, staleTokens } = await sendPushNotifications(messages, accessToken);
-
-    if (staleTokens.length > 0) {
-      await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, staleTokens));
+    let result: { ticketTokenPairs: TicketTokenPair[]; staleTokens: string[] };
+    try {
+      result = await sendPushNotifications(messages, accessToken);
+    } catch (err) {
+      // Leave any `pending` marker in place — retries will re-attempt the
+      // send while skipping the badge increment.
+      return {
+        kind: 'failed',
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
 
-    if (ticketTokenPairs.length > 0) {
-      const receiptMsg: ReceiptCheckMessage = { ticketTokenPairs };
+    if (result.staleTokens.length > 0) {
+      await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, result.staleTokens));
+    }
+
+    if (result.ticketTokenPairs.length > 0) {
+      const receiptMsg: ReceiptCheckMessage = { ticketTokenPairs: result.ticketTokenPairs };
       await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
     }
+
+    // 6. Mark `delivered` so future retries short-circuit as duplicate.
+    const ts = Date.now();
+    await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'delivered', ts });
+    await this.ensureCleanupAlarm(ts);
+
+    return { kind: 'delivered', tokenCount: tokens.length };
   }
 
-  private async markWebhookSeen(webhookId: string): Promise<void> {
-    await this.ctx.storage.put(`${DEDUP_PREFIX}${webhookId}`, Date.now());
+  override async alarm(): Promise<void> {
+    const now = Date.now();
+    const entries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
+    const expired: string[] = [];
+    let earliestRemaining: number | undefined;
+    for (const [key, rec] of entries) {
+      if (now - rec.ts > IDEM_TTL_MS) {
+        expired.push(key);
+      } else if (earliestRemaining === undefined || rec.ts < earliestRemaining) {
+        earliestRemaining = rec.ts;
+      }
+    }
+    if (expired.length > 0) await this.ctx.storage.delete(expired);
+    // Reschedule for the earliest remaining record so a quiet conversation
+    // still gets its leftover entries pruned exactly once their TTL elapses.
+    if (earliestRemaining !== undefined) {
+      await this.ctx.storage.setAlarm(earliestRemaining + IDEM_TTL_MS);
+    }
   }
 
-  private async scheduleAlarm(delayMs: number): Promise<void> {
-    // Always reset the alarm to the new debounce window
-    await this.ctx.storage.setAlarm(Date.now() + delayMs);
+  // Schedule cleanup `IDEM_TTL_MS` from `refTs` only if no alarm is pending.
+  // `setAlarm` replaces any existing alarm; calling it unconditionally would
+  // push cleanup forward indefinitely on a busy conversation.
+  private async ensureCleanupAlarm(refTs: number): Promise<void> {
+    if ((await this.ctx.storage.getAlarm()) === null) {
+      await this.ctx.storage.setAlarm(refTs + IDEM_TTL_MS);
+    }
   }
-}
-
-export function getNotificationChannelDO(
-  env: Env,
-  channelId: string
-): DurableObjectStub<NotificationChannelDO> {
-  const id = env.NOTIFICATION_CHANNEL_DO.idFromName(channelId);
-  return env.NOTIFICATION_CHANNEL_DO.get(id) as DurableObjectStub<NotificationChannelDO>;
 }

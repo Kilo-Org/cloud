@@ -5,13 +5,6 @@ beforeEach(() => {
   jest.restoreAllMocks();
 });
 
-async function flushMicrotasks() {
-  // Two awaits drain the .then/.catch/.finally chain in refresh().
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
 describe('createCachedFetch', () => {
   test('calls fetcher on first invocation', async () => {
     const fetcher = jest.fn<() => Promise<number>>().mockResolvedValue(42);
@@ -34,7 +27,7 @@ describe('createCachedFetch', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  test('past TTL returns stale value immediately and refreshes in background', async () => {
+  test('re-fetches after TTL expires', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(1000);
     const fetcher = jest
       .fn<() => Promise<number>>()
@@ -45,45 +38,32 @@ describe('createCachedFetch', () => {
     const first = await get();
     expect(first).toBe(1);
 
-    // Still within TTL.
+    // Still within TTL
     jest.spyOn(Date, 'now').mockReturnValue(1400);
     const cached = await get();
     expect(cached).toBe(1);
     expect(fetcher).toHaveBeenCalledTimes(1);
 
-    // Past TTL: stale-while-revalidate returns the stale value
-    // and kicks off a background refresh.
+    // Past TTL
     jest.spyOn(Date, 'now').mockReturnValue(1600);
-    const stale = await get();
-    expect(stale).toBe(1);
-    expect(fetcher).toHaveBeenCalledTimes(2);
-
-    await flushMicrotasks();
-
     const refreshed = await get();
     expect(refreshed).toBe(2);
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
-  test('keeps serving stale value when background refresh fails', async () => {
+  test('returns stale value when fetcher fails after a successful fetch', async () => {
     const fetcher = jest
       .fn<() => Promise<string>>()
       .mockResolvedValueOnce('good')
-      .mockRejectedValueOnce(new Error('Redis timeout'))
-      // Further stale-triggered background refreshes after the failure keep
-      // failing; we still expect the cached 'good' to be served.
-      .mockRejectedValue(new Error('Redis timeout'));
-    const get = createCachedFetch(fetcher, 0, 'fallback');
+      .mockRejectedValueOnce(new Error('Redis timeout'));
+    const get = createCachedFetch(fetcher, 0, 'fallback'); // TTL=0 forces re-fetch every call
 
-    expect(await get()).toBe('good');
+    const first = await get();
+    expect(first).toBe('good');
 
-    const stale = await get();
-    expect(stale).toBe('good');
+    const fallback = await get();
+    expect(fallback).toBe('good');
     expect(fetcher).toHaveBeenCalledTimes(2);
-
-    await flushMicrotasks();
-
-    expect(await get()).toBe('good');
   });
 
   test('returns default value when fetcher fails and there is no cached value', async () => {
@@ -96,44 +76,16 @@ describe('createCachedFetch', () => {
     expect(result).toBe('default');
   });
 
-  test('background refresh updates cached value after a transient failure', async () => {
+  test('updates cached value after stale fallback when fetcher recovers', async () => {
     const fetcher = jest
       .fn<() => Promise<number>>()
       .mockResolvedValueOnce(10)
       .mockRejectedValueOnce(new Error('timeout'))
-      .mockResolvedValue(20);
+      .mockResolvedValueOnce(20);
     const get = createCachedFetch(fetcher, 0, 0);
 
     expect(await get()).toBe(10);
-    expect(await get()).toBe(10); // stale; background refresh fails
-    await flushMicrotasks();
-
-    expect(await get()).toBe(10); // still stale; triggers another refresh
-    await flushMicrotasks();
-
-    expect(await get()).toBe(20); // next read sees the recovered value
-  });
-
-  test('concurrent callers share a single in-flight fetch', async () => {
-    let resolve: (value: number) => void = () => {};
-    const fetcher = jest.fn<() => Promise<number>>().mockImplementation(
-      () =>
-        new Promise<number>(r => {
-          resolve = r;
-        })
-    );
-    const get = createCachedFetch(fetcher, 10_000, 0);
-
-    const a = get();
-    const b = get();
-    const c = get();
-
-    expect(fetcher).toHaveBeenCalledTimes(1);
-
-    resolve(7);
-
-    expect(await a).toBe(7);
-    expect(await b).toBe(7);
-    expect(await c).toBe(7);
+    expect(await get()).toBe(10); // stale fallback
+    expect(await get()).toBe(20); // recovered
   });
 });

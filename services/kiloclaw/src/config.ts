@@ -18,17 +18,17 @@ export const OPENCLAW_BUILTIN_DEFAULT_MODEL = 'kilocode/anthropic/claude-opus-4.
  * Version marker for what the worker hands to a machine's controller at
  * provision/start/restart time. Bumped when we change the set of env vars,
  * controller config shape, or origin-check rules. Persisted per-instance as
- * `controllerCapabilitiesVersion` so the dashboard can tell whether a given
- * live machine was configured by a current worker (safe to route at a new
- * host, etc.) or is still running on a pre-cutover config and needs a restart.
+ * `controllerCapabilitiesVersion` so callers can tell which controller
+ * configuration contract a running machine was started with.
  *
  * Legacy instances (persisted as null) are treated as version 1.
  *
  * Version history:
  *   1 — implicit; pre-capability-tracking.
- *   2 — controller accepts wildcard entries in OPENCLAW_ALLOWED_ORIGINS
- *       (e.g. `https://*.kiloclaw.ai`). Machines at this version can serve
- *       the Control UI from any *.kiloclaw.ai subdomain.
+ *   2 — controller env contains a per-instance literal origin
+ *       `https://<label>.kiloclaw.ai` appended to OPENCLAW_ALLOWED_ORIGINS.
+ *       Origin checking remains exact string only; wildcard host patterns are
+ *       not supported.
  */
 export const WORKER_CONTROLLER_CAPABILITIES_VERSION = 2;
 

@@ -878,11 +878,9 @@ export async function syncStatusWithFly(
     if (state.lastStartedAt === null) {
       state.lastStartedAt = Date.now();
     }
-    // Mark the capability version here too: this is the reconcile-driven
-    // success path that covers the case where _startInner / restart's
-    // waitForState timed out (408) but the machine did in fact start with the
-    // new env. Without this mark, a timed-out-but-successful restart would
-    // leave the DO reporting a stale pre-cutover capability version.
+    // Reconcile may be the first path to observe that a machine reached its
+    // running state, so keep the capability marker coupled to the observed
+    // running transition here as well.
     state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
     await ctx.storage.put(
       storageUpdate({

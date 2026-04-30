@@ -8,6 +8,7 @@ import { formatKiloChatError } from '@kilocode/kilo-chat';
 import { ConversationList } from './ConversationList';
 import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
 import { shouldApplyConversationRead } from './conversation-read-events';
+import { moveConversationToFirstPage } from './conversation-list-cache';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
 import { useEventServiceClient } from '@/contexts/EventServiceContext';
@@ -117,9 +118,10 @@ export function KiloChatLayout({
       kiloChatClient.onConversationActivity((_ctx, e) => {
         if (isOnFirstPage(e.conversationId)) {
           queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
-            updateConversationPages(old, c =>
-              c.conversationId === e.conversationId ? { ...c, lastActivityAt: e.lastActivityAt } : c
-            )
+            moveConversationToFirstPage(old, e.conversationId, c => ({
+              ...c,
+              lastActivityAt: e.lastActivityAt,
+            }))
           );
           return;
         }

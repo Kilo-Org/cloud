@@ -10,9 +10,10 @@ export function useInstanceEventSubscription(sandboxId: string | undefined) {
   const qc = useQueryClient();
   const ctx = sandboxId ? kiloclawInstanceContext(sandboxId) : null;
 
-  // message.* / conversation.* invalidate the conversations list so
-  // last-message preview and unread counts stay current while the user is on
-  // the list (instance-level presence, not viewing a specific conv).
+  // conversation.* events are published on the instance context to keep the
+  // conversation list (last-activity, unread, title, membership) current while
+  // the user is on the list. message.* events fire on conversation contexts,
+  // not here.
   const invalidateConversations = useCallback(() => {
     void qc.invalidateQueries({ queryKey: conversationsKey(sandboxId ?? null) });
   }, [qc, sandboxId]);
@@ -23,8 +24,8 @@ export function useInstanceEventSubscription(sandboxId: string | undefined) {
 
   useEventSubscription(ctx, 'conversation.created', invalidateConversations);
   useEventSubscription(ctx, 'conversation.left', invalidateConversations);
-  useEventSubscription(ctx, 'message.created', invalidateConversations);
-  useEventSubscription(ctx, 'message.updated', invalidateConversations);
-  useEventSubscription(ctx, 'message.deleted', invalidateConversations);
+  useEventSubscription(ctx, 'conversation.renamed', invalidateConversations);
+  useEventSubscription(ctx, 'conversation.read', invalidateConversations);
+  useEventSubscription(ctx, 'conversation.activity', invalidateConversations);
   useEventSubscription(ctx, 'bot.status', invalidateBotStatus);
 }

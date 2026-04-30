@@ -648,13 +648,31 @@ describe('generateBaseConfig', () => {
 
   it('adds KiloClaw customizer to an existing plugin allowlist', () => {
     const existing = JSON.stringify({
+      channels: {
+        streamchat: { enabled: true },
+      },
       plugins: {
+        load: {
+          paths: [
+            '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat',
+            '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer',
+          ],
+        },
         allow: ['openclaw-channel-streamchat', 'telegram', 'kilocode', 'browser'],
+        entries: {
+          'openclaw-channel-streamchat': { enabled: true },
+        },
       },
     });
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
+    expect(config.channels.streamchat).toBeUndefined();
+    expect(config.plugins.load.paths).not.toContain(
+      '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'
+    );
+    expect(config.plugins.entries).not.toHaveProperty('openclaw-channel-streamchat');
+    expect(config.plugins.allow).not.toContain('openclaw-channel-streamchat');
     expect(config.plugins.allow).toContain('kiloclaw-customizer');
     expect(config.plugins.allow).toContain('kiloclaw-morning-briefing');
   });

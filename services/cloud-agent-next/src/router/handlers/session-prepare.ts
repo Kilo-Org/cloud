@@ -244,8 +244,12 @@ const prepareSessionHandler = internalApiProtectedProcedure
             githubRepo: input.githubRepo,
             githubToken: input.githubToken,
             gitUrl: input.gitUrl,
-            gitToken: input.gitToken,
+            // Forward the already-resolved managed GitLab token so async
+            // prep does not re-resolve it (which would race with refresh-
+            // token rotation and fail with token_refresh_failed).
+            gitToken: resolvedGitToken,
             platform: input.platform,
+            gitlabTokenManaged,
             prompt: input.prompt,
             mode: input.mode,
             model: input.model,

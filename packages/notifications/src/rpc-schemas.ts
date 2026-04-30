@@ -96,7 +96,6 @@ export type InstanceLifecycleEvent = z.infer<typeof instanceLifecycleEventSchema
 
 export const sendInstanceLifecycleNotificationInputSchema = z.object({
   userId: z.string().min(1),
-  instanceId: z.string().min(1),
   sandboxId: z.string().min(1),
   event: instanceLifecycleEventSchema,
   instanceName: z.string().nullable(),

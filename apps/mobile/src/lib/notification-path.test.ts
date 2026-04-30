@@ -14,14 +14,23 @@ describe('notificationPathForData', () => {
     ).toBe('/(app)/chat/sandbox-1/conversation-1');
   });
 
-  it('routes lifecycle notifications to the sandbox chat screen', () => {
+  it('routes ready lifecycle notifications with legacy sandbox IDs to the sandbox chat screen', () => {
     expect(
       notificationPathForData({
         type: 'instance-lifecycle',
         event: 'ready',
-        instanceId: 'instance-1',
-        sandboxId: 'sandbox-1',
+        sandboxId: 'abcDEF123_-',
       })
-    ).toBe('/(app)/chat/sandbox-1');
+    ).toBe('/(app)/chat/abcDEF123_-');
+  });
+
+  it('routes start_failed lifecycle notifications with ki sandbox IDs to the sandbox chat screen', () => {
+    expect(
+      notificationPathForData({
+        type: 'instance-lifecycle',
+        event: 'start_failed',
+        sandboxId: 'ki_deadbeef',
+      })
+    ).toBe('/(app)/chat/ki_deadbeef');
   });
 });

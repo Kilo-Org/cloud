@@ -901,6 +901,8 @@ export function remediateGatewayClientDeviceScopes(
 
     const tokens = value.tokens;
     const operatorToken = isJsonRecord(tokens) ? tokens[OPERATOR_TOKEN_ROLE] : undefined;
+    // Intentionally monotonic: converge OpenClaw's persisted approval layers to the
+    // broadest locally observed gateway-client operator repair scope set.
     const mergedScopes = mergeStringLists(
       value.scopes,
       value.approvedScopes,

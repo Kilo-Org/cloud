@@ -3,16 +3,16 @@ import { useMemo } from 'react';
 
 import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
 import { useKiloChatTokenGetter } from '@/components/kilo-chat/hooks/use-kilo-chat-token';
+import { badgeBucketForInstance } from '@/lib/badge-buckets';
 import { NOTIFICATIONS_URL } from '@/lib/config';
 
 type Bucket = { badgeBucket: string; badgeCount: number };
 
 /**
- * Fetches per-channel unread message counts for the current user from the
- * notifications worker and returns a Map keyed by sandboxId for O(1) lookup
- * from dashboard cards. Badge buckets use the format
- * `kiloclaw:{sandboxId}:{conversationId}`; counts are summed across all
- * conversations belonging to the same sandbox.
+ * Fetches unread message counts for the current user from the notifications
+ * worker and returns a Map keyed by instance badge bucket for O(1) lookup from
+ * dashboard cards. Conversation buckets are summed into their parent instance
+ * bucket.
  *
  * Freshness is driven by invalidations, not polling:
  *   - Foreground chat push → invalidate (see `use-unread-counts-invalidation`).
@@ -40,18 +40,16 @@ export function useUnreadCounts() {
     },
   });
 
-  const byChannel = useMemo(() => {
+  const byBadgeBucket = useMemo(() => {
     const map = new Map<string, number>();
     for (const row of query.data ?? []) {
-      // Badge buckets: `kiloclaw:{sandboxId}:{conversationId}`
       const parts = row.badgeBucket.split(':');
-      const sandboxId = parts.length >= 2 ? parts[1] : row.badgeBucket;
-      if (sandboxId) {
-        map.set(sandboxId, (map.get(sandboxId) ?? 0) + row.badgeCount);
-      }
+      const aggregateBucket =
+        parts[0] === 'kiloclaw' && parts[1] ? badgeBucketForInstance(parts[1]) : row.badgeBucket;
+      map.set(aggregateBucket, (map.get(aggregateBucket) ?? 0) + row.badgeCount);
     }
     return map;
   }, [query.data]);
 
-  return { byChannel, query };
+  return { byBadgeBucket, query };
 }

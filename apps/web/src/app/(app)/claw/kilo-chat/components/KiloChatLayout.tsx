@@ -8,10 +8,14 @@ import { formatKiloChatError } from '@kilocode/kilo-chat';
 import { ConversationList } from './ConversationList';
 import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
 import { shouldApplyConversationRead } from './conversation-read-events';
-import { moveConversationToFirstPage } from './conversation-list-cache';
+import {
+  conversationListQueryKeyForInstanceEvent,
+  moveConversationToFirstPage,
+} from './conversation-list-cache';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
 import { useEventServiceClient } from '@/contexts/EventServiceContext';
+import { conversationsKey } from '@kilocode/kilo-chat-hooks';
 import {
   useConversations,
   useCreateConversation,
@@ -67,9 +71,7 @@ export function KiloChatLayout({
   // cache so the affected conversation either appears at the top (new/active)
   // or re-sorts correctly once refetched.
   useEffect(() => {
-    const queryKey = ['kilo-chat', 'conversations'];
-
-    function isOnFirstPage(conversationId: string): boolean {
+    function isOnFirstPage(queryKey: readonly unknown[], conversationId: string): boolean {
       const entries = queryClient.getQueriesData<ConversationListInfiniteData>({ queryKey });
       for (const [, data] of entries) {
         const firstPage = data?.pages[0];
@@ -81,13 +83,17 @@ export function KiloChatLayout({
     }
 
     const offs = [
-      kiloChatClient.onConversationCreated((_ctx, e) => {
+      kiloChatClient.onConversationCreated((ctx, e) => {
+        const queryKey = conversationListQueryKeyForInstanceEvent(ctx, sandboxId);
+        if (!queryKey) return;
         if (e.sandboxId !== sandboxId) return;
         queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
           insertConversationOnFirstPage(old, e.conversationListItem)
         );
       }),
-      kiloChatClient.onConversationRenamed((_ctx, e) => {
+      kiloChatClient.onConversationRenamed((ctx, e) => {
+        const queryKey = conversationListQueryKeyForInstanceEvent(ctx, sandboxId);
+        if (!queryKey) return;
         queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
           updateConversationPages(old, c =>
             c.conversationId === e.conversationId ? { ...c, title: e.title } : c
@@ -98,12 +104,16 @@ export function KiloChatLayout({
           queryKey: ['kilo-chat', 'conversation', e.conversationId],
         });
       }),
-      kiloChatClient.onConversationLeft((_ctx, e) => {
+      kiloChatClient.onConversationLeft((ctx, e) => {
+        const queryKey = conversationListQueryKeyForInstanceEvent(ctx, sandboxId);
+        if (!queryKey) return;
         queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
           filterConversationPages(old, c => c.conversationId !== e.conversationId)
         );
       }),
-      kiloChatClient.onConversationRead((_ctx, e) => {
+      kiloChatClient.onConversationRead((ctx, e) => {
+        const queryKey = conversationListQueryKeyForInstanceEvent(ctx, sandboxId);
+        if (!queryKey) return;
         // `.read` is broadcast to every human in the conversation with the
         // `memberId` of whose read-marker moved. Only the actual reader
         // should see their own sidebar row's `lastReadAt` advance — without
@@ -115,8 +125,10 @@ export function KiloChatLayout({
           )
         );
       }),
-      kiloChatClient.onConversationActivity((_ctx, e) => {
-        if (isOnFirstPage(e.conversationId)) {
+      kiloChatClient.onConversationActivity((ctx, e) => {
+        const queryKey = conversationListQueryKeyForInstanceEvent(ctx, sandboxId);
+        if (!queryKey) return;
+        if (isOnFirstPage(queryKey, e.conversationId)) {
           queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
             moveConversationToFirstPage(old, e.conversationId, c => ({
               ...c,
@@ -134,9 +146,9 @@ export function KiloChatLayout({
   // Refetch conversations on WebSocket reconnect (events may have been missed)
   useEffect(() => {
     return eventService.onReconnect(() => {
-      void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: conversationsKey(sandboxId) });
     });
-  }, [eventService, queryClient]);
+  }, [eventService, queryClient, sandboxId]);
 
   const createConversation = useCreateConversation(kiloChatClient);
   const renameConversation = useRenameConversation(kiloChatClient);
@@ -156,7 +168,7 @@ export function KiloChatLayout({
     (conversationId: string) => {
       // Mark as leaving so child queries disable themselves immediately
       setLeavingConversationId(conversationId);
-      const queryKey = ['kilo-chat', 'conversations'];
+      const queryKey = conversationsKey(sandboxId);
       // Optimistically remove the row before the router.push fires. When the
       // user leaves the *active* conversation, router navigation concurrent
       // with the mutation's onSuccess invalidateQueries left the row stale
@@ -180,7 +192,7 @@ export function KiloChatLayout({
         },
       });
     },
-    [leaveConversation.mutate, params?.conversationId, queryClient, router, basePath]
+    [leaveConversation.mutate, params?.conversationId, queryClient, router, basePath, sandboxId]
   );
 
   const handleNewConversation = useCallback(() => {

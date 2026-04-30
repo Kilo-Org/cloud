@@ -1,4 +1,6 @@
 import type { ConversationListItem } from '@kilocode/kilo-chat';
+import { kiloclawInstanceContext } from '@kilocode/event-service';
+import { conversationsKey } from '@kilocode/kilo-chat-hooks';
 import type { ConversationListInfiniteData } from '../hooks/useConversations';
 
 type ConversationUpdater = (conversation: ConversationListItem) => ConversationListItem;
@@ -33,4 +35,10 @@ export function moveConversationToFirstPage(
       ...pages.slice(1),
     ],
   };
+}
+
+export function conversationListQueryKeyForInstanceEvent(ctx: string, sandboxId: string | null) {
+  if (!sandboxId) return null;
+  if (ctx !== kiloclawInstanceContext(sandboxId)) return null;
+  return conversationsKey(sandboxId);
 }

@@ -310,7 +310,8 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
 export function useAddReaction(
   client: KiloChatClient,
   conversationId: string | null,
-  currentUserId: string | null
+  currentUserId: string | null,
+  options?: MutationErrorOptions
 ) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -330,9 +331,11 @@ export function useAddReaction(
       });
       return { queryKey, snapshot };
     },
-    onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
-      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    onError: (err, _variables, context) => {
+      if (context?.snapshot) {
+        restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+      }
+      options?.onError?.(err);
     },
     onSuccess: (response, variables, context) => {
       if (!context) return;
@@ -350,7 +353,8 @@ export function useAddReaction(
 export function useRemoveReaction(
   client: KiloChatClient,
   conversationId: string | null,
-  currentUserId: string | null
+  currentUserId: string | null,
+  options?: MutationErrorOptions
 ) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -370,9 +374,11 @@ export function useRemoveReaction(
       });
       return { queryKey, snapshot };
     },
-    onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
-      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    onError: (err, _variables, context) => {
+      if (context?.snapshot) {
+        restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+      }
+      options?.onError?.(err);
     },
     onSuccess: (response, variables, context) => {
       if (!context) return;
@@ -390,7 +396,8 @@ export function useRemoveReaction(
 export function useExecuteAction(
   client: KiloChatClient,
   conversationId: string | null,
-  currentUserId: string | null
+  currentUserId: string | null,
+  options?: MutationErrorOptions
 ) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -429,9 +436,11 @@ export function useExecuteAction(
       });
       return { queryKey, snapshot };
     },
-    onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
-      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    onError: (err, _variables, context) => {
+      if (context?.snapshot) {
+        restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+      }
+      options?.onError?.(err);
     },
   });
 }

@@ -1,4 +1,3 @@
-import { useAddReaction, useExecuteAction, useRemoveReaction } from '@kilocode/kilo-chat-hooks';
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
 import * as Crypto from 'expo-crypto';
 import { useCallback } from 'react';
@@ -14,7 +13,14 @@ import { useConversationPresence } from './hooks/use-conversation-presence';
 import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useMarkRead } from './hooks/use-mark-read';
-import { useMessageCacheUpdater, useMessages, useSendMessage } from './hooks/use-messages';
+import {
+  useAddReaction,
+  useExecuteAction,
+  useMessageCacheUpdater,
+  useMessages,
+  useRemoveReaction,
+  useSendMessage,
+} from './hooks/use-messages';
 import { useCurrentUserId } from './hooks/use-current-user-id';
 import { setActiveChatLocation } from '@/lib/notifications';
 

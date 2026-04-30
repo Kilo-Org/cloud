@@ -47,9 +47,9 @@ export const getOpenRouterModelsMetadata = createStoredModelsFetcher(
 // cache refreshes, so this avoids re-filtering hundreds of models on
 // every gateway request while still invalidating automatically whenever
 // the underlying record changes.
-const languageModelIdSetCache = new WeakMap<StoredModelMap, Set<string>>();
+const languageModelIdSetCache = new WeakMap<StoredModelMap, ReadonlySet<string>>();
 
-function toLanguageModelIdSet(models: StoredModelMap): Set<string> {
+function toLanguageModelIdSet(models: StoredModelMap): ReadonlySet<string> {
   const cached = languageModelIdSetCache.get(models);
   if (cached) return cached;
   const set = new Set(
@@ -61,10 +61,10 @@ function toLanguageModelIdSet(models: StoredModelMap): Set<string> {
   return set;
 }
 
-export async function getVercelModels(): Promise<Set<string>> {
+export async function getVercelModels(): Promise<ReadonlySet<string>> {
   return toLanguageModelIdSet(await getVercelModelsMetadata());
 }
 
-export async function getOpenRouterModels(): Promise<Set<string>> {
+export async function getOpenRouterModels(): Promise<ReadonlySet<string>> {
   return toLanguageModelIdSet(await getOpenRouterModelsMetadata());
 }

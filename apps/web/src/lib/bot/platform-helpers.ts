@@ -1,7 +1,6 @@
 import type { PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
 import { eq, and } from 'drizzle-orm';
-import { PLATFORM } from '@/lib/integrations/core/constants';
 import { type SlackEvent } from '@chat-adapter/slack';
 import { platform_integrations } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
@@ -57,36 +56,21 @@ export function getPlatformIdentity(thread: Thread, message: Message): PlatformI
   }
 }
 
-async function getPlatformIntegrationByInstallationId(platform: string, installationId: string) {
+/**
+ * Look up the platform integration row for a given identity.
+ * Platform-agnostic: queries by identity.platform + identity.teamId.
+ */
+export async function getPlatformIntegration(identity: PlatformIdentity) {
   const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
-        eq(platform_integrations.platform, platform),
-        eq(platform_integrations.platform_installation_id, installationId)
+        eq(platform_integrations.platform, identity.platform),
+        eq(platform_integrations.platform_installation_id, identity.teamId)
       )
     )
     .limit(1);
 
   return integration ?? null;
-}
-
-export async function getPlatformIntegration(thread: Thread, message: Message) {
-  const platform = thread.id.split(':')[0];
-
-  switch (platform) {
-    case 'slack':
-      return await getPlatformIntegrationByInstallationId(
-        PLATFORM.SLACK,
-        getSlackTeamId(message as Message<SlackEvent>)
-      );
-    case 'teams':
-      return await getPlatformIntegrationByInstallationId(
-        PLATFORM.TEAMS,
-        getTeamsTenantId(message as Message<TeamsActivity>)
-      );
-    default:
-      throw new Error(`PlatformNotSupported: ${platform}`);
-  }
 }

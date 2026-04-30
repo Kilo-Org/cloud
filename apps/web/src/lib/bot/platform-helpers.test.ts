@@ -13,6 +13,7 @@ jest.mock('@/lib/drizzle', () => ({
 }));
 
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import type { PlatformIdentity } from '@/lib/bot-identity';
 import { getPlatformIdentity, getPlatformIntegration } from './platform-helpers';
 
 describe('platform helpers', () => {
@@ -28,13 +29,13 @@ describe('platform helpers', () => {
     };
     mockLimit.mockResolvedValue([integration]);
 
-    const result = await getPlatformIntegration(
-      { id: 'slack:C123:123.456' } as Parameters<typeof getPlatformIntegration>[0],
-      {
-        raw: { team_id: 'T123' },
-        author: { userId: 'U123' },
-      } as Parameters<typeof getPlatformIntegration>[1]
-    );
+    const identity = {
+      platform: PLATFORM.SLACK,
+      teamId: 'T123',
+      userId: 'U123',
+    } satisfies PlatformIdentity;
+
+    const result = await getPlatformIntegration(identity);
 
     expect(result).toBe(integration);
   });
@@ -42,13 +43,13 @@ describe('platform helpers', () => {
   it('returns null when no canonical Slack platform integration exists', async () => {
     mockLimit.mockResolvedValue([]);
 
-    const result = await getPlatformIntegration(
-      { id: 'slack:C123:123.456' } as Parameters<typeof getPlatformIntegration>[0],
-      {
-        raw: { team_id: 'T404' },
-        author: { userId: 'U123' },
-      } as Parameters<typeof getPlatformIntegration>[1]
-    );
+    const identity = {
+      platform: PLATFORM.SLACK,
+      teamId: 'T404',
+      userId: 'U123',
+    } satisfies PlatformIdentity;
+
+    const result = await getPlatformIntegration(identity);
 
     expect(result).toBeNull();
   });
@@ -81,13 +82,13 @@ describe('platform helpers', () => {
     };
     mockLimit.mockResolvedValue([integration]);
 
-    const result = await getPlatformIntegration(
-      { id: 'teams:conversation:service' } as Parameters<typeof getPlatformIntegration>[0],
-      {
-        raw: { channelData: { tenant: { id: 'tenant-1' } } },
-        author: { userId: '29:user' },
-      } as Parameters<typeof getPlatformIntegration>[1]
-    );
+    const identity = {
+      platform: PLATFORM.TEAMS,
+      teamId: 'tenant-1',
+      userId: '29:user',
+    } satisfies PlatformIdentity;
+
+    const result = await getPlatformIntegration(identity);
 
     expect(result).toBe(integration);
   });

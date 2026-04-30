@@ -9,4 +9,5 @@ export const ENV_KEYS = {
   appsFlyerAppId: 'APPSFLYER_APP_ID',
   kiloChatUrl: 'EXPO_PUBLIC_KILO_CHAT_URL',
   eventServiceUrl: 'EXPO_PUBLIC_EVENT_SERVICE_URL',
+  notificationsUrl: 'EXPO_PUBLIC_NOTIFICATIONS_URL',
 };

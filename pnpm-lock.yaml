@@ -230,9 +230,6 @@ importers:
       expo-image:
         specifier: ~55.0.8
         version: 55.0.8(expo@55.0.12)(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
-      expo-image-manipulator:
-        specifier: ~55.0.14
-        version: 55.0.14(expo@55.0.12)
       expo-image-picker:
         specifier: ~55.0.17
         version: 55.0.17(expo@55.0.12)
@@ -323,9 +320,6 @@ importers:
       tailwindcss:
         specifier: ^4.2.2
         version: 4.2.2
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.6
     devDependencies:
       '@sentry/cli':
         specifier: ^3.3.4
@@ -9959,11 +9953,6 @@ packages:
 
   expo-image-loader@55.0.0:
     resolution: {integrity: sha512-NOjp56wDrfuA5aiNAybBIjqIn1IxKeGJ8CECWZncQ/GzjZfyTYAHTCyeApYkdKkMBLHINzI4BbTGSlbCa0fXXQ==}
-    peerDependencies:
-      expo: '*'
-
-  expo-image-manipulator@55.0.14:
-    resolution: {integrity: sha512-j46l8ok7lWrDvgYaIJTjrSg7zBuDrGIbR7TFI6VnI/IfFUi/CGqMfw1Ks+2wzXB1Vcs+LLH8OLv+WR1y+/zVKg==}
     peerDependencies:
       expo: '*'
 
@@ -23957,11 +23946,6 @@ snapshots:
   expo-image-loader@55.0.0(expo@55.0.12):
     dependencies:
       expo: 55.0.12(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@55.0.9)(bufferutil@4.1.0)(expo-router@55.0.11)(react-dom@19.2.4(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-
-  expo-image-manipulator@55.0.14(expo@55.0.12):
-    dependencies:
-      expo: 55.0.12(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(@expo/metro-runtime@55.0.9)(bufferutil@4.1.0)(expo-router@55.0.11)(react-dom@19.2.4(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      expo-image-loader: 55.0.0(expo@55.0.12)
 
   expo-image-picker@55.0.17(expo@55.0.12):
     dependencies:

@@ -5,6 +5,7 @@ export function canEditOrDeleteMessage(message: Message, currentUserId: string |
     currentUserId !== null &&
     message.senderId === currentUserId &&
     !message.deleted &&
+    !message.deliveryFailed &&
     !message.id.startsWith('pending-')
   );
 }
@@ -18,4 +19,8 @@ export function editableTextForMessage(message: Message): string | null {
     textParts.push(block.text);
   }
   return textParts.join('\n');
+}
+
+export function deliveryFailureTextForMessage(message: Message): string | null {
+  return message.deliveryFailed ? 'Not delivered to bot' : null;
 }

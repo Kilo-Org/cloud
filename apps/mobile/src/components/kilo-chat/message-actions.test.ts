@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { type Message } from '@kilocode/kilo-chat';
 
-import { canEditOrDeleteMessage, editableTextForMessage } from './message-actions';
+import {
+  canEditOrDeleteMessage,
+  deliveryFailureTextForMessage,
+  editableTextForMessage,
+} from './message-actions';
 
 function message(overrides: Partial<Message> = {}): Message {
   return {
@@ -25,6 +29,7 @@ describe('message actions', () => {
     expect(canEditOrDeleteMessage(message(), 'user-2')).toBe(false);
     expect(canEditOrDeleteMessage(message({ deleted: true }), 'user-1')).toBe(false);
     expect(canEditOrDeleteMessage(message({ id: 'pending-client-id' }), 'user-1')).toBe(false);
+    expect(canEditOrDeleteMessage(message({ deliveryFailed: true }), 'user-1')).toBe(false);
   });
 
   it('extracts editable text only from text-only messages', () => {
@@ -52,5 +57,12 @@ describe('message actions', () => {
         })
       )
     ).toBeNull();
+  });
+
+  it('exposes visible text for failed delivery messages', () => {
+    expect(deliveryFailureTextForMessage(message())).toBeNull();
+    expect(deliveryFailureTextForMessage(message({ deliveryFailed: true }))).toBe(
+      'Not delivered to bot'
+    );
   });
 });

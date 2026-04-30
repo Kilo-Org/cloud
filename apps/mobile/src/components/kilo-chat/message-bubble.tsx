@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
+import { deliveryFailureTextForMessage } from './message-actions';
 
 type Props = {
   message: Message;
@@ -55,6 +56,7 @@ function MessageBubbleComponent({
   }
 
   const textColor = isFromMe ? 'text-primary-foreground' : 'text-foreground';
+  const deliveryFailureText = deliveryFailureTextForMessage(message);
 
   return (
     <Pressable
@@ -79,7 +81,8 @@ function MessageBubbleComponent({
       <View
         className={cn(
           'max-w-[80%] rounded-2xl px-3 py-2',
-          isFromMe ? 'bg-primary' : 'bg-neutral-100 dark:bg-neutral-800'
+          isFromMe ? 'bg-primary' : 'bg-neutral-100 dark:bg-neutral-800',
+          message.deliveryFailed && 'border border-destructive/40 bg-destructive/10'
         )}
       >
         {message.deleted ? (
@@ -113,7 +116,7 @@ function MessageBubbleComponent({
                       key={action.value}
                       variant={actionStyleToVariant(action.style)}
                       size="sm"
-                      disabled={isExecutingAction}
+                      disabled={isExecutingAction || message.deliveryFailed}
                       onPress={() => {
                         handleExecuteAction(block.groupId, action.value);
                       }}
@@ -137,6 +140,12 @@ function MessageBubbleComponent({
             {formatTimestamp(timestamp)}
           </Text>
         )}
+
+        {deliveryFailureText !== null && (
+          <Text className="mt-1 text-right text-[10px] font-medium text-destructive">
+            {deliveryFailureText}
+          </Text>
+        )}
       </View>
 
       {message.reactions.length > 0 && (
@@ -151,12 +160,14 @@ function MessageBubbleComponent({
             return (
               <Pressable
                 key={reaction.emoji}
+                disabled={message.deliveryFailed}
                 onPress={() => {
                   handleReactionPress(reaction.emoji);
                 }}
                 className={cn(
                   'flex-row items-center gap-0.5 rounded-full px-2 py-0.5',
-                  hasReacted ? 'bg-primary' : 'bg-neutral-200 dark:bg-neutral-700'
+                  hasReacted ? 'bg-primary' : 'bg-neutral-200 dark:bg-neutral-700',
+                  message.deliveryFailed && 'opacity-50'
                 )}
               >
                 <Text className="text-sm">{reaction.emoji}</Text>

@@ -82,16 +82,21 @@ export function BulkChangeVersionDialog({
   }, [open]);
 
   // Filter out any tag that every visible instance is already running on —
-  // mirrors the single-instance dialog convention. We use only visible rows
-  // to make this decision because we don't have tracked_image_tag for
-  // off-page selections.
+  // mirrors the single-instance dialog convention. Skip the exclusion
+  // entirely when off-page selections exist: visible rows may all be on
+  // tag A, but an off-page selection on tag B still makes A a valid
+  // target. Being permissive when our view is partial avoids hiding
+  // legitimate options.
   const tagsToExclude = useMemo(() => {
     if (visibleSelectedInstances.length === 0) return new Set<string>();
+    const visibleIds = new Set(visibleSelectedInstances.map(i => i.id));
+    const hasOffPageSelections = selectedIds.some(id => !visibleIds.has(id));
+    if (hasOffPageSelections) return new Set<string>();
     const firstTag = visibleSelectedInstances[0].tracked_image_tag;
     if (firstTag === null) return new Set<string>();
     const allMatch = visibleSelectedInstances.every(i => i.tracked_image_tag === firstTag);
     return allMatch ? new Set([firstTag]) : new Set<string>();
-  }, [visibleSelectedInstances]);
+  }, [selectedIds, visibleSelectedInstances]);
 
   const targetOptions = useMemo(
     () => availableVersions.filter(v => !tagsToExclude.has(v.image_tag)),
@@ -395,7 +400,13 @@ export function BulkChangeVersionDialog({
                   className="border-amber-500/30 bg-amber-500/5"
                 >
                   {(
-                    ['pinned_by_user', 'pinned_by_admin', 'already_on_target', 'destroyed'] as const
+                    [
+                      'pinned_by_user',
+                      'pinned_by_admin',
+                      'pin_changed_in_flight',
+                      'already_on_target',
+                      'destroyed',
+                    ] as const
                   ).map(reason => {
                     const items = result.skipped.filter(s => s.reason === reason);
                     if (items.length === 0) return null;
@@ -493,13 +504,20 @@ function ResultSection({
 }
 
 function reasonLabel(
-  reason: 'pinned_by_user' | 'pinned_by_admin' | 'already_on_target' | 'destroyed'
+  reason:
+    | 'pinned_by_user'
+    | 'pinned_by_admin'
+    | 'already_on_target'
+    | 'destroyed'
+    | 'pin_changed_in_flight'
 ) {
   switch (reason) {
     case 'pinned_by_user':
       return 'Pinned by user';
     case 'pinned_by_admin':
       return 'Pinned by admin';
+    case 'pin_changed_in_flight':
+      return 'Pin changed during apply';
     case 'already_on_target':
       return 'Already on target';
     case 'destroyed':

@@ -1467,7 +1467,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       // 3. Partition. Order: destroyed → pinned_by_admin → pinned_by_user →
       // already_on_target → apply.
       type ApplyTarget = (typeof rows)[number] & { ownerUserRecord: (typeof ownerUsers)[number] };
-      type SkipReason = 'destroyed' | 'pinned_by_user' | 'pinned_by_admin' | 'already_on_target';
+      type SkipReason =
+        | 'destroyed'
+        | 'pinned_by_user'
+        | 'pinned_by_admin'
+        | 'already_on_target'
+        | 'pin_changed_in_flight';
+
+      type ApplyOutcome = { status: 'applied' } | { status: 'skipped'; reason: SkipReason };
 
       const applied: string[] = [];
       const skipped: Array<{ instanceId: string; reason: SkipReason }> = [];
@@ -1514,7 +1521,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       // detectOrphans pattern already in this router.
       const CONCURRENCY = 10;
 
-      const applyOne = async (target: ApplyTarget): Promise<void> => {
+      const applyOne = async (target: ApplyTarget): Promise<ApplyOutcome> => {
         if (target.pin_id && input.overridePins) {
           // Atomic delete tied to id + updated_at — same three-predicate
           // guard restartMachine uses. Catches both replacement (different
@@ -1532,22 +1539,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             )
             .returning({ id: kiloclaw_version_pins.id });
 
-          // If the delete missed (pin row was replaced in flight by a new
-          // user pin), still proceed with the restart. The DB pin row and
-          // DO state will diverge until the next user-initiated restart:
-          // the DO will run input.imageTag, but the DB still shows the
-          // user's freshly-written pin. The next user Restart resyncs both
-          // via the PR #2913 push-on-write path.
-          //
-          // We chose this over aborting because the admin explicitly opted
-          // into override at request time; the alternative (refuse to act
-          // when the pin was concurrently updated) would silently swallow
-          // a fraction of bulk applies under contention. Result rows still
-          // surface as `applied` in the partition; a follow-on TOCTOU test
-          // case would assert the persisting pin row.
-          if (deleted.length > 0) {
-            await pushPinToWorker(target.user_id, target.instance_id, null);
+          // CAS miss: a new pin row was written between the partition
+          // SELECT and this delete (the user replaced or updated their
+          // pin). Skip rather than override the user's fresh write.
+          // Surfacing as `pin_changed_in_flight` keeps DB pin and DO
+          // state aligned and lets the admin re-run with the now-current
+          // pin information visible in the table.
+          if (deleted.length === 0) {
+            return { status: 'skipped', reason: 'pin_changed_in_flight' };
           }
+          await pushPinToWorker(target.user_id, target.instance_id, null);
         }
 
         const token = generateApiToken(target.ownerUserRecord, undefined, {
@@ -1564,6 +1565,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             }),
           }
         );
+        return { status: 'applied' };
       };
 
       for (let i = 0; i < applyQueue.length; i += CONCURRENCY) {
@@ -1573,7 +1575,11 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           const target = batch[j];
           const r = results[j];
           if (r.status === 'fulfilled') {
-            applied.push(target.instance_id);
+            if (r.value.status === 'applied') {
+              applied.push(target.instance_id);
+            } else {
+              skipped.push({ instanceId: target.instance_id, reason: r.value.reason });
+            }
           } else {
             const err = r.reason;
             const message =

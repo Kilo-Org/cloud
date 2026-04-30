@@ -1369,6 +1369,45 @@ describe('remediateGatewayClientDeviceScopes', () => {
       'operator.admin',
     ]);
   });
+
+  it('still repairs direct gateway-client pairs when pending state is malformed', () => {
+    const harness = fakeDeps();
+    const pairedPath = '/root/.openclaw/devices/paired.json';
+    const pendingPath = '/root/.openclaw/devices/pending.json';
+    (harness.deps.existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+      (p: string) => p === pairedPath || p === pendingPath
+    );
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockImplementation((p: string) => {
+      if (p === pendingPath) return '{not json';
+      if (p === pairedPath) {
+        return JSON.stringify({
+          gatewayDevice: {
+            clientId: 'gateway-client',
+            scopes: ['operator.read'],
+            approvedScopes: ['operator.read'],
+            tokens: { operator: { role: 'operator', scopes: ['operator.read'] } },
+          },
+        });
+      }
+      return '{}';
+    });
+
+    const result = remediateGatewayClientDeviceScopes(harness.deps);
+
+    expect(result).toEqual({ checked: 1, updated: 1 });
+    const rename = harness.renameCalls.find(call => call.to === pairedPath);
+    if (!rename) throw new Error('expected a rename into paired.json');
+    const tempWrite = harness.writeCalls.find(call => call.path === rename.from);
+    if (!tempWrite) throw new Error('expected a paired.json temp write');
+    const rewritten = JSON.parse(tempWrite.data) as Record<string, Record<string, unknown>>;
+    expect(rewritten.gatewayDevice?.approvedScopes).toEqual([
+      'operator.read',
+      'operator.admin',
+      'operator.approvals',
+      'operator.pairing',
+      'operator.write',
+    ]);
+  });
 });
 
 // ---- updateToolsMdSection ----

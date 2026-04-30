@@ -828,8 +828,17 @@ function readGatewayClientRepairRequests(
 ): GatewayClientScopeRepairRequest[] {
   if (!deps.existsSync(DEVICE_PENDING_PATH)) return [];
 
-  const pendingFile = JSON.parse(deps.readFileSync(DEVICE_PENDING_PATH, 'utf8')) as unknown;
-  if (!isJsonRecord(pendingFile)) return [];
+  let pendingFile: unknown;
+  try {
+    pendingFile = JSON.parse(deps.readFileSync(DEVICE_PENDING_PATH, 'utf8')) as unknown;
+  } catch (err) {
+    console.warn('[controller] Device pending state is unreadable, skipping repair lookup:', err);
+    return [];
+  }
+  if (!isJsonRecord(pendingFile)) {
+    console.warn('[controller] Device pending state is not an object, skipping repair lookup');
+    return [];
+  }
 
   const repairs: GatewayClientScopeRepairRequest[] = [];
   for (const value of Object.values(pendingFile)) {

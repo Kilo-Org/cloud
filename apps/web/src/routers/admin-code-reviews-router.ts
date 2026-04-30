@@ -100,6 +100,10 @@ function buildAgentVersionFilter(agentVersion?: 'all' | 'v1' | 'v2'): SQL | unde
   return eq(cloud_agent_code_reviews.agent_version, agentVersion);
 }
 
+const ownershipTypeExpr = sql<string>`CASE WHEN ${cloud_agent_code_reviews.owned_by_organization_id} IS NOT NULL THEN 'organization' ELSE 'personal' END`;
+const waitSecondsExpr = sql<number>`EXTRACT(EPOCH FROM (${cloud_agent_code_reviews.started_at} - ${cloud_agent_code_reviews.created_at}))`;
+const validStartedWaitCondition = sql`${cloud_agent_code_reviews.started_at} IS NOT NULL AND ${cloud_agent_code_reviews.started_at} >= ${cloud_agent_code_reviews.created_at}`;
+
 export const adminCodeReviewsRouter = createTRPCRouter({
   // Get overview KPIs
   getOverviewStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
@@ -124,6 +128,12 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         interrupted_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'interrupted')`,
         in_progress_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running'))`,
         avg_duration_seconds: sql<number>`AVG(EXTRACT(EPOCH FROM (${cloud_agent_code_reviews.completed_at}::timestamp - ${cloud_agent_code_reviews.started_at}::timestamp))) FILTER (WHERE ${cloud_agent_code_reviews.completed_at} IS NOT NULL AND ${cloud_agent_code_reviews.started_at} IS NOT NULL)`,
+        wait_started_count: sql<number>`COUNT(*) FILTER (WHERE ${validStartedWaitCondition})`,
+        avg_wait_seconds: sql<number>`AVG(${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
+        p95_wait_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
+        p99_wait_seconds: sql<number>`percentile_cont(0.99) WITHIN GROUP (ORDER BY ${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
+        max_wait_seconds: sql<number>`MAX(${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
+        within_5m_wait_count: sql<number>`COUNT(*) FILTER (WHERE ${validStartedWaitCondition} AND ${cloud_agent_code_reviews.started_at} <= ${cloud_agent_code_reviews.created_at} + INTERVAL '5 minutes')`,
         // Billing errors (402): not system failures, not cancellations — separate bucket
         billing_error_count: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'failed' AND ${isBillingError})`,
       })
@@ -138,6 +148,8 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     const interruptedCount = Number(stats.interrupted_count) || 0;
     const inProgressCount = Number(stats.in_progress_count) || 0;
     const billingErrorCount = Number(stats.billing_error_count) || 0;
+    const waitStartedCount = Number(stats.wait_started_count) || 0;
+    const withinFiveMinuteWaitCount = Number(stats.within_5m_wait_count) || 0;
 
     // Calculate rates over terminal states only (completed, failed, interrupted, cancelled, billing errors)
     // In-progress states (pending, queued, running) are excluded as they haven't finished yet
@@ -183,6 +195,13 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       // Cancelled rate = cancelled / terminal states (the remainder to reach 100%)
       cancelledRate: terminalCount > 0 ? (cancelledCount / terminalCount) * 100 : 0,
       avgDurationSeconds: Number(stats.avg_duration_seconds) || 0,
+      waitStartedCount,
+      avgWaitSeconds: Number(stats.avg_wait_seconds) || 0,
+      p95WaitSeconds: Number(stats.p95_wait_seconds) || 0,
+      p99WaitSeconds: Number(stats.p99_wait_seconds) || 0,
+      maxWaitSeconds: Number(stats.max_wait_seconds) || 0,
+      waitWithinFiveMinuteRate:
+        waitStartedCount > 0 ? (withinFiveMinuteWaitCount / waitStartedCount) * 100 : 0,
       versionBreakdown: versionBreakdown?.map(row => ({
         agentVersion: row.agent_version,
         total: Number(row.total) || 0,
@@ -417,17 +436,18 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     // Personal vs Org breakdown
     const ownershipBreakdown = await db
       .select({
-        ownership_type: sql<string>`CASE WHEN ${cloud_agent_code_reviews.owned_by_organization_id} IS NOT NULL THEN 'organization' ELSE 'personal' END`,
+        ownership_type: ownershipTypeExpr,
         count: sql<number>`COUNT(*)`,
         completed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'completed')`,
         // Exclude billing errors from failed count
         failed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_code_reviews.status} = 'failed' AND ${excludeBillingErrors})`,
+        wait_started_count: sql<number>`COUNT(*) FILTER (WHERE ${validStartedWaitCondition})`,
+        avg_wait_seconds: sql<number>`AVG(${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
+        p95_wait_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSecondsExpr}) FILTER (WHERE ${validStartedWaitCondition})`,
       })
       .from(cloud_agent_code_reviews)
       .where(and(...baseConditions))
-      .groupBy(
-        sql`CASE WHEN ${cloud_agent_code_reviews.owned_by_organization_id} IS NOT NULL THEN 'organization' ELSE 'personal' END`
-      );
+      .groupBy(ownershipTypeExpr);
 
     // Top users (only show if not filtering by specific user)
     const topUsers = userId
@@ -487,6 +507,9 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         count: Number(row.count) || 0,
         completed: Number(row.completed) || 0,
         failed: Number(row.failed) || 0,
+        waitStartedCount: Number(row.wait_started_count) || 0,
+        avgWaitSeconds: Number(row.avg_wait_seconds) || 0,
+        p95WaitSeconds: Number(row.p95_wait_seconds) || 0,
       })),
       topUsers: topUsers.map(row => ({
         userId: row.user_id,
@@ -503,6 +526,46 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         completedCount: Number(row.completed_count) || 0,
       })),
     };
+  }),
+
+  // Get daily queue wait percentiles (wait time = started_at - created_at)
+  getWaitTimeStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
+    const { startDate, endDate, userId, organizationId, ownershipType, agentVersion } = input;
+    const ownershipFilter = buildOwnershipFilter(userId, organizationId, ownershipType);
+    const agentVersionFilter = buildAgentVersionFilter(agentVersion);
+
+    const conditions = [
+      gte(cloud_agent_code_reviews.created_at, startDate),
+      lt(cloud_agent_code_reviews.created_at, endDate),
+      validStartedWaitCondition,
+      ownershipFilter,
+      agentVersionFilter,
+    ].filter(Boolean) as SQL[];
+
+    const dayExpr = sql`DATE_TRUNC('day', ${cloud_agent_code_reviews.created_at})`;
+
+    const result = await db
+      .select({
+        day: sql<string>`${dayExpr}::date::text`,
+        ownership_type: ownershipTypeExpr,
+        avg_seconds: sql<number>`AVG(${waitSecondsExpr})`,
+        p50_seconds: sql<number>`percentile_cont(0.5) WITHIN GROUP (ORDER BY ${waitSecondsExpr})`,
+        p95_seconds: sql<number>`percentile_cont(0.95) WITHIN GROUP (ORDER BY ${waitSecondsExpr})`,
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(and(...conditions))
+      .groupBy(dayExpr, ownershipTypeExpr)
+      .orderBy(dayExpr, ownershipTypeExpr);
+
+    return result.map(row => ({
+      day: row.day,
+      ownershipType: row.ownership_type,
+      avgSeconds: Number(row.avg_seconds) || 0,
+      p50Seconds: Number(row.p50_seconds) || 0,
+      p95Seconds: Number(row.p95_seconds) || 0,
+      count: Number(row.count) || 0,
+    }));
   }),
 
   // Get daily performance percentiles (execution time = completed_at - started_at)
@@ -615,6 +678,23 @@ export const adminCodeReviewsRouter = createTRPCRouter({
   searchOrganizations: adminProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
+      const searchTerm = input.query.trim();
+      if (!searchTerm) {
+        return [];
+      }
+
+      const escapedTerm = searchTerm.replace(/[%_\\]/g, '\\$&');
+      const ilikePattern = `%${escapedTerm}%`;
+      const nameSearchCondition = ilike(organizations.name, ilikePattern);
+      const organizationId = z.string().uuid().safeParse(searchTerm);
+      const searchCondition = organizationId.success
+        ? or(nameSearchCondition, eq(organizations.id, organizationId.data))
+        : nameSearchCondition;
+
+      if (!searchCondition) {
+        return [];
+      }
+
       const result = await db
         .select({
           id: organizations.id,
@@ -622,7 +702,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
           plan: organizations.plan,
         })
         .from(organizations)
-        .where(or(ilike(organizations.name, `%${input.query}%`), eq(organizations.id, input.query)))
+        .where(searchCondition)
         .limit(20);
 
       return result;

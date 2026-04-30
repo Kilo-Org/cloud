@@ -62,6 +62,16 @@ vi.mock('../lib/image-version', async () => {
   return {
     ...actual,
     resolveLatestVersion: vi.fn().mockResolvedValue(null),
+    resolveVersionByTag: vi.fn().mockResolvedValue(null),
+  };
+});
+
+// -- Mock catalog-registration (Postgres fallback for pin resolution) --
+vi.mock('../lib/catalog-registration', async () => {
+  const actual = await vi.importActual('../lib/catalog-registration');
+  return {
+    ...actual,
+    lookupCatalogVersion: vi.fn().mockResolvedValue(null),
   };
 });
 
@@ -147,7 +157,8 @@ import { FlyApiError } from '../fly/client';
 import * as db from '../db';
 import * as gatewayEnv from '../gateway/env';
 import * as regions from './regions';
-import { resolveLatestVersion } from '../lib/image-version';
+import { resolveLatestVersion, resolveVersionByTag } from '../lib/image-version';
+import { lookupCatalogVersion } from '../lib/catalog-registration';
 import { selectImageVersionForInstance } from '../lib/version-rollout';
 import { setupDefaultStreamChatChannel } from '../stream-chat/client';
 import { verifyKiloToken } from '@kilocode/worker-utils';
@@ -7174,6 +7185,185 @@ describe('restartMachine image tag override', () => {
     expect(storage._store.get('trackedImageTag')).toBe('2026.2.25-abc123');
     expect(storage._store.get('openclawVersion')).toBeNull();
     expect(storage._store.get('imageVariant')).toBeNull();
+  });
+});
+
+// ============================================================================
+// applyPinnedVersion — admin pin push into DO state
+// ============================================================================
+
+describe('applyPinnedVersion', () => {
+  beforeEach(() => {
+    (resolveVersionByTag as Mock).mockReset().mockResolvedValue(null);
+    (lookupCatalogVersion as Mock).mockReset().mockResolvedValue(null);
+    (selectImageVersionForInstance as Mock).mockReset().mockResolvedValue(null);
+  });
+
+  it('writes resolved image fields from KV and does not restart the machine', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'old-tag',
+      openclawVersion: '1.0.0',
+      imageVariant: 'default',
+      trackedImageDigest: 'sha256:old',
+    });
+
+    (resolveVersionByTag as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.9',
+      variant: 'default',
+      imageTag: '2026-04-09',
+      imageDigest: 'sha256:new',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 0,
+      isLatest: false,
+    });
+
+    const applied = await instance.applyPinnedVersion('2026-04-09');
+
+    expect(applied).toEqual({
+      openclawVersion: '2026.4.9',
+      imageTag: '2026-04-09',
+      imageDigest: 'sha256:new',
+      variant: 'default',
+    });
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-09');
+    expect(storage._store.get('openclawVersion')).toBe('2026.4.9');
+    expect(storage._store.get('trackedImageDigest')).toBe('sha256:new');
+    expect(storage._store.get('imageVariant')).toBe('default');
+    // Machine is untouched — no Fly calls, status stays 'running'.
+    expect(flyClient.stopMachineAndWait).not.toHaveBeenCalled();
+    expect(flyClient.updateMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('falls back to the Postgres catalog when KV misses', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { trackedImageTag: 'old-tag' });
+
+    (resolveVersionByTag as Mock).mockResolvedValueOnce(null);
+    (lookupCatalogVersion as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.9',
+      variant: 'default',
+      imageTag: '2026-04-09',
+      imageDigest: 'sha256:pg',
+      publishedAt: new Date().toISOString(),
+    });
+
+    const applied = await instance.applyPinnedVersion('2026-04-09');
+
+    expect(applied.imageTag).toBe('2026-04-09');
+    expect(applied.imageDigest).toBe('sha256:pg');
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-09');
+    expect(storage._store.get('trackedImageDigest')).toBe('sha256:pg');
+    expect(lookupCatalogVersion).toHaveBeenCalledOnce();
+  });
+
+  it('stores the raw tag when neither KV nor Postgres resolves it', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'old-tag',
+      openclawVersion: '1.0.0',
+      imageVariant: 'default',
+    });
+
+    const applied = await instance.applyPinnedVersion('unknown-tag');
+
+    expect(applied.imageTag).toBe('unknown-tag');
+    expect(applied.openclawVersion).toBeNull();
+    expect(applied.variant).toBeNull();
+    expect(storage._store.get('trackedImageTag')).toBe('unknown-tag');
+    expect(storage._store.get('openclawVersion')).toBeNull();
+    expect(storage._store.get('imageVariant')).toBeNull();
+    expect(storage._store.get('trackedImageDigest')).toBeNull();
+  });
+
+  it('when cleared (imageTag=null), resolves via the rollout selector', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'pinned-old',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.15',
+      variant: 'default',
+      imageTag: '2026-04-15',
+      imageDigest: 'sha256:latest',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 100,
+      isLatest: true,
+    });
+
+    const applied = await instance.applyPinnedVersion(null);
+
+    expect(applied.imageTag).toBe('2026-04-15');
+    expect(applied.openclawVersion).toBe('2026.4.15');
+    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
+    expect(resolveVersionByTag).not.toHaveBeenCalled();
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-15');
+  });
+
+  it('when cleared, passes currentImageTag=null to the selector so non-cohort users can fall off the pinned candidate', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'candidate-tag',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    // Simulate the bug scenario: user was pinned to what happens to be the
+    // current rollout candidate, but is not in the cohort. The selector
+    // would normally return null (sticky-on-candidate). With
+    // ignoreCurrentImageTag, it should instead be invoked with
+    // currentImageTag=null and return :latest.
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.15',
+      variant: 'default',
+      imageTag: 'latest-tag',
+      imageDigest: 'sha256:latest',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 100,
+      isLatest: true,
+    });
+
+    const applied = await instance.applyPinnedVersion(null);
+
+    expect(applied.imageTag).toBe('latest-tag');
+    expect(storage._store.get('trackedImageTag')).toBe('latest-tag');
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
+      expect.objectContaining({ currentImageTag: null })
+    );
+  });
+
+  it('when cleared and no rollout target, leaves existing tracked image alone', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'pinned-old',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce(null);
+
+    const applied = await instance.applyPinnedVersion(null);
+
+    expect(applied.imageTag).toBe('pinned-old');
+    expect(storage._store.get('trackedImageTag')).toBe('pinned-old');
+    expect(storage._store.get('openclawVersion')).toBe('2026.4.9');
+  });
+
+  it('rejects when the instance has no status (fresh DO)', async () => {
+    const { instance } = createInstance();
+
+    await expect(instance.applyPinnedVersion('2026-04-09')).rejects.toThrow(/has no status/);
+  });
+
+  it('rejects when the instance is being destroyed', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'destroying' });
+
+    await expect(instance.applyPinnedVersion('2026-04-09')).rejects.toThrow(/being destroyed/);
   });
 });
 

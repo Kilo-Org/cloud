@@ -11,6 +11,16 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const mockRestartMachine: jest.Mock<any, any> = jest.fn();
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+jest.mock('@/lib/kiloclaw/kiloclaw-user-client', () => ({
+  KiloClawUserClient: jest.fn().mockImplementation(() => ({
+    restartMachine: mockRestartMachine,
+  })),
+}));
+
 let userA: User;
 let userB: User;
 let adminUser: User;
@@ -266,10 +276,15 @@ describe('kiloclaw.removeMyPin', () => {
     expect(pins.length).toBe(0);
   });
 
-  it('throws error when no pin exists', async () => {
+  it('is idempotent when no pin exists — still pushes clear to DO so failed syncs are retryable', async () => {
     const caller = await createCallerForUser(userA.id);
 
-    await expect(caller.kiloclaw.removeMyPin()).rejects.toThrow('No pin found for your account');
+    const result = await caller.kiloclaw.removeMyPin();
+    expect(result.success).toBe(true);
+    expect(result.deleted).toBe(false);
+    // DO sync may fail in tests (no KILOCLAW_API_URL); the point is the
+    // mutation does not throw NOT_FOUND, so a UI retry can succeed.
+    expect(result.worker_sync).toBeDefined();
   });
 });
 
@@ -306,18 +321,20 @@ describe('Authorization', () => {
     expect(resultB?.instance_id).toBe(userBInstanceId);
   });
 
-  it('removeMyPin only removes the current user pin (self-set)', async () => {
+  it("removeMyPin only touches the caller's own instance", async () => {
     const callerA = await createCallerForUser(userA.id);
     await callerA.kiloclaw.removeMyPin();
 
-    // UserA's pin should be deleted
+    // UserA's pin (on UserA's instance) should be deleted.
     const pinsA = await db
       .select()
       .from(kiloclaw_version_pins)
       .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
     expect(pinsA.length).toBe(0);
 
-    // UserB's pin should still exist
+    // UserB's pin (on a different instance) is untouched. Pin removal is
+    // scoped to the caller's active instance, not to who originally set
+    // the pin row.
     const pinsB = await db
       .select()
       .from(kiloclaw_version_pins)
@@ -326,53 +343,64 @@ describe('Authorization', () => {
   });
 });
 
-describe('Admin-pin guard', () => {
+describe('Pin metadata mutations are unrestricted by who set the pin', () => {
+  // Pins are advisory consent metadata — either the user or an admin can
+  // write/replace/delete the pin at any time. Override awareness lives on
+  // the upgrade/downgrade paths via the consent dialog, not on these
+  // metadata mutations.
   afterEach(async () => {
     await db
       .delete(kiloclaw_version_pins)
       .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
   });
 
-  it('setMyPin throws FORBIDDEN when an admin has pinned the user', async () => {
-    // Admin pins userA
+  it('setMyPin overwrites an admin-set pin with a user-set pin', async () => {
     await db.insert(kiloclaw_version_pins).values({
       instance_id: userAInstanceId,
       image_tag: availableVersion.image_tag,
       pinned_by: adminUser.id,
-      reason: 'Admin override',
+      reason: 'Admin set this',
     });
 
     const caller = await createCallerForUser(userA.id);
-    await expect(
-      caller.kiloclaw.setMyPin({
-        imageTag: availableVersion.image_tag,
-        reason: 'User trying to override',
-      })
-    ).rejects.toThrow('pinned by an admin');
-  });
-
-  it('removeMyPin throws FORBIDDEN when an admin has pinned the user', async () => {
-    // Admin pins userA
-    await db.insert(kiloclaw_version_pins).values({
-      instance_id: userAInstanceId,
-      image_tag: availableVersion.image_tag,
-      pinned_by: adminUser.id,
+    const result = await caller.kiloclaw.setMyPin({
+      imageTag: availableVersion.image_tag,
+      reason: 'User overrides',
     });
 
-    const caller = await createCallerForUser(userA.id);
-    await expect(caller.kiloclaw.removeMyPin()).rejects.toThrow('pinned by an admin');
+    expect(result.pinned_by).toBe(userA.id);
+    expect(result.reason).toBe('User overrides');
 
-    // Verify pin is still there
+    // The single pin row is now owned by the user.
     const pins = await db
       .select()
       .from(kiloclaw_version_pins)
       .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
     expect(pins.length).toBe(1);
-    expect(pins[0].pinned_by).toBe(adminUser.id);
+    expect(pins[0].pinned_by).toBe(userA.id);
+  });
+
+  it('removeMyPin clears an admin-set pin', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: userAInstanceId,
+      image_tag: availableVersion.image_tag,
+      pinned_by: adminUser.id,
+    });
+
+    const caller = await createCallerForUser(userA.id);
+    const result = await caller.kiloclaw.removeMyPin();
+
+    expect(result.success).toBe(true);
+    expect(result.deleted).toBe(true);
+
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
+    expect(pins.length).toBe(0);
   });
 
   it('setMyPin succeeds when user has self-set pin', async () => {
-    // User pins themselves first
     await db.insert(kiloclaw_version_pins).values({
       instance_id: userAInstanceId,
       image_tag: availableVersion.image_tag,
@@ -387,5 +415,146 @@ describe('Admin-pin guard', () => {
 
     expect(result.reason).toBe('Updated by user');
     expect(result.pinned_by).toBe(userA.id);
+  });
+});
+
+describe('kiloclaw.restartMachine pin consent gate', () => {
+  beforeEach(() => {
+    mockRestartMachine.mockReset();
+    mockRestartMachine.mockResolvedValue({ success: true, message: 'restarting' });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
+  });
+
+  it('plain restart (no imageTag) ignores pin state and never triggers the gate', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: userAInstanceId,
+      image_tag: availableVersion.image_tag,
+      pinned_by: userA.id,
+    });
+
+    const caller = await createCallerForUser(userA.id);
+    const result = await caller.kiloclaw.restartMachine();
+
+    expect(result.success).toBe(true);
+    expect(mockRestartMachine).toHaveBeenCalledWith(undefined, expect.any(Object));
+
+    // Pin must remain untouched on plain restart.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
+    expect(pins.length).toBe(1);
+  });
+
+  it('upgrade with no pin succeeds without acknowledgePinRemoval', async () => {
+    const caller = await createCallerForUser(userA.id);
+    const result = await caller.kiloclaw.restartMachine({ imageTag: 'latest' });
+
+    expect(result.success).toBe(true);
+    expect(mockRestartMachine).toHaveBeenCalledWith({ imageTag: 'latest' }, expect.any(Object));
+  });
+
+  it('upgrade with user-set pin and no acknowledgement throws PRECONDITION_FAILED with PIN_EXISTS', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: userAInstanceId,
+      image_tag: availableVersion.image_tag,
+      pinned_by: userA.id,
+    });
+
+    const caller = await createCallerForUser(userA.id);
+    await expect(caller.kiloclaw.restartMachine({ imageTag: 'latest' })).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'PIN_EXISTS',
+    });
+
+    // Worker must NOT be called when the gate blocks.
+    expect(mockRestartMachine).not.toHaveBeenCalled();
+
+    // Pin must remain in place after a blocked attempt.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
+    expect(pins.length).toBe(1);
+  });
+
+  it('upgrade with user-set pin and acknowledgePinRemoval=true deletes pin and proceeds', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: userAInstanceId,
+      image_tag: availableVersion.image_tag,
+      pinned_by: userA.id,
+    });
+
+    const caller = await createCallerForUser(userA.id);
+    const result = await caller.kiloclaw.restartMachine({
+      imageTag: 'latest',
+      acknowledgePinRemoval: true,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockRestartMachine).toHaveBeenCalledWith({ imageTag: 'latest' }, expect.any(Object));
+
+    // Pin row removed.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
+    expect(pins.length).toBe(0);
+  });
+
+  it('upgrade against an admin-set pin without ack throws PRECONDITION_FAILED (consent gate, not lock-in)', async () => {
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: userAInstanceId,
+      image_tag: availableVersion.image_tag,
+      pinned_by: adminUser.id,
+    });
+
+    const caller = await createCallerForUser(userA.id);
+    await expect(caller.kiloclaw.restartMachine({ imageTag: 'latest' })).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'PIN_EXISTS',
+    });
+
+    expect(mockRestartMachine).not.toHaveBeenCalled();
+
+    // Admin pin must remain in place when the user has not yet consented.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
+    expect(pins.length).toBe(1);
+    expect(pins[0].pinned_by).toBe(adminUser.id);
+  });
+
+  it('upgrade against an admin-set pin with ack=true deletes the pin and proceeds', async () => {
+    // Pins are advisory consent gates; an informed user can override an
+    // admin pin via Upgrade just like their own pin. Either party can
+    // re-pin after if they want to block the next change.
+    await db.insert(kiloclaw_version_pins).values({
+      instance_id: userAInstanceId,
+      image_tag: availableVersion.image_tag,
+      pinned_by: adminUser.id,
+    });
+
+    const caller = await createCallerForUser(userA.id);
+    const result = await caller.kiloclaw.restartMachine({
+      imageTag: 'latest',
+      acknowledgePinRemoval: true,
+    });
+
+    expect(result.success).toBe(true);
+    expect(mockRestartMachine).toHaveBeenCalledWith({ imageTag: 'latest' }, expect.any(Object));
+
+    // Admin pin removed.
+    const pins = await db
+      .select()
+      .from(kiloclaw_version_pins)
+      .where(eq(kiloclaw_version_pins.instance_id, userAInstanceId));
+    expect(pins.length).toBe(0);
   });
 });

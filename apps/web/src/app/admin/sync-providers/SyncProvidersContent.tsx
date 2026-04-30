@@ -49,8 +49,8 @@ export function SyncProvidersContent() {
 
       <p className="text-muted-foreground">
         Fetches provider and model data from OpenRouter and the Vercel AI Gateway, then stores the
-        result in the database. This runs automatically via cron but can be triggered manually here.
-        Mainly intended for local development use.
+        result in the database. In production this runs automatically via cron; the manual trigger
+        below is intended for local development only.
       </p>
 
       {lastSync && (
@@ -70,7 +70,8 @@ export function SyncProvidersContent() {
             Manual Sync
           </CardTitle>
           <CardDescription>
-            Trigger a full sync of providers and models. This may take a minute.
+            Trigger a full sync of providers and models. This may take a minute. Use this in local
+            development only — production syncs are handled by cron.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

@@ -6,10 +6,11 @@ import {
   kiloclaw_version_pins,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { eq, desc, sql, or, ilike, inArray, and, isNull } from 'drizzle-orm';
+import { eq, desc, asc, sql, or, ilike, inArray, and, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { TRPCError } from '@trpc/server';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 
 /**
  * Resolve a user's active personal instance, throwing NOT_FOUND if none exists.
@@ -35,17 +36,72 @@ async function requireActivePersonalInstance(userId: string) {
   }
   return instance;
 }
+
+/**
+ * Look up the owner userId for an instance. Falls back to `fallbackUserId`
+ * if provided and the row is not found — keeps set/removePin usable even
+ * for instance rows that have been hard-deleted (shouldn't happen for
+ * pin flows, but defensive).
+ */
+async function resolveInstanceOwnerUserId(
+  instanceId: string,
+  fallbackUserId?: string
+): Promise<string> {
+  const [row] = await db
+    .select({ user_id: kiloclaw_instances.user_id })
+    .from(kiloclaw_instances)
+    .where(eq(kiloclaw_instances.id, instanceId))
+    .limit(1);
+  if (row?.user_id) return row.user_id;
+  if (fallbackUserId) return fallbackUserId;
+  throw new TRPCError({
+    code: 'NOT_FOUND',
+    message: `Instance ${instanceId} has no owner userId`,
+  });
+}
+
 import * as z from 'zod';
+
+// Columns the admin Versions table allows sorting on. The display column
+// "State" sorts by the underlying `status` field (alphabetic: available
+// before disabled) — sorting by the composite is_latest/candidate/status
+// triplet would be confusing, so we expose the simpler signal.
+const SORTABLE_COLUMNS = {
+  openclaw_version: kiloclaw_image_catalog.openclaw_version,
+  image_tag: kiloclaw_image_catalog.image_tag,
+  status: kiloclaw_image_catalog.status,
+  published_at: kiloclaw_image_catalog.published_at,
+} as const;
 
 const ListVersionsSchema = z.object({
   offset: z.number().min(0).default(0),
   limit: z.number().min(1).max(100).default(25),
   status: z.enum(['available', 'disabled']).optional(),
+  sortBy: z
+    .enum(['openclaw_version', 'image_tag', 'status', 'published_at'])
+    .default('published_at'),
+  sortDir: z.enum(['asc', 'desc']).default('desc'),
 });
 
 const UpdateVersionStatusSchema = z.object({
   imageTag: z.string().min(1),
   status: z.enum(['available', 'disabled']),
+});
+
+// max(50) is a defensive bound on the raw payload, NOT a guarantee about
+// distinct operations. The handler dedupes server side via Set, so a caller
+// passing 50 copies of one tag collapses to a single op rather than 50.
+// In practice the UI only sends unique tags from the rendered page.
+const BulkDisableVersionsSchema = z.object({
+  imageTags: z.array(z.string().min(1).max(128)).min(1).max(50),
+});
+
+const BulkDisableVersionsOutputSchema = z.object({
+  disabled: z.array(z.string()),
+  skippedLatest: z.array(z.string()),
+  skippedAlreadyDisabled: z.array(z.string()),
+  notFound: z.array(z.string()),
+  errors: z.array(z.object({ imageTag: z.string(), message: z.string() })),
 });
 
 const ListPinsSchema = z.object({
@@ -71,16 +127,35 @@ const RemovePinSchema = z.object({
 
 export const adminKiloclawVersionsRouter = createTRPCRouter({
   listVersions: adminProcedure.input(ListVersionsSchema).query(async ({ input }) => {
-    const { offset, limit, status } = input;
+    const { offset, limit, status, sortBy, sortDir } = input;
 
     const whereCondition = status ? eq(kiloclaw_image_catalog.status, status) : undefined;
+
+    // openclaw_version is stored as text but values follow CalVer
+    // (YYYY.M.D, no zero padding). Plain text ordering would put
+    // '2026.2.10' before '2026.2.9'. Cast components to int[] so the
+    // sort matches what admins expect from a version selector.
+    // Catalog values are validated against /^\d{4}\.\d{1,2}\.\d{1,2}$/
+    // in syncCatalog, so the cast is safe for all rows.
+    const sortExpression =
+      sortBy === 'openclaw_version'
+        ? sql`string_to_array(${kiloclaw_image_catalog.openclaw_version}, '.')::int[]`
+        : SORTABLE_COLUMNS[sortBy];
+    const primaryOrder = sortDir === 'asc' ? asc(sortExpression) : desc(sortExpression);
+    // Secondary tiebreaker on image_tag keeps row order stable across pages
+    // when the primary column has duplicates (very common for status, less
+    // for openclaw_version, rare for published_at).
+    const orderBy =
+      sortBy === 'image_tag'
+        ? [primaryOrder]
+        : [primaryOrder, asc(kiloclaw_image_catalog.image_tag)];
 
     const [items, countResult] = await Promise.all([
       db
         .select()
         .from(kiloclaw_image_catalog)
         .where(whereCondition)
-        .orderBy(desc(kiloclaw_image_catalog.published_at))
+        .orderBy(...orderBy)
         .offset(offset)
         .limit(limit),
       db
@@ -177,6 +252,78 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       }
 
       return updated;
+    }),
+
+  /**
+   * Disable many versions in one call. Each tag is routed through the kiloclaw
+   * service's disableImageAndClearRollout (the only path that keeps Postgres +
+   * KV `:latest`/`:candidate` pointers consistent via refreshPointersForVariant).
+   *
+   * Loops sequentially — not parallel — so concurrent refreshPointersForVariant
+   * calls don't race on the same variant. Per-row errors don't abort the batch:
+   * we collect them and return per-bucket arrays.
+   *
+   * Already-pinned instances are NOT affected — pins ignore the catalog row's
+   * status. This procedure only changes which tags are selectable for new
+   * pins/rollouts.
+   */
+  bulkDisableVersions: adminProcedure
+    .input(BulkDisableVersionsSchema)
+    .output(BulkDisableVersionsOutputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const uniqueTags = Array.from(new Set(input.imageTags));
+
+      const rows = await db
+        .select({
+          image_tag: kiloclaw_image_catalog.image_tag,
+          is_latest: kiloclaw_image_catalog.is_latest,
+          status: kiloclaw_image_catalog.status,
+        })
+        .from(kiloclaw_image_catalog)
+        .where(inArray(kiloclaw_image_catalog.image_tag, uniqueTags));
+      const byTag = new Map(rows.map(r => [r.image_tag, r]));
+
+      const disabled: string[] = [];
+      const skippedLatest: string[] = [];
+      const skippedAlreadyDisabled: string[] = [];
+      const notFound: string[] = [];
+      const errors: { imageTag: string; message: string }[] = [];
+
+      const client = new KiloClawInternalClient();
+
+      for (const tag of uniqueTags) {
+        const row = byTag.get(tag);
+        if (!row) {
+          notFound.push(tag);
+          continue;
+        }
+        if (row.is_latest) {
+          skippedLatest.push(tag);
+          continue;
+        }
+        if (row.status === 'disabled') {
+          skippedAlreadyDisabled.push(tag);
+          continue;
+        }
+
+        try {
+          await client.disableImageAndClearRollout(tag, ctx.user.id);
+          disabled.push(tag);
+        } catch (err) {
+          // Surface the kiloclaw service's per-row error rather than aborting
+          // the batch — a concurrent markLatest between our SELECT and this
+          // call gets caught here as a 400 from the service.
+          const message =
+            err instanceof KiloClawApiError
+              ? err.message
+              : err instanceof Error
+                ? err.message
+                : 'Unknown error';
+          errors.push({ imageTag: tag, message });
+        }
+      }
+
+      return { disabled, skippedLatest, skippedAlreadyDisabled, notFound, errors };
     }),
 
   setRolloutPercent: adminProcedure
@@ -340,20 +487,34 @@ export const adminKiloclawVersionsRouter = createTRPCRouter({
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
     }
 
-    return result;
+    // Push the resolved pin into DO state so the next redeploy boots the
+    // pinned image. Failures are logged but do NOT roll back the DB row —
+    // the pin is the intent of record; the DO will converge on next
+    // provision if this sync fails.
+    const ownerUserId = await resolveInstanceOwnerUserId(resolvedInstanceId, input.userId);
+    const workerSync = await pushPinToWorker(ownerUserId, resolvedInstanceId, input.imageTag);
+
+    return { ...result, worker_sync: workerSync };
   }),
 
   removePin: adminProcedure.input(RemovePinSchema).mutation(async ({ input }) => {
+    // Look up the owner before deleting so we can still push the clear to
+    // the worker after the row is gone.
+    const ownerUserId = await resolveInstanceOwnerUserId(input.instanceId);
+
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
       .where(eq(kiloclaw_version_pins.instance_id, input.instanceId))
       .returning();
 
-    if (!deleted) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'No pin found for this user' });
-    }
+    // Idempotent clear: always push null to the DO, even if no row
+    // existed. This makes `removePin` safe to retry after a failed
+    // worker sync — the DB row is already gone but a stale
+    // `trackedImageTag` in the DO can still be cleaned up by calling
+    // removePin again.
+    const workerSync = await pushPinToWorker(ownerUserId, input.instanceId, null);
 
-    return { success: true };
+    return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
   getLatestTag: adminProcedure.query(async () => {

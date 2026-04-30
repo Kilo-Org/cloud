@@ -12,7 +12,7 @@ const getProviders = createCachedFetch(
     if (raw === null) return null;
     return OpenRouterProvidersResponseSchema.shape.data.parse(JSON.parse(raw));
   },
-  60_000, // 60 seconds in-process TTL
+  600_000,
   null
 );
 

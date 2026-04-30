@@ -17,8 +17,10 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { lt } from 'drizzle-orm';
+import { desc, lt, sql } from 'drizzle-orm';
+import { captureException } from '@sentry/nextjs';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
+import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@/lib/ai-gateway/providers/vercel/types';
 import { EndpointsSchema, ModelsSchema } from '@/lib/ai-gateway/providers/vercel/types';
@@ -30,6 +32,14 @@ const ATTRIBUTION_HEADERS = {
   'HTTP-Referer': 'https://kilocode.ai',
   'X-Title': 'Kilo Code',
 } as const;
+
+/**
+ * Advisory lock key hashed from a stable identifier. Serializes concurrent
+ * calls to `applySnapshotChangesAndAudit` so two overlapping syncs cannot
+ * both read the same "previous" snapshot and emit duplicate system audit
+ * logs for the same diff. Auto-releases on transaction commit/rollback.
+ */
+const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
 async function fetchGatewayModels(gateway: Provider) {
   const headers = {
@@ -309,6 +319,67 @@ async function mirrorToRedis(values: {
   await Promise.all(entries.map(([key, value]) => redisSet(key, JSON.stringify(value))));
 }
 
+/**
+ * Apply a freshly-synced OpenRouter snapshot to the database and emit
+ * per-org audit log entries describing how it affects each enterprise
+ * organization's effective model availability.
+ *
+ * Extracted from `syncAndStoreProviders` so it can be tested without
+ * mocking upstream HTTP calls: seed the DB with a prior snapshot row, call
+ * this with a new synthetic snapshot, and assert on the resulting rows in
+ * `organization_audit_logs`.
+ *
+ * Concurrency safety: a transaction-scoped Postgres advisory lock
+ * (`pg_advisory_xact_lock`) is taken before the previous-snapshot read so
+ * two overlapping sync runs cannot both observe the same "previous" row
+ * and emit duplicate system audit logs for the same diff. The lock is
+ * released automatically on commit/rollback.
+ */
+export async function applySnapshotChangesAndAudit(params: {
+  providers: NormalizedOpenRouterResponse;
+  openrouter_data: Record<string, StoredModel>;
+  vercel_data: Record<string, StoredModel>;
+}): Promise<{
+  id: number;
+  data: NormalizedOpenRouterResponse;
+  previousSnapshot: NormalizedOpenRouterResponse | null;
+}> {
+  const { providers, openrouter_data, vercel_data } = params;
+
+  const { row, previousSnapshot } = await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY}))`
+    );
+
+    const [previousSnapshotRow] = await tx
+      .select({ data: modelsByProvider.data })
+      .from(modelsByProvider)
+      .orderBy(desc(modelsByProvider.id))
+      .limit(1);
+    const previousSnapshot = previousSnapshotRow?.data ?? null;
+
+    const results = await tx
+      .insert(modelsByProvider)
+      .values({
+        data: providers,
+        openrouter: openrouter_data,
+        vercel: vercel_data,
+      })
+      .returning();
+    await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
+    return { row: results[0], previousSnapshot };
+  });
+
+  try {
+    await logAutoModelChangesForAllOrgs(previousSnapshot, providers);
+  } catch (err) {
+    console.error('[sync-providers] auto-change audit logging failed', err);
+    captureException(err, { tags: { component: 'sync-providers-auto-audit' } });
+  }
+
+  return { id: row.id, data: row.data, previousSnapshot };
+}
+
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
@@ -332,17 +403,10 @@ export async function syncAndStoreProviders() {
     throw new Error(`Suspicious: total number of models is ${providers.total_models} < 100`);
   }
 
-  const result = await db.transaction(async tx => {
-    const results = await tx
-      .insert(modelsByProvider)
-      .values({
-        data: providers,
-        openrouter: openrouter_data,
-        vercel: vercel_data,
-      })
-      .returning();
-    await tx.delete(modelsByProvider).where(lt(modelsByProvider.id, results[0].id));
-    return results[0];
+  const result = await applySnapshotChangesAndAudit({
+    providers,
+    openrouter_data,
+    vercel_data,
   });
 
   await mirrorToRedis({

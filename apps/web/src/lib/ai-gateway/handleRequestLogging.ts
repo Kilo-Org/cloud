@@ -4,9 +4,6 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { after } from 'next/server';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { kilologHash } from '@/lib/ai-gateway/kilologHash';
-import { createHash } from 'crypto';
-import { redisSet } from '@/lib/redis';
-import { requestLogRedisKey } from '@/lib/redis-keys';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 
 const users = [
@@ -75,10 +72,10 @@ export async function handleRequestLogging(params: {
         //ignore
       }
       try {
-        const serialized = JSON.stringify(request.body);
-        const hash = createHash('sha256').update(serialized).digest('hex');
-        await redisSet(requestLogRedisKey(hash), serialized, 86400);
-        logExceptInTest('[handleRequestLogging] request hash: ' + hash);
+        logExceptInTest(
+          '[handleRequestLogging] request (truncated): ' +
+            JSON.stringify(request.body).substring(0, 4000)
+        );
       } catch {
         //ignore
       }

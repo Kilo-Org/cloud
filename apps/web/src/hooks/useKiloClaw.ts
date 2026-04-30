@@ -436,11 +436,13 @@ export function useKiloClawAvailableVersions(offset = 0, limit = 25) {
   );
 }
 
-export function useKiloClawMyPin() {
+export function useKiloClawMyPin(opts: { enabled?: boolean } = {}) {
+  const { enabled = true } = opts;
   const trpc = useTRPC();
   return useQuery(
     trpc.kiloclaw.getMyPin.queryOptions(undefined, {
       staleTime: 60_000, // pins don't change frequently
+      enabled,
     })
   );
 }

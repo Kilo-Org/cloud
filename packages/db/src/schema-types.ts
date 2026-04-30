@@ -355,6 +355,7 @@ export const AuditLogAction = z.enum([
   'organization.user.send_invite', // ✅
   'organization.user.revoke_invite', // ✅
   'organization.settings.change', // ✅
+  'organization.settings.auto_change', // ✅ (system-initiated; null actor)
   'organization.purchase_credits', // ✅
   'organization.promo_credit_granted', // ✅
   'organization.member.remove', // ✅

@@ -95,14 +95,20 @@ describe('KiloChatClient', () => {
           reactions: [],
         },
       ];
-      const fetch = mockFetch(200, { messages: rawMessages });
+      const fetch = mockFetch(200, {
+        messages: rawMessages,
+        hasMore: false,
+        nextCursor: null,
+      });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.listMessages('conv-1');
-      expect(res[0].content).toEqual([{ type: 'text', text: 'hello' }]);
+      expect(res.messages[0].content).toEqual([{ type: 'text', text: 'hello' }]);
+      expect(res.hasMore).toBe(false);
+      expect(res.nextCursor).toBeNull();
     });
 
     it('sends pagination params as query string', async () => {
-      const fetch = mockFetch(200, { messages: [] });
+      const fetch = mockFetch(200, { messages: [], hasMore: false, nextCursor: null });
       const client = new KiloChatClient(createMockConfig(fetch));
       await client.listMessages('conv-1', { before: 'cursor-id', limit: 25 });
       expect(fetch).toHaveBeenCalledWith(

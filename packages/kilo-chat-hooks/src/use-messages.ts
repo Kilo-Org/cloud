@@ -14,6 +14,7 @@ import type {
   ActionDeliveryFailedEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
+  MessageListResponse,
 } from '@kilocode/kilo-chat';
 import { useEffect } from 'react';
 import { kiloclawConversationContext } from '@kilocode/event-service';
@@ -21,6 +22,7 @@ import { kiloclawConversationContext } from '@kilocode/event-service';
 import { messagesKey } from './query-keys';
 
 export const PAGE_SIZE = 50;
+export type MessagesInfiniteData = InfiniteData<MessageListResponse, string | undefined>;
 
 export function applyReactionAdded(
   reactions: ReactionSummary[],
@@ -61,7 +63,7 @@ export function restoreMessageInCache(
   queryKey: readonly unknown[],
   snapshot: Message
 ): void {
-  queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+  queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
     if (!old) return old;
     return updateMessageInPages(old, snapshot.id, () => snapshot);
   });
@@ -77,11 +79,14 @@ export function removeMessageFromCache(
   queryKey: readonly unknown[],
   messageId: string
 ): void {
-  queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+  queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
     if (!old) return old;
     return {
       ...old,
-      pages: old.pages.map(page => page.filter(msg => msg.id !== messageId)),
+      pages: old.pages.map(page => ({
+        ...page,
+        messages: page.messages.filter(msg => msg.id !== messageId),
+      })),
     };
   });
 }
@@ -91,32 +96,32 @@ export function findMessageInCache(
   queryKey: readonly unknown[],
   messageId: string
 ): Message | undefined {
-  const data = queryClient.getQueryData<InfiniteData<Message[]>>(queryKey);
+  const data = queryClient.getQueryData<MessagesInfiniteData>(queryKey);
   if (!data) return undefined;
   for (const page of data.pages) {
-    const match = page.find(msg => msg.id === messageId);
+    const match = page.messages.find(msg => msg.id === messageId);
     if (match) return match;
   }
   return undefined;
 }
 
 export function updateMessageInPages<TPageParam>(
-  old: InfiniteData<Message[], TPageParam>,
+  old: InfiniteData<MessageListResponse, TPageParam>,
   messageId: string,
   updater: (message: Message) => Message
-): InfiniteData<Message[], TPageParam> {
+): InfiniteData<MessageListResponse, TPageParam> {
   for (let pageIndex = 0; pageIndex < old.pages.length; pageIndex++) {
     const page = old.pages[pageIndex];
     if (!page) continue;
-    const messageIndex = page.findIndex(msg => msg.id === messageId);
+    const messageIndex = page.messages.findIndex(msg => msg.id === messageId);
     if (messageIndex === -1) continue;
 
     const pages = old.pages.slice();
-    const updatedPage = page.slice();
-    const message = updatedPage[messageIndex];
+    const updatedMessages = page.messages.slice();
+    const message = updatedMessages[messageIndex];
     if (!message) return old;
-    updatedPage[messageIndex] = updater(message);
-    pages[pageIndex] = updatedPage;
+    updatedMessages[messageIndex] = updater(message);
+    pages[pageIndex] = { ...page, messages: updatedMessages };
     return { ...old, pages };
   }
   return old;
@@ -129,14 +134,11 @@ export function useMessages(client: KiloChatClient, conversationId: string | nul
       return client.listMessages(conversationId ?? '', { before: pageParam, limit: PAGE_SIZE });
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: lastPage => {
-      if (lastPage.length < PAGE_SIZE) return undefined;
-      return lastPage[lastPage.length - 1]?.id;
-    },
+    getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
     enabled: !!conversationId,
     select: data => ({
       ...data,
-      messages: data.pages.flatMap(p => p).reverse(),
+      messages: data.pages.flatMap(p => p.messages).reverse(),
     }),
   });
 }
@@ -162,9 +164,9 @@ export function messageFromCreatedEvent(e: MessageCreatedEvent): Message {
 }
 
 export function applyMessageCreatedEventToPages<TPageParam>(
-  old: InfiniteData<Message[], TPageParam>,
+  old: InfiniteData<MessageListResponse, TPageParam>,
   e: MessageCreatedEvent
-): InfiniteData<Message[], TPageParam> {
+): InfiniteData<MessageListResponse, TPageParam> {
   const newMessage = messageFromCreatedEvent(e);
 
   if (e.clientId) {
@@ -174,11 +176,14 @@ export function applyMessageCreatedEventToPages<TPageParam>(
   }
 
   for (const page of old.pages) {
-    if (page.some(msg => msg.id === e.messageId)) return old;
+    if (page.messages.some(msg => msg.id === e.messageId)) return old;
   }
 
-  const firstPage = old.pages[0] ?? [];
-  return { ...old, pages: [[newMessage, ...firstPage], ...old.pages.slice(1)] };
+  const firstPage = old.pages[0] ?? { messages: [], hasMore: false, nextCursor: null };
+  return {
+    ...old,
+    pages: [{ ...firstPage, messages: [newMessage, ...firstPage.messages] }, ...old.pages.slice(1)],
+  };
 }
 
 export function useSendMessage(
@@ -206,17 +211,23 @@ export function useSendMessage(
         deliveryFailed: false,
         reactions: [],
       };
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
-        const firstPage = old.pages[0] ?? [];
-        return { ...old, pages: [[optimisticMessage, ...firstPage], ...old.pages.slice(1)] };
+        const firstPage = old.pages[0] ?? { messages: [], hasMore: false, nextCursor: null };
+        return {
+          ...old,
+          pages: [
+            { ...firstPage, messages: [optimisticMessage, ...firstPage.messages] },
+            ...old.pages.slice(1),
+          ],
+        };
       });
       return { queryKey, pendingId };
     },
     onSuccess: (response, _variables, context) => {
       if (!context) return;
       const { queryKey, pendingId } = context;
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, pendingId, msg => ({ ...msg, id: response.messageId }));
       });
@@ -239,7 +250,7 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, variables.messageId, msg => ({
           ...msg,
@@ -266,7 +277,7 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, variables.messageId, msg => ({ ...msg, deleted: true }));
       });
@@ -293,7 +304,7 @@ export function useAddReaction(
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, variables.messageId, msg => ({
           ...msg,
@@ -323,7 +334,7 @@ export function useRemoveReaction(
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, variables.messageId, msg => ({
           ...msg,
@@ -361,7 +372,7 @@ export function useExecuteAction(
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
       // Optimistically mark the action as resolved
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, variables.messageId, msg => ({
           ...msg,
@@ -427,7 +438,7 @@ export function useMessageCacheUpdater(
       if (!e.senderId.startsWith('bot:')) {
         onHumanMessageCreated?.(ctx, e.senderId);
       }
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return applyMessageCreatedEventToPages(old, e);
       });
@@ -435,7 +446,7 @@ export function useMessageCacheUpdater(
 
     const onUpdated = (ctx: string, e: MessageUpdatedEvent) => {
       if (ctx !== expectedContext) return;
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, e.messageId, msg => ({
           ...msg,
@@ -447,7 +458,7 @@ export function useMessageCacheUpdater(
 
     const onDeleted = (ctx: string, e: MessageDeletedEvent) => {
       if (ctx !== expectedContext) return;
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, e.messageId, msg => ({ ...msg, deleted: true }));
       });
@@ -455,7 +466,7 @@ export function useMessageCacheUpdater(
 
     const onDeliveryFailed = (ctx: string, e: MessageDeliveryFailedEvent) => {
       if (ctx !== expectedContext) return;
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, e.messageId, msg => ({ ...msg, deliveryFailed: true }));
       });
@@ -463,7 +474,7 @@ export function useMessageCacheUpdater(
 
     const onActionDeliveryFailed = (ctx: string, e: ActionDeliveryFailedEvent) => {
       if (ctx !== expectedContext) return;
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, e.messageId, msg => ({
           ...msg,
@@ -479,7 +490,7 @@ export function useMessageCacheUpdater(
 
     const onReactionAdded = (ctx: string, e: ReactionAddedEvent) => {
       if (ctx !== expectedContext) return;
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, e.messageId, msg => ({
           ...msg,
@@ -490,7 +501,7 @@ export function useMessageCacheUpdater(
 
     const onReactionRemoved = (ctx: string, e: ReactionRemovedEvent) => {
       if (ctx !== expectedContext) return;
-      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+      queryClient.setQueryData<MessagesInfiniteData>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, e.messageId, msg => ({
           ...msg,

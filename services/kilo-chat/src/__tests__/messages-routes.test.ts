@@ -226,19 +226,34 @@ describe('GET /v1/conversations/:id/messages', () => {
       env
     );
     expect(page1Res.status).toBe(200);
-    const page1 = await page1Res.json<{ messages: Array<{ id: string }> }>();
+    const page1 = await page1Res.json<{
+      messages: Array<{ id: string }>;
+      hasMore: boolean;
+      nextCursor: string | null;
+    }>();
     expect(page1.messages.length).toBe(2);
+    expect(page1.hasMore).toBe(true);
+    expect(page1.nextCursor).toBe(page1.messages[page1.messages.length - 1].id);
 
     // Paginate using cursor
-    const cursor = page1.messages[page1.messages.length - 1].id;
+    const cursor = page1.nextCursor;
+    if (cursor === null) {
+      throw new Error('expected page 1 to return nextCursor');
+    }
     const page2Res = await userApp.request(
       `/v1/conversations/${conversationId}/messages?limit=2&before=${cursor}`,
       {},
       env
     );
     expect(page2Res.status).toBe(200);
-    const page2 = await page2Res.json<{ messages: Array<{ id: string }> }>();
+    const page2 = await page2Res.json<{
+      messages: Array<{ id: string }>;
+      hasMore: boolean;
+      nextCursor: string | null;
+    }>();
     expect(page2.messages.length).toBe(1);
+    expect(page2.hasMore).toBe(false);
+    expect(page2.nextCursor).toBeNull();
     // All page2 ids should be less than cursor
     for (const msg of page2.messages) {
       expect(msg.id < cursor).toBe(true);

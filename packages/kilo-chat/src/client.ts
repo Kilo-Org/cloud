@@ -33,7 +33,7 @@ import type {
   EditMessageRequest,
   EditMessageResponse,
   RenameConversationRequest,
-  Message,
+  MessageListResponse,
   MessageCreatedEvent,
   MessageUpdatedEvent,
   MessageDeletedEvent,
@@ -248,12 +248,11 @@ export class KiloChatClient {
   async listMessages(
     conversationId: string,
     opts?: z.input<typeof listMessagesQuerySchema>
-  ): Promise<Message[]> {
-    const res = await this.httpRequest(`/v1/conversations/${conversationId}/messages`, {
+  ): Promise<MessageListResponse> {
+    return this.httpRequest(`/v1/conversations/${conversationId}/messages`, {
       query: { before: opts?.before, limit: opts?.limit },
       schema: messageListResponseSchema,
     });
-    return res.messages;
   }
 
   // ── Typed event subscriptions ─────────────────────────────────────────────

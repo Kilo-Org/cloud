@@ -99,6 +99,8 @@ export type MessageRow = Message;
 
 export type ListMessagesResult = {
   messages: MessageRow[];
+  hasMore: boolean;
+  nextCursor: string | null;
 };
 
 export type EditMessageParams = {
@@ -360,15 +362,21 @@ export class ConversationDO extends DurableObject<Env> {
       ? query
           .where(lt(messages.id, params.before))
           .orderBy(desc(messages.id))
-          .limit(params.limit)
+          .limit(params.limit + 1)
           .all()
-      : query.orderBy(desc(messages.id)).limit(params.limit).all();
+      : query
+          .orderBy(desc(messages.id))
+          .limit(params.limit + 1)
+          .all();
 
     if (rows.length === 0) {
-      return { messages: [] };
+      return { messages: [], hasMore: false, nextCursor: null };
     }
+    const hasMore = rows.length > params.limit;
+    const pageRows = hasMore ? rows.slice(0, params.limit) : rows;
+    const nextCursor = hasMore ? (pageRows.at(-1)?.id ?? null) : null;
 
-    const ids = rows.map(r => r.id);
+    const ids = pageRows.map(r => r.id);
     const reactionRows = this.db
       .select()
       .from(reactions)
@@ -389,7 +397,7 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     return {
-      messages: rows.map(row => ({
+      messages: pageRows.map(row => ({
         id: row.id,
         senderId: row.sender_id,
         content: row.deleted === 1 ? [] : parseStoredContent(row.content, row.id),
@@ -400,6 +408,8 @@ export class ConversationDO extends DurableObject<Env> {
         deliveryFailed: row.delivery_failed === 1,
         reactions: reactionsByMessage.get(row.id) ?? [],
       })),
+      hasMore,
+      nextCursor,
     };
   }
 

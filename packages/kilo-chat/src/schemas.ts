@@ -211,6 +211,8 @@ export const conversationListResponseSchema = z.object({
 
 export const messageListResponseSchema = z.object({
   messages: z.array(messageSchema),
+  hasMore: z.boolean(),
+  nextCursor: z.string().nullable(),
 });
 
 export const conversationDetailResponseSchema = conversationDetailSchema;

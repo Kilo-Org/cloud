@@ -899,14 +899,13 @@ export async function POST(
         completedStepCount,
       });
       try {
+        if (!requestRow.platform_integration_id) {
+          throw new Error(`Bot callback is missing a platform integration id for ${botRequestId}`);
+        }
+
         const platformIntegration = await getPlatformIntegrationById(
           requestRow.platform_integration_id
         );
-        if (!platformIntegration) {
-          throw new Error(
-            `Bot callback could not find platform integration ${requestRow.platform_integration_id ?? 'null'}`
-          );
-        }
         const thread = await getBotThread(requestRow.platform_thread_id);
 
         if (childSessionStatus && trackedCallbackSession) {

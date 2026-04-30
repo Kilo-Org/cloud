@@ -48,16 +48,18 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
   return integration ?? null;
 }
 
-export async function getPlatformIntegrationById(platformIntegrationId: string | null) {
-  if (!platformIntegrationId) return null;
-
+export async function getPlatformIntegrationById(platformIntegrationId: string) {
   const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(eq(platform_integrations.id, platformIntegrationId))
     .limit(1);
 
-  return integration ?? null;
+  if (!integration) {
+    throw new Error(`Could not find platform integration ${platformIntegrationId}`);
+  }
+
+  return integration;
 }
 
 export async function getPlatformIntegrationByBotUserId(

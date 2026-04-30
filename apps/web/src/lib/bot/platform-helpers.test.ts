@@ -67,19 +67,12 @@ describe('platform helpers', () => {
     expect(result).toBe(integration);
   });
 
-  it('returns null when no platform integration id is available', async () => {
-    const result = await getPlatformIntegrationById(null);
-
-    expect(result).toBeNull();
-    expect(mockLimit).not.toHaveBeenCalled();
-  });
-
-  it('returns null when no platform integration exists for an id', async () => {
+  it('throws when no platform integration exists for an id', async () => {
     mockLimit.mockResolvedValue([]);
 
-    const result = await getPlatformIntegrationById('pi_missing');
-
-    expect(result).toBeNull();
+    await expect(getPlatformIntegrationById('pi_missing')).rejects.toThrow(
+      'Could not find platform integration pi_missing'
+    );
   });
 
   it('returns the platform integration for a bot user id', async () => {

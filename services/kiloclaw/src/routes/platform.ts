@@ -19,12 +19,15 @@ import {
   InstanceIdParam,
   MachineSizeSchema,
 } from '../schemas/instance-config';
-import {
-  ImageVersionEntrySchema,
-  imageVersionKey,
-  imageVersionLatestKey,
-} from '../schemas/image-version';
+import { ImageVersionEntrySchema, imageVersionKey } from '../schemas/image-version';
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
+import {
+  selectImageVersionForInstance,
+  setRolloutPercent,
+  markImageAsLatest,
+  disableImageAndClearRollout,
+} from '../lib/version-rollout';
+import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
 import { flattenError, z } from 'zod';
 import {
@@ -1917,21 +1920,39 @@ const MorningBriefingSetupSchema = z.object({
   timezone: z.string().min(1).optional(),
 });
 
-function isMorningBriefingWarmupError(err: unknown): boolean {
+type MorningBriefingWarmupRetryPolicy = {
+  includeTimeout: boolean;
+};
+
+function isMorningBriefingTimeoutError(err: unknown): boolean {
   const raw = err instanceof Error ? err.message : String(err);
   const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
-  return (
+  return normalized.includes('operation was aborted due to timeout');
+}
+
+function isMorningBriefingWarmupError(
+  err: unknown,
+  policy: MorningBriefingWarmupRetryPolicy = { includeTimeout: true }
+): boolean {
+  const raw = err instanceof Error ? err.message : String(err);
+  const normalized = raw.replace(/^(?:[A-Za-z]+Error:\s*)+/, '');
+  if (
     normalized.includes('Gateway not running') ||
-    normalized.includes('Failed to reach gateway') ||
-    normalized.includes('operation was aborted due to timeout')
-  );
+    normalized.includes('Failed to reach gateway')
+  ) {
+    return true;
+  }
+  return policy.includeTimeout && isMorningBriefingTimeoutError(err);
 }
 
 async function sleep(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function withMorningBriefingWarmupRetry<T>(operation: () => Promise<T>): Promise<T> {
+async function withMorningBriefingWarmupRetry<T>(
+  operation: () => Promise<T>,
+  policy: MorningBriefingWarmupRetryPolicy = { includeTimeout: true }
+): Promise<T> {
   const delaysMs = [0, 750, 1500];
   let lastError: unknown = null;
 
@@ -1944,7 +1965,7 @@ async function withMorningBriefingWarmupRetry<T>(operation: () => Promise<T>): P
       return await operation();
     } catch (err) {
       lastError = err;
-      if (!isMorningBriefingWarmupError(err)) {
+      if (!isMorningBriefingWarmupError(err, policy)) {
         throw err;
       }
     }
@@ -1984,7 +2005,6 @@ platform.get('/morning-briefing/status', async c => {
       return c.json(
         {
           ok: true,
-          enabled: false,
           reconcileState: 'in_progress',
           error: 'Gateway warming up, retrying shortly.',
           code: 'gateway_warming_up',
@@ -2078,12 +2098,16 @@ platform.post('/morning-briefing/run', async c => {
   if ('error' in iidResult) return iidResult.error;
 
   try {
-    const response = await withResolvedDORetry(
-      c.env,
-      result.data.userId,
-      iidResult.instanceId,
-      stub => stub.runMorningBriefing(),
-      'runMorningBriefing'
+    const response = await withMorningBriefingWarmupRetry(
+      () =>
+        withResolvedDORetry(
+          c.env,
+          result.data.userId,
+          iidResult.instanceId,
+          stub => stub.runMorningBriefing(),
+          'runMorningBriefing'
+        ),
+      { includeTimeout: false }
     );
     if (!response) {
       return jsonError(
@@ -2094,6 +2118,16 @@ platform.post('/morning-briefing/run', async c => {
     }
     return c.json(response, 200);
   } catch (err) {
+    if (isMorningBriefingWarmupError(err, { includeTimeout: false })) {
+      return jsonError('Gateway warming up, retrying shortly.', 503, 'gateway_warming_up');
+    }
+    if (isMorningBriefingTimeoutError(err)) {
+      return jsonError(
+        'Morning Briefing run timed out while work may still be in progress. Check Last generated and Last delivery before retrying.',
+        504,
+        'morning_briefing_run_timeout'
+      );
+    }
     const { message, status, code } = sanitizeOpenclawConfigError(err, 'morning-briefing/run');
     return jsonError(message, status, code);
   }
@@ -3384,35 +3418,238 @@ platform.get('/versions', async c => {
 });
 
 // GET /api/platform/versions/latest
-// Returns the current :latest image version from KV.
+// Resolves the image version this caller should be on next.
+//
+// Query params (all optional):
+//   instanceId       — bucket subject for rollout candidate selection
+//   currentImageTag  — caller's current image; used to suppress self-upgrades
+//
+// Without instanceId, returns the current :latest pointer (back-compat for
+// anonymous callers — public version banner, CI, etc.). With instanceId, runs
+// the rollout-aware selector and returns the candidate when the instance falls
+// in cohort, the :latest baseline when not, or 404 when the caller is already
+// on the newest applicable image (banner: "no upgrade").
+//
+// The Early Access flag is looked up server-side from the instance's owning
+// user — callers cannot pass it as a query param. This keeps the service as
+// the single authoritative source: even an internal-key-holding caller can't
+// claim Early Access for an arbitrary instance.
 platform.get('/versions/latest', async c => {
   try {
-    const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
-    if (!latest) return c.json({ error: 'No latest version registered' }, 404);
-    return c.json(latest);
+    const instanceId = c.req.query('instanceId');
+    const currentImageTag = c.req.query('currentImageTag') ?? null;
+
+    if (!instanceId) {
+      const latest = await resolveLatestVersion(c.env.KV_CLAW_CACHE, 'default');
+      if (!latest) return c.json({ error: 'No latest version registered' }, 404);
+      return c.json(latest);
+    }
+
+    // Resolve Early Access from the instance's owner. This requires Hyperdrive;
+    // without it we degrade gracefully to autoEnroll=false (the bucket math
+    // still works correctly — only the staff/beta-tester override is missing).
+    let autoEnroll = false;
+    const connectionString = c.env.HYPERDRIVE?.connectionString;
+    if (connectionString) {
+      try {
+        autoEnroll = await lookupKiloclawEarlyAccessByInstanceId(connectionString, instanceId);
+      } catch (err) {
+        console.warn(
+          '[platform] Early Access lookup failed; treating as false:',
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+
+    const selected = await selectImageVersionForInstance({
+      kv: c.env.KV_CLAW_CACHE,
+      variant: 'default',
+      instanceId,
+      currentImageTag,
+      autoEnroll,
+    });
+    if (!selected) return c.json({ error: 'No upgrade available' }, 404);
+    return c.json(selected);
   } catch (err) {
     console.error('[platform] Failed to get latest version:', err);
     return c.json({ error: 'Failed to get latest version' }, 500);
   }
 });
 
+// POST /api/platform/versions/rollout
+// Set an image's rollout percent (0..100). Updates Postgres + KV pointers.
+const SetRolloutPercentBody = z.object({
+  imageTag: z.string().min(1),
+  percent: z.number().int().min(0).max(100),
+});
+
+// POST /api/platform/versions/disable-with-clear
+// Mark a tag as disabled AND set its rollout_percent to 0 atomically.
+// Used by the admin "Disable image" flow so a disabled tag never lingers as
+// a rollout candidate.
+const DisableWithClearBody = z.object({
+  imageTag: z.string().min(1),
+  updatedBy: z.string().min(1),
+});
+
+platform.post('/versions/disable-with-clear', async c => {
+  const result = await parseBody(c, DisableWithClearBody);
+  if ('error' in result) return result.error;
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return c.json({ error: 'Database not configured' }, 503);
+
+  try {
+    await disableImageAndClearRollout({
+      kv: c.env.KV_CLAW_CACHE,
+      hyperdriveConnectionString: connectionString,
+      imageTag: result.data.imageTag,
+      updatedBy: result.data.updatedBy,
+    });
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[platform] Failed to disable + clear rollout:', err);
+    return c.json({ error: 'Failed to disable image' }, 500);
+  }
+});
+
+// POST /api/platform/users/:userId/kiloclaw-early-access
+// Toggle the per-user kiloclaw_early_access flag. Affects all of the user's
+// instances (personal + every org instance they own).
+const SetEarlyAccessBody = z.object({
+  value: z.boolean(),
+});
+
+platform.post('/users/:userId/kiloclaw-early-access', async c => {
+  const userId = c.req.param('userId');
+  if (!userId) return c.json({ error: 'Missing userId' }, 400);
+
+  const result = await parseBody(c, SetEarlyAccessBody);
+  if ('error' in result) return result.error;
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return c.json({ error: 'Database not configured' }, 503);
+
+  try {
+    const updated = await setKiloclawEarlyAccess(connectionString, userId, result.data.value);
+    if (!updated) return c.json({ error: 'User not found' }, 404);
+    return c.json({ ok: true, userId, earlyAccess: result.data.value });
+  } catch (err) {
+    console.error('[platform] Failed to set kiloclaw_early_access:', err);
+    return c.json({ error: 'Failed to set kiloclaw_early_access' }, 500);
+  }
+});
+
+platform.post('/versions/rollout', async c => {
+  const result = await parseBody(c, SetRolloutPercentBody);
+  if ('error' in result) return result.error;
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    return c.json({ error: 'Database not configured' }, 503);
+  }
+
+  try {
+    const updated = await setRolloutPercent({
+      kv: c.env.KV_CLAW_CACHE,
+      hyperdriveConnectionString: connectionString,
+      imageTag: result.data.imageTag,
+      percent: result.data.percent,
+    });
+    return c.json({ ok: true, ...updated });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    if (msg.startsWith('Image not found')) return c.json({ error: msg }, 404);
+    if (
+      msg.startsWith('Invalid rollout percent') ||
+      msg.startsWith('Image not available') ||
+      msg.startsWith('Cannot set rollout percent')
+    ) {
+      return c.json({ error: msg }, 400);
+    }
+    console.error('[platform] Failed to set rollout percent:', err);
+    return c.json({ error: 'Failed to set rollout percent' }, 500);
+  }
+});
+
+// POST /api/platform/versions/mark-latest
+// Mark an image as the production :latest for its variant. Atomically clears
+// is_latest from the previous :latest in the same variant. Independent of
+// rollout_percent.
+const MarkLatestBody = z.object({
+  imageTag: z.string().min(1),
+});
+
+// POST /api/platform/versions/apply-pin
+// Pushes a resolved admin pin (or pin clear) into the target instance's DO
+// state so the next redeploy/restart boots the pinned image. Does NOT
+// restart the machine — the caller triggers that separately if desired.
+const ApplyPinSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().min(1),
+  imageTag: z.string().min(1).nullable(),
+});
+
+platform.post('/versions/apply-pin', async c => {
+  const result = await parseBody(c, ApplyPinSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, instanceId, imageTag } = result.data;
+
+  try {
+    const applied = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.applyPinnedVersion(imageTag, instanceId),
+      'applyPinnedVersion'
+    );
+    return c.json({ ok: true, ...applied });
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'apply-pin');
+    return jsonError(message, status);
+  }
+});
+
+platform.post('/versions/mark-latest', async c => {
+  const result = await parseBody(c, MarkLatestBody);
+  if ('error' in result) return result.error;
+
+  const connectionString = c.env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return c.json({ error: 'Database not configured' }, 503);
+
+  try {
+    const updated = await markImageAsLatest({
+      kv: c.env.KV_CLAW_CACHE,
+      hyperdriveConnectionString: connectionString,
+      imageTag: result.data.imageTag,
+    });
+    return c.json({ ok: true, ...updated });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    if (msg.startsWith('Image not found')) return c.json({ error: msg }, 404);
+    if (msg.startsWith('Image is disabled')) return c.json({ error: msg }, 400);
+    console.error('[platform] Failed to mark image as latest:', err);
+    return c.json({ error: 'Failed to mark image as latest' }, 500);
+  }
+});
+
 // POST /api/platform/publish-image-version
-// Manual fallback for publishing/correcting version entries.
-// Primary registration path is worker self-registration on deploy.
+// Manual fallback for publishing/correcting version entries. Newly published
+// images land at rollout_percent=0 (not exposed). Ops slides the percent up
+// from the admin Versions page.
 const PublishImageVersionSchema = z.object({
   openclawVersion: z.string().min(1),
   variant: z.string().min(1).default('default'),
   imageTag: z.string().min(1),
   imageDigest: z.string().nullable().optional(),
-  // Set to false when backfilling older versions to avoid overwriting the latest pointer.
-  setLatest: z.boolean().optional().default(true),
 });
 
 platform.post('/publish-image-version', async c => {
   const result = await parseBody(c, PublishImageVersionSchema);
   if ('error' in result) return result.error;
 
-  const { openclawVersion, variant, imageTag, imageDigest, setLatest } = result.data;
+  const { openclawVersion, variant, imageTag, imageDigest } = result.data;
 
   if (openclawVersion === 'latest') {
     return c.json({ error: '"latest" is reserved and cannot be used as a version' }, 400);
@@ -3424,6 +3661,7 @@ platform.post('/publish-image-version', async c => {
     imageTag,
     imageDigest: imageDigest ?? null,
     publishedAt: new Date().toISOString(),
+    rolloutPercent: 0,
   };
 
   // Validate against schema
@@ -3432,15 +3670,13 @@ platform.post('/publish-image-version', async c => {
     return c.json({ error: 'Invalid version entry', details: parsed.error.flatten() }, 400);
   }
 
-  // Write the versioned key; optionally update the latest pointer
+  // Write the versioned key + tag lookup. Do NOT touch :latest — that
+  // pointer is owned by the rollout flow now.
   const serialized = JSON.stringify(parsed.data);
-  const writes: Promise<void>[] = [
+  await Promise.all([
     c.env.KV_CLAW_CACHE.put(imageVersionKey(openclawVersion, variant), serialized),
-  ];
-  if (setLatest) {
-    writes.push(c.env.KV_CLAW_CACHE.put(imageVersionLatestKey(variant), serialized));
-  }
-  await Promise.all(writes);
+    c.env.KV_CLAW_CACHE.put(`image-version-tag:${imageTag}`, serialized),
+  ]);
 
   // Maintain KV tag index
   await updateTagIndex(c.env.KV_CLAW_CACHE, imageTag);
@@ -3462,14 +3698,26 @@ platform.post('/publish-image-version', async c => {
   }
 
   console.log(
-    '[platform] Published image version:',
+    '[platform] Published image version (at 0% rollout):',
     openclawVersion,
     variant,
     '→',
-    imageTag,
-    setLatest ? '(latest)' : '(backfill)'
+    imageTag
   );
-  return c.json({ ok: true, setLatest, ...parsed.data }, 201);
+  return c.json(
+    {
+      ok: true,
+      ...parsed.data,
+      // Surfaced in CI logs / curl output so devs aren't surprised when their
+      // newly-pushed image isn't immediately picked up by instances.
+      promotionHint:
+        'Image registered at rollout_percent=0 and is_latest=false. It will not be served to ' +
+        'any instance until ops promotes it. Open /admin/kiloclaw?tab=versions and either ' +
+        'click "Make :latest" (full immediate rollout) or "Start rollout" with a percent ' +
+        '(staged rollout).',
+    },
+    201
+  );
 });
 
 // ---------------------------------------------------------------------------

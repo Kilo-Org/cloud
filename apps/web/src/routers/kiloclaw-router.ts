@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server';
 import { baseProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import {
@@ -27,6 +28,7 @@ import {
   kiloclaw_instances,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
+  kilocode_users,
   cloud_agent_webhook_triggers,
   credit_transactions,
   organizations,
@@ -2259,10 +2261,32 @@ export const kiloclawRouter = createTRPCRouter({
     return fetchKiloClawServiceDegraded();
   }),
 
-  latestVersion: baseProcedure.query(async () => {
-    const client = new KiloClawInternalClient();
-    return client.getLatestVersion();
-  }),
+  latestVersion: baseProcedure
+    .input(z.object({ currentImageTag: z.string().min(1).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      // Pass instance + currentImageTag through; Early Access is resolved
+      // server-side from the instance's owning user (the platform endpoint
+      // does the kilocode_users lookup itself, so callers can't fake it).
+      const [instance] = await db
+        .select({ id: kiloclaw_instances.id })
+        .from(kiloclaw_instances)
+        .where(
+          and(
+            eq(kiloclaw_instances.user_id, ctx.user.id),
+            isNull(kiloclaw_instances.organization_id),
+            isNull(kiloclaw_instances.destroyed_at)
+          )
+        )
+        .limit(1);
+
+      const client = new KiloClawInternalClient();
+      if (!instance) return client.getLatestVersion();
+
+      return client.getLatestVersion({
+        instanceId: instance.id,
+        currentImageTag: input?.currentImageTag ?? null,
+      });
+    }),
 
   validateWeatherLocation: baseProcedure
     .input(weatherLocationInputSchema)
@@ -2926,11 +2950,98 @@ export const kiloclawRouter = createTRPCRouter({
               'Image tag must be alphanumeric with dots, hyphens, or underscores'
             )
             .optional(),
+          // When true, the caller has confirmed they understand a redeploy
+          // with imageTag will remove their existing user-set pin. The
+          // frontend Upgrade flow sets this after showing the user a
+          // confirmation dialog. Ignored when no pin exists or imageTag is
+          // omitted (a plain restart never touches pin state).
+          acknowledgePinRemoval: z.boolean().default(false),
         })
         .optional()
     )
     .mutation(async ({ ctx, input }) => {
       const instance = await getActiveInstance(ctx.user.id);
+      if (!instance) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'No active KiloClaw instance found' });
+      }
+
+      // Pin consent gate: when the caller is asking for a specific image
+      // tag (typically `latest`), surface a confirmation gate if a pin
+      // exists. Pins are advisory consent gates, not locks — the user is
+      // informed and consents, then the upgrade proceeds. This applies
+      // whether the pin was set by the user themselves or by an admin;
+      // both kinds are removable via the consent dialog. The DO does not
+      // consult the pin table on restart (push-on-write architecture from
+      // PR #2913), so the gate lives here at the web layer.
+      //
+      // Concurrency note: there is a residual narrow race where a pin is
+      // written between the SELECT below and the worker call. That pin
+      // is not consulted by the worker on restart, so the redeploy
+      // proceeds for this click — the new pin row simply remains in the
+      // DB and takes effect on the next sync. This is accepted because
+      // the architecture deliberately keeps pin reads off the restart
+      // hot path; trying to close this window would require either
+      // pulling the pin into the worker or wrapping the entire restart
+      // RPC in a DB transaction, both of which we explicitly avoided.
+      if (input?.imageTag) {
+        const [pin] = await db
+          .select({
+            id: kiloclaw_version_pins.id,
+            image_tag: kiloclaw_version_pins.image_tag,
+            updated_at: kiloclaw_version_pins.updated_at,
+          })
+          .from(kiloclaw_version_pins)
+          .where(eq(kiloclaw_version_pins.instance_id, instance.id))
+          .limit(1);
+
+        if (pin && !input.acknowledgePinRemoval) {
+          // Frontend handles this discriminator by surfacing a confirmation
+          // dialog and re-calling with acknowledgePinRemoval: true. Pin
+          // details for the dialog come from the existing getMyPin query;
+          // the dialog copy can differentiate user-set vs admin-set based
+          // on the pinned_by field returned there.
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'PIN_EXISTS',
+          });
+        }
+
+        if (pin) {
+          // Conditional delete tied to both the row id and the updated_at
+          // we observed. setMyPin uses onConflictDoUpdate which keeps the
+          // same row id but bumps updated_at, so checking id alone would
+          // miss in-place edits. Pinning updated_at as an optimistic lock
+          // catches both replacement (different id) and update (same id,
+          // newer updated_at). Empty returning() means the row changed,
+          // so we throw PIN_EXISTS and let the caller re-check.
+          const deleted = await db
+            .delete(kiloclaw_version_pins)
+            .where(
+              and(
+                eq(kiloclaw_version_pins.instance_id, instance.id),
+                eq(kiloclaw_version_pins.id, pin.id),
+                eq(kiloclaw_version_pins.updated_at, pin.updated_at)
+              )
+            )
+            .returning({ id: kiloclaw_version_pins.id });
+
+          if (deleted.length === 0) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'PIN_EXISTS',
+            });
+          }
+
+          // Sync the cleared pin into DO state. The follow-up restartMachine
+          // call below overwrites trackedImageTag anyway, but pushing the
+          // clear keeps DB and DO state consistent if the restart fails
+          // after this point. Mirrors the removeMyPin pattern. Failures are
+          // logged inside pushPinToWorker; we don't surface them here
+          // because the restart call is the operative side effect.
+          await pushPinToWorker(ctx.user.id, instance.id, null);
+        }
+      }
+
       const client = new KiloClawUserClient(
         generateApiToken(ctx.user, undefined, { expiresIn: TOKEN_EXPIRY.fiveMinutes })
       );
@@ -3280,6 +3391,49 @@ export const kiloclawRouter = createTRPCRouter({
       };
     }),
 
+  /**
+   * Read the signed in user's `kiloclaw_early_access` flag. When true, the
+   * rollout selector force includes the user's instances in any in flight
+   * candidate, regardless of bucket. Pin overrides still win per instance.
+   */
+  myEarlyAccess: baseProcedure.query(async ({ ctx }) => {
+    const [row] = await db
+      .select({ early_access: kilocode_users.kiloclaw_early_access })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, ctx.user.id))
+      .limit(1);
+    return row?.early_access ?? false;
+  }),
+
+  /**
+   * Toggle the signed in user's own `kiloclaw_early_access` flag.
+   * Self serve counterpart of admin.kiloclawInstances.setEarlyAccess.
+   *
+   * Uses baseProcedure (not clawAccessProcedure) because the Settings page is
+   * shared between personal and org contexts. An org-only user — who has
+   * KiloClaw access via their org but no personal subscription/trial — must
+   * still be able to toggle this user-level preference for their org instance.
+   *
+   * Routes through the KiloClaw platform service (same path as the admin
+   * endpoint) so writes to this flag have a single choke-point — if that
+   * route ever gains side-effects (cache bust, audit log, DO notification),
+   * both admin and self-serve paths pick them up automatically.
+   */
+  setMyEarlyAccess: baseProcedure
+    .input(z.object({ value: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const client = new KiloClawInternalClient();
+      try {
+        const result = await client.setUserKiloclawEarlyAccess(ctx.user.id, input.value);
+        return { earlyAccess: result.earlyAccess };
+      } catch (err) {
+        if (err instanceof KiloClawApiError && err.statusCode === 404) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
+        throw err;
+      }
+    }),
+
   getMyPin: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
     if (!instance) return null;
@@ -3346,21 +3500,12 @@ export const kiloclawRouter = createTRPCRouter({
         });
       }
 
-      // Prevent users from overwriting admin-set pins
-      const [existingPin] = await db
-        .select({ pinned_by: kiloclaw_version_pins.pinned_by })
-        .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
-        .limit(1);
-
-      if (existingPin && existingPin.pinned_by !== ctx.user.id) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message:
-            'Your version is pinned by an admin. Contact your Kilo admin to change or remove the pin.',
-        });
-      }
-
+      // Pins are advisory consent metadata. Either the user or an admin
+      // can write/replace/delete the pin at any time — overrides happen
+      // through explicit upgrade/downgrade actions where the consent
+      // dialog enforces awareness, not through this metadata mutation.
+      // The upsert below handles overwriting any existing pin (including
+      // admin-set) with the caller's pin.
       let result: typeof kiloclaw_version_pins.$inferSelect | undefined;
       try {
         [result] = await db
@@ -3396,7 +3541,9 @@ export const kiloclawRouter = createTRPCRouter({
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create pin' });
       }
 
-      return result;
+      const workerSync = await pushPinToWorker(ctx.user.id, instance.id, input.imageTag);
+
+      return { ...result, worker_sync: workerSync };
     }),
 
   removeMyPin: clawAccessProcedure.mutation(async ({ ctx }) => {
@@ -3405,37 +3552,18 @@ export const kiloclawRouter = createTRPCRouter({
       throw new TRPCError({ code: 'NOT_FOUND', message: 'No active KiloClaw instance found' });
     }
 
-    // Atomically delete only self-set pins — the WHERE clause enforces the admin-pin guard
-    // so there's no TOCTOU race between checking pinned_by and deleting.
+    // Pins are advisory consent metadata — either the user or an admin
+    // can clear it at any time. Idempotent: if no row exists, we still
+    // push the clear to the DO so a previously-failed worker sync can be
+    // retried by simply calling removeMyPin again.
     const [deleted] = await db
       .delete(kiloclaw_version_pins)
-      .where(
-        and(
-          eq(kiloclaw_version_pins.instance_id, instance.id),
-          eq(kiloclaw_version_pins.pinned_by, ctx.user.id)
-        )
-      )
+      .where(eq(kiloclaw_version_pins.instance_id, instance.id))
       .returning();
 
-    if (!deleted) {
-      // Check if a pin exists at all — if so, it's admin-set
-      const [existingPin] = await db
-        .select({ pinned_by: kiloclaw_version_pins.pinned_by })
-        .from(kiloclaw_version_pins)
-        .where(eq(kiloclaw_version_pins.instance_id, instance.id))
-        .limit(1);
+    const workerSync = await pushPinToWorker(ctx.user.id, instance.id, null);
 
-      if (existingPin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Your version is pinned by an admin. Contact your Kilo admin to remove the pin.',
-        });
-      }
-
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'No pin found for your account' });
-    }
-
-    return { success: true };
+    return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
 
   fileTree: clawAccessProcedure.query(async ({ ctx }) => {

@@ -4,7 +4,9 @@ import {
   type ProviderState,
   type FlyProviderState,
   type DockerLocalProviderState,
+  type NorthflankProviderState,
 } from '../../schemas/instance-config';
+import { LIFECYCLE_NOTIFICATION_RESET } from './lifecycle-push';
 import type { InstanceMutableState } from './types';
 
 /**
@@ -98,6 +100,28 @@ export function getDockerLocalProviderState(
   };
 }
 
+export function getNorthflankProviderState(
+  source: Pick<InstanceMutableState, 'providerState'>
+): NorthflankProviderState {
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState;
+  }
+  return {
+    provider: 'northflank',
+    projectId: null,
+    projectName: null,
+    serviceId: null,
+    serviceName: null,
+    volumeId: null,
+    volumeName: null,
+    secretId: null,
+    secretName: null,
+    secretContentHash: null,
+    ingressHost: null,
+    region: null,
+  };
+}
+
 export function getRuntimeId(
   source: Pick<InstanceMutableState, 'providerState' | 'flyMachineId'>
 ): string | null {
@@ -106,6 +130,9 @@ export function getRuntimeId(
   }
   if (source.providerState?.provider === 'docker-local') {
     return source.providerState.containerName;
+  }
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState.serviceId ?? source.providerState.serviceName;
   }
   return source.flyMachineId;
 }
@@ -119,6 +146,9 @@ export function getStorageId(
   if (source.providerState?.provider === 'docker-local') {
     return source.providerState.volumeName;
   }
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState.volumeId ?? source.providerState.volumeName;
+  }
   return source.flyVolumeId;
 }
 
@@ -130,6 +160,9 @@ export function getProviderRegion(
   }
   if (source.providerState?.provider === 'docker-local') {
     return null;
+  }
+  if (source.providerState?.provider === 'northflank') {
+    return source.providerState.region;
   }
   return source.flyRegion;
 }
@@ -281,6 +314,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.lastRecoveryErrorAt = d.lastRecoveryErrorAt;
     s.lastBoundMachineRecoveryAt = d.lastBoundMachineRecoveryAt;
     s.instanceFeatures = d.instanceFeatures;
+    s.controllerCapabilitiesVersion = d.controllerCapabilitiesVersion;
     s.gmailNotificationsEnabled = d.gmailNotificationsEnabled;
     s.gmailLastHistoryId = d.gmailLastHistoryId;
     s.gmailPushOidcEmail = d.gmailPushOidcEmail;
@@ -298,8 +332,13 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.preRestoreStatus = d.preRestoreStatus;
     s.pendingRestoreVolumeId = d.pendingRestoreVolumeId;
     // Legacy instances pre-dating this field treat absence as already-sent
-    // to avoid spurious emails after deploy.
+    // to avoid spurious emails/pushes after deploy.
     s.instanceReadyEmailSent = 'instanceReadyEmailSent' in raw ? d.instanceReadyEmailSent : true;
+    // Legacy instances with an in-flight `starting` attempt at deploy time
+    // should not emit a retroactive `start_failed` push for that attempt.
+    // startAsync() re-arms this flag for every subsequent attempt.
+    s.startFailurePushSentForAttempt =
+      'startFailurePushSentForAttempt' in raw ? d.startFailurePushSentForAttempt : true;
     s.customSecretMeta = d.customSecretMeta;
     s.streamChatApiKey = d.streamChatApiKey;
     s.streamChatBotUserId = d.streamChatBotUserId;
@@ -383,6 +422,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.lastRecoveryErrorAt = null;
   s.lastBoundMachineRecoveryAt = null;
   s.instanceFeatures = [];
+  s.controllerCapabilitiesVersion = null;
   s.gmailNotificationsEnabled = false;
   s.gmailLastHistoryId = null;
   s.gmailPushOidcEmail = null;
@@ -399,7 +439,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.restoreStartedAt = null;
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
-  s.instanceReadyEmailSent = false;
+  Object.assign(s, LIFECYCLE_NOTIFICATION_RESET);
   s.streamChatApiKey = null;
   s.streamChatBotUserId = null;
   s.streamChatBotUserToken = null;
@@ -476,6 +516,7 @@ export function createMutableState(): InstanceMutableState {
     lastRecoveryErrorAt: null,
     lastBoundMachineRecoveryAt: null,
     instanceFeatures: [],
+    controllerCapabilitiesVersion: null,
     gmailNotificationsEnabled: false,
     gmailLastHistoryId: null,
     gmailPushOidcEmail: null,
@@ -492,7 +533,7 @@ export function createMutableState(): InstanceMutableState {
     restoreStartedAt: null,
     preRestoreStatus: null,
     pendingRestoreVolumeId: null,
-    instanceReadyEmailSent: false,
+    ...LIFECYCLE_NOTIFICATION_RESET,
     customSecretMeta: null,
     streamChatApiKey: null,
     streamChatBotUserId: null,

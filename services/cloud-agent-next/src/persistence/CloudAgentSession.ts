@@ -73,12 +73,12 @@ import { isExecutionError } from '../execution/errors.js';
 import type { Env as WorkerEnv, SandboxId } from '../types.js';
 import { generateSandboxId, getSandboxNamespace } from '../sandbox-id.js';
 
-import { GitHubTokenService } from '../services/github-token-service.js';
 import { validateStreamTicket } from '../auth.js';
 import { getSandbox } from '@cloudflare/sandbox';
 import { stopWrapper } from '../kilo/wrapper-manager.js';
 import { SessionService } from '../session-service.js';
 import { executePreparationSteps } from './async-preparation.js';
+import { resolveManagedGitLabToken } from '../services/git-token-service-client.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -142,7 +142,7 @@ function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
   return pieces.join('').trim();
 }
 
-export class CloudAgentSession extends DurableObject {
+export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private executionQueries: ExecutionQueries;
   private eventQueries: EventQueries;
   private leaseQueries: LeaseQueries;
@@ -165,7 +165,7 @@ export class CloudAgentSession extends DurableObject {
     gateResult?: 'pass' | 'fail'
   ): Promise<void> {
     const metadata = await this.getMetadata();
-    const callbackQueue = (this.env as unknown as WorkerEnv).CALLBACK_QUEUE;
+    const callbackQueue = this.env.CALLBACK_QUEUE;
 
     if (!metadata?.callbackTarget || !callbackQueue) {
       return;
@@ -211,7 +211,7 @@ export class CloudAgentSession extends DurableObject {
     });
   }
 
-  constructor(ctx: DurableObjectState, env: Env) {
+  constructor(ctx: DurableObjectState, env: WorkerEnv) {
     super(ctx, env);
 
     // Extract sessionId from DO name pattern: "userId:sessionId"
@@ -865,6 +865,7 @@ export class CloudAgentSession extends DurableObject {
     gitUrl?: string;
     gitToken?: string;
     platform?: 'github' | 'gitlab';
+    gitlabTokenManaged?: boolean;
     envVars?: Record<string, string>;
     encryptedSecrets?: EncryptedSecrets;
     setupCommands?: string[];
@@ -1003,7 +1004,7 @@ export class CloudAgentSession extends DurableObject {
   private async runPreparationAsync(input: PreparationInput): Promise<void> {
     const sessionId = input.sessionId as SessionId;
     const prepExecutionId: EventSourceId = `prep_${input.sessionId}`;
-    const env = this.env as unknown as WorkerEnv;
+    const env = this.env;
 
     const emitProgress = (
       step: PreparingStep,
@@ -1079,12 +1080,13 @@ export class CloudAgentSession extends DurableObject {
         variant: input.variant,
         kilocodeToken: input.authToken,
         githubRepo: input.githubRepo,
-        githubToken: input.githubToken,
+        githubToken: result.resolvedGithubToken ?? input.githubToken,
         githubInstallationId: result.resolvedInstallationId,
         githubAppType: result.resolvedGithubAppType,
         gitUrl: input.gitUrl,
-        gitToken: input.gitToken,
+        gitToken: result.resolvedGitToken,
         platform: input.platform,
+        gitlabTokenManaged: result.gitlabTokenManaged,
         envVars: input.envVars,
         encryptedSecrets: input.encryptedSecrets,
         setupCommands: input.setupCommands,
@@ -1307,7 +1309,7 @@ export class CloudAgentSession extends DurableObject {
               await svc.deleteCliSessionViaSessionIngest(
                 metadata.kiloSessionId,
                 metadata.userId,
-                this.env as unknown as WorkerEnv,
+                this.env,
                 { onlyIfEmpty: true }
               );
             } catch {
@@ -1604,22 +1606,22 @@ export class CloudAgentSession extends DurableObject {
   /** Initial reaper interval used only by {@link ensureAlarmScheduled}.
    *  Steady-state intervals are {@link REAPER_IDLE_INTERVAL_MS} / {@link REAPER_ACTIVE_INTERVAL_MS}. */
   private getReaperIntervalMs(): number {
-    const value = Number((this.env as unknown as WorkerEnv).REAPER_INTERVAL_MS);
+    const value = Number(this.env.REAPER_INTERVAL_MS);
     return Number.isFinite(value) && value > 0 ? value : REAPER_INTERVAL_MS_DEFAULT;
   }
 
   private getStaleThresholdMs(): number {
-    const value = Number((this.env as unknown as WorkerEnv).STALE_THRESHOLD_MS);
+    const value = Number(this.env.STALE_THRESHOLD_MS);
     return Number.isFinite(value) && value > 0 ? value : STALE_THRESHOLD_MS;
   }
 
   private getPendingStartTimeoutMs(): number {
-    const value = Number((this.env as unknown as WorkerEnv).PENDING_START_TIMEOUT_MS);
+    const value = Number(this.env.PENDING_START_TIMEOUT_MS);
     return Number.isFinite(value) && value > 0 ? value : PENDING_START_TIMEOUT_MS_DEFAULT;
   }
 
   private getKiloServerIdleTimeoutMs(): number {
-    const value = Number((this.env as unknown as WorkerEnv).KILO_SERVER_IDLE_TIMEOUT_MS);
+    const value = Number(this.env.KILO_SERVER_IDLE_TIMEOUT_MS);
     return Number.isFinite(value) && value > 0 ? value : KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT;
   }
 
@@ -1670,17 +1672,16 @@ export class CloudAgentSession extends DurableObject {
       .info('Stopping idle kilo server');
 
     try {
-      const workerEnv = this.env as unknown as WorkerEnv;
       const sandboxId =
         metadata.sandboxId ??
         (await generateSandboxId(
-          workerEnv.PER_SESSION_SANDBOX_ORG_IDS,
+          this.env.PER_SESSION_SANDBOX_ORG_IDS,
           metadata.orgId,
           metadata.userId,
           metadata.sessionId,
           metadata.botId
         ));
-      const sandbox = getSandbox(getSandboxNamespace(workerEnv, sandboxId), sandboxId);
+      const sandbox = getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId);
 
       const rpcStart = Date.now();
       logger
@@ -1733,17 +1734,16 @@ export class CloudAgentSession extends DurableObject {
       const metadata = await this.getMetadata();
       if (!metadata) return;
 
-      const workerEnvForKeepAlive = this.env as unknown as WorkerEnv;
       const sandboxId =
         metadata.sandboxId ??
         (await generateSandboxId(
-          workerEnvForKeepAlive.PER_SESSION_SANDBOX_ORG_IDS,
+          this.env.PER_SESSION_SANDBOX_ORG_IDS,
           metadata.orgId,
           metadata.userId,
           metadata.sessionId,
           metadata.botId
         ));
-      const sandbox = getSandbox(getSandboxNamespace(workerEnvForKeepAlive, sandboxId), sandboxId);
+      const sandbox = getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId);
       await sandbox.setSleepAfter(SANDBOX_SLEEP_AFTER_SECONDS);
     } catch (error) {
       logger
@@ -2227,23 +2227,21 @@ export class CloudAgentSession extends DurableObject {
     if (!this.orchestrator) {
       const deps: OrchestratorDeps = {
         getSandbox: async (sandboxId: string) => {
-          const workerEnvForOrch = this.env as unknown as WorkerEnv;
-          return getSandbox(getSandboxNamespace(workerEnvForOrch, sandboxId), sandboxId, {
+          return getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId, {
             sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS,
           });
         },
         getSessionStub: (userId, sessionId) => {
           const doKey = `${userId}:${sessionId}`;
-          const id = (this.env as unknown as WorkerEnv).CLOUD_AGENT_SESSION.idFromName(doKey);
-          return (this.env as unknown as WorkerEnv).CLOUD_AGENT_SESSION.get(id);
+          const id = this.env.CLOUD_AGENT_SESSION.idFromName(doKey);
+          return this.env.CLOUD_AGENT_SESSION.get(id);
         },
         getIngestUrl: (sessionId, userId) => {
-          const workerUrl =
-            (this.env as unknown as WorkerEnv).WORKER_URL || 'http://localhost:8788';
+          const workerUrl = this.env.WORKER_URL || 'http://localhost:8788';
           // Encode userId to handle OAuth IDs like "oauth/google:123" that contain slashes
           return `${workerUrl}/sessions/${encodeURIComponent(userId)}/${sessionId}/ingest`;
         },
-        env: this.env as unknown as WorkerEnv,
+        env: this.env,
       };
       this.orchestrator = new ExecutionOrchestrator(deps);
     }
@@ -2271,15 +2269,51 @@ export class CloudAgentSession extends DurableObject {
     };
   }
 
-  private getGitHubTokenService(): GitHubTokenService {
-    const env = this.env as unknown as WorkerEnv;
-    return new GitHubTokenService({
-      GITHUB_TOKEN_CACHE: env.GITHUB_TOKEN_CACHE,
-      GITHUB_APP_ID: env.GITHUB_APP_ID,
-      GITHUB_APP_PRIVATE_KEY: env.GITHUB_APP_PRIVATE_KEY,
-      GITHUB_LITE_APP_ID: env.GITHUB_LITE_APP_ID,
-      GITHUB_LITE_APP_PRIVATE_KEY: env.GITHUB_LITE_APP_PRIVATE_KEY,
+  /**
+   * Refresh a managed GitLab token via GIT_TOKEN_SERVICE. Logs and returns
+   * the current value if the refresh fails with a transient reason so callers
+   * can keep running with the last-known token (best effort). Successful
+   * refreshes are persisted to metadata so a later refresh failure falls back
+   * to the most recent working token rather than a stale prepare-time token.
+   *
+   * Access-revocation reasons (`no_integration_found`, `invalid_org_id`) fail
+   * closed by throwing `BAD_REQUEST`: the stored token is no longer authorized
+   * (integration was removed, or user lost access to the org) and continuing
+   * to use it would bypass revocation.
+   *
+   * `gitlabTokenManaged === false` (explicitly set during prepare when the
+   * caller supplied their own PAT) skips refresh. `undefined` — i.e. sessions
+   * prepared before this flag existed — is treated as managed for backwards
+   * compatibility, since the previous code path relied on the web app
+   * injecting a fresh managed token on every `sendMessage`.
+   */
+  private async refreshManagedGitLabToken(
+    metadata: CloudAgentSessionState,
+    current: string | undefined
+  ): Promise<string | undefined> {
+    if (metadata.platform !== 'gitlab' || metadata.gitlabTokenManaged === false) {
+      return current;
+    }
+    const result = await resolveManagedGitLabToken(this.env, {
+      userId: metadata.userId,
+      orgId: metadata.orgId,
     });
+    if (result.success) {
+      if (result.token !== current) {
+        await this.updateGitToken(result.token);
+      }
+      return result.token;
+    }
+    if (result.reason === 'no_integration_found' || result.reason === 'invalid_org_id') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'No GitLab integration found. Please connect your GitLab account first.',
+      });
+    }
+    logger
+      .withFields({ reason: result.reason, sessionId: metadata.sessionId })
+      .warn('Managed GitLab token refresh failed; using last-known value');
+    return current;
   }
 
   /**
@@ -2333,7 +2367,7 @@ export class CloudAgentSession extends DurableObject {
         }
 
         const sandboxId = await generateSandboxId(
-          (this.env as unknown as WorkerEnv).PER_SESSION_SANDBOX_ORG_IDS,
+          this.env.PER_SESSION_SANDBOX_ORG_IDS,
           request.orgId,
           request.userId,
           sessionId,
@@ -2451,7 +2485,7 @@ export class CloudAgentSession extends DurableObject {
         let githubToken = metadata.githubToken;
         if (metadata.githubInstallationId) {
           const appType = metadata.githubAppType || 'standard';
-          githubToken = await this.getGitHubTokenService().getToken(
+          githubToken = await this.env.GIT_TOKEN_SERVICE.getToken(
             metadata.githubInstallationId,
             appType
           );
@@ -2463,10 +2497,12 @@ export class CloudAgentSession extends DurableObject {
           );
         }
 
+        const gitToken = await this.refreshManagedGitLabToken(metadata, metadata.gitToken);
+
         const sandboxId =
           metadata.sandboxId ??
           (await generateSandboxId(
-            (this.env as unknown as WorkerEnv).PER_SESSION_SANDBOX_ORG_IDS,
+            this.env.PER_SESSION_SANDBOX_ORG_IDS,
             metadata.orgId,
             metadata.userId,
             metadata.sessionId,
@@ -2478,7 +2514,7 @@ export class CloudAgentSession extends DurableObject {
           githubRepo: metadata.githubRepo,
           githubToken,
           gitUrl: metadata.gitUrl,
-          gitToken: metadata.gitToken,
+          gitToken,
           envVars: metadata.envVars,
           encryptedSecrets: metadata.encryptedSecrets,
           setupCommands: metadata.setupCommands,
@@ -2545,7 +2581,7 @@ export class CloudAgentSession extends DurableObject {
       let githubToken = request.tokenOverrides?.githubToken ?? metadata.githubToken;
       if (!request.tokenOverrides?.githubToken && metadata.githubInstallationId) {
         const appType = metadata.githubAppType || 'standard';
-        githubToken = await this.getGitHubTokenService().getToken(
+        githubToken = await this.env.GIT_TOKEN_SERVICE.getToken(
           metadata.githubInstallationId,
           appType
         );
@@ -2557,10 +2593,16 @@ export class CloudAgentSession extends DurableObject {
         );
       }
 
+      // Refresh GitLab token if auto-managed (override wins when provided)
+      const overrideGitToken = request.tokenOverrides?.gitToken;
+      const gitToken = overrideGitToken
+        ? overrideGitToken
+        : await this.refreshManagedGitLabToken(metadata, metadata.gitToken);
+
       const sandboxId =
         metadata.sandboxId ??
         (await generateSandboxId(
-          (this.env as unknown as WorkerEnv).PER_SESSION_SANDBOX_ORG_IDS,
+          this.env.PER_SESSION_SANDBOX_ORG_IDS,
           metadata.orgId,
           metadata.userId,
           metadata.sessionId,
@@ -2570,7 +2612,7 @@ export class CloudAgentSession extends DurableObject {
         kilocodeToken: metadata.kilocodeToken ?? '',
         kilocodeModel: model,
         githubToken,
-        gitToken: request.tokenOverrides?.gitToken,
+        gitToken,
       };
 
       const plan = this.buildExecutionPlan({

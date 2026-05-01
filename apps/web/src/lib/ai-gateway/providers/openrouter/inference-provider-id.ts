@@ -1,38 +1,91 @@
 import * as z from 'zod';
+import { stripModelTilde } from '@/lib/ai-gateway/providers/model-prefix';
+import { isGptOssModel } from '@/lib/ai-gateway/providers/openai';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
+  'ai21',
+  'aion-labs',
+  'akashml',
   'alibaba',
   'amazon-bedrock',
+  'ambient',
   'anthropic',
   'arcee-ai',
+  'atlas-cloud',
+  'azure',
+  'baidu',
+  'baseten',
+  'cerebras',
+  'chutes',
+  'clarifai',
+  'cloudflare',
+  'cohere',
   'deepinfra',
+  'deepseek',
+  'dekallm',
+  'featherless',
   'fireworks',
+  'friendli',
+  'gmicloud',
   'google-ai-studio',
   'google-vertex',
+  'groq',
   'inception',
-  'moonshotai',
-  'morph',
-  'xai',
+  'inceptron',
+  'infermatic',
+  'inflection',
+  'io-net',
+  'ionstream',
+  'liquid',
+  'mancer',
+  'mara',
   'minimax',
   'mistral',
+  'modelrun',
+  'moonshotai',
+  'morph',
+  'nebius',
+  'nextbit',
   'novita',
+  'nvidia',
+  'open-inference',
+  'openai',
+  'parasail',
+  'perplexity',
+  'phala',
+  'poolside',
+  'reka',
+  'relace',
+  'sambanova',
+  'sambanova-turbo',
   'seed',
+  'siliconflow',
+  'stealth',
   'stepfun',
   'streamlake',
-  'stealth',
-  'z-ai',
+  'switchpoint',
   'together',
+  'upstage',
+  'venice',
+  'wandb',
+  'xai',
+  'xiaomi',
+  'z-ai',
 ]);
 
 export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'anthropic',
   'bedrock',
+  'fireworks',
   'google', // Google AI Studio
   'inception',
   'openai',
   'minimax',
   'mistral',
+  'moonshotai',
+  'novita',
   'xai',
+  'xiaomi',
   'zai',
 ]);
 
@@ -42,6 +95,7 @@ export type VercelUserByokInferenceProviderId = z.infer<
 
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'byteplus-coding',
+  'chutes-byok',
   'codestral',
   'kimi-coding',
   'neuralwatt',
@@ -61,14 +115,19 @@ export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.fireworks]: 'openai/gpt-oss-20b',
   [VercelUserByokInferenceProviderIdSchema.enum.inception]: 'inception/mercury-2',
+  [VercelUserByokInferenceProviderIdSchema.enum.moonshotai]: 'moonshotai/kimi-k2.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.novita]: 'openai/gpt-oss-20b',
   [VercelUserByokInferenceProviderIdSchema.enum.google]: 'google/gemini-2.5-flash-lite',
   [VercelUserByokInferenceProviderIdSchema.enum.minimax]: 'minimax/minimax-m2.5',
   [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/devstral-2',
   [VercelUserByokInferenceProviderIdSchema.enum.openai]: 'openai/gpt-5-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
+  [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
+  [DirectUserByokInferenceProviderIdSchema.enum['chutes-byok']]: 'Qwen/Qwen3-30B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
   [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
@@ -77,9 +136,32 @@ export const UserByokTestModels = {
 
 export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'alibaba',
+  'arcee-ai',
+  'azure',
+  'baseten',
+  'bfl',
   'bytedance',
+  'cerebras',
+  'chutes',
+  'cohere',
+  'deepinfra',
+  'deepseek',
+  'groq',
+  'interfaze',
+  'klingai',
+  'meituan',
+  'morph',
+  'nebius',
+  'parasail',
+  'perplexity',
+  'prodia',
+  'recraft',
+  'sambanova',
+  'streamlake',
   'togetherai',
   'vertex',
+  'vertexAnthropic',
+  'voyage',
 ]);
 
 export const VercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
@@ -127,9 +209,9 @@ const modelPrefixToVercelInferenceProviderMapping = {
 export function inferVercelFirstPartyInferenceProviderForModel(
   model: string
 ): VercelInferenceProviderId | null {
-  return model.startsWith('openai/gpt-oss')
+  return isGptOssModel(model)
     ? null
-    : (modelPrefixToVercelInferenceProviderMapping[model.split('/')[0]] ?? null);
+    : (modelPrefixToVercelInferenceProviderMapping[stripModelTilde(model).split('/')[0]] ?? null);
 }
 
 export const AwsCredentialsSchema = z.object({

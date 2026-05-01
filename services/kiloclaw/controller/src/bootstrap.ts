@@ -22,6 +22,8 @@ import type { AuthProfilesMigrationDeps } from './auth-profiles-migration';
 const CONFIG_DIR = '/root/.openclaw';
 const CONFIG_PATH = '/root/.openclaw/openclaw.json';
 const EXEC_APPROVALS_PATH = '/root/.openclaw/exec-approvals.json';
+const DEVICE_PAIRED_PATH = '/root/.openclaw/devices/paired.json';
+const DEVICE_PENDING_PATH = '/root/.openclaw/devices/pending.json';
 const WORKSPACE_DIR = '/root/clawd';
 const COMPILE_CACHE_DIR = '/var/tmp/openclaw-compile-cache';
 const TOOLS_MD_SOURCE = '/usr/local/share/kiloclaw/TOOLS.md';
@@ -35,10 +37,26 @@ const LEGACY_BOT_IDENTITY_DESTS = ['/root/.openclaw/workspace/BOOTSTRAP.md'];
 const ENC_PREFIX = 'KILOCLAW_ENC_';
 const VALUE_PREFIX = 'enc:v1:';
 const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const GATEWAY_CLIENT_ID = 'gateway-client';
+const OPERATOR_TOKEN_ROLE = 'operator';
+const GATEWAY_CLIENT_OPERATOR_SCOPES = [
+  'operator.read',
+  'operator.admin',
+  'operator.approvals',
+  'operator.pairing',
+  'operator.write',
+];
 
 // ---- Types ----
 
 type EnvLike = Record<string, string | undefined>;
+
+type JsonRecord = Record<string, unknown>;
+
+type GatewayClientScopeRepairRequest = {
+  deviceId: string;
+  scopes: string[];
+};
 
 type ExecOpts = {
   env?: NodeJS.ProcessEnv;
@@ -91,6 +109,56 @@ export type ControllerState =
   | { state: 'degraded'; error: string };
 
 export type ControllerStateRef = { current: ControllerState };
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringArraySetEquals(left: unknown, right: readonly string[]): boolean {
+  if (!Array.isArray(left)) return false;
+  const rightSet = new Set(right);
+  const leftSet = new Set<string>();
+  for (const value of left) {
+    if (typeof value !== 'string') return false;
+    leftSet.add(value);
+  }
+  if (leftSet.size !== rightSet.size) return false;
+  return [...rightSet].every(value => leftSet.has(value));
+}
+
+function mergeStringLists(...lists: unknown[]): string[] {
+  const values = new Set<string>();
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const value of list) {
+      if (typeof value !== 'string') continue;
+      const trimmed = value.trim();
+      if (trimmed) values.add(trimmed);
+    }
+  }
+  return [...values];
+}
+
+function setScopeList(
+  record: JsonRecord,
+  key: 'scopes' | 'approvedScopes',
+  scopes: readonly string[]
+): boolean {
+  if (stringArraySetEquals(record[key], scopes)) return false;
+  record[key] = [...scopes];
+  return true;
+}
+
+function roleList(record: JsonRecord): string[] {
+  return mergeStringLists(
+    record.roles,
+    typeof record.role === 'string' ? [record.role] : undefined
+  );
+}
+
+function hasOperatorRole(record: JsonRecord): boolean {
+  return roleList(record).includes(OPERATOR_TOKEN_ROLE);
+}
 
 // ---- Step 1: Env decryption ----
 
@@ -289,11 +357,18 @@ export function writeBotIdentityFile(
   > = defaultDeps
 ): void {
   deps.mkdirSync(path.dirname(IDENTITY_MD_DEST), { recursive: true });
-  atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
-    writeFileSync: deps.writeFileSync,
-    renameSync: deps.renameSync,
-    unlinkSync: deps.unlinkSync,
-  });
+
+  // Only seed IDENTITY.md on the initial boot. After that it's agent/user-owned
+  // content — we must not clobber edits on subsequent reboots. Bot-identity env
+  // var changes (KILOCLAW_BOT_NAME etc.) therefore only take effect on a fresh
+  // instance; existing instances keep whatever IDENTITY.md currently contains.
+  if (!deps.existsSync(IDENTITY_MD_DEST)) {
+    atomicWrite(IDENTITY_MD_DEST, formatBotIdentityMarkdown(env), {
+      writeFileSync: deps.writeFileSync,
+      renameSync: deps.renameSync,
+      unlinkSync: deps.unlinkSync,
+    });
+  }
 
   for (const legacyPath of LEGACY_BOT_IDENTITY_DESTS) {
     if (!deps.existsSync(legacyPath)) continue;
@@ -736,6 +811,158 @@ export function seedExecApprovalsDefaults(env: EnvLike, deps: BootstrapDeps = de
   }
 }
 
+// ---- gateway-client paired device remediation ----
+
+export type GatewayClientDeviceScopeRemediationResult = {
+  checked: number;
+  updated: number;
+};
+
+function hasOperatorToken(record: JsonRecord): boolean {
+  const tokens = record.tokens;
+  return isJsonRecord(tokens) && isJsonRecord(tokens[OPERATOR_TOKEN_ROLE]);
+}
+
+function readGatewayClientRepairRequests(
+  deps: Pick<BootstrapDeps, 'existsSync' | 'readFileSync'>
+): GatewayClientScopeRepairRequest[] {
+  if (!deps.existsSync(DEVICE_PENDING_PATH)) return [];
+
+  let pendingFile: unknown;
+  try {
+    pendingFile = JSON.parse(deps.readFileSync(DEVICE_PENDING_PATH, 'utf8')) as unknown;
+  } catch (err) {
+    console.warn('[controller] Device pending state is unreadable, skipping repair lookup:', err);
+    return [];
+  }
+  if (!isJsonRecord(pendingFile)) {
+    console.warn('[controller] Device pending state is not an object, skipping repair lookup');
+    return [];
+  }
+
+  const repairs: GatewayClientScopeRepairRequest[] = [];
+  for (const value of Object.values(pendingFile)) {
+    if (!isJsonRecord(value)) continue;
+    if (value.clientId !== GATEWAY_CLIENT_ID) continue;
+    if (value.isRepair !== true) continue;
+    if (!hasOperatorRole(value)) continue;
+    if (typeof value.deviceId !== 'string' || value.deviceId.trim().length === 0) continue;
+
+    // Trust boundary: pending.json is local OpenClaw state, not external API input.
+    // Revisit this guard if any non-OpenClaw writer starts staging device requests.
+    const operatorScopes = mergeStringLists(value.scopes).filter(scope =>
+      scope.startsWith('operator.')
+    );
+    if (operatorScopes.length === 0) continue;
+
+    repairs.push({ deviceId: value.deviceId, scopes: operatorScopes });
+  }
+  return repairs;
+}
+
+function buildGatewayClientRepairScopesByDeviceId(
+  deps: Pick<BootstrapDeps, 'existsSync' | 'readFileSync'>
+): Map<string, string[]> {
+  const scopesByDeviceId = new Map<string, string[]>();
+  for (const repair of readGatewayClientRepairRequests(deps)) {
+    const existing = scopesByDeviceId.get(repair.deviceId);
+    scopesByDeviceId.set(repair.deviceId, mergeStringLists(existing, repair.scopes));
+  }
+  return scopesByDeviceId;
+}
+
+export function remediateGatewayClientDeviceScopes(
+  deps: Pick<
+    BootstrapDeps,
+    'existsSync' | 'readFileSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'chmodSync'
+  > = defaultDeps
+): GatewayClientDeviceScopeRemediationResult {
+  if (!deps.existsSync(DEVICE_PAIRED_PATH)) {
+    return { checked: 0, updated: 0 };
+  }
+
+  const pairedFile = JSON.parse(deps.readFileSync(DEVICE_PAIRED_PATH, 'utf8')) as unknown;
+  if (!isJsonRecord(pairedFile)) {
+    console.warn('[controller] Device paired state is not an object, skipping remediation');
+    return { checked: 0, updated: 0 };
+  }
+
+  let checked = 0;
+  let updated = 0;
+  const repairScopesByDeviceId = buildGatewayClientRepairScopesByDeviceId(deps);
+
+  for (const value of Object.values(pairedFile)) {
+    if (!isJsonRecord(value)) continue;
+    const deviceId = typeof value.deviceId === 'string' ? value.deviceId : undefined;
+    const repairScopes = deviceId ? repairScopesByDeviceId.get(deviceId) : undefined;
+    const isGatewayClientPairing = value.clientId === GATEWAY_CLIENT_ID;
+    const shouldRepairByDeviceId =
+      Array.isArray(repairScopes) && repairScopes.length > 0 && hasOperatorToken(value);
+    if (!isGatewayClientPairing && !shouldRepairByDeviceId) continue;
+    checked += 1;
+
+    const tokens = value.tokens;
+    const operatorToken = isJsonRecord(tokens) ? tokens[OPERATOR_TOKEN_ROLE] : undefined;
+    // Intentionally monotonic: converge OpenClaw's persisted approval layers to the
+    // broadest locally observed gateway-client operator repair scope set.
+    const mergedScopes = mergeStringLists(
+      value.scopes,
+      value.approvedScopes,
+      isJsonRecord(operatorToken) ? operatorToken.scopes : undefined,
+      GATEWAY_CLIENT_OPERATOR_SCOPES,
+      repairScopes
+    );
+
+    let changed = false;
+    changed = setScopeList(value, 'scopes', mergedScopes) || changed;
+    changed = setScopeList(value, 'approvedScopes', mergedScopes) || changed;
+
+    if (isJsonRecord(operatorToken)) {
+      changed = setScopeList(operatorToken, 'scopes', mergedScopes) || changed;
+    }
+
+    if (changed) updated += 1;
+  }
+
+  if (updated === 0) {
+    return { checked, updated };
+  }
+
+  atomicWrite(
+    DEVICE_PAIRED_PATH,
+    JSON.stringify(pairedFile, null, 2) + '\n',
+    {
+      writeFileSync: deps.writeFileSync,
+      renameSync: deps.renameSync,
+      unlinkSync: deps.unlinkSync,
+      chmodSync: deps.chmodSync,
+    },
+    { mode: 0o600 }
+  );
+
+  return { checked, updated };
+}
+
+export function runGatewayClientDeviceScopeRemediation(
+  deps: Pick<
+    BootstrapDeps,
+    'existsSync' | 'readFileSync' | 'writeFileSync' | 'renameSync' | 'unlinkSync' | 'chmodSync'
+  > = defaultDeps
+): GatewayClientDeviceScopeRemediationResult {
+  try {
+    const remediation = remediateGatewayClientDeviceScopes(deps);
+    if (remediation.updated > 0) {
+      console.log(
+        `[controller] gateway-client device scopes remediated: ${remediation.updated}/${remediation.checked} paired device(s)`
+      );
+    }
+    return remediation;
+  } catch (err) {
+    console.warn('[controller] Failed to remediate gateway-client device scopes:', err);
+    return { checked: 0, updated: 0 };
+  }
+}
+
 // ---- TOOLS.md bounded-section helper ----
 
 export type ToolsMdSectionConfig = {
@@ -987,6 +1214,10 @@ export async function bootstrapNonCritical(
   const steps: BootstrapStep[] = [
     { phase: 'github', run: () => configureGitHub(env, deps) },
     { phase: 'linear', run: () => configureLinear(env) },
+    {
+      phase: 'gateway-client-device-scopes',
+      run: () => runGatewayClientDeviceScopeRemediation(deps),
+    },
     { phase: configPhase, run: () => runOnboardOrDoctor(env, deps) },
     {
       phase: 'tools-md',

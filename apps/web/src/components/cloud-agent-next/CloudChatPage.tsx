@@ -150,13 +150,14 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   useEffect(() => {
     if (prevActivityRef.current === 'busy' && activity.type === 'idle') {
       playCelebrationSound();
-      void queryClient.invalidateQueries(trpc.unifiedSessions.list.pathFilter());
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
     }
     prevActivityRef.current = activity.type;
   }, [activity.type, playCelebrationSound, queryClient, trpc]);
 
   // -- Scroll ---------------------------------------------------------------
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const messagesContentRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const chatUI = useAtomValue(manager.atoms.chatUI);
@@ -166,25 +167,83 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   // Without this, auto-scroll's scrollTo fires handleScroll which re-enables
   // shouldAutoScroll, making it impossible for the user to scroll away during streaming.
   const isAutoScrollingRef = useRef(false);
+  const autoScrollRunRef = useRef(0);
   const lastScrollTopRef = useRef(0);
 
   const autoScrollFrameRef = useRef(0);
+  const delayedAutoScrollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scrollToBottomNow = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const scrollRun = autoScrollRunRef.current + 1;
+    autoScrollRunRef.current = scrollRun;
+    isAutoScrollingRef.current = true;
+    el.scrollTop = el.scrollHeight;
+    lastScrollTopRef.current = el.scrollTop;
+    setShowScrollButton(false);
+
+    requestAnimationFrame(() => {
+      if (autoScrollRunRef.current === scrollRun) {
+        isAutoScrollingRef.current = false;
+      }
+    });
+  }, []);
+
+  const scheduleScrollToBottom = useCallback(() => {
+    cancelAnimationFrame(autoScrollFrameRef.current);
+    if (delayedAutoScrollRef.current !== null) {
+      clearTimeout(delayedAutoScrollRef.current);
+      delayedAutoScrollRef.current = null;
+    }
+
+    autoScrollFrameRef.current = requestAnimationFrame(() => {
+      scrollToBottomNow();
+      requestAnimationFrame(scrollToBottomNow);
+      delayedAutoScrollRef.current = setTimeout(() => {
+        delayedAutoScrollRef.current = null;
+        scrollToBottomNow();
+      }, 100);
+    });
+  }, [scrollToBottomNow]);
+
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(autoScrollFrameRef.current);
+      if (delayedAutoScrollRef.current !== null) {
+        clearTimeout(delayedAutoScrollRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!chatUI.shouldAutoScroll) return;
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    // Coalesce rapid streaming updates into one scroll per animation frame
-    cancelAnimationFrame(autoScrollFrameRef.current);
-    autoScrollFrameRef.current = requestAnimationFrame(() => {
-      isAutoScrollingRef.current = true;
-      el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
-      requestAnimationFrame(() => {
-        isAutoScrollingRef.current = false;
-      });
+    scheduleScrollToBottom();
+  }, [staticMessages, dynamicMessages, chatUI.shouldAutoScroll, scheduleScrollToBottom]);
+
+  useEffect(() => {
+    if (!chatUI.shouldAutoScroll) return;
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const content = messagesContentRef.current;
+    if (!content) return;
+
+    const observer = new ResizeObserver(() => {
+      scheduleScrollToBottom();
     });
-    return () => cancelAnimationFrame(autoScrollFrameRef.current);
-  }, [staticMessages, dynamicMessages, chatUI.shouldAutoScroll]);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [chatUI.shouldAutoScroll, scheduleScrollToBottom]);
+
+  useEffect(() => {
+    if (!sessionIdFromParams) return;
+
+    setChatUI({ shouldAutoScroll: true });
+    lastScrollTopRef.current = 0;
+    setShowScrollButton(false);
+    scheduleScrollToBottom();
+  }, [sessionIdFromParams, setChatUI, scheduleScrollToBottom]);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -209,31 +268,30 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const scrollToBottom = useCallback(() => {
     setChatUI({ shouldAutoScroll: true });
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    isAutoScrollingRef.current = true;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
-    requestAnimationFrame(() => {
-      isAutoScrollingRef.current = false;
-    });
-  }, [setChatUI]);
+    scheduleScrollToBottom();
+  }, [scheduleScrollToBottom, setChatUI]);
 
   // -- Handlers -------------------------------------------------------------
   const handleSendMessage = useCallback(
     async (prompt: string, images?: Images) => {
-      const accepted = await manager.send({
+      setChatUI({ shouldAutoScroll: true });
+      const acceptedPromise = manager.send({
         prompt,
         mode: sessionConfig?.mode ?? 'code',
         model: sessionConfig?.model ?? '',
         variant: sessionConfig?.variant ?? undefined,
         images,
       });
+      scheduleScrollToBottom();
+
+      const accepted = await acceptedPromise;
       if (accepted) {
         setImageMessageUuid(crypto.randomUUID());
+        scheduleScrollToBottom();
       }
       return accepted;
     },
-    [manager, sessionConfig]
+    [manager, scheduleScrollToBottom, sessionConfig, setChatUI]
   );
 
   const handleStopExecution = useCallback(() => {
@@ -384,16 +442,21 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                     className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 lg:pt-12 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                     onScroll={handleScroll}
                   >
-                    <StaticMessages messages={staticMessages} getChildMessages={getChildMessages} />
-                    <DynamicMessages
-                      messages={dynamicMessages}
-                      getChildMessages={getChildMessages}
-                    />
+                    <div ref={messagesContentRef}>
+                      <StaticMessages
+                        messages={staticMessages}
+                        getChildMessages={getChildMessages}
+                      />
+                      <DynamicMessages
+                        messages={dynamicMessages}
+                        getChildMessages={getChildMessages}
+                      />
 
-                    <WorkingIndicator messages={dynamicMessages} isStreaming={isStreaming} />
-                    {statusIndicator && <SessionStatusIndicator indicator={statusIndicator} />}
+                      <WorkingIndicator messages={dynamicMessages} isStreaming={isStreaming} />
+                      {statusIndicator && <SessionStatusIndicator indicator={statusIndicator} />}
 
-                    <div ref={messagesEndRef} />
+                      <div ref={messagesEndRef} />
+                    </div>
                   </div>
 
                   {showScrollButton && (

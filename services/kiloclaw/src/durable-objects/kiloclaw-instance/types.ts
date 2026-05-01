@@ -113,6 +113,7 @@ export type InstanceMutableState = {
   lastRecoveryErrorAt: number | null;
   lastBoundMachineRecoveryAt: number | null;
   instanceFeatures: string[];
+  controllerCapabilitiesVersion: number | null;
   gmailNotificationsEnabled: boolean;
   gmailLastHistoryId: string | null;
   gmailPushOidcEmail: string | null;
@@ -131,6 +132,7 @@ export type InstanceMutableState = {
   preRestoreStatus: InstanceStatus | null;
   pendingRestoreVolumeId: string | null;
   instanceReadyEmailSent: boolean;
+  startFailurePushSentForAttempt: boolean;
   customSecretMeta: PersistedState['customSecretMeta'];
   // Stream Chat default channel (auto-provisioned)
   streamChatApiKey: string | null;

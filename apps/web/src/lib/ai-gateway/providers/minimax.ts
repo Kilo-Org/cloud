@@ -11,13 +11,12 @@ export const minimax_m25_free_model: KiloExclusiveModel = {
   flags: ['reasoning'],
   gateway: 'openrouter',
   internal_id: 'minimax/minimax-m2.5',
-  inference_provider: null,
   pricing: null,
   exclusive_to: [],
 };
 
 export function isMinimaxModel(model: string) {
-  return model.startsWith('minimax/');
+  return model.includes('minimax');
 }
 
 export const MINIMAX_CURRENT_MODEL_ID = 'minimax/minimax-m2.7';

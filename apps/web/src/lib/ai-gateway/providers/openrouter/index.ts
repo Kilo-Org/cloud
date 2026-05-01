@@ -1,4 +1,9 @@
-import { isFreeModel, kiloExclusiveModels, preferredModels } from '@/lib/ai-gateway/models';
+import {
+  isFreeModel,
+  isPdfSupportingModel,
+  kiloExclusiveModels,
+  preferredModels,
+} from '@/lib/ai-gateway/models';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
@@ -10,47 +15,71 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { convertFromKiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import {
-  getModelSettings,
   getOpenClawSettings,
   getOpenCodeSettings,
-  getVersionedModelSettings,
 } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/kilo-auto';
+import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 function buildAutoModels(): OpenRouterModel[] {
-  return AUTO_MODELS.map(m => ({
-    id: m.id,
-    name: m.name,
-    created: 0,
-    description: m.description,
-    architecture: {
-      input_modalities: m.supports_images ? ['text', 'image'] : ['text'],
-      output_modalities: ['text'],
-      tokenizer: 'Other',
-    },
-    top_provider: {
-      is_moderated: false,
+  return AUTO_MODELS.map(m => {
+    const input_modalities = ['text'];
+    if (m.supports_images) {
+      input_modalities.push('image');
+    }
+    if (m.supports_pdf) {
+      input_modalities.push('pdf');
+    }
+    return {
+      id: m.id,
+      name: m.name,
+      created: 0,
+      description: m.description,
+      architecture: {
+        input_modalities: input_modalities,
+        output_modalities: ['text'],
+        tokenizer: 'Other',
+      },
+      top_provider: {
+        is_moderated: false,
+        context_length: m.context_length,
+        max_completion_tokens: m.max_completion_tokens,
+      },
+      pricing: {
+        prompt: m.prompt_price,
+        completion: m.completion_price,
+        input_cache_read: m.input_cache_read_price,
+        input_cache_write: m.input_cache_write_price,
+        request: '0',
+        image: '0',
+        web_search: '0',
+        internal_reasoning: '0',
+      },
       context_length: m.context_length,
-      max_completion_tokens: m.max_completion_tokens,
-    },
-    pricing: {
-      prompt: m.prompt_price,
-      completion: m.completion_price,
-      input_cache_read: m.input_cache_read_price,
-      input_cache_write: m.input_cache_write_price,
-      request: '0',
-      image: '0',
-      web_search: '0',
-      internal_reasoning: '0',
-    },
-    context_length: m.context_length,
-    supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
-    settings: m.roocode_settings,
-    opencode: m.opencode_settings,
-  }));
+      supported_parameters: [
+        'max_tokens',
+        'temperature',
+        'tools',
+        'reasoning',
+        'include_reasoning',
+      ],
+      opencode: m.opencode_settings,
+    };
+  });
+}
+
+function formatName(model: OpenRouterModel, preferredIndex: number) {
+  const promptPrice = Number.parseFloat(model.pricing.prompt);
+  const isExpensive = Number.isFinite(promptPrice) && promptPrice >= 0.00003; // Opus Fast / GPT Pro price
+  if (isExpensive) return model.name + ' ($$$$)';
+  if (model.name.endsWith(')')) return model.name;
+  const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
+  const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
+  if (isNew) return model.name + ' (new)';
+  return model.name;
 }
 
 function enhancedModelList(models: OpenRouterModel[]) {
@@ -68,18 +97,21 @@ function enhancedModelList(models: OpenRouterModel[]) {
     .concat(autoModels)
     .map((model: OpenRouterModel) => {
       const preferredIndex = preferredModels.indexOf(model.id);
-      const ageDays = (Date.now() / 1_000 - model.created) / (24 * 3600);
-      const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
-      const skipSuffix = model.name.endsWith(')');
+      const addPdf =
+        isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
       return {
         ...model,
-        name: skipSuffix ? model.name : isNew ? model.name + ' (new)' : model.name,
+        name: formatName(model, preferredIndex),
         preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
         isFree: isFreeModel(model.id),
-        settings: model.settings ?? getModelSettings(model.id),
-        versioned_settings: model.versioned_settings ?? getVersionedModelSettings(model.id),
         opencode: model.opencode ?? getOpenCodeSettings(model.id),
         openclaw: model.openclaw ?? getOpenClawSettings(model.id),
+        architecture: addPdf
+          ? {
+              ...model.architecture,
+              input_modalities: model.architecture.input_modalities.concat(['pdf']),
+            }
+          : model.architecture,
       };
     });
   const sortedModels = enhancedModels.sort((a, b) => {
@@ -107,8 +139,7 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
     method: 'GET',
     headers: {
       Authorization: `Bearer ${PROVIDERS.OPENROUTER.apiKey}`,
-      'HTTP-Referer': 'https://kilocode.ai',
-      'X-Title': 'Kilo Code',
+      ...ATTRIBUTION_HEADERS,
     },
     next: { revalidate: 60 },
   });

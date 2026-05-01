@@ -3,11 +3,11 @@ import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
 export function isGeminiModel(model: string) {
-  return model.startsWith('google/gemini');
+  return model.includes('gemini');
 }
 
 export function isGemmaModel(model: string) {
-  return model.startsWith('google/gemma');
+  return model.includes('gemma');
 }
 
 export const GEMMA_4_31B_IT_ID = 'google/gemma-4-31b-it';
@@ -23,13 +23,12 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   flags: ['vision'],
   gateway: 'openrouter',
   internal_id: 'google/gemma-4-26b-a4b-it',
-  inference_provider: 'novita',
   pricing: null,
   exclusive_to: [],
 };
 
 export function isGemini3Model(model: string) {
-  return model.startsWith('google/gemini-3');
+  return model.includes('gemini-3');
 }
 
 type ReadFileParametersSchema = {
@@ -55,7 +54,7 @@ export function applyGoogleModelSettings(provider: ProviderId, requestToMutate: 
   }
 
   const readFileTool = requestToMutate.body.tools?.find(
-    tool => tool.type === 'function' && tool.function.name === 'read_file'
+    tool => tool.type === 'function' && tool.function?.name === 'read_file'
   );
   if (!readFileTool || readFileTool.type !== 'function') {
     return;

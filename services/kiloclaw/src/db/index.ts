@@ -109,6 +109,7 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
       sandbox_id: kiloclaw_instances.sandbox_id,
       user_id: kiloclaw_instances.user_id,
       organization_id: kiloclaw_instances.organization_id,
+      provider: kiloclaw_instances.provider,
     })
     .from(kiloclaw_instances)
     .where(
@@ -123,6 +124,7 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
     sandboxId: row.sandbox_id,
     userId: row.user_id,
     orgId: row.organization_id,
+    provider: row.provider,
   };
 }
 
@@ -150,6 +152,7 @@ export async function getInstanceByIdIncludingDestroyed(
       user_id: kiloclaw_instances.user_id,
       organization_id: kiloclaw_instances.organization_id,
       inbound_email_enabled: kiloclaw_instances.inbound_email_enabled,
+      provider: kiloclaw_instances.provider,
     })
     .from(kiloclaw_instances)
     .where(where)
@@ -163,6 +166,7 @@ export async function getInstanceByIdIncludingDestroyed(
     userId: row.user_id,
     orgId: row.organization_id,
     inboundEmailEnabled: row.inbound_email_enabled,
+    provider: row.provider,
   };
 }
 
@@ -195,6 +199,29 @@ export async function markInstanceDestroyed(db: WorkerDb, userId: string, sandbo
       userId,
     });
   });
+}
+
+/**
+ * Sync the active instance's tracked_image_tag column from DO state.
+ * No-op at the SQL level when the value already matches (IS DISTINCT FROM).
+ */
+export async function syncTrackedImageTag(
+  db: WorkerDb,
+  userId: string,
+  sandboxId: string,
+  trackedImageTag: string | null
+) {
+  await db
+    .update(kiloclaw_instances)
+    .set({ tracked_image_tag: trackedImageTag })
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.destroyed_at),
+        sql`${kiloclaw_instances.tracked_image_tag} IS DISTINCT FROM ${trackedImageTag}`
+      )
+    );
 }
 
 export async function getGoogleOAuthConnectionByInstanceId(db: WorkerDb, instanceId: string) {

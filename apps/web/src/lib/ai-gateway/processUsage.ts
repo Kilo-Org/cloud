@@ -9,7 +9,7 @@ import type {
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
 } from './providers/openrouter/types';
-import { fetchGeneration } from './providers';
+import { fetchGeneration } from './providers/upstream-request';
 import PROVIDERS from './providers/provider-definitions';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
@@ -54,7 +54,7 @@ import {
 } from '@/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
 import { computeOpenRouterCostFields, drainSseStream } from '@/lib/ai-gateway/processUsage.shared';
-import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic';
+import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
@@ -195,7 +195,7 @@ export function toInsertableDbUsageRecord(
     message_id: usageStats.messageId ?? '<missing>',
     upstream_id: usageStats.upstream_id,
     finish_reason: usageStats.finish_reason,
-    latency: ttfb_ms,
+    latency: usageStats.latency ?? ttfb_ms,
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
     is_byok: usageStats.is_byok,
@@ -950,9 +950,7 @@ async function processTokenData(
 }
 
 function useAnthropicStyleTokenCounting(requestedModel: string, provider: ProviderId) {
-  return (
-    provider === 'vercel' && (isAnthropicModel(requestedModel) || isMinimaxModel(requestedModel))
-  );
+  return provider === 'vercel' && (isClaudeModel(requestedModel) || isMinimaxModel(requestedModel));
 }
 
 function useGenerationLookup(provider: ProviderId, usageStats: MicrodollarUsageStats | null) {

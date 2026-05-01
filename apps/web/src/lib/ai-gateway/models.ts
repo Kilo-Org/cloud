@@ -14,7 +14,7 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { trinity_large_thinking_free_model } from '@/lib/ai-gateway/providers/arcee';
-import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
+import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   MINIMAX_CURRENT_MODEL_ID,
@@ -23,15 +23,21 @@ import {
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
-import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { alibabaDirectModels, qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
-import { grok_code_fast_1_optimized_free_model } from '@/lib/ai-gateway/providers/xai';
+import {
+  grok_code_fast_1_optimized_free_model,
+  isGrok4Model,
+} from '@/lib/ai-gateway/providers/xai';
+import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
   'inclusionai/ling-2.6-1t:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
+  'poolside/laguna-m.1:free',
   grok_code_fast_1_optimized_free_model.status === 'public'
     ? grok_code_fast_1_optimized_free_model.public_id
     : null,
@@ -63,6 +69,10 @@ export function isFreeModel(model: string): boolean {
   );
 }
 
+export function isPdfSupportingModel(model: string): boolean {
+  return isClaudeModel(model) || isOpenAiModel(model) || isGrok4Model(model);
+}
+
 export function isKiloExclusiveFreeModel(model: string): boolean {
   return kiloExclusiveModels.some(
     m => m.public_id === model && m.status !== 'disabled' && !m.pricing
@@ -70,22 +80,19 @@ export function isKiloExclusiveFreeModel(model: string): boolean {
 }
 
 export const kiloExclusiveModels = [
-  // Please do not remove models from this list immediately.
-  // Instead, set status to 'disabled' first
-  // and only remove when very few users are requesting it.
   gemma_4_26b_a4b_it_free_model,
   minimax_m25_free_model,
   morph_warp_grep_free_model,
   grok_code_fast_1_optimized_free_model,
-  seed_20_pro_free_model,
-  qwen36_plus_model,
+  seed_20_code_free_model,
+  ...alibabaDirectModels,
   trinity_large_thinking_free_model,
   claude_sonnet_clawsetup_model,
   stepfun_35_flash_free_model,
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {
-  return kiloExclusiveModels.some(m => m.public_id === model && m.inference_provider === 'stealth');
+  return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));
 }
 
 function isOpenRouterStealthModel(model: string): boolean {

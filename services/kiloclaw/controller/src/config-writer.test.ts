@@ -607,6 +607,29 @@ describe('generateBaseConfig', () => {
     ]);
   });
 
+  it('passes allowed origins entries through as literal strings', () => {
+    // The config-writer does not interpret entries — whatever openclaw's
+    // origin check understands (exact matches and bare `*`) is what matters.
+    // Per-instance virtual hosting is implemented by the worker appending a
+    // specific `https://<instanceId>.kiloclaw.ai` entry to the list before it
+    // reaches the controller (see services/kiloclaw/src/gateway/env.ts), not
+    // by using a wildcard host pattern here. A wildcard entry would be kept
+    // in the config but would never match a real Origin header.
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      OPENCLAW_ALLOWED_ORIGINS:
+        'https://claw.kilosessions.ai, https://abc.kiloclaw.ai, https://kilo.ai',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.gateway.controlUi.allowedOrigins).toEqual([
+      'https://claw.kilosessions.ai',
+      'https://abc.kiloclaw.ai',
+      'https://kilo.ai',
+    ]);
+  });
+
   it('always configures the KiloClaw customizer plugin', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);

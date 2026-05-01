@@ -26,12 +26,21 @@ export const actionExecutedWebhookSchema = z.object({
   executedAt: z.string().min(1),
 });
 
+// Sent when a subscribed client polls for bot status. The plugin replies by
+// POSTing the current heartbeat back via `sendBotStatus`. No payload fields —
+// `sandboxId` is carried by the rpc-level `targetBotId`.
+export const botStatusRequestWebhookSchema = z.object({
+  type: z.literal('bot.status_request'),
+});
+
 export const chatWebhookSchema = z.discriminatedUnion('type', [
   messageCreatedWebhookSchema,
   actionExecutedWebhookSchema,
+  botStatusRequestWebhookSchema,
 ]);
 
 export const chatWebhookRpcSchema = z.discriminatedUnion('type', [
   messageCreatedWebhookSchema.extend({ targetBotId: z.string().min(1) }),
   actionExecutedWebhookSchema.extend({ targetBotId: z.string().min(1) }),
+  botStatusRequestWebhookSchema.extend({ targetBotId: z.string().min(1) }),
 ]);

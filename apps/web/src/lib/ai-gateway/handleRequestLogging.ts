@@ -4,9 +4,6 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { after } from 'next/server';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { kilologHash } from '@/lib/ai-gateway/kilologHash';
-import { createHash } from 'crypto';
-import { redisSet } from '@/lib/redis';
-import { requestLogRedisKey } from '@/lib/redis-keys';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
 
 const users = [
@@ -64,31 +61,10 @@ export async function handleRequestLogging(params: {
         apiRequestLogId[0].id
       );
     } catch (e) {
+      const cause = e instanceof Error ? e.cause : undefined;
       logExceptInTest(
-        `[handleRequestLogging] failed to insert api_request_log (user=${user?.id}, status=${clonedResponse.status}, model=${model})`
+        `[handleRequestLogging] failed to insert api_request_log (user=${user?.id}, status=${clonedResponse.status}, model=${model}) cause (truncated): ${String(cause).substring(0, 4000)} error (truncated): ${String(e).substring(0, 4000)}`
       );
-      try {
-        logExceptInTest(
-          '[handleRequestLogging] error (truncated): ' + String(e).substring(0, 4000)
-        );
-      } catch {
-        //ignore
-      }
-      try {
-        const serialized = JSON.stringify(request.body);
-        const hash = createHash('sha256').update(serialized).digest('hex');
-        await redisSet(requestLogRedisKey(hash), serialized, 86400);
-        logExceptInTest('[handleRequestLogging] request hash: ' + hash);
-      } catch {
-        //ignore
-      }
-      try {
-        logExceptInTest(
-          '[handleRequestLogging] response (truncated): ' + response?.substring(0, 4000)
-        );
-      } catch {
-        //ignore
-      }
     }
   });
 }

@@ -43,6 +43,10 @@ const ProductTelemetrySchema = z.object({
 
 const INSTANCE_READY_LOAD_THRESHOLD = 0.1;
 
+function isReadyCheckin(data: { loadAvg5m: number }, workerEnv: string | undefined): boolean {
+  return workerEnv !== 'production' || data.loadAvg5m <= INSTANCE_READY_LOAD_THRESHOLD;
+}
+
 const DiskBytesSchema = z
   .number()
   .int()
@@ -106,6 +110,17 @@ type GoogleGrantsBySource = {
   legacy?: string[];
   oauth?: string[];
 };
+
+function sqlTextArray(values: readonly string[]) {
+  if (values.length === 0) {
+    return sql`ARRAY[]::text[]`;
+  }
+
+  return sql`ARRAY[${sql.join(
+    values.map(value => sql`${value}`),
+    sql`, `
+  )}]::text[]`;
+}
 
 function normalizeCapabilities(capabilities: readonly string[]): string[] {
   return [...new Set(capabilities.map(capability => capability.trim()).filter(Boolean))].sort();
@@ -427,18 +442,14 @@ controller.post('/checkin', async (c: Context<AppEnv>) => {
   // Instance readiness detection: when load drops below threshold, notify the
   // backend so it can send the one-time "instance ready" email and finalize
   // any pending async auto-resume state for this instance.
-  if (data.loadAvg5m <= INSTANCE_READY_LOAD_THRESHOLD) {
+  const readyCheckin = isReadyCheckin(data, c.env.WORKER_ENV);
+
+  if (readyCheckin) {
     try {
       const apiOrigin = backendApiOrigin(c.env.BACKEND_API_URL);
       const { shouldNotify } = await stub.tryMarkInstanceReady();
 
       if (c.env.INTERNAL_API_SECRET) {
-        console.log('[controller] instance-ready: dispatching notification', {
-          userId,
-          sandboxId: data.sandboxId,
-          instanceId: isInstanceKeyedSandboxId(data.sandboxId) ? doKey : null,
-          shouldNotify,
-        });
         waitUntil(
           notifyInstanceReady(
             apiOrigin,
@@ -689,7 +700,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
       UPDATE kiloclaw_google_oauth_connections
       SET
         grants_by_source = ${JSON.stringify(grantsBySource)}::jsonb,
-        capabilities = ${capabilities},
+        capabilities = ${sqlTextArray(capabilities)},
         updated_at = ${now}
       WHERE instance_id = ${instance.id}
     `);
@@ -714,7 +725,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
         account_email = ${parsed.data.accountEmail},
         account_subject = ${parsed.data.accountSubject},
         grants_by_source = ${JSON.stringify(grantsBySource)}::jsonb,
-        capabilities = ${capabilities},
+        capabilities = ${sqlTextArray(capabilities)},
         connected_at = ${now},
         updated_at = ${now}
       WHERE instance_id = ${instance.id}
@@ -749,9 +760,9 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
         ${encryptWithSymmetricKey(parsed.data.oauthClientSecret, encryptionKey)},
         'legacy',
         ${encryptWithSymmetricKey(parsed.data.refreshToken, encryptionKey)},
-        ${scopes},
+        ${sqlTextArray(scopes)},
         ${JSON.stringify(grantsBySource)}::jsonb,
-        ${capabilities},
+        ${sqlTextArray(capabilities)},
         'active',
         ${now},
         ${now},
@@ -813,7 +824,7 @@ controller.post('/google/migrate-legacy', async (c: Context<AppEnv>) => {
       UPDATE kiloclaw_google_oauth_connections
       SET
         grants_by_source = ${JSON.stringify(mergedGrantsBySource)}::jsonb,
-        capabilities = ${resolvedCapabilities},
+        capabilities = ${sqlTextArray(resolvedCapabilities)},
         updated_at = ${now}
       WHERE instance_id = ${instance.id}
     `);

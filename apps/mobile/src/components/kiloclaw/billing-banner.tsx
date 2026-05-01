@@ -1,13 +1,30 @@
-import { AlertTriangle, Clock, Info } from 'lucide-react-native';
+import { AlertTriangle, Clock, Info, type LucideIcon } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { toneColor, type ToneKey } from '@/lib/agent-color';
 import {
   type ClawBillingStatus,
   deriveBannerState,
   formatBillingDate,
 } from '@/lib/hooks/use-kiloclaw-billing';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+
+type Severity = 'info' | 'warn' | 'danger';
+
+// 'info' has no dedicated tone token yet — map to warn (amber). If a
+// true neutral-info tone is needed later, add a token pair in global.css.
+const SEVERITY_TO_TONE: Record<Severity, ToneKey> = {
+  info: 'warn',
+  warn: 'warn',
+  danger: 'danger',
+};
+
+type BannerConfig = {
+  icon: LucideIcon;
+  message: string;
+  severity: Severity;
+};
 
 export function BillingBanner({ billing }: Readonly<{ billing: ClawBillingStatus }>) {
   const colors = useThemeColors();
@@ -23,25 +40,28 @@ export function BillingBanner({ billing }: Readonly<{ billing: ClawBillingStatus
   }
 
   const Icon = config.icon;
+  const tint = toneColor(SEVERITY_TO_TONE[config.severity]);
+  const iconColor = colors[tint.hueThemeKey];
 
   return (
-    <View className={`flex-row items-center gap-3 rounded-lg p-3 ${config.bgClass}`}>
-      <Icon size={18} color={colors.foreground} />
-      <Text className="flex-1 text-xs font-medium">{config.message}</Text>
+    <View className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3">
+      <View
+        className={`h-9 w-9 items-center justify-center rounded-lg border ${tint.tileBgClass} ${tint.tileBorderClass}`}
+      >
+        <Icon size={16} color={iconColor} />
+      </View>
+      <Text className="flex-1 text-[13px] font-medium text-foreground">{config.message}</Text>
     </View>
   );
 }
 
-function getBannerConfig(
-  billing: ClawBillingStatus,
-  state: string
-): { icon: typeof Info; message: string; bgClass: string } | undefined {
+function getBannerConfig(billing: ClawBillingStatus, state: string): BannerConfig | undefined {
   switch (state) {
     case 'trial_active': {
       return {
         icon: Info,
         message: `Trial: ${String(billing.trial?.daysRemaining ?? 0)} days remaining`,
-        bgClass: 'bg-secondary',
+        severity: 'info',
       };
     }
     case 'trial_ending_soon':
@@ -49,14 +69,14 @@ function getBannerConfig(
       return {
         icon: Clock,
         message: `Trial ending soon: ${String(billing.trial?.daysRemaining ?? 0)} day${billing.trial?.daysRemaining === 1 ? '' : 's'} left`,
-        bgClass: 'bg-secondary',
+        severity: 'warn',
       };
     }
     case 'trial_expires_today': {
       return {
         icon: AlertTriangle,
         message: 'Trial expires today',
-        bgClass: 'bg-red-100 dark:bg-red-950',
+        severity: 'danger',
       };
     }
     case 'earlybird_active': {
@@ -65,14 +85,14 @@ function getBannerConfig(
         message: billing.earlybird
           ? `Earlybird access until ${formatBillingDate(billing.earlybird.expiresAt)}`
           : '',
-        bgClass: 'bg-secondary',
+        severity: 'info',
       };
     }
     case 'earlybird_ending_soon': {
       return {
         icon: Clock,
         message: `Earlybird ending: ${String(billing.earlybird?.daysRemaining ?? 0)} days left`,
-        bgClass: 'bg-secondary',
+        severity: 'warn',
       };
     }
     case 'subscription_canceling': {
@@ -81,14 +101,14 @@ function getBannerConfig(
         message: billing.subscription
           ? `Subscription cancels ${formatBillingDate(billing.subscription.currentPeriodEnd)}`
           : '',
-        bgClass: 'bg-red-100 dark:bg-red-950',
+        severity: 'danger',
       };
     }
     case 'subscription_past_due': {
       return {
         icon: AlertTriangle,
         message: 'Payment past due — please update your payment method',
-        bgClass: 'bg-red-100 dark:bg-red-950',
+        severity: 'danger',
       };
     }
     default: {

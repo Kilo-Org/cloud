@@ -2,6 +2,7 @@ import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { type Href, router } from 'expo-router';
 import { Platform } from 'react-native';
+import { z } from 'zod';
 
 function getProjectId(): string {
   const eas = expoConstants.expoConfig?.extra?.eas as { projectId?: string } | undefined;
@@ -23,8 +24,30 @@ export function setActiveChatInstance(instanceId: string | null) {
   activeChatInstanceId = instanceId;
 }
 
-// Keep in sync with data field in services/notifications/src/dos/NotificationChannelDO.ts
-export type NotificationData = { type: 'chat'; instanceId: string };
+// Keep in sync with the `data` payloads emitted by:
+//   - services/notifications/src/dos/NotificationChannelDO.ts (chat)
+//   - services/notifications/src/lib/notifications-service.ts (instance-lifecycle)
+const notificationDataSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('chat'),
+    instanceId: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal('instance-lifecycle'),
+    event: z.enum(['ready', 'start_failed']),
+    instanceId: z.string().min(1),
+  }),
+]);
+
+type NotificationData = z.infer<typeof notificationDataSchema>;
+
+// Runtime-validates that an arbitrary notification `data` payload matches the
+// shape we care about. Push producers can evolve independently of the app, so
+// always parse before reading fields from the OS-provided notification content.
+export function parseNotificationData(data: unknown): NotificationData | null {
+  const parsed = notificationDataSchema.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
 
 const shown = {
   shouldShowAlert: true,
@@ -46,10 +69,10 @@ export function setupNotificationHandler() {
   Notifications.setNotificationHandler({
     // eslint-disable-next-line require-await -- expo-notifications requires async callback type but logic is synchronous
     handleNotification: async notification => {
-      const data = notification.request.content.data as NotificationData | undefined;
+      const data = parseNotificationData(notification.request.content.data);
 
       // Suppress only if the user is already viewing this exact chat
-      if (data?.type === 'chat' && data.instanceId === activeChatInstanceId) {
+      if (data && data.instanceId === activeChatInstanceId) {
         return suppressed;
       }
 
@@ -68,19 +91,29 @@ export function getPendingNotificationLink(): string | null {
   return link;
 }
 
+function instanceChatPath(data: NotificationData | null): string | null {
+  if (!data) {
+    return null;
+  }
+  // Both chat and instance-lifecycle payloads carry `instanceId` and deep-link
+  // to the same chat route.
+  return `/(app)/chat/${data.instanceId}`;
+}
+
 export function setupNotificationResponseHandler() {
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-    const data = response.notification.request.content.data as NotificationData | undefined;
+    const data = parseNotificationData(response.notification.request.content.data);
+    const path = instanceChatPath(data);
+    if (!path) {
+      return;
+    }
 
-    if (data?.type === 'chat') {
-      const path = `/(app)/chat/${data.instanceId}`;
-      // If the router is ready (has segments), navigate immediately.
-      // Otherwise store as pending for consumption after auth completes.
-      try {
-        router.replace(path as Href);
-      } catch {
-        pendingNotificationLink = path;
-      }
+    // If the router is ready (has segments), navigate immediately.
+    // Otherwise store as pending for consumption after auth completes.
+    try {
+      router.replace(path as Href);
+    } catch {
+      pendingNotificationLink = path;
     }
   });
 
@@ -93,9 +126,10 @@ export function checkInitialNotification(): void {
   if (!response) {
     return;
   }
-  const data = response.notification.request.content.data as NotificationData | undefined;
-  if (data?.type === 'chat') {
-    pendingNotificationLink = `/(app)/chat/${data.instanceId}`;
+  const data = parseNotificationData(response.notification.request.content.data);
+  const path = instanceChatPath(data);
+  if (path) {
+    pendingNotificationLink = path;
   }
 }
 

@@ -1,75 +1,89 @@
 import { describe, expect, test } from '@jest/globals';
 import {
   canonicalizeDenyList,
+  canonicalizeProviderAllowList,
   computeAllowedModelIds,
   computeEnabledProviderSlugs,
+  deriveProviderAllowListFromLegacyDenyList,
   toggleModelAllowed,
   toggleProviderEnabled,
 } from '@/components/organizations/providers-and-models/allowLists.domain';
 
 describe('allowLists.domain', () => {
-  test('empty provider_deny_list means all providers enabled', () => {
-    const enabled = computeEnabledProviderSlugs([], ['a', 'b']);
-    expect([...enabled].sort()).toEqual(['a', 'b']);
-  });
-
-  test('non-empty provider_deny_list excludes denied providers', () => {
+  test('provider allow list excludes newly synced providers', () => {
     const enabled = computeEnabledProviderSlugs(['a'], ['a', 'b']);
-    expect([...enabled].sort()).toEqual(['b']);
+    expect([...enabled].sort()).toEqual(['a']);
   });
 
-  test('empty model_deny_list means all models allowed (normalized)', () => {
-    const openRouterModels = [{ slug: 'openai/gpt-4.1:free' }, { slug: 'openai/gpt-4.1' }];
-
-    const allowed = computeAllowedModelIds([], openRouterModels);
-    expect([...allowed].sort()).toEqual(['openai/gpt-4.1']);
+  test('empty provider allow list means no providers enabled', () => {
+    const enabled = computeEnabledProviderSlugs([], ['a', 'b']);
+    expect([...enabled]).toEqual([]);
   });
 
-  test('non-empty model_deny_list excludes denied models', () => {
+  test('model deny list does not exclude newly synced models', () => {
     const openRouterModels = [{ slug: 'openai/gpt-4.1' }, { slug: 'anthropic/claude-3-opus' }];
 
-    const allowed = computeAllowedModelIds(['anthropic/claude-3-opus'], openRouterModels);
+    const allowed = computeAllowedModelIds(['openai/gpt-4.1'], openRouterModels);
+    expect([...allowed].sort()).toEqual(['anthropic/claude-3-opus']);
+  });
+
+  test('empty model deny list means all models allowed', () => {
+    const openRouterModels = [{ slug: 'openai/gpt-4.1' }];
+
+    const allowed = computeAllowedModelIds([], openRouterModels);
     expect([...allowed]).toEqual(['openai/gpt-4.1']);
   });
 
-  test('canonicalizeDenyList normalizes :free and dedupes', () => {
+  test('canonicalize deny list normalizes and dedupes model ids', () => {
     expect(canonicalizeDenyList(['openai/gpt-4.1:free', 'openai/gpt-4.1'])).toEqual([
       'openai/gpt-4.1',
     ]);
   });
 
-  test('toggleProviderEnabled(disable) adds provider to deny list', () => {
+  test('canonicalize provider allow list dedupes and sorts providers', () => {
+    expect(canonicalizeProviderAllowList(['openai', 'openai', 'anthropic'])).toEqual([
+      'anthropic',
+      'openai',
+    ]);
+  });
+
+  test('legacy provider deny list can be inverted into an allow list snapshot', () => {
+    const allowed = deriveProviderAllowListFromLegacyDenyList(['openai'], ['anthropic', 'openai']);
+    expect(allowed).toEqual(['anthropic']);
+  });
+
+  test('toggleProviderEnabled(disable) removes provider from allow list', () => {
     const next = toggleProviderEnabled({
       providerSlug: 'openai',
       nextEnabled: false,
-      draftProviderDenyList: [],
+      draftProviderAllowList: ['openai', 'anthropic'],
     });
-    expect(next).toEqual(['openai']);
+    expect(next).toEqual(['anthropic']);
   });
 
-  test('toggleProviderEnabled(enable) removes provider from deny list', () => {
+  test('toggleProviderEnabled(enable) adds provider to allow list', () => {
     const next = toggleProviderEnabled({
       providerSlug: 'openai',
       nextEnabled: true,
-      draftProviderDenyList: ['openai', 'anthropic'],
+      draftProviderAllowList: ['anthropic'],
     });
-    expect(next).toEqual(['anthropic']);
+    expect(next).toEqual(['anthropic', 'openai']);
   });
 
   test('toggleModelAllowed(disallow) adds model to deny list', () => {
     const next = toggleModelAllowed({
       modelId: 'openai/gpt-4.1',
       nextAllowed: false,
-      draftModelDenyList: [],
+      draftModelDenyList: ['anthropic/claude-3-opus'],
     });
-    expect(next).toEqual(['openai/gpt-4.1']);
+    expect(next).toEqual(['anthropic/claude-3-opus', 'openai/gpt-4.1']);
   });
 
   test('toggleModelAllowed(allow) removes model from deny list', () => {
     const next = toggleModelAllowed({
       modelId: 'openai/gpt-4.1',
       nextAllowed: true,
-      draftModelDenyList: ['openai/gpt-4.1', 'anthropic/claude-3-opus'],
+      draftModelDenyList: ['anthropic/claude-3-opus', 'openai/gpt-4.1'],
     });
     expect(next).toEqual(['anthropic/claude-3-opus']);
   });

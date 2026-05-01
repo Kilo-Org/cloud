@@ -38,6 +38,13 @@ export function resolveRuntimeImageRef(state: InstanceMutableState, env: KiloCla
   if (state.provider === 'docker-local') {
     return env.DOCKER_LOCAL_IMAGE ?? 'kiloclaw:local';
   }
+  if (state.provider === 'northflank') {
+    const template = env.NF_IMAGE_PATH_TEMPLATE;
+    if (!template) {
+      throw new Error('NF_IMAGE_PATH_TEMPLATE is not configured');
+    }
+    return template.replaceAll('{tag}', resolveImageTag(state, env));
+  }
   return resolveImageRef(state, env);
 }
 

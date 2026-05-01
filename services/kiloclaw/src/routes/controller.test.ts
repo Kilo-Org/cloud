@@ -524,7 +524,7 @@ describe('POST /checkin', () => {
     expect(tryMarkInstanceReady).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call tryMarkInstanceReady when loadAvg5m is above threshold', async () => {
+  it('does not call tryMarkInstanceReady in production when loadAvg5m is above threshold', async () => {
     const tryMarkInstanceReady = vi.fn();
     const env = makeEnv({ tryMarkInstanceReady });
     const headers = await makeAuthHeaders();
@@ -541,6 +541,25 @@ describe('POST /checkin', () => {
 
     expect(response.status).toBe(204);
     expect(tryMarkInstanceReady).not.toHaveBeenCalled();
+  });
+
+  it('calls tryMarkInstanceReady in development when loadAvg5m is above threshold', async () => {
+    const tryMarkInstanceReady = vi.fn().mockResolvedValue({ shouldNotify: false, userId: null });
+    const env = makeEnv({ tryMarkInstanceReady, workerEnv: 'development' });
+    const headers = await makeAuthHeaders();
+
+    const response = await controller.request(
+      '/checkin',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(makeBody({ loadAvg5m: 0.5 })),
+      },
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(tryMarkInstanceReady).toHaveBeenCalledTimes(1);
   });
 
   it('does not fail checkin when tryMarkInstanceReady throws', async () => {
@@ -1381,6 +1400,68 @@ describe('POST /google/migrate-legacy', () => {
     const instanceStub = getInstanceStub(env);
     expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'active' })
+    );
+  });
+
+  it('handles empty scopes and capabilities when inserting a new legacy row', async () => {
+    const encryptionKey = Buffer.alloc(32, 7).toString('base64');
+    const execute = vi.fn().mockResolvedValue(undefined);
+    mockGetWorkerDb.mockReturnValue({ execute });
+    const env = makeEnv({
+      hyperdriveConnectionString: 'postgres://example',
+      googleWorkspaceRefreshTokenEncryptionKey: encryptionKey,
+    });
+    const headers = await makeAuthHeaders();
+
+    mockGetInstanceBySandboxId.mockResolvedValue({ id: 'instance-1' });
+    mockGetGoogleOAuthConnectionByInstanceId.mockResolvedValueOnce(null).mockResolvedValueOnce(
+      makeGoogleConnection(encryptionKey, {
+        credential_profile: 'legacy',
+        account_email: 'legacy@example.com',
+        account_subject: 'legacy-subject',
+        oauth_client_id: 'legacy-client-id',
+        oauth_client_secret_encrypted: encryptWithSymmetricKey(
+          'legacy-client-secret',
+          encryptionKey
+        ),
+        refresh_token_encrypted: encryptWithSymmetricKey('legacy-refresh-token', encryptionKey),
+        grants_by_source: {},
+        capabilities: [],
+        scopes: [],
+        status: 'active',
+      })
+    );
+
+    const response = await controller.request(
+      '/google/migrate-legacy',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sandboxId,
+          accountEmail: 'legacy@example.com',
+          accountSubject: 'legacy-subject',
+          oauthClientId: 'legacy-client-id',
+          oauthClientSecret: 'legacy-client-secret',
+          refreshToken: 'legacy-refresh-token',
+          scopes: [],
+          capabilities: [],
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ migrated: true, profile: 'legacy' });
+    expect(execute).toHaveBeenCalledTimes(1);
+
+    const instanceStub = getInstanceStub(env);
+    expect(instanceStub.updateGoogleOAuthConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'active',
+        scopes: [],
+        capabilities: [],
+      })
     );
   });
 

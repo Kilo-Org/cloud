@@ -33,7 +33,16 @@ type TestHarness = {
   commandHandler: (ctx: { args?: string }) => Promise<{ text: string }>;
   statusHttpHandler: (_req: unknown, res: FakeResponse) => Promise<void>;
   enableHttpHandler: (req: unknown, res: FakeResponse) => Promise<void>;
+  runHttpHandler: (_req: unknown, res: FakeResponse) => Promise<void>;
   cronJobs: CronJob[];
+  sentMessages: Array<{
+    channel: string;
+    target: string;
+    accountId?: string;
+    message: string;
+  }>;
+  loggerInfo: ReturnType<typeof vi.fn>;
+  loggerWarn: ReturnType<typeof vi.fn>;
   runCommandWithTimeout: ReturnType<typeof vi.fn>;
 };
 
@@ -63,6 +72,12 @@ async function createHarness(options?: {
   disableCommandFails?: boolean;
   preloadedConfig?: Record<string, unknown>;
   preloadedStatus?: Record<string, unknown>;
+  githubAuthReady?: boolean;
+  githubIssues?: Array<{ title: string; url: string; updatedAt?: string }>;
+  channelsConfig?: Record<string, unknown>;
+  messageSendFailures?: Partial<Record<'telegram' | 'discord' | 'slack', string>>;
+  messageSendFailureCounts?: Partial<Record<'telegram' | 'discord' | 'slack', number>>;
+  omitRuntimeChannelsConfig?: boolean;
 }): Promise<TestHarness> {
   const { default: morningBriefingPlugin } = await import('./index');
   const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'morning-briefing-'));
@@ -86,9 +101,79 @@ async function createHarness(options?: {
 
   let sequence = 0;
   const cronJobs: CronJob[] = [];
+  const sentMessages: Array<{
+    channel: string;
+    target: string;
+    accountId?: string;
+    message: string;
+  }> = [];
   const runCommandWithTimeout = vi.fn(async (argv: string[]) => {
     if (argv[0] === 'gh' && argv[1] === 'auth' && argv[2] === 'status') {
+      if (options?.githubAuthReady) {
+        return { stdout: '', stderr: '', code: 0 };
+      }
       return { stdout: '', stderr: 'not authenticated', code: 1 };
+    }
+
+    if (argv[0] === 'gh' && argv[1] === 'search' && argv[2] === 'issues') {
+      return {
+        stdout: JSON.stringify(options?.githubIssues ?? []),
+        stderr: '',
+        code: 0,
+      };
+    }
+
+    if (
+      argv[0] === 'openclaw' &&
+      argv[1] === 'config' &&
+      argv[2] === 'get' &&
+      argv[3] === 'channels'
+    ) {
+      if (!options?.channelsConfig) {
+        return {
+          stdout: '',
+          stderr: 'Config path not found: channels',
+          code: 1,
+        };
+      }
+      return {
+        stdout: JSON.stringify(options.channelsConfig),
+        stderr: '',
+        code: 0,
+      };
+    }
+
+    if (argv[0] === 'openclaw' && argv[1] === 'message' && argv[2] === 'send') {
+      const channelIndex = argv.indexOf('--channel');
+      const targetIndex = argv.indexOf('--target');
+      const messageIndex = argv.indexOf('--message');
+      const accountIndex = argv.indexOf('--account');
+      const channel = channelIndex >= 0 ? (argv[channelIndex + 1] ?? '') : '';
+      const target = targetIndex >= 0 ? (argv[targetIndex + 1] ?? '') : '';
+      const message = messageIndex >= 0 ? (argv[messageIndex + 1] ?? '') : '';
+      const accountId = accountIndex >= 0 ? argv[accountIndex + 1] : undefined;
+      if (channel && target && message) {
+        sentMessages.push({ channel, target, accountId, message });
+      }
+      const configuredFailure =
+        channel === 'telegram' || channel === 'discord' || channel === 'slack'
+          ? options?.messageSendFailures?.[channel]
+          : undefined;
+      const configuredFailureCount =
+        channel === 'telegram' || channel === 'discord' || channel === 'slack'
+          ? options?.messageSendFailureCounts?.[channel]
+          : undefined;
+      if (configuredFailure && configuredFailureCount && configuredFailureCount > 0) {
+        if (!options?.messageSendFailureCounts) {
+          return { stdout: '', stderr: configuredFailure, code: 1 };
+        }
+        options.messageSendFailureCounts[channel] = configuredFailureCount - 1;
+        return { stdout: '', stderr: configuredFailure, code: 1 };
+      }
+      if (configuredFailure && configuredFailureCount === undefined) {
+        return { stdout: '', stderr: configuredFailure, code: 1 };
+      }
+      return { stdout: JSON.stringify({ ok: true }), stderr: '', code: 0 };
     }
 
     if (argv[0] === 'openclaw' && argv[1] === 'cron') {
@@ -156,6 +241,9 @@ async function createHarness(options?: {
   let commandHandler: ((ctx: { args?: string }) => Promise<{ text: string }>) | null = null;
   let statusHttpHandler: ((_req: unknown, res: FakeResponse) => Promise<void>) | null = null;
   let enableHttpHandler: ((req: unknown, res: FakeResponse) => Promise<void>) | null = null;
+  let runHttpHandler: ((_req: unknown, res: FakeResponse) => Promise<void>) | null = null;
+  const loggerInfo = vi.fn();
+  const loggerWarn = vi.fn();
 
   morningBriefingPlugin.register({
     runtime: {
@@ -168,8 +256,9 @@ async function createHarness(options?: {
     },
     config: {
       agents: { defaults: { userTimezone: 'America/Chicago' } },
+      ...(options?.omitRuntimeChannelsConfig ? {} : { channels: options?.channelsConfig ?? {} }),
     },
-    logger: { warn: vi.fn() },
+    logger: { info: loggerInfo, warn: loggerWarn },
     registerCommand: (def: { handler: (ctx: { args?: string }) => Promise<{ text: string }> }) => {
       commandHandler = def.handler;
     },
@@ -181,13 +270,15 @@ async function createHarness(options?: {
         statusHttpHandler = route.handler;
       } else if (route.path.endsWith('/enable')) {
         enableHttpHandler = route.handler;
+      } else if (route.path.endsWith('/run')) {
+        runHttpHandler = route.handler;
       }
     },
     registerTool: vi.fn(),
     on: vi.fn(),
   } as never);
 
-  if (!commandHandler || !statusHttpHandler || !enableHttpHandler) {
+  if (!commandHandler || !statusHttpHandler || !enableHttpHandler || !runHttpHandler) {
     throw new Error('Failed to register command or HTTP handlers');
   }
 
@@ -196,7 +287,11 @@ async function createHarness(options?: {
     commandHandler,
     statusHttpHandler,
     enableHttpHandler,
+    runHttpHandler,
     cronJobs,
+    sentMessages,
+    loggerInfo,
+    loggerWarn,
     runCommandWithTimeout,
   };
 }
@@ -430,5 +525,421 @@ describe('morning briefing lifecycle', () => {
     await waitForReconcileState(harness.stateDir, 'succeeded');
     const config = await readJson(path.join(harness.stateDir, 'morning-briefing', 'config.json'));
     expect(config.timezone).toBe('UTC');
+  });
+
+  it('sends adapted briefing message to configured channel targets and persists delivery metadata', async () => {
+    const harness = await createHarness({
+      githubAuthReady: true,
+      githubIssues: [
+        {
+          title: 'Fix failing deploy workflow',
+          url: 'https://github.com/Kilo-Org/cloud/issues/123',
+          updatedAt: '2026-04-24T10:00:00Z',
+        },
+      ],
+      channelsConfig: {
+        telegram: {
+          enabled: true,
+          defaultTo: '-100123456',
+        },
+        discord: {
+          enabled: true,
+          accounts: {
+            default: {
+              defaultTo: 'channel:1234567890',
+            },
+          },
+        },
+      },
+    });
+
+    const response = new FakeResponse();
+    await harness.runHttpHandler({}, response);
+    expect(response.statusCode).toBe(200);
+
+    const payload = JSON.parse(response.body) as {
+      ok: boolean;
+      delivery?: Array<{ channel: string; status: string; target?: string; accountId?: string }>;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.delivery).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ channel: 'telegram', status: 'sent', target: '-100123456' }),
+        expect.objectContaining({
+          channel: 'discord',
+          status: 'sent',
+          target: 'channel:1234567890',
+          accountId: 'default',
+        }),
+      ])
+    );
+
+    expect(harness.sentMessages).toHaveLength(2);
+    for (const sent of harness.sentMessages) {
+      expect(sent.message).toContain('Morning Briefing -');
+      expect(sent.message).toContain('GitHub');
+      expect(sent.message).toContain('• ');
+      expect(sent.message).not.toContain('# ');
+      expect(sent.message).toContain('https://github.com/Kilo-Org/cloud/issues/123');
+      expect(sent.message).not.toContain('Repository:');
+    }
+
+    const statusPayload = new FakeResponse();
+    await harness.statusHttpHandler({}, statusPayload);
+    const statusBody = JSON.parse(statusPayload.body) as {
+      ok: boolean;
+      lastDelivery?: Array<{ channel: string; status: string }>;
+    };
+    expect(statusBody.ok).toBe(true);
+    expect(statusBody.lastDelivery).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ channel: 'telegram', status: 'sent' }),
+        expect.objectContaining({ channel: 'discord', status: 'sent' }),
+      ])
+    );
+  });
+
+  it('marks missing default targets as skipped and send errors as failed without failing run', async () => {
+    const harness = await createHarness({
+      githubAuthReady: true,
+      githubIssues: [
+        {
+          title: 'Investigate queue latency',
+          url: 'https://github.com/Kilo-Org/cloud/issues/456',
+          updatedAt: '2026-04-24T12:00:00Z',
+        },
+      ],
+      channelsConfig: {
+        telegram: {
+          enabled: true,
+        },
+        slack: {
+          enabled: true,
+          defaultTo: 'channel:C123',
+        },
+      },
+      messageSendFailures: {
+        slack: 'slack send failed',
+      },
+    });
+
+    const response = new FakeResponse();
+    await harness.runHttpHandler({}, response);
+    expect(response.statusCode).toBe(200);
+
+    const payload = JSON.parse(response.body) as {
+      ok: boolean;
+      delivery?: Array<{ channel: string; status: string; reason?: string; error?: string }>;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.delivery).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          channel: 'telegram',
+          status: 'skipped',
+          reason: 'missing_target',
+        }),
+        expect.objectContaining({
+          channel: 'slack',
+          status: 'failed',
+          reason: 'send_failed',
+        }),
+      ])
+    );
+    const slackFailure = payload.delivery?.find(entry => entry.channel === 'slack');
+    expect(slackFailure?.error).toBe('slack send failed');
+  });
+
+  it('uses single configured telegram group as fallback target when defaultTo is missing', async () => {
+    const harness = await createHarness({
+      githubAuthReady: true,
+      githubIssues: [
+        {
+          title: 'Review release checklist',
+          url: 'https://github.com/Kilo-Org/cloud/issues/789',
+          updatedAt: '2026-04-24T13:00:00Z',
+        },
+      ],
+      channelsConfig: {
+        telegram: {
+          enabled: true,
+          groups: {
+            '-5055658641': {
+              requireMention: false,
+            },
+          },
+        },
+      },
+    });
+
+    const response = new FakeResponse();
+    await harness.runHttpHandler({}, response);
+    expect(response.statusCode).toBe(200);
+
+    const payload = JSON.parse(response.body) as {
+      ok: boolean;
+      delivery?: Array<{ channel: string; status: string; target?: string }>;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.delivery).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          channel: 'telegram',
+          status: 'sent',
+          target: '-5055658641',
+        }),
+      ])
+    );
+  });
+
+  it('skips with ambiguous_target when multiple fallback destinations are available', async () => {
+    const harness = await createHarness({
+      githubAuthReady: true,
+      githubIssues: [
+        {
+          title: 'Investigate flaky integration test',
+          url: 'https://github.com/Kilo-Org/cloud/issues/790',
+          updatedAt: '2026-04-24T14:00:00Z',
+        },
+      ],
+      channelsConfig: {
+        telegram: {
+          enabled: true,
+          groups: {
+            '-5055658641': {
+              requireMention: false,
+            },
+            '-5055658642': {
+              requireMention: false,
+            },
+          },
+        },
+      },
+    });
+
+    const response = new FakeResponse();
+    await harness.runHttpHandler({}, response);
+    expect(response.statusCode).toBe(200);
+
+    const payload = JSON.parse(response.body) as {
+      ok: boolean;
+      delivery?: Array<{ channel: string; status: string; reason?: string }>;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.delivery).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          channel: 'telegram',
+          status: 'skipped',
+          reason: 'ambiguous_target',
+        }),
+      ])
+    );
+    expect(harness.sentMessages).toHaveLength(0);
+  });
+
+  it('uses runtime config channels for delivery without shelling out', async () => {
+    const harness = await createHarness({
+      githubAuthReady: true,
+      githubIssues: [
+        {
+          title: 'Confirm runtime config path',
+          url: 'https://github.com/Kilo-Org/cloud/issues/800',
+          updatedAt: '2026-04-24T15:00:00Z',
+        },
+      ],
+      channelsConfig: {
+        telegram: {
+          enabled: true,
+          groups: {
+            '-5055658641': {
+              requireMention: false,
+            },
+          },
+        },
+      },
+    });
+
+    const response = new FakeResponse();
+    await harness.runHttpHandler({}, response);
+    expect(response.statusCode).toBe(200);
+
+    const payload = JSON.parse(response.body) as {
+      ok: boolean;
+      delivery?: Array<{ channel: string; status: string; target?: string }>;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.delivery).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ channel: 'telegram', status: 'sent', target: '-5055658641' }),
+      ])
+    );
+    expect(
+      harness.runCommandWithTimeout.mock.calls.some(
+        call =>
+          Array.isArray(call[0]) &&
+          call[0][0] === 'openclaw' &&
+          call[0][1] === 'config' &&
+          call[0][2] === 'get' &&
+          call[0][3] === 'channels'
+      )
+    ).toBe(false);
+  });
+
+  it('falls back to CLI channel config when runtime channels are unavailable', async () => {
+    const harness = await createHarness({
+      githubAuthReady: true,
+      githubIssues: [
+        {
+          title: 'Confirm CLI fallback path',
+          url: 'https://github.com/Kilo-Org/cloud/issues/801',
+          updatedAt: '2026-04-24T15:10:00Z',
+        },
+      ],
+      channelsConfig: {
+        telegram: {
+          enabled: true,
+          groups: {
+            '-5055658641': {
+              requireMention: false,
+            },
+          },
+        },
+      },
+      omitRuntimeChannelsConfig: true,
+    });
+
+    const response = new FakeResponse();
+    await harness.runHttpHandler({}, response);
+    expect(response.statusCode).toBe(200);
+
+    const payload = JSON.parse(response.body) as {
+      ok: boolean;
+      delivery?: Array<{ channel: string; status: string; target?: string }>;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.delivery).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ channel: 'telegram', status: 'sent', target: '-5055658641' }),
+      ])
+    );
+    expect(
+      harness.runCommandWithTimeout.mock.calls.some(
+        call =>
+          Array.isArray(call[0]) &&
+          call[0][0] === 'openclaw' &&
+          call[0][1] === 'config' &&
+          call[0][2] === 'get' &&
+          call[0][3] === 'channels'
+      )
+    ).toBe(true);
+  });
+
+  it('retries timed-out delivery once before marking send_failed', async () => {
+    const harness = await createHarness({
+      githubAuthReady: true,
+      githubIssues: [
+        {
+          title: 'Retry flaky channel send',
+          url: 'https://github.com/Kilo-Org/cloud/issues/900',
+          updatedAt: '2026-04-25T00:00:00Z',
+        },
+      ],
+      channelsConfig: {
+        telegram: {
+          enabled: true,
+          defaultTo: '-5055658641',
+        },
+      },
+      messageSendFailures: {
+        telegram: 'The operation was aborted due to timeout',
+      },
+      messageSendFailureCounts: {
+        telegram: 1,
+      },
+    });
+
+    const response = new FakeResponse();
+    await harness.runHttpHandler({}, response);
+    expect(response.statusCode).toBe(200);
+
+    const payload = JSON.parse(response.body) as {
+      ok: boolean;
+      delivery?: Array<{ channel: string; status: string }>;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.delivery).toEqual(
+      expect.arrayContaining([expect.objectContaining({ channel: 'telegram', status: 'sent' })])
+    );
+
+    const sendCalls = harness.runCommandWithTimeout.mock.calls.filter(
+      call =>
+        Array.isArray(call[0]) &&
+        call[0][0] === 'openclaw' &&
+        call[0][1] === 'message' &&
+        call[0][2] === 'send'
+    );
+    expect(sendCalls).toHaveLength(2);
+    expect(sendCalls[0]?.[1]).toMatchObject({ timeoutMs: 120_000 });
+    expect(sendCalls[1]?.[1]).toMatchObject({ timeoutMs: 120_000 });
+  });
+
+  it('emits delivery outcome metric logs for sent/skipped/failed results', async () => {
+    const harness = await createHarness({
+      githubAuthReady: true,
+      githubIssues: [
+        {
+          title: 'Delivery observability smoke check',
+          url: 'https://github.com/Kilo-Org/cloud/issues/910',
+          updatedAt: '2026-04-25T00:10:00Z',
+        },
+      ],
+      channelsConfig: {
+        telegram: {
+          enabled: true,
+          defaultTo: '-5055658641',
+        },
+        discord: {
+          enabled: true,
+        },
+        slack: {
+          enabled: true,
+          defaultTo: 'channel:C123',
+        },
+      },
+      messageSendFailures: {
+        slack: 'slack send failed',
+      },
+    });
+
+    const response = new FakeResponse();
+    await harness.runHttpHandler({}, response);
+    expect(response.statusCode).toBe(200);
+
+    const infoMessages = harness.loggerInfo.mock.calls.map(call => String(call[0]));
+    expect(
+      infoMessages.some(message =>
+        message.includes('event=morning_briefing_delivery_outcome outcome=sent channel=telegram')
+      )
+    ).toBe(true);
+    expect(
+      infoMessages.some(message =>
+        message.includes('event=morning_briefing_delivery_outcome outcome=skipped channel=discord')
+      )
+    ).toBe(true);
+    expect(
+      infoMessages.some(message =>
+        message.includes('event=morning_briefing_delivery_outcome outcome=failed channel=slack')
+      )
+    ).toBe(true);
+
+    const warnMessages = harness.loggerWarn.mock.calls.map(call => String(call[0]));
+    expect(
+      warnMessages.some(message =>
+        message.includes(
+          'event=morning_briefing_delivery_failure channel=slack detail=slack send failed'
+        )
+      )
+    ).toBe(true);
   });
 });

@@ -160,6 +160,11 @@ export function useKiloClawMutations() {
     ]);
   };
 
+  const clearGatewayAndMorningBriefingCaches = () => {
+    queryClient.removeQueries({ queryKey: trpc.kiloclaw.gatewayReady.queryKey() });
+    queryClient.removeQueries({ queryKey: trpc.kiloclaw.getMorningBriefingStatus.queryKey() });
+  };
+
   // Wipe all instance-scoped caches so no stale data (e.g. gatewayReady
   // from the old instance) bleeds into a subsequent re-provision flow.
   // removeQueries drops the cached payload entirely; invalidateQueries
@@ -183,13 +188,25 @@ export function useKiloClawMutations() {
   };
 
   return {
-    start: useMutation(trpc.kiloclaw.start.mutationOptions({ onSuccess: invalidateStatus })),
+    start: useMutation(
+      trpc.kiloclaw.start.mutationOptions({
+        onSuccess: async () => {
+          clearGatewayAndMorningBriefingCaches();
+          await invalidateStatus();
+        },
+      })
+    ),
     stop: useMutation(trpc.kiloclaw.stop.mutationOptions({ onSuccess: invalidateStatus })),
     destroy: useMutation(
       trpc.kiloclaw.destroy.mutationOptions({ onSuccess: resetAllInstanceState })
     ),
     provision: useMutation(
-      trpc.kiloclaw.provision.mutationOptions({ onSuccess: invalidateStatusAndBilling })
+      trpc.kiloclaw.provision.mutationOptions({
+        onSuccess: async () => {
+          clearGatewayAndMorningBriefingCaches();
+          await invalidateStatusAndBilling();
+        },
+      })
     ),
     cycleInboundEmailAddress: useMutation(
       trpc.kiloclaw.cycleInboundEmailAddress.mutationOptions({ onSuccess: invalidateStatus })
@@ -222,6 +239,7 @@ export function useKiloClawMutations() {
     restartMachine: useMutation(
       trpc.kiloclaw.restartMachine.mutationOptions({
         onSuccess: async () => {
+          clearGatewayAndMorningBriefingCaches();
           await invalidateStatus();
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.gatewayStatus.queryKey(),
@@ -232,6 +250,7 @@ export function useKiloClawMutations() {
     restartOpenClaw: useMutation(
       trpc.kiloclaw.restartOpenClaw.mutationOptions({
         onSuccess: async () => {
+          clearGatewayAndMorningBriefingCaches();
           await invalidateStatus();
           await queryClient.invalidateQueries({
             queryKey: trpc.kiloclaw.gatewayStatus.queryKey(),
@@ -417,11 +436,13 @@ export function useKiloClawAvailableVersions(offset = 0, limit = 25) {
   );
 }
 
-export function useKiloClawMyPin() {
+export function useKiloClawMyPin(opts: { enabled?: boolean } = {}) {
+  const { enabled = true } = opts;
   const trpc = useTRPC();
   return useQuery(
     trpc.kiloclaw.getMyPin.queryOptions(undefined, {
       staleTime: 60_000, // pins don't change frequently
+      enabled,
     })
   );
 }

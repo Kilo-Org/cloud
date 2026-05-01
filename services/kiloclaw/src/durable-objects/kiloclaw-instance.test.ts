@@ -62,8 +62,33 @@ vi.mock('../lib/image-version', async () => {
   return {
     ...actual,
     resolveLatestVersion: vi.fn().mockResolvedValue(null),
+    resolveVersionByTag: vi.fn().mockResolvedValue(null),
   };
 });
+
+// -- Mock catalog-registration (Postgres fallback for pin resolution) --
+vi.mock('../lib/catalog-registration', async () => {
+  const actual = await vi.importActual('../lib/catalog-registration');
+  return {
+    ...actual,
+    lookupCatalogVersion: vi.fn().mockResolvedValue(null),
+  };
+});
+
+// -- Mock version-rollout (the DO now uses selectImageVersionForInstance for
+//    rollout-aware "latest" resolution; see lib/version-rollout.ts) --
+vi.mock('../lib/version-rollout', async () => {
+  const actual = await vi.importActual('../lib/version-rollout');
+  return {
+    ...actual,
+    selectImageVersionForInstance: vi.fn().mockResolvedValue(null),
+  };
+});
+
+// -- Mock user-flags (early-access lookup, called from DO provision/restart) --
+vi.mock('../lib/user-flags', () => ({
+  lookupKiloclawEarlyAccess: vi.fn().mockResolvedValue(false),
+}));
 
 // -- Mock db --
 vi.mock('../db', () => ({
@@ -132,7 +157,9 @@ import { FlyApiError } from '../fly/client';
 import * as db from '../db';
 import * as gatewayEnv from '../gateway/env';
 import * as regions from './regions';
-import { resolveLatestVersion } from '../lib/image-version';
+import { resolveLatestVersion, resolveVersionByTag } from '../lib/image-version';
+import { lookupCatalogVersion } from '../lib/catalog-registration';
+import { selectImageVersionForInstance } from '../lib/version-rollout';
 import { setupDefaultStreamChatChannel } from '../stream-chat/client';
 import { verifyKiloToken } from '@kilocode/worker-utils';
 import {
@@ -147,6 +174,7 @@ import {
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   STALE_PROVISION_THRESHOLD_MS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
 } from '../config';
 
 // ============================================================================
@@ -219,10 +247,11 @@ function createFakeAppStub() {
   };
 }
 
-function createFakeEnv() {
+function createFakeEnv(opts: { includeNorthflank?: boolean } = {}) {
+  const { includeNorthflank = true } = opts;
   const appStub = createFakeAppStub();
   const writeDataPoint = vi.fn();
-  return {
+  const base = {
     FLY_API_TOKEN: 'test-token',
     FLY_APP_NAME: 'test-app',
     FLY_REGION: 'eu,us',
@@ -249,6 +278,18 @@ function createFakeEnv() {
         .fn()
         .mockResolvedValue({ ok: true, conversationsDeleted: 0, failedConversations: [] }),
     } as unknown,
+  };
+  if (!includeNorthflank) {
+    return base;
+  }
+  return {
+    ...base,
+    NF_API_TOKEN: 'nf-test-token',
+    NF_REGION: 'us-central',
+    NF_DEPLOYMENT_PLAN: 'nf-compute-10',
+    NF_EDGE_HEADER_NAME: 'X-KC-Edge',
+    NF_EDGE_HEADER_VALUE: 'edge-test-secret',
+    NF_IMAGE_PATH_TEMPLATE: 'registry.example.com/kiloclaw:{tag}',
   };
 }
 
@@ -387,6 +428,38 @@ async function seedDockerInstance(
     flyVolumeId: null,
     flyRegion: null,
     providerState: dockerProviderState(),
+    ...overrides,
+  });
+}
+
+function northflankProviderState(overrides: Record<string, unknown> = {}) {
+  return {
+    provider: 'northflank',
+    projectId: 'project-1',
+    projectName: 'kc-ki-test',
+    serviceId: 'service-1',
+    serviceName: 'kc-ki-test',
+    volumeId: 'volume-1',
+    volumeName: 'kc-ki-test',
+    secretId: 'secret-1',
+    secretName: 'kc-ki-test',
+    secretContentHash: null,
+    ingressHost: 'kc-ki-test.code.run',
+    region: 'us-central',
+    ...overrides,
+  };
+}
+
+async function seedNorthflankInstance(
+  storage: ReturnType<typeof createFakeStorage>,
+  overrides: Record<string, unknown> = {}
+) {
+  await seedProvisioned(storage, {
+    provider: 'northflank',
+    flyMachineId: null,
+    flyVolumeId: null,
+    flyRegion: null,
+    providerState: northflankProviderState(),
     ...overrides,
   });
 }
@@ -1034,7 +1107,9 @@ describe('reconciliation: machine status sync', () => {
       const { instance: inst, waitUntilPromises } = createInstance(storage);
       await inst.alarm();
       if (i === SELF_HEAL_THRESHOLD - 1) {
-        expect(waitUntilPromises).toHaveLength(1);
+        // 2 = recovery launch + tracked_image_tag Postgres sync (always enqueued
+        // by alarm() when sandboxId is set; see kiloclaw-instance/index.ts).
+        expect(waitUntilPromises).toHaveLength(2);
       }
     }
 
@@ -1052,7 +1127,8 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    expect(waitUntilPromises).toHaveLength(0);
+    // 1 = tracked_image_tag Postgres sync only; no recovery launched.
+    expect(waitUntilPromises).toHaveLength(1);
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('healthCheckFailCount')).toBe(0);
     expect(storage._store.get('recoveryStartedAt')).toBeUndefined();
@@ -1066,7 +1142,8 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    expect(waitUntilPromises).toHaveLength(0);
+    // 1 = tracked_image_tag Postgres sync only; no fresh recovery launched.
+    expect(waitUntilPromises).toHaveLength(1);
   });
 
   it('does not clean up a pending recovery volume while recovery is still in progress', async () => {
@@ -1944,6 +2021,25 @@ describe('buildUserEnvVars API key refresh', () => {
     expect(db.findPepperByUserId).not.toHaveBeenCalled();
     expect(gatewayEnv.buildEnvVars).not.toHaveBeenCalled();
   });
+
+  it('does NOT persist controllerCapabilitiesVersion during env build', async () => {
+    // The capabilities version must only be bumped atomically with the
+    // final `status = running` transition, inside the DO's ownership guard.
+    // Persisting here would let the DO report a version the running machine
+    // may not actually have yet if the subsequent provider update fails or
+    // is raced by a concurrent destroy().
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      kilocodeApiKey: 'stale-key',
+      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+    });
+
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBeUndefined();
+
+    await callBuildUserEnvVars(instance);
+
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBeUndefined();
+  });
 });
 
 describe('alarm cadence', () => {
@@ -2099,6 +2195,30 @@ describe('startExistingMachine: transient vs 404 errors', () => {
 
     expect(flyClient.createMachine).toHaveBeenCalled();
     expect(storage._store.get('flyMachineId')).toBe('machine-new');
+  });
+
+  it('persists controllerCapabilitiesVersion atomically with the running transition', async () => {
+    // The version bump must land in the same persist call that flips status
+    // to `running`, inside the post-start ownership guard. This keeps it in
+    // sync with what the running machine actually has, and prevents a stale
+    // write recreating partial DO storage after a concurrent destroy.
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped' });
+
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'machine-new',
+      region: 'iad',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.start('user-1');
+
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBe(
+      WORKER_CONTROLLER_CAPABILITIES_VERSION
+    );
   });
 
   it('destroys stale machine and recreates it when updateMachine reports a missing volume', async () => {
@@ -5187,7 +5307,7 @@ describe('controller-first pairing', () => {
     fetchSpy.mockRestore();
   });
 
-  it('channel approve returns redeploy-required when non-Fly controller route is unavailable', async () => {
+  it('channel approve returns controller-unavailable message when non-Fly controller route is missing', async () => {
     const { instance, storage } = createInstance();
     await seedDockerInstance(storage, { status: 'running' });
 
@@ -5741,6 +5861,149 @@ describe('controller-first pairing', () => {
 });
 
 // ============================================================================
+// Pairing + runDoctor on non-Fly providers
+// ============================================================================
+
+describe('non-Fly pairing + runDoctor behavior', () => {
+  it('listPairingRequests on Northflank returns empty when controller route is unavailable, does not fly-exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.listPairingRequests();
+
+    expect(result).toEqual({ requests: [] });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('approvePairingRequest on Northflank returns controller-unavailable message when controller route is missing', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.approvePairingRequest('telegram', 'ABC123');
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('listDevicePairingRequests on Northflank returns empty when controller route is unavailable, does not fly-exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.listDevicePairingRequests();
+
+    expect(result).toEqual({ requests: [] });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('approveDevicePairingRequest on Northflank returns controller-unavailable message when controller route is missing', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await instance.approveDevicePairingRequest(
+      '11111111-1111-4111-8111-111111111111'
+    );
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Controller pairing route unavailable; redeploy required',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('runDoctor on Northflank returns not-yet-wired-up without invoking fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'running' });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({
+      success: false,
+      output: 'Run doctor is not yet wired up for this instance',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+  });
+
+  it('runDoctor on docker-local returns not-yet-wired-up without invoking fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedDockerInstance(storage, { status: 'running' });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({
+      success: false,
+      output: 'Run doctor is not yet wired up for this instance',
+    });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+  });
+
+  it('runDoctor on Fly running instance still invokes fly exec', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { flyAppName: 'acct-test' });
+
+    (flyClient.execCommand as Mock).mockResolvedValue({
+      exit_code: 0,
+      stdout: 'doctor ok',
+      stderr: '',
+    });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({ success: true, output: 'doctor ok' });
+    expect(flyClient.execCommand).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'acct-test' },
+      'machine-1',
+      ['/usr/bin/env', 'HOME=/root', 'openclaw', 'doctor', '--fix', '--non-interactive'],
+      60
+    );
+  });
+
+  it('runDoctor on non-running instance returns Instance is not running regardless of provider', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, { status: 'stopped' });
+
+    const result = await instance.runDoctor();
+
+    expect(result).toEqual({ success: false, output: 'Instance is not running' });
+    expect(flyClient.execCommand).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
 // Kilo CLI run controller routing
 // ============================================================================
 
@@ -6214,11 +6477,15 @@ describe('provision: auto-start after fresh provision', () => {
     });
   });
 
-  it('does not leave the hot DO on an unsupported provider after failed provision', async () => {
-    const { instance, storage, waitUntilPromises } = createInstance();
+  it('does not leave the hot DO on a misconfigured provider after failed provision', async () => {
+    const envWithoutNorthflank = createFakeEnv({ includeNorthflank: false });
+    const { instance, storage, waitUntilPromises } = createInstance(
+      createFakeStorage(),
+      envWithoutNorthflank
+    );
 
     await expect(instance.provision('user-1', {}, { provider: 'northflank' })).rejects.toThrow(
-      'Provider northflank is not implemented yet'
+      /^Provider northflank is not configured; missing /
     );
 
     expect(storage._store.get('userId')).toBeUndefined();
@@ -6530,7 +6797,7 @@ describe('start failure analytics events', () => {
   });
 });
 
-describe('manual and crash recovery analytics events', () => {
+describe('manual lifecycle analytics events', () => {
   it('can record manual start success events through Analytics Engine payloads', () => {
     const env = createFakeEnv();
     const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
@@ -6559,37 +6826,6 @@ describe('manual and crash recovery analytics events', () => {
     expect(successEvents).toHaveLength(1);
     expect(successEvents[0].blobs).toEqual(
       expect.arrayContaining(['instance.manual_start_succeeded', 'user-1', 'http'])
-    );
-  });
-
-  it('can record crash recovery failure events through Analytics Engine payloads', () => {
-    const env = createFakeEnv();
-    const dataset = env.KILOCLAW_AE as { writeDataPoint: Mock };
-
-    dataset.writeDataPoint({
-      blobs: [
-        'instance.crash_recovery_failed',
-        'user-1',
-        'http',
-        '',
-        'restart failed',
-        'acct-test',
-        'machine-1',
-        'sandbox-1',
-        'running',
-        '',
-        '',
-        '',
-        '',
-      ],
-      doubles: [34, 0],
-      indexes: ['instance.crash_recovery_failed'],
-    });
-
-    const failureEvents = analyticsEventsByName(env, 'instance.crash_recovery_failed');
-    expect(failureEvents).toHaveLength(1);
-    expect(failureEvents[0].blobs).toEqual(
-      expect.arrayContaining(['instance.crash_recovery_failed', 'user-1', 'http', 'restart failed'])
     );
   });
 });
@@ -6910,7 +7146,7 @@ describe('restartMachine image tag override', () => {
     expect(storage._store.get('trackedImageTag')).toBe('old-tag-123');
   });
 
-  it('fetches latest from KV when imageTag is "latest"', async () => {
+  it('resolves the rollout selector when imageTag is "latest"', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, {
       trackedImageTag: 'old-tag',
@@ -6918,33 +7154,35 @@ describe('restartMachine image tag override', () => {
       imageVariant: 'default',
     });
 
-    (resolveLatestVersion as Mock).mockResolvedValueOnce({
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
       openclawVersion: '2.0.0',
       variant: 'default',
       imageTag: 'new-tag-from-kv',
       imageDigest: null,
       publishedAt: new Date().toISOString(),
+      rolloutPercent: 0,
+      isLatest: true,
     });
 
     const result = await instance.restartMachine({ imageTag: 'latest' });
 
     expect(result.success).toBe(true);
-    expect(resolveLatestVersion).toHaveBeenCalledOnce();
+    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
     expect(storage._store.get('trackedImageTag')).toBe('new-tag-from-kv');
     expect(storage._store.get('openclawVersion')).toBe('2.0.0');
     expect(storage._store.get('imageVariant')).toBe('default');
   });
 
-  it('falls back gracefully when "latest" but KV is empty', async () => {
+  it('falls back gracefully when "latest" but selector returns null', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, { trackedImageTag: 'old-tag' });
 
-    (resolveLatestVersion as Mock).mockResolvedValueOnce(null);
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce(null);
 
     const result = await instance.restartMachine({ imageTag: 'latest' });
 
     expect(result.success).toBe(true);
-    expect(resolveLatestVersion).toHaveBeenCalledOnce();
+    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
     // trackedImageTag unchanged — resolveImageTag will use existing value
     expect(storage._store.get('trackedImageTag')).toBe('old-tag');
   });
@@ -6964,6 +7202,185 @@ describe('restartMachine image tag override', () => {
     expect(storage._store.get('trackedImageTag')).toBe('2026.2.25-abc123');
     expect(storage._store.get('openclawVersion')).toBeNull();
     expect(storage._store.get('imageVariant')).toBeNull();
+  });
+});
+
+// ============================================================================
+// applyPinnedVersion — admin pin push into DO state
+// ============================================================================
+
+describe('applyPinnedVersion', () => {
+  beforeEach(() => {
+    (resolveVersionByTag as Mock).mockReset().mockResolvedValue(null);
+    (lookupCatalogVersion as Mock).mockReset().mockResolvedValue(null);
+    (selectImageVersionForInstance as Mock).mockReset().mockResolvedValue(null);
+  });
+
+  it('writes resolved image fields from KV and does not restart the machine', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'old-tag',
+      openclawVersion: '1.0.0',
+      imageVariant: 'default',
+      trackedImageDigest: 'sha256:old',
+    });
+
+    (resolveVersionByTag as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.9',
+      variant: 'default',
+      imageTag: '2026-04-09',
+      imageDigest: 'sha256:new',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 0,
+      isLatest: false,
+    });
+
+    const applied = await instance.applyPinnedVersion('2026-04-09');
+
+    expect(applied).toEqual({
+      openclawVersion: '2026.4.9',
+      imageTag: '2026-04-09',
+      imageDigest: 'sha256:new',
+      variant: 'default',
+    });
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-09');
+    expect(storage._store.get('openclawVersion')).toBe('2026.4.9');
+    expect(storage._store.get('trackedImageDigest')).toBe('sha256:new');
+    expect(storage._store.get('imageVariant')).toBe('default');
+    // Machine is untouched — no Fly calls, status stays 'running'.
+    expect(flyClient.stopMachineAndWait).not.toHaveBeenCalled();
+    expect(flyClient.updateMachine).not.toHaveBeenCalled();
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('falls back to the Postgres catalog when KV misses', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { trackedImageTag: 'old-tag' });
+
+    (resolveVersionByTag as Mock).mockResolvedValueOnce(null);
+    (lookupCatalogVersion as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.9',
+      variant: 'default',
+      imageTag: '2026-04-09',
+      imageDigest: 'sha256:pg',
+      publishedAt: new Date().toISOString(),
+    });
+
+    const applied = await instance.applyPinnedVersion('2026-04-09');
+
+    expect(applied.imageTag).toBe('2026-04-09');
+    expect(applied.imageDigest).toBe('sha256:pg');
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-09');
+    expect(storage._store.get('trackedImageDigest')).toBe('sha256:pg');
+    expect(lookupCatalogVersion).toHaveBeenCalledOnce();
+  });
+
+  it('stores the raw tag when neither KV nor Postgres resolves it', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'old-tag',
+      openclawVersion: '1.0.0',
+      imageVariant: 'default',
+    });
+
+    const applied = await instance.applyPinnedVersion('unknown-tag');
+
+    expect(applied.imageTag).toBe('unknown-tag');
+    expect(applied.openclawVersion).toBeNull();
+    expect(applied.variant).toBeNull();
+    expect(storage._store.get('trackedImageTag')).toBe('unknown-tag');
+    expect(storage._store.get('openclawVersion')).toBeNull();
+    expect(storage._store.get('imageVariant')).toBeNull();
+    expect(storage._store.get('trackedImageDigest')).toBeNull();
+  });
+
+  it('when cleared (imageTag=null), resolves via the rollout selector', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'pinned-old',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.15',
+      variant: 'default',
+      imageTag: '2026-04-15',
+      imageDigest: 'sha256:latest',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 100,
+      isLatest: true,
+    });
+
+    const applied = await instance.applyPinnedVersion(null);
+
+    expect(applied.imageTag).toBe('2026-04-15');
+    expect(applied.openclawVersion).toBe('2026.4.15');
+    expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
+    expect(resolveVersionByTag).not.toHaveBeenCalled();
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-15');
+  });
+
+  it('when cleared, passes currentImageTag=null to the selector so non-cohort users can fall off the pinned candidate', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'candidate-tag',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    // Simulate the bug scenario: user was pinned to what happens to be the
+    // current rollout candidate, but is not in the cohort. The selector
+    // would normally return null (sticky-on-candidate). With
+    // ignoreCurrentImageTag, it should instead be invoked with
+    // currentImageTag=null and return :latest.
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
+      openclawVersion: '2026.4.15',
+      variant: 'default',
+      imageTag: 'latest-tag',
+      imageDigest: 'sha256:latest',
+      publishedAt: new Date().toISOString(),
+      rolloutPercent: 100,
+      isLatest: true,
+    });
+
+    const applied = await instance.applyPinnedVersion(null);
+
+    expect(applied.imageTag).toBe('latest-tag');
+    expect(storage._store.get('trackedImageTag')).toBe('latest-tag');
+    expect(selectImageVersionForInstance).toHaveBeenCalledWith(
+      expect.objectContaining({ currentImageTag: null })
+    );
+  });
+
+  it('when cleared and no rollout target, leaves existing tracked image alone', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      trackedImageTag: 'pinned-old',
+      openclawVersion: '2026.4.9',
+      imageVariant: 'default',
+    });
+
+    (selectImageVersionForInstance as Mock).mockResolvedValueOnce(null);
+
+    const applied = await instance.applyPinnedVersion(null);
+
+    expect(applied.imageTag).toBe('pinned-old');
+    expect(storage._store.get('trackedImageTag')).toBe('pinned-old');
+    expect(storage._store.get('openclawVersion')).toBe('2026.4.9');
+  });
+
+  it('rejects when the instance has no status (fresh DO)', async () => {
+    const { instance } = createInstance();
+
+    await expect(instance.applyPinnedVersion('2026-04-09')).rejects.toThrow(/has no status/);
+  });
+
+  it('rejects when the instance is being destroyed', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'destroying' });
+
+    await expect(instance.applyPinnedVersion('2026-04-09')).rejects.toThrow(/being destroyed/);
   });
 });
 
@@ -7278,6 +7695,48 @@ describe("status guards: 'starting'", () => {
     await expect(instance.startAsync()).rejects.toThrow(
       'Cannot start: instance is being destroyed'
     );
+  });
+
+  it('startAsync() short-circuits a duplicate call within the fresh starting window', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    const originalStartingAt = Date.now();
+    await seedProvisioned(storage, {
+      status: 'starting',
+      startingAt: originalStartingAt,
+    });
+
+    await instance.startAsync();
+
+    // No duplicate waitUntil scheduled, startingAt unchanged.
+    expect(waitUntilPromises).toHaveLength(0);
+    expect(storage._store.get('startingAt')).toBe(originalStartingAt);
+  });
+
+  it('startAsync() falls through to a fresh attempt when starting state is stale', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    const staleStartingAt = Date.now() - STARTING_TIMEOUT_MS - 1_000;
+    await seedProvisioned(storage, {
+      status: 'starting',
+      startingAt: staleStartingAt,
+    });
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.startAsync('user-1');
+
+    // Fresh attempt: startingAt is updated synchronously in startAsync before
+    // scheduling the background start(); a new waitUntil was scheduled. Check
+    // before awaiting waitUntilPromises, since the background start() will
+    // transition out of 'starting' and clear startingAt.
+    const persisted = storage._store.get('startingAt');
+    expect(typeof persisted).toBe('number');
+    expect(persisted).toBeGreaterThan(staleStartingAt);
+    expect(waitUntilPromises).toHaveLength(1);
+
+    await Promise.all(waitUntilPromises);
   });
 
   it('background start() aborts if instance was destroyed while starting', async () => {
@@ -9154,5 +9613,307 @@ describe('Stream Chat backfill on restartMachine', () => {
     await Promise.all(waitUntilPromises);
 
     expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// Lifecycle push notifications
+// ============================================================================
+
+type LifecyclePushCall = {
+  userId: string;
+  instanceId: string;
+  sandboxId: string;
+  event: 'ready' | 'start_failed';
+  instanceName: string | null;
+  errorMessage?: string;
+};
+
+function createFakeNotificationsBinding(): {
+  binding: {
+    sendInstanceLifecycleNotification: (params: LifecyclePushCall) => Promise<{
+      sent: number;
+      staleTokens: number;
+    }>;
+  };
+  calls: LifecyclePushCall[];
+} {
+  const calls: LifecyclePushCall[] = [];
+  return {
+    binding: {
+      sendInstanceLifecycleNotification: async (params: LifecyclePushCall) => {
+        calls.push(params);
+        return { tokenCount: 1, sent: 1, staleTokens: 0, receiptCount: 1 };
+      },
+    },
+    calls,
+  };
+}
+
+describe('instance ready push', () => {
+  it('dispatches a ready push when tryMarkInstanceReady flips the flag', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('ready');
+    expect(calls[0].userId).toBe('user-1');
+    expect(calls[0].instanceId).toBe('sandbox-1');
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
+  });
+
+  it('does not dispatch when the flag is already set', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: true });
+
+    await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it('does not dispatch when provisioned > 6h ago', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, {
+      instanceReadyEmailSent: false,
+      provisionedAt: Date.now() - 7 * 60 * 60 * 1000,
+    });
+
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    expect(result.shouldNotify).toBe(false);
+    expect(calls).toHaveLength(0);
+    // Flag still flips so future checkins don't keep retrying.
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
+  });
+
+  it('no-ops cleanly when NOTIFICATIONS binding is unavailable', async () => {
+    const env = createFakeEnv();
+    // No NOTIFICATIONS binding assigned.
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    const result = await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    expect(result).toEqual({ shouldNotify: true, userId: 'user-1' });
+    expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
+  });
+
+  it('initializes startFailurePushSentForAttempt to false on initial provision()', async () => {
+    const env = createFakeEnv();
+    const { binding } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    const { instance, storage, waitUntilPromises } = createInstance(createFakeStorage(), env);
+    await instance.provision('user-1', {});
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(false);
+  });
+});
+
+describe('instance start-failed push', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('dispatches one push when start times out without a machine', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: null,
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: false,
+    });
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].instanceId).toBe('sandbox-1');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('dispatches one push when the machine is gone (404) during start', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: 'machine-1',
+      startFailurePushSentForAttempt: false,
+    });
+
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('dispatches one push when the machine enters a failed state', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: 'machine-1',
+      startFailurePushSentForAttempt: false,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      id: 'machine-1',
+      state: 'failed',
+      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
+    });
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('does not dispatch a second push for the same attempt', async () => {
+    const env = createFakeEnv();
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedStarting(storage, {
+      flyMachineId: null,
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: true,
+    });
+
+    await instance.alarm();
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it('re-arms the flag on each startAsync attempt', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      startFailurePushSentForAttempt: true,
+      flyMachineId: null,
+    });
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.startAsync('user-1');
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(false);
+  });
+});
+
+describe('non-Fly lifecycle push dispatch', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('dispatches a start-failed push when the docker-local alarm detects a timeout', async () => {
+    const env = { ...createFakeEnv(), DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750' };
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage } = createInstance(createFakeStorage(), env);
+    await seedDockerInstance(storage, {
+      status: 'starting',
+      startingAt: Date.now() - STARTING_TIMEOUT_MS - 1000,
+      startFailurePushSentForAttempt: false,
+    });
+
+    vi.mocked(fetch).mockResolvedValue(new Response('', { status: 404 }));
+
+    await instance.alarm();
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].errorMessage).toBe('Start failed.');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
+  });
+
+  it('dispatches a start-failed push when docker-local inline start throws', async () => {
+    const env = {
+      ...createFakeEnv(),
+      DOCKER_LOCAL_API_BASE: 'http://127.0.0.1:23750',
+      DOCKER_LOCAL_PORT_RANGE: '45000-45010',
+    };
+    const { binding, calls } = createFakeNotificationsBinding();
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(createFakeStorage(), env);
+    await seedDockerInstance(storage, {
+      status: 'provisioned',
+      providerState: dockerProviderState({ hostPort: null }),
+      startFailurePushSentForAttempt: false,
+    });
+
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/kiloclaw-root-sandbox-1')) {
+        return new Response(JSON.stringify({ Name: 'kiloclaw-root-sandbox-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/containers/json?all=1')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/containers/kiloclaw-sandbox-1/json')) {
+        return new Response('', { status: 404 });
+      }
+      if (url.includes('/containers/create?name=kiloclaw-sandbox-1')) {
+        return new Response('create failed', { status: 500 });
+      }
+      throw new Error(`Unhandled Docker API request: ${url}`);
+    });
+
+    await instance.startAsync();
+    await Promise.all(waitUntilPromises);
+
+    expect(storage._store.get('status')).toBe('stopped');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].event).toBe('start_failed');
+    expect(calls[0].errorMessage).toBe('Start failed.');
+    expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
   });
 });

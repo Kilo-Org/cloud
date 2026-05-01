@@ -1,7 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { channel_badge_counts, kilocode_users } from '@kilocode/db/schema';
+import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
@@ -414,5 +414,29 @@ describe('session and API token reset mutations', () => {
     expect(updated.web_session_pepper).toEqual(expect.any(String));
     expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
     expect(updated.api_token_pepper).toBe('api-pepper-before');
+  });
+});
+
+describe('user router - getUnreadCounts', () => {
+  it('does not return counts from other users', async () => {
+    const user = await insertTestUser({
+      google_user_email: `unread-counts-me-${crypto.randomUUID()}@example.com`,
+    });
+    const other = await insertTestUser({
+      google_user_email: `unread-counts-other-${crypto.randomUUID()}@example.com`,
+    });
+    await db.insert(channel_badge_counts).values([
+      { user_id: user.id, channel_id: 'sandbox-mine', badge_count: 4 },
+      { user_id: other.id, channel_id: 'sandbox-theirs', badge_count: 9 },
+    ]);
+
+    const caller = await createCallerForUser(user.id);
+    const result = await caller.user.getUnreadCounts();
+
+    expect(result).toEqual([{ channelId: 'sandbox-mine', badgeCount: 4 }]);
+
+    await db
+      .delete(channel_badge_counts)
+      .where(inArray(channel_badge_counts.user_id, [user.id, other.id]));
   });
 });

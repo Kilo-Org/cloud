@@ -11,7 +11,6 @@ import { subDays } from 'date-fns';
 import { hasReceivedPromotion } from '@/lib/promotionalCredits';
 
 import { fromMicrodollars } from '@/lib/utils';
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {
@@ -110,8 +109,6 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateByokProvidersNotification,
-    generateMimoNoLongerFreeNotification,
-    generateTrinityLargeThinkingNoLongerFreeNotification,
     generateFirstDayWelcomeNotification,
     generateKiloPassNotification,
   ];
@@ -232,88 +229,18 @@ async function generateTeamsTrialNotification(
   ];
 }
 
-async function generateMimoNoLongerFreeNotification(
-  user: User,
-  _ctx: NotificationContext
-): Promise<KiloNotification[]> {
-  try {
-    const users = await cachedPosthogQuery(
-      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
-    )(
-      'mimo-no-longer-free-users',
-      'select kilo_user_id from notification_apr_2_mimo_no_longer_free_users limit 5e5'
-    );
-
-    if (!users.includes(user.id)) {
-      console.debug('[generateMimoNoLongerFreeNotification] not showing notification for user');
-      return [];
-    }
-
-    console.debug('[generateMimoNoLongerFreeNotification] showing notification for user');
-    return [
-      {
-        id: 'mimo-no-longer-free-apr-2',
-        title: 'MiMo V2 and MiniMax M2.5 no longer free',
-        message:
-          'The MiMo V2 and MiniMax M2.5 free promotions have ended. Please switch to Kilo Auto Free or another free model.',
-        suggestModelId: KILO_AUTO_FREE_MODEL.id,
-        showIn: ['cli', 'extension'],
-      },
-    ];
-  } catch (e) {
-    console.error('[generateMiniMaxNoLongerFreeNotification]', e);
-    return [];
-  }
-}
-
-async function generateTrinityLargeThinkingNoLongerFreeNotification(
-  user: User,
-  _ctx: NotificationContext
-): Promise<KiloNotification[]> {
-  try {
-    const users = await cachedPosthogQuery(
-      z.array(z.tuple([z.string()]).transform(([userId]) => userId))
-    )(
-      'trinity-large-thinking-no-longer-free-users',
-      'select kilo_user_id from notification_trinity_large_thinking_no_longer_free_users limit 5e5'
-    );
-
-    if (!users.includes(user.id)) {
-      console.debug(
-        '[generateTrinityLargeThinkingNoLongerFreeNotification] not showing notification for user'
-      );
-      return [];
-    }
-
-    console.debug(
-      '[generateTrinityLargeThinkingNoLongerFreeNotification] showing notification for user'
-    );
-    return [
-      {
-        id: 'trinity-large-thinking-no-longer-free',
-        title: 'Trinity Large Thinking is no longer free',
-        message:
-          'The Arcee AI Trinity Large Thinking free promotion has ended. You can continue using it as a paid model, or switch to Kilo Auto Free for free inference.',
-        suggestModelId: KILO_AUTO_FREE_MODEL.id,
-        showIn: ['cli', 'extension'],
-      },
-    ];
-  } catch (e) {
-    console.error('[generateTrinityLargeThinkingNoLongerFreeNotification]', e);
-    return [];
-  }
-}
+const getByokProviderUsers = cachedPosthogQuery(
+  z.array(
+    z.tuple([z.string(), z.string()]).transform(([userId, provider]) => ({ userId, provider }))
+  )
+);
 
 async function generateByokProvidersNotification(
   user: User,
   _ctx: NotificationContext
 ): Promise<KiloNotification[]> {
   try {
-    const byokProviderUsers = await cachedPosthogQuery(
-      z.array(
-        z.tuple([z.string(), z.string()]).transform(([userId, provider]) => ({ userId, provider }))
-      )
-    )(
+    const byokProviderUsers = await getByokProviderUsers(
       'byok-provider-usage-users',
       'select id, apiProvider from notification_byok_providers_jan_19 limit 5e5'
     );
@@ -327,10 +254,14 @@ async function generateByokProvidersNotification(
     const names = {
       anthropic: 'Claude API Key',
       bedrock: 'Amazon Bedrock',
+      chutes: 'Chutes API Key',
+      fireworks: 'Fireworks API Key',
       gemini: 'Google AI API Key',
       'openai-native': 'OpenAI API Key',
+      moonshot: 'Moonshot AI API Key',
       minimax: 'MiniMax Coding Plan',
       mistral: 'Mistral AI API Key',
+      novita: 'Novita AI API Key',
       xai: 'xAI API Key',
       zai: 'GLM Coding Plan',
     } as Record<string, string>;

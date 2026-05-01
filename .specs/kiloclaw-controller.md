@@ -136,15 +136,16 @@ endpoint.
 
 The `phase` field during `bootstrapping` progresses through:
 
-| Phase           | What is happening                                 |
-| --------------- | ------------------------------------------------- |
-| `init`          | HTTP server started, bootstrap not yet begun      |
-| `decrypting`    | Decrypting `KILOCLAW_ENC_*` env vars              |
-| `directories`   | Creating config/workspace dirs, setting env vars  |
-| `feature-flags` | Applying instance feature flags                   |
-| `github`        | Configuring GitHub access (best-effort)           |
-| `onboard`       | Running `openclaw onboard` (first boot)           |
-| `doctor`        | Running `openclaw doctor --fix` (subsequent boot) |
+| Phase                          | What is happening                                 |
+| ------------------------------ | ------------------------------------------------- |
+| `init`                         | HTTP server started, bootstrap not yet begun      |
+| `decrypting`                   | Decrypting `KILOCLAW_ENC_*` env vars              |
+| `directories`                  | Creating config/workspace dirs, setting env vars  |
+| `feature-flags`                | Applying instance feature flags                   |
+| `github`                       | Configuring GitHub access (best-effort)           |
+| `gateway-client-device-scopes` | Remediating gateway-client device approval scopes |
+| `onboard`                      | Running `openclaw onboard` (first boot)           |
+| `doctor`                       | Running `openclaw doctor --fix` (subsequent boot) |
 
 ### Endpoint Availability by Phase
 

@@ -88,12 +88,36 @@ export const DockerLocalProviderStateSchema = z.object({
   hostPort: z.number().int().nullable().default(null),
 });
 
+export const NorthflankProviderStateSchema = z.object({
+  provider: z.literal('northflank'),
+  projectId: z.string().nullable().default(null),
+  projectName: z.string().nullable().default(null),
+  serviceId: z.string().nullable().default(null),
+  serviceName: z.string().nullable().default(null),
+  volumeId: z.string().nullable().default(null),
+  volumeName: z.string().nullable().default(null),
+  secretId: z.string().nullable().default(null),
+  secretName: z.string().nullable().default(null),
+  /**
+   * SHA-256 hex digest of the canonical JSON of the restricted secret's
+   * variables. Used by `ensureSecret` to skip redundant PATCHes when
+   * `bootstrapEnv` is unchanged — Northflank propagates restricted-secret
+   * updates by re-rolling the deployed service, so writing the same values
+   * on every start would churn the pod unnecessarily.
+   */
+  secretContentHash: z.string().nullable().default(null),
+  ingressHost: z.string().nullable().default(null),
+  region: z.string().nullable().default(null),
+});
+
 export const ProviderStateSchema = z.discriminatedUnion('provider', [
   FlyProviderStateSchema,
   DockerLocalProviderStateSchema,
+  NorthflankProviderStateSchema,
 ]);
 export type FlyProviderState = z.infer<typeof FlyProviderStateSchema>;
 export type DockerLocalProviderState = z.infer<typeof DockerLocalProviderStateSchema>;
+export type NorthflankProviderState = z.infer<typeof NorthflankProviderStateSchema>;
 export type ProviderState = z.infer<typeof ProviderStateSchema>;
 
 export const KiloExaSearchModeSchema = z.enum(['kilo-proxy', 'disabled']);
@@ -337,6 +361,13 @@ export const PersistedStateSchema = z.object({
   // Each entry is a feature name (e.g. "npm-global-prefix") that gates runtime behavior.
   // New instances get the current feature set; legacy instances have an empty array.
   instanceFeatures: z.array(z.string()).default([]),
+  // Version of the controller config the running machine was last provisioned
+  // with. Written only when the DO observes or completes a transition to a
+  // running machine, so callers can treat it as a property of the running
+  // runtime rather than desired future config. Null means legacy (treat as
+  // version 1). See WORKER_CONTROLLER_CAPABILITIES_VERSION in config.ts for
+  // semantics.
+  controllerCapabilitiesVersion: z.number().int().nullable().default(null),
   gmailNotificationsEnabled: z.boolean().default(false),
   gmailLastHistoryId: z.string().nullable().default(null),
   gmailPushOidcEmail: z.string().nullable().default(null),
@@ -383,9 +414,14 @@ export const PersistedStateSchema = z.object({
   // Snapshot restore: volume ID created by the queue worker during restore.
   // Used for idempotency on retry — if set, the worker reuses this volume instead of creating another.
   pendingRestoreVolumeId: z.string().nullable().default(null),
-  // Tracks whether the "instance ready" email has been sent for this provision lifecycle.
-  // Set to true on first low-load checkin; reset on DO wipe (destroy + re-provision).
+  // Tracks whether the "instance ready" notifications (email + mobile push)
+  // have been dispatched for this provision lifecycle. Set to true on first
+  // low-load checkin; reset on DO wipe (destroy + re-provision).
   instanceReadyEmailSent: z.boolean().default(false),
+  // Tracks whether a "start failed" mobile push has been dispatched for the
+  // current starting attempt. Re-armed at the top of startAsync() so each
+  // retry can emit its own notification.
+  startFailurePushSentForAttempt: z.boolean().default(false),
   // Metadata for custom (non-catalog) secrets: env var name → { configPath? }.
   // configPath is a JSON dot-notation path for patching into openclaw.json at boot.
   customSecretMeta: z.record(z.string(), CustomSecretMetaSchema).nullable().default(null),

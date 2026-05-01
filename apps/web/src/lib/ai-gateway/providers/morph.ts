@@ -11,7 +11,6 @@ export const morph_warp_grep_free_model: KiloExclusiveModel = {
   flags: [],
   gateway: 'morph',
   internal_id: 'morph-warp-grep-v2',
-  inference_provider: 'morph',
   pricing: null,
   exclusive_to: [],
 };

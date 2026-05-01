@@ -173,5 +173,8 @@ jobs:
   deploy-kiloclaw:
     needs: [check-kiloclaw-changes]
     if: needs.check-kiloclaw-changes.outputs.changed == 'true'
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/deploy-kiloclaw.yml
     secrets: inherit

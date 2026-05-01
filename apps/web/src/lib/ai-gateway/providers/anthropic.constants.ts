@@ -18,7 +18,18 @@ export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
   max_completion_tokens: 128_000,
   gateway: 'openrouter',
   flags: ['reasoning', 'vision'],
-  inference_provider: null,
   pricing: null,
   exclusive_to: [],
 };
+
+export function isClaudeModel(requestedModel: string) {
+  return requestedModel.includes('claude');
+}
+
+export function isHaikuModel(requestedModel: string) {
+  return requestedModel.includes('haiku');
+}
+
+export function isOpusModel(requestedModel: string) {
+  return requestedModel.includes('opus');
+}

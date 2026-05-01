@@ -15,13 +15,11 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  applyProviderSpecificLogic,
-  getProvider,
-  openRouterRequest,
-} from '@/lib/ai-gateway/providers';
+import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
+import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
@@ -40,6 +38,7 @@ import {
   featureExclusiveModelResponse,
   invalidPathResponse,
   invalidRequestResponse,
+  malformedJsonResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
@@ -81,7 +80,7 @@ import {
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
-import { isKiloAutoModel } from '@/lib/ai-gateway/kilo-auto';
+import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
@@ -191,11 +190,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed = { kind: 'responses', body };
     }
   } catch (e) {
-    captureException(e, {
-      extra: { requestBodyText },
-      tags: { source: 'openrouter-proxy' },
-    });
-    return invalidRequestResponse();
+    return malformedJsonResponse(e);
   }
 
   delete requestBodyParsed.body.models; // OpenRouter specific field we do not support
@@ -280,7 +275,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Server-side products (cloud-agent, code-review, app-builder) rate-limit
   // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
   // All other products rate-limit per IP (fast pre-auth path).
-  if (isKiloExclusiveFreeModel(originalModelIdLowerCased)) {
+  const isRateLimitedFreeModelRequest =
+    isKiloExclusiveFreeModel(originalModelIdLowerCased) || autoModel === KILO_AUTO_FREE_MODEL.id;
+  if (isRateLimitedFreeModelRequest) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
     if (rateLimit instanceof NextResponse) return rateLimit;
 
@@ -373,7 +370,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isKiloExclusiveFreeModel(originalModelIdLowerCased)) {
+  if (isRateLimitedFreeModelRequest) {
     await logFreeModelRequest(
       ipAddress,
       originalModelIdLowerCased,
@@ -470,8 +467,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
 
     // Organization model/provider restrictions check
-    // Model allow list only applies to Enterprise plans
-    // Provider allow list applies to Enterprise plans; data collection applies to all plans
+    // Provider/model access policy applies to Enterprise plans; data collection applies to all plans.
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
       modelId: originalModelIdLowerCased,
       settings,
@@ -490,7 +486,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   const openrouterRequestSpan = startInactiveSpan({
-    name: 'openrouter-request-start',
+    name: 'upstream-request-start',
     op: 'http.client',
   });
 
@@ -530,10 +526,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     originalModelIdLowerCased,
     requestBodyParsed,
     extraHeaders,
-    userByok
+    userByok,
+    fraudHeaders
   );
 
-  const response = await openRouterRequest({
+  const response = await upstreamRequest({
     path,
     search: url.search,
     method: request.method,

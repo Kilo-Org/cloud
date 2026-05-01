@@ -9,6 +9,8 @@ import { CodeReviewDailyChart } from '@/app/admin/components/CodeReviewDailyChar
 import { CodeReviewCancellationAnalysis } from '@/app/admin/components/CodeReviewCancellationAnalysis';
 import { CodeReviewErrorAnalysis } from '@/app/admin/components/CodeReviewErrorAnalysis';
 import { CodeReviewPerformanceChart } from '@/app/admin/components/CodeReviewPerformanceChart';
+import { CodeReviewWaitTimeChart } from '@/app/admin/components/CodeReviewWaitTimeChart';
+import { CodeReviewWaitTimeSummary } from '@/app/admin/components/CodeReviewWaitTimeSummary';
 import { CodeReviewUserSegmentation } from '@/app/admin/components/CodeReviewUserSegmentation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +19,7 @@ import {
   useCodeReviewOverviewStats,
   useCodeReviewDailyStats,
   useCodeReviewPerformanceStats,
+  useCodeReviewWaitTimeStats,
   useCodeReviewCancellationAnalysis,
   useCodeReviewErrorAnalysis,
   useCodeReviewUserSegmentation,
@@ -107,6 +110,7 @@ export default function CodeReviewsPage() {
   const overviewQuery = useCodeReviewOverviewStats(filterParams);
   const dailyQuery = useCodeReviewDailyStats(filterParams);
   const performanceQuery = useCodeReviewPerformanceStats(filterParams);
+  const waitTimeQuery = useCodeReviewWaitTimeStats(filterParams);
   const cancellationQuery = useCodeReviewCancellationAnalysis(filterParams);
   const errorQuery = useCodeReviewErrorAnalysis(filterParams);
   const segmentationQuery = useCodeReviewUserSegmentation(filterParams);
@@ -115,6 +119,7 @@ export default function CodeReviewsPage() {
     void overviewQuery.refetch();
     void dailyQuery.refetch();
     void performanceQuery.refetch();
+    void waitTimeQuery.refetch();
     void cancellationQuery.refetch();
     void errorQuery.refetch();
     void segmentationQuery.refetch();
@@ -122,6 +127,7 @@ export default function CodeReviewsPage() {
     overviewQuery,
     dailyQuery,
     performanceQuery,
+    waitTimeQuery,
     cancellationQuery,
     errorQuery,
     segmentationQuery,
@@ -168,6 +174,17 @@ export default function CodeReviewsPage() {
   const hasActiveFilter =
     selectedUser || selectedOrg || ownershipType !== 'all' || agentVersion !== 'all';
 
+  const splitWaitTimeByOwnership = !selectedUser && !selectedOrg && ownershipType === 'all';
+  const waitTimeSeriesLabel = selectedUser
+    ? `User: ${selectedUser.name || selectedUser.email || selectedUser.id}`
+    : selectedOrg
+      ? `Org: ${selectedOrg.name || selectedOrg.id}`
+      : ownershipType === 'personal'
+        ? 'Personal'
+        : ownershipType === 'organization'
+          ? 'Organizations'
+          : undefined;
+
   // Handle CSV export
   const handleExport = useCallback(async () => {
     if (isExporting || !startDate || !endDate) return;
@@ -185,11 +202,16 @@ export default function CodeReviewsPage() {
     }
   }, [trpcClient, filterParams, startDate, endDate, isExporting]);
 
-  const isLoading = overviewQuery.isLoading || dailyQuery.isLoading || performanceQuery.isLoading;
+  const isLoading =
+    overviewQuery.isLoading ||
+    dailyQuery.isLoading ||
+    performanceQuery.isLoading ||
+    waitTimeQuery.isLoading;
   const isRefreshing =
     overviewQuery.isFetching ||
     dailyQuery.isFetching ||
     performanceQuery.isFetching ||
+    waitTimeQuery.isFetching ||
     cancellationQuery.isFetching ||
     errorQuery.isFetching ||
     segmentationQuery.isFetching;
@@ -440,8 +462,20 @@ export default function CodeReviewsPage() {
             {/* KPI Cards */}
             {overviewQuery.data && <CodeReviewStats data={overviewQuery.data} />}
 
+            {/* Queue Wait Summary */}
+            {overviewQuery.data && <CodeReviewWaitTimeSummary data={overviewQuery.data} />}
+
             {/* Daily Chart */}
             {dailyQuery.data && <CodeReviewDailyChart data={dailyQuery.data} />}
+
+            {/* Queue Wait Trend */}
+            {waitTimeQuery.data && (
+              <CodeReviewWaitTimeChart
+                data={waitTimeQuery.data}
+                splitByOwnership={splitWaitTimeByOwnership}
+                filteredSeriesLabel={waitTimeSeriesLabel}
+              />
+            )}
 
             {/* Performance Trend */}
             {performanceQuery.data && (
@@ -476,6 +510,7 @@ export default function CodeReviewsPage() {
         {(overviewQuery.error ||
           dailyQuery.error ||
           performanceQuery.error ||
+          waitTimeQuery.error ||
           cancellationQuery.error ||
           errorQuery.error ||
           segmentationQuery.error) && (
@@ -485,6 +520,7 @@ export default function CodeReviewsPage() {
               {overviewQuery.error?.message ||
                 dailyQuery.error?.message ||
                 performanceQuery.error?.message ||
+                waitTimeQuery.error?.message ||
                 cancellationQuery.error?.message ||
                 errorQuery.error?.message ||
                 segmentationQuery.error?.message ||

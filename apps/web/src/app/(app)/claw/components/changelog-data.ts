@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-04-28',
+    description:
+      'Added an Early Access opt-in under Settings → Manage Version. Turn it on to receive new KiloClaw versions while they are still rolling out, instead of waiting for full availability. Applies to all of your instances, personal and org. A version pin always wins per instance, so a pinned instance ignores Early Access until you unpin.',
+    category: 'feature',
+    deployHint: null,
+  },
+  {
     date: '2026-04-23',
     description:
       'Added Morning Briefing for KiloClaw-hosted OpenClaw instances. The new bundled plugin can schedule daily briefings, run on demand, and save/read today and yesterday briefing Markdown files from persistent instance storage. Dashboard settings now include Morning Briefing status, source readiness, and controls.',

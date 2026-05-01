@@ -1,7 +1,7 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
-export function isMoonshotModel(model: string) {
-  return model.startsWith('moonshotai/');
+export function isKimiModel(model: string) {
+  return model.includes('kimi');
 }
 
 export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {

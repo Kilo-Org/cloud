@@ -8,6 +8,7 @@ import {
   FileCode,
   Hash,
   Info,
+  Newspaper,
   RotateCcw,
   Save,
   Settings,
@@ -15,7 +16,7 @@ import {
   Square,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { OpenclawImportCard } from './OpenclawImportCard';
 
 import { usePostHog } from 'posthog-js/react';
@@ -23,7 +24,7 @@ import { toast } from 'sonner';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { useUser } from '@/hooks/useUser';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
+import type { KiloClawDashboardStatus, MorningBriefingStatusLite } from '@/lib/kiloclaw/types';
 import { calverAtLeast, cleanVersion } from '@/lib/kiloclaw/version';
 import type { useKiloClawMutations } from '@/hooks/useKiloClaw';
 import {
@@ -66,6 +67,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DetailTile } from './DetailTile';
 import { EMBEDDING_MODELS, DEFAULT_EMBEDDING_MODEL } from './embeddingModels';
+import { deriveMorningBriefingCardState } from './morning-briefing-card-state';
 
 import { getEntriesByCategory } from '@kilocode/kiloclaw-secret-catalog';
 import { SecretEntrySection } from './SecretEntrySection';
@@ -74,6 +76,7 @@ import { AnimatedDots } from './AnimatedDots';
 import { ConfirmActionDialog } from './ConfirmActionDialog';
 import { PairingSection } from './PairingSection';
 import { VersionPinCard } from './VersionPinCard';
+import { EarlyAccessCard } from './EarlyAccessCard';
 import { WorkspaceFileEditor } from './WorkspaceFileEditor';
 import { PermissionPresetCards } from './PermissionPresetCards';
 import { CustomSecretsSection } from './CustomSecretsSection';
@@ -500,24 +503,7 @@ function MorningBriefingCard({
   actionsReady,
 }: {
   mutations: ClawMutations;
-  briefingStatus:
-    | {
-        enabled?: boolean;
-        desiredEnabled?: boolean;
-        observedEnabled?: boolean | null;
-        reconcileState?: 'idle' | 'in_progress' | 'succeeded' | 'failed';
-        lastReconcileAction?: 'enable' | 'disable' | null;
-        code?: string;
-        cron?: string;
-        timezone?: string;
-        lastGeneratedDate?: string | null;
-        sourceReadiness?: {
-          github: { configured: boolean; summary: string };
-          linear: { configured: boolean; summary: string };
-          web: { configured: boolean; summary: string };
-        };
-      }
-    | undefined;
+  briefingStatus: MorningBriefingStatusLite | undefined;
   fallbackReadiness: {
     githubConfigured: boolean;
     linearConfigured: boolean;
@@ -553,11 +539,14 @@ function MorningBriefingCard({
     } as const);
 
   const hasSchedule = Boolean(briefingStatus?.cron && briefingStatus?.timezone);
-  const desiredEnabled = briefingStatus?.desiredEnabled ?? briefingStatus?.enabled ?? false;
-  const observedEnabled = briefingStatus?.observedEnabled ?? briefingStatus?.enabled ?? false;
+  const { desiredEnabled, observedEnabled, hasResolvedBriefingToggleState, isWarmupState } =
+    deriveMorningBriefingCardState({
+      isRunning,
+      actionsReady,
+      briefingStatus,
+    });
   const reconcileState = briefingStatus?.reconcileState ?? 'idle';
   const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
-  const isWarmupState = isRunning && actionsReady === false;
   const isTransitioning =
     reconcileState === 'in_progress' ||
     mutations.enableMorningBriefing.isPending ||
@@ -596,8 +585,9 @@ function MorningBriefingCard({
 
     return observedEnabled ? 'Enabled' : 'Disabled';
   })();
-  const statusVariant =
-    statusLabel === 'Instance Stopped'
+  const statusVariant = isWarmupState
+    ? 'secondary'
+    : statusLabel === 'Instance Stopped'
       ? 'secondary'
       : observedEnabled || (isTransitioning && desiredEnabled)
         ? 'default'
@@ -623,25 +613,73 @@ function MorningBriefingCard({
   const showScheduleDetails = !isWarmupState && hasSchedule && desiredEnabled;
   const controlsEnabled = actionsReady && !isWarmupState;
   const canUseBriefingControls = controlsEnabled && desiredEnabled;
+  const lastDelivery = briefingStatus?.lastDelivery ?? [];
+  const showLastDelivery =
+    !isWarmupState && actionsReady && hasResolvedBriefingToggleState && lastDelivery.length > 0;
+  const deliveryChannelLabel = {
+    telegram: 'Telegram',
+    discord: 'Discord',
+    slack: 'Slack',
+  } as const;
+  const deliveryStatusLabel = {
+    sent: 'Sent',
+    skipped: 'Skipped',
+    failed: 'Failed',
+  } as const;
+  const deliveryReasonLabel = {
+    missing_target: 'Missing target',
+    ambiguous_target: 'Ambiguous target',
+    send_failed: 'Send failed',
+    config_unavailable: 'Config unavailable',
+  } as const;
 
   return (
     <div className="rounded-lg border px-4 py-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium">Morning Briefing</p>
-            <Badge variant={statusVariant}>{statusLabel}</Badge>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <Newspaper className="text-muted-foreground h-5 w-5 shrink-0" />
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium">Morning Briefing</p>
+              <Badge variant={statusVariant} className="px-1.5 py-0 text-[10px] leading-4">
+                {statusLabel}
+              </Badge>
+            </div>
+            {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
+              <p className="text-muted-foreground text-xs">
+                {formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)}
+              </p>
+            )}
+            {showScheduleDetails && (
+              <p className="text-muted-foreground text-xs">
+                Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
+              </p>
+            )}
+            {showLastDelivery && (
+              <p className="text-muted-foreground text-xs">
+                Last delivery:{' '}
+                {lastDelivery
+                  .map(entry => {
+                    const channel = deliveryChannelLabel[entry.channel] ?? entry.channel;
+                    const status = deliveryStatusLabel[entry.status] ?? entry.status;
+                    const reason = entry.reason
+                      ? (deliveryReasonLabel[entry.reason] ?? entry.reason)
+                      : undefined;
+                    return reason ? `${channel} (${status}: ${reason})` : `${channel} (${status})`;
+                  })
+                  .join(' • ')}
+              </p>
+            )}
+
+            {isWarmupState && (
+              <p className="text-muted-foreground mt-2 text-xs">
+                Instance is still warming up. Morning Briefing controls will become available once
+                the gateway is fully ready.
+              </p>
+            )}
+
+            <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
           </div>
-          {showScheduleDetails && briefingStatus?.cron && briefingStatus?.timezone && (
-            <p className="text-muted-foreground text-xs">
-              {formatMorningBriefingSchedule(briefingStatus.cron, briefingStatus.timezone)}
-            </p>
-          )}
-          {showScheduleDetails && (
-            <p className="text-muted-foreground text-xs">
-              Last generated: {briefingStatus?.lastGeneratedDate ?? '(none)'}
-            </p>
-          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -712,20 +750,11 @@ function MorningBriefingCard({
         </div>
       </div>
 
-      {isWarmupState && (
-        <p className="text-muted-foreground mt-2 text-xs">
-          Instance is still warming up. Morning Briefing controls will become available once the
-          gateway is fully ready.
-        </p>
-      )}
-
       {!desiredEnabled && controlsEnabled && (
         <p className="text-muted-foreground mt-2 text-xs">
           Enable Morning Briefing to get a personalized briefing everyday.
         </p>
       )}
-
-      <p className="text-muted-foreground mt-3 text-xs">{sourceSummaryText}</p>
 
       {requestedDay && (
         <div className="mt-3">
@@ -1277,7 +1306,6 @@ export function SettingsTab({
   onSecretsChanged,
   dirtySecrets,
   onRedeploy,
-  onUpgrade,
   onRequestUpgrade,
   organizationName,
 }: {
@@ -1286,9 +1314,7 @@ export function SettingsTab({
   onSecretsChanged?: (entryId: string) => void;
   dirtySecrets: Set<string>;
   onRedeploy?: () => void;
-  /** Callback that triggers an image upgrade (pull latest) instead of a plain restart. */
-  onUpgrade?: () => void;
-  /** Callback that requests an upgrade via the InstanceControls dialog. */
+  /** Callback that opens the focused upgrade confirmation flow. */
   onRequestUpgrade?: () => void;
   /** Present in organization context; required in the destroy confirmation phrase. */
   organizationName?: string;
@@ -1314,10 +1340,40 @@ export function SettingsTab({
     isControllerVersionError,
   } = useClawUpdateAvailable(status);
   const { data: myPin } = useClawMyPin();
-  const { data: morningBriefingStatus } = useClawMorningBriefingStatus(true);
-  const { data: gatewayReady } = useClawGatewayReady(isRunning);
+  const morningBriefingStatusQuery = useClawMorningBriefingStatus(isRunning);
+  const morningBriefingStatus = morningBriefingStatusQuery.data;
+  const gatewayReadyQuery = useClawGatewayReady(isRunning);
+  const gatewayReady = gatewayReadyQuery.data;
   const [confirmDestroy, setConfirmDestroy] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
+  const [bootStartedAtMs, setBootStartedAtMs] = useState<number | null>(null);
+  const previousStatusRef = useRef(status.status);
+
+  useEffect(() => {
+    const previousStatus = previousStatusRef.current;
+    if (status.status === 'running' && previousStatus !== 'running') {
+      setBootStartedAtMs(Date.now());
+    }
+    if (status.status !== 'running' && previousStatus === 'running') {
+      setBootStartedAtMs(null);
+    }
+    previousStatusRef.current = status.status;
+  }, [status.status]);
+
+  const hasFreshGatewayReady =
+    isRunning &&
+    (bootStartedAtMs === null || gatewayReadyQuery.dataUpdatedAt >= bootStartedAtMs) &&
+    gatewayReadyQuery.dataUpdatedAt > 0;
+  const hasFreshMorningBriefingStatus =
+    isRunning &&
+    (bootStartedAtMs === null || morningBriefingStatusQuery.dataUpdatedAt >= bootStartedAtMs) &&
+    morningBriefingStatusQuery.dataUpdatedAt > 0;
+  const morningBriefingActionsReady =
+    isRunning &&
+    hasFreshGatewayReady &&
+    hasFreshMorningBriefingStatus &&
+    gatewayReady?.ready === true &&
+    gatewayReady?.settled === true;
   const hasModelSelectionError = isRunning && isControllerVersionError;
   const modelSelectionError = hasModelSelectionError
     ? 'Failed to load the running OpenClaw version. Retry before changing the default model.'
@@ -1556,14 +1612,15 @@ export function SettingsTab({
           </Button>
         </div>
 
-        {/* Expandable version pinning */}
+        {/* Expandable Manage Version section: pinning + Early Access opt in. */}
         {manageVersionOpen && (
-          <div className="mt-4 border-t pt-4">
+          <div className="mt-4 space-y-6 border-t pt-4">
             <VersionPinCard
               trackedImageTag={status.trackedImageTag}
               latestImageTag={variantsMatch ? (latestVersion?.imageTag ?? null) : null}
               mutations={mutations}
             />
+            <EarlyAccessCard />
           </div>
         )}
       </div>
@@ -1821,7 +1878,7 @@ export function SettingsTab({
                   mutations={mutations}
                   onSecretsChanged={onSecretsChanged}
                   isDirty={dirtySecrets.has(entry.id)}
-                  onRedeploy={onUpgrade ?? onRedeploy}
+                  onRedeploy={onRequestUpgrade ?? onRedeploy}
                   redeployLabel="Upgrade"
                   actionRowExtra={<AgentCardSetupGuide />}
                 />
@@ -1867,9 +1924,7 @@ export function SettingsTab({
               mutations={mutations}
               briefingStatus={morningBriefingStatus}
               isRunning={isRunning}
-              actionsReady={
-                isRunning && gatewayReady?.ready === true && gatewayReady?.settled === true
-              }
+              actionsReady={morningBriefingActionsReady}
               fallbackReadiness={{
                 githubConfigured: configuredSecrets.github ?? false,
                 linearConfigured: configuredSecrets.linear ?? false,

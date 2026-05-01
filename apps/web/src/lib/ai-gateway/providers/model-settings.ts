@@ -1,62 +1,36 @@
-import { seed_20_pro_free_model } from '@/lib/ai-gateway/providers/bytedance';
-import { isGemini3Model, isGeminiModel, isGemmaModel } from '@/lib/ai-gateway/providers/google';
-import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import { isMoonshotModel } from '@/lib/ai-gateway/providers/moonshotai';
+import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
+import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
-import { isXaiModel } from '@/lib/ai-gateway/providers/xai';
-import { isZaiModel } from '@/lib/ai-gateway/providers/zai';
+import { isAlibabaDirectModel } from '@/lib/ai-gateway/providers/qwen';
+import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
+import { isGrokModel, isGrokToggleableReasoningModel } from '@/lib/ai-gateway/providers/xai';
+import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import type {
   CustomLlmProvider,
-  ModelSettings,
   OpenClawModelSettings,
   OpenCodeSettings,
-  VersionedSettings,
 } from '@kilocode/db/schema-types';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
-
-export function getModelSettings(model: string): ModelSettings | undefined {
-  if (isOpenAiModel(model)) {
-    return {
-      included_tools: ['apply_patch'],
-      excluded_tools: ['apply_diff', 'delete_file', 'edit_file', 'write_to_file'],
-    };
-  }
-  if (isMinimaxModel(model)) {
-    return {
-      included_tools: ['search_and_replace'],
-      excluded_tools: ['apply_diff', 'edit_file'],
-    };
-  }
-  return undefined;
-}
-
-export function getVersionedModelSettings(model: string): VersionedSettings | undefined {
-  if (isGeminiModel(model) || isZaiModel(model)) {
-    return {
-      '4.146.0': {
-        included_tools: ['write_file', 'edit_file'],
-        excluded_tools: ['apply_diff'],
-      },
-    };
-  }
-  return undefined;
-}
 
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
   thinking: { reasoning: { enabled: true, effort: 'medium' } },
 } as const;
 
-export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
-  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
   low: { reasoning: { enabled: true, effort: 'low' } },
   medium: { reasoning: { enabled: true, effort: 'medium' } },
   high: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
+export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH = {
+  minimal: { reasoning: { enabled: true, effort: 'minimal' } },
+  ...REASONING_VARIANTS_LOW_MEDIUM_HIGH,
+} as const;
+
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
-  if (model.startsWith('anthropic/claude-opus-4.7')) {
+  if (isOpusModel(model) && model.includes('4.7')) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
@@ -66,7 +40,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
     };
   }
-  if (model.startsWith('anthropic/')) {
+  if (isClaudeModel(model)) {
     return {
       none: { reasoning: { enabled: false, effort: 'none' } },
       low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
@@ -90,14 +64,15 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
     );
   }
   if (
-    isMoonshotModel(model) ||
-    isZaiModel(model) ||
-    model === qwen36_plus_model.public_id ||
+    isKimiModel(model) ||
+    isGlmModel(model) ||
+    isGrokToggleableReasoningModel(model) ||
+    isAlibabaDirectModel(model) ||
     isGemmaModel(model)
   ) {
     return REASONING_VARIANTS_BINARY;
   }
-  if (model === seed_20_pro_free_model.public_id) {
+  if (model === seed_20_code_free_model.public_id) {
     return {
       none: { reasoning: { enabled: false, effort: 'minimal' } },
       low: { reasoning: { enabled: true, effort: 'low' } },
@@ -113,25 +88,24 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       high: { reasoning: { enabled: true, effort: 'high' } },
     };
   }
-  if (model.startsWith('x-ai/grok-4')) {
-    return {
-      'non-reasoning': { reasoning: { enabled: false, effort: 'none' } },
-      reasoning: { reasoning: { enabled: true, effort: 'medium' } },
-    };
-  }
   return undefined;
 }
 
 function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
-  if (qwen36_plus_model.public_id === model) {
-    // with 'openai' prompt caching doesn't seem to work
+  if (isAlibabaDirectModel(model)) {
+    // with 'openai' (Responses) prompt caching doesn't work
+    // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
+    return 'alibaba';
+  }
+  if (seed_20_code_free_model.public_id === model) {
+    // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
   }
-  if (seed_20_pro_free_model.public_id === model) {
-    // with 'openai' a bunch of bugs in vercel ai sdk v5 get triggered
-    return 'openai-compatible';
+  if (isClaudeModel(model)) {
+    // on Vercel AI Gateway, this is necessary to support document attachments
+    return 'anthropic';
   }
-  if (isOpenAiModel(model) || isXaiModel(model)) {
+  if (isOpenAiModel(model) || isGrokModel(model)) {
     // OpenAI: "While Chat Completions remains supported, Responses is recommended for all new projects.""
     // xAI: "The Responses API is the recommended way to interact with xAI models."
     return 'openai';
@@ -146,7 +120,11 @@ export function getOpenCodeSettings(model: string): OpenCodeSettings | undefined
 }
 
 export function getOpenClawSettings(model: string): OpenClawModelSettings | undefined {
-  if (isOpenAiModel(model) || isXaiModel(model)) {
+  // 2026-04-28: this is aspirational, the OpenClaw Kilo provider does not respect this
+  if (isClaudeModel(model)) {
+    return { api_adapter: 'anthropic-messages' };
+  }
+  if (isOpenAiModel(model) || isGrokModel(model)) {
     return { api_adapter: 'openai-responses' };
   }
   return undefined;

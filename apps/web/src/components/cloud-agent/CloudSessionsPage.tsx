@@ -55,6 +55,7 @@ import {
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { AdvancedConfig } from '@/components/shared/AdvancedConfig';
 import { cn } from '@/lib/utils';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@/lib/cloud-agent/constants';
 import { MODES } from './ResumeConfigModal';
 
 type CloudSessionsPageProps = {
@@ -150,7 +151,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
     // reset to an allowed model
     const isCurrentModelAvailable = modelOptions.some(m => m.id === model);
     if (!isCurrentModelAvailable || !model || !isModelUserSelected) {
-      // Prefer the default model if it's in the allow list, otherwise use the first available
+      // Prefer the default model if it is available under org policy, otherwise use the first available.
       const defaultModel = defaultsData?.defaultModel;
       const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
       const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;
@@ -466,7 +467,11 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
         }
       }
 
-      // Invalidate the sessions list cache so the sidebar shows the new session
+      // Invalidate the sessions list cache so the sidebar shows the new session.
+      // This legacy page goes through cloudAgent.prepareSession which writes to
+      // cli_sessions (v1), so the sidebar/list data it produces still comes from
+      // the unified router (which UNIONs v1 and v2). Invalidating cliSessionsV2.list
+      // would miss the newly-created v1 row.
       void queryClient.invalidateQueries({
         queryKey: trpc.unifiedSessions.list.queryKey({
           limit: 3,
@@ -604,6 +609,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
 
   const isFormValid =
     prompt.trim().length > 0 &&
+    prompt.length <= CLOUD_AGENT_PROMPT_MAX_LENGTH &&
     selectedRepo.length > 0 &&
     model.length > 0 &&
     !isPreparing &&
@@ -845,6 +851,9 @@ const PromptField = memo(function PromptField({ value, onChange }: PromptFieldPr
     [onChange]
   );
 
+  const isOverLimit = value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH;
+  const showCounter = value.length >= CLOUD_AGENT_PROMPT_MAX_LENGTH * 0.9;
+
   return (
     <div className="space-y-2">
       <Label htmlFor="prompt">Task Description</Label>
@@ -855,8 +864,16 @@ const PromptField = memo(function PromptField({ value, onChange }: PromptFieldPr
         placeholder="Describe your task..."
         rows={3}
         className="resize-y"
+        maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
       />
-      <p className="text-xs text-gray-400">Describe what you want the cloud agent to do</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs text-gray-400">Describe what you want the cloud agent to do</p>
+        {showCounter && (
+          <p className={cn('text-xs', isOverLimit ? 'text-red-400' : 'text-gray-400')}>
+            {value.length.toLocaleString()} / {CLOUD_AGENT_PROMPT_MAX_LENGTH.toLocaleString()}
+          </p>
+        )}
+      </div>
     </div>
   );
 });

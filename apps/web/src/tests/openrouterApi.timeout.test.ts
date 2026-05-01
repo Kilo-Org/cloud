@@ -1,7 +1,7 @@
-import { openRouterRequest } from '../lib/ai-gateway/providers';
+import { upstreamRequest } from '../lib/ai-gateway/providers/upstream-request';
 import PROVIDERS from '../lib/ai-gateway/providers/provider-definitions';
 
-describe('openRouterRequest timeout', () => {
+describe('upstreamRequest timeout', () => {
   it('should abort after timeout', async () => {
     // Use a very short timeout for testing by temporarily modifying the function
     // For a quick manual test, we can verify the signal is properly combined
@@ -13,7 +13,7 @@ describe('openRouterRequest timeout', () => {
     controller.abort();
 
     await expect(
-      openRouterRequest({
+      upstreamRequest({
         path: '/chat/completions',
         search: '',
         method: 'POST',

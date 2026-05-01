@@ -4,6 +4,7 @@ import {
   type DirectByokModel,
   type DirectByokProvider,
 } from '@/lib/ai-gateway/providers/direct-byok/types';
+import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
@@ -21,18 +22,18 @@ function convertModel(
   preferredIndex: number
 ) {
   const id = formatDirectByokModelId(provider, model);
-  const name = provider.name + ': ' + model.name;
+  const name = DIRECT_BYOK_PROVIDERS_META[provider.id] + ': ' + model.name;
   return {
     id,
     canonical_slug: id,
     hugging_face_id: '',
     name,
     created: 631148400, // our clients do not care about this field, we can fix it later if that changes
-    description: model.description,
+    description: '',
     context_length: model.context_length,
     architecture: {
-      modality: model.flags.includes('vision') ? 'text+image-\u003Etext' : 'text-\u003Etext',
-      input_modalities: ['text'].concat(model.flags.includes('vision') ? ['image'] : []),
+      modality: model.flags?.includes('vision') ? 'text+image-\u003Etext' : 'text-\u003Etext',
+      input_modalities: ['text'].concat(model.flags?.includes('vision') ? ['image'] : []),
       output_modalities: ['text'],
       tokenizer: 'Other',
       instruct_type: null,
@@ -54,27 +55,32 @@ function convertModel(
     per_request_limits: null,
     supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning', 'include_reasoning'],
     default_parameters: {},
-    preferredIndex: model.flags.includes('recommended') ? preferredIndex : undefined,
+    preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     opencode: {
       ai_sdk_provider: provider.ai_sdk_provider,
-      variants: model.variants ?? undefined,
+      variants: model.variants,
     } satisfies OpenCodeSettings,
   };
 }
 
-function getDirectByokModels(byokProviders: UserByokProviderId[]) {
+async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
   let nextPreferredId = preferredModels.length;
-  return DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).flatMap(
-    provider => provider.models.map(model => convertModel(provider, model, nextPreferredId++))
-  );
+  return (
+    await Promise.all(
+      DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).map(
+        async provider =>
+          (await provider.models()).map(model => convertModel(provider, model, nextPreferredId++))
+      )
+    )
+  ).flat();
 }
 
-export function getDirectByokModel(requestedModel: string): {
+export async function getDirectByokModel(requestedModel: string): Promise<{
   provider: DirectByokProvider | null;
   model: DirectByokModel | null;
-} {
+}> {
   for (const provider of DIRECT_BYOK_PROVIDERS) {
-    const model = provider?.models.find(
+    const model = (await provider.models()).find(
       model => formatDirectByokModelId(provider, model) === requestedModel
     );
     if (model) {
@@ -90,7 +96,7 @@ export async function getDirectByokModelsForOrganization(organizationId: string)
     organizationId,
     DIRECT_BYOK_PROVIDERS.map(provider => provider.id)
   );
-  return userByok ? getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
+  return userByok ? await getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
 }
 
 export async function getDirectByokModelsForUser(userId: string) {
@@ -99,7 +105,7 @@ export async function getDirectByokModelsForUser(userId: string) {
     userId,
     DIRECT_BYOK_PROVIDERS.map(provider => provider.id)
   );
-  return userByok ? getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
+  return userByok ? await getDirectByokModels(userByok.map(ub => ub.providerId)) : [];
 }
 
 export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {

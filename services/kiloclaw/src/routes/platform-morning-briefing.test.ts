@@ -121,4 +121,119 @@ describe('platform morning-briefing warm-up handling', () => {
     expect(response.status).toBe(500);
     expect(enableMorningBriefing).toHaveBeenCalledTimes(1);
   });
+
+  it('returns delivery metadata from run endpoint', async () => {
+    const runMorningBriefing = vi.fn<() => Promise<unknown>>().mockResolvedValue({
+      ok: true,
+      date: '2026-04-24',
+      filePath: '/tmp/morning-briefing/2026-04-24.md',
+      failures: [],
+      delivery: [
+        { channel: 'telegram', status: 'sent', target: '-100123' },
+        { channel: 'discord', status: 'skipped', reason: 'ambiguous_target' },
+      ],
+    });
+    const env = baseEnv({ runMorningBriefing });
+
+    const response = await platform.request(
+      '/morning-briefing/run',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      date: '2026-04-24',
+      delivery: [
+        { channel: 'telegram', status: 'sent', target: '-100123' },
+        { channel: 'discord', status: 'skipped', reason: 'ambiguous_target' },
+      ],
+    });
+  });
+
+  it('retries run when gateway is warming up and then succeeds', async () => {
+    const runMorningBriefing = vi
+      .fn<() => Promise<unknown>>()
+      .mockRejectedValueOnce(new Error('Failed to reach gateway'))
+      .mockResolvedValueOnce({
+        ok: true,
+        date: '2026-04-24',
+        filePath: '/tmp/morning-briefing/2026-04-24.md',
+        failures: [],
+      });
+    const env = baseEnv({ runMorningBriefing });
+
+    const requestPromise = platform.request(
+      '/morning-briefing/run',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    await vi.runAllTimersAsync();
+    const response = await requestPromise;
+
+    expect(response.status).toBe(200);
+    expect(runMorningBriefing).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry run when timeout occurs and returns dedicated timeout code', async () => {
+    const runMorningBriefing = vi
+      .fn<() => Promise<unknown>>()
+      .mockRejectedValue(
+        new Error('Gateway controller request failed: The operation was aborted due to timeout')
+      );
+    const env = baseEnv({ runMorningBriefing });
+
+    const response = await platform.request(
+      '/morning-briefing/run',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({
+      code: 'morning_briefing_run_timeout',
+    });
+    expect(runMorningBriefing).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns timeout code for run timeout instead of generic 500', async () => {
+    const runMorningBriefing = vi
+      .fn<() => Promise<unknown>>()
+      .mockRejectedValue(
+        new Error('Gateway controller request failed: The operation was aborted due to timeout')
+      );
+    const env = baseEnv({ runMorningBriefing });
+
+    const requestPromise = platform.request(
+      '/morning-briefing/run',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1' }),
+      },
+      env
+    );
+
+    await vi.runAllTimersAsync();
+    const response = await requestPromise;
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({
+      code: 'morning_briefing_run_timeout',
+    });
+  });
 });

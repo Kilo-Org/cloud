@@ -5,6 +5,7 @@ import { type Message, type MessageCreatedEvent } from '@kilocode/kilo-chat';
 import {
   applyMessageCreatedEventToPages,
   applyReactionAdded,
+  latestMarkReadMessageId,
   messagesKey,
   restoreMessageInCache,
   updateMessageInPages,
@@ -99,5 +100,14 @@ describe('shared optimistic rollback helpers', () => {
     expect(applyReactionAdded([], '👍', 'user-1')).toEqual([
       { emoji: '👍', count: 1, memberIds: ['user-1'] },
     ]);
+  });
+});
+
+describe('latestMarkReadMessageId', () => {
+  it('skips pending optimistic messages when selecting the newest read boundary', () => {
+    expect(latestMarkReadMessageId([message('real-message'), message('pending-client-1')])).toBe(
+      'real-message'
+    );
+    expect(latestMarkReadMessageId([message('pending-client-1')])).toBeNull();
   });
 });

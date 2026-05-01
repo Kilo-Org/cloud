@@ -3,6 +3,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import {
   createMarkReadState,
   finishMarkReadAttempt,
+  latestMarkReadMessageId,
   shouldStartMarkReadAttempt,
   startMarkReadAttempt,
   succeedMarkReadAttempt,
@@ -55,7 +56,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
 
   const messagesQuery = useMessages(client, conversationId);
   const messages = messagesQuery.data?.messages ?? [];
-  const latestMessageId = messages.at(-1)?.id ?? null;
+  const latestMessageId = latestMarkReadMessageId(messages);
   const hasOlder = messagesQuery.hasNextPage;
   const fetchOlder = useCallback(() => {
     if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) {

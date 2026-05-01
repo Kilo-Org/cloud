@@ -7,5 +7,6 @@ export {
   useRemoveReaction,
   useExecuteAction,
   useMessageCacheUpdater,
+  latestMarkReadMessageId,
 } from '@kilocode/kilo-chat-hooks';
 export type { SendMessageVariables } from '@kilocode/kilo-chat-hooks';

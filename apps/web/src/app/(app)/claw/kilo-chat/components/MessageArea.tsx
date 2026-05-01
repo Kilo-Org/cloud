@@ -18,6 +18,7 @@ import {
   useAddReaction,
   useRemoveReaction,
   useExecuteAction,
+  latestMarkReadMessageId,
 } from '../hooks/useMessages';
 import {
   kiloclawConversationContext,
@@ -130,7 +131,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     conversationId
   );
   const messages = data?.messages ?? [];
-  const latestMessageId = messages[messages.length - 1]?.id ?? null;
+  const latestMessageId = latestMarkReadMessageId(messages);
 
   const conversationDetail = useConversationDetail(kiloChatClient, conversationId);
   const renameConversation = useRenameConversation(kiloChatClient);

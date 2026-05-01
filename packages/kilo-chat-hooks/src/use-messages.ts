@@ -51,6 +51,16 @@ export function applyReactionRemoved(
     .filter(r => r.count > 0);
 }
 
+export function latestMarkReadMessageId(messages: readonly Pick<Message, 'id'>[]): string | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message && !message.id.startsWith('pending-')) {
+      return message.id;
+    }
+  }
+  return null;
+}
+
 /**
  * Splice a snapshotted message back into the current cache state. If the
  * message no longer exists in any page (e.g. a concurrent delete event), the

@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { type InfiniteData } from '@tanstack/react-query';
+import { type InfiniteData, QueryClient } from '@tanstack/react-query';
 import { type Message, type MessageCreatedEvent } from '@kilocode/kilo-chat';
 
-import { applyMessageCreatedEventToPages, updateMessageInPages } from '@kilocode/kilo-chat-hooks';
+import {
+  applyMessageCreatedEventToPages,
+  applyReactionAdded,
+  messagesKey,
+  restoreMessageInCache,
+  updateMessageInPages,
+} from '@kilocode/kilo-chat-hooks';
 
 function message(id: string): Message {
   return {
@@ -65,5 +71,33 @@ describe('updateMessageInPages', () => {
     expect(result.pages[0]).toBe(firstPage);
     expect(result.pages[1]).not.toBe(secondPage);
     expect(result.pages[1]?.[0]?.deleted).toBe(true);
+  });
+});
+
+describe('shared optimistic rollback helpers', () => {
+  it('restores snapshotted message content for edit and delete rollbacks', () => {
+    const queryClient = new QueryClient();
+    const queryKey = messagesKey('conv-rollback');
+    const original = message('m1');
+    const optimistic = {
+      ...original,
+      content: [{ type: 'text' as const, text: 'edited' }],
+      deleted: true,
+    };
+    queryClient.setQueryData<InfiniteData<Message[], string | undefined>>(queryKey, {
+      pages: [[optimistic]],
+      pageParams: [undefined],
+    });
+
+    restoreMessageInCache(queryClient, queryKey, original);
+
+    const result = queryClient.getQueryData<InfiniteData<Message[], string | undefined>>(queryKey);
+    expect(result?.pages[0]?.[0]).toEqual(original);
+  });
+
+  it('creates the first reaction summary when adding a new emoji', () => {
+    expect(applyReactionAdded([], '👍', 'user-1')).toEqual([
+      { emoji: '👍', count: 1, memberIds: ['user-1'] },
+    ]);
   });
 });

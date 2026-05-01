@@ -1,4 +1,4 @@
-import { Send } from 'lucide-react-native';
+import { Send, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
@@ -8,12 +8,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 type Props = {
   onSend: (text: string) => void;
   disabled?: boolean;
+  initialText?: string;
+  onCancelEdit?: () => void;
 };
 
-export function MessageInput({ onSend, disabled }: Props) {
+export function MessageInput({ onSend, disabled, initialText = '', onCancelEdit }: Props) {
   const colors = useThemeColors();
-  const valueRef = useRef('');
-  const [canSend, setCanSend] = useState(false);
+  const valueRef = useRef(initialText);
+  const [canSend, setCanSend] = useState(initialText.trim().length > 0);
   const inputRef = useRef<TextInput>(null);
 
   const submit = () => {
@@ -34,6 +36,7 @@ export function MessageInput({ onSend, disabled }: Props) {
         className="flex-1 rounded-md border border-input bg-card px-3 py-2 leading-5 text-foreground"
         placeholder="Message"
         placeholderTextColor={colors.mutedForeground}
+        defaultValue={initialText}
         multiline
         onChangeText={t => {
           valueRef.current = t;
@@ -41,6 +44,18 @@ export function MessageInput({ onSend, disabled }: Props) {
         }}
         onSubmitEditing={submit}
       />
+      {onCancelEdit && (
+        <Pressable
+          onPress={onCancelEdit}
+          disabled={disabled}
+          className={cn(
+            'h-10 w-10 items-center justify-center rounded-md bg-secondary',
+            disabled && 'opacity-50'
+          )}
+        >
+          <X size={18} color={colors.foreground} />
+        </Pressable>
+      )}
       <Pressable
         onPress={submit}
         disabled={!canSend || disabled}

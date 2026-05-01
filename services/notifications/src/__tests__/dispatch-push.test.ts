@@ -83,6 +83,24 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(sendPushNotifications).not.toHaveBeenCalled();
   });
 
+  it('records unread badge buckets even when the user has no push tokens', async () => {
+    installDbMock({ tokens: [] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-no-token-badge');
+
+    const result = await stub.dispatchPush(
+      baseInput({ userId: 'user-no-token-badge', idempotencyKey: 'k-no-token-badge' })
+    );
+
+    expect(result.kind).toBe('no_tokens');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+    await expect(stub.listNonZeroBuckets()).resolves.toEqual([
+      { badgeBucket: 'conv1', badgeCount: 1 },
+    ]);
+    await expect(stub.markBucketRead('conv1')).resolves.toBe(0);
+    await expect(stub.listNonZeroBuckets()).resolves.toEqual([]);
+  });
+
   it('delivers, increments bucket in DO storage, writes idempotency key', async () => {
     installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(false);

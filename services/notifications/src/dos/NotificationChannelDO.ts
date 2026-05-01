@@ -40,15 +40,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
-    // 3. Tokens
-    const tokens = await db
-      .select({ token: user_push_tokens.token })
-      .from(user_push_tokens)
-      .where(eq(user_push_tokens.user_id, input.userId));
-
-    if (tokens.length === 0) return { kind: 'no_tokens' };
-
-    // 4. Badge math. On a retry the badge was already incremented during
+    // 3. Badge math. On a retry the badge was already incremented during
     //    the prior attempt; re-applying the delta would double-count.
     //    The total is recomputed in either case (other writers may have
     //    advanced it).
@@ -66,6 +58,15 @@ export class NotificationChannelDO extends DurableObject<Env> {
       }
       badgeTotal = await this.getTotal();
     }
+
+    // 4. Tokens. Missing Expo tokens only means no OS push can be sent; the
+    //    in-app badge state above is still authoritative for client hydration.
+    const tokens = await db
+      .select({ token: user_push_tokens.token })
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.user_id, input.userId));
+
+    if (tokens.length === 0) return { kind: 'no_tokens' };
 
     // 5. Send via Expo
     const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({

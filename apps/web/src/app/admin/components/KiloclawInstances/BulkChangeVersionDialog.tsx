@@ -23,7 +23,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, ChevronDown, ChevronRight, Copy } from 'lucide-react';
+import { toast } from 'sonner';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
 import type { AdminKiloclawInstance } from '@/routers/admin-kiloclaw-instances-router';
@@ -69,6 +71,13 @@ export function BulkChangeVersionDialog({
   const [appliedSectionOpen, setAppliedSectionOpen] = useState(true);
   const [skippedSectionOpen, setSkippedSectionOpen] = useState(true);
   const [failedSectionOpen, setFailedSectionOpen] = useState(true);
+  const [mode, setMode] = useState<'now' | 'scheduled'>('now');
+  const [scheduledAt, setScheduledAt] = useState<string>(() => {
+    // Default = now + 5 minutes (local time, datetime-local format).
+    const d = new Date(Date.now() + 5 * 60_000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
 
   // Reset form whenever the dialog reopens. Keeps state from leaking
   // between independent admin actions.
@@ -78,6 +87,7 @@ export function BulkChangeVersionDialog({
       setOverridePins(false);
       setConfirmInput('');
       setResult(null);
+      setMode('now');
     }
   }, [open]);
 
@@ -163,21 +173,56 @@ export function BulkChangeVersionDialog({
     })
   );
 
+  // Scheduled bulk path. One scheduleAction call covers all selected
+  // instances (parent + N targets). The schedule shows up in the
+  // Scheduler tab; no per-instance result partition (that happens at
+  // apply time inside each DO).
+  const bulkSchedule = useMutation(
+    trpc.admin.kiloclawInstances.scheduleAction.mutationOptions({
+      onSuccess: () => {
+        toast.success(
+          `Scheduled version change on ${selectedIds.length} ${selectedIds.length === 1 ? 'instance' : 'instances'}`
+        );
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.listScheduledActions.queryKey(),
+        });
+        onApplied();
+        onOpenChange(false);
+      },
+      onError: err => {
+        toast.error(`Failed to schedule: ${err.message}`);
+      },
+    })
+  );
+
   const overrideRequiresConfirm = overridePins;
   const confirmMatches = !overrideRequiresConfirm || confirmInput === CONFIRM_TOKEN;
-  const canApply = targetTag !== '' && confirmMatches && !bulkChange.isPending && result === null;
+  const isPending = bulkChange.isPending || bulkSchedule.isPending;
+  const canApply = targetTag !== '' && confirmMatches && !isPending && result === null;
 
   const onApply = () => {
     if (!targetTag) return;
-    bulkChange.mutate({
+    if (mode === 'now') {
+      bulkChange.mutate({
+        instanceIds: selectedIds,
+        imageTag: targetTag,
+        overridePins,
+      });
+      return;
+    }
+    // Scheduled path — convert local datetime-local to UTC ISO.
+    const local = new Date(scheduledAt);
+    bulkSchedule.mutate({
+      actionType: 'version_change',
       instanceIds: selectedIds,
       imageTag: targetTag,
       overridePins,
+      scheduledAt: local.toISOString(),
     });
   };
 
   const handleClose = (next: boolean) => {
-    if (bulkChange.isPending) return; // don't close mid-flight
+    if (isPending) return; // don't close mid-flight
     onOpenChange(next);
   };
 
@@ -217,15 +262,41 @@ export function BulkChangeVersionDialog({
               </DialogDescription>
             </DialogHeader>
 
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>This runs immediately. No undo, no user notice.</AlertTitle>
-              <AlertDescription>
-                Every selected instance restarts now. End users get no notification, and any active
-                session is interrupted. Confirm the selection and target version are correct before
-                applying.
-              </AlertDescription>
-            </Alert>
+            <Tabs value={mode} onValueChange={v => setMode(v as 'now' | 'scheduled')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="now">Apply now</TabsTrigger>
+                <TabsTrigger value="scheduled">Schedule for later</TabsTrigger>
+              </TabsList>
+              <TabsContent value="now" className="mt-3">
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>This runs immediately. No undo, no user notice.</AlertTitle>
+                  <AlertDescription>
+                    Every selected instance restarts now. End users get no notification, and any
+                    active session is interrupted. Confirm the selection and target version are
+                    correct before applying.
+                  </AlertDescription>
+                </Alert>
+              </TabsContent>
+              <TabsContent value="scheduled" className="mt-3 space-y-2">
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-scheduled-at">Scheduled at (local time)</Label>
+                  <Input
+                    id="bulk-scheduled-at"
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={e => setScheduledAt(e.target.value)}
+                    disabled={isPending}
+                  />
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  Each instance fires on its next reconcile alarm tick after the scheduled time
+                  (cadence ~5 minutes for running instances). Treat as a "no earlier than" bound.
+                  Per-instance outcome (applied / skipped / failed) shows up in the Scheduler tab as
+                  the action progresses.
+                </p>
+              </TabsContent>
+            </Tabs>
 
             <div className="space-y-4 py-2">
               <div className="bg-muted/30 rounded-md border p-3 text-sm">
@@ -344,19 +415,23 @@ export function BulkChangeVersionDialog({
             </div>
 
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => handleClose(false)}
-                disabled={bulkChange.isPending}
-              >
+              <Button variant="outline" onClick={() => handleClose(false)} disabled={isPending}>
                 Cancel
               </Button>
               <Button
                 onClick={onApply}
                 disabled={!canApply}
-                className={overridePins ? 'bg-destructive hover:bg-destructive/90' : undefined}
+                className={
+                  mode === 'now' && overridePins
+                    ? 'bg-destructive hover:bg-destructive/90'
+                    : undefined
+                }
               >
-                {overridePins ? 'Override and change version' : 'Apply'}
+                {mode === 'scheduled'
+                  ? 'Schedule'
+                  : overridePins
+                    ? 'Override and change version'
+                    : 'Apply'}
               </Button>
             </DialogFooter>
           </>

@@ -1643,7 +1643,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.discriminatedUnion('actionType', [
         z.object({
           actionType: z.literal('scheduled_restart'),
-          instanceId: z.string().uuid(),
+          // One parent + one stage + N targets per call. min(1) keeps the
+          // shape consistent for single-instance UIs (which pass an array
+          // of length 1). Cap mirrors bulkChangeVersion's batch ceiling.
+          instanceIds: z.array(z.string().uuid()).min(1).max(500),
           // Must be in the future. Loose lower bound (>= now() + 1 min)
           // is enforced in the procedure body since Zod can't compare to
           // wall-clock time.
@@ -1658,7 +1661,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         }),
         z.object({
           actionType: z.literal('version_change'),
-          instanceId: z.string().uuid(),
+          instanceIds: z.array(z.string().uuid()).min(1).max(500),
           // The image_tag the worker should redeploy on at the scheduled
           // time. Must exist in kiloclaw_image_catalog with status='available'
           // (validated in the procedure body, mirrors bulkChangeVersion).
@@ -1717,25 +1720,34 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         }
       }
 
-      // Resolve the instance + owner so we can stamp source_image_tag
-      // and user_id on the target row.
-      const [row] = await db
+      // Dedupe instance ids — duplicate target rows would violate
+      // UQ_kiloclaw_scheduled_action_targets_parent_instance.
+      const uniqueInstanceIds = Array.from(new Set(input.instanceIds));
+
+      // Resolve all instances + owners in one query so we can stamp
+      // source_image_tag and user_id per target.
+      const instanceRows = await db
         .select({
           instance: kiloclaw_instances,
           owner_id: kilocode_users.id,
         })
         .from(kiloclaw_instances)
         .innerJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
-        .where(eq(kiloclaw_instances.id, input.instanceId))
-        .limit(1);
+        .where(inArray(kiloclaw_instances.id, uniqueInstanceIds));
 
-      if (!row) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Instance not found' });
+      const resolvedById = new Map(instanceRows.map(r => [r.instance.id, r]));
+      const missing = uniqueInstanceIds.filter(id => !resolvedById.has(id));
+      if (missing.length > 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Instance not found: ${missing.join(', ')}`,
+        });
       }
-      if (row.instance.destroyed_at) {
+      const destroyed = instanceRows.filter(r => r.instance.destroyed_at);
+      if (destroyed.length > 0) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Cannot schedule action on a destroyed instance',
+          message: `Cannot schedule action on destroyed instance(s): ${destroyed.map(r => r.instance.id).join(', ')}`,
         });
       }
 
@@ -1743,8 +1755,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       const parentTargetImageTag = input.actionType === 'version_change' ? input.imageTag : null;
       const parentOverridePins = input.actionType === 'version_change' ? input.overridePins : false;
 
-      // Insert parent + single stage + single target in one transaction
-      // so a partial failure doesn't leave dangling rows.
+      // Insert parent + single stage + N targets in one transaction so a
+      // partial failure doesn't leave dangling rows.
       const result = await db.transaction(async tx => {
         const [parentRow] = await tx
           .insert(kiloclaw_scheduled_actions)
@@ -1758,7 +1770,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             reason: input.reason ?? null,
             status: 'scheduled',
             created_by: ctx.user.id,
-            total_count: 1,
+            total_count: uniqueInstanceIds.length,
           })
           .returning({ id: kiloclaw_scheduled_actions.id });
 
@@ -1772,41 +1784,59 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           })
           .returning({ id: kiloclaw_scheduled_action_stages.id });
 
-        await tx.insert(kiloclaw_scheduled_action_targets).values({
-          scheduled_action_id: parentRow.id,
-          stage_id: stageRow.id,
-          instance_id: row.instance.id,
-          source_image_tag: row.instance.tracked_image_tag,
-          // For version_change targets we stamp the target tag so the
-          // DO apply path can read it from the target row directly
-          // without having to join back to the parent.
-          target_image_tag: parentTargetImageTag,
-          user_id: row.owner_id,
-          status: 'pending',
-        });
+        await tx.insert(kiloclaw_scheduled_action_targets).values(
+          uniqueInstanceIds.map(id => {
+            const row = resolvedById.get(id);
+            // resolvedById is built from instanceRows (all uniqueInstanceIds
+            // resolve after the missing check above), so this is non-null.
+            if (!row) throw new Error(`unresolved instance ${id}`);
+            return {
+              scheduled_action_id: parentRow.id,
+              stage_id: stageRow.id,
+              instance_id: row.instance.id,
+              source_image_tag: row.instance.tracked_image_tag,
+              // For version_change targets we stamp the target tag so the
+              // DO apply path can read it from the target row directly
+              // without having to join back to the parent.
+              target_image_tag: parentTargetImageTag,
+              user_id: row.owner_id,
+              status: 'pending' as const,
+            };
+          })
+        );
 
         return { id: parentRow.id, stageId: stageRow.id };
       });
 
       // Audit log fire-and-forget. Multi-user actions still use the
       // actor's id as the target_user_id sentinel since the column is
-      // notNull; the actual targeted instance/user are in metadata.
+      // notNull; the actual targeted instances are in metadata.
       try {
         const messageDetail =
           input.actionType === 'version_change'
             ? `version_change → ${input.imageTag}${input.overridePins ? ' (override_pins=true)' : ''}`
             : 'scheduled_restart';
+        const countLabel =
+          uniqueInstanceIds.length === 1
+            ? `instance ${uniqueInstanceIds[0]}`
+            : `${uniqueInstanceIds.length} instances`;
         await createKiloClawAdminAuditLog({
           action: 'kiloclaw.scheduled_action.created',
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
-          target_user_id: row.owner_id,
-          message: `Scheduled ${messageDetail} for instance ${input.instanceId} at ${input.scheduledAt}`,
+          // target_user_id is notNull. For single-instance use the owner;
+          // for bulk fall back to the actor (sentinel — real owners are
+          // in metadata.instanceIds).
+          target_user_id:
+            uniqueInstanceIds.length === 1
+              ? (resolvedById.get(uniqueInstanceIds[0])?.owner_id ?? ctx.user.id)
+              : ctx.user.id,
+          message: `Scheduled ${messageDetail} for ${countLabel} at ${input.scheduledAt}`,
           metadata: {
             scheduledActionId: result.id,
             actionType: input.actionType,
-            instanceId: input.instanceId,
+            instanceIds: uniqueInstanceIds,
             scheduledAt: input.scheduledAt,
             reason: input.reason ?? null,
             // Action-type-specific metadata
@@ -1814,7 +1844,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               ? {
                   imageTag: input.imageTag,
                   overridePins: input.overridePins,
-                  sourceImageTag: row.instance.tracked_image_tag,
                 }
               : {}),
           },
@@ -1823,20 +1852,27 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         console.error('Failed to write audit log for scheduleAction:', auditErr);
       }
 
-      // Wake the target instance's DO so it re-arms its alarm with a
-      // fresh future timestamp. Without this, the wedge in alarm()
-      // never gets a chance to run the new action — the DO's alarm may
-      // be stale (in wrangler dev) or future-but-distant (in prod), and
-      // we need it pointing at "soon" so the sweep happens promptly.
-      // Best-effort: a failure here doesn't block the schedule from
-      // existing — the next user-initiated activity on the instance
-      // will eventually re-arm.
-      try {
-        const internalClient = new KiloClawInternalClient();
-        await internalClient.wakeScheduledAction(row.owner_id, input.instanceId);
-      } catch (wakeErr) {
-        console.error('Failed to wake DO after scheduleAction:', wakeErr);
-      }
+      // Wake the target instances' DOs so each re-arms its alarm with a
+      // fresh future timestamp. Without this, the wedge in alarm() never
+      // gets a chance to run the new action — the DO's alarm may be
+      // stale (in wrangler dev) or future-but-distant (in prod), and we
+      // need it pointing at "soon" so the sweep happens promptly.
+      // Best-effort + parallel: a failure on one wake doesn't block any
+      // other wake or the schedule's existence — the next user-initiated
+      // activity on the instance will eventually re-arm.
+      const internalClient = new KiloClawInternalClient();
+      await Promise.all(
+        instanceRows.map(async r => {
+          try {
+            await internalClient.wakeScheduledAction(r.owner_id, r.instance.id);
+          } catch (wakeErr) {
+            console.error(
+              `Failed to wake DO after scheduleAction (instance=${r.instance.id}):`,
+              wakeErr
+            );
+          }
+        })
+      );
 
       return { id: result.id, stageId: result.stageId };
     }),

@@ -1868,7 +1868,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       await expect(
         caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'scheduled_restart',
-          instanceId: testInstanceId,
+          instanceIds: [testInstanceId],
           scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -1879,7 +1879,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       await expect(
         caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'scheduled_restart',
-          instanceId: testInstanceId,
+          instanceIds: [testInstanceId],
           // 30 seconds in the future — under the 1-minute floor.
           scheduledAt: new Date(Date.now() + 30_000).toISOString(),
         })
@@ -1894,7 +1894,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       await expect(
         caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'scheduled_restart',
-          instanceId: crypto.randomUUID(),
+          instanceIds: [crypto.randomUUID()],
           scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
         })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
@@ -1911,7 +1911,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       await expect(
         caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'scheduled_restart',
-          instanceId: testInstanceId,
+          instanceIds: [testInstanceId],
           scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
@@ -1922,7 +1922,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       const caller = await createCallerForUser(adminUser.id);
       const result = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
-        instanceId: testInstanceId,
+        instanceIds: [testInstanceId],
         scheduledAt,
         reason: 'e2e test',
       });
@@ -1970,8 +1970,88 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       expect(logs[0].metadata).toMatchObject({
         scheduledActionId: result.id,
         actionType: 'scheduled_restart',
-        instanceId: testInstanceId,
+        instanceIds: [testInstanceId],
       });
+    });
+
+    it('multi-instance happy path creates one parent + one stage + N targets', async () => {
+      // Build a second instance owned by a different user.
+      const secondUser = await insertTestUser();
+      const [secondInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: secondUser.id,
+          sandbox_id: `test-multi-schedule-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId, secondInstance.id],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, result.id));
+      expect(parent.total_count).toBe(2);
+
+      const stages = await db
+        .select()
+        .from(kiloclaw_scheduled_action_stages)
+        .where(eq(kiloclaw_scheduled_action_stages.scheduled_action_id, result.id));
+      expect(stages).toHaveLength(1);
+
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
+      expect(targets).toHaveLength(2);
+      const targetInstanceIds = new Set(targets.map(t => t.instance_id));
+      expect(targetInstanceIds).toEqual(new Set([testInstanceId, secondInstance.id]));
+      // Each target is stamped with the right user_id.
+      const userIdByInstance = new Map(targets.map(t => [t.instance_id, t.user_id]));
+      expect(userIdByInstance.get(testInstanceId)).toBe(regularUser.id);
+      expect(userIdByInstance.get(secondInstance.id)).toBe(secondUser.id);
+    });
+
+    it('rejects bulk request when any instance is destroyed', async () => {
+      const [destroyedInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: regularUser.id,
+          sandbox_id: `test-bulk-dead-${Date.now()}`,
+          destroyed_at: new Date().toISOString(),
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceIds: [testInstanceId, destroyedInstance.id],
+          scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining(destroyedInstance.id),
+      });
+    });
+
+    it('dedupes duplicate instanceIds in the input', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId, testInstanceId, testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
+      expect(targets).toHaveLength(1);
     });
   });
 
@@ -1994,7 +2074,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       const adminCaller = await createCallerForUser(adminUser.id);
       const created = await adminCaller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
-        instanceId: testInstanceId,
+        instanceIds: [testInstanceId],
         scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
       });
 
@@ -2031,7 +2111,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       const caller = await createCallerForUser(adminUser.id);
       const created = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
-        instanceId: testInstanceId,
+        instanceIds: [testInstanceId],
         scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
       });
 
@@ -2077,7 +2157,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       const caller = await createCallerForUser(adminUser.id);
       const created = await caller.admin.kiloclawInstances.scheduleAction({
         actionType: 'scheduled_restart',
-        instanceId: testInstanceId,
+        instanceIds: [testInstanceId],
         scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
       });
 

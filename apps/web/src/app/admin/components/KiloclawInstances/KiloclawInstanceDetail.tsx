@@ -1256,6 +1256,14 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [resizeConfirmText, setResizeConfirmText] = useState('');
   const [changeVersionDialogOpen, setChangeVersionDialogOpen] = useState(false);
   const [changeVersionSelectedTag, setChangeVersionSelectedTag] = useState<string>('');
+  const [changeVersionMode, setChangeVersionMode] = useState<'now' | 'scheduled'>('now');
+  const [changeVersionScheduledAt, setChangeVersionScheduledAt] = useState<string>(() => {
+    // Default = now + 5 minutes (local time, datetime-local format).
+    const d = new Date(Date.now() + 5 * 60_000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
+  const [upgradeLatestConfirmOpen, setUpgradeLatestConfirmOpen] = useState(false);
   const [resizePhase, setResizePhase] = useState<
     'idle' | 'stopping' | 'resizing' | 'starting' | 'waiting' | 'done' | 'error'
   >('idle');
@@ -1597,6 +1605,27 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           return;
         }
         toast.error(`Failed to change version: ${err.message}`);
+      },
+    })
+  );
+
+  // Scheduled-version-change path. Used by the "Schedule for later" tab
+  // in the Change Version dialog. Routes through scheduleAction with a
+  // single-element instanceIds array.
+  const { mutateAsync: scheduleVersionChange, isPending: isSchedulingVersionChange } = useMutation(
+    trpc.admin.kiloclawInstances.scheduleAction.mutationOptions({
+      onSuccess: () => {
+        toast.success('Version change scheduled');
+        setChangeVersionDialogOpen(false);
+        setChangeVersionSelectedTag('');
+        setChangeVersionMode('now');
+        // Surface the new row in the Scheduler tab list if open.
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.listScheduledActions.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to schedule: ${err.message}`);
       },
     })
   );
@@ -2760,7 +2789,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         setChangeVersionDialogOpen(true);
                         return;
                       }
-                      void machineUpgrade({ instanceId: data.id, imageTag: 'latest' });
+                      // Open the confirm dialog instead of firing
+                      // immediately. This action interrupts the user's
+                      // session with no notice; we want a clear consent
+                      // step before proceeding.
+                      setUpgradeLatestConfirmOpen(true);
                     }}
                   >
                     {isMachineUpgrading ? (
@@ -2768,7 +2801,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     ) : (
                       <ArrowUpCircle className="mr-1 h-4 w-4" />
                     )}
-                    Upgrade to Latest
+                    Upgrade to Latest Now
                   </Button>
                 )}
                 {supportsImageTagOverride && (
@@ -3067,13 +3100,71 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           </DialogContent>
         </Dialog>
 
+        {/* Upgrade-to-Latest confirm dialog. The button used to fire
+            immediately; an active end-user session would be interrupted
+            with no warning. The confirm step is a thin gate so it's
+            never a one-click accident. */}
+        <Dialog
+          open={upgradeLatestConfirmOpen}
+          onOpenChange={open => {
+            if (isMachineUpgrading) return;
+            setUpgradeLatestConfirmOpen(open);
+          }}
+        >
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ArrowUpCircle className="h-5 w-5" />
+                Upgrade to latest now
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                The instance will redeploy on the latest available image tag immediately. The end
+                user gets no notice and any active session is interrupted.
+                <span className="text-foreground mt-2 block font-medium">
+                  User: {data?.user_email ?? data?.user_id}
+                </span>
+                <span className="mt-2 block text-sm">
+                  Current:{' '}
+                  {currentTrackedImageTag ? (
+                    <code className="text-xs">{currentTrackedImageTag}</code>
+                  ) : (
+                    '—'
+                  )}
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isMachineUpgrading}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                onClick={() => {
+                  if (!data) return;
+                  void machineUpgrade({ instanceId: data.id, imageTag: 'latest' }).then(() => {
+                    setUpgradeLatestConfirmOpen(false);
+                  });
+                }}
+                disabled={isMachineUpgrading}
+              >
+                {isMachineUpgrading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                Upgrade now
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Change Version Dialog */}
         <Dialog
           open={changeVersionDialogOpen}
           onOpenChange={open => {
-            if (isChangingVersion) return;
+            if (isChangingVersion || isSchedulingVersionChange) return;
             setChangeVersionDialogOpen(open);
-            if (!open) setChangeVersionSelectedTag('');
+            if (!open) {
+              setChangeVersionSelectedTag('');
+              setChangeVersionMode('now');
+            }
           }}
         >
           <DialogContent className="sm:max-w-[520px]">
@@ -3099,12 +3190,41 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              <Tabs
+                value={changeVersionMode}
+                onValueChange={v => setChangeVersionMode(v as 'now' | 'scheduled')}
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="now">Now</TabsTrigger>
+                  <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
+                </TabsList>
+                <TabsContent value="now" className="text-muted-foreground mt-3 text-xs">
+                  Applies immediately. End-user session is interrupted with no notice.
+                </TabsContent>
+                <TabsContent value="scheduled" className="mt-3 space-y-2">
+                  <label htmlFor="change-version-scheduled-at" className="text-sm font-medium">
+                    Scheduled at (local time)
+                  </label>
+                  <Input
+                    id="change-version-scheduled-at"
+                    type="datetime-local"
+                    value={changeVersionScheduledAt}
+                    onChange={e => setChangeVersionScheduledAt(e.target.value)}
+                    disabled={isSchedulingVersionChange}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Fires on the next instance reconcile alarm tick after this time (cadence ~5
+                    minutes for running instances). Treat as a "no earlier than" bound.
+                  </p>
+                </TabsContent>
+              </Tabs>
+
               <div>
                 <label className="text-sm font-medium">Target version</label>
                 <Select
                   value={changeVersionSelectedTag}
                   onValueChange={setChangeVersionSelectedTag}
-                  disabled={isChangingVersion}
+                  disabled={isChangingVersion || isSchedulingVersionChange}
                 >
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder="Select a version..." />
@@ -3146,36 +3266,58 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     <strong>
                       {changeVersionPinData.pinned_by_email ?? changeVersionPinData.pinned_by}
                     </strong>
-                    {'. Proceeding will remove the pin.'}
+                    {'. Proceeding will remove the pin'}
+                    {changeVersionMode === 'scheduled' ? ' at the scheduled time.' : '.'}
                   </AlertDescription>
                 </Alert>
               )}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <DialogClose asChild>
-                <Button variant="secondary" disabled={isChangingVersion}>
+                <Button
+                  variant="secondary"
+                  disabled={isChangingVersion || isSchedulingVersionChange}
+                >
                   Cancel
                 </Button>
               </DialogClose>
               <Button
                 onClick={() => {
                   if (!data || !changeVersionSelectedTag) return;
-                  // Only ack what the dialog actually rendered. If
-                  // changeVersionPinData is null (no warning shown), send
-                  // false; the backend gate catches any pin that appeared
-                  // between render and click and surfaces PIN_EXISTS,
-                  // which the onError handler routes back through this
-                  // dialog with the warning.
-                  void machineChangeVersion({
-                    instanceId: data.id,
+                  if (changeVersionMode === 'now') {
+                    // Only ack what the dialog actually rendered. If
+                    // changeVersionPinData is null (no warning shown), send
+                    // false; the backend gate catches any pin that appeared
+                    // between render and click and surfaces PIN_EXISTS,
+                    // which the onError handler routes back through this
+                    // dialog with the warning.
+                    void machineChangeVersion({
+                      instanceId: data.id,
+                      imageTag: changeVersionSelectedTag,
+                      acknowledgeOverride: !!changeVersionPinData,
+                    });
+                    return;
+                  }
+                  // Scheduled path. The datetime-local input is in the
+                  // admin's local zone; convert to UTC ISO for the
+                  // backend.
+                  const local = new Date(changeVersionScheduledAt);
+                  void scheduleVersionChange({
+                    actionType: 'version_change',
+                    instanceIds: [data.id],
                     imageTag: changeVersionSelectedTag,
-                    acknowledgeOverride: !!changeVersionPinData,
+                    overridePins: !!changeVersionPinData,
+                    scheduledAt: local.toISOString(),
                   });
                 }}
-                disabled={!changeVersionSelectedTag || isChangingVersion}
+                disabled={
+                  !changeVersionSelectedTag || isChangingVersion || isSchedulingVersionChange
+                }
               >
-                {isChangingVersion && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-                Apply
+                {(isChangingVersion || isSchedulingVersionChange) && (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                )}
+                {changeVersionMode === 'now' ? 'Apply now' : 'Schedule'}
               </Button>
             </DialogFooter>
           </DialogContent>

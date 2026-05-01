@@ -123,7 +123,7 @@ export function KiloclawSchedulerTab() {
     schedule.mutate(
       {
         actionType: 'scheduled_restart',
-        instanceId: restartInstanceId.trim(),
+        instanceIds: [restartInstanceId.trim()],
         scheduledAt: local.toISOString(),
         reason: restartReason.trim() || undefined,
       },
@@ -141,7 +141,7 @@ export function KiloclawSchedulerTab() {
     schedule.mutate(
       {
         actionType: 'version_change',
-        instanceId: vcInstanceId.trim(),
+        instanceIds: [vcInstanceId.trim()],
         imageTag: vcImageTag,
         overridePins: vcOverridePins,
         scheduledAt: local.toISOString(),

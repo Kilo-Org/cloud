@@ -21,6 +21,8 @@ import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { FraudDetectionHeaders } from '@/lib/utils';
+import { isAlibabaDirectModel } from '@/lib/ai-gateway/providers/qwen';
+import { addCacheBreakpoints } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 
 function applyToolChoiceSetting(
   requestedModel: string,
@@ -121,6 +123,10 @@ export function applyProviderSpecificLogic(
         requestToMutate.body.provider = { only: [inferenceProvider] };
       }
     }
+  }
+
+  if (isAlibabaDirectModel(requestedModel)) {
+    addCacheBreakpoints(requestToMutate);
   }
 
   if (isClaudeModel(requestedModel)) {

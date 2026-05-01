@@ -1,8 +1,5 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import {
-  addCacheBreakpoints,
-  isReasoningExplicitlyDisabled,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
 
@@ -22,7 +19,6 @@ export default {
     supportedChatApis: ['chat_completions' /*, 'responses'*/],
     transformRequest(context) {
       context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
-      addCacheBreakpoints(context.request);
     },
   },
   SEED: {

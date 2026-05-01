@@ -5,7 +5,7 @@ import type { AuthContext } from '../auth';
 import { botAuthMiddleware } from '../auth-bot';
 import { registerBotRoutes } from '../routes/bot-messages';
 import { registerConversationRoutes } from '../routes/conversations';
-import { handleCreateMessage, handleExecuteAction } from '../routes/handler';
+import { handleCreateMessage, handleDeleteMessage, handleExecuteAction } from '../routes/handler';
 import { deriveGatewayToken } from '../lib/gateway-token';
 import { withTestExecutionCtx } from './helpers';
 
@@ -73,6 +73,7 @@ async function setupData(suffix: string) {
   });
   registerConversationRoutes(setupAppBase);
   setupAppBase.post('/v1/messages', handleCreateMessage);
+  setupAppBase.delete('/v1/messages/:messageId', handleDeleteMessage);
   const setupApp = withTestExecutionCtx(setupAppBase);
 
   const testEnv = makeEnv();
@@ -265,6 +266,50 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
       testEnv
     );
     expect(res.status).toBe(401);
+  });
+
+  it('returns 404 for a missing target message', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-msg-df-missing');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/01K00000000000000000000000/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: '{}',
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 for a deleted target message', async () => {
+    const { sandboxId, conversationId, messageId, testEnv, userApp } =
+      await setupData('bot-msg-df-deleted');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const deleteRes = await userApp.request(
+      `/v1/messages/${messageId}?${new URLSearchParams({ conversationId }).toString()}`,
+      { method: 'DELETE' },
+      testEnv
+    );
+    expect(deleteRes.status).toBe(204);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: '{}',
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(404);
   });
 });
 

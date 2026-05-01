@@ -8,6 +8,7 @@ import { formatError, withDORetry } from '@kilocode/worker-utils';
 import type { z } from 'zod';
 import { logger, withLogTags } from '../util/logger';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
+import type { ConversationDO, NotifyDeliveryFailedResult } from '../do/conversation-do';
 
 type MessageCreatedPayload = z.infer<typeof messageCreatedWebhookSchema>;
 type ActionExecutedWebhookPayload = z.infer<typeof actionExecutedWebhookSchema>;
@@ -114,12 +115,18 @@ export async function notifyMessageDeliveryFailed(
     messageId: string;
     convContext?: ConversationEventContext;
   }
-): Promise<void> {
-  await withDORetry(
+): Promise<NotifyDeliveryFailedResult> {
+  const result = await withDORetry<DurableObjectStub<ConversationDO>, NotifyDeliveryFailedResult>(
     () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId)),
-    stub => stub.notifyDeliveryFailed(params.messageId),
+    async stub => {
+      const result: NotifyDeliveryFailedResult = await stub.notifyDeliveryFailed(params.messageId);
+      return result;
+    },
     'ConversationDO.notifyDeliveryFailed'
   );
+  if (!result.ok) {
+    return result;
+  }
 
   const ctx = params.convContext ?? (await getConversationContext(env, params.conversationId));
   if (ctx?.sandboxId) {
@@ -132,6 +139,7 @@ export async function notifyMessageDeliveryFailed(
       { messageId: params.messageId }
     );
   }
+  return result;
 }
 
 /**

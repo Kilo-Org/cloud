@@ -2,7 +2,11 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, vi } from 'vitest';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
-import { deliverActionExecutedToBot, deliverToBot } from '../webhook/deliver';
+import {
+  deliverActionExecutedToBot,
+  deliverToBot,
+  notifyMessageDeliveryFailed,
+} from '../webhook/deliver';
 
 function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
   return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(convId));
@@ -78,7 +82,7 @@ describe('deliverToBot', () => {
 
   it('retries up to 2 times then notifies failure', async () => {
     const deliverChatWebhook = vi.fn().mockRejectedValue(new Error('boom'));
-    const notifyDeliveryFailed = vi.fn().mockResolvedValue(undefined);
+    const notifyDeliveryFailed = vi.fn().mockResolvedValue({ ok: true });
     const env = makeEnvWithConvStub(deliverChatWebhook, notifyDeliveryFailed);
 
     await deliverToBot(env, makeMsg());
@@ -158,7 +162,7 @@ describe('deliverToBot', () => {
   it('uses provided convContext on permanent failure instead of re-fetching', async () => {
     const deliverChatWebhook = vi.fn().mockRejectedValue(new Error('boom'));
     const pushEvent = vi.fn().mockResolvedValue(false);
-    const notifyDeliveryFailed = vi.fn().mockResolvedValue(undefined);
+    const notifyDeliveryFailed = vi.fn().mockResolvedValue({ ok: true });
     const env = {
       KILOCLAW: { deliverChatWebhook },
       EVENT_SERVICE: { pushEvent },
@@ -179,6 +183,36 @@ describe('deliverToBot', () => {
     // But getConversationContext should NOT have been called since we passed context
     // The get() call comes from withDORetry for notifyDeliveryFailed, not from getConversationContext
     expect(notifyDeliveryFailed).toHaveBeenCalledWith('msg-1');
+  });
+
+  it('skips message.delivery_failed event when no valid message was updated', async () => {
+    const notifyDeliveryFailed = vi.fn().mockResolvedValue({
+      ok: false,
+      code: 'not_found',
+      error: 'Message not found',
+    });
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const env = {
+      EVENT_SERVICE: { pushEvent },
+      CONVERSATION_DO: {
+        idFromName: vi.fn().mockReturnValue('id'),
+        get: vi.fn().mockReturnValue({
+          notifyDeliveryFailed,
+        }),
+      },
+    } as unknown as Env;
+
+    await notifyMessageDeliveryFailed(env, {
+      conversationId: 'conv-1',
+      messageId: 'missing-message',
+      convContext: {
+        humanMemberIds: ['user-1'],
+        sandboxId: 'sandbox-1',
+      },
+    });
+
+    expect(notifyDeliveryFailed).toHaveBeenCalledWith('missing-message');
+    expect(pushEvent).not.toHaveBeenCalled();
   });
 });
 

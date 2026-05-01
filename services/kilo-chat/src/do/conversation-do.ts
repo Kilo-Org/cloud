@@ -163,6 +163,10 @@ export type RevertActionResolutionResult =
   | { ok: true }
   | { ok: false; code: 'not_found'; error: string };
 
+export type NotifyDeliveryFailedResult =
+  | { ok: true }
+  | { ok: false; code: 'not_found'; error: string };
+
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
 export type AddReactionResult =
   | { ok: true; added: true; id: string; memberContext: MemberContext }
@@ -213,8 +217,18 @@ export class ConversationDO extends DurableObject<Env> {
     this.ctx.waitUntil(this.webhookChain);
   }
 
-  notifyDeliveryFailed(messageId: string): void {
+  notifyDeliveryFailed(messageId: string): NotifyDeliveryFailedResult {
+    const row = this.db.select().from(messages).where(eq(messages.id, messageId)).get();
+    if (!row || row.deleted === 1) {
+      return { ok: false, code: 'not_found', error: 'Message not found' };
+    }
+
+    if (row.delivery_failed === 1) {
+      return { ok: true };
+    }
+
     this.db.update(messages).set({ delivery_failed: 1 }).where(eq(messages.id, messageId)).run();
+    return { ok: true };
   }
 
   revertActionResolution(params: {

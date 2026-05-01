@@ -253,10 +253,13 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
   }
   messageDeliveryFailedRequestSchema.safeParse(body);
 
-  await notifyMessageDeliveryFailed(c.env, {
+  const result = await notifyMessageDeliveryFailed(c.env, {
     conversationId: convId.data,
     messageId: msgId.data,
   });
+  if (!result.ok) {
+    return c.json({ error: result.error }, 404);
+  }
   return c.json({}, 202);
 }
 

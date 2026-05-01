@@ -23,12 +23,7 @@ import {
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
-import {
-  qwen36_27b_model,
-  qwen36_flash_model,
-  qwen36_max_preview_model,
-  qwen36_plus_model,
-} from '@/lib/ai-gateway/providers/qwen';
+import { qwen36_models, qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import {
   grok_code_fast_1_optimized_free_model,
@@ -59,10 +54,7 @@ export const preferredModels = [
   'openai/gpt-5.5',
   'google/gemini-3.1-pro-preview',
   MINIMAX_CURRENT_MODEL_ID,
-  qwen36_max_preview_model.public_id,
   qwen36_plus_model.public_id,
-  qwen36_flash_model.public_id,
-  qwen36_27b_model.public_id,
   'z-ai/glm-5.1',
 ];
 
@@ -92,10 +84,7 @@ export const kiloExclusiveModels = [
   morph_warp_grep_free_model,
   grok_code_fast_1_optimized_free_model,
   seed_20_code_free_model,
-  qwen36_plus_model,
-  qwen36_flash_model,
-  qwen36_max_preview_model,
-  qwen36_27b_model,
+  ...qwen36_models,
   trinity_large_thinking_free_model,
   claude_sonnet_clawsetup_model,
   stepfun_35_flash_free_model,

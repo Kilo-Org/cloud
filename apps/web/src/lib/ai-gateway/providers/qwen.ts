@@ -197,3 +197,10 @@ export const qwen36_27b_model: KiloExclusiveModel = {
   }),
   exclusive_to: [],
 };
+
+export const qwen36_models: ReadonlyArray<KiloExclusiveModel> = [
+  qwen36_plus_model,
+  qwen36_flash_model,
+  qwen36_max_preview_model,
+  qwen36_27b_model,
+];

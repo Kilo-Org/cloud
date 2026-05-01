@@ -2,19 +2,9 @@ import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import {
-  qwen36_27b_model,
-  qwen36_flash_model,
-  qwen36_max_preview_model,
-  qwen36_plus_model,
-} from '@/lib/ai-gateway/providers/qwen';
+import { qwen36_models } from '@/lib/ai-gateway/providers/qwen';
 
-const qwen36ModelIds: ReadonlySet<string> = new Set([
-  qwen36_plus_model.public_id,
-  qwen36_flash_model.public_id,
-  qwen36_max_preview_model.public_id,
-  qwen36_27b_model.public_id,
-]);
+const qwen36ModelIds: ReadonlySet<string> = new Set(qwen36_models.map(m => m.public_id));
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrok4Model, isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';

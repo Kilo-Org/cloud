@@ -1,6 +1,6 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
@@ -146,18 +146,23 @@ export async function getProvider(
   organizationId: string | undefined,
   taskId: string | undefined
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; bypassAccessCheck: boolean }> {
-  const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
-  if (directByokByok) {
-    return directByokByok;
-  }
+  // Kilo-exclusive models must always be served by Kilo; user BYOK keys cannot be used for them.
+  const isKiloExclusive = isKiloExclusiveModel(requestedModel);
 
-  const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
-  if (vercelByok) {
-    return {
-      provider: PROVIDERS.VERCEL_AI_GATEWAY,
-      userByok: vercelByok,
-      bypassAccessCheck: false,
-    };
+  if (!isKiloExclusive) {
+    const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
+    if (directByokByok) {
+      return directByokByok;
+    }
+
+    const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
+    if (vercelByok) {
+      return {
+        provider: PROVIDERS.VERCEL_AI_GATEWAY,
+        userByok: vercelByok,
+        bypassAccessCheck: false,
+      };
+    }
   }
 
   if (requestedModel.startsWith('kilo-internal/') && organizationId) {

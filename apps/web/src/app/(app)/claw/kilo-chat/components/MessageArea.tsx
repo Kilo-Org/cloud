@@ -125,6 +125,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     conversationId
   );
   const messages = data?.messages ?? [];
+  const latestMessageId = messages[messages.length - 1]?.id ?? null;
 
   const conversationDetail = useConversationDetail(kiloChatClient, conversationId);
   const renameConversation = useRenameConversation(kiloChatClient);
@@ -153,13 +154,15 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const markRead = useMarkConversationRead(kiloChatClient);
   const lastMarkedRef = useRef<string | null>(null);
 
-  // Mark conversation as read when opened. react-query's mutate is stable
-  // across renders, so including it in deps is safe.
+  // Mark conversation as read when opened and whenever visible hydration or
+  // realtime receipt advances the newest message.
   useEffect(() => {
-    if (lastMarkedRef.current === conversationId) return;
-    lastMarkedRef.current = conversationId;
+    if (!visible) return;
+    const marker = `${conversationId}:${latestMessageId ?? 'empty'}`;
+    if (lastMarkedRef.current === marker) return;
+    lastMarkedRef.current = marker;
     markRead.mutate(conversationId);
-  }, [conversationId, markRead.mutate]);
+  }, [conversationId, latestMessageId, markRead.mutate, visible]);
 
   // Register side-effect handlers that don't mutate the message cache
   // (cache updates are handled by useMessageCacheUpdater).
@@ -182,8 +185,11 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   useEffect(() => {
     return eventService.onReconnect(() => {
       void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'messages', conversationId] });
+      if (visible) {
+        markRead.mutate(conversationId);
+      }
     });
-  }, [eventService, queryClient, conversationId]);
+  }, [conversationId, eventService, markRead.mutate, queryClient, visible]);
 
   // Auto-scroll whenever content height changes (new messages, streaming
   // updates, image loads). A ResizeObserver on the inner content fires only

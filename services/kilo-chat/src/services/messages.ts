@@ -199,11 +199,11 @@ async function postCommitFanOut(
     }
   };
 
-  // ── Block B: Push message.created + typing.stop; returns delivery map ─
-  const pushMessageEvents = async (): Promise<Map<string, boolean>> => {
-    if (!sandboxId) return new Map();
+  // ── Block B: Push message.created + typing.stop ──────────────────────
+  const pushMessageEvents = async (): Promise<void> => {
+    if (!sandboxId) return;
 
-    const deliveryMap = await pushEventToHumanMembers(
+    await pushEventToHumanMembers(
       env,
       conversationId,
       sandboxId,
@@ -223,18 +223,11 @@ async function postCommitFanOut(
         memberId: callerId,
       });
     }
-
-    return deliveryMap;
   };
 
   // Run webhook delivery, ConversationDO title write, and event push in
-  // parallel; the MembershipDO fan-out needs the delivery map, so it runs
-  // after pushMessageEvents resolves.
-  const [, , deliveryMap] = await Promise.all([
-    webhookDelivery(),
-    conversationDoTitleWrite(),
-    pushMessageEvents(),
-  ]);
+  // parallel; membership updates run after commit side effects settle.
+  await Promise.all([webhookDelivery(), conversationDoTitleWrite(), pushMessageEvents()]);
 
   // ── Block C: Single MembershipDO RPC per member ──────────────────────
   // Combines autoTitle, lastActivityAt, and lastReadAt into one round-trip.
@@ -242,14 +235,12 @@ async function postCommitFanOut(
   // Per-member semantics:
   // - title      : autoTitle string for every member when auto-titling applied.
   // - activityAt : always `now`.
-  // - markRead   : true when the member's own WS received the event
-  //                (sender for human-sent messages, or a human recipient with
-  //                an active WS for the delivered message.created event).
+  // - markRead   : true only for the sender. Recipients advance read state
+  //                through the explicit mark-read endpoint when their client is
+  //                visible/focused.
   const postCommitUpdates = await Promise.allSettled(
     info.members.map(member => {
       const isSender = isSenderHuman && member.id === callerId;
-      const delivered = deliveryMap.get(member.id) === true;
-      const markRead = isSender || delivered;
       return withDORetry(
         () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
         stub =>
@@ -257,7 +248,7 @@ async function postCommitFanOut(
             conversationId,
             ...(autoTitle !== null && { title: autoTitle }),
             activityAt: now,
-            markRead,
+            markRead: isSender,
           }),
         'MembershipDO.applyPostCommit'
       );
@@ -282,10 +273,8 @@ async function postCommitFanOut(
     }
     // Every member — including the sender — gets a `conversation.activity`
     // event so their sidebar row's `lastActivityAt` advances across tabs.
-    // Independently, anyone who has "read" this message (the sender, who
-    // authored it, or a recipient whose WS subscribed to the conversation
-    // context and delivered `message.created`) gets a targeted
-    // `conversation.read` with their own `memberId`.
+    // Independently, the sender gets a targeted `conversation.read`; recipients
+    // must explicitly mark the conversation read from a visible/focused client.
     instanceEvents.push(
       pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.activity', {
         conversationId,
@@ -293,9 +282,7 @@ async function postCommitFanOut(
       })
     );
     for (const userId of humanMemberIds) {
-      const isSender = userId === callerId;
-      const present = deliveryMap.get(userId) === true;
-      if (!isSender && !present) continue;
+      if (userId !== callerId) continue;
       instanceEvents.push(
         pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
           conversationId,

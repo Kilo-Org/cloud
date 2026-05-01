@@ -1,7 +1,7 @@
 import { useAddReaction, useExecuteAction, useRemoveReaction } from '@kilocode/kilo-chat-hooks';
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
 import * as Crypto from 'expo-crypto';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { toast } from 'sonner-native';
@@ -13,6 +13,7 @@ import { TypingIndicator } from './typing-indicator';
 import { useConversationPresence } from './hooks/use-conversation-presence';
 import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
+import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';
 import { useMarkRead } from './hooks/use-mark-read';
 import { useMessageCacheUpdater, useMessages, useSendMessage } from './hooks/use-messages';
 import { useCurrentUserId } from './hooks/use-current-user-id';
@@ -26,6 +27,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
 
   const messagesQuery = useMessages(client, conversationId);
   const messages = messagesQuery.data?.messages ?? [];
+  const latestMessageId = messages[messages.length - 1]?.id ?? null;
   const hasOlder = messagesQuery.hasNextPage;
   const fetchOlder = useCallback(() => {
     if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) {
@@ -76,15 +78,28 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   }, []);
   useMessageCacheUpdater(client, sandboxId, conversationId, undefined, handleActionFailed);
 
+  const activeAndFocused = useAppActiveAndFocused();
   const markRead = useMarkRead(client);
+  const lastMarkedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeAndFocused) {
+      return;
+    }
+    const marker = `${conversationId}:${latestMessageId ?? 'empty'}`;
+    if (lastMarkedRef.current === marker) {
+      return;
+    }
+    lastMarkedRef.current = marker;
+    markRead(sandboxId, conversationId);
+  }, [activeAndFocused, conversationId, latestMessageId, markRead, sandboxId]);
+
   useFocusEffect(
     useCallback(() => {
-      markRead(sandboxId, conversationId);
       setActiveChatLocation({ sandboxId, conversationId });
       return () => {
         setActiveChatLocation(null);
       };
-    }, [sandboxId, conversationId, markRead])
+    }, [sandboxId, conversationId])
   );
 
   return (

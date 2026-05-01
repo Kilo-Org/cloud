@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
+import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
 import { makeApp } from './helpers';
 
@@ -59,6 +60,55 @@ async function createConversation(userSuffix: string) {
   const { conversationId } = await res.json<{ conversationId: string }>();
 
   return { conversationId, userId, botId, sandboxId, userApp, botApp };
+}
+
+async function createMultiHumanConversation(userSuffix: string) {
+  const userId = `user-${userSuffix}`;
+  const recipientId = `recipient-${userSuffix}`;
+  const sandboxId = `sandbox-${userSuffix}`;
+  const botId = `bot:kiloclaw:${sandboxId}`;
+  const conversationId = ulid();
+  const joinedAt = Date.now();
+  const members: Array<{ id: string; kind: 'user' | 'bot' }> = [
+    { id: userId, kind: 'user' },
+    { id: recipientId, kind: 'user' },
+    { id: botId, kind: 'bot' },
+  ];
+
+  const convStub = getConvStub(conversationId);
+  const initResult = await convStub.initialize({
+    id: conversationId,
+    title: `Chat ${userSuffix}`,
+    createdBy: userId,
+    createdAt: joinedAt,
+    members,
+  });
+  expect(initResult).toEqual({ ok: true });
+
+  for (const member of members) {
+    await env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)).addConversation({
+      conversationId,
+      title: `Chat ${userSuffix}`,
+      sandboxId,
+      joinedAt,
+    });
+  }
+
+  const deliveredEventService = {
+    fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+    connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+    pushEvent: async () => true,
+  } satisfies Env['EVENT_SERVICE'];
+
+  return {
+    conversationId,
+    userId,
+    recipientId,
+    sandboxId,
+    userApp: makeApp(userId, 'user'),
+    recipientApp: makeApp(recipientId, 'user'),
+    deliveredEnv: { ...env, EVENT_SERVICE: deliveredEventService } satisfies Env,
+  };
 }
 
 const sampleContent = [{ type: 'text', text: 'Hello world' }];
@@ -847,6 +897,65 @@ describe('sender conversation read state after sending', () => {
     // Sender's lastReadAt is updated so the conversation doesn't look unread
     expect(convAfter!.lastReadAt).not.toBeNull();
     expect(convAfter!.lastReadAt).toBe(convAfter!.lastActivityAt);
+  });
+});
+
+describe('recipient conversation read state after message delivery', () => {
+  it('does not mark delivered recipient sockets as read without an explicit read call', async () => {
+    const { conversationId, recipientId, sandboxId, userApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-hidden');
+
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      deliveredEnv
+    );
+    expect(res.status).toBe(201);
+
+    const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
+    const after = await recipientMemberStub.listConversations({ sandboxId });
+    const conversation = after.conversations.find(c => c.conversationId === conversationId);
+    if (!conversation) {
+      throw new Error('Expected recipient membership conversation');
+    }
+    expect(conversation.lastActivityAt).not.toBeNull();
+    expect(conversation.lastReadAt).toBeNull();
+  });
+
+  it('marks recipients read when the visible client explicitly marks the conversation read', async () => {
+    const { conversationId, recipientId, sandboxId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-visible');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      deliveredEnv
+    );
+    expect(createRes.status).toBe(201);
+
+    const markReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      { method: 'POST' },
+      deliveredEnv
+    );
+    expect(markReadRes.status).toBe(204);
+
+    const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
+    const after = await recipientMemberStub.listConversations({ sandboxId });
+    const conversation = after.conversations.find(c => c.conversationId === conversationId);
+    if (!conversation) {
+      throw new Error('Expected recipient membership conversation');
+    }
+    expect(conversation.lastActivityAt).not.toBeNull();
+    expect(conversation.lastReadAt).not.toBeNull();
   });
 });
 

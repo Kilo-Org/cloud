@@ -41,6 +41,7 @@ import {
   kiloclaw_cli_runs,
   bot_requests,
   bot_request_cloud_agent_sessions,
+  bot_user_memories,
   kiloclaw_admin_audit_logs,
   user_push_tokens,
   security_advisor_scans,
@@ -106,6 +107,7 @@ describe('User', () => {
     await db.delete(user_admin_notes);
     await db.delete(magic_link_tokens);
     await db.delete(bot_request_cloud_agent_sessions);
+    await db.delete(bot_user_memories);
     await db.delete(bot_requests);
     await db.delete(stytch_fingerprints);
     await db.delete(kiloclaw_cli_runs);
@@ -993,6 +995,44 @@ describe('User', () => {
           .select({ count: count() })
           .from(bot_requests)
           .where(eq(bot_requests.created_by, user2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete bot_user_memories for the user without touching others', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(bot_user_memories).values({
+        user_id: user1.id,
+        content: "User1's default repo is example/repo.",
+        importance: 7,
+      });
+      await db.insert(bot_user_memories).values({
+        user_id: user1.id,
+        content: 'User1 prefers terse responses.',
+        importance: 5,
+      });
+      await db.insert(bot_user_memories).values({
+        user_id: user2.id,
+        content: 'User2 has their own preferences.',
+        importance: 5,
+      });
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(bot_user_memories)
+          .where(eq(bot_user_memories.user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(bot_user_memories)
+          .where(eq(bot_user_memories.user_id, user2.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

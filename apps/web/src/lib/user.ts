@@ -42,6 +42,7 @@ import {
   auto_fix_tickets,
   slack_bot_requests,
   bot_requests,
+  bot_user_memories,
   cloud_agent_code_reviews,
   kiloclaw_instances,
   kiloclaw_google_oauth_connections,
@@ -773,6 +774,7 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
     await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
     await tx.delete(slack_bot_requests).where(eq(slack_bot_requests.owned_by_user_id, userId));
+    await tx.delete(bot_user_memories).where(eq(bot_user_memories.user_id, userId));
     await tx.delete(bot_requests).where(eq(bot_requests.created_by, userId));
     await tx
       .delete(cloud_agent_code_reviews)

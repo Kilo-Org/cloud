@@ -757,6 +757,13 @@
       "when": 1777499940275,
       "tag": "0107_classy_ultimo",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1777631768242,
+      "tag": "0108_add_bot_user_memories",
+      "breakpoints": true
     }
   ]
 }

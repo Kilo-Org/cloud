@@ -4288,6 +4288,57 @@ export const bot_requests = pgTable(
 
 export type BotRequest = typeof bot_requests.$inferSelect;
 
+// ─── Bot User Memories ──────────────────────────────────────────────
+
+/**
+ * Durable per-user preferences for the chat bot ("Kilo Bot"), surfaced into
+ * the agent's system prompt at the start of each turn. Capped per user in
+ * application code (see `apps/web/src/lib/bot/memory.ts`).
+ *
+ * `platform_integration_id` scopes a memory to a specific platform install
+ * (e.g. "on this Slack workspace, ping me in DMs"). NULL = applies on every
+ * platform this user uses.
+ */
+export const bot_user_memories = pgTable(
+  'bot_user_memories',
+  {
+    id: idPrimaryKeyColumn,
+
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+
+    platform_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'cascade',
+    }),
+
+    content: text().notNull(),
+    importance: smallint().notNull().default(5),
+
+    source_bot_request_id: uuid().references(() => bot_requests.id, { onDelete: 'set null' }),
+
+    superseded_by: uuid().references((): AnyPgColumn => bot_user_memories.id, {
+      onDelete: 'set null',
+    }),
+
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    index('idx_bot_user_memories_user_active')
+      .on(table.user_id, table.platform_integration_id)
+      .where(isNull(table.superseded_by)),
+    check('bot_user_memories_importance_range', sql`${table.importance} between 1 and 10`),
+  ]
+);
+
+export type BotUserMemory = typeof bot_user_memories.$inferSelect;
+export type NewBotUserMemory = typeof bot_user_memories.$inferInsert;
+
 export const app_min_versions = pgTable('app_min_versions', {
   id: uuid()
     .default(sql`pg_catalog.gen_random_uuid()`)

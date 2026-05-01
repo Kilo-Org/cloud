@@ -242,31 +242,31 @@ export const listMessagesQuerySchema = z.object({
 
 export const botStatusRequestSchema = z.object({
   online: z.boolean(),
-  at: z.number(),
+  at: nonNegativeIntegerSchema,
 });
 
 export const conversationStatusRequestSchema = z.object({
-  contextTokens: z.number(),
-  contextWindow: z.number(),
+  contextTokens: nonNegativeIntegerSchema,
+  contextWindow: nonNegativeIntegerSchema,
   model: z.string().nullable(),
   provider: z.string().nullable(),
-  at: z.number(),
+  at: nonNegativeIntegerSchema,
 });
 
 export const botStatusRecordSchema = z.object({
   online: z.boolean(),
-  at: z.number(),
-  updatedAt: z.number(),
+  at: nonNegativeIntegerSchema,
+  updatedAt: nonNegativeIntegerSchema,
 });
 
 export const conversationStatusRecordSchema = z.object({
   conversationId: z.string(),
-  contextTokens: z.number(),
-  contextWindow: z.number(),
+  contextTokens: nonNegativeIntegerSchema,
+  contextWindow: nonNegativeIntegerSchema,
   model: z.string().nullable(),
   provider: z.string().nullable(),
-  at: z.number(),
-  updatedAt: z.number(),
+  at: nonNegativeIntegerSchema,
+  updatedAt: nonNegativeIntegerSchema,
 });
 
 export const getBotStatusResponseSchema = z.object({

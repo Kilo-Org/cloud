@@ -6,12 +6,7 @@ import type {
 
 const KILO_DISCOUNT_FACTOR = 0.65;
 
-type PricePerMillion = {
-  prompt_per_million: number;
-  completion_per_million: number;
-  input_cache_read_per_million: number | null;
-  input_cache_write_per_million: number | null;
-};
+type PricePerMillion = Omit<Pricing, 'calculate_mUsd'>;
 
 function applyKiloDiscount(price: PricePerMillion): PricePerMillion {
   return {
@@ -204,3 +199,5 @@ export const qwen36_models: ReadonlyArray<KiloExclusiveModel> = [
   qwen36_max_preview_model,
   qwen36_27b_model,
 ];
+
+export const qwen36ModelIds: ReadonlySet<string> = new Set(qwen36_models.map(m => m.public_id));

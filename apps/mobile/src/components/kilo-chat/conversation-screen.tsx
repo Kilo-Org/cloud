@@ -157,11 +157,13 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       if (message.deleted) {
         return;
       }
+      const isPendingMessage = message.id.startsWith('pending-');
       const isOwnMessage = currentUserId !== null && message.senderId === currentUserId;
       const actionSheet = buildMessageActionSheetOptions({
         isOwnMessage,
         canReact: currentUserId !== null,
         canReply: !message.deliveryFailed,
+        isPendingMessage,
       });
       showActionSheetWithOptions(
         {

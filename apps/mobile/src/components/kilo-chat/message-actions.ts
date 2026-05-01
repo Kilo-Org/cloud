@@ -13,12 +13,14 @@ type BuildMessageActionSheetOptionsInput = {
   isOwnMessage: boolean;
   canReact: boolean;
   canReply: boolean;
+  isPendingMessage?: boolean;
 };
 
 export function buildMessageActionSheetOptions({
   isOwnMessage,
   canReact,
   canReply,
+  isPendingMessage = false,
 }: BuildMessageActionSheetOptionsInput): {
   actions: MessageAction[];
   options: string[];
@@ -26,21 +28,23 @@ export function buildMessageActionSheetOptions({
   destructiveButtonIndex?: number;
 } {
   const actions: MessageAction[] = [];
-  if (canReact) {
+  const canUseApiBackedActions = !isPendingMessage;
+  if (canUseApiBackedActions && canReact) {
     for (const emoji of FIRST_REACTION_EMOJIS) {
       actions.push({ kind: 'reaction', label: `${emoji} React`, emoji });
     }
   }
-  if (canReply) {
+  if (canUseApiBackedActions && canReply) {
     actions.push({ kind: 'reply', label: 'Reply' });
   }
-  if (isOwnMessage) {
+  if (canUseApiBackedActions && isOwnMessage) {
     actions.push({ kind: 'edit', label: 'Edit' }, { kind: 'delete', label: 'Delete' });
   }
   actions.push({ kind: 'cancel', label: 'Cancel' });
 
   const options = actions.map(action => action.label);
-  const destructiveButtonIndex = isOwnMessage ? options.indexOf('Delete') : undefined;
+  const deleteButtonIndex = options.indexOf('Delete');
+  const destructiveButtonIndex = deleteButtonIndex === -1 ? undefined : deleteButtonIndex;
   return {
     actions,
     options,

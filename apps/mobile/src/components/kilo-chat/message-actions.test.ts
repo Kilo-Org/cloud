@@ -74,4 +74,18 @@ describe('buildMessageActionSheetOptions', () => {
     expect(selectedAction).toEqual({ kind: 'reply', label: 'Reply' });
     expect(selectedAction?.kind).not.toBe('reaction');
   });
+
+  it('offers no API-backed actions for pending messages', () => {
+    const actionSheet = buildMessageActionSheetOptions({
+      isOwnMessage: true,
+      canReact: true,
+      canReply: true,
+      isPendingMessage: true,
+    });
+
+    expect(actionSheet.options).toEqual(['Cancel']);
+    expect(actionSheet.actions.every(action => action.kind === 'cancel')).toBe(true);
+    expect(actionSheet.destructiveButtonIndex).toBeUndefined();
+    expect(getSelectedMessageAction(actionSheet, 0)).toBeNull();
+  });
 });

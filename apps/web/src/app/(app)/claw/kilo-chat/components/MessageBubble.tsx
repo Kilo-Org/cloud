@@ -11,6 +11,7 @@ import type { Message, ContentBlock, ExecApprovalDecision } from '@kilocode/kilo
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
+import { buildMessageActionAvailability } from './message-action-availability';
 
 const MemoizedMarkdown = memo(function MemoizedMarkdown({ content }: { content: string }) {
   return (
@@ -79,17 +80,20 @@ export const MessageBubble = memo(function MessageBubble({
   });
 
   const textContent = message.deleted ? '' : contentBlocksToText(message.content);
+  const actionAvailability = buildMessageActionAvailability(message, isOwn);
 
   const myReactions = new Set(
     message.reactions.filter(r => r.memberIds.includes(currentUserId)).map(r => r.emoji)
   );
 
   function handleStartEdit() {
+    if (!actionAvailability.canEdit) return;
     setEditText(textContent);
     setIsEditing(true);
   }
 
   function handleSaveEdit() {
+    if (!actionAvailability.canEdit) return;
     const trimmed = editText.trim();
     if (!trimmed) return;
     // Short-circuit no-op edits so we don't bump updatedAt and flash the
@@ -109,6 +113,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   function handleQuickPickSelect(emoji: string) {
     setShowQuickPick(false);
+    if (!actionAvailability.canReact) return;
     if (myReactions.has(emoji)) {
       onRemoveReaction(message.id, emoji);
     } else {
@@ -119,6 +124,7 @@ export const MessageBubble = memo(function MessageBubble({
   function handleFullPickerSelect(emoji: string) {
     setShowFullPicker(false);
     setShowQuickPick(false);
+    if (!actionAvailability.canReact) return;
     if (myReactions.has(emoji)) {
       onRemoveReaction(message.id, emoji);
     } else {
@@ -134,13 +140,15 @@ export const MessageBubble = memo(function MessageBubble({
         isOwn ? 'right-full mr-1' : 'left-full ml-1'
       }`}
     >
-      <button
-        onClick={() => setShowQuickPick(prev => !prev)}
-        className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
-        title="React"
-      >
-        <Smile className="h-3.5 w-3.5" />
-      </button>
+      {actionAvailability.canReact && (
+        <button
+          onClick={() => setShowQuickPick(prev => !prev)}
+          className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+          title="React"
+        >
+          <Smile className="h-3.5 w-3.5" />
+        </button>
+      )}
       <button
         onClick={() => {
           void navigator.clipboard.writeText(textContent).then(
@@ -153,7 +161,7 @@ export const MessageBubble = memo(function MessageBubble({
       >
         <Copy className="h-3.5 w-3.5" />
       </button>
-      {isOwn && !message.deliveryFailed && (
+      {actionAvailability.canEdit && (
         <button
           onClick={handleStartEdit}
           className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
@@ -162,7 +170,7 @@ export const MessageBubble = memo(function MessageBubble({
           <Pencil className="h-3.5 w-3.5" />
         </button>
       )}
-      {isOwn && (
+      {actionAvailability.canDelete && (
         <button
           onClick={() => onDelete(message.id)}
           className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
@@ -171,7 +179,7 @@ export const MessageBubble = memo(function MessageBubble({
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
-      {!message.deliveryFailed && (
+      {actionAvailability.canReply && (
         <button
           onClick={() => onReply(message)}
           className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
@@ -219,7 +227,7 @@ export const MessageBubble = memo(function MessageBubble({
 
         <div className="relative min-w-0 max-w-full">
           {actionButtons}
-          {showQuickPick && (
+          {showQuickPick && actionAvailability.canReact && (
             <div className={`absolute z-20 ${isOwn ? 'right-full mr-1' : 'left-full ml-1'} top-0`}>
               <EmojiQuickPick
                 currentUserReactions={myReactions}
@@ -231,7 +239,7 @@ export const MessageBubble = memo(function MessageBubble({
               />
             </div>
           )}
-          {showFullPicker && (
+          {showFullPicker && actionAvailability.canReact && (
             <EmojiPicker
               onSelect={handleFullPickerSelect}
               onClose={() => setShowFullPicker(false)}
@@ -337,8 +345,9 @@ export const MessageBubble = memo(function MessageBubble({
                       {actionsBlock.actions.map(action => (
                         <button
                           key={action.value}
-                          disabled={actionPending}
+                          disabled={actionPending || !actionAvailability.canExecuteAction}
                           onClick={() =>
+                            actionAvailability.canExecuteAction &&
                             onExecuteAction(message.id, actionsBlock.groupId, action.value)
                           }
                           className={`rounded-md px-3 py-1 text-xs font-medium cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -376,7 +385,7 @@ export const MessageBubble = memo(function MessageBubble({
               <span>{timeStr}</span>
             </div>
           </div>
-          {!message.deleted && !message.deliveryFailed && (
+          {actionAvailability.canReact && (
             <ReactionPills
               reactions={message.reactions}
               currentUserId={currentUserId}

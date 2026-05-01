@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import {
   actionGroupIdSchema,
+  conversationTitleSchema,
   contentBlockSchema,
+  emojiSchema,
   execApprovalDecisionSchema,
   nonEmptyStringSchema,
   nonNegativeIntegerSchema,
@@ -40,13 +42,13 @@ export const typingEventSchema = z.object({
 export const reactionAddedEventSchema = z.object({
   messageId: ulidSchema,
   memberId: nonEmptyStringSchema,
-  emoji: z.string(),
+  emoji: emojiSchema,
 });
 
 export const reactionRemovedEventSchema = z.object({
   messageId: ulidSchema,
   memberId: nonEmptyStringSchema,
-  emoji: z.string(),
+  emoji: emojiSchema,
 });
 
 export const conversationCreatedEventSchema = z.object({
@@ -55,7 +57,7 @@ export const conversationCreatedEventSchema = z.object({
 
 export const conversationRenamedEventSchema = z.object({
   conversationId: ulidSchema,
-  title: z.string(),
+  title: conversationTitleSchema,
 });
 
 export const conversationLeftEventSchema = z.object({

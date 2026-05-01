@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ACTION_LABEL_MAX_CHARS } from '../src/schemas';
+import { ACTION_LABEL_MAX_CHARS, CONVERSATION_TITLE_MAX_CHARS } from '../src/schemas';
 import { getKiloChatEventPayloadSchema } from '../src/events';
 
 const validConversationId = '01HXYZ00000ABCDEFGHJKMNPQR';
@@ -137,6 +137,50 @@ describe('kilo chat event payload schemas', () => {
         model: null,
         provider: null,
         at: 1000,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects invalid reaction emoji values', () => {
+    const reactionAddedSchema = getKiloChatEventPayloadSchema('reaction.added');
+    const reactionRemovedSchema = getKiloChatEventPayloadSchema('reaction.removed');
+
+    expect(
+      reactionAddedSchema.safeParse({
+        messageId: validMessageId,
+        memberId: 'user-1',
+        emoji: '',
+      }).success
+    ).toBe(false);
+    expect(
+      reactionAddedSchema.safeParse({
+        messageId: validMessageId,
+        memberId: 'user-1',
+        emoji: 'a'.repeat(65),
+      }).success
+    ).toBe(false);
+    expect(
+      reactionRemovedSchema.safeParse({
+        messageId: validMessageId,
+        memberId: 'user-1',
+        emoji: 'ok\u0000',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects blank and overlong renamed conversation titles', () => {
+    const renamedSchema = getKiloChatEventPayloadSchema('conversation.renamed');
+
+    expect(
+      renamedSchema.safeParse({
+        conversationId: validConversationId,
+        title: '   ',
+      }).success
+    ).toBe(false);
+    expect(
+      renamedSchema.safeParse({
+        conversationId: validConversationId,
+        title: 'a'.repeat(CONVERSATION_TITLE_MAX_CHARS + 1),
       }).success
     ).toBe(false);
   });

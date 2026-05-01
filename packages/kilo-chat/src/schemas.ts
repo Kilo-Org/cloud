@@ -35,6 +35,8 @@ const trimmedNonEmptyString = (max: number) =>
     .transform(s => s.trim())
     .refine(s => s.length >= 1, { message: 'must not be empty or whitespace-only' });
 
+export const conversationTitleSchema = trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS);
+
 // 1-64 bytes UTF-8, no C0 (0x00-0x1F) or C1 (0x7F-0x9F) control chars.
 export const emojiSchema = z
   .string()
@@ -164,7 +166,7 @@ export const conversationDetailSchema = z.object({
 
 export const createConversationRequestSchema = z.object({
   sandboxId: sandboxIdSchema,
-  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS).optional(),
+  title: conversationTitleSchema.optional(),
 });
 
 export const createConversationResponseSchema = z.object({
@@ -200,7 +202,7 @@ export const deleteMessageRequestSchema = z.object({
 });
 
 export const renameConversationRequestSchema = z.object({
-  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS),
+  title: conversationTitleSchema,
 });
 
 export const executeActionRequestSchema = z.object({
@@ -300,7 +302,7 @@ export const actionDeliveryFailedRequestSchema = z.object({
 });
 
 export const createBotConversationRequestSchema = z.object({
-  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS).optional(),
+  title: conversationTitleSchema.optional(),
   additionalMembers: z.array(z.string().min(1)).max(20).optional(),
 });
 

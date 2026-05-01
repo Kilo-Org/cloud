@@ -282,21 +282,25 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   );
 
   const handleEdit = useCallback(
-    (messageId: string, content: ContentBlock[]) => {
-      editMessage.mutate(
-        { messageId, conversationId, content: toEditableContent(content), timestamp: Date.now() },
-        {
-          onError: err => {
-            if (err instanceof KiloChatApiError && err.status === 409) {
-              toast.error('Message was edited by someone else — please try again');
-              return;
-            }
-            toast.error(formatKiloChatError(err, 'Failed to edit message'));
-          },
+    async (messageId: string, content: ContentBlock[]): Promise<boolean> => {
+      try {
+        await editMessage.mutateAsync({
+          messageId,
+          conversationId,
+          content: toEditableContent(content),
+          timestamp: Date.now(),
+        });
+        return true;
+      } catch (err) {
+        if (err instanceof KiloChatApiError && err.status === 409) {
+          toast.error('Message was edited by someone else — please try again');
+          return false;
         }
-      );
+        toast.error(formatKiloChatError(err, 'Failed to edit message'));
+        return false;
+      }
     },
-    [editMessage.mutate, conversationId]
+    [editMessage.mutateAsync, conversationId]
   );
 
   const handleDelete = useCallback((messageId: string) => {

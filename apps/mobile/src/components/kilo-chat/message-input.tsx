@@ -6,11 +6,19 @@ import { type Message } from '@kilocode/kilo-chat';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { applyMessageInputTextChange, submitMessageInputDraft } from './message-input-state';
+import {
+  applyMessageInputTextChange,
+  type MessageInputSubmitControls,
+  submitMessageInputDraft,
+} from './message-input-state';
 import { getReplyPreviewText } from './message-presentation';
 
 type Props = {
-  onSend: (text: string, inReplyToMessageId?: string) => void;
+  onSend: (
+    text: string,
+    inReplyToMessageId?: string,
+    controls?: MessageInputSubmitControls
+  ) => void;
   onTyping?: () => void;
   disabled?: boolean;
   initialText?: string;
@@ -18,6 +26,7 @@ type Props = {
   replyingTo?: Message | null;
   onCancelReply?: () => void;
   disabledReason?: string | null;
+  clearOnSubmit?: boolean;
 };
 
 export function MessageInput({
@@ -29,6 +38,7 @@ export function MessageInput({
   replyingTo,
   onCancelReply,
   disabledReason,
+  clearOnSubmit,
 }: Props) {
   const colors = useThemeColors();
   const valueRef = useRef(initialText);
@@ -45,6 +55,7 @@ export function MessageInput({
       onSend,
       clearInput: () => inputRef.current?.clear(),
       setCanSend,
+      clearOnSubmit,
     });
   };
 

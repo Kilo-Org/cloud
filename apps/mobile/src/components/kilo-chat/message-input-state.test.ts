@@ -78,4 +78,66 @@ describe('message input typing behavior', () => {
     expect(valueRef.current).toBe(overLimitText);
     expect(canSendValues).toEqual([false]);
   });
+
+  it('leaves edit drafts intact when the caller controls clearing', () => {
+    const valueRef = { current: '  edited draft  ' };
+    const canSendValues: boolean[] = [];
+    const sentMessages: string[] = [];
+    let cleared = false;
+
+    const submitted = submitMessageInputDraft({
+      valueRef,
+      onSend: text => {
+        sentMessages.push(text);
+      },
+      clearInput: () => {
+        cleared = true;
+      },
+      setCanSend: canSend => {
+        canSendValues.push(canSend);
+      },
+      clearOnSubmit: false,
+    });
+
+    expect(submitted).toBe(true);
+    expect(sentMessages).toEqual(['edited draft']);
+    expect(cleared).toBe(false);
+    expect(valueRef.current).toBe('  edited draft  ');
+    expect(canSendValues).toEqual([]);
+  });
+
+  it('lets edit callers clear drafts after successful mutation', () => {
+    const valueRef = { current: '  edited draft  ' };
+    const canSendValues: boolean[] = [];
+    const successControls: { clearDraft?: () => void } = {};
+    let cleared = false;
+
+    const submitted = submitMessageInputDraft({
+      valueRef,
+      onSend: (_text, _replyTo, controls) => {
+        if (!controls) {
+          throw new Error('expected submit controls');
+        }
+        successControls.clearDraft = controls.clearDraft;
+      },
+      clearInput: () => {
+        cleared = true;
+      },
+      setCanSend: canSend => {
+        canSendValues.push(canSend);
+      },
+      clearOnSubmit: false,
+    });
+
+    const clearDraft = successControls.clearDraft;
+    if (!clearDraft) {
+      throw new Error('expected submit controls');
+    }
+    clearDraft();
+
+    expect(submitted).toBe(true);
+    expect(cleared).toBe(true);
+    expect(valueRef.current).toBe('');
+    expect(canSendValues).toEqual([false]);
+  });
 });

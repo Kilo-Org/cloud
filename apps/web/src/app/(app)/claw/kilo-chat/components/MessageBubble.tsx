@@ -13,10 +13,13 @@ import type {
   ExecApprovalDecision,
   ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
-import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
+import { MESSAGE_TEXT_MAX_CHARS, ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
 import { buildMessageActionAvailability } from './message-action-availability';
+import { isMessageEditOverLimit, submitMessageEdit } from './message-edit-state';
+
+const EDIT_COUNTER_SHOW_AT = Math.floor(MESSAGE_TEXT_MAX_CHARS * 0.8);
 
 const MemoizedMarkdown = memo(function MemoizedMarkdown({ content }: { content: string }) {
   return (
@@ -40,7 +43,7 @@ type MessageBubbleProps = {
   isOwn: boolean;
   replyToMessage?: Message | ReplyToMessageSnapshot | null;
   pendingDeleteId: string | null;
-  onEdit: (messageId: string, content: ContentBlock[]) => void;
+  onEdit: (messageId: string, content: ContentBlock[]) => Promise<boolean>;
   onDelete: (messageId: string) => void;
   onConfirmDelete: (messageId: string) => void;
   onCancelDelete: () => void;
@@ -79,6 +82,7 @@ export const MessageBubble = memo(function MessageBubble({
   const { assistantName } = useKiloChatContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [showQuickPick, setShowQuickPick] = useState(false);
   const [showFullPicker, setShowFullPicker] = useState(false);
@@ -93,6 +97,8 @@ export const MessageBubble = memo(function MessageBubble({
   });
 
   const textContent = message.deleted ? '' : contentBlocksToText(message.content);
+  const editOverLimit = isMessageEditOverLimit(editText);
+  const showEditCounter = editText.length >= EDIT_COUNTER_SHOW_AT || editOverLimit;
   const baseActionAvailability = buildMessageActionAvailability(message, isOwn);
   const actionAvailability =
     currentUserId === null
@@ -117,23 +123,32 @@ export const MessageBubble = memo(function MessageBubble({
     setIsEditing(true);
   }
 
-  function handleSaveEdit() {
-    if (!actionAvailability.canEdit) return;
-    const trimmed = editText.trim();
-    if (!trimmed) return;
-    // Short-circuit no-op edits so we don't bump updatedAt and flash the
-    // "(edited)" label when the user presses Enter without changes.
-    if (trimmed === textContent.trim()) {
-      setIsEditing(false);
-      return;
+  const canSaveEdit =
+    actionAvailability.canEdit && !isSavingEdit && editText.trim().length > 0 && !editOverLimit;
+
+  async function handleSaveEdit() {
+    if (!canSaveEdit) return;
+    setIsSavingEdit(true);
+    try {
+      await submitMessageEdit({
+        messageId: message.id,
+        editText,
+        originalText: textContent,
+        onEdit,
+        closeEditor: () => {
+          setIsEditing(false);
+          setEditText('');
+        },
+      });
+    } finally {
+      setIsSavingEdit(false);
     }
-    onEdit(message.id, [{ type: 'text', text: trimmed }]);
-    setIsEditing(false);
   }
 
   function handleCancelEdit() {
     setIsEditing(false);
     setEditText('');
+    setIsSavingEdit(false);
   }
 
   function handleQuickPickSelect(emoji: string) {
@@ -284,16 +299,26 @@ export const MessageBubble = memo(function MessageBubble({
                   onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSaveEdit();
+                      if (canSaveEdit) void handleSaveEdit();
                     }
                     if (e.key === 'Escape') handleCancelEdit();
                   }}
                   autoFocus
                 />
+                <div
+                  className={`mt-1 text-right text-[11px] ${
+                    editOverLimit ? 'text-destructive' : 'opacity-70'
+                  } ${showEditCounter ? '' : 'invisible'}`}
+                  aria-live="polite"
+                >
+                  {editText.length.toLocaleString('en-US')} /{' '}
+                  {MESSAGE_TEXT_MAX_CHARS.toLocaleString('en-US')}
+                </div>
                 <div className="mt-1 flex items-center gap-1">
                   <button
-                    onClick={handleSaveEdit}
-                    className="rounded p-0.5 hover:opacity-70 cursor-pointer transition-opacity"
+                    onClick={() => void handleSaveEdit()}
+                    disabled={!canSaveEdit}
+                    className="rounded p-0.5 hover:opacity-70 cursor-pointer transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                     title="Save (Enter)"
                   >
                     <Check className="h-3 w-3" />

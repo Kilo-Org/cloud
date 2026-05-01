@@ -25,6 +25,7 @@ import { resolveMobileMessageInputAvailability } from './bot-send-state';
 import { executeActionWithMobileFeedback } from './execute-action-feedback';
 import { buildMessageActionSheetOptions, getSelectedMessageAction } from './message-actions';
 import { MessageInput } from './message-input';
+import { type MessageInputSubmitControls } from './message-input-state';
 import { MessageList } from './message-list';
 import { buildSendMessageVariables, createSendMessageClientId } from './message-presentation';
 import { useConversationPresence } from './hooks/use-conversation-presence';
@@ -104,7 +105,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
     editing: editingMessage !== null,
   });
   const handleSend = useCallback(
-    (text: string, inReplyToMessageId?: string) => {
+    (text: string, inReplyToMessageId?: string, controls?: MessageInputSubmitControls) => {
       if (!editingMessage && inputAvailability.disabled) {
         return;
       }
@@ -118,6 +119,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           },
           {
             onSuccess: () => {
+              controls?.clearDraft();
               setEditingMessage(null);
             },
             onError: err => {
@@ -326,6 +328,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           disabled={inputAvailability.disabled}
           disabledReason={inputAvailability.disabledReason}
           initialText={editingText}
+          clearOnSubmit={editingMessage === null}
           replyingTo={replyingTo}
           onCancelReply={
             replyingTo

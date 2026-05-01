@@ -133,12 +133,12 @@ describe('kilo-chat actions adapter', () => {
     expect(discovery?.actions).toContain('channel-create');
   });
 
-  it('describeMessageTool returns schema contribution for additionalMembers', () => {
+  it('describeMessageTool does not expose additionalMembers until approval authorization supports groups', () => {
     const adapter = kiloChatPlugin.actions;
     const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
     expect(discovery?.schema).toBeDefined();
     const schema = Array.isArray(discovery?.schema) ? discovery.schema[0] : discovery?.schema;
-    expect(schema?.properties).toHaveProperty('additionalMembers');
+    expect(schema?.properties).not.toHaveProperty('additionalMembers');
     expect(schema?.properties).toHaveProperty('groupId');
     expect(schema?.properties).toHaveProperty('target');
     expect(schema?.visibility).toBe('current-channel');

@@ -173,11 +173,6 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         ] as const,
         schema: {
           properties: {
-            additionalMembers: Type.Optional(
-              Type.String({
-                description: 'Comma-separated member IDs to add when creating a conversation.',
-              })
-            ),
             groupId: Type.Optional(
               Type.String({
                 description:

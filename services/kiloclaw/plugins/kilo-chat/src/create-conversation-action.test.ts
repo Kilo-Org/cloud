@@ -51,7 +51,7 @@ describe('handleKiloChatCreateConversationAction', () => {
     expect(result.content[0].text).toBe('Created conversation 01NEWCONV');
   });
 
-  it('parses comma-separated additionalMembers IDs', async () => {
+  it('does not forward additionalMembers for bot-created conversations', async () => {
     const client = mockClient();
 
     await handleKiloChatCreateConversationAction({
@@ -61,7 +61,7 @@ describe('handleKiloChatCreateConversationAction', () => {
 
     expect(client.createConversation).toHaveBeenCalledWith({
       title: 'Group',
-      additionalMembers: ['user_1', 'user_2', 'user_3'],
+      additionalMembers: undefined,
     });
   });
 });

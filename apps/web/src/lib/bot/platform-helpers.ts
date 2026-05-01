@@ -48,6 +48,20 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
   return integration ?? null;
 }
 
+export async function getPlatformIntegrationById(platformIntegrationId: string) {
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(eq(platform_integrations.id, platformIntegrationId))
+    .limit(1);
+
+  if (!integration) {
+    throw new Error(`Could not find platform integration ${platformIntegrationId}`);
+  }
+
+  return integration;
+}
+
 export async function getPlatformIntegrationByBotUserId(
   platform: string,
   botUserId: string | undefined
@@ -66,4 +80,12 @@ export async function getPlatformIntegrationByBotUserId(
     .limit(1);
 
   return integration ?? null;
+}
+
+export function getBotDocumentationUrl(platform: string): string {
+  switch (platform) {
+    //TODO(remon): Update when we have specific docs pages for other platforms
+    default:
+      return 'https://kilo.ai/docs/code-with-ai/platforms/slack';
+  }
 }

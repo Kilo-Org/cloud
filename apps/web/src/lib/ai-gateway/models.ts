@@ -23,7 +23,7 @@ import {
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
-import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import { alibabaDirectModels, qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import {
   grok_code_fast_1_optimized_free_model,
@@ -37,6 +37,7 @@ export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 export const autoFreeModels = [
   'inclusionai/ling-2.6-1t:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
+  'poolside/laguna-m.1:free',
   grok_code_fast_1_optimized_free_model.status === 'public'
     ? grok_code_fast_1_optimized_free_model.public_id
     : null,
@@ -84,7 +85,7 @@ export const kiloExclusiveModels = [
   morph_warp_grep_free_model,
   grok_code_fast_1_optimized_free_model,
   seed_20_code_free_model,
-  qwen36_plus_model,
+  ...alibabaDirectModels,
   trinity_large_thinking_free_model,
   claude_sonnet_clawsetup_model,
   stepfun_35_flash_free_model,

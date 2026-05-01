@@ -86,6 +86,7 @@ export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'moonshotai',
   'novita',
   'xai',
+  'xiaomi',
   'zai',
 ]);
 
@@ -125,6 +126,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/devstral-2',
   [VercelUserByokInferenceProviderIdSchema.enum.openai]: 'openai/gpt-5-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
+  [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum['chutes-byok']]: 'Qwen/Qwen3-30B-A3B',
@@ -161,7 +163,6 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'vertex',
   'vertexAnthropic',
   'voyage',
-  'xiaomi',
 ]);
 
 export const VercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(

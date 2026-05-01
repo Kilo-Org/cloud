@@ -74,6 +74,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
 ]);
 
 export const VercelUserByokInferenceProviderIdSchema = z.enum([
+  'alibaba',
   'anthropic',
   'bedrock',
   'fireworks',
@@ -112,6 +113,7 @@ export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
 export const UserByokTestModels = {
+  [VercelUserByokInferenceProviderIdSchema.enum.alibaba]: 'alibaba/qwen3-coder-plus',
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.fireworks]: 'openai/gpt-oss-20b',
@@ -133,7 +135,6 @@ export const UserByokTestModels = {
 } satisfies Record<UserByokProviderId, string>;
 
 export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
-  'alibaba',
   'arcee-ai',
   'azure',
   'baseten',
@@ -200,7 +201,7 @@ const modelPrefixToVercelInferenceProviderMapping = {
   openai: VercelUserByokInferenceProviderIdSchema.enum.openai,
   minimax: VercelUserByokInferenceProviderIdSchema.enum.minimax,
   mistralai: VercelUserByokInferenceProviderIdSchema.enum.mistral,
-  qwen: VercelNonUserByokInferenceProviderIdSchema.enum.alibaba,
+  qwen: VercelUserByokInferenceProviderIdSchema.enum.alibaba,
   'x-ai': VercelUserByokInferenceProviderIdSchema.enum.xai,
   'z-ai': VercelUserByokInferenceProviderIdSchema.enum.zai,
 } as Record<string, VercelInferenceProviderId | undefined>;

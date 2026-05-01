@@ -51,6 +51,7 @@ import * as z from 'zod';
 // clause forces new entries here whenever a provider is added to
 // VercelUserByokInferenceProviderIdSchema.
 const VERCEL_BYOK_PROVIDER_NAMES = {
+  alibaba: 'Alibaba',
   anthropic: 'Anthropic',
   bedrock: 'AWS Bedrock',
   openai: 'OpenAI',

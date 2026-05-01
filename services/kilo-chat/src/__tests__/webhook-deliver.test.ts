@@ -47,6 +47,28 @@ describe('deliverToBot', () => {
     expect(notifyDeliveryFailed).not.toHaveBeenCalled();
   });
 
+  it('skips textless action-only message.created webhooks without marking failure', async () => {
+    const deliverChatWebhook = vi.fn().mockResolvedValue(undefined);
+    const notifyDeliveryFailed = vi.fn();
+    const env = makeEnvWithConvStub(deliverChatWebhook, notifyDeliveryFailed);
+
+    await deliverToBot(
+      env,
+      makeMsg({
+        content: [
+          {
+            type: 'actions',
+            groupId: 'approval',
+            actions: [{ label: 'Allow', style: 'primary', value: 'allow-once' }],
+          },
+        ],
+      })
+    );
+
+    expect(deliverChatWebhook).not.toHaveBeenCalled();
+    expect(notifyDeliveryFailed).not.toHaveBeenCalled();
+  });
+
   it('retries up to 2 times then notifies failure', async () => {
     const deliverChatWebhook = vi.fn().mockRejectedValue(new Error('boom'));
     const notifyDeliveryFailed = vi.fn().mockResolvedValue(undefined);

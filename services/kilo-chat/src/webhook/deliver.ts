@@ -62,6 +62,8 @@ export async function deliverToBot(
     });
 
     const payload = buildPayload(msg);
+    if (payload.text.length === 0) return;
+
     // Payload fields are already validated; skip redundant Zod parse.
     const rpcPayload = {
       targetBotId: msg.targetBotId,

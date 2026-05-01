@@ -35,6 +35,20 @@ export type PlatformIdentity = {
   userId: string;
 };
 
+export type LinkAccountContext = {
+  threadId: string;
+  messageId: string;
+};
+
+export type LinkAccountTokenPayload = PlatformIdentity & {
+  linkContext?: LinkAccountContext;
+  nonce: string;
+};
+
+export type CreateLinkTokenPayload = PlatformIdentity & {
+  linkContext?: LinkAccountContext;
+};
+
 /**
  * Look up the Kilo user ID linked to a chat-platform user.
  * Returns `null` when no mapping exists yet.
@@ -133,7 +147,7 @@ function hmacSign(data: string): string {
 }
 
 /** Create a signed, time-limited token encoding a PlatformIdentity. */
-export function createLinkToken(identity: PlatformIdentity): string {
+export function createLinkToken(identity: CreateLinkTokenPayload): string {
   const iat = Math.floor(Date.now() / 1000);
   const nonce = crypto.randomBytes(NONCE_BYTES).toString('base64url');
   const payload = Buffer.from(JSON.stringify({ ...identity, iat, nonce })).toString('base64url');
@@ -141,7 +155,7 @@ export function createLinkToken(identity: PlatformIdentity): string {
 }
 
 /** Verify and decode a link token. Returns the identity or `null` on failure. */
-export function verifyLinkToken(token: string): PlatformIdentity | null {
+export function verifyLinkToken(token: string): LinkAccountTokenPayload | null {
   const dotIndex = token.indexOf('.');
   if (dotIndex === -1) return null;
 
@@ -161,6 +175,7 @@ export function verifyLinkToken(token: string): PlatformIdentity | null {
       platform?: PlatformIdentity['platform'];
       teamId?: string;
       userId?: string;
+      linkContext?: unknown;
       iat?: number;
       nonce?: string;
     };
@@ -180,7 +195,34 @@ export function verifyLinkToken(token: string): PlatformIdentity | null {
 
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
 
-    return { platform: data.platform, teamId: data.teamId, userId: data.userId };
+    let linkContext: LinkAccountContext | undefined;
+    if (data.linkContext !== undefined) {
+      if (
+        !data.linkContext ||
+        typeof data.linkContext !== 'object' ||
+        !('threadId' in data.linkContext) ||
+        typeof data.linkContext.threadId !== 'string' ||
+        data.linkContext.threadId.length === 0 ||
+        !('messageId' in data.linkContext) ||
+        typeof data.linkContext.messageId !== 'string' ||
+        data.linkContext.messageId.length === 0
+      ) {
+        return null;
+      }
+
+      linkContext = {
+        threadId: data.linkContext.threadId,
+        messageId: data.linkContext.messageId,
+      };
+    }
+
+    return {
+      platform: data.platform,
+      teamId: data.teamId,
+      userId: data.userId,
+      linkContext,
+      nonce: data.nonce,
+    };
   } catch {
     return null;
   }

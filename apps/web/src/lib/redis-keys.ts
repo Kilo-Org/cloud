@@ -35,3 +35,6 @@ export const requestLogRedisKey = (hash: string) => redisKey(`ai-gateway.request
 
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
+
+export const botLinkAccountReplayRedisKey = (nonce: string) =>
+  redisKey(`bot:link-account-replay:${nonce}`);

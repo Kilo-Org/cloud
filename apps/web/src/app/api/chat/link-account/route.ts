@@ -1,9 +1,23 @@
 import { bot } from '@/lib/bot';
 import { APP_URL } from '@/lib/constants';
-import { linkKiloUser, verifyLinkToken, type PlatformIdentity } from '@/lib/bot-identity';
+import {
+  linkKiloUser,
+  verifyLinkToken,
+  type LinkAccountTokenPayload,
+  type PlatformIdentity,
+} from '@/lib/bot-identity';
+import { processAuthenticatedBotMessage } from '@/lib/bot/message-processing';
+import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
+import { getBotThread } from '@/lib/bot/thread';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getPlatformIntegration } from '@/lib/bot/platform-helpers';
+import { botLinkAccountReplayRedisKey } from '@/lib/redis-keys';
+import { captureException } from '@sentry/nextjs';
+import { after } from 'next/server';
+import type { User } from '@kilocode/db';
+
+const ORIGINAL_MESSAGE_REPLAY_TTL_MS = 30 * 60 * 1000;
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -17,6 +31,86 @@ function errorPage(title: string, message: string, status: number): Response {
 </body></html>`,
     { status, headers: { 'content-type': 'text/html; charset=utf-8' } }
   );
+}
+
+async function scheduleOriginalMessageReplay(params: {
+  identity: LinkAccountTokenPayload;
+  user: User;
+}): Promise<boolean> {
+  const { linkContext } = params.identity;
+  if (!linkContext) {
+    return false;
+  }
+
+  const threadPlatform = linkContext.threadId.split(':', 1)[0];
+  if (threadPlatform !== params.identity.platform) {
+    throw new Error('Link-account token thread context does not match the platform identity.');
+  }
+
+  const state = bot.getState();
+  const replayClaimed = await state.setIfNotExists(
+    botLinkAccountReplayRedisKey(params.identity.nonce),
+    {
+      messageId: linkContext.messageId,
+      threadId: linkContext.threadId,
+      userId: params.user.id,
+    },
+    ORIGINAL_MESSAGE_REPLAY_TTL_MS
+  );
+
+  if (!replayClaimed) {
+    return false;
+  }
+
+  after(async () => {
+    try {
+      const platformIntegration = await getPlatformIntegration(params.identity);
+      if (!platformIntegration) {
+        throw new Error('No matching integration found while replaying linked chat message.');
+      }
+
+      const thread = await getBotThread(linkContext.threadId);
+      await withBotPlatformAuthContext(platformIntegration, async () => {
+        const message = await Promise.resolve(
+          thread.adapter.fetchMessage?.(thread.id, linkContext.messageId) ?? null
+        );
+
+        if (!message) {
+          await thread.post({
+            markdown:
+              'Your Kilo account is linked, but I could not find the original message. Please mention Kilo again with your request.',
+          });
+          return;
+        }
+
+        if (message.author.userId !== params.identity.userId) {
+          throw new Error(
+            'Original linked chat message author does not match the linked identity.'
+          );
+        }
+
+        await processAuthenticatedBotMessage({
+          thread,
+          message,
+          platformIntegration,
+          user: params.user,
+        });
+      });
+    } catch (error) {
+      console.error('[BotLinkAccount] Failed to replay original chat message:', error);
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'link-account-replay-original-message' },
+        extra: {
+          platform: params.identity.platform,
+          teamId: params.identity.teamId,
+          threadId: linkContext.threadId,
+          messageId: linkContext.messageId,
+        },
+      });
+    }
+  });
+
+  return true;
 }
 
 /**
@@ -103,14 +197,33 @@ export async function GET(request: Request) {
 
   await linkKiloUser(bot.getState(), identity, user.id);
 
+  let originalMessageReplayScheduled = false;
+  try {
+    originalMessageReplayScheduled = await scheduleOriginalMessageReplay({ identity, user });
+  } catch (error) {
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'link-account-schedule-original-message' },
+      extra: {
+        platform: identity.platform,
+        teamId: identity.teamId,
+        hasLinkContext: Boolean(identity.linkContext),
+      },
+    });
+  }
+
+  const successMessage = originalMessageReplayScheduled
+    ? `Your ${identity.platform} account has been linked to your Kilo account.<br>
+      You can close this tab. I am processing your original chat message now.`
+    : `Your ${identity.platform} account has been linked to your Kilo account.<br>
+      You can close this tab and @mention Kilo again in your chat.`;
+
   return new Response(
     `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Account Linked</title></head>
 <body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
 <div style="text-align:center">
   <h1>Account linked</h1>
-  <p>Your ${identity.platform} account has been linked to your Kilo account.<br>
-     You can close this tab and @mention Kilo again in your chat.</p>
+  <p>${successMessage}</p>
 </div>
 </body></html>`,
     { headers: { 'content-type': 'text/html; charset=utf-8' } }

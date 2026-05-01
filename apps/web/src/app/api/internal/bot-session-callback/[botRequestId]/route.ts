@@ -10,7 +10,6 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { bot } from '@/lib/bot';
 import { MAX_ITERATIONS } from '@/lib/bot/constants';
 import {
   claimBotRequestCloudAgentSessionGroupContinuation,
@@ -26,9 +25,9 @@ import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { runBotAgent, type BotAgentMessageLike } from '@/lib/bot/agent-runner';
 import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
+import { getBotThread } from '@/lib/bot/thread';
 import { findUserById } from '@/lib/user';
-import { PLATFORM } from '@/lib/integrations/core/constants';
-import { ThreadImpl, type Thread } from 'chat';
+import type { Thread } from 'chat';
 
 type ExecutionCallbackPayload = {
   sessionId: string;
@@ -55,31 +54,6 @@ async function getBotRequest(botRequestId: string) {
 
 function logCallback(message: string, extra?: Record<string, unknown>) {
   console.log('[BotSessionCallback]', message, extra ?? {});
-}
-
-async function getBotThread(threadId: string): Promise<Thread> {
-  await bot.initialize();
-  bot.registerSingleton();
-
-  const adapterName = threadId.split(':', 1)[0];
-  if (!adapterName) {
-    throw new Error(`Bot callback thread id is missing an adapter prefix: ${threadId}`);
-  }
-
-  switch (adapterName) {
-    case PLATFORM.SLACK: {
-      const adapter = bot.getAdapter(PLATFORM.SLACK);
-      return new ThreadImpl({
-        adapterName,
-        channelId: adapter.channelIdFromThreadId(threadId),
-        channelVisibility: adapter.getChannelVisibility?.(threadId),
-        id: threadId,
-        isDM: adapter.isDM?.(threadId) ?? false,
-      });
-    }
-    default:
-      throw new Error(`No chat SDK adapter registered for platform ${adapterName}`);
-  }
 }
 
 function parseTerminalCallbackStatus(status: unknown): TerminalCallbackStatus | undefined {

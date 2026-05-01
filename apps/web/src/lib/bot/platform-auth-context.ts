@@ -14,10 +14,8 @@ export async function withBotPlatformAuthContext<T>(
     const installation = await slackAdapter.getInstallation(
       platformIntegration.platform_account_id as string
     );
-    if (!installation?.botToken) {
-      throw new Error(
-        `No Slack bot token found for platform integration ${platformIntegration.id}`
-      );
+    if (!installation) {
+      throw new Error(`No Slack installation for platform integration ${platformIntegration.id}`);
     }
 
     return await slackAdapter.withBotToken(installation.botToken, fn);

@@ -1,4 +1,10 @@
+import { MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
+
 type DraftRef = { current: string };
+
+function canSubmitDraft(text: string): boolean {
+  return text.trim().length > 0 && text.length <= MESSAGE_TEXT_MAX_CHARS;
+}
 
 export function applyMessageInputTextChange({
   text,
@@ -12,7 +18,7 @@ export function applyMessageInputTextChange({
   onTyping?: () => void;
 }) {
   valueRef.current = text;
-  setCanSend(text.trim().length > 0);
+  setCanSend(canSubmitDraft(text));
   onTyping?.();
 }
 
@@ -29,11 +35,12 @@ export function submitMessageInputDraft({
   clearInput: () => void;
   setCanSend: (canSend: boolean) => void;
 }) {
-  const text = valueRef.current.trim();
-  if (!text) {
+  const draft = valueRef.current;
+  if (!canSubmitDraft(draft)) {
     return false;
   }
 
+  const text = draft.trim();
   onSend(text, replyingToMessageId);
   valueRef.current = '';
   clearInput();

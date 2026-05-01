@@ -61,30 +61,14 @@ export async function handleRequestLogging(params: {
         apiRequestLogId[0].id
       );
     } catch (e) {
-      logExceptInTest(
-        `[handleRequestLogging] failed to insert api_request_log (user=${user?.id}, status=${clonedResponse.status}, model=${model})`
-      );
       try {
         logExceptInTest(
-          '[handleRequestLogging] error (truncated): ' + String(e).substring(0, 4000)
+          `[handleRequestLogging] failed to insert api_request_log (user=${user?.id}, status=${clonedResponse.status}, model=${model}) (truncated): ${String(e).substring(0, 4000)}`
         );
-      } catch {
-        //ignore
-      }
-      try {
+      } catch (inner) {
         logExceptInTest(
-          '[handleRequestLogging] request (truncated): ' +
-            JSON.stringify(request.body).substring(0, 4000)
+          `[handleRequestLogging] failed to log failure (truncated): ${String(inner).substring(0, 4000)} original (truncated): ${String(e).substring(0, 4000)}`
         );
-      } catch {
-        //ignore
-      }
-      try {
-        logExceptInTest(
-          '[handleRequestLogging] response (truncated): ' + response?.substring(0, 4000)
-        );
-      } catch {
-        //ignore
       }
     }
   });

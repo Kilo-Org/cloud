@@ -32,6 +32,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
 import { KiloPassTier, KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { differenceInCalendarMonths } from 'date-fns';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
@@ -5062,11 +5063,9 @@ describe('enrollWithCredits', () => {
     expect(sub.payment_source).toBe('credits');
     expect(sub.commit_ends_at).not.toBeNull();
 
-    // commit_ends_at should be ~6 months from now
+    // commit_ends_at should be 6 calendar months from now.
     const commitEnd = new Date(sub.commit_ends_at!);
-    const diffDays = (commitEnd.getTime() - Date.now()) / 86_400_000;
-    expect(diffDays).toBeGreaterThanOrEqual(178);
-    expect(diffDays).toBeLessThanOrEqual(184);
+    expect(differenceInCalendarMonths(commitEnd, new Date())).toBe(6);
   });
 
   it('rejects enrollment when balance is insufficient', async () => {

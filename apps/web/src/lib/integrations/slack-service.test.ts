@@ -6,6 +6,8 @@ const mockUpdateSet = jest.fn();
 const mockUpdateWhere = jest.fn();
 const mockUpdateReturning = jest.fn();
 const mockDeleteWhere = jest.fn();
+const mockInsertValues = jest.fn();
+const mockInsertReturning = jest.fn();
 const mockAuthRevoke = jest.fn();
 const mockAuthTest = jest.fn();
 
@@ -24,6 +26,9 @@ jest.mock('@/lib/drizzle', () => ({
     update: jest.fn(() => ({
       set: mockUpdateSet,
     })),
+    insert: jest.fn(() => ({
+      values: mockInsertValues,
+    })),
   },
 }));
 
@@ -39,7 +44,9 @@ jest.mock('@slack/web-api', () => ({
 import type { Owner } from '@/lib/integrations/core/types';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import {
+  deleteInstallationByTeamId,
   getMissingSlackScopes,
+  SlackWorkspaceAlreadyConnectedError,
   SLACK_SCOPES,
   testConnection,
   uninstallApp,
@@ -55,6 +62,8 @@ function buildSlackIntegration(overrides: Record<string, unknown> = {}) {
     metadata: { access_token: 'xoxb-token' },
     platform_installation_id: 'T123',
     platform_account_id: 'T123',
+    owned_by_user_id: owner.id,
+    owned_by_organization_id: null,
     ...overrides,
   };
 }
@@ -135,6 +144,46 @@ describe('slack-service uninstallApp', () => {
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T456');
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
+
+  it('disconnects suspended integrations without deleting shared Slack installation state', async () => {
+    mockLimit.mockResolvedValue([
+      buildSlackIntegration({
+        integration_status: 'suspended',
+        platform_installation_id: null,
+        platform_account_id: 'T456',
+      }),
+    ]);
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await expect(
+      uninstallApp(owner, { deleteChatSdkInstallation, deleteChatSdkIdentityCache })
+    ).resolves.toEqual({ success: true });
+
+    expect(mockAuthRevoke).not.toHaveBeenCalled();
+    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('slack-service deleteInstallationByTeamId', () => {
+  beforeEach(() => {
+    mockLimit.mockReset();
+    mockDeleteWhere.mockReset();
+    mockDeleteWhere.mockResolvedValue(undefined);
+  });
+
+  it('deletes the platform integration and Chat SDK state for a Slack team', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+
+    await expect(deleteInstallationByTeamId('T123')).resolves.toEqual({
+      success: true,
+      deleted: true,
+    });
+
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('slack-service testConnection', () => {
@@ -213,6 +262,10 @@ describe('upsertSlackInstallation', () => {
     mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
     mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
     mockUpdateReturning.mockResolvedValue([buildSlackIntegration()]);
+    mockInsertValues.mockReset();
+    mockInsertReturning.mockReset();
+    mockInsertValues.mockReturnValue({ returning: mockInsertReturning });
+    mockInsertReturning.mockResolvedValue([buildSlackIntegration()]);
   });
 
   it('preserves the selected model when refreshing an existing installation', async () => {
@@ -243,7 +296,44 @@ describe('upsertSlackInstallation', () => {
           incoming_webhook: { channel: '#general', channelId: 'C123', url: 'https://example.com' },
           model_slug: 'anthropic/claude-sonnet-4.5',
         }),
+        platform_installation_id: 'T123',
       })
+    );
+  });
+
+  it('rejects installing a Slack workspace connected to another owner', async () => {
+    mockLimit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([buildSlackIntegration({ owned_by_user_id: 'user-2' })]);
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await expect(upsertSlackInstallation({ owner, teamId: 'T123', installation })).rejects.toThrow(
+      SlackWorkspaceAlreadyConnectedError
+    );
+
+    expect(mockInsertValues).not.toHaveBeenCalled();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it('maps Slack workspace unique violations to a helpful install error', async () => {
+    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockInsertReturning.mockRejectedValue({
+      constraint: 'UQ_platform_integrations_slack_platform_inst',
+    });
+
+    const installation = {
+      botToken: 'xoxb-new-token',
+      botUserId: 'U_NEW_BOT',
+      teamName: 'Kilo Team',
+    } satisfies SlackInstallation;
+
+    await expect(upsertSlackInstallation({ owner, teamId: 'T123', installation })).rejects.toThrow(
+      'Kilo Team is already connected to another Kilo account or organization'
     );
   });
 });

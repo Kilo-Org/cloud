@@ -7,7 +7,7 @@
  * enqueue, and MembershipDO maintenance in one place.
  */
 
-import type { ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
+import { ulidToTimestamp, type ContentBlock, type ExecApprovalDecision } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { contentBlocksToText } from '../util/content';
@@ -111,7 +111,7 @@ export async function postCommitFanOut(
 ): Promise<void> {
   const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
   const botMembers = info.members.filter(m => m.kind === 'bot' && m.id !== callerId);
-  const now = Date.now();
+  const activityAt = ulidToTimestamp(messageId);
   const isSenderHuman = humanMemberIds.includes(callerId);
 
   // ── Block A: Deliver webhook to bot members ──────────────────────────
@@ -241,7 +241,7 @@ export async function postCommitFanOut(
   //
   // Per-member semantics:
   // - title      : autoTitle string for every member when auto-titling applied.
-  // - activityAt : always `now`.
+  // - activityAt : timestamp encoded in the committed messageId.
   // - markRead   : true only for the sender. Recipients advance read state
   //                through the explicit mark-read endpoint when their client is
   //                visible/focused.
@@ -254,7 +254,7 @@ export async function postCommitFanOut(
           stub.applyPostCommit({
             conversationId,
             ...(appliedAutoTitle !== null && { title: appliedAutoTitle }),
-            activityAt: now,
+            activityAt,
             markRead: isSender,
           }),
         'MembershipDO.applyPostCommit'
@@ -285,7 +285,7 @@ export async function postCommitFanOut(
     instanceEvents.push(
       pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.activity', {
         conversationId,
-        lastActivityAt: now,
+        lastActivityAt: activityAt,
       })
     );
     for (const userId of humanMemberIds) {
@@ -294,7 +294,7 @@ export async function postCommitFanOut(
         pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
           conversationId,
           memberId: userId,
-          lastReadAt: now,
+          lastReadAt: activityAt,
         })
       );
     }

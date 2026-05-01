@@ -961,8 +961,14 @@ describe('recipient conversation read state after message delivery', () => {
     if (!conversation) {
       throw new Error('Expected recipient membership conversation');
     }
-    expect(conversation.lastActivityAt).not.toBeNull();
-    expect(conversation.lastReadAt).not.toBeNull();
+    const lastActivityAt = conversation.lastActivityAt;
+    const lastReadAt = conversation.lastReadAt;
+    if (lastActivityAt === null || lastReadAt === null) {
+      throw new Error('Expected recipient conversation activity and read state');
+    }
+    expect(lastActivityAt).toBe(ulidToTimestamp(messageId));
+    expect(lastReadAt).toBe(ulidToTimestamp(messageId));
+    expect(lastReadAt).toBeGreaterThanOrEqual(lastActivityAt);
   });
 
   it('marks recipients read only through the latest message the client observed', async () => {

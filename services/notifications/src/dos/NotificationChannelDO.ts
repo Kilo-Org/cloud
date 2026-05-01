@@ -9,11 +9,11 @@ import { sendPushNotifications } from '../lib/expo-push';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
-// Two-stage idempotency record. `pending` means the badge was incremented
-// for this idempotency key but the Expo send did not (yet) succeed; on
-// retry we must skip the increment to avoid double-counting. `delivered`
-// means the send succeeded; further attempts are duplicates.
-type IdemRecord = { stage: 'pending' | 'delivered'; ts: number };
+// Idempotency record. `pending` means the badge was incremented for this
+// idempotency key but the Expo send did not (yet) succeed; on retry we must
+// skip the increment to avoid double-counting. `delivered` and `suppressed`
+// are terminal stages; further attempts are duplicates.
+type IdemRecord = { stage: 'pending' | 'delivered' | 'suppressed'; ts: number };
 
 const IDEM_PREFIX = 'idem:';
 const BUCKET_PREFIX = 'bucket:';
@@ -28,7 +28,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
     //    re-incrementing the badge.
     const idemKey = `${IDEM_PREFIX}${input.idempotencyKey}`;
     const existing = await this.ctx.storage.get<IdemRecord>(idemKey);
-    if (existing?.stage === 'delivered') return { kind: 'duplicate' };
+    if (existing?.stage === 'delivered' || existing?.stage === 'suppressed') {
+      return { kind: 'duplicate' };
+    }
     const isRetry = existing?.stage === 'pending';
 
     // 2. Presence
@@ -42,7 +44,12 @@ export class NotificationChannelDO extends DurableObject<Env> {
         error: err instanceof Error ? err.message : String(err),
       });
     }
-    if (inContext) return { kind: 'suppressed_presence' };
+    if (inContext) {
+      const ts = Date.now();
+      await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'suppressed', ts });
+      await this.ensureCleanupAlarm(ts);
+      return { kind: 'suppressed_presence' };
+    }
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 

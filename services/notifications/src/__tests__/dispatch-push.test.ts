@@ -73,6 +73,41 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(sendPushNotifications).not.toHaveBeenCalled();
   });
 
+  it('records presence suppression as terminal idempotency', async () => {
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
+    const presenceSpy = vi
+      .spyOn(env.EVENT_SERVICE, 'isUserInContext')
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const stub = getDO('user-suppressed-idem');
+    const input = baseInput({
+      userId: 'user-suppressed-idem',
+      idempotencyKey: 'k-suppressed-idem',
+    });
+
+    const first = await stub.dispatchPush(input);
+    const second = await stub.dispatchPush(input);
+
+    expect(first.kind).toBe('suppressed_presence');
+    expect(second.kind).toBe('duplicate');
+    expect(presenceSpy).toHaveBeenCalledOnce();
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+
+    const stored = await runInDurableObject(stub, async (_inst, state) => {
+      const buckets = await state.storage.list<number>({ prefix: 'bucket:' });
+      return {
+        buckets: Array.from(buckets.entries()),
+        total: await state.storage.get<number>('total'),
+        idem: await state.storage.get<{ stage: string; ts: number }>('idem:k-suppressed-idem'),
+        alarm: await state.storage.getAlarm(),
+      };
+    });
+    expect(stored.buckets).toEqual([]);
+    expect(stored.total).toBeUndefined();
+    expect(stored.idem).toMatchObject({ stage: 'suppressed' });
+    expect(stored.alarm).not.toBeNull();
+  });
+
   it('returns no_tokens when the user has no push tokens', async () => {
     installDbMock({ tokens: [] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(false);

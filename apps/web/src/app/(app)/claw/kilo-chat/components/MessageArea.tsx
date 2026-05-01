@@ -47,6 +47,11 @@ import { ContextUsageRing } from './ContextUsageRing';
 import { useBotStatus } from '../hooks/useBotStatus';
 import { useConversationStatus } from '../hooks/useConversationStatus';
 import {
+  clearMarkReadRetry,
+  createMarkReadRetryState,
+  scheduleMarkReadRetry,
+} from './message-area-mark-read-retry';
+import {
   KiloChatApiError,
   formatKiloChatError,
   CONVERSATION_TITLE_MAX_CHARS,
@@ -162,11 +167,20 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
 
   const markRead = useMarkConversationRead(kiloChatClient);
   const markReadStateRef = useRef(createMarkReadState());
+  const markReadRetryStateRef = useRef(createMarkReadRetryState());
+  const currentMarkReadMarker =
+    latestMessageId === null ? null : `${conversationId}:${latestMessageId}`;
+  const currentMarkReadMarkerRef = useRef<string | null>(currentMarkReadMarker);
+  const visibleRef = useRef(visible);
+  const markCurrentConversationReadRef = useRef<() => void>(() => {});
+  currentMarkReadMarkerRef.current = currentMarkReadMarker;
+  visibleRef.current = visible;
+
   const markCurrentConversationRead = useCallback(() => {
-    if (latestMessageId === null) {
+    if (latestMessageId === null || currentMarkReadMarker === null) {
       return;
     }
-    const marker = `${conversationId}:${latestMessageId}`;
+    const marker = currentMarkReadMarker;
     const state = markReadStateRef.current;
     if (!shouldStartMarkReadAttempt(state, marker)) {
       return;
@@ -177,13 +191,41 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       {
         onSuccess: () => {
           succeedMarkReadAttempt(state, marker);
+          clearMarkReadRetry(markReadRetryStateRef.current);
         },
         onSettled: () => {
           finishMarkReadAttempt(state, marker);
+          if (state.lastSucceededMarker !== marker) {
+            scheduleMarkReadRetry(markReadRetryStateRef.current, {
+              marker,
+              currentMarker: () => currentMarkReadMarkerRef.current,
+              isVisible: () => visibleRef.current,
+              lastSucceededMarker: () => markReadStateRef.current.lastSucceededMarker,
+              retry: () => markCurrentConversationReadRef.current(),
+            });
+          }
         },
       }
     );
-  }, [conversationId, latestMessageId, markRead.mutate]);
+  }, [conversationId, currentMarkReadMarker, latestMessageId, markRead.mutate]);
+  markCurrentConversationReadRef.current = markCurrentConversationRead;
+
+  useEffect(() => {
+    if (!visible || currentMarkReadMarker === null) {
+      clearMarkReadRetry(markReadRetryStateRef.current);
+      return;
+    }
+    if (
+      markReadRetryStateRef.current.marker !== null &&
+      markReadRetryStateRef.current.marker !== currentMarkReadMarker
+    ) {
+      clearMarkReadRetry(markReadRetryStateRef.current);
+    }
+  }, [currentMarkReadMarker, visible]);
+
+  useEffect(() => {
+    return () => clearMarkReadRetry(markReadRetryStateRef.current);
+  }, []);
 
   // Mark conversation as read when opened and whenever visible hydration or
   // realtime receipt advances the newest message.

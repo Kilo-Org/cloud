@@ -504,6 +504,7 @@ export async function executeActionFor(
                 value,
                 executedBy: callerId,
                 executedAt: new Date().toISOString(),
+                convContext,
               }),
             'ConversationDO.enqueueActionExecutedWebhook'
           );

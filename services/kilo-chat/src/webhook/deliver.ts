@@ -24,6 +24,13 @@ export type WebhookMessage = {
   inReplyToSender?: string;
 };
 
+type ConversationEventContext = { humanMemberIds: string[]; sandboxId: string | null };
+
+export type ActionExecutedWebhookMessage = ActionExecutedWebhookPayload & {
+  targetBotId: string;
+  convContext?: ConversationEventContext;
+};
+
 function buildPayload(msg: WebhookMessage): MessageCreatedPayload {
   // Content was validated at the route handler entry point; trust the shape.
   const text = msg.content
@@ -105,7 +112,7 @@ export async function notifyMessageDeliveryFailed(
   params: {
     conversationId: string;
     messageId: string;
-    convContext?: { humanMemberIds: string[]; sandboxId: string | null };
+    convContext?: ConversationEventContext;
   }
 ): Promise<void> {
   await withDORetry(
@@ -128,12 +135,54 @@ export async function notifyMessageDeliveryFailed(
 }
 
 /**
+ * Roll back an optimistically resolved action group and push
+ * `action.delivery_failed` to human members. Used when the direct
+ * action.executed RPC cannot be delivered to the bot after retries.
+ */
+export async function notifyActionDeliveryFailed(
+  env: Env,
+  params: {
+    conversationId: string;
+    messageId: string;
+    groupId: string;
+    convContext?: ConversationEventContext;
+  }
+): Promise<void> {
+  await withDORetry(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId)),
+    async stub => {
+      await stub.revertActionResolution({
+        messageId: params.messageId,
+        groupId: params.groupId,
+      });
+    },
+    'ConversationDO.revertActionResolution'
+  );
+
+  const ctx = params.convContext ?? (await getConversationContext(env, params.conversationId));
+  if (ctx?.sandboxId) {
+    await pushEventToHumanMembers(
+      env,
+      params.conversationId,
+      ctx.sandboxId,
+      ctx.humanMemberIds,
+      'action.delivery_failed',
+      {
+        conversationId: params.conversationId,
+        messageId: params.messageId,
+        groupId: params.groupId,
+      }
+    );
+  }
+}
+
+/**
  * Delivers an action.executed webhook to a bot via direct RPC to kiloclaw.
  * Retries up to 2 times, then logs permanent failure.
  */
 export async function deliverActionExecutedToBot(
   env: Env,
-  msg: ActionExecutedWebhookPayload & { targetBotId: string }
+  msg: ActionExecutedWebhookMessage
 ): Promise<void> {
   return withLogTags({ source: 'deliverActionExecutedToBot' }, async () => {
     logger.setTags({
@@ -143,7 +192,16 @@ export async function deliverActionExecutedToBot(
     });
 
     // Payload fields are already validated; skip redundant Zod parse.
-    const rpcPayload = msg satisfies z.infer<typeof chatWebhookRpcSchema>;
+    const rpcPayload = {
+      type: msg.type,
+      targetBotId: msg.targetBotId,
+      conversationId: msg.conversationId,
+      messageId: msg.messageId,
+      groupId: msg.groupId,
+      value: msg.value,
+      executedBy: msg.executedBy,
+      executedAt: msg.executedAt,
+    } satisfies z.infer<typeof chatWebhookRpcSchema>;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
         await env.KILOCLAW.deliverChatWebhook(rpcPayload);
@@ -159,5 +217,15 @@ export async function deliverActionExecutedToBot(
       }
     }
     logger.error('Action webhook permanently failed');
+    try {
+      await notifyActionDeliveryFailed(env, {
+        conversationId: msg.conversationId,
+        messageId: msg.messageId,
+        groupId: msg.groupId,
+        convContext: msg.convContext,
+      });
+    } catch (err) {
+      logger.error('Failed to notify action delivery failure', formatError(err));
+    }
   });
 }

@@ -4,12 +4,15 @@ import type {
   Message,
   ReactionSummary,
   ExecApprovalDecision,
-  actionExecutedWebhookSchema,
 } from '@kilocode/kilo-chat';
-import type { z } from 'zod';
 import { DurableObject } from 'cloudflare:workers';
 import { logger } from '../util/logger';
-import { deliverToBot, deliverActionExecutedToBot, type WebhookMessage } from '../webhook/deliver';
+import {
+  deliverToBot,
+  deliverActionExecutedToBot,
+  type ActionExecutedWebhookMessage,
+  type WebhookMessage,
+} from '../webhook/deliver';
 
 /**
  * Parses stored message content JSON. Content was validated by Zod at write
@@ -184,9 +187,7 @@ export class ConversationDO extends DurableObject<Env> {
     this.ctx.waitUntil(this.webhookChain);
   }
 
-  async enqueueActionExecutedWebhook(
-    msg: z.infer<typeof actionExecutedWebhookSchema> & { targetBotId: string }
-  ): Promise<void> {
+  async enqueueActionExecutedWebhook(msg: ActionExecutedWebhookMessage): Promise<void> {
     this.webhookChain = this.webhookChain
       .catch(() => {})
       .then(() => deliverActionExecutedToBot(this.env, msg));

@@ -1,5 +1,12 @@
+import { env } from 'cloudflare:test';
 import { describe, it, expect, vi } from 'vitest';
-import { deliverToBot } from '../webhook/deliver';
+import { ulid } from 'ulid';
+import type { ConversationDO } from '../do/conversation-do';
+import { deliverActionExecutedToBot, deliverToBot } from '../webhook/deliver';
+
+function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
+  return env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(convId));
+}
 
 function makeMsg(overrides?: Partial<Parameters<typeof deliverToBot>[1]>) {
   return {
@@ -172,5 +179,90 @@ describe('deliverToBot', () => {
     // But getConversationContext should NOT have been called since we passed context
     // The get() call comes from withDORetry for notifyDeliveryFailed, not from getConversationContext
     expect(notifyDeliveryFailed).toHaveBeenCalledWith('msg-1');
+  });
+});
+
+describe('deliverActionExecutedToBot', () => {
+  it('reverts resolved action content and pushes delivery_failed after permanent RPC failure', async () => {
+    const sandboxId = 'sandbox-action-delivery';
+    const conversationId = ulid();
+    const userId = 'user-action-delivery';
+    const botId = `bot:kiloclaw:${sandboxId}`;
+    const stub = getConvStub(conversationId);
+    await stub.initialize({
+      id: conversationId,
+      title: 'Action delivery',
+      createdBy: userId,
+      createdAt: Date.now(),
+      members: [
+        { id: userId, kind: 'user' },
+        { id: botId, kind: 'bot' },
+      ],
+    });
+    const create = await stub.createMessage({
+      senderId: botId,
+      content: [
+        {
+          type: 'actions',
+          groupId: 'g1',
+          actions: [{ value: 'allow-once', label: 'Allow', style: 'primary' }],
+        },
+      ],
+    });
+    if (!create.ok) {
+      throw new Error('Expected action message creation to succeed');
+    }
+    const execute = await stub.executeAction({
+      messageId: create.messageId,
+      memberId: userId,
+      groupId: 'g1',
+      value: 'allow-once',
+    });
+    expect(execute.ok).toBe(true);
+
+    const deliverChatWebhook = vi.fn().mockRejectedValue(new Error('bot down'));
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const failingEnv = {
+      ...env,
+      KILOCLAW: {
+        fetch: env.KILOCLAW.fetch.bind(env.KILOCLAW),
+        connect: env.KILOCLAW.connect.bind(env.KILOCLAW),
+        deliverChatWebhook,
+      } satisfies Env['KILOCLAW'],
+      EVENT_SERVICE: {
+        fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+        connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+        pushEvent,
+      } satisfies Env['EVENT_SERVICE'],
+    } satisfies Env;
+
+    await deliverActionExecutedToBot(failingEnv, {
+      type: 'action.executed',
+      targetBotId: botId,
+      conversationId,
+      messageId: create.messageId,
+      groupId: 'g1',
+      value: 'allow-once',
+      executedBy: userId,
+      executedAt: '2026-05-01T00:00:00.000Z',
+    });
+
+    expect(deliverChatWebhook).toHaveBeenCalledTimes(3);
+    const after = await stub.listMessages({ limit: 10 });
+    const message = after.messages.find(m => m.id === create.messageId);
+    if (!message) {
+      throw new Error('Expected action message to remain stored');
+    }
+    const actionsBlock = message.content.find(block => block.type === 'actions');
+    if (!actionsBlock || actionsBlock.type !== 'actions') {
+      throw new Error('Expected actions block to remain stored');
+    }
+    expect(actionsBlock.resolved).toBeUndefined();
+    expect(pushEvent).toHaveBeenCalledWith(
+      userId,
+      `/kiloclaw/${sandboxId}/${conversationId}`,
+      'action.delivery_failed',
+      { conversationId, messageId: create.messageId, groupId: 'g1' }
+    );
   });
 });

@@ -1672,10 +1672,18 @@ export const wastelandRouter = router({
         // Step 3: enqueue the merge. DoltHub's merge is asynchronous — it
         // returns 202 with an `operation_name` that we have to poll.
         const merge = await doltApi.mergePull(upstream, token, orphanedPullId);
-        // Step 4: wait for the merge worker to finish before cleaning up
-        // the source branch. Deleting the branch while the worker is
-        // still reading it aborts the merge and leaves `main` unchanged.
-        if (merge.operationName) {
+        // Step 4: confirm the merge landed on `main` before cleaning up the
+        // source branch. Deleting the branch while the worker is still
+        // reading it aborts the merge and leaves `main` unchanged. There are
+        // two valid confirmation paths:
+        //   a) the POST returned a terminal `merged` state (synchronous merge),
+        //   b) we have an `operation_name` we can poll to completion.
+        // Any other response (e.g. `merging` with no operation_name) is
+        // treated as an error: we do not know whether the merge landed, so
+        // we leave the PR/branch intact for an operator to inspect.
+        if (merge.state === 'merged') {
+          mergeConfirmed = true;
+        } else if (merge.operationName) {
           const result = await doltApi.waitForMergeCompletion(
             upstream,
             token,
@@ -1688,9 +1696,14 @@ export const wastelandRouter = router({
               message: `Merge job completed but DoltHub reported failure for pull ${orphanedPullId}`,
             });
           }
+          mergeConfirmed = true;
+        } else {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `Merge for pull ${orphanedPullId} returned state=${merge.state} without an operation_name; cannot confirm completion`,
+          });
         }
         // Merge landed on `main`. Safe to clean up in `finally` now.
-        mergeConfirmed = true;
         orphanedPullId = null;
         meterEvent(ctx.env, {
           event: 'billing.api_operation',

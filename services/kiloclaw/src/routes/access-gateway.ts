@@ -360,8 +360,12 @@ async function redeemCodeAndSetCookie(
     env: c.env.WORKER_ENV,
   });
 
-  // Verify instanceId ownership before minting a gateway token
-  if (instanceId && isValidInstanceId(instanceId)) {
+  // Verify instanceId ownership before minting a gateway token.
+  // On per-instance virtual hosts the Host header is the authoritative
+  // routing signal; `buildRedirectUrl` ignores the query-param instanceId
+  // and derives the sandbox from the host instead, so a stale/mismatched
+  // `?instanceId=` must not reject an otherwise-valid request here either.
+  if (!requestIsOnInstanceHost(c) && instanceId && isValidInstanceId(instanceId)) {
     try {
       await assertInstanceOwnership(c.env, redeemedUserId, instanceId);
     } catch {
@@ -425,23 +429,25 @@ accessGatewayRoutes.get('/kilo-access-gateway', async c => {
   if (secret) {
     const cookie = getCookie(c, KILOCLAW_AUTH_COOKIE);
     if (await hasValidCookie(cookie, userId, secret, c.env.WORKER_ENV)) {
-      // Verify instanceId ownership before minting a gateway token
-      if (instanceId && isValidInstanceId(instanceId)) {
+      const onInstanceHost = requestIsOnInstanceHost(c);
+      // Verify query-param instanceId ownership only on legacy hosts. On
+      // per-instance virtual hosts the Host is the routing signal and the
+      // query param is ignored by `buildRedirectUrl`, so a stale/mismatched
+      // value must not block an otherwise-valid request.
+      if (!onInstanceHost && instanceId && isValidInstanceId(instanceId)) {
         try {
           await assertInstanceOwnership(c.env, userId, instanceId);
         } catch {
           return c.text('Access denied', 403);
         }
-        if (!requestIsOnInstanceHost(c)) {
-          setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, instanceId, {
-            path: '/',
-            httpOnly: true,
-            secure: c.env.WORKER_ENV !== 'development',
-            sameSite: 'Lax',
-            maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
-          });
-        }
-      } else if (!requestIsOnInstanceHost(c)) {
+        setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, instanceId, {
+          path: '/',
+          httpOnly: true,
+          secure: c.env.WORKER_ENV !== 'development',
+          sameSite: 'Lax',
+          maxAge: KILOCLAW_AUTH_COOKIE_MAX_AGE,
+        });
+      } else if (!onInstanceHost) {
         setCookie(c, KILOCLAW_ACTIVE_INSTANCE_COOKIE, '', {
           path: '/',
           httpOnly: true,

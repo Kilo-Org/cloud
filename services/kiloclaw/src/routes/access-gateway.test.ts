@@ -245,6 +245,56 @@ describe('access-gateway token derivation on per-instance hosts', () => {
     expect(response.status).toBe(403);
   });
 
+  it('ignores mismatched `?instanceId=` on per-instance hosts (no pre-flight 403)', async () => {
+    // Regression: `assertInstanceOwnership` on the query-param used to run
+    // before the host-based logic, so a stale `?instanceId=` on a
+    // per-instance host returned 403 even though `buildRedirectUrl` would
+    // have ignored the param anyway. On per-instance hosts the Host header
+    // is the authoritative routing signal.
+    const app = buildApp();
+    const token = await signedAuthCookie();
+    const label = `i-${INSTANCE_ID.replaceAll('-', '')}`;
+    const staleQueryInstanceId = '11111111-1111-1111-1111-111111111111';
+
+    // Two separate DO stubs: the host-encoded instance is owned by USER_ID,
+    // the query-param instance is owned by someone else. Without the fix,
+    // the pre-flight check on the latter would 403.
+    const hostStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: USER_ID,
+        sandboxId: INSTANCE_SANDBOX_ID,
+      }),
+    };
+    const staleStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'someone-else',
+        sandboxId: sandboxIdFromInstanceId(staleQueryInstanceId),
+      }),
+    };
+    const instanceBinding = {
+      idFromName: vi.fn((id: string) => `do-id:${id}`),
+      get: vi.fn((doId: string) => {
+        if (doId === `do-id:${INSTANCE_ID}`) return hostStub;
+        if (doId === `do-id:${staleQueryInstanceId}`) return staleStub;
+        throw new Error(`unexpected DO lookup: ${doId}`);
+      }),
+    };
+
+    const response = await app.fetch(
+      new Request(
+        `https://${label}.kiloclaw.ai/kilo-access-gateway?userId=${USER_ID}&instanceId=${staleQueryInstanceId}`,
+        { headers: { Cookie: `${KILOCLAW_AUTH_COOKIE}=${token}` } }
+      ),
+      envBindings({ KILOCLAW_INSTANCE: instanceBinding })
+    );
+
+    expect(response.status).toBe(302);
+    const actualToken = extractTokenFromRedirect(response);
+    expect(actualToken).toBe(await deriveGatewayToken(INSTANCE_SANDBOX_ID, GATEWAY_TOKEN_SECRET));
+    // Stale-query-param DO should never have been consulted.
+    expect(staleStub.getStatus).not.toHaveBeenCalled();
+  });
+
   it('rejects legacy host that decodes to a different userId', async () => {
     const app = buildApp();
     const token = await signedAuthCookie();

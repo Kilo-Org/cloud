@@ -13,7 +13,6 @@ import {
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { trinity_large_thinking_free_model } from '@/lib/ai-gateway/providers/arcee';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
@@ -86,7 +85,6 @@ export const kiloExclusiveModels = [
   grok_code_fast_1_optimized_free_model,
   seed_20_code_free_model,
   ...alibabaDirectModels,
-  trinity_large_thinking_free_model,
   claude_sonnet_clawsetup_model,
   stepfun_35_flash_free_model,
 ] as KiloExclusiveModel[];

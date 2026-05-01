@@ -104,7 +104,7 @@ async function setupData(suffix: string) {
   expect(msgRes.status).toBe(201);
   const { messageId } = await msgRes.json<{ messageId: string }>();
 
-  return { sandboxId, conversationId, messageId, testEnv };
+  return { sandboxId, conversationId, messageId, testEnv, userApp: setupApp };
 }
 
 const sampleContent = [{ type: 'text', text: 'Hello from bot' }];
@@ -148,6 +148,74 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
     );
 
     expect(res.status).toBe(400);
+  });
+
+  it('rejects bot create/edit/delete after the last human leaves', async () => {
+    const { sandboxId, conversationId, testEnv, userApp } = await setupData('bot-after-leave');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const createRes = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'bot before leave' }],
+        }),
+      },
+      testEnv
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const leaveRes = await userApp.request(
+      `/v1/conversations/${conversationId}/leave`,
+      { method: 'POST' },
+      testEnv
+    );
+    expect(leaveRes.status).toBe(204);
+
+    const createAfterLeaveRes = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'bot after leave' }],
+        }),
+      },
+      testEnv
+    );
+    expect(createAfterLeaveRes.status).toBe(403);
+
+    const editAfterLeaveRes = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'bot edit after leave' }],
+          timestamp: Date.now(),
+        }),
+      },
+      testEnv
+    );
+    expect(editAfterLeaveRes.status).toBe(403);
+
+    const deleteQs = new URLSearchParams({ conversationId });
+    const deleteAfterLeaveRes = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}?${deleteQs.toString()}`,
+      {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+    expect(deleteAfterLeaveRes.status).toBe(403);
   });
 });
 

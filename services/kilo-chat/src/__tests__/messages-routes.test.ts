@@ -469,6 +469,44 @@ describe('PATCH /v1/messages/:id', () => {
 
     expect(editRes.status).toBe(403);
   });
+
+  it('returns 403 when a former member tries to edit their message', async () => {
+    const { conversationId, userApp } = await createConversation('msg-edit-left');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      env
+    );
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const leaveRes = await userApp.request(
+      `/v1/conversations/${conversationId}/leave`,
+      { method: 'POST' },
+      env
+    );
+    expect(leaveRes.status).toBe(204);
+
+    const editRes = await userApp.request(
+      `/v1/messages/${messageId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Edited after leaving' }],
+          timestamp: Date.now(),
+        }),
+      },
+      env
+    );
+
+    expect(editRes.status).toBe(403);
+  });
 });
 
 describe('DELETE /v1/messages/:id', () => {
@@ -532,6 +570,40 @@ describe('DELETE /v1/messages/:id', () => {
     // Bot tries to delete user's message
     const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await botApp.request(
+      `/v1/messages/${messageId}?${delQs.toString()}`,
+      {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+      },
+      env
+    );
+
+    expect(deleteRes.status).toBe(403);
+  });
+
+  it('returns 403 when a former member tries to delete their message', async () => {
+    const { conversationId, userApp } = await createConversation('msg-delete-left');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      env
+    );
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const leaveRes = await userApp.request(
+      `/v1/conversations/${conversationId}/leave`,
+      { method: 'POST' },
+      env
+    );
+    expect(leaveRes.status).toBe(204);
+
+    const delQs = new URLSearchParams({ conversationId });
+    const deleteRes = await userApp.request(
       `/v1/messages/${messageId}?${delQs.toString()}`,
       {
         method: 'DELETE',

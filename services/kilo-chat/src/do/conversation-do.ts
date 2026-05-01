@@ -431,6 +431,14 @@ export class ConversationDO extends DurableObject<Env> {
       };
     }
 
+    if (!this.isMember(params.senderId)) {
+      return {
+        ok: false,
+        code: 'forbidden',
+        error: `Sender ${params.senderId} is not a member of this conversation`,
+      };
+    }
+
     // Discard out-of-order edits: if the client's timestamp is older than the
     // last accepted edit, silently drop it.
     if (row.client_updated_at != null && params.clientTimestamp <= row.client_updated_at) {
@@ -481,6 +489,14 @@ export class ConversationDO extends DurableObject<Env> {
         ok: false,
         code: 'forbidden',
         error: `Sender ${params.senderId} is not the owner of message ${params.messageId}`,
+      };
+    }
+
+    if (!this.isMember(params.senderId)) {
+      return {
+        ok: false,
+        code: 'forbidden',
+        error: `Sender ${params.senderId} is not a member of this conversation`,
       };
     }
 
@@ -717,10 +733,19 @@ export class ConversationDO extends DurableObject<Env> {
       .from(members)
       .where(sql`${members.left_at} IS NULL`)
       .all();
+    const remainingUsers = active.filter(m => m.kind === 'user');
+    const botMembers = active.filter(m => m.kind === 'bot');
+    if (remainingUsers.length === 0 && botMembers.length > 0) {
+      this.db
+        .update(members)
+        .set({ left_at: Date.now() })
+        .where(and(eq(members.kind, 'bot'), sql`${members.left_at} IS NULL`))
+        .run();
+    }
     return {
       ok: true,
-      remainingUsers: active.filter(m => m.kind === 'user'),
-      botMembers: active.filter(m => m.kind === 'bot'),
+      remainingUsers,
+      botMembers,
     };
   }
 

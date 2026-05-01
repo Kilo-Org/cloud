@@ -10,6 +10,9 @@ import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
+  kiloclaw_scheduled_actions,
+  kiloclaw_scheduled_action_stages,
+  kiloclaw_scheduled_action_targets,
   kiloclaw_subscriptions,
   kiloclaw_version_pins,
 } from '@kilocode/db/schema';
@@ -1814,5 +1817,280 @@ describe('admin.kiloclawInstances.bulkChangeVersion', () => {
     });
     expect(logs[0].metadata).toHaveProperty('skipped');
     expect(logs[0].metadata).toHaveProperty('failed');
+  });
+});
+
+describe('admin.kiloclawInstances scheduled actions', () => {
+  let testInstanceId: string;
+
+  beforeEach(async () => {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        id: crypto.randomUUID(),
+        user_id: regularUser.id,
+        sandbox_id: `ki_${crypto.randomUUID().replace(/-/g, '')}`,
+      })
+      .returning({ id: kiloclaw_instances.id });
+    testInstanceId = instance.id;
+  });
+
+  afterEach(async () => {
+    /* eslint-disable drizzle/enforce-delete-with-where */
+    await db
+      .delete(kiloclaw_scheduled_action_targets)
+      .where(eq(kiloclaw_scheduled_action_targets.instance_id, testInstanceId));
+    // We deleted target rows above (by instance_id). Stages and parents
+    // don't auto-delete from that — the FK from target.stage_id is ON
+    // DELETE SET NULL, which nullifies the column on the target row, not
+    // the other way around. Tear down stages and parents explicitly by
+    // id so the test instance leaves no orphans.
+    const parents = await db
+      .select({ id: kiloclaw_scheduled_actions.id })
+      .from(kiloclaw_scheduled_actions)
+      .where(eq(kiloclaw_scheduled_actions.created_by, adminUser.id));
+    if (parents.length > 0) {
+      const ids = parents.map(p => p.id);
+      await db
+        .delete(kiloclaw_scheduled_action_stages)
+        .where(inArray(kiloclaw_scheduled_action_stages.scheduled_action_id, ids));
+      await db
+        .delete(kiloclaw_scheduled_actions)
+        .where(inArray(kiloclaw_scheduled_actions.id, ids));
+    }
+    await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, testInstanceId));
+    /* eslint-enable drizzle/enforce-delete-with-where */
+  });
+
+  describe('scheduleAction', () => {
+    it('throws FORBIDDEN for non-admin callers', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceId: testInstanceId,
+          scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('rejects scheduledAt within 1 minute of now', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceId: testInstanceId,
+          // 30 seconds in the future — under the 1-minute floor.
+          scheduledAt: new Date(Date.now() + 30_000).toISOString(),
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('1 minute'),
+      });
+    });
+
+    it('rejects unknown instanceId with NOT_FOUND', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceId: crypto.randomUUID(),
+          scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('rejects scheduling on a destroyed instance', async () => {
+      // Mark the test instance destroyed.
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, testInstanceId));
+
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceId: testInstanceId,
+          scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('happy path creates parent + stage + target rows and writes audit log', async () => {
+      const scheduledAt = new Date(Date.now() + 60 * 60_000).toISOString();
+      const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceId: testInstanceId,
+        scheduledAt,
+        reason: 'e2e test',
+      });
+
+      expect(result.id).toBeDefined();
+      expect(result.stageId).toBeDefined();
+
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, result.id));
+      expect(parent.action_type).toBe('scheduled_restart');
+      expect(parent.status).toBe('scheduled');
+      expect(parent.created_by).toBe(adminUser.id);
+      expect(parent.total_count).toBe(1);
+      expect(parent.reason).toBe('e2e test');
+
+      const stages = await db
+        .select()
+        .from(kiloclaw_scheduled_action_stages)
+        .where(eq(kiloclaw_scheduled_action_stages.scheduled_action_id, result.id));
+      expect(stages).toHaveLength(1);
+      expect(stages[0].stage_index).toBe(0);
+      expect(stages[0].status).toBe('pending');
+
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
+      expect(targets).toHaveLength(1);
+      expect(targets[0].instance_id).toBe(testInstanceId);
+      expect(targets[0].status).toBe('pending');
+      expect(targets[0].user_id).toBe(regularUser.id);
+
+      const logs = await db
+        .select()
+        .from(kiloclaw_admin_audit_logs)
+        .where(
+          and(
+            eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+            eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.scheduled_action.created')
+          )
+        );
+      expect(logs).toHaveLength(1);
+      expect(logs[0].metadata).toMatchObject({
+        scheduledActionId: result.id,
+        actionType: 'scheduled_restart',
+        instanceId: testInstanceId,
+      });
+    });
+  });
+
+  describe('listScheduledActions / getScheduledAction', () => {
+    it('throws FORBIDDEN for non-admin callers (listScheduledActions)', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(caller.admin.kiloclawInstances.listScheduledActions({})).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+    });
+
+    it('throws FORBIDDEN for non-admin callers (getScheduledAction)', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.getScheduledAction({ id: crypto.randomUUID() })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('lists scheduled actions and getScheduledAction returns parent + stages + targets', async () => {
+      const adminCaller = await createCallerForUser(adminUser.id);
+      const created = await adminCaller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceId: testInstanceId,
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      const list = await adminCaller.admin.kiloclawInstances.listScheduledActions({});
+      expect(list.items.some(a => a.id === created.id)).toBe(true);
+      expect(list.pagination.total).toBeGreaterThanOrEqual(1);
+
+      const detail = await adminCaller.admin.kiloclawInstances.getScheduledAction({
+        id: created.id,
+      });
+      expect(detail.action.id).toBe(created.id);
+      expect(detail.stages).toHaveLength(1);
+      expect(detail.targets).toHaveLength(1);
+      expect(detail.targets[0].instance_id).toBe(testInstanceId);
+    });
+  });
+
+  describe('cancelScheduledAction', () => {
+    it('throws FORBIDDEN for non-admin callers', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.cancelScheduledAction({ id: crypto.randomUUID() })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('throws NOT_FOUND for an unknown id', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.cancelScheduledAction({ id: crypto.randomUUID() })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('cancels a scheduled action and marks pending stages + targets cancelled', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceId: testInstanceId,
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      const result = await caller.admin.kiloclawInstances.cancelScheduledAction({
+        id: created.id,
+      });
+      expect(result).toEqual({ cancelled: true, status: 'cancelled' });
+
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, created.id));
+      expect(parent.status).toBe('cancelled');
+      expect(parent.cancelled_at).not.toBeNull();
+
+      const stages = await db
+        .select()
+        .from(kiloclaw_scheduled_action_stages)
+        .where(eq(kiloclaw_scheduled_action_stages.scheduled_action_id, created.id));
+      expect(stages.every(s => s.status === 'cancelled')).toBe(true);
+
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      expect(targets.every(t => t.status === 'skipped' && t.skip_reason === 'cancelled')).toBe(
+        true
+      );
+
+      const logs = await db
+        .select()
+        .from(kiloclaw_admin_audit_logs)
+        .where(
+          and(
+            eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+            eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.scheduled_action.cancelled')
+          )
+        );
+      expect(logs).toHaveLength(1);
+    });
+
+    it('returns no-op when called twice (idempotent)', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceId: testInstanceId,
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      const first = await caller.admin.kiloclawInstances.cancelScheduledAction({
+        id: created.id,
+      });
+      expect(first).toEqual({ cancelled: true, status: 'cancelled' });
+
+      const second = await caller.admin.kiloclawInstances.cancelScheduledAction({
+        id: created.id,
+      });
+      expect(second.cancelled).toBe(false);
+      expect(second.status).toBe('cancelled');
+    });
   });
 });

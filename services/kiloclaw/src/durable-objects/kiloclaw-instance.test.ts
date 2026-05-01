@@ -1107,9 +1107,10 @@ describe('reconciliation: machine status sync', () => {
       const { instance: inst, waitUntilPromises } = createInstance(storage);
       await inst.alarm();
       if (i === SELF_HEAL_THRESHOLD - 1) {
-        // 2 = recovery launch + tracked_image_tag Postgres sync (always enqueued
-        // by alarm() when sandboxId is set; see kiloclaw-instance/index.ts).
-        expect(waitUntilPromises).toHaveLength(2);
+        // 3 = recovery launch + tracked_image_tag Postgres sync + scheduled-action
+        // apply pass (both syncs are always enqueued by alarm() when sandboxId is
+        // set; see kiloclaw-instance/index.ts).
+        expect(waitUntilPromises).toHaveLength(3);
       }
     }
 
@@ -1127,8 +1128,9 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    // 1 = tracked_image_tag Postgres sync only; no recovery launched.
-    expect(waitUntilPromises).toHaveLength(1);
+    // 2 = tracked_image_tag Postgres sync + scheduled-action apply pass; no
+    // recovery launched.
+    expect(waitUntilPromises).toHaveLength(2);
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('healthCheckFailCount')).toBe(0);
     expect(storage._store.get('recoveryStartedAt')).toBeUndefined();
@@ -1142,8 +1144,9 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    // 1 = tracked_image_tag Postgres sync only; no fresh recovery launched.
-    expect(waitUntilPromises).toHaveLength(1);
+    // 2 = tracked_image_tag Postgres sync + scheduled-action apply pass; no
+    // fresh recovery launched.
+    expect(waitUntilPromises).toHaveLength(2);
   });
 
   it('does not clean up a pending recovery volume while recovery is still in progress', async () => {

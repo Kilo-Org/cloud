@@ -8,8 +8,11 @@ import {
   kiloclaw_access_codes,
   kiloclaw_google_oauth_connections,
   kiloclaw_instances,
+  kiloclaw_scheduled_actions,
+  kiloclaw_scheduled_action_stages,
+  kiloclaw_scheduled_action_targets,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, gt, sql } from 'drizzle-orm';
+import { eq, and, isNull, gt, lte, inArray, sql } from 'drizzle-orm';
 
 export { getWorkerDb, type WorkerDb };
 
@@ -287,4 +290,174 @@ export async function updateGoogleOAuthConnectionTokenData(
     .update(kiloclaw_google_oauth_connections)
     .set(update)
     .where(eq(kiloclaw_google_oauth_connections.instance_id, instanceId));
+}
+
+// ─── Scheduled Actions (PR 1: scheduled_restart) ───────────────────────
+
+export type DueScheduledActionTarget = {
+  target_id: string;
+  scheduled_action_id: string;
+  stage_id: string | null;
+  instance_id: string;
+  user_id: string;
+  action_type: 'scheduled_restart' | 'version_change';
+  target_image_tag: string | null;
+  override_pins: boolean;
+  parent_status: 'scheduled' | 'running' | 'completed' | 'cancelled' | 'failed';
+};
+
+/**
+ * Find pending scheduled-action targets for a single instance whose stage
+ * time has passed and whose parent is still actionable. Used by the DO
+ * apply path on alarm fire.
+ */
+export async function findDueScheduledActionTargetsForInstance(
+  db: WorkerDb,
+  instanceId: string
+): Promise<DueScheduledActionTarget[]> {
+  const rows = await db
+    .select({
+      target_id: kiloclaw_scheduled_action_targets.id,
+      scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
+      stage_id: kiloclaw_scheduled_action_targets.stage_id,
+      instance_id: kiloclaw_scheduled_action_targets.instance_id,
+      user_id: kiloclaw_scheduled_action_targets.user_id,
+      action_type: kiloclaw_scheduled_actions.action_type,
+      target_image_tag: kiloclaw_scheduled_actions.target_image_tag,
+      override_pins: kiloclaw_scheduled_actions.override_pins,
+      parent_status: kiloclaw_scheduled_actions.status,
+      stage_scheduled_at: kiloclaw_scheduled_action_stages.scheduled_at,
+    })
+    .from(kiloclaw_scheduled_action_targets)
+    .innerJoin(
+      kiloclaw_scheduled_actions,
+      eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
+    )
+    .innerJoin(
+      kiloclaw_scheduled_action_stages,
+      eq(kiloclaw_scheduled_action_stages.id, kiloclaw_scheduled_action_targets.stage_id)
+    )
+    .where(
+      and(
+        eq(kiloclaw_scheduled_action_targets.instance_id, instanceId),
+        eq(kiloclaw_scheduled_action_targets.status, 'pending'),
+        lte(kiloclaw_scheduled_action_stages.scheduled_at, sql`now()`),
+        inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+      )
+    )
+    .orderBy(kiloclaw_scheduled_action_stages.scheduled_at);
+
+  return rows.map(r => ({
+    target_id: r.target_id,
+    scheduled_action_id: r.scheduled_action_id,
+    stage_id: r.stage_id,
+    instance_id: r.instance_id,
+    user_id: r.user_id,
+    action_type: r.action_type,
+    target_image_tag: r.target_image_tag,
+    override_pins: r.override_pins,
+    parent_status: r.parent_status,
+  }));
+}
+
+/**
+ * Mark a scheduled-action target with its outcome (applied / skipped /
+ * failed) and bump the corresponding stage + parent counters atomically.
+ *
+ * Stage / parent transitions to 'completed' happen lazily — this writer
+ * just records the per-target outcome and increments counters. A
+ * follow-up sweep (or the next apply call when no targets remain) can
+ * promote stage/parent statuses if their pending counts hit zero.
+ */
+export async function recordScheduledActionTargetOutcome(
+  db: WorkerDb,
+  args: {
+    target_id: string;
+    scheduled_action_id: string;
+    stage_id: string | null;
+    outcome: 'applied' | 'skipped' | 'failed';
+    skip_reason?: string;
+    error_message?: string;
+  }
+): Promise<void> {
+  const now = sql`now()`;
+
+  await db
+    .update(kiloclaw_scheduled_action_targets)
+    .set({
+      status: args.outcome,
+      applied_at: args.outcome === 'applied' ? sql`now()` : null,
+      skip_reason: args.skip_reason ?? null,
+      error_message: args.error_message ?? null,
+    })
+    .where(
+      and(
+        eq(kiloclaw_scheduled_action_targets.id, args.target_id),
+        eq(kiloclaw_scheduled_action_targets.status, 'pending')
+      )
+    );
+
+  const counterField =
+    args.outcome === 'applied'
+      ? 'applied_count'
+      : args.outcome === 'skipped'
+        ? 'skipped_count'
+        : 'failed_count';
+
+  if (args.stage_id) {
+    await db
+      .update(kiloclaw_scheduled_action_stages)
+      .set({
+        [counterField]: sql`${kiloclaw_scheduled_action_stages[counterField]} + 1`,
+        started_at: sql`COALESCE(${kiloclaw_scheduled_action_stages.started_at}, ${now})`,
+      })
+      .where(eq(kiloclaw_scheduled_action_stages.id, args.stage_id));
+  }
+
+  await db
+    .update(kiloclaw_scheduled_actions)
+    .set({
+      [counterField]: sql`${kiloclaw_scheduled_actions[counterField]} + 1`,
+      status: sql`CASE WHEN ${kiloclaw_scheduled_actions.status} = 'scheduled' THEN 'running' ELSE ${kiloclaw_scheduled_actions.status} END`,
+      started_at: sql`COALESCE(${kiloclaw_scheduled_actions.started_at}, ${now})`,
+    })
+    .where(eq(kiloclaw_scheduled_actions.id, args.scheduled_action_id));
+}
+
+/**
+ * Promote stages and parents to 'completed' when all targets have
+ * resolved. Called at the end of the DO apply pass. Safe to run when no
+ * targets are pending — it just no-ops on already-completed rows.
+ */
+export async function maybePromoteScheduledActionsToCompleted(
+  db: WorkerDb,
+  scheduledActionIds: string[]
+): Promise<void> {
+  if (scheduledActionIds.length === 0) return;
+
+  // Stages: complete any stage whose pending target count is 0.
+  await db.execute(sql`
+    UPDATE kiloclaw_scheduled_action_stages s
+    SET status = 'completed',
+        completed_at = COALESCE(s.completed_at, now())
+    WHERE s.scheduled_action_id IN ${scheduledActionIds}
+      AND s.status IN ('pending', 'running')
+      AND NOT EXISTS (
+        SELECT 1 FROM kiloclaw_scheduled_action_targets t
+        WHERE t.stage_id = s.id AND t.status = 'pending'
+      )
+  `);
+
+  // Parents: complete any parent whose pending target count is 0.
+  await db.execute(sql`
+    UPDATE kiloclaw_scheduled_actions a
+    SET status = 'completed',
+        completed_at = COALESCE(a.completed_at, now())
+    WHERE a.id IN ${scheduledActionIds}
+      AND a.status IN ('scheduled', 'running')
+      AND NOT EXISTS (
+        SELECT 1 FROM kiloclaw_scheduled_action_targets t
+        WHERE t.scheduled_action_id = a.id AND t.status = 'pending'
+      )
+  `);
 }

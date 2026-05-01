@@ -10,6 +10,7 @@ import { RegionsTab } from './KiloclawRegions/KiloclawRegionsPage';
 import { CliRunsTab } from './KiloclawCliRuns/KiloclawCliRunsTab';
 import { KiloclawSecurityAdvisorContentTab } from './KiloclawSecurityAdvisorContent/KiloclawSecurityAdvisorContentTab';
 import { KiloclawProvidersTab } from './KiloclawProvidersTab';
+import { KiloclawSchedulerTab } from './KiloclawScheduler/KiloclawSchedulerTab';
 
 const VALID_TABS: readonly string[] = [
   'instances',
@@ -20,6 +21,7 @@ const VALID_TABS: readonly string[] = [
   'providers',
   'cli-runs',
   'shell-security-content',
+  'scheduler',
 ];
 type Tab =
   | 'instances'
@@ -29,7 +31,8 @@ type Tab =
   | 'regions'
   | 'providers'
   | 'cli-runs'
-  | 'shell-security-content';
+  | 'shell-security-content'
+  | 'scheduler';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -116,6 +119,9 @@ export function KiloclawDashboard() {
           <TabsTrigger value="shell-security-content" className={tabTriggerClass}>
             ShellSecurity Content
           </TabsTrigger>
+          <TabsTrigger value="scheduler" className={tabTriggerClass}>
+            Scheduler
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="instances" className="mt-4">
           <KiloclawInstancesPage />
@@ -140,6 +146,9 @@ export function KiloclawDashboard() {
         </TabsContent>
         <TabsContent value="shell-security-content" className="mt-4">
           <KiloclawSecurityAdvisorContentTab />
+        </TabsContent>
+        <TabsContent value="scheduler" className="mt-4">
+          <KiloclawSchedulerTab />
         </TabsContent>
       </Tabs>
     </div>

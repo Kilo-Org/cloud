@@ -7,6 +7,7 @@ import { KiloChatHooksProvider } from '@kilocode/kilo-chat-hooks';
 import { EVENT_SERVICE_URL, KILO_CHAT_URL } from '@/lib/config';
 
 import {
+  clearKiloChatTokenCache,
   useKiloChatTokenGetter,
   useKiloChatTokenResponseGetter,
 } from './hooks/use-kilo-chat-token';
@@ -26,6 +27,10 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
     const eventService = new EventServiceClient({
       url: EVENT_SERVICE_URL,
       getToken,
+      onUnauthorized: () => {
+        clearKiloChatTokenCache();
+        return 'retry';
+      },
     });
     const kiloChatClient = new KiloChatClient({
       eventService,

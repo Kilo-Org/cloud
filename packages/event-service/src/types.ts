@@ -22,14 +22,19 @@ export type ServerMessage = z.infer<typeof serverMessageSchema>;
 
 // ── Config ─────────────────────────────────────────────────────────
 
+export type UnauthorizedRecoveryDecision = 'retry' | 'stop';
+
 export type EventServiceConfig = {
   url: string;
   getToken: () => Promise<string>;
   /**
    * Called when the WebSocket upgrade is rejected (typically 401/403, though
-   * browsers do not expose the HTTP status of a failed handshake). The client
-   * marks itself destroyed and stops reconnecting; the caller should clear any
-   * cached token and trigger re-authentication.
+   * browsers do not expose the HTTP status of a failed handshake). Return
+   * 'retry' after clearing cached token state to let the client reconnect with
+   * a fresh token, or 'stop' to permanently stop reconnecting.
    */
-  onUnauthorized?: () => void;
+  onUnauthorized?: () =>
+    | void
+    | UnauthorizedRecoveryDecision
+    | Promise<void | UnauthorizedRecoveryDecision>;
 };

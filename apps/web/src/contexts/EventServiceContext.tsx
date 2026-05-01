@@ -30,11 +30,11 @@ export function EventServiceProvider({ children }: EventServiceProviderProps) {
       new EventServiceClient({
         url: EVENT_SERVICE_URL,
         getToken: getKiloChatToken,
-        // Event Service rejected our token as 401/403. Drop the cached
-        // token so the next request refetches; the socket is permanently
-        // stopped by the client to avoid a reconnect storm.
+        // Event Service rejected our token as 401/403. Drop the cached token
+        // so the bounded reconnect path refetches a fresh one.
         onUnauthorized: () => {
           clearKiloChatToken();
+          return 'retry';
         },
       }),
     []

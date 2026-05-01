@@ -33,6 +33,7 @@ export class HandshakeTimeoutError extends Error {
 }
 
 const HANDSHAKE_TIMEOUT_MS = 10_000;
+const MAX_AUTH_RECOVERY_ATTEMPTS = 1;
 
 function encodeBase64Url(input: string): string {
   // btoa handles each char as a single byte; JWTs are ASCII so this is safe.
@@ -43,7 +44,7 @@ function encodeBase64Url(input: string): string {
 export class EventServiceClient {
   private readonly url: string;
   private readonly getToken: () => Promise<string>;
-  private readonly onUnauthorized: (() => void) | undefined;
+  private readonly onUnauthorized: EventServiceConfig['onUnauthorized'];
 
   private ws: WebSocket | null = null;
   private connected = false;
@@ -56,11 +57,13 @@ export class EventServiceClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
   private reconnectAttempts = 0;
+  private authRecoveryAttempts = 0;
   private hasConnectedBefore = false;
   private reconnectHandlers = new Set<() => void>();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private handshakeTimer: ReturnType<typeof setTimeout> | null = null;
   private abortHandshake: ((err: Error) => void) | null = null;
+  private suppressNextCloseReconnect = false;
 
   constructor(config: EventServiceConfig) {
     this.url = config.url;
@@ -71,6 +74,7 @@ export class EventServiceClient {
   async connect(): Promise<void> {
     this.destroyed = false;
     this.reconnectAttempts = 0;
+    this.authRecoveryAttempts = 0;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -78,24 +82,39 @@ export class EventServiceClient {
     try {
       await this.connectOnce();
     } catch (err) {
-      if (this.handleAuthFailure(err)) return;
+      if (await this.handleAuthFailure(err)) return;
       if (!this.destroyed) {
         this.scheduleReconnect();
       }
     }
   }
 
-  private handleAuthFailure(err: unknown): boolean {
-    if (err instanceof WebSocketAuthError) {
-      this.destroyed = true;
-      if (this.reconnectTimer !== null) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-      }
-      this.onUnauthorized?.();
+  private async handleAuthFailure(err: unknown): Promise<boolean> {
+    if (!(err instanceof WebSocketAuthError) || !this.onUnauthorized) {
+      return false;
+    }
+
+    const decision = await this.onUnauthorized();
+    if (
+      decision === 'stop' ||
+      this.destroyed ||
+      this.authRecoveryAttempts >= MAX_AUTH_RECOVERY_ATTEMPTS
+    ) {
+      this.stopAfterUnauthorized();
       return true;
     }
-    return false;
+
+    this.authRecoveryAttempts++;
+    this.scheduleReconnect();
+    return true;
+  }
+
+  private stopAfterUnauthorized(): void {
+    this.destroyed = true;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
   }
 
   private async connectOnce(): Promise<void> {
@@ -153,6 +172,7 @@ export class EventServiceClient {
         this.connected = true;
         this.hasConnectedBefore = true;
         this.reconnectAttempts = 0;
+        this.authRecoveryAttempts = 0;
         this.resubscribeContexts();
         if (isReconnect) {
           for (const handler of this.reconnectHandlers) {
@@ -172,6 +192,10 @@ export class EventServiceClient {
         this.connected = false;
         this.stopPing();
         this.clearHandshakeTimer();
+        if (this.suppressNextCloseReconnect) {
+          this.suppressNextCloseReconnect = false;
+          return;
+        }
         if (!this.destroyed) {
           this.scheduleReconnect();
         }
@@ -185,6 +209,7 @@ export class EventServiceClient {
         // errors as potential auth failures and surface them via
         // onUnauthorized. Callers can refresh the token and reconnect.
         if (!this.connected) {
+          this.suppressNextCloseReconnect = true;
           settleReject(new WebSocketAuthError());
         }
       });
@@ -343,12 +368,15 @@ export class EventServiceClient {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connectOnce().catch(err => {
-        // If the handshake failed with auth rejection, stop reconnecting.
-        if (this.handleAuthFailure(err)) return;
-        if (!this.destroyed) {
-          this.scheduleReconnect();
-        }
+        void this.handleReconnectFailure(err);
       });
     }, delay);
+  }
+
+  private async handleReconnectFailure(err: unknown): Promise<void> {
+    if (await this.handleAuthFailure(err)) return;
+    if (!this.destroyed) {
+      this.scheduleReconnect();
+    }
   }
 }

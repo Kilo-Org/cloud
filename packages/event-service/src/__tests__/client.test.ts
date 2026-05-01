@@ -210,10 +210,60 @@ describe('EventServiceClient', () => {
     expect(allMockWs).toHaveLength(2);
   });
 
-  it('error before open calls onUnauthorized and stops reconnecting', async () => {
+  it('refreshes a stale token once after a pre-open rejection and reconnects', async () => {
     vi.useFakeTimers();
     try {
-      const onUnauthorized = vi.fn();
+      const tokens = ['stale.token.sig', 'fresh.token.sig'];
+      const getToken = vi.fn(async () => tokens.shift() ?? 'fresh.token.sig');
+      const retryAuth = (): 'retry' => 'retry';
+      const onUnauthorized = vi.fn(retryAuth);
+      let wsCount = 0;
+      const WebSocketMock = function (url: string, protocols?: string | string[]) {
+        lastMockWs = new MockWebSocket(url, protocols);
+        allMockWs.push(lastMockWs);
+        wsCount++;
+        if (wsCount === 1) {
+          lastMockWs.readyState = 0; // CONNECTING
+          void Promise.resolve().then(() => {
+            lastMockWs.triggerError();
+            lastMockWs.triggerClose();
+          });
+        } else {
+          void Promise.resolve().then(() => lastMockWs.triggerOpen());
+        }
+        return lastMockWs;
+      };
+      WebSocketMock.OPEN = 1;
+      WebSocketMock.CLOSING = 2;
+      WebSocketMock.CLOSED = 3;
+      vi.stubGlobal('WebSocket', WebSocketMock);
+
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken,
+        onUnauthorized,
+      });
+
+      await client.connect();
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(client.isConnected()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(allMockWs).toHaveLength(2);
+      expect(getToken).toHaveBeenCalledTimes(2);
+      expect(allMockWs[1]?.protocols).toEqual([`kilo.jwt.${encodeBase64Url('fresh.token.sig')}`]);
+      expect(client.isConnected()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops after bounded auth recovery attempts keep failing', async () => {
+    vi.useFakeTimers();
+    try {
+      const retryAuth = (): 'retry' => 'retry';
+      const onUnauthorized = vi.fn(retryAuth);
       const WebSocketMock = function (url: string, protocols?: string | string[]) {
         lastMockWs = new MockWebSocket(url, protocols);
         allMockWs.push(lastMockWs);
@@ -236,13 +286,54 @@ describe('EventServiceClient', () => {
       });
 
       await client.connect();
+      await vi.advanceTimersByTimeAsync(2_000);
 
-      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(onUnauthorized).toHaveBeenCalledTimes(2);
+      expect(allMockWs).toHaveLength(2);
       expect(client.isConnected()).toBe(false);
 
-      // No reconnect should be scheduled — advancing time keeps the count at 1.
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(allMockWs).toHaveLength(1);
+      expect(allMockWs).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries non-auth pre-open failures with normal backoff', async () => {
+    vi.useFakeTimers();
+    try {
+      let wsCount = 0;
+      const WebSocketMock = function (url: string, protocols?: string | string[]) {
+        lastMockWs = new MockWebSocket(url, protocols);
+        allMockWs.push(lastMockWs);
+        wsCount++;
+        if (wsCount === 1) {
+          lastMockWs.readyState = 0; // CONNECTING
+          void Promise.resolve().then(() => {
+            lastMockWs.triggerError();
+            lastMockWs.triggerClose();
+          });
+        } else {
+          void Promise.resolve().then(() => lastMockWs.triggerOpen());
+        }
+        return lastMockWs;
+      };
+      WebSocketMock.OPEN = 1;
+      WebSocketMock.CLOSING = 2;
+      WebSocketMock.CLOSED = 3;
+      vi.stubGlobal('WebSocket', WebSocketMock);
+
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken: () => Promise.resolve('h.p.s'),
+      });
+
+      await client.connect();
+      expect(client.isConnected()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(allMockWs).toHaveLength(2);
+      expect(client.isConnected()).toBe(true);
     } finally {
       vi.useRealTimers();
     }

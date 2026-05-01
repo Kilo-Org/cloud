@@ -3642,7 +3642,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         runScheduledActionApply({
           env: this.env,
           state: this.s,
-          restartCurrentInstance: async () => {
+          restartCurrentInstance: async (imageTag?: string) => {
             // Call the public restartMachine entry point (not the
             // internal *InBackground variant). The entry point sets
             // status='restarting' and triggers the background restart
@@ -3650,7 +3650,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
             // bypasses the status flip, which causes its own initial
             // guard ("status is not 'restarting' → abort") to bail
             // silently and the actual restart never happens.
-            const result = await this.restartMachine();
+            //
+            // imageTag is optional: omit for `scheduled_restart`
+            // (redeploys current tag); pass for `version_change`
+            // (redeploys on the chosen target tag).
+            const result = await this.restartMachine(imageTag ? { imageTag } : undefined);
             if (!result.success) {
               throw new Error(result.error ?? 'restartMachine returned failure');
             }

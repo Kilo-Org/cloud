@@ -11,6 +11,7 @@ import {
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
+  kiloclaw_version_pins,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, gt, lte, inArray, sql } from 'drizzle-orm';
 
@@ -297,7 +298,13 @@ export async function updateGoogleOAuthConnectionTokenData(
 export type DueScheduledActionTarget = {
   target_id: string;
   scheduled_action_id: string;
-  stage_id: string | null;
+  // Non-null because the apply query INNER JOINs on stage. The schema
+  // column is nullable (ON DELETE SET NULL is defensive), but a target
+  // whose stage has been deleted intentionally drops out of the apply
+  // path — without a stage we have no scheduled_at to gate on, so firing
+  // the action would be unsafe. Such orphans remain visible to the admin
+  // via getScheduledAction for cleanup.
+  stage_id: string;
   instance_id: string;
   user_id: string;
   action_type: 'scheduled_restart' | 'version_change';
@@ -310,6 +317,11 @@ export type DueScheduledActionTarget = {
  * Find pending scheduled-action targets for a single instance whose stage
  * time has passed and whose parent is still actionable. Used by the DO
  * apply path on alarm fire.
+ *
+ * The INNER JOIN on stages is intentional: a target whose stage has been
+ * deleted (nullable FK with ON DELETE SET NULL) drops out — we have no
+ * scheduled_at to gate on, so firing it would be unsafe. Stages aren't
+ * deleted outside parent CASCADE in v1; the SET NULL is defensive.
  */
 export async function findDueScheduledActionTargetsForInstance(
   db: WorkerDb,
@@ -350,7 +362,8 @@ export async function findDueScheduledActionTargetsForInstance(
   return rows.map(r => ({
     target_id: r.target_id,
     scheduled_action_id: r.scheduled_action_id,
-    stage_id: r.stage_id,
+    // INNER JOIN on stages guarantees stage_id is non-null here.
+    stage_id: r.stage_id as string,
     instance_id: r.instance_id,
     user_id: r.user_id,
     action_type: r.action_type,
@@ -374,7 +387,7 @@ export async function recordScheduledActionTargetOutcome(
   args: {
     target_id: string;
     scheduled_action_id: string;
-    stage_id: string | null;
+    stage_id: string;
     outcome: 'applied' | 'skipped' | 'failed';
     skip_reason?: string;
     error_message?: string;
@@ -404,15 +417,13 @@ export async function recordScheduledActionTargetOutcome(
         ? 'skipped_count'
         : 'failed_count';
 
-  if (args.stage_id) {
-    await db
-      .update(kiloclaw_scheduled_action_stages)
-      .set({
-        [counterField]: sql`${kiloclaw_scheduled_action_stages[counterField]} + 1`,
-        started_at: sql`COALESCE(${kiloclaw_scheduled_action_stages.started_at}, ${now})`,
-      })
-      .where(eq(kiloclaw_scheduled_action_stages.id, args.stage_id));
-  }
+  await db
+    .update(kiloclaw_scheduled_action_stages)
+    .set({
+      [counterField]: sql`${kiloclaw_scheduled_action_stages[counterField]} + 1`,
+      started_at: sql`COALESCE(${kiloclaw_scheduled_action_stages.started_at}, ${now})`,
+    })
+    .where(eq(kiloclaw_scheduled_action_stages.id, args.stage_id));
 
   await db
     .update(kiloclaw_scheduled_actions)
@@ -460,4 +471,67 @@ export async function maybePromoteScheduledActionsToCompleted(
         WHERE t.scheduled_action_id = a.id AND t.status = 'pending'
       )
   `);
+}
+
+// ─── Version pins (read-only access from the DO apply path) ──────────
+//
+// The web layer is the canonical writer for kiloclaw_version_pins (via
+// admin-kiloclaw-instances-router and the user pin UI). The worker DO
+// only needs read + atomic-CAS-delete access during the version_change
+// scheduled-action apply path, so the helpers here are intentionally
+// scoped to that one use case.
+
+export type VersionPinRow = {
+  id: string;
+  instance_id: string;
+  image_tag: string;
+  pinned_by: string;
+  updated_at: string;
+};
+
+/**
+ * Look up the active pin row for an instance (or null if none exists).
+ */
+export async function selectVersionPinForInstance(
+  db: WorkerDb,
+  instanceId: string
+): Promise<VersionPinRow | null> {
+  const [row] = await db
+    .select({
+      id: kiloclaw_version_pins.id,
+      instance_id: kiloclaw_version_pins.instance_id,
+      image_tag: kiloclaw_version_pins.image_tag,
+      pinned_by: kiloclaw_version_pins.pinned_by,
+      updated_at: kiloclaw_version_pins.updated_at,
+    })
+    .from(kiloclaw_version_pins)
+    .where(eq(kiloclaw_version_pins.instance_id, instanceId))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Atomic compare-and-set delete for a pin row. Mirrors the three-
+ * predicate guard `bulkChangeVersion.applyOne` and `restartMachine` use:
+ * deletes only when (instance_id, id, updated_at) all match the row we
+ * observed. If a concurrent writer modified or replaced the pin
+ * between observation and delete, this returns `{ deleted: false }` so
+ * the caller can mark the target skipped:pin_changed_in_flight rather
+ * than silently overriding the user's fresh pin.
+ */
+export async function deleteVersionPinWithCAS(
+  db: WorkerDb,
+  observed: { instance_id: string; id: string; updated_at: string }
+): Promise<{ deleted: boolean }> {
+  const result = await db
+    .delete(kiloclaw_version_pins)
+    .where(
+      and(
+        eq(kiloclaw_version_pins.instance_id, observed.instance_id),
+        eq(kiloclaw_version_pins.id, observed.id),
+        eq(kiloclaw_version_pins.updated_at, observed.updated_at)
+      )
+    )
+    .returning({ id: kiloclaw_version_pins.id });
+  return { deleted: result.length > 0 };
 }

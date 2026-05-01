@@ -1649,8 +1649,30 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           // wall-clock time.
           scheduledAt: z.string().datetime(),
           reason: z.string().max(256).optional(),
-          // Notice fields are collected for PR 2 but unused in PR 1.
-          // Defaults are sensible empty values so PR 1 callers can omit.
+          // Notice fields are collected here but unused until the
+          // notifications PR. Defaults are sensible empty values so
+          // current callers can omit.
+          noticeLeadHours: z.number().int().min(0).max(168).default(24),
+          noticeSubject: z.string().max(120).default(''),
+          noticeBody: z.string().max(2000).default(''),
+        }),
+        z.object({
+          actionType: z.literal('version_change'),
+          instanceId: z.string().uuid(),
+          // The image_tag the worker should redeploy on at the scheduled
+          // time. Must exist in kiloclaw_image_catalog with status='available'
+          // (validated in the procedure body, mirrors bulkChangeVersion).
+          imageTag: z
+            .string()
+            .min(1)
+            .max(128)
+            .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),
+          // Whether to delete an existing pin row at apply time. Same
+          // semantics as bulkChangeVersion.overridePins. Without this,
+          // a pinned instance is recorded as skipped:pinned at apply.
+          overridePins: z.boolean().default(false),
+          scheduledAt: z.string().datetime(),
+          reason: z.string().max(256).optional(),
           noticeLeadHours: z.number().int().min(0).max(168).default(24),
           noticeSubject: z.string().max(120).default(''),
           noticeBody: z.string().max(2000).default(''),
@@ -1666,6 +1688,33 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           code: 'BAD_REQUEST',
           message: 'scheduledAt must be at least 1 minute in the future',
         });
+      }
+
+      // For version_change, validate the target image tag matches the
+      // catalog rules bulkChangeVersion uses (must exist + status='available').
+      // We do this BEFORE inserting any rows so a bad tag fails fast.
+      if (input.actionType === 'version_change') {
+        const [catalogEntry] = await db
+          .select({
+            image_tag: kiloclaw_image_catalog.image_tag,
+            status: kiloclaw_image_catalog.status,
+          })
+          .from(kiloclaw_image_catalog)
+          .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag))
+          .limit(1);
+
+        if (!catalogEntry) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Target image tag not found in catalog: ${input.imageTag}`,
+          });
+        }
+        if (catalogEntry.status === 'disabled') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Target image tag is disabled: ${input.imageTag}`,
+          });
+        }
       }
 
       // Resolve the instance + owner so we can stamp source_image_tag
@@ -1690,6 +1739,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         });
       }
 
+      // version_change-specific parent/target columns. Null for other action types.
+      const parentTargetImageTag = input.actionType === 'version_change' ? input.imageTag : null;
+      const parentOverridePins = input.actionType === 'version_change' ? input.overridePins : false;
+
       // Insert parent + single stage + single target in one transaction
       // so a partial failure doesn't leave dangling rows.
       const result = await db.transaction(async tx => {
@@ -1697,9 +1750,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           .insert(kiloclaw_scheduled_actions)
           .values({
             action_type: input.actionType,
-            // version_change-specific columns ignored for scheduled_restart
-            target_image_tag: null,
-            override_pins: false,
+            target_image_tag: parentTargetImageTag,
+            override_pins: parentOverridePins,
             notice_lead_hours: input.noticeLeadHours,
             notice_subject: input.noticeSubject,
             notice_body: input.noticeBody,
@@ -1725,7 +1777,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           stage_id: stageRow.id,
           instance_id: row.instance.id,
           source_image_tag: row.instance.tracked_image_tag,
-          target_image_tag: null,
+          // For version_change targets we stamp the target tag so the
+          // DO apply path can read it from the target row directly
+          // without having to join back to the parent.
+          target_image_tag: parentTargetImageTag,
           user_id: row.owner_id,
           status: 'pending',
         });
@@ -1737,19 +1792,31 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       // actor's id as the target_user_id sentinel since the column is
       // notNull; the actual targeted instance/user are in metadata.
       try {
+        const messageDetail =
+          input.actionType === 'version_change'
+            ? `version_change → ${input.imageTag}${input.overridePins ? ' (override_pins=true)' : ''}`
+            : 'scheduled_restart';
         await createKiloClawAdminAuditLog({
           action: 'kiloclaw.scheduled_action.created',
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
           target_user_id: row.owner_id,
-          message: `Scheduled ${input.actionType} for instance ${input.instanceId} at ${input.scheduledAt}`,
+          message: `Scheduled ${messageDetail} for instance ${input.instanceId} at ${input.scheduledAt}`,
           metadata: {
             scheduledActionId: result.id,
             actionType: input.actionType,
             instanceId: input.instanceId,
             scheduledAt: input.scheduledAt,
             reason: input.reason ?? null,
+            // Action-type-specific metadata
+            ...(input.actionType === 'version_change'
+              ? {
+                  imageTag: input.imageTag,
+                  overridePins: input.overridePins,
+                  sourceImageTag: row.instance.tracked_image_tag,
+                }
+              : {}),
           },
         });
       } catch (auditErr) {
@@ -1825,6 +1892,30 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         targetRows.map(t => [t.scheduled_action_id, t.instance_id])
       );
 
+      // Earliest stage's scheduled_at — surfaces the "fire no earlier than"
+      // bound in the list view. v1 has one stage per action so this is
+      // unambiguous. With multi-stage rollouts (post-PR-4) consider
+      // returning min(scheduled_at) and "+ N stages" instead.
+      const stageRows =
+        actionIds.length > 0
+          ? await db
+              .select({
+                scheduled_action_id: kiloclaw_scheduled_action_stages.scheduled_action_id,
+                scheduled_at: kiloclaw_scheduled_action_stages.scheduled_at,
+              })
+              .from(kiloclaw_scheduled_action_stages)
+              .where(inArray(kiloclaw_scheduled_action_stages.scheduled_action_id, actionIds))
+              .orderBy(asc(kiloclaw_scheduled_action_stages.scheduled_at))
+          : [];
+      const scheduledAtByAction = new Map<string, string>();
+      for (const s of stageRows) {
+        // First stage we see per action wins (rows are ordered ascending
+        // so this captures the earliest scheduled_at).
+        if (!scheduledAtByAction.has(s.scheduled_action_id)) {
+          scheduledAtByAction.set(s.scheduled_action_id, s.scheduled_at);
+        }
+      }
+
       const totalCountResult = await db
         .select({ count: sql<number>`COUNT(*)::int` })
         .from(kiloclaw_scheduled_actions)
@@ -1836,6 +1927,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         items: rows.map(r => ({
           ...r,
           instance_id: instanceIdByAction.get(r.id) ?? null,
+          scheduled_at: scheduledAtByAction.get(r.id) ?? null,
         })),
         pagination: {
           offset: input.offset,

@@ -4,9 +4,10 @@
  * (and whose parent action is still actionable), dispatches by
  * action_type and records the outcome.
  *
- * PR 1 implements only `action_type='scheduled_restart'`. PR 3 will add
- * `version_change`. The action_type switch is structured so future types
- * slot in without churning the dispatcher.
+ * Currently dispatches:
+ *   - `scheduled_restart` → existing `restartMachine()` path (no imageTag)
+ *   - `version_change`    → pin override + `restartMachine({ imageTag })`
+ *                           (delegates to applyVersionChangeForTarget)
  *
  * Coexistence with the existing reconcile alarm: this path runs first
  * (best-effort wrapped in try/catch) so reconciliation continues even if
@@ -23,22 +24,27 @@ import {
   recordScheduledActionTargetOutcome,
   maybePromoteScheduledActionsToCompleted,
   type DueScheduledActionTarget,
+  type WorkerDb,
 } from '../../db';
-import { kiloclaw_instances } from '@kilocode/db/schema';
+import { kiloclaw_instances, kiloclaw_scheduled_actions } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { doLog, doWarn, toLoggable } from './log';
+import { applyVersionChangeForTarget } from './version-change-apply';
 
 type ApplyContext = {
   env: KiloClawEnv;
   state: InstanceMutableState;
   /**
    * Trigger the DO's existing redeploy / restart machinery for the
-   * current instance. The DO calls into this from its own internal
-   * restartMachine path with no `imageTag` argument, which is the
-   * scheduled_restart semantic.
+   * current instance. Optional `imageTag` argument supports the
+   * `version_change` apply path (which redeploys on a new tag); a
+   * call with no argument is a `scheduled_restart` (redeploy current
+   * tag).
    */
-  restartCurrentInstance: () => Promise<void>;
+  restartCurrentInstance: (imageTag?: string) => Promise<void>;
 };
+
+type DispatchOutcome = { kind: 'applied' } | { kind: 'skipped'; reason: string };
 
 export async function runScheduledActionApply(ctx: ApplyContext): Promise<{ processed: number }> {
   const connectionString = ctx.env.HYPERDRIVE?.connectionString;
@@ -104,11 +110,34 @@ export async function runScheduledActionApply(ctx: ApplyContext): Promise<{ proc
   for (const target of due) {
     touchedActionIds.add(target.scheduled_action_id);
 
-    // The query already filters parent.status IN ('scheduled', 'running')
-    // but a concurrent cancellation between the query and the apply is
-    // possible. Re-check parent status before dispatching. If cancelled,
-    // mark the target skipped:cancelled.
-    if (target.parent_status === 'cancelled' || target.parent_status === 'completed') {
+    // Re-fetch parent status right before dispatch. The findDue query's
+    // parent_status is from a prior snapshot — by now an admin may have
+    // cancelled. The atomic UPDATE in recordScheduledActionTargetOutcome
+    // (WHERE status='pending') keeps the audit trail consistent if cancel
+    // wins the race, but we'd still fire the side effect (restartMachine)
+    // if we relied on the snapshot alone. The fresh SELECT narrows the
+    // race window to a single round-trip; truly closing it would require
+    // a transaction wrapping the side effect, which we intentionally
+    // avoid (long-running tx around restartMachine).
+    let currentParentStatus: string | undefined;
+    try {
+      const [parentRow] = await db
+        .select({ status: kiloclaw_scheduled_actions.status })
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, target.scheduled_action_id))
+        .limit(1);
+      currentParentStatus = parentRow?.status;
+    } catch (err) {
+      doWarn(ctx.state, 'scheduled-action-apply: parent status re-fetch failed', {
+        error: toLoggable(err),
+        targetId: target.target_id,
+      });
+      // Fall through and trust the snapshot. The atomic UPDATE will still
+      // refuse to overwrite a non-pending target.
+      currentParentStatus = target.parent_status;
+    }
+
+    if (currentParentStatus === 'cancelled' || currentParentStatus === 'completed') {
       try {
         await recordScheduledActionTargetOutcome(db, {
           target_id: target.target_id,
@@ -127,17 +156,32 @@ export async function runScheduledActionApply(ctx: ApplyContext): Promise<{ proc
     }
 
     try {
-      await dispatchByActionType(target, ctx);
-      await recordScheduledActionTargetOutcome(db, {
-        target_id: target.target_id,
-        scheduled_action_id: target.scheduled_action_id,
-        stage_id: target.stage_id,
-        outcome: 'applied',
-      });
-      doLog(ctx.state, 'scheduled-action-apply: applied', {
-        targetId: target.target_id,
-        actionType: target.action_type,
-      });
+      const outcome = await dispatchByActionType(target, ctx, db);
+      if (outcome.kind === 'applied') {
+        await recordScheduledActionTargetOutcome(db, {
+          target_id: target.target_id,
+          scheduled_action_id: target.scheduled_action_id,
+          stage_id: target.stage_id,
+          outcome: 'applied',
+        });
+        doLog(ctx.state, 'scheduled-action-apply: applied', {
+          targetId: target.target_id,
+          actionType: target.action_type,
+        });
+      } else {
+        await recordScheduledActionTargetOutcome(db, {
+          target_id: target.target_id,
+          scheduled_action_id: target.scheduled_action_id,
+          stage_id: target.stage_id,
+          outcome: 'skipped',
+          skip_reason: outcome.reason,
+        });
+        doLog(ctx.state, 'scheduled-action-apply: skipped', {
+          targetId: target.target_id,
+          actionType: target.action_type,
+          reason: outcome.reason,
+        });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'unknown error';
       try {
@@ -176,16 +220,20 @@ export async function runScheduledActionApply(ctx: ApplyContext): Promise<{ proc
 
 async function dispatchByActionType(
   target: DueScheduledActionTarget,
-  ctx: ApplyContext
-): Promise<void> {
+  ctx: ApplyContext,
+  db: WorkerDb
+): Promise<DispatchOutcome> {
   switch (target.action_type) {
     case 'scheduled_restart':
       await ctx.restartCurrentInstance();
-      return;
+      return { kind: 'applied' };
     case 'version_change':
-      // PR 3 will implement this case via the shared
-      // applyVersionChangeToInstance helper. For PR 1, fail loudly.
-      throw new Error('version_change action_type not implemented in PR 1');
+      return await applyVersionChangeForTarget({
+        db,
+        state: ctx.state,
+        target,
+        restartCurrentInstance: ctx.restartCurrentInstance,
+      });
     default: {
       const exhaustive: never = target.action_type;
       throw new Error(`unhandled action_type: ${String(exhaustive)}`);

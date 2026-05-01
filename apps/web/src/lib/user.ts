@@ -593,6 +593,9 @@ export class SoftDeletePreconditionError extends Error {
  * - stytch_fingerprints (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
+ * - kiloclaw_scheduled_action_targets (retained operational records;
+ *   user_id FK references the anonymized kilocode_users row — no PII
+ *   stored directly on the target row)
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)

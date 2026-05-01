@@ -8,3 +8,7 @@ export function isOpenAiModel(requestedModel: string) {
 export function isGptOssModel(requestedModel: string) {
   return requestedModel.includes('gpt-oss');
 }
+
+export const GPT_CURRENT_MODEL_ID = 'openai/gpt-5.5';
+
+export const GPT_CURRENT_VERCEL_MODEL_ID = GPT_CURRENT_MODEL_ID;

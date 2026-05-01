@@ -19,6 +19,7 @@ import {
   getOpenCodeSettings,
 } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/kilo-auto';
+import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -138,8 +139,7 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
     method: 'GET',
     headers: {
       Authorization: `Bearer ${PROVIDERS.OPENROUTER.apiKey}`,
-      'HTTP-Referer': 'https://kilocode.ai',
-      'X-Title': 'Kilo Code',
+      ...ATTRIBUTION_HEADERS,
     },
     next: { revalidate: 60 },
   });

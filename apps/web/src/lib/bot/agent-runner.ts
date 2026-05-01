@@ -10,6 +10,7 @@ import {
   formatConversationContextForPrompt,
 } from '@/lib/bot/conversation-context';
 import { buildPrSignature, getRequesterInfo } from '@/lib/bot/pr-signature';
+import { getBotDocumentationUrl } from '@/lib/bot/platform-helpers';
 import {
   linkBotRequestToSession,
   recordBotRequestCloudAgentSession,
@@ -41,7 +42,6 @@ import type { BotRequestStep } from '@kilocode/db/schema';
 import { ToolLoopAgent, generateText, stepCountIs, tool } from 'ai';
 import type { StepResult, ToolSet } from 'ai';
 import { Actions, Card, CardText, LinkButton, Section } from 'chat';
-import { ThreadImpl } from 'chat';
 import type { Author, Message, Thread } from 'chat';
 import { randomUUID } from 'crypto';
 
@@ -98,6 +98,7 @@ async function buildSystemPrompt(
   triggerMessage: { id: string }
 ) {
   const owner = ownerFromIntegration(platformIntegration);
+  const botDocumentationUrl = getBotDocumentationUrl(platformIntegration.platform);
 
   const [githubContext, gitlabContext, conversationContext] = await Promise.all([
     getGitHubRepositoryContext(owner),
@@ -113,7 +114,7 @@ async function buildSystemPrompt(
 - If the user's request is ambiguous, ask 1-2 clarifying questions instead of guessing.
 
 ## Answering questions about Kilo Bot
-- When users ask what you can do, how you work, or for general help, include a link to the Bot documentation: https://kilo.ai/docs/code-with-ai/platforms/slack
+- When users ask what you can do, how you work, or for general help, include a link to the Bot documentation: ${botDocumentationUrl}
 - Provide the docs link along with your answer so users can learn more.
 
 ## Context you may receive
@@ -358,18 +359,4 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
     collectedSteps,
     responseTimeMs: Date.now() - startedAt,
   };
-}
-
-export function createSyntheticThread(params: {
-  threadId: string;
-  adapterName: string;
-  channelId: string;
-  isDM: boolean;
-}): Thread {
-  return new ThreadImpl({
-    adapterName: params.adapterName,
-    id: params.threadId,
-    channelId: params.channelId,
-    isDM: params.isDM,
-  });
 }

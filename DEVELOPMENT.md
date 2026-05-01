@@ -74,7 +74,7 @@ brew install --cask docker
 
 **Important:** Open Docker Desktop at least once after installation — it configures the CLI tools needed for `docker compose`.
 
-### Vercel CLI
+### Vercel CLI (recommended if you have access)
 
 Used to pull environment variables from the Vercel project:
 
@@ -108,6 +108,8 @@ git lfs pull
 
 ### 3. Set up environment variables
 
+#### a. Set up using Vercel
+
 The project pulls environment variables from Vercel. Run these commands interactively (each will prompt for browser-based authentication):
 
 ```bash
@@ -124,6 +126,20 @@ The KiloClaw pages (`/claw/*`) render the Pylon support chat widget, which requi
 - `PYLON_IDENTITY_SECRET` — the identity verification secret used to HMAC-sign user emails
 
 Both are already present in Vercel and pulled by `vercel env pull`. If either is missing the widget is silently skipped, so local dev continues to work without Pylon configured.
+
+#### b. Set up manually
+
+If you do not have Vercel access (typical for non-Kilo-employees), you will need to set up the `.env.local` file manually.
+
+Copy `.env.local.example` to `.env.local`, then update the following variables in `.env.local`:
+
+- `NEXTAUTH_SECRET`: Generate a random secret with `openssl rand -base64 32`
+- `INTERNAL_API_SECRET`: Generate a random secret with `openssl rand -base64 32`
+- `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: These must be set to create a fake account. You can use an existing Stripe account or create a new one, and use the keys from Sandbox Mode (formerly Test Mode) here.
+
+Then copy `.env.development.local.example` to `.env.development.local`.
+
+These changes will allow you to do local testing with a fake account.
 
 ### 4. Start the database
 

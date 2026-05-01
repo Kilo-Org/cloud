@@ -7,9 +7,10 @@ import type {
   OpenRouterGeneration,
   GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
+import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 
-export async function openRouterRequest({
+export async function upstreamRequest({
   path,
   search,
   method,
@@ -27,13 +28,10 @@ export async function openRouterRequest({
   signal?: AbortSignal;
 }) {
   const headers = new Headers();
-  // HTTP-Referer deviates from HTTP spec per https://openrouter.ai/docs/api-reference/overview#headers
-  // Important: this must be the same as in the extension, so they're seen as the same app.
-  // TODO: Don't change HTTP-Referer; per OpenRouter docs it would identify us as a different app
-  headers.set('HTTP-Referer', 'https://kilocode.ai');
-  headers.set('X-Title', 'Kilo Code');
+  for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
+    headers.set(key, value);
+  }
   headers.set('Authorization', `Bearer ${provider.apiKey}`);
-
   headers.set('Content-Type', 'application/json');
 
   Object.entries(extraHeaders).forEach(([key, value]) => {
@@ -68,8 +66,7 @@ export async function fetchGeneration(messageId: string, provider: Provider) {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${provider.apiKey}`,
-          'HTTP-Referer': 'https://kilocode.ai',
-          'X-Title': 'Kilo Code',
+          ...ATTRIBUTION_HEADERS,
         },
       },
       { retryResponse: r => r.status >= 400 } // openrouter returns 404 when called too soon.

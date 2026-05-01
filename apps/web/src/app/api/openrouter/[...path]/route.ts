@@ -17,7 +17,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { openRouterRequest } from '@/lib/ai-gateway/providers/openrouter-request';
+import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -486,7 +486,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   const openrouterRequestSpan = startInactiveSpan({
-    name: 'openrouter-request-start',
+    name: 'upstream-request-start',
     op: 'http.client',
   });
 
@@ -530,7 +530,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     fraudHeaders
   );
 
-  const response = await openRouterRequest({
+  const response = await upstreamRequest({
     path,
     search: url.search,
     method: request.method,

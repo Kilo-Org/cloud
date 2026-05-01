@@ -89,7 +89,7 @@ export async function extractAndUploadImages(
     } catch (error) {
       console.error('[KiloBot] Failed to upload image attachment:', error);
       captureException(error, {
-        tags: { component: 'kilo-bot', op: 'upload-slack-image' },
+        tags: { component: 'kilo-bot', op: 'upload-bot-image' },
       });
     }
   }

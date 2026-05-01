@@ -2,7 +2,22 @@ import { test, describe, expect } from '@jest/globals';
 import { calculateKiloExclusiveCost_mUsd } from './processUsage';
 import type { JustTheCostsUsageStats } from './processUsage.types';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import {
+  qwen36_27b_model,
+  qwen36_flash_model,
+  qwen36_max_preview_model,
+  qwen36_plus_model,
+} from '@/lib/ai-gateway/providers/qwen';
+
+const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCostsUsageStats => ({
+  cost_mUsd: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheWriteTokens: 0,
+  cacheHitTokens: 0,
+  is_byok: false,
+  ...overrides,
+});
 
 describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   // Pre-discount prices from Qwen pricing page (35% Kilo discount applied in code):
@@ -14,16 +29,6 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
   // 256k<Input<=1M tier:
   //   Input: $2/1M → $1.3/1M   CacheWrite: $2.5/1M → $1.625/1M
   //   CacheRead: $0.2/1M → $0.13/1M   Output: $6/1M → $3.9/1M
-
-  const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCostsUsageStats => ({
-    cost_mUsd: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheWriteTokens: 0,
-    cacheHitTokens: 0,
-    is_byok: false,
-    ...overrides,
-  });
 
   test('returns 0 when model has no pricing', () => {
     const model: KiloExclusiveModel = {
@@ -221,5 +226,215 @@ describe('calculatKiloExclusiveCost_mUsd with qwen3.6-plus', () => {
       makeUsage({ inputTokens: 300_000, outputTokens: 1_000_000 })
     );
     expect(result).toBe(4_290_000);
+  });
+});
+
+describe('calculatKiloExclusiveCost_mUsd with qwen3.6-flash', () => {
+  // Pre-discount prices from Qwen pricing page (35% Kilo discount applied in code):
+  //
+  // Input<=256k tier:
+  //   Input: $0.25/1M → $0.1625/1M   CacheWrite: $0.3125/1M → $0.203125/1M
+  //   CacheRead: $0.025/1M → $0.01625/1M   Output: $1.5/1M → $0.975/1M
+  //
+  // 256k<Input<=1M tier:
+  //   Input: $1/1M → $0.65/1M   CacheWrite: $1.25/1M → $0.8125/1M
+  //   CacheRead: $0.1/1M → $0.065/1M   Output: $4/1M → $2.6/1M
+
+  test('input-only cost in <=256k tier', () => {
+    // 1M tokens * 0.1625 = 162_500 mUsd
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_flash_model,
+      makeUsage({ inputTokens: 100_000 })
+    );
+    expect(result).toBe(Math.round(100_000 * 0.1625));
+  });
+
+  test('output cost in <=256k tier', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_flash_model,
+      makeUsage({ outputTokens: 50_000 })
+    );
+    expect(result).toBe(Math.round(50_000 * 0.975));
+  });
+
+  test('mixed usage in <=256k tier', () => {
+    // 100k input, 20k cache hit, 30k cache write → 50k uncached
+    // total input = 50k + 30k + 20k = 100k (<=256k)
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_flash_model,
+      makeUsage({
+        inputTokens: 100_000,
+        outputTokens: 10_000,
+        cacheHitTokens: 20_000,
+        cacheWriteTokens: 30_000,
+      })
+    );
+    expect(result).toBe(
+      Math.round(50_000 * 0.1625 + 10_000 * 0.975 + 20_000 * 0.01625 + 30_000 * 0.203125)
+    );
+  });
+
+  test('input-only cost in >256k tier', () => {
+    // 300k uncached input tokens > 256k → tier 2: 300_000 * 0.65
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_flash_model,
+      makeUsage({ inputTokens: 300_000 })
+    );
+    expect(result).toBe(Math.round(300_000 * 0.65));
+  });
+
+  test('mixed usage in >256k tier', () => {
+    // 500k input, 50k cache hit, 100k cache write → 350k uncached
+    // total input = 500k (>256k)
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_flash_model,
+      makeUsage({
+        inputTokens: 500_000,
+        outputTokens: 20_000,
+        cacheHitTokens: 50_000,
+        cacheWriteTokens: 100_000,
+      })
+    );
+    expect(result).toBe(
+      Math.round(350_000 * 0.65 + 20_000 * 2.6 + 50_000 * 0.065 + 100_000 * 0.8125)
+    );
+  });
+
+  test('tier boundary: exactly 256k total input uses <=256k pricing', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_flash_model,
+      makeUsage({ inputTokens: 256 * 1024 })
+    );
+    expect(result).toBe(Math.round(256 * 1024 * 0.1625));
+  });
+
+  test('tier boundary: 256k+1 total input uses >256k pricing', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_flash_model,
+      makeUsage({ inputTokens: 256 * 1024 + 1 })
+    );
+    expect(result).toBe(Math.round((256 * 1024 + 1) * 0.65));
+  });
+
+  test('1M tokens input cost matches post-discount tier 2 price', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_flash_model,
+      makeUsage({ inputTokens: 1_000_000 })
+    );
+    expect(result).toBe(1_000_000 * 0.65);
+  });
+});
+
+describe('calculatKiloExclusiveCost_mUsd with qwen3.6-max-preview', () => {
+  // Pre-discount prices from Qwen pricing page (35% Kilo discount applied in code):
+  //
+  // Input<=128k tier:
+  //   Input: $1.3/1M → $0.845/1M   CacheWrite: $1.625/1M → $1.05625/1M
+  //   CacheRead: $0.13/1M → $0.0845/1M   Output: $7.8/1M → $5.07/1M
+  //
+  // 128k<Input<=256k tier:
+  //   Input: $2/1M → $1.3/1M   CacheWrite: $2.5/1M → $1.625/1M
+  //   CacheRead: $0.2/1M → $0.13/1M   Output: $12/1M → $7.8/1M
+
+  test('input-only cost in <=128k tier', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_max_preview_model,
+      makeUsage({ inputTokens: 50_000 })
+    );
+    expect(result).toBe(Math.round(50_000 * 0.845));
+  });
+
+  test('output cost in <=128k tier', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_max_preview_model,
+      makeUsage({ outputTokens: 10_000 })
+    );
+    expect(result).toBe(Math.round(10_000 * 5.07));
+  });
+
+  test('mixed usage in <=128k tier', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_max_preview_model,
+      makeUsage({
+        inputTokens: 100_000,
+        outputTokens: 5_000,
+        cacheHitTokens: 20_000,
+        cacheWriteTokens: 30_000,
+      })
+    );
+    expect(result).toBe(
+      Math.round(50_000 * 0.845 + 5_000 * 5.07 + 20_000 * 0.0845 + 30_000 * 1.05625)
+    );
+  });
+
+  test('input-only cost in >128k tier', () => {
+    // 200k > 128k → tier 2
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_max_preview_model,
+      makeUsage({ inputTokens: 200_000 })
+    );
+    expect(result).toBe(Math.round(200_000 * 1.3));
+  });
+
+  test('tier boundary: exactly 128k total input uses <=128k pricing', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_max_preview_model,
+      makeUsage({ inputTokens: 128 * 1024 })
+    );
+    expect(result).toBe(Math.round(128 * 1024 * 0.845));
+  });
+
+  test('tier boundary: 128k+1 total input uses >128k pricing', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_max_preview_model,
+      makeUsage({ inputTokens: 128 * 1024 + 1 })
+    );
+    expect(result).toBe(Math.round((128 * 1024 + 1) * 1.3));
+  });
+
+  test('256k tokens input cost uses >128k tier', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_max_preview_model,
+      makeUsage({ inputTokens: 256 * 1024 })
+    );
+    expect(result).toBe(Math.round(256 * 1024 * 1.3));
+  });
+});
+
+describe('calculatKiloExclusiveCost_mUsd with qwen3.6-27b', () => {
+  // Pre-discount prices (35% Kilo discount applied in code):
+  //   Input: $0.5/1M → $0.325/1M   Output: $5/1M → $3.25/1M
+
+  test('input-only cost', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_27b_model,
+      makeUsage({ inputTokens: 100_000 })
+    );
+    expect(result).toBe(Math.round(100_000 * 0.325));
+  });
+
+  test('output-only cost', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_27b_model,
+      makeUsage({ outputTokens: 50_000 })
+    );
+    expect(result).toBe(Math.round(50_000 * 3.25));
+  });
+
+  test('cache hit falls back to prompt price when cache_read is null', () => {
+    // no explicit cache_read price → uses prompt_per_million
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_27b_model,
+      makeUsage({ inputTokens: 100_000, cacheHitTokens: 100_000 })
+    );
+    expect(result).toBe(Math.round(100_000 * 0.325));
+  });
+
+  test('pricing is flat regardless of input size', () => {
+    const result = calculateKiloExclusiveCost_mUsd(
+      qwen36_27b_model,
+      makeUsage({ inputTokens: 250_000 })
+    );
+    expect(result).toBe(Math.round(250_000 * 0.325));
   });
 });

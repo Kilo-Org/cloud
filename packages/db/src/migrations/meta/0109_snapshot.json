@@ -1,6 +1,6 @@
 {
-  "id": "651d03b8-17af-4348-a39f-47908cc68191",
-  "prevId": "c225381f-febe-4048-a82f-3a506b8f4d56",
+  "id": "4c1ec3c4-df75-4028-a0ab-68a0ad3c1c4d",
+  "prevId": "651d03b8-17af-4348-a39f-47908cc68191",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -9807,6 +9807,534 @@
           "tableTo": "organizations",
           "columnsFrom": [
             "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.kiloclaw_scheduled_action_stages": {
+      "name": "kiloclaw_scheduled_action_stages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "scheduled_action_id": {
+          "name": "scheduled_action_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stage_index": {
+          "name": "stage_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduled_at": {
+          "name": "scheduled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "notice_sent_at": {
+          "name": "notice_sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "applied_count": {
+          "name": "applied_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "skipped_count": {
+          "name": "skipped_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "failed_count": {
+          "name": "failed_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "UQ_kiloclaw_scheduled_action_stages_parent_index": {
+          "name": "UQ_kiloclaw_scheduled_action_stages_parent_index",
+          "columns": [
+            {
+              "expression": "scheduled_action_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "stage_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_scheduled_action_stages_notice_due": {
+          "name": "IDX_kiloclaw_scheduled_action_stages_notice_due",
+          "columns": [
+            {
+              "expression": "scheduled_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_scheduled_action_stages\".\"notice_sent_at\" IS NULL AND \"kiloclaw_scheduled_action_stages\".\"status\" = 'pending'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "kiloclaw_scheduled_action_stages_scheduled_action_id_kiloclaw_scheduled_actions_id_fk": {
+          "name": "kiloclaw_scheduled_action_stages_scheduled_action_id_kiloclaw_scheduled_actions_id_fk",
+          "tableFrom": "kiloclaw_scheduled_action_stages",
+          "tableTo": "kiloclaw_scheduled_actions",
+          "columnsFrom": [
+            "scheduled_action_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.kiloclaw_scheduled_action_targets": {
+      "name": "kiloclaw_scheduled_action_targets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "scheduled_action_id": {
+          "name": "scheduled_action_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stage_id": {
+          "name": "stage_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_image_tag": {
+          "name": "source_image_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_image_tag": {
+          "name": "target_image_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "applied_at": {
+          "name": "applied_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "skip_reason": {
+          "name": "skip_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "UQ_kiloclaw_scheduled_action_targets_parent_instance": {
+          "name": "UQ_kiloclaw_scheduled_action_targets_parent_instance",
+          "columns": [
+            {
+              "expression": "scheduled_action_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "instance_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_scheduled_action_targets_stage": {
+          "name": "IDX_kiloclaw_scheduled_action_targets_stage",
+          "columns": [
+            {
+              "expression": "stage_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_scheduled_action_targets_pending_by_instance": {
+          "name": "IDX_kiloclaw_scheduled_action_targets_pending_by_instance",
+          "columns": [
+            {
+              "expression": "instance_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_scheduled_action_targets\".\"status\" = 'pending'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "kiloclaw_scheduled_action_targets_scheduled_action_id_kiloclaw_scheduled_actions_id_fk": {
+          "name": "kiloclaw_scheduled_action_targets_scheduled_action_id_kiloclaw_scheduled_actions_id_fk",
+          "tableFrom": "kiloclaw_scheduled_action_targets",
+          "tableTo": "kiloclaw_scheduled_actions",
+          "columnsFrom": [
+            "scheduled_action_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "kiloclaw_scheduled_action_targets_stage_id_kiloclaw_scheduled_action_stages_id_fk": {
+          "name": "kiloclaw_scheduled_action_targets_stage_id_kiloclaw_scheduled_action_stages_id_fk",
+          "tableFrom": "kiloclaw_scheduled_action_targets",
+          "tableTo": "kiloclaw_scheduled_action_stages",
+          "columnsFrom": [
+            "stage_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "kiloclaw_scheduled_action_targets_instance_id_kiloclaw_instances_id_fk": {
+          "name": "kiloclaw_scheduled_action_targets_instance_id_kiloclaw_instances_id_fk",
+          "tableFrom": "kiloclaw_scheduled_action_targets",
+          "tableTo": "kiloclaw_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "kiloclaw_scheduled_action_targets_user_id_kilocode_users_id_fk": {
+          "name": "kiloclaw_scheduled_action_targets_user_id_kilocode_users_id_fk",
+          "tableFrom": "kiloclaw_scheduled_action_targets",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.kiloclaw_scheduled_actions": {
+      "name": "kiloclaw_scheduled_actions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "action_type": {
+          "name": "action_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_image_tag": {
+          "name": "target_image_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "override_pins": {
+          "name": "override_pins",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "notice_lead_hours": {
+          "name": "notice_lead_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 24
+        },
+        "notice_subject": {
+          "name": "notice_subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "notice_body": {
+          "name": "notice_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'scheduled'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_count": {
+          "name": "total_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "applied_count": {
+          "name": "applied_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "skipped_count": {
+          "name": "skipped_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "failed_count": {
+          "name": "failed_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "IDX_kiloclaw_scheduled_actions_status": {
+          "name": "IDX_kiloclaw_scheduled_actions_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_scheduled_actions_action_type": {
+          "name": "IDX_kiloclaw_scheduled_actions_action_type",
+          "columns": [
+            {
+              "expression": "action_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_scheduled_actions_created_by": {
+          "name": "IDX_kiloclaw_scheduled_actions_created_by",
+          "columns": [
+            {
+              "expression": "created_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "kiloclaw_scheduled_actions_target_image_tag_kiloclaw_image_catalog_image_tag_fk": {
+          "name": "kiloclaw_scheduled_actions_target_image_tag_kiloclaw_image_catalog_image_tag_fk",
+          "tableFrom": "kiloclaw_scheduled_actions",
+          "tableTo": "kiloclaw_image_catalog",
+          "columnsFrom": [
+            "target_image_tag"
+          ],
+          "columnsTo": [
+            "image_tag"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "kiloclaw_scheduled_actions_created_by_kilocode_users_id_fk": {
+          "name": "kiloclaw_scheduled_actions_created_by_kilocode_users_id_fk",
+          "tableFrom": "kiloclaw_scheduled_actions",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "created_by"
           ],
           "columnsTo": [
             "id"

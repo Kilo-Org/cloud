@@ -12,13 +12,16 @@ export const ACTION_LABEL_MAX_CHARS = 200;
 // ── Primitives ──────────────────────────────────────────────────────
 
 export const ulidSchema = z.string().ulid();
+export const nonNegativeIntegerSchema = z.number().int().nonnegative();
 
 const SANDBOX_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 export const sandboxIdSchema = z.string().regex(SANDBOX_ID_PATTERN, 'Invalid sandboxId');
+export const nonEmptyStringSchema = z.string().min(1);
 
 // Approval decision values produced by openclaw's approval runtime. Kept in
 // lockstep with `ExecApprovalDecision` from `openclaw/plugin-sdk/approval-runtime`.
 export const execApprovalDecisionSchema = z.enum(['allow-once', 'allow-always', 'deny']);
+export const actionGroupIdSchema = z.string().min(1).max(ACTION_LABEL_MAX_CHARS);
 
 // Accepts strings up to `max` chars, trims leading/trailing whitespace, and
 // rejects values that become empty after trimming. Control characters are
@@ -31,6 +34,8 @@ const trimmedNonEmptyString = (max: number) =>
     .max(max)
     .transform(s => s.trim())
     .refine(s => s.length >= 1, { message: 'must not be empty or whitespace-only' });
+
+export const conversationTitleSchema = trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS);
 
 // 1-64 bytes UTF-8, no C0 (0x00-0x1F) or C1 (0x7F-0x9F) control chars.
 export const emojiSchema = z
@@ -56,18 +61,25 @@ export const actionItemSchema = z.object({
   value: execApprovalDecisionSchema,
 });
 
+export const actionResolutionSchema = z.object({
+  value: execApprovalDecisionSchema,
+  resolvedBy: nonEmptyStringSchema,
+  resolvedAt: nonNegativeIntegerSchema,
+});
+
+export const inputActionsBlockSchema = z.object({
+  type: z.literal('actions'),
+  groupId: actionGroupIdSchema,
+  actions: z.array(actionItemSchema).min(1).max(10),
+  resolved: z.never().optional(),
+});
+
 export const actionsBlockSchema = z
   .object({
     type: z.literal('actions'),
-    groupId: z.string().min(1).max(ACTION_LABEL_MAX_CHARS),
+    groupId: actionGroupIdSchema,
     actions: z.array(actionItemSchema).max(10),
-    resolved: z
-      .object({
-        value: execApprovalDecisionSchema,
-        resolvedBy: z.string(),
-        resolvedAt: z.number(),
-      })
-      .optional(),
+    resolved: actionResolutionSchema.optional(),
   })
   .refine(block => block.resolved !== undefined || block.actions.length >= 1, {
     message: 'actions must contain at least one item unless the block is resolved',
@@ -82,6 +94,11 @@ export const textBlockSchema = z.object({
 export const contentBlockSchema = z.discriminatedUnion('type', [
   textBlockSchema,
   actionsBlockSchema,
+]);
+
+export const inputContentBlockSchema = z.discriminatedUnion('type', [
+  textBlockSchema,
+  inputActionsBlockSchema,
 ]);
 
 // ── Reactions ───────────────────────────────────────────────────────
@@ -132,6 +149,11 @@ export const conversationListItemSchema = z.object({
   joinedAt: z.number(),
 });
 
+export const conversationCursorSchema = z.object({
+  t: z.number().int().nonnegative(),
+  c: ulidSchema,
+});
+
 export const conversationDetailSchema = z.object({
   id: z.string(),
   title: z.string().nullable(),
@@ -144,7 +166,7 @@ export const conversationDetailSchema = z.object({
 
 export const createConversationRequestSchema = z.object({
   sandboxId: sandboxIdSchema,
-  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS).optional(),
+  title: conversationTitleSchema.optional(),
 });
 
 export const createConversationResponseSchema = z.object({
@@ -155,7 +177,7 @@ export const okResponseSchema = z.object({ ok: z.literal(true) });
 
 export const createMessageRequestSchema = z.object({
   conversationId: ulidSchema,
-  content: z.array(contentBlockSchema).min(1).max(20),
+  content: z.array(inputContentBlockSchema).min(1).max(20),
   inReplyToMessageId: ulidSchema.optional(),
   clientId: ulidSchema.optional(),
 });
@@ -167,7 +189,7 @@ export const createMessageResponseSchema = z.object({
 
 export const editMessageRequestSchema = z.object({
   conversationId: ulidSchema,
-  content: z.array(contentBlockSchema).min(1).max(20),
+  content: z.array(inputContentBlockSchema).min(1).max(20),
   timestamp: z.number().int().positive(),
 });
 
@@ -180,11 +202,11 @@ export const deleteMessageRequestSchema = z.object({
 });
 
 export const renameConversationRequestSchema = z.object({
-  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS),
+  title: conversationTitleSchema,
 });
 
 export const executeActionRequestSchema = z.object({
-  groupId: z.string().min(1).max(ACTION_LABEL_MAX_CHARS),
+  groupId: actionGroupIdSchema,
   value: execApprovalDecisionSchema,
 });
 
@@ -234,31 +256,31 @@ export const listMessagesQuerySchema = z.object({
 
 export const botStatusRequestSchema = z.object({
   online: z.boolean(),
-  at: z.number(),
+  at: nonNegativeIntegerSchema,
 });
 
 export const conversationStatusRequestSchema = z.object({
-  contextTokens: z.number(),
-  contextWindow: z.number(),
+  contextTokens: nonNegativeIntegerSchema,
+  contextWindow: nonNegativeIntegerSchema,
   model: z.string().nullable(),
   provider: z.string().nullable(),
-  at: z.number(),
+  at: nonNegativeIntegerSchema,
 });
 
 export const botStatusRecordSchema = z.object({
   online: z.boolean(),
-  at: z.number(),
-  updatedAt: z.number(),
+  at: nonNegativeIntegerSchema,
+  updatedAt: nonNegativeIntegerSchema,
 });
 
 export const conversationStatusRecordSchema = z.object({
   conversationId: z.string(),
-  contextTokens: z.number(),
-  contextWindow: z.number(),
+  contextTokens: nonNegativeIntegerSchema,
+  contextWindow: nonNegativeIntegerSchema,
   model: z.string().nullable(),
   provider: z.string().nullable(),
-  at: z.number(),
-  updatedAt: z.number(),
+  at: nonNegativeIntegerSchema,
+  updatedAt: nonNegativeIntegerSchema,
 });
 
 export const getBotStatusResponseSchema = z.object({
@@ -280,7 +302,7 @@ export const actionDeliveryFailedRequestSchema = z.object({
 });
 
 export const createBotConversationRequestSchema = z.object({
-  title: trimmedNonEmptyString(CONVERSATION_TITLE_MAX_CHARS).optional(),
+  title: conversationTitleSchema.optional(),
   additionalMembers: z.array(z.string().min(1)).max(20).optional(),
 });
 

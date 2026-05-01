@@ -6,7 +6,7 @@ import { EmojiPicker } from './EmojiPicker';
 
 type ReactionPillsProps = {
   reactions: ReactionSummary[];
-  currentUserId: string;
+  currentUserId: string | null;
   isOwn: boolean;
   onAdd: (emoji: string) => void;
   onRemove: (emoji: string) => void;
@@ -26,7 +26,7 @@ export function ReactionPills({
     (emoji: string) => {
       setShowPicker(false);
       const existing = reactions.find(r => r.emoji === emoji);
-      if (existing?.memberIds.includes(currentUserId)) {
+      if (currentUserId !== null && existing?.memberIds.includes(currentUserId)) {
         onRemove(emoji);
       } else {
         onAdd(emoji);
@@ -40,7 +40,7 @@ export function ReactionPills({
   return (
     <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
       {reactions.map(r => {
-        const isMine = r.memberIds.includes(currentUserId);
+        const isMine = currentUserId !== null && r.memberIds.includes(currentUserId);
         return (
           <button
             key={r.emoji}

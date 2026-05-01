@@ -44,7 +44,7 @@ type MessageBubbleProps = {
   onRemoveReaction: (messageId: string, emoji: string) => void;
   onExecuteAction: (messageId: string, groupId: string, value: ExecApprovalDecision) => void;
   actionPending?: boolean;
-  currentUserId: string;
+  currentUserId: string | null;
 };
 
 export const MessageBubble = memo(function MessageBubble({
@@ -80,10 +80,22 @@ export const MessageBubble = memo(function MessageBubble({
   });
 
   const textContent = message.deleted ? '' : contentBlocksToText(message.content);
-  const actionAvailability = buildMessageActionAvailability(message, isOwn);
+  const baseActionAvailability = buildMessageActionAvailability(message, isOwn);
+  const actionAvailability =
+    currentUserId === null
+      ? {
+          canReact: false,
+          canEdit: false,
+          canDelete: false,
+          canReply: false,
+          canExecuteAction: false,
+        }
+      : baseActionAvailability;
 
   const myReactions = new Set(
-    message.reactions.filter(r => r.memberIds.includes(currentUserId)).map(r => r.emoji)
+    currentUserId === null
+      ? []
+      : message.reactions.filter(r => r.memberIds.includes(currentUserId)).map(r => r.emoji)
   );
 
   function handleStartEdit() {

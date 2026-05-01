@@ -24,7 +24,7 @@ import {
 
 // ── Layout component ────────────────────────────────────────────────
 type KiloChatLayoutProps = {
-  currentUserId: string;
+  currentUserId: string | null;
   sandboxId: string | null;
   basePath: string;
   noInstanceRedirect: string;

@@ -10,7 +10,7 @@ export default function KiloChatRootLayout({ children }: { children: React.React
 
   return (
     <KiloChatLayout
-      currentUserId={user?.id ?? ''}
+      currentUserId={user?.id ?? null}
       sandboxId={status?.sandboxId ?? null}
       basePath="/claw/kilo-chat"
       noInstanceRedirect="/claw/new"

@@ -183,6 +183,9 @@ export function applyMessageCreatedEventToPages<TPageParam>(
     if (replacedPending !== old) return replacedPending;
   }
 
+  const replacedExisting = updateMessageInPages(old, e.messageId, () => newMessage);
+  if (replacedExisting !== old) return replacedExisting;
+
   for (const page of old.pages) {
     if (page.some(msg => msg.id === e.messageId)) return old;
   }

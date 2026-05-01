@@ -16,7 +16,7 @@ export default function OrgKiloChatRootLayout({ children }: { children: React.Re
 
   return (
     <KiloChatLayout
-      currentUserId={user?.id ?? ''}
+      currentUserId={user?.id ?? null}
       sandboxId={status?.sandboxId ?? null}
       basePath={basePath}
       noInstanceRedirect={noInstanceRedirect}

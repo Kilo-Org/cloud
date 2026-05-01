@@ -12,13 +12,22 @@ type MessageInputProps = {
   replyingTo: Message | null;
   onCancelReply: () => void;
   assistantName?: string;
-  currentUserId: string;
+  currentUserId: string | null;
   canSend?: boolean;
   disabledReason?: string | null;
 };
 
 // Hide the counter until the user is at 80% capacity; below that it's noise.
 const COUNTER_SHOW_AT = Math.floor(MESSAGE_TEXT_MAX_CHARS * 0.8);
+
+export function canSubmitMessageInput(
+  currentUserId: string | null,
+  canSend: boolean,
+  overLimit: boolean,
+  text: string
+): boolean {
+  return currentUserId !== null && canSend && !overLimit && text.trim().length > 0;
+}
 
 export function MessageInput({
   onSend,
@@ -46,12 +55,13 @@ export function MessageInput({
 
   const overLimit = text.length > MESSAGE_TEXT_MAX_CHARS;
   const showCounter = text.length >= COUNTER_SHOW_AT;
+  const inputEnabled = currentUserId !== null && canSend;
+  const effectiveDisabledReason =
+    currentUserId === null ? 'Loading user...' : (disabledReason ?? 'Sending is disabled');
 
   function handleSubmit() {
-    if (!canSend) return;
-    if (overLimit) return;
+    if (!canSubmitMessageInput(currentUserId, canSend, overLimit, text)) return;
     const trimmed = text.trim();
-    if (!trimmed) return;
     onSend(trimmed, replyingTo?.id);
     setText('');
     onCancelReply();
@@ -65,7 +75,7 @@ export function MessageInput({
     }
   }
 
-  const placeholder = canSend ? 'Type a message...' : (disabledReason ?? 'Sending is disabled');
+  const placeholder = inputEnabled ? 'Type a message...' : effectiveDisabledReason;
 
   return (
     <div className="border-border border-t">
@@ -90,13 +100,13 @@ export function MessageInput({
           onKeyDown={handleKeyDown}
           rows={1}
           autoFocus
-          disabled={!canSend}
+          disabled={!inputEnabled}
         />
         <button
           onClick={handleSubmit}
-          disabled={!canSend || overLimit || !text.trim()}
+          disabled={!canSubmitMessageInput(currentUserId, canSend, overLimit, text)}
           className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg p-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
-          title={canSend ? 'Send' : (disabledReason ?? 'Sending is disabled')}
+          title={inputEnabled ? 'Send' : effectiveDisabledReason}
         >
           <Send className="h-4 w-4" />
         </button>

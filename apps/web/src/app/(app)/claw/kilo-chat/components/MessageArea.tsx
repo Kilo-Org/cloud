@@ -88,12 +88,15 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   // which is a normal steady state. Only block sends once the bot is clearly
   // `offline` (>90 s stale, explicitly offline, or instance not running) or
   // `unknown` (no presence data at all).
-  const canSend = botDisplay.state === 'online' || botDisplay.state === 'idle';
+  const botCanSend = botDisplay.state === 'online' || botDisplay.state === 'idle';
+  const canSend = currentUserId !== null && botCanSend;
   const sendDisabledReason = canSend
     ? null
-    : botDisplay.state === 'unknown'
-      ? 'Waiting for bot status…'
-      : 'Bot is offline — messages will resume when it reconnects';
+    : currentUserId === null
+      ? 'Loading user...'
+      : botDisplay.state === 'unknown'
+        ? 'Waiting for bot status…'
+        : 'Bot is offline — messages will resume when it reconnects';
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -452,7 +455,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
               <MessageBubble
                 key={msg.id}
                 message={msg}
-                isOwn={msg.senderId === currentUserId}
+                isOwn={currentUserId !== null && msg.senderId === currentUserId}
                 replyToMessage={
                   msg.inReplyToMessageId ? (messageMap.get(msg.inReplyToMessageId) ?? null) : null
                 }

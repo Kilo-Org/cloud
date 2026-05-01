@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { ConversationHeader } from './conversation-header';
+import { resolveMobileMessageInputAvailability } from './bot-send-state';
 import { executeActionWithMobileFeedback } from './execute-action-feedback';
 import { buildMessageActionSheetOptions, getSelectedMessageAction } from './message-actions';
 import { MessageInput } from './message-input';
@@ -31,10 +32,14 @@ import { useConversationEventSubscription } from './hooks/use-conversation-event
 import { useMobileTypingState, useTypingSender } from './hooks/use-typing';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';
+import { useBotStatus } from './hooks/use-bot-status';
 import { useMarkRead } from './hooks/use-mark-read';
 import { useMessageCacheUpdater, useMessages, useSendMessage } from './hooks/use-messages';
+import { useNowTicker } from './hooks/use-now-ticker';
 import { useCurrentUserId } from './hooks/use-current-user-id';
 import { TypingIndicator } from './typing-indicator';
+import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { setActiveChatLocation } from '@/lib/notifications';
 
 type Props = { sandboxId: string; conversationId: string; conversationTitle: string };
@@ -53,6 +58,15 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const { bottom } = useSafeAreaInsets();
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const instanceContext = useInstanceContext(sandboxId);
+  const instanceStatusQuery = useKiloClawStatus(
+    instanceContext.organizationId,
+    instanceContext.isResolved
+  );
+  const instanceStatus = instanceStatusQuery.data?.status ?? null;
+  const botStatus = useBotStatus(client, sandboxId);
+  const botPresence = botStatus ? { online: botStatus.online, lastAt: botStatus.at } : undefined;
+  const now = useNowTicker(10_000);
 
   const messagesQuery = useMessages(client, conversationId);
   const messages = messagesQuery.data?.messages ?? [];
@@ -81,8 +95,19 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
     () => (editingMessage ? editableText(editingMessage) : ''),
     [editingMessage]
   );
+  const inputAvailability = resolveMobileMessageInputAvailability({
+    currentUserId,
+    instanceStatus,
+    presence: botPresence,
+    now,
+    pendingMutation: sendMutation.isPending || editMessage.isPending,
+    editing: editingMessage !== null,
+  });
   const handleSend = useCallback(
     (text: string, inReplyToMessageId?: string) => {
+      if (!editingMessage && inputAvailability.disabled) {
+        return;
+      }
       if (editingMessage) {
         editMessage.mutate(
           {
@@ -116,7 +141,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
         }
       );
     },
-    [conversationId, editMessage, editingMessage, sendMutation]
+    [conversationId, editMessage, editingMessage, inputAvailability.disabled, sendMutation]
   );
   const handleReactionPress = useCallback(
     (message: Message, emoji: string) => {
@@ -298,7 +323,8 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           key={editingMessage?.id ?? 'compose'}
           onSend={handleSend}
           onTyping={sendTyping}
-          disabled={sendMutation.isPending || editMessage.isPending}
+          disabled={inputAvailability.disabled}
+          disabledReason={inputAvailability.disabledReason}
           initialText={editingText}
           replyingTo={replyingTo}
           onCancelReply={

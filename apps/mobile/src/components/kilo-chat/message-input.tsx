@@ -17,6 +17,7 @@ type Props = {
   onCancelEdit?: () => void;
   replyingTo?: Message | null;
   onCancelReply?: () => void;
+  disabledReason?: string | null;
 };
 
 export function MessageInput({
@@ -27,6 +28,7 @@ export function MessageInput({
   onCancelEdit,
   replyingTo,
   onCancelReply,
+  disabledReason,
 }: Props) {
   const colors = useThemeColors();
   const valueRef = useRef(initialText);
@@ -34,6 +36,9 @@ export function MessageInput({
   const inputRef = useRef<TextInput>(null);
 
   const submit = () => {
+    if (disabled) {
+      return;
+    }
     submitMessageInputDraft({
       valueRef,
       replyingToMessageId: replyingTo?.id,
@@ -65,6 +70,11 @@ export function MessageInput({
           </Pressable>
         </View>
       )}
+      {disabledReason && (
+        <View className="mb-2 rounded-md bg-secondary px-3 py-2">
+          <Text className="text-xs text-muted-foreground">{disabledReason}</Text>
+        </View>
+      )}
       <View className="flex-row items-end gap-2">
         <TextInput
           ref={inputRef}
@@ -73,6 +83,7 @@ export function MessageInput({
           placeholderTextColor={colors.mutedForeground}
           defaultValue={initialText}
           multiline
+          editable={!disabled}
           onChangeText={t => {
             applyMessageInputTextChange({
               text: t,

@@ -25,20 +25,24 @@ export async function markReadConversationAndBadge({
   markConversationRead,
   getToken,
   fetchBadgeRead,
-}: MarkReadConversationAndBadgeInput): Promise<MarkBadgeReadResponse> {
+}: MarkReadConversationAndBadgeInput): Promise<MarkBadgeReadResponse | null> {
   await markConversationRead({ conversationId, lastSeenMessageId });
-  const token = await getToken();
-  const input = { badgeBucket } satisfies MarkBadgeReadInput;
-  const response = await fetchBadgeRead(`${notificationsUrl}/v1/badges/mark-read`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(input),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to mark badge read: ${response.status}`);
+  try {
+    const token = await getToken();
+    const input = { badgeBucket } satisfies MarkBadgeReadInput;
+    const response = await fetchBadgeRead(`${notificationsUrl}/v1/badges/mark-read`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return markBadgeReadResponseSchema.parse(await response.json());
+  } catch {
+    return null;
   }
-  return markBadgeReadResponseSchema.parse(await response.json());
 }

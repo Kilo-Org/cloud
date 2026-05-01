@@ -36,33 +36,38 @@ describe('mark-read attempt state', () => {
 });
 
 describe('markReadConversationAndBadge', () => {
-  it('rejects when membership read succeeds but badge clearing fails', async () => {
+  it('does not reject or prevent read-marker success when badge clearing fails', async () => {
+    const state = createMarkReadState();
+    const marker = 'conversation-1:message-1';
     let membershipReadCount = 0;
     let badgeReadCount = 0;
 
-    await expect(
-      markReadConversationAndBadge({
-        conversationId: 'conversation-1',
-        lastSeenMessageId: 'message-1',
-        badgeBucket: 'bucket-1',
-        notificationsUrl: 'https://notifications.example',
-        markConversationRead: async () => {
-          await Promise.resolve();
-          membershipReadCount += 1;
-        },
-        getToken: async () => {
-          await Promise.resolve();
-          return 'token-1';
-        },
-        fetchBadgeRead: async () => {
-          await Promise.resolve();
-          badgeReadCount += 1;
-          return new Response('{}', { status: 500 });
-        },
-      })
-    ).rejects.toThrow('Failed to mark badge read: 500');
+    startMarkReadAttempt(state, marker);
+    const result = await markReadConversationAndBadge({
+      conversationId: 'conversation-1',
+      lastSeenMessageId: 'message-1',
+      badgeBucket: 'bucket-1',
+      notificationsUrl: 'https://notifications.example',
+      markConversationRead: async () => {
+        await Promise.resolve();
+        membershipReadCount += 1;
+      },
+      getToken: async () => {
+        await Promise.resolve();
+        return 'token-1';
+      },
+      fetchBadgeRead: async () => {
+        await Promise.resolve();
+        badgeReadCount += 1;
+        return new Response('{}', { status: 500 });
+      },
+    });
+    succeedMarkReadAttempt(state, marker);
+    finishMarkReadAttempt(state, marker);
 
+    expect(result).toBeNull();
     expect(membershipReadCount).toBe(1);
     expect(badgeReadCount).toBe(1);
+    expect(shouldStartMarkReadAttempt(state, marker)).toBe(false);
   });
 });

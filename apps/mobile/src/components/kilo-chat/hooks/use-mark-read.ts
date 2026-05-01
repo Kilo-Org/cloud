@@ -40,7 +40,7 @@ export function useMarkRead(client: KiloChatClient) {
       conversationId,
       lastSeenMessageId,
       badgeBucket,
-    }: MarkReadInput): Promise<MarkBadgeReadResponse> => {
+    }: MarkReadInput): Promise<MarkBadgeReadResponse | null> => {
       const result = await markReadConversationAndBadge({
         conversationId,
         lastSeenMessageId,
@@ -74,7 +74,7 @@ export function useMarkRead(client: KiloChatClient) {
       toast.error(error.message);
     },
     onSuccess: result => {
-      if (typeof result.badgeCount === 'number') {
+      if (typeof result?.badgeCount === 'number') {
         void Notifications.setBadgeCountAsync(result.badgeCount);
       }
     },

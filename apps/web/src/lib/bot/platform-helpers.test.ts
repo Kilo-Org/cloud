@@ -99,6 +99,8 @@ describe('platform helpers', () => {
     expect(getBotDocumentationUrl(PLATFORM.SLACK)).toBe(
       'https://kilo.ai/docs/code-with-ai/platforms/slack'
     );
-    expect(getBotDocumentationUrl(PLATFORM.DISCORD)).toBe('https://kilo.ai/docs/code-with-ai');
+    expect(getBotDocumentationUrl(PLATFORM.DISCORD)).toBe(
+      'https://kilo.ai/docs/code-with-ai/platforms/slack'
+    );
   });
 });

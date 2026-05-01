@@ -84,12 +84,12 @@ describe('withBotPlatformAuthContext', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  it('throws when Slack auth has no token', async () => {
+  it('throws when Slack installation is missing', async () => {
     mockGetInstallation.mockResolvedValue(null);
 
     await expect(
       withBotPlatformAuthContext(createPlatformIntegration({ metadata: {} }), async () => 'result')
-    ).rejects.toThrow('No Slack bot token found for platform integration pi_slack');
+    ).rejects.toThrow('No Slack installation for platform integration pi_slack');
   });
 
   it('runs non-Slack callbacks directly', async () => {

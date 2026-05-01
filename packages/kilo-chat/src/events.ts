@@ -7,6 +7,7 @@ import {
   execApprovalDecisionSchema,
   nonEmptyStringSchema,
   nonNegativeIntegerSchema,
+  replyToMessageSnapshotSchema,
   sandboxIdSchema,
   ulidSchema,
 } from './schemas';
@@ -18,6 +19,7 @@ export const messageCreatedEventSchema = z.object({
   senderId: nonEmptyStringSchema,
   content: z.array(contentBlockSchema),
   inReplyToMessageId: ulidSchema.nullable(),
+  replyTo: replyToMessageSnapshotSchema.nullable(),
   clientId: ulidSchema.nullable(),
 });
 

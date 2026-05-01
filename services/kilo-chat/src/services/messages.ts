@@ -7,7 +7,13 @@
  * enqueue, and MembershipDO maintenance in one place.
  */
 
-import { ulidToTimestamp, type ContentBlock, type ExecApprovalDecision } from '@kilocode/kilo-chat';
+import {
+  buildReplyToMessageSnapshot,
+  ulidToTimestamp,
+  type ContentBlock,
+  type ExecApprovalDecision,
+  type ReplyToMessageSnapshot,
+} from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { contentBlocksToText } from '../util/content';
@@ -42,6 +48,31 @@ function truncateByGrapheme(text: string, maxGraphemes: number): string {
     }
   }
   return text;
+}
+
+async function getReplyToSnapshot(
+  env: Env,
+  conversationId: string,
+  inReplyToMessageId: string | undefined
+): Promise<ReplyToMessageSnapshot | null> {
+  if (!inReplyToMessageId) return null;
+
+  const parent = await withDORetry(
+    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+    stub => stub.getMessage(inReplyToMessageId),
+    'ConversationDO.getMessage'
+  );
+
+  return buildReplyToMessageSnapshot(
+    inReplyToMessageId,
+    parent
+      ? {
+          senderId: parent.senderId,
+          deleted: parent.deleted,
+          content: parent.content,
+        }
+      : null
+  );
 }
 
 // ─── createMessage ──────────────────────────────────────────────────────────
@@ -204,6 +235,7 @@ export async function postCommitFanOut(
   // ── Block B: Push message.created + typing.stop ──────────────────────
   const pushMessageEvents = async (): Promise<void> => {
     if (!sandboxId) return;
+    const replyTo = await getReplyToSnapshot(env, conversationId, inReplyToMessageId);
 
     await pushEventToHumanMembers(
       env,
@@ -216,6 +248,7 @@ export async function postCommitFanOut(
         senderId: callerId,
         content,
         inReplyToMessageId: inReplyToMessageId ?? null,
+        replyTo,
         clientId: clientId ?? null,
       }
     );

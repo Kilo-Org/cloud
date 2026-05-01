@@ -199,7 +199,7 @@ export function messageFromCreatedEvent(e: MessageCreatedEvent): Message {
     senderId: e.senderId,
     content: e.content,
     inReplyToMessageId: e.inReplyToMessageId,
-    replyTo: null,
+    replyTo: e.replyTo,
     updatedAt: null,
     clientUpdatedAt: null,
     deleted: false,

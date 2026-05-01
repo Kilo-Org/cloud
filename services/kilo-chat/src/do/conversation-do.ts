@@ -1,11 +1,10 @@
 import {
-  contentBlocksToText,
+  buildReplyToMessageSnapshot,
   type ContentBlock,
   type ActionsBlock,
   type Message,
   type ReactionSummary,
   type ExecApprovalDecision,
-  type ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
 import { logger } from '../util/logger';
@@ -39,29 +38,22 @@ import { conversation, members, messages, reactions } from '../db/conversation-s
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
 
-const REPLY_PREVIEW_MAX_CHARS = 160;
-
 type StoredMessageRow = typeof messages.$inferSelect;
 
 function buildReplySnapshot(
   messageId: string,
   parent: StoredMessageRow | undefined
-): ReplyToMessageSnapshot {
-  if (!parent) {
-    return { messageId, senderId: null, deleted: true, previewText: null };
-  }
-
-  if (parent.deleted === 1) {
-    return { messageId, senderId: parent.sender_id, deleted: true, previewText: null };
-  }
-
-  const preview = contentBlocksToText(parseStoredContent(parent.content, parent.id)).trim();
-  return {
+): Message['replyTo'] {
+  return buildReplyToMessageSnapshot(
     messageId,
-    senderId: parent.sender_id,
-    deleted: false,
-    previewText: (preview || 'Message').slice(0, REPLY_PREVIEW_MAX_CHARS),
-  };
+    parent
+      ? {
+          senderId: parent.sender_id,
+          deleted: parent.deleted === 1,
+          content: parent.deleted === 1 ? [] : parseStoredContent(parent.content, parent.id),
+        }
+      : null
+  );
 }
 
 export type MemberContext = {

@@ -1303,4 +1303,79 @@ describe('auto-title on first message', () => {
       .map(pushedEvent => pushedEvent.payload);
     expect(renamedPayloads).toEqual([{ conversationId, title: 'First title' }]);
   });
+
+  it('publishes reply snapshots on message.created events', async () => {
+    const { conversationId, userId } = await createMultiHumanConversation('reply-event-snapshot');
+    const convStub = getConvStub(conversationId);
+    const info = await convStub.getInfo();
+    expect(info).not.toBeNull();
+    if (!info) return;
+
+    const parent = await convStub.createMessage({
+      senderId: 'recipient-reply-event-snapshot',
+      content: [{ type: 'text', text: 'Parent context' }],
+    });
+    expect(parent.ok).toBe(true);
+    if (!parent.ok) return;
+
+    const replyMessageId = ulid();
+    const pushedEvents: Array<{ event: string; payload: unknown }> = [];
+    const pushEvent = vi.fn(
+      async (_userId: string, _context: string, event: string, payload: unknown) => {
+        pushedEvents.push({ event, payload });
+        return true;
+      }
+    );
+    const eventEnv = {
+      ...env,
+      EVENT_SERVICE: {
+        fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+        connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+        pushEvent,
+      },
+    } satisfies Env;
+
+    await postCommitFanOut(
+      eventEnv,
+      info,
+      userId,
+      conversationId,
+      replyMessageId,
+      [{ type: 'text', text: 'Reply body' }],
+      parent.messageId,
+      undefined
+    );
+
+    const createdPayloads = pushedEvents
+      .filter(pushedEvent => pushedEvent.event === 'message.created')
+      .map(pushedEvent => pushedEvent.payload);
+    expect(createdPayloads).toEqual([
+      {
+        messageId: replyMessageId,
+        senderId: userId,
+        content: [{ type: 'text', text: 'Reply body' }],
+        inReplyToMessageId: parent.messageId,
+        replyTo: {
+          messageId: parent.messageId,
+          senderId: 'recipient-reply-event-snapshot',
+          deleted: false,
+          previewText: 'Parent context',
+        },
+        clientId: null,
+      },
+      {
+        messageId: replyMessageId,
+        senderId: userId,
+        content: [{ type: 'text', text: 'Reply body' }],
+        inReplyToMessageId: parent.messageId,
+        replyTo: {
+          messageId: parent.messageId,
+          senderId: 'recipient-reply-event-snapshot',
+          deleted: false,
+          previewText: 'Parent context',
+        },
+        clientId: null,
+      },
+    ]);
+  });
 });

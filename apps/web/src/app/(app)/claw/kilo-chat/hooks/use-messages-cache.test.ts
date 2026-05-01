@@ -26,6 +26,7 @@ describe('applyMessageCreatedEventToPages', () => {
       senderId: 'user-1',
       content: [{ type: 'text', text: 'server text' }],
       inReplyToMessageId: '01K8ZB8B3H9BRWZ6KCN39AX09H',
+      replyTo: null,
       clientId: 'client-1',
     } satisfies MessageCreatedEvent;
 

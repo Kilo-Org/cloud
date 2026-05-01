@@ -37,12 +37,38 @@ describe('applyMessageCreatedEventToPages', () => {
       senderId: 'bot:sandbox-1',
       content: [{ type: 'text', text: 'hello from bot' }],
       inReplyToMessageId: null,
+      replyTo: null,
       clientId: null,
     } satisfies MessageCreatedEvent;
 
     const result = applyMessageCreatedEventToPages(data, event);
 
     expect(result.pages[0]?.map(m => m.id)).toEqual(['bot-message', 'existing']);
+  });
+
+  it('preserves reply snapshots from created events when the parent is not loaded', () => {
+    const data: InfiniteData<Message[], string | undefined> = {
+      pages: [[message('existing')]],
+      pageParams: [undefined],
+    };
+    const replyTo = {
+      messageId: 'parent-outside-loaded-pages',
+      senderId: 'user:parent',
+      deleted: false,
+      previewText: 'Parent context from an older page',
+    };
+    const event = {
+      messageId: 'reply-message',
+      senderId: 'bot:sandbox-1',
+      content: [{ type: 'text', text: 'reply body' }],
+      inReplyToMessageId: replyTo.messageId,
+      replyTo,
+      clientId: null,
+    } satisfies MessageCreatedEvent;
+
+    const result = applyMessageCreatedEventToPages(data, event);
+
+    expect(result.pages[0]?.[0]?.replyTo).toEqual(replyTo);
   });
 
   it('repositions resolved optimistic messages by newest server id', () => {
@@ -57,6 +83,7 @@ describe('applyMessageCreatedEventToPages', () => {
       senderId: 'user:1',
       content: [{ type: 'text', text: 'local newer' }],
       inReplyToMessageId: null,
+      replyTo: null,
       clientId: 'client-1',
     } satisfies MessageCreatedEvent;
 

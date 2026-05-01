@@ -2,6 +2,7 @@ import { decodeTime } from 'ulid';
 import type { z } from 'zod';
 
 import { conversationCursorSchema } from './schemas';
+import type { ReplyToMessageSnapshot } from './types';
 
 /** Extract the millisecond timestamp encoded in a ULID. */
 export function ulidToTimestamp(ulid: string): number {
@@ -64,4 +65,33 @@ export function contentBlocksToText(content: Array<{ type: string; text?: string
     .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
     .map(b => b.text)
     .join('');
+}
+
+const REPLY_PREVIEW_MAX_CHARS = 160;
+
+type ReplySnapshotParent = {
+  senderId: string;
+  deleted: boolean;
+  content: Array<{ type: string; text?: string }>;
+};
+
+export function buildReplyToMessageSnapshot(
+  messageId: string,
+  parent: ReplySnapshotParent | null | undefined
+): ReplyToMessageSnapshot {
+  if (!parent) {
+    return { messageId, senderId: null, deleted: true, previewText: null };
+  }
+
+  if (parent.deleted) {
+    return { messageId, senderId: parent.senderId, deleted: true, previewText: null };
+  }
+
+  const preview = contentBlocksToText(parent.content).trim();
+  return {
+    messageId,
+    senderId: parent.senderId,
+    deleted: false,
+    previewText: (preview || 'Message').slice(0, REPLY_PREVIEW_MAX_CHARS),
+  };
 }

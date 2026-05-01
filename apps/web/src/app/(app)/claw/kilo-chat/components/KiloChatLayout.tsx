@@ -16,6 +16,7 @@ import {
   useCreateConversation,
   useRenameConversation,
   useLeaveConversation,
+  applyConversationActivityToPages,
   updateConversationPages,
   filterConversationPages,
   type ConversationListInfiniteData,
@@ -112,15 +113,18 @@ export function KiloChatLayout({
         );
       }),
       kiloChatClient.onConversationActivity((_ctx, e) => {
-        if (isOnFirstPage(e.conversationId)) {
-          queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
-            updateConversationPages(old, c =>
-              c.conversationId === e.conversationId ? { ...c, lastActivityAt: e.lastActivityAt } : c
-            )
-          );
-          return;
+        let applied = false;
+        const entries = queryClient.getQueriesData<ConversationListInfiniteData>({ queryKey });
+        for (const [key, data] of entries) {
+          const result = applyConversationActivityToPages(data, e);
+          if (result.applied) {
+            applied = true;
+            queryClient.setQueryData(key, result.data);
+          }
         }
-        void queryClient.invalidateQueries({ queryKey });
+        if (!applied) {
+          void queryClient.invalidateQueries({ queryKey });
+        }
       }),
     ];
     return () => offs.forEach(off => off());

@@ -10,6 +10,7 @@ import {
   conversationRenamedEventSchema,
 } from '@kilocode/kilo-chat';
 import {
+  applyConversationActivityToPages,
   botStatusKey,
   conversationKey,
   type ConversationListInfiniteData,
@@ -114,18 +115,15 @@ export function useInstanceEventSubscription(sandboxId: string | undefined) {
         return;
       }
       const event = result.data;
-      const data = qc.getQueryData<ConversationListInfiniteData>(queryKey);
-      if (!isConversationOnFirstPage(data, event.conversationId)) {
+      const activityResult = applyConversationActivityToPages(
+        qc.getQueryData<ConversationListInfiniteData>(queryKey),
+        event
+      );
+      if (!activityResult.applied) {
         void qc.invalidateQueries({ queryKey });
         return;
       }
-      qc.setQueryData<ConversationListInfiniteData>(queryKey, old =>
-        updateConversationPages(old, conversation =>
-          conversation.conversationId === event.conversationId
-            ? { ...conversation, lastActivityAt: event.lastActivityAt }
-            : conversation
-        )
-      );
+      qc.setQueryData<ConversationListInfiniteData>(queryKey, activityResult.data);
     },
     [qc, queryKey]
   );

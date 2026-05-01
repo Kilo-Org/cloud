@@ -10,6 +10,7 @@ export {
   shouldStartMarkReadAttempt,
   startMarkReadAttempt,
   succeedMarkReadAttempt,
+  applyConversationActivityToPages,
   updateConversationPages,
   filterConversationPages,
 } from '@kilocode/kilo-chat-hooks';

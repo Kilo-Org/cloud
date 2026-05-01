@@ -1,4 +1,7 @@
-import { type ConversationListInfiniteData } from '@kilocode/kilo-chat-hooks';
+import {
+  applyConversationActivityToPages,
+  type ConversationListInfiniteData,
+} from '@kilocode/kilo-chat-hooks';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -6,13 +9,19 @@ import {
   shouldApplyConversationRead,
 } from './hooks/instance-event-cache';
 
-function conversation(conversationId: string) {
+function conversation(
+  conversationId: string,
+  overrides: {
+    lastActivityAt?: number | null;
+    joinedAt?: number;
+  } = {}
+) {
   return {
     conversationId,
     title: null,
-    lastActivityAt: null,
+    lastActivityAt: overrides.lastActivityAt ?? null,
     lastReadAt: null,
-    joinedAt: 1,
+    joinedAt: overrides.joinedAt ?? 1,
   };
 }
 
@@ -35,5 +44,60 @@ describe('instance event cache helpers', () => {
     expect(shouldApplyConversationRead('reader', 'reader')).toBe(true);
     expect(shouldApplyConversationRead('reader', 'other')).toBe(false);
     expect(shouldApplyConversationRead(null, 'reader')).toBe(false);
+  });
+
+  it('moves a first-page conversation ahead after newer activity', () => {
+    const data: ConversationListInfiniteData = {
+      pages: [
+        {
+          conversations: [
+            conversation('01ARZ3NDEKTSV4RRFFQ69G5FA1', { lastActivityAt: 100, joinedAt: 100 }),
+            conversation('01ARZ3NDEKTSV4RRFFQ69G5FA2', { lastActivityAt: 90, joinedAt: 90 }),
+          ],
+          hasMore: false,
+          nextCursor: null,
+        },
+      ],
+      pageParams: [null],
+    };
+
+    const result = applyConversationActivityToPages(data, {
+      conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FA2',
+      lastActivityAt: 200,
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.data?.pages[0]?.conversations.map(c => c.conversationId)).toEqual([
+      '01ARZ3NDEKTSV4RRFFQ69G5FA2',
+      '01ARZ3NDEKTSV4RRFFQ69G5FA1',
+    ]);
+    expect(result.data?.pages[0]?.conversations[0]?.lastActivityAt).toBe(200);
+  });
+
+  it('sorts equal activity timestamps by conversation id descending', () => {
+    const data: ConversationListInfiniteData = {
+      pages: [
+        {
+          conversations: [
+            conversation('01ARZ3NDEKTSV4RRFFQ69G5FA1', { lastActivityAt: 100, joinedAt: 100 }),
+            conversation('01ARZ3NDEKTSV4RRFFQ69G5FA2', { lastActivityAt: 90, joinedAt: 90 }),
+          ],
+          hasMore: false,
+          nextCursor: null,
+        },
+      ],
+      pageParams: [null],
+    };
+
+    const result = applyConversationActivityToPages(data, {
+      conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FA2',
+      lastActivityAt: 100,
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.data?.pages[0]?.conversations.map(c => c.conversationId)).toEqual([
+      '01ARZ3NDEKTSV4RRFFQ69G5FA2',
+      '01ARZ3NDEKTSV4RRFFQ69G5FA1',
+    ]);
   });
 });

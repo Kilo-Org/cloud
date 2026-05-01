@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
 import type { KiloChatClient } from '@kilocode/kilo-chat';
-import type { CreateConversationRequest, ConversationListResponse } from '@kilocode/kilo-chat';
+import type {
+  CreateConversationRequest,
+  ConversationListItem,
+  ConversationListResponse,
+} from '@kilocode/kilo-chat';
 
 import { conversationKey, conversationsKey, conversationsKeyAll, messagesKey } from './query-keys';
 
@@ -101,6 +105,58 @@ export function filterConversationPages(
       ...page,
       conversations: page.conversations.filter(predicate),
     })),
+  };
+}
+
+type ConversationActivity = {
+  conversationId: string;
+  lastActivityAt: number;
+};
+
+type ApplyConversationActivityResult = {
+  data: ConversationListInfiniteData | undefined;
+  applied: boolean;
+};
+
+function conversationActivitySortValue(conversation: ConversationListItem): number {
+  return conversation.lastActivityAt ?? conversation.joinedAt;
+}
+
+function compareConversationsByActivity(a: ConversationListItem, b: ConversationListItem): number {
+  const timestampDelta = conversationActivitySortValue(b) - conversationActivitySortValue(a);
+  if (timestampDelta !== 0) return timestampDelta;
+  if (a.conversationId === b.conversationId) return 0;
+  return a.conversationId < b.conversationId ? 1 : -1;
+}
+
+export function applyConversationActivityToPages(
+  data: ConversationListInfiniteData | undefined,
+  activity: ConversationActivity
+): ApplyConversationActivityResult {
+  const firstPage = data?.pages[0];
+  if (!data || !firstPage?.conversations.some(c => c.conversationId === activity.conversationId)) {
+    return { data, applied: false };
+  }
+
+  return {
+    data: {
+      ...data,
+      pages: data.pages.map((page, index) =>
+        index === 0
+          ? {
+              ...page,
+              conversations: page.conversations
+                .map(c =>
+                  c.conversationId === activity.conversationId
+                    ? { ...c, lastActivityAt: activity.lastActivityAt }
+                    : c
+                )
+                .sort(compareConversationsByActivity),
+            }
+          : page
+      ),
+    },
+    applied: true,
   };
 }
 

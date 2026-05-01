@@ -137,14 +137,21 @@ export async function runScheduledActionApply(ctx: ApplyContext): Promise<{ proc
       currentParentStatus = target.parent_status;
     }
 
-    if (currentParentStatus === 'cancelled' || currentParentStatus === 'completed') {
+    if (
+      currentParentStatus === 'cancelled' ||
+      currentParentStatus === 'completed' ||
+      currentParentStatus === 'failed'
+    ) {
       try {
         await recordScheduledActionTargetOutcome(db, {
           target_id: target.target_id,
           scheduled_action_id: target.scheduled_action_id,
           stage_id: target.stage_id,
           outcome: 'skipped',
-          skip_reason: 'cancelled',
+          // Use the actual terminal status as the skip reason so the
+          // audit trail distinguishes "admin cancelled" from "parent
+          // already completed/failed before this target's tick".
+          skip_reason: currentParentStatus,
         });
       } catch (err) {
         doWarn(ctx.state, 'scheduled-action-apply: record skipped failed', {

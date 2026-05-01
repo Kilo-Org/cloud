@@ -359,18 +359,26 @@ export async function findDueScheduledActionTargetsForInstance(
     )
     .orderBy(kiloclaw_scheduled_action_stages.scheduled_at);
 
-  return rows.map(r => ({
-    target_id: r.target_id,
-    scheduled_action_id: r.scheduled_action_id,
-    // INNER JOIN on stages guarantees stage_id is non-null here.
-    stage_id: r.stage_id as string,
-    instance_id: r.instance_id,
-    user_id: r.user_id,
-    action_type: r.action_type,
-    target_image_tag: r.target_image_tag,
-    override_pins: r.override_pins,
-    parent_status: r.parent_status,
-  }));
+  return rows.map(r => {
+    // INNER JOIN on stages guarantees stage_id is non-null at runtime;
+    // assert the invariant rather than `as`-casting through it. If the
+    // join is ever loosened to LEFT, this throw documents what the
+    // change would mean for the apply path.
+    if (!r.stage_id) {
+      throw new Error('findDueScheduledActionTargetsForInstance: stage_id null after INNER JOIN');
+    }
+    return {
+      target_id: r.target_id,
+      scheduled_action_id: r.scheduled_action_id,
+      stage_id: r.stage_id,
+      instance_id: r.instance_id,
+      user_id: r.user_id,
+      action_type: r.action_type,
+      target_image_tag: r.target_image_tag,
+      override_pins: r.override_pins,
+      parent_status: r.parent_status,
+    };
+  });
 }
 
 /**
@@ -446,12 +454,23 @@ export async function maybePromoteScheduledActionsToCompleted(
 ): Promise<void> {
   if (scheduledActionIds.length === 0) return;
 
+  // Build a parameterised IN list explicitly. Interpolating a bare
+  // string[] into `sql\`... IN ${ids}\`` happens to work (drizzle wraps
+  // the array as a tuple of positional params) but is an implicit
+  // contract: if the array ever contains an SQL fragment instead of a
+  // primitive, the serialisation silently changes. sql.join makes the
+  // shape explicit.
+  const idList = sql.join(
+    scheduledActionIds.map(id => sql`${id}`),
+    sql`, `
+  );
+
   // Stages: complete any stage whose pending target count is 0.
   await db.execute(sql`
     UPDATE kiloclaw_scheduled_action_stages s
     SET status = 'completed',
         completed_at = COALESCE(s.completed_at, now())
-    WHERE s.scheduled_action_id IN ${scheduledActionIds}
+    WHERE s.scheduled_action_id IN (${idList})
       AND s.status IN ('pending', 'running')
       AND NOT EXISTS (
         SELECT 1 FROM kiloclaw_scheduled_action_targets t
@@ -464,7 +483,7 @@ export async function maybePromoteScheduledActionsToCompleted(
     UPDATE kiloclaw_scheduled_actions a
     SET status = 'completed',
         completed_at = COALESCE(a.completed_at, now())
-    WHERE a.id IN ${scheduledActionIds}
+    WHERE a.id IN (${idList})
       AND a.status IN ('scheduled', 'running')
       AND NOT EXISTS (
         SELECT 1 FROM kiloclaw_scheduled_action_targets t

@@ -15,7 +15,7 @@
  *     status, target instance, counters, and a cancel button for
  *     pending rows.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Info } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -41,11 +41,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { formatRelativeTime } from '../KiloclawInstances/shared';
 
+// Per design.md: every status badge is `bg-{color}-500/20 text-{color}-400
+// ring-1 ring-{color}-500/20`. Color assignments are fixed by domain —
+// blue for neutral default, yellow for in-progress/warning, green for
+// success, zinc for terminal-but-quiet, red for errors.
 const statusBadgeClass: Record<string, string> = {
   scheduled: 'border-transparent bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/20',
-  running: 'border-transparent bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/20',
+  running: 'border-transparent bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-500/20',
   completed: 'border-transparent bg-green-500/20 text-green-400 ring-1 ring-green-500/20',
   cancelled: 'border-transparent bg-zinc-500/20 text-zinc-400 ring-1 ring-zinc-500/20',
   failed: 'border-transparent bg-red-500/20 text-red-400 ring-1 ring-red-500/20',
@@ -76,12 +87,66 @@ export function KiloclawSchedulerTab() {
   const [vcScheduledAt, setVcScheduledAt] = useState(defaultScheduledAt);
   const [vcReason, setVcReason] = useState('');
 
+  // Client-side sort over the current page of listScheduledActions.
+  // The list is paginated server-side (limit 50) and ordered by
+  // created_at desc; this re-sorts whatever rows are on screen. For
+  // multi-page sort we'd need to push sortBy/sortDir through the tRPC
+  // input; defer until pagination becomes an actual constraint.
+  type SortKey =
+    | 'action_type'
+    | 'target_count'
+    | 'status'
+    | 'applied_count'
+    | 'skipped_count'
+    | 'failed_count'
+    | 'scheduled_at'
+    | 'created_at';
+  const [sortKey, setSortKey] = useState<SortKey>('created_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  // Detail-dialog state. Holds the action id whose target list is open.
+  const [viewingActionId, setViewingActionId] = useState<string | null>(null);
+  const detail = useQuery(
+    trpc.admin.kiloclawInstances.getScheduledAction.queryOptions(
+      { id: viewingActionId ?? '' },
+      { enabled: viewingActionId !== null }
+    )
+  );
+
   const list = useQuery(
     trpc.admin.kiloclawInstances.listScheduledActions.queryOptions({
       offset: 0,
       limit: 50,
     })
   );
+
+  // Stable sort across the current page. Server returns sorted by
+  // created_at desc; we override locally based on header clicks.
+  const sortedItems = useMemo(() => {
+    const items = list.data?.items ?? [];
+    const dirSign = sortDir === 'asc' ? 1 : -1;
+    const cmp = (a: (typeof items)[number], b: (typeof items)[number]) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      // Nulls always sort last regardless of direction so empty
+      // scheduled_at rows don't float above real data on asc.
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dirSign;
+      return String(av).localeCompare(String(bv)) * dirSign;
+    };
+    return [...items].sort(cmp);
+  }, [list.data?.items, sortKey, sortDir]);
 
   // Same listVersions query the bulk dialog uses. Status filter
   // 'available' so disabled tags can't be picked from the dropdown
@@ -158,7 +223,7 @@ export function KiloclawSchedulerTab() {
   return (
     <div className="flex w-full flex-col gap-y-6">
       <Alert>
-        <AlertTriangle className="h-4 w-4" />
+        <Info className="h-4 w-4" />
         <AlertTitle>Scheduler</AlertTitle>
         <AlertDescription>
           Schedule and observe admin actions across instances. Currently supports{' '}
@@ -320,30 +385,92 @@ export function KiloclawSchedulerTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Instance</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Counts (a/s/f)</TableHead>
-                  <TableHead>Scheduled at</TableHead>
-                  <TableHead>Created</TableHead>
+                  <SortableTh
+                    sortKey="action_type"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                  >
+                    Action
+                  </SortableTh>
+                  <SortableTh
+                    sortKey="target_count"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                  >
+                    Instances
+                  </SortableTh>
+                  <SortableTh
+                    sortKey="status"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                  >
+                    Status
+                  </SortableTh>
+                  <SortableTh
+                    sortKey="applied_count"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Applied
+                  </SortableTh>
+                  <SortableTh
+                    sortKey="skipped_count"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Skipped
+                  </SortableTh>
+                  <SortableTh
+                    sortKey="failed_count"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                    align="right"
+                  >
+                    Failed
+                  </SortableTh>
+                  <SortableTh
+                    sortKey="scheduled_at"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                    title="When the action is scheduled to run (no earlier than)"
+                  >
+                    Run at
+                  </SortableTh>
+                  <SortableTh
+                    sortKey="created_at"
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={handleSort}
+                  >
+                    Created
+                  </SortableTh>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {list.isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-16 text-center">
+                    <TableCell colSpan={9} className="h-16 text-center">
                       Loading…
                     </TableCell>
                   </TableRow>
-                ) : (list.data?.items ?? []).length === 0 ? (
+                ) : sortedItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-16 text-center">
+                    <TableCell colSpan={9} className="h-16 text-center">
                       No scheduled actions yet.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  (list.data?.items ?? []).map(action => (
+                  sortedItems.map(action => (
                     <TableRow key={action.id}>
                       <TableCell>
                         <div className="flex flex-col">
@@ -353,11 +480,17 @@ export function KiloclawSchedulerTab() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {action.instance_id ? (
-                          <span title={action.instance_id}>{action.instance_id}</span>
-                        ) : (
+                      <TableCell className="text-xs">
+                        {action.target_count === 0 ? (
                           <span className="text-muted-foreground">—</span>
+                        ) : action.target_count === 1 && action.first_instance_id ? (
+                          <span className="font-mono" title={action.first_instance_id}>
+                            {action.first_instance_id}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {action.target_count} instances
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -365,12 +498,17 @@ export function KiloclawSchedulerTab() {
                           {action.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {action.applied_count}/{action.skipped_count}/{action.failed_count} of{' '}
-                        {action.total_count}
+                      <TableCell className="text-right font-mono text-xs">
+                        {action.applied_count}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        {action.skipped_count}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        {action.failed_count}
                       </TableCell>
                       <TableCell
-                        className="text-muted-foreground text-sm"
+                        className="text-muted-foreground font-mono text-xs"
                         title={
                           action.scheduled_at
                             ? new Date(action.scheduled_at).toLocaleString()
@@ -390,16 +528,25 @@ export function KiloclawSchedulerTab() {
                         {formatRelativeTime(action.created_at)}
                       </TableCell>
                       <TableCell>
-                        {(action.status === 'scheduled' || action.status === 'running') && (
+                        <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => cancel.mutate({ id: action.id })}
-                            disabled={cancel.isPending}
+                            onClick={() => setViewingActionId(action.id)}
                           >
-                            Cancel
+                            View
                           </Button>
-                        )}
+                          {(action.status === 'scheduled' || action.status === 'running') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => cancel.mutate({ id: action.id })}
+                              disabled={cancel.isPending}
+                            >
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -409,6 +556,156 @@ export function KiloclawSchedulerTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Per-action detail dialog. Lists all targets with their per-instance
+          outcome — the listScheduledActions row only shows aggregate counts
+          and a single representative instance, so this is where bulk actions
+          actually become inspectable. */}
+      <Dialog
+        open={viewingActionId !== null}
+        onOpenChange={open => {
+          if (!open) setViewingActionId(null);
+        }}
+      >
+        <DialogContent className="max-h-[80vh] sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Scheduled action detail</DialogTitle>
+            <DialogDescription>
+              {detail.data ? (
+                <span className="font-mono text-xs">{detail.data.action.id}</span>
+              ) : (
+                'Loading…'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {detail.isLoading && (
+            <div className="text-muted-foreground py-8 text-center text-sm">Loading…</div>
+          )}
+
+          {detail.data && (
+            <div className="space-y-4 overflow-y-auto">
+              <div className="bg-muted/30 rounded-md border p-3 text-sm">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+                  <div>
+                    <span className="text-muted-foreground">Type:</span>{' '}
+                    <span className="font-medium">{detail.data.action.action_type}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Status:</span>{' '}
+                    <Badge
+                      variant="outline"
+                      className={statusBadgeClass[detail.data.action.status] ?? ''}
+                    >
+                      {detail.data.action.status}
+                    </Badge>
+                  </div>
+                  {detail.data.action.target_image_tag && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Target tag:</span>{' '}
+                      <code className="font-mono text-xs">
+                        {detail.data.action.target_image_tag}
+                      </code>
+                    </div>
+                  )}
+                  {detail.data.action.action_type === 'version_change' && (
+                    <div>
+                      <span className="text-muted-foreground">Override pins:</span>{' '}
+                      {detail.data.action.override_pins ? 'yes' : 'no'}
+                    </div>
+                  )}
+                  {detail.data.action.reason && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Reason:</span>{' '}
+                      {detail.data.action.reason}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-sm font-medium">Targets ({detail.data.targets.length})</div>
+              <div className="rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Instance</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Detail</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.data.targets.map(t => (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-mono text-xs">
+                          {t.instance_sandbox_id ? (
+                            <span title={t.instance_id}>{t.instance_sandbox_id}</span>
+                          ) : (
+                            <span title={t.instance_id}>{t.instance_id}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <span className="text-muted-foreground">{t.user_email ?? t.user_id}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={statusBadgeClass[t.status] ?? ''}>
+                            {t.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {t.skip_reason && <span>skip: {t.skip_reason}</span>}
+                          {t.error_message && (
+                            <span className="text-red-400" title={t.error_message}>
+                              {t.error_message.length > 80
+                                ? t.error_message.slice(0, 80) + '…'
+                                : t.error_message}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+type SortableThProps<K extends string> = {
+  sortKey: K;
+  activeKey: K;
+  dir: 'asc' | 'desc';
+  onSort: (key: K) => void;
+  align?: 'left' | 'right';
+  title?: string;
+  children: React.ReactNode;
+};
+
+function SortableTh<K extends string>({
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+  align = 'left',
+  title,
+  children,
+}: SortableThProps<K>) {
+  const isActive = sortKey === activeKey;
+  const Icon = !isActive ? ArrowUpDown : dir === 'asc' ? ArrowUp : ArrowDown;
+  return (
+    <TableHead className={align === 'right' ? 'text-right' : undefined} title={title}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`hover:text-foreground inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''}`}
+      >
+        <span>{children}</span>
+        <Icon className={`h-3 w-3 ${isActive ? 'text-foreground' : 'text-muted-foreground/60'}`} />
+      </button>
+    </TableHead>
   );
 }

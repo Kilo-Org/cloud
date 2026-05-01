@@ -1908,24 +1908,33 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         .limit(input.limit)
         .offset(input.offset);
 
-      // PR 1 ships single-instance scheduling so each parent has at most
-      // one target. Fetch instance ids in a single query and zip into
-      // the rows. PR 4 will likely shift this to a "first N targets"
-      // sample for multi-instance actions; aggregate-by-action is fine
-      // for now.
+      // For each parent action, we want a compact summary for the list
+      // view: the total number of instances + a representative
+      // instance_id when there's only one. The full target list lives
+      // in `getScheduledAction`. Aggregate via GROUP BY so the response
+      // size stays bounded even for bulk schedules touching hundreds
+      // of instances.
       const actionIds = rows.map(r => r.id);
-      const targetRows =
+      const targetSummaryRows =
         actionIds.length > 0
           ? await db
               .select({
                 scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
-                instance_id: kiloclaw_scheduled_action_targets.instance_id,
+                count: sql<number>`COUNT(*)::int`,
+                // Deterministic single-instance preview: oldest target
+                // (lowest id under uuid v4 ordering is fine — we just
+                // need *some* stable choice).
+                first_instance_id: sql<string>`MIN(${kiloclaw_scheduled_action_targets.instance_id}::text)`,
               })
               .from(kiloclaw_scheduled_action_targets)
               .where(inArray(kiloclaw_scheduled_action_targets.scheduled_action_id, actionIds))
+              .groupBy(kiloclaw_scheduled_action_targets.scheduled_action_id)
           : [];
-      const instanceIdByAction = new Map(
-        targetRows.map(t => [t.scheduled_action_id, t.instance_id])
+      const targetSummaryByAction = new Map(
+        targetSummaryRows.map(t => [
+          t.scheduled_action_id,
+          { count: t.count, first_instance_id: t.first_instance_id },
+        ])
       );
 
       // Earliest stage's scheduled_at — surfaces the "fire no earlier than"
@@ -1960,11 +1969,17 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       const total = totalCountResult[0]?.count ?? 0;
 
       return {
-        items: rows.map(r => ({
-          ...r,
-          instance_id: instanceIdByAction.get(r.id) ?? null,
-          scheduled_at: scheduledAtByAction.get(r.id) ?? null,
-        })),
+        items: rows.map(r => {
+          const summary = targetSummaryByAction.get(r.id);
+          return {
+            ...r,
+            target_count: summary?.count ?? 0,
+            // Only meaningful when target_count === 1; UI shows
+            // "N instances" otherwise.
+            first_instance_id: summary?.first_instance_id ?? null,
+            scheduled_at: scheduledAtByAction.get(r.id) ?? null,
+          };
+        }),
         pagination: {
           offset: input.offset,
           limit: input.limit,

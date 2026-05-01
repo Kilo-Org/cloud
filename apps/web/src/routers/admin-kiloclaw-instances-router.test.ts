@@ -2053,6 +2053,152 @@ describe('admin.kiloclawInstances scheduled actions', () => {
         .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
       expect(targets).toHaveLength(1);
     });
+
+    describe('version_change variant', () => {
+      // Per-test tags so cross-test runs can't collide on the unique
+      // image_tag constraint when an earlier test's catalog cleanup is
+      // delayed by FK ordering.
+      let availableTag: string;
+      let disabledTag: string;
+
+      beforeEach(async () => {
+        availableTag = `vc-test-available-${crypto.randomUUID()}`;
+        disabledTag = `vc-test-disabled-${crypto.randomUUID()}`;
+        await db.insert(kiloclaw_image_catalog).values([
+          {
+            openclaw_version: '2026.1.1',
+            variant: 'default',
+            image_tag: availableTag,
+            image_digest: 'sha256:vc-available',
+            status: 'available',
+            published_at: new Date().toISOString(),
+          },
+          {
+            openclaw_version: '2026.0.1',
+            variant: 'default',
+            image_tag: disabledTag,
+            image_digest: 'sha256:vc-disabled',
+            status: 'disabled',
+            published_at: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+          },
+        ]);
+      });
+
+      afterEach(async () => {
+        /* eslint-disable drizzle/enforce-delete-with-where */
+        // FK from kiloclaw_scheduled_actions.target_image_tag → catalog
+        // is ON DELETE RESTRICT. Outer afterEach deletes parents but
+        // runs after this inner one, so clear our parents first.
+        const parents = await db
+          .select({ id: kiloclaw_scheduled_actions.id })
+          .from(kiloclaw_scheduled_actions)
+          .where(inArray(kiloclaw_scheduled_actions.target_image_tag, [availableTag, disabledTag]));
+        if (parents.length > 0) {
+          const parentIds = parents.map(p => p.id);
+          await db
+            .delete(kiloclaw_scheduled_action_targets)
+            .where(inArray(kiloclaw_scheduled_action_targets.scheduled_action_id, parentIds));
+          await db
+            .delete(kiloclaw_scheduled_action_stages)
+            .where(inArray(kiloclaw_scheduled_action_stages.scheduled_action_id, parentIds));
+          await db
+            .delete(kiloclaw_scheduled_actions)
+            .where(inArray(kiloclaw_scheduled_actions.id, parentIds));
+        }
+        await db
+          .delete(kiloclaw_image_catalog)
+          .where(inArray(kiloclaw_image_catalog.image_tag, [availableTag, disabledTag]));
+        /* eslint-enable drizzle/enforce-delete-with-where */
+      });
+
+      it('happy path stamps target_image_tag + override_pins on parent and target', async () => {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'version_change',
+          instanceIds: [testInstanceId],
+          imageTag: availableTag,
+          overridePins: true,
+          scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+        });
+
+        const [parent] = await db
+          .select()
+          .from(kiloclaw_scheduled_actions)
+          .where(eq(kiloclaw_scheduled_actions.id, result.id));
+        expect(parent.action_type).toBe('version_change');
+        expect(parent.target_image_tag).toBe(availableTag);
+        expect(parent.override_pins).toBe(true);
+
+        const [target] = await db
+          .select()
+          .from(kiloclaw_scheduled_action_targets)
+          .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
+        // target_image_tag mirrored from the parent — DO apply path
+        // reads the per-target column directly without re-joining.
+        expect(target.target_image_tag).toBe(availableTag);
+        expect(target.instance_id).toBe(testInstanceId);
+
+        const logs = await db
+          .select()
+          .from(kiloclaw_admin_audit_logs)
+          .where(
+            and(
+              eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+              eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.scheduled_action.created')
+            )
+          );
+        expect(logs).toHaveLength(1);
+        expect(logs[0].metadata).toMatchObject({
+          actionType: 'version_change',
+          imageTag: availableTag,
+          overridePins: true,
+        });
+      });
+
+      it('rejects unknown imageTag with BAD_REQUEST', async () => {
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.admin.kiloclawInstances.scheduleAction({
+            actionType: 'version_change',
+            instanceIds: [testInstanceId],
+            imageTag: 'totally-not-in-catalog',
+            scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('not found'),
+        });
+      });
+
+      it('rejects disabled imageTag with BAD_REQUEST', async () => {
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.admin.kiloclawInstances.scheduleAction({
+            actionType: 'version_change',
+            instanceIds: [testInstanceId],
+            imageTag: disabledTag,
+            scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('disabled'),
+        });
+      });
+
+      it('Zod rejects malformed imageTag (regex)', async () => {
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.admin.kiloclawInstances.scheduleAction({
+            actionType: 'version_change',
+            instanceIds: [testInstanceId],
+            // Starts with a non-alphanumeric — fails the
+            // /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/ guard.
+            imageTag: '-bad-tag',
+            scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      });
+    });
   });
 
   describe('listScheduledActions / getScheduledAction', () => {

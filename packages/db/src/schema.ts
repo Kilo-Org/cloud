@@ -4204,8 +4204,15 @@ export const kiloclaw_scheduled_action_targets = pgTable(
 
     applied_at: timestamp({ withTimezone: true, mode: 'string' }),
 
+    // 'running' is a transient claim state set by the DO apply path
+    // immediately before it dispatches the side effect (restartMachine).
+    // Without it, two concurrent waitUntil passes can both find the
+    // same pending row and both fire the side effect — only one wins
+    // the final CAS but both restarts have already been kicked off.
+    // The claim CAS (pending → running) makes the dispatch
+    // single-writer without needing a row lock.
     status: text()
-      .$type<'pending' | 'applied' | 'skipped' | 'failed'>()
+      .$type<'pending' | 'running' | 'applied' | 'skipped' | 'failed'>()
       .notNull()
       .default('pending'),
     skip_reason: text(),

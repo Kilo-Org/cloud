@@ -21,6 +21,7 @@ import type { InstanceMutableState } from './types';
 import {
   getWorkerDb,
   findDueScheduledActionTargetsForInstance,
+  claimScheduledActionTarget,
   recordScheduledActionTargetOutcome,
   maybePromoteScheduledActionsToCompleted,
   type DueScheduledActionTarget,
@@ -173,6 +174,28 @@ export async function runScheduledActionApply(ctx: ApplyContext): Promise<{ proc
           targetId: target.target_id,
         });
       }
+      continue;
+    }
+
+    // Claim the target before dispatch. Without this, two concurrent
+    // waitUntil passes can both find the same due row and both invoke
+    // restartMachine — only one wins the final outcome CAS, but both
+    // side effects have already started. The atomic pending → running
+    // transition makes the dispatch single-writer.
+    let claimed = false;
+    try {
+      claimed = await claimScheduledActionTarget(db, { target_id: target.target_id });
+    } catch (err) {
+      doWarn(ctx.state, 'scheduled-action-apply: claim failed', {
+        error: toLoggable(err),
+        targetId: target.target_id,
+      });
+      continue;
+    }
+    if (!claimed) {
+      doLog(ctx.state, 'scheduled-action-apply: claim missed (concurrent pass)', {
+        targetId: target.target_id,
+      });
       continue;
     }
 

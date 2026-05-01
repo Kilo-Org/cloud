@@ -1761,99 +1761,106 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       const liveInstanceIds = liveInstanceRows.map(r => r.instance.id);
       const liveResolvedById = new Map(liveInstanceRows.map(r => [r.instance.id, r]));
 
-      // Reject if any of the live instances already has a pending
-      // scheduled action. We don't support 1+N concurrent schedules per
-      // instance — the admin should cancel the existing one first if
-      // they want to reschedule. This is enforced here rather than via
-      // a unique partial index because multi-stage rollouts (post-PR-4)
-      // will legitimately have multiple targets per instance under the
-      // same parent action; a partial index keyed only on
-      // (instance_id, status='pending') would block that case too.
-      const existingPending = await db
-        .select({
-          instance_id: kiloclaw_scheduled_action_targets.instance_id,
-          scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
-        })
-        .from(kiloclaw_scheduled_action_targets)
-        .innerJoin(
-          kiloclaw_scheduled_actions,
-          eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
-        )
-        .where(
-          and(
-            inArray(kiloclaw_scheduled_action_targets.instance_id, liveInstanceIds),
-            eq(kiloclaw_scheduled_action_targets.status, 'pending'),
-            inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
-          )
-        );
-
-      if (existingPending.length > 0) {
-        const conflictIds = Array.from(new Set(existingPending.map(e => e.instance_id)));
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message:
-            conflictIds.length === 1
-              ? `Instance ${conflictIds[0]} already has a pending scheduled action; cancel it first`
-              : `${conflictIds.length} instances already have pending scheduled actions; cancel those first: ${conflictIds.join(', ')}`,
-        });
-      }
-
       // version_change-specific parent/target columns. Null for other action types.
       const parentTargetImageTag = input.actionType === 'version_change' ? input.imageTag : null;
       const parentOverridePins = input.actionType === 'version_change' ? input.overridePins : false;
 
-      // Insert parent + single stage + N targets in one transaction so a
-      // partial failure doesn't leave dangling rows.
-      const result = await db.transaction(async tx => {
-        const [parentRow] = await tx
-          .insert(kiloclaw_scheduled_actions)
-          .values({
-            action_type: input.actionType,
-            target_image_tag: parentTargetImageTag,
-            override_pins: parentOverridePins,
-            notice_lead_hours: input.noticeLeadHours,
-            notice_subject: input.noticeSubject,
-            notice_body: input.noticeBody,
-            reason: input.reason ?? null,
-            status: 'scheduled',
-            created_by: ctx.user.id,
-            total_count: liveInstanceIds.length,
-          })
-          .returning({ id: kiloclaw_scheduled_actions.id });
+      // Conflict check + parent/stage/target inserts run in one
+      // SERIALIZABLE transaction. Without serialization, two concurrent
+      // schedule requests on the same instance can both observe "no
+      // pending" outside any transaction and then both insert separate
+      // scheduled actions, violating the one-pending-action-per-instance
+      // invariant. SSI in Postgres detects the conflict and aborts the
+      // losing tx with 40001; the admin retries (the click) and the
+      // second attempt sees the now-committed pending row and rejects
+      // with the normal CONFLICT message. We don't add an in-procedure
+      // retry loop — admin-initiated path, low contention, retry-by-
+      // clicking is fine.
+      const result = await db.transaction(
+        async tx => {
+          const existingPending = await tx
+            .select({
+              instance_id: kiloclaw_scheduled_action_targets.instance_id,
+              scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
+            })
+            .from(kiloclaw_scheduled_action_targets)
+            .innerJoin(
+              kiloclaw_scheduled_actions,
+              eq(
+                kiloclaw_scheduled_actions.id,
+                kiloclaw_scheduled_action_targets.scheduled_action_id
+              )
+            )
+            .where(
+              and(
+                inArray(kiloclaw_scheduled_action_targets.instance_id, liveInstanceIds),
+                eq(kiloclaw_scheduled_action_targets.status, 'pending'),
+                inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+              )
+            );
 
-        const [stageRow] = await tx
-          .insert(kiloclaw_scheduled_action_stages)
-          .values({
-            scheduled_action_id: parentRow.id,
-            stage_index: 0,
-            scheduled_at: input.scheduledAt,
-            status: 'pending',
-          })
-          .returning({ id: kiloclaw_scheduled_action_stages.id });
+          if (existingPending.length > 0) {
+            const conflictIds = Array.from(new Set(existingPending.map(e => e.instance_id)));
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message:
+                conflictIds.length === 1
+                  ? `Instance ${conflictIds[0]} already has a pending scheduled action; cancel it first`
+                  : `${conflictIds.length} instances already have pending scheduled actions; cancel those first: ${conflictIds.join(', ')}`,
+            });
+          }
 
-        await tx.insert(kiloclaw_scheduled_action_targets).values(
-          liveInstanceIds.map(id => {
-            const row = liveResolvedById.get(id);
-            // liveResolvedById is built from liveInstanceRows (filtered
-            // above), so every id resolves.
-            if (!row) throw new Error(`unresolved instance ${id}`);
-            return {
-              scheduled_action_id: parentRow.id,
-              stage_id: stageRow.id,
-              instance_id: row.instance.id,
-              source_image_tag: row.instance.tracked_image_tag,
-              // For version_change targets we stamp the target tag so the
-              // DO apply path can read it from the target row directly
-              // without having to join back to the parent.
+          const [parentRow] = await tx
+            .insert(kiloclaw_scheduled_actions)
+            .values({
+              action_type: input.actionType,
               target_image_tag: parentTargetImageTag,
-              user_id: row.owner_id,
-              status: 'pending' as const,
-            };
-          })
-        );
+              override_pins: parentOverridePins,
+              notice_lead_hours: input.noticeLeadHours,
+              notice_subject: input.noticeSubject,
+              notice_body: input.noticeBody,
+              reason: input.reason ?? null,
+              status: 'scheduled',
+              created_by: ctx.user.id,
+              total_count: liveInstanceIds.length,
+            })
+            .returning({ id: kiloclaw_scheduled_actions.id });
 
-        return { id: parentRow.id, stageId: stageRow.id };
-      });
+          const [stageRow] = await tx
+            .insert(kiloclaw_scheduled_action_stages)
+            .values({
+              scheduled_action_id: parentRow.id,
+              stage_index: 0,
+              scheduled_at: input.scheduledAt,
+              status: 'pending',
+            })
+            .returning({ id: kiloclaw_scheduled_action_stages.id });
+
+          await tx.insert(kiloclaw_scheduled_action_targets).values(
+            liveInstanceIds.map(id => {
+              const row = liveResolvedById.get(id);
+              // liveResolvedById is built from liveInstanceRows (filtered
+              // above), so every id resolves.
+              if (!row) throw new Error(`unresolved instance ${id}`);
+              return {
+                scheduled_action_id: parentRow.id,
+                stage_id: stageRow.id,
+                instance_id: row.instance.id,
+                source_image_tag: row.instance.tracked_image_tag,
+                // For version_change targets we stamp the target tag so the
+                // DO apply path can read it from the target row directly
+                // without having to join back to the parent.
+                target_image_tag: parentTargetImageTag,
+                user_id: row.owner_id,
+                status: 'pending' as const,
+              };
+            })
+          );
+
+          return { id: parentRow.id, stageId: stageRow.id };
+        },
+        { isolationLevel: 'serializable' }
+      );
 
       // Audit log fire-and-forget. Multi-user actions still use the
       // actor's id as the target_user_id sentinel since the column is

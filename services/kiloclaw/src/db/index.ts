@@ -382,6 +382,35 @@ export async function findDueScheduledActionTargetsForInstance(
 }
 
 /**
+ * Atomically claim a pending target before the apply path dispatches
+ * its side effect. Returns true iff this caller won the CAS — the row
+ * transitions pending → running, and the caller is now the single
+ * writer that will set the final outcome.
+ *
+ * Cloudflare's DO model lets a subsequent alarm() reach the handler
+ * while a previous waitUntil pass is still outstanding. Without claim-
+ * before-dispatch, both passes can find the same due target and both
+ * fire restartMachine — only one wins the final CAS, but both side
+ * effects have already started.
+ */
+export async function claimScheduledActionTarget(
+  db: WorkerDb,
+  args: { target_id: string }
+): Promise<boolean> {
+  const claimed = await db
+    .update(kiloclaw_scheduled_action_targets)
+    .set({ status: 'running' })
+    .where(
+      and(
+        eq(kiloclaw_scheduled_action_targets.id, args.target_id),
+        eq(kiloclaw_scheduled_action_targets.status, 'pending')
+      )
+    )
+    .returning({ id: kiloclaw_scheduled_action_targets.id });
+  return claimed.length > 0;
+}
+
+/**
  * Mark a scheduled-action target with its outcome (applied / skipped /
  * failed) and bump the corresponding stage + parent counters atomically.
  *
@@ -401,58 +430,71 @@ export async function recordScheduledActionTargetOutcome(
     error_message?: string;
   }
 ): Promise<void> {
-  const now = sql`now()`;
+  // All three writes (target row update + stage counter + parent counter)
+  // run in a single transaction. If any one fails, all three roll back —
+  // which means the target row stays 'pending' and the next apply pass
+  // can re-attempt cleanly. Without the transaction wrapper, a Postgres
+  // failure between the target update and the counter bumps would
+  // permanently desync counters: the target would already be off
+  // 'pending' so retry's CAS would no-op, and there's no other reconciler.
+  await db.transaction(async tx => {
+    const now = sql`now()`;
 
-  // Use RETURNING so we can short-circuit the counter increments when
-  // the CAS UPDATE was a no-op. Cloudflare's DO model lets a subsequent
-  // alarm() reach the handler while a previous waitUntil pass is still
-  // outstanding; both passes can call this with the same pending target,
-  // only one wins the CAS, but without this guard both would still
-  // increment the stage/parent counters and double-count.
-  const updated = await db
-    .update(kiloclaw_scheduled_action_targets)
-    .set({
-      status: args.outcome,
-      applied_at: args.outcome === 'applied' ? sql`now()` : null,
-      skip_reason: args.skip_reason ?? null,
-      error_message: args.error_message ?? null,
-    })
-    .where(
-      and(
-        eq(kiloclaw_scheduled_action_targets.id, args.target_id),
-        eq(kiloclaw_scheduled_action_targets.status, 'pending')
+    // Use RETURNING so we can short-circuit the counter increments when
+    // the CAS UPDATE was a no-op. Cloudflare's DO model lets a subsequent
+    // alarm() reach the handler while a previous waitUntil pass is still
+    // outstanding; both passes can call this with the same pending target,
+    // only one wins the CAS, but without this guard both would still
+    // increment the stage/parent counters and double-count.
+    // CAS accepts either 'pending' (skip-due-to-parent-cancelled path,
+    // where we haven't claimed the target) or 'running' (post-dispatch
+    // path, where the apply loop just claimed it pending → running
+    // before invoking the side effect).
+    const updated = await tx
+      .update(kiloclaw_scheduled_action_targets)
+      .set({
+        status: args.outcome,
+        applied_at: args.outcome === 'applied' ? sql`now()` : null,
+        skip_reason: args.skip_reason ?? null,
+        error_message: args.error_message ?? null,
+      })
+      .where(
+        and(
+          eq(kiloclaw_scheduled_action_targets.id, args.target_id),
+          inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running'])
+        )
       )
-    )
-    .returning({ id: kiloclaw_scheduled_action_targets.id });
+      .returning({ id: kiloclaw_scheduled_action_targets.id });
 
-  if (updated.length === 0) {
-    // Another pass already claimed this target. Don't bump counters.
-    return;
-  }
+    if (updated.length === 0) {
+      // Another pass already claimed this target. Don't bump counters.
+      return;
+    }
 
-  const counterField =
-    args.outcome === 'applied'
-      ? 'applied_count'
-      : args.outcome === 'skipped'
-        ? 'skipped_count'
-        : 'failed_count';
+    const counterField =
+      args.outcome === 'applied'
+        ? 'applied_count'
+        : args.outcome === 'skipped'
+          ? 'skipped_count'
+          : 'failed_count';
 
-  await db
-    .update(kiloclaw_scheduled_action_stages)
-    .set({
-      [counterField]: sql`${kiloclaw_scheduled_action_stages[counterField]} + 1`,
-      started_at: sql`COALESCE(${kiloclaw_scheduled_action_stages.started_at}, ${now})`,
-    })
-    .where(eq(kiloclaw_scheduled_action_stages.id, args.stage_id));
+    await tx
+      .update(kiloclaw_scheduled_action_stages)
+      .set({
+        [counterField]: sql`${kiloclaw_scheduled_action_stages[counterField]} + 1`,
+        started_at: sql`COALESCE(${kiloclaw_scheduled_action_stages.started_at}, ${now})`,
+      })
+      .where(eq(kiloclaw_scheduled_action_stages.id, args.stage_id));
 
-  await db
-    .update(kiloclaw_scheduled_actions)
-    .set({
-      [counterField]: sql`${kiloclaw_scheduled_actions[counterField]} + 1`,
-      status: sql`CASE WHEN ${kiloclaw_scheduled_actions.status} = 'scheduled' THEN 'running' ELSE ${kiloclaw_scheduled_actions.status} END`,
-      started_at: sql`COALESCE(${kiloclaw_scheduled_actions.started_at}, ${now})`,
-    })
-    .where(eq(kiloclaw_scheduled_actions.id, args.scheduled_action_id));
+    await tx
+      .update(kiloclaw_scheduled_actions)
+      .set({
+        [counterField]: sql`${kiloclaw_scheduled_actions[counterField]} + 1`,
+        status: sql`CASE WHEN ${kiloclaw_scheduled_actions.status} = 'scheduled' THEN 'running' ELSE ${kiloclaw_scheduled_actions.status} END`,
+        started_at: sql`COALESCE(${kiloclaw_scheduled_actions.started_at}, ${now})`,
+      })
+      .where(eq(kiloclaw_scheduled_actions.id, args.scheduled_action_id));
+  });
 }
 
 /**

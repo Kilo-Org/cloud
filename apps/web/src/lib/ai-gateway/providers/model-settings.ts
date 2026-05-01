@@ -2,7 +2,19 @@ import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
+import {
+  qwen36_27b_model,
+  qwen36_flash_model,
+  qwen36_max_preview_model,
+  qwen36_plus_model,
+} from '@/lib/ai-gateway/providers/qwen';
+
+const qwen36ModelIds: ReadonlySet<string> = new Set([
+  qwen36_plus_model.public_id,
+  qwen36_flash_model.public_id,
+  qwen36_max_preview_model.public_id,
+  qwen36_27b_model.public_id,
+]);
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrok4Model, isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
@@ -66,7 +78,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (
     isKimiModel(model) ||
     isGlmModel(model) ||
-    model === qwen36_plus_model.public_id ||
+    qwen36ModelIds.has(model) ||
     isGemmaModel(model)
   ) {
     return REASONING_VARIANTS_BINARY;
@@ -97,7 +109,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
 }
 
 function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
-  if (qwen36_plus_model.public_id === model) {
+  if (qwen36ModelIds.has(model)) {
     // with 'openai' (Responses) prompt caching doesn't work
     // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
     return 'alibaba';

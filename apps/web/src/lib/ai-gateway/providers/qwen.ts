@@ -105,7 +105,7 @@ export const qwen36_plus_model: KiloExclusiveModel = {
   exclusive_to: [],
 };
 
-export const qwen36_flash_model: KiloExclusiveModel = {
+const qwen36_flash_model: KiloExclusiveModel = {
   public_id: 'qwen/qwen3.6-flash',
   display_name: 'Qwen: Qwen3.6 Flash',
   description:
@@ -139,7 +139,7 @@ export const qwen36_flash_model: KiloExclusiveModel = {
   exclusive_to: [],
 };
 
-export const qwen36_max_preview_model: KiloExclusiveModel = {
+const qwen36_max_preview_model: KiloExclusiveModel = {
   public_id: 'qwen/qwen3.6-max-preview',
   display_name: 'Qwen: Qwen3.6 Max Preview',
   description:
@@ -173,7 +173,7 @@ export const qwen36_max_preview_model: KiloExclusiveModel = {
   exclusive_to: [],
 };
 
-export const qwen36_27b_model: KiloExclusiveModel = {
+const qwen36_27b_model: KiloExclusiveModel = {
   public_id: 'qwen/qwen3.6-27b',
   display_name: 'Qwen: Qwen3.6 27B',
   description:

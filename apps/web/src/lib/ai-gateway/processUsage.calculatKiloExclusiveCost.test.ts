@@ -2,9 +2,12 @@ import { test, describe, expect } from '@jest/globals';
 import { calculateKiloExclusiveCost_mUsd } from './processUsage';
 import type { JustTheCostsUsageStats } from './processUsage.types';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { qwen36_models, qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
-
-const [, qwen36_flash_model, qwen36_max_preview_model, qwen36_27b_model] = qwen36_models;
+import {
+  qwen36_27b_model,
+  qwen36_flash_model,
+  qwen36_max_preview_model,
+  qwen36_plus_model,
+} from '@/lib/ai-gateway/providers/qwen';
 
 const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCostsUsageStats => ({
   cost_mUsd: 0,

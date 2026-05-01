@@ -132,6 +132,42 @@ export function updateMessageInPages<TPageParam>(
   return old;
 }
 
+function orderNewestLoadedPageByServerId(page: Message[]): Message[] {
+  const orderedServerMessages = page
+    .filter(message => !message.id.startsWith('pending-'))
+    .toSorted((left, right) => right.id.localeCompare(left.id));
+  let orderedServerMessageIndex = 0;
+
+  return page.map(message => {
+    if (message.id.startsWith('pending-')) return message;
+    const orderedMessage = orderedServerMessages[orderedServerMessageIndex];
+    orderedServerMessageIndex += 1;
+    return orderedMessage ?? message;
+  });
+}
+
+export function replaceMessageAndOrderNewestPage<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  messageId: string,
+  updater: (message: Message) => Message
+): InfiniteData<Message[], TPageParam> {
+  for (let pageIndex = 0; pageIndex < old.pages.length; pageIndex++) {
+    const page = old.pages[pageIndex];
+    if (!page) continue;
+    const messageIndex = page.findIndex(msg => msg.id === messageId);
+    if (messageIndex === -1) continue;
+
+    const pages = old.pages.slice();
+    const updatedPage = page.slice();
+    const message = updatedPage[messageIndex];
+    if (!message) return old;
+    updatedPage[messageIndex] = updater(message);
+    pages[pageIndex] = pageIndex === 0 ? orderNewestLoadedPageByServerId(updatedPage) : updatedPage;
+    return { ...old, pages };
+  }
+  return old;
+}
+
 export function useMessages(client: KiloChatClient, conversationId: string | null) {
   return useInfiniteQuery({
     queryKey: messagesKey(conversationId),
@@ -179,11 +215,11 @@ export function applyMessageCreatedEventToPages<TPageParam>(
 
   if (e.clientId) {
     const pendingId = `pending-${e.clientId}`;
-    const replacedPending = updateMessageInPages(old, pendingId, () => newMessage);
+    const replacedPending = replaceMessageAndOrderNewestPage(old, pendingId, () => newMessage);
     if (replacedPending !== old) return replacedPending;
   }
 
-  const replacedExisting = updateMessageInPages(old, e.messageId, () => newMessage);
+  const replacedExisting = replaceMessageAndOrderNewestPage(old, e.messageId, () => newMessage);
   if (replacedExisting !== old) return replacedExisting;
 
   for (const page of old.pages) {
@@ -231,7 +267,10 @@ export function useSendMessage(
       const { queryKey, pendingId } = context;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, pendingId, msg => ({ ...msg, id: response.messageId }));
+        return replaceMessageAndOrderNewestPage(old, pendingId, msg => ({
+          ...msg,
+          id: response.messageId,
+        }));
       });
     },
     onError: (err, _variables, context) => {

@@ -43,6 +43,29 @@ describe('applyMessageCreatedEventToPages', () => {
 
     expect(result.pages[0]?.map(m => m.id)).toEqual(['bot-message', 'existing']);
   });
+
+  it('repositions resolved optimistic messages by newest server id', () => {
+    const remoteOlder = message('01HX0000000000000000000000');
+    const pendingLocal = message('pending-client-1');
+    const data: InfiniteData<Message[], string | undefined> = {
+      pages: [[remoteOlder, pendingLocal]],
+      pageParams: [undefined],
+    };
+    const event = {
+      messageId: '01HX0000000000000000000001',
+      senderId: 'user:1',
+      content: [{ type: 'text', text: 'local newer' }],
+      inReplyToMessageId: null,
+      clientId: 'client-1',
+    } satisfies MessageCreatedEvent;
+
+    const result = applyMessageCreatedEventToPages(data, event);
+
+    expect(result.pages[0]?.map(m => m.id)).toEqual([
+      '01HX0000000000000000000001',
+      '01HX0000000000000000000000',
+    ]);
+  });
 });
 
 describe('updateMessageInPages', () => {

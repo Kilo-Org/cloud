@@ -6,6 +6,7 @@ const validConversationId = '01HXYZ00000ABCDEFGHJKMNPQR';
 const validMessageId = '01HXYZ00000ABCDEFGHJKMNPQS';
 const validReplyMessageId = '01HXYZ00000ABCDEFGHJKMNPQT';
 const validClientId = '01HXYZ00000ABCDEFGHJKMNPQV';
+const uuidClientId = '8bb5a00b-98a3-4910-bda3-2669bcde23bc';
 
 describe('kilo chat event payload schemas', () => {
   it('rejects malformed or empty event identifiers', () => {
@@ -35,6 +36,15 @@ describe('kilo chat event payload schemas', () => {
         content: [{ type: 'text', text: 'hello' }],
         inReplyToMessageId: validReplyMessageId,
         clientId: '',
+      }).success
+    ).toBe(false);
+    expect(
+      messageCreatedSchema.safeParse({
+        messageId: validMessageId,
+        senderId: 'bot:kiloclaw:sandbox-1',
+        content: [{ type: 'text', text: 'hello' }],
+        inReplyToMessageId: validReplyMessageId,
+        clientId: uuidClientId,
       }).success
     ).toBe(false);
 

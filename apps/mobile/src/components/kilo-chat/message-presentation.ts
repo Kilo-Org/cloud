@@ -1,4 +1,5 @@
 import { type CreateMessageRequest, type Message } from '@kilocode/kilo-chat';
+import { ulid } from 'ulid';
 
 export type SendMessageVariables = CreateMessageRequest & { clientId: string };
 
@@ -22,6 +23,10 @@ export function buildSendMessageVariables({
     clientId,
     ...(inReplyToMessageId ? { inReplyToMessageId } : {}),
   };
+}
+
+export function createSendMessageClientId(): string {
+  return ulid();
 }
 
 export function contentBlocksToPreviewText(content: Message['content']): string {

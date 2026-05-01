@@ -13,7 +13,6 @@ import {
   useRemoveReaction,
 } from '@kilocode/kilo-chat-hooks';
 import { type ExecApprovalDecision, formatKiloChatError, type Message } from '@kilocode/kilo-chat';
-import * as Crypto from 'expo-crypto';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -25,7 +24,7 @@ import { executeActionWithMobileFeedback } from './execute-action-feedback';
 import { buildMessageActionSheetOptions, getSelectedMessageAction } from './message-actions';
 import { MessageInput } from './message-input';
 import { MessageList } from './message-list';
-import { buildSendMessageVariables } from './message-presentation';
+import { buildSendMessageVariables, createSendMessageClientId } from './message-presentation';
 import { useConversationPresence } from './hooks/use-conversation-presence';
 import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
 import { useMobileTypingState, useTypingSender } from './hooks/use-typing';
@@ -106,7 +105,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
         buildSendMessageVariables({
           conversationId,
           text,
-          clientId: Crypto.randomUUID(),
+          clientId: createSendMessageClientId(),
           inReplyToMessageId,
         }),
         {

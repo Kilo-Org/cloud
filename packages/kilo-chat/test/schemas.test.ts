@@ -15,6 +15,8 @@ import {
 } from '../src/schemas';
 
 const validConversationId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+const validClientId = '01HXYZ00000ABCDEFGHJKMNPQV';
+const uuidClientId = '8bb5a00b-98a3-4910-bda3-2669bcde23bc';
 
 describe('title schemas — trim and reject empty', () => {
   describe('renameConversationRequestSchema', () => {
@@ -148,6 +150,24 @@ describe('text content blocks — trim and reject empty', () => {
   });
 
   describe('createMessageRequestSchema', () => {
+    it('accepts ULID client ids and rejects UUID client ids', () => {
+      const content = [{ type: 'text', text: 'hello' }];
+      expect(
+        createMessageRequestSchema.safeParse({
+          conversationId: validConversationId,
+          content,
+          clientId: validClientId,
+        }).success
+      ).toBe(true);
+      expect(
+        createMessageRequestSchema.safeParse({
+          conversationId: validConversationId,
+          content,
+          clientId: uuidClientId,
+        }).success
+      ).toBe(false);
+    });
+
     it('rejects whitespace-only text block', () => {
       const res = createMessageRequestSchema.safeParse({
         conversationId: validConversationId,

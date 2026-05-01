@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { type Message } from '@kilocode/kilo-chat';
+import { createMessageRequestSchema, type Message } from '@kilocode/kilo-chat';
 
 import {
   buildSendMessageVariables,
+  createSendMessageClientId,
   getDeliveryFailureLabel,
   getReplyPreviewText,
 } from './message-presentation';
@@ -23,6 +24,16 @@ function message(overrides: Partial<Message> = {}): Message {
 }
 
 describe('buildSendMessageVariables', () => {
+  it('builds variables accepted by the create message request schema', () => {
+    const variables = buildSendMessageVariables({
+      conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      text: 'mobile message',
+      clientId: createSendMessageClientId(),
+    });
+
+    expect(createMessageRequestSchema.safeParse(variables).success).toBe(true);
+  });
+
   it('includes inReplyToMessageId when sending a reply', () => {
     expect(
       buildSendMessageVariables({

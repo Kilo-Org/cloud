@@ -103,14 +103,6 @@ supabase/.temp
 # agent plans
 .opencode/plans/
 
-# AI session artifacts — local-only, never committed
-.claude/
-proposals/
-
-# Stray expo/eslint cache directory written by mobile dev tooling at the
-# repo root. The actual mobile workspace package lives at apps/mobile/.
-kilo-app/
-
 # misc
 TMP_CI_commit_msg.txt
 *.csv

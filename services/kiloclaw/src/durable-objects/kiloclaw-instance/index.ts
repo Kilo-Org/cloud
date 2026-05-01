@@ -50,6 +50,7 @@ import {
   OPENCLAW_BUILTIN_DEFAULT_MODEL,
   RESTARTING_TIMEOUT_MS,
   STARTING_TIMEOUT_MS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
 } from '../../config';
 import {
   SECRET_CATALOG,
@@ -2117,6 +2118,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.healthCheckFailCount = 0;
     this.s.lastStartErrorMessage = null;
     this.s.lastStartErrorAt = null;
+    this.s.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
     await this.persist({
       status: 'running',
       startingAt: null,
@@ -2126,6 +2128,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyMachineId: this.s.flyMachineId,
       lastStartErrorMessage: null,
       lastStartErrorAt: null,
+      controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
     });
 
     await this.syncGoogleWorkspaceConfig('instance_started');
@@ -2545,6 +2548,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     botNature: string | null;
     botVibe: string | null;
     botEmoji: string | null;
+    controllerCapabilitiesVersion: number | null;
   }> {
     await this.loadState();
 
@@ -2602,6 +2606,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       botNature: this.s.botNature,
       botVibe: this.s.botVibe,
       botEmoji: this.s.botEmoji,
+      controllerCapabilitiesVersion: this.s.controllerCapabilitiesVersion,
     };
   }
 

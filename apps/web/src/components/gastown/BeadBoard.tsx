@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Clock, Play } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -26,6 +26,7 @@ type BeadBoardProps = {
   isLoading: boolean;
   onDeleteBead?: (beadId: string) => void;
   onSelectBead?: (bead: Bead) => void;
+  onStartBead?: (beadId: string) => void;
   selectedBeadId?: string | null;
   agentNameById?: Record<string, string>;
 };
@@ -53,22 +54,31 @@ const priorityColors: Record<string, string> = {
   critical: 'text-red-300',
 };
 
+const HELD_LABEL = 'gt:held';
+
+function isHeld(bead: Bead) {
+  return bead.labels.includes(HELD_LABEL);
+}
+
 function BeadCard({
   bead,
   onDelete,
   onSelect,
+  onStart,
   isSelected,
   agentNameById,
 }: {
   bead: Bead;
   onDelete?: () => void;
   onSelect?: () => void;
+  onStart?: () => void;
   isSelected?: boolean;
   agentNameById?: Record<string, string>;
 }) {
   const assigneeName = bead.assignee_agent_bead_id
     ? agentNameById?.[bead.assignee_agent_bead_id]
     : null;
+  const held = isHeld(bead);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!onSelect) return;
@@ -81,8 +91,9 @@ function BeadCard({
   return (
     <Card
       className={cn(
-        'group border-white/10 bg-white/[0.03] transition-[border-color,background-color,transform] hover:bg-white/[0.05]',
+        'group relative border-white/10 bg-white/[0.03] transition-[border-color,background-color,transform] hover:bg-white/[0.05]',
         onSelect ? 'cursor-pointer' : 'cursor-default',
+        held ? 'border-amber-500/20 bg-amber-500/[0.03]' : '',
         isSelected
           ? 'border-[color:oklch(95%_0.15_108_/_0.45)] bg-[color:oklch(95%_0.15_108_/_0.06)]'
           : ''
@@ -103,7 +114,14 @@ function BeadCard({
       >
         <CardContent className="p-3">
           <div className="mb-2 flex items-start justify-between gap-2">
-            <h4 className="line-clamp-2 text-sm font-medium text-white/90">{bead.title}</h4>
+            <div className="flex min-w-0 items-start gap-1.5">
+              {held && (
+                <span title="Held" className="mt-0.5 flex shrink-0">
+                  <Clock className="size-3 text-amber-400/60" aria-label="Held" />
+                </span>
+              )}
+              <h4 className="line-clamp-2 text-sm font-medium text-white/90">{bead.title}</h4>
+            </div>
             <div className="flex shrink-0 items-center gap-1">
               <span className={cn('text-xs font-medium', priorityColors[bead.priority])}>
                 {bead.priority}
@@ -124,9 +142,16 @@ function BeadCard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="text-xs">
-              {bead.type}
-            </Badge>
+            {held ? (
+              <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400/80">
+                <Clock className="size-2.5" />
+                Held
+              </span>
+            ) : (
+              <Badge variant="outline" className="text-xs">
+                {bead.type}
+              </Badge>
+            )}
             <span className="text-xs text-white/50">
               {formatDistanceToNow(new Date(bead.created_at), { addSuffix: true })}
             </span>
@@ -137,17 +162,34 @@ function BeadCard({
             )}
           </div>
 
-          {bead.labels.length > 0 && (
+          {bead.labels.filter(l => l !== HELD_LABEL).length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
-              {bead.labels.map(label => (
-                <Badge key={label} variant="secondary" className="text-xs">
-                  {label}
-                </Badge>
-              ))}
+              {bead.labels
+                .filter(l => l !== HELD_LABEL)
+                .map(label => (
+                  <Badge key={label} variant="secondary" className="text-xs">
+                    {label}
+                  </Badge>
+                ))}
             </div>
           )}
         </CardContent>
       </div>
+
+      {/* Hover quick action for held beads */}
+      {held && onStart && (
+        <button
+          type="button"
+          onClick={e => {
+            e.stopPropagation();
+            onStart();
+          }}
+          className="absolute right-2 bottom-2 flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-400 opacity-0 transition-opacity hover:bg-emerald-500/20 group-hover:opacity-100"
+        >
+          <Play className="size-2.5" />
+          Start now
+        </button>
+      )}
     </Card>
   );
 }
@@ -157,6 +199,7 @@ export function BeadBoard({
   isLoading,
   onDeleteBead,
   onSelectBead,
+  onStartBead,
   selectedBeadId,
   agentNameById,
 }: BeadBoardProps) {
@@ -235,6 +278,7 @@ export function BeadBoard({
                       bead={bead}
                       onDelete={onDeleteBead ? () => onDeleteBead(bead.bead_id) : undefined}
                       onSelect={onSelectBead ? () => onSelectBead(bead) : undefined}
+                      onStart={onStartBead ? () => onStartBead(bead.bead_id) : undefined}
                       isSelected={selectedBeadId === bead.bead_id}
                       agentNameById={agentNameById}
                     />

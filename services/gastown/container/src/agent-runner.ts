@@ -565,6 +565,8 @@ export async function runAgent(originalRequest: StartAgentRequest): Promise<Mana
       branch: request.branch,
       startPoint: request.startPoint,
       defaultBranch: request.defaultBranch,
+      envVars,
+      gitUrl: request.gitUrl,
     });
 
     // Set up git credentials so the agent can push

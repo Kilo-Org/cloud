@@ -54,7 +54,7 @@ export function applyGoogleModelSettings(provider: ProviderId, requestToMutate: 
   }
 
   const readFileTool = requestToMutate.body.tools?.find(
-    tool => tool.type === 'function' && tool.function.name === 'read_file'
+    tool => tool.type === 'function' && tool.function?.name === 'read_file'
   );
   if (!readFileTool || readFileTool.type !== 'function') {
     return;

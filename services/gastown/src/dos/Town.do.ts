@@ -2399,6 +2399,79 @@ export class TownDO extends DurableObject<Env> {
     return { bead, agent: hookedAgent };
   }
 
+  /**
+   * Create an open bead with the given labels, without arming the reconciler alarm.
+   * The caller is responsible for including `gt:held` in the labels if the bead
+   * should not be dispatched immediately.
+   */
+  async createHeldBead(input: {
+    rigId: string;
+    title: string;
+    body?: string;
+    labels?: string[];
+  }): Promise<Bead> {
+    const bead = beadOps.createBead(this.sql, {
+      type: 'issue',
+      title: input.title,
+      body: input.body,
+      rig_id: input.rigId,
+      labels: input.labels,
+    });
+
+    events.insertEvent(this.sql, 'bead_created', {
+      bead_id: bead.bead_id,
+      payload: { bead_type: 'issue', rig_id: input.rigId, has_blockers: false },
+    });
+
+    return bead;
+  }
+
+  /**
+   * Notify the mayor about a newly created held bead.
+   * The mayor can then explore the codebase, plan, decompose into a convoy, or start it.
+   */
+  async notifyMayorOfNewBead(
+    beadId: string,
+    rigId: string,
+    title: string,
+    body?: string
+  ): Promise<void> {
+    const message = [
+      `A user just created a new bead in rig ${rigId}:`,
+      `ID: ${beadId}`,
+      `Title: "${title}"`,
+      body ? `Description: ${body.slice(0, 500)}${body.length > 500 ? '...' : ''}` : '',
+      ``,
+      `The bead is currently held (tagged gt:held) and will not be dispatched until started.`,
+      `Would you like to explore the codebase and flesh out a detailed plan, decompose it into a staged convoy, or start it immediately?`,
+      `Your chat reply is already visible to the user — no extra tool call is needed to surface your response.`,
+      `To start the bead immediately, remove the gt:held label via gt_bead_update.`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    await this.sendMayorMessage(message);
+  }
+
+  /**
+   * Remove the `gt:held` label from a bead and arm the reconciler alarm so the
+   * bead is picked up on the next tick.
+   *
+   * @param rigId - The rig the caller has verified ownership of. The bead must
+   *   belong to this rig to prevent cross-rig label removal within the same town.
+   */
+  async startHeldBead(beadId: string, rigId: string): Promise<Bead> {
+    const bead = beadOps.getBead(this.sql, beadId);
+    if (!bead) throw new Error(`Bead ${beadId} not found`);
+    if (bead.rig_id !== rigId) {
+      throw new Error(`Bead ${beadId} does not belong to rig ${rigId}`);
+    }
+
+    const updatedLabels = (bead.labels ?? []).filter(l => l !== patrol.HELD_LABEL);
+    const updated = beadOps.updateBeadFields(this.sql, beadId, { labels: updatedLabels }, 'system');
+    await this.escalateToActiveCadence();
+    return updated;
+  }
+
   /** Build the rig list for mayor agent startup (browse worktree setup on fresh containers). */
   private async rigListForMayor(): Promise<
     Array<{
@@ -2476,6 +2549,25 @@ export class TownDO extends DurableObject<Env> {
     let sessionStatus: 'idle' | 'active' | 'starting';
 
     if (isAlive) {
+      // Refresh the container-scoped JWT before sending. The mayor makes GT
+      // tool calls using GASTOWN_CONTAINER_TOKEN, and sendMessageToAgent does
+      // not otherwise call ensureContainerToken. Without this, a mayor that
+      // has been waiting longer than the 8h token expiry would 401 on its
+      // first GT tool call for the new prompt.
+      //
+      // Best-effort: ensureContainerToken throws on non-2xx /refresh-token
+      // responses. We don't want a transient refresh failure (404/500) to
+      // drop the user's prompt — the stored envVar fallback and the next
+      // alarm tick will recover. Log and proceed to sendMessageToAgent.
+      try {
+        const townConfig = await this.getTownConfig();
+        const userId = townConfig.owner_user_id ?? townId;
+        await dispatch.ensureContainerToken(this.env, townId, userId);
+      } catch (err) {
+        logger.warn('sendMayorMessage: ensureContainerToken failed, proceeding with send', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
       const sent = await dispatch.sendMessageToAgent(this.env, townId, mayor.id, combinedMessage);
       if (sent) {
         // Transition waiting → working so the alarm runs at the active cadence
@@ -4033,17 +4125,16 @@ export class TownDO extends DurableObject<Env> {
    * requests that reset the container's sleepAfter timer (#1409).
    */
   private async refreshContainerToken(): Promise<void> {
-    // Skip if no active work AND no alive mayor — the container is sleeping
-    // and doesn't need a fresh token. The token will be refreshed when work
-    // is next dispatched (ensureContainerToken is called in
-    // startAgentInContainer at container-dispatch.ts:329).
-    // However, a waiting mayor IS alive in the container and needs a valid
-    // token for GT tool calls when the user sends the next message
-    // (sendMayorMessage → sendMessageToAgent does NOT call ensureContainerToken).
+    // Skip if no active work AND no actively-running mayor — the container is
+    // sleeping (or about to) and doesn't need a fresh token. The token will be
+    // refreshed when work is next dispatched (ensureContainerToken is called in
+    // startAgentInContainer at container-dispatch.ts) and on the warm-send path
+    // in _sendMayorMessage before sendMessageToAgent. 'waiting' is intentionally
+    // excluded: a user may leave a mayor in waiting indefinitely, and counting
+    // it as alive here would keep the container awake forever via hourly
+    // /refresh-token pings that reset sleepAfter (#1409).
     const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
-    const mayorAlive =
-      mayor &&
-      (mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting');
+    const mayorAlive = mayor && (mayor.status === 'working' || mayor.status === 'stalled');
     if (!this.hasActiveWork() && !mayorAlive) return;
 
     const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000; // 1 hour

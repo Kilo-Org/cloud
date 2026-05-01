@@ -174,6 +174,7 @@ import {
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   STALE_PROVISION_THRESHOLD_MS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
 } from '../config';
 
 // ============================================================================
@@ -2020,6 +2021,25 @@ describe('buildUserEnvVars API key refresh', () => {
     expect(db.findPepperByUserId).not.toHaveBeenCalled();
     expect(gatewayEnv.buildEnvVars).not.toHaveBeenCalled();
   });
+
+  it('does NOT persist controllerCapabilitiesVersion during env build', async () => {
+    // The capabilities version must only be bumped atomically with the
+    // final `status = running` transition, inside the DO's ownership guard.
+    // Persisting here would let the DO report a version the running machine
+    // may not actually have yet if the subsequent provider update fails or
+    // is raced by a concurrent destroy().
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      kilocodeApiKey: 'stale-key',
+      kilocodeApiKeyExpiresAt: '2026-12-01T00:00:00.000Z',
+    });
+
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBeUndefined();
+
+    await callBuildUserEnvVars(instance);
+
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBeUndefined();
+  });
 });
 
 describe('alarm cadence', () => {
@@ -2175,6 +2195,30 @@ describe('startExistingMachine: transient vs 404 errors', () => {
 
     expect(flyClient.createMachine).toHaveBeenCalled();
     expect(storage._store.get('flyMachineId')).toBe('machine-new');
+  });
+
+  it('persists controllerCapabilitiesVersion atomically with the running transition', async () => {
+    // The version bump must land in the same persist call that flips status
+    // to `running`, inside the post-start ownership guard. This keeps it in
+    // sync with what the running machine actually has, and prevents a stale
+    // write recreating partial DO storage after a concurrent destroy.
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, { status: 'stopped' });
+
+    (flyClient.getMachine as Mock).mockRejectedValue(new FlyApiError('not found', 404, '{}'));
+    (flyClient.createMachine as Mock).mockResolvedValue({
+      id: 'machine-new',
+      region: 'iad',
+    });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1' });
+
+    await instance.start('user-1');
+
+    expect(storage._store.get('status')).toBe('running');
+    expect(storage._store.get('controllerCapabilitiesVersion')).toBe(
+      WORKER_CONTROLLER_CAPABILITIES_VERSION
+    );
   });
 
   it('destroys stale machine and recreates it when updateMachine reports a missing volume', async () => {

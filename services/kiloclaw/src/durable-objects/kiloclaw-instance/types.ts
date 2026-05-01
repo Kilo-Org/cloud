@@ -113,6 +113,7 @@ export type InstanceMutableState = {
   lastRecoveryErrorAt: number | null;
   lastBoundMachineRecoveryAt: number | null;
   instanceFeatures: string[];
+  controllerCapabilitiesVersion: number | null;
   gmailNotificationsEnabled: boolean;
   gmailLastHistoryId: string | null;
   gmailPushOidcEmail: string | null;

@@ -11,6 +11,7 @@ import type {
   KiloExaSearchMode,
 } from '../schemas/instance-config';
 import { deriveGatewayToken } from '../auth/gateway-token';
+import { hostnameLabelFromSandboxId } from '../auth/hostname-label';
 import {
   mergeEnvVarsWithSecrets,
   decryptChannelTokens,
@@ -227,8 +228,32 @@ export async function buildEnvVars(
   // Worker-level passthrough (non-sensitive)
   if (env.TELEGRAM_DM_POLICY) plainEnv.TELEGRAM_DM_POLICY = env.TELEGRAM_DM_POLICY;
   if (env.DISCORD_DM_POLICY) plainEnv.DISCORD_DM_POLICY = env.DISCORD_DM_POLICY;
-  if (env.OPENCLAW_ALLOWED_ORIGINS)
-    plainEnv.OPENCLAW_ALLOWED_ORIGINS = env.OPENCLAW_ALLOWED_ORIGINS;
+
+  // Control UI allowed origins. Starts from the worker-level shared list,
+  // then appends a per-instance virtual host `https://<label>.kiloclaw.ai`
+  // derived from the sandboxId. Two label shapes, distinguishable by prefix:
+  //   instance-keyed: `i-{32hex}`   (ki_{32hex} sandboxId)
+  //   legacy:         `u-{body}`    (base64url-encoded userId)
+  // OpenClaw's origin check does exact-string matching, so each hostname
+  // must be enumerated explicitly — this covers both instance-keyed and
+  // legacy sandboxes with a single per-instance origin.
+  const originEntries: string[] = [];
+  if (env.OPENCLAW_ALLOWED_ORIGINS) {
+    for (const raw of env.OPENCLAW_ALLOWED_ORIGINS.split(',')) {
+      const trimmed = raw.trim();
+      if (trimmed) originEntries.push(trimmed);
+    }
+  }
+  const perInstanceLabel = hostnameLabelFromSandboxId(sandboxId);
+  if (perInstanceLabel) {
+    const perInstanceOrigin = `https://${perInstanceLabel}.kiloclaw.ai`;
+    if (!originEntries.includes(perInstanceOrigin)) {
+      originEntries.push(perInstanceOrigin);
+    }
+  }
+  if (originEntries.length > 0) {
+    plainEnv.OPENCLAW_ALLOWED_ORIGINS = originEntries.join(',');
+  }
   if (env.KILOCLAW_CHECKIN_URL) plainEnv.KILOCLAW_CHECKIN_URL = env.KILOCLAW_CHECKIN_URL;
   if (env.KILOCHAT_BASE_URL) plainEnv.KILOCHAT_BASE_URL = env.KILOCHAT_BASE_URL;
   plainEnv.REQUIRE_PROXY_TOKEN = env.REQUIRE_PROXY_TOKEN ?? 'false';

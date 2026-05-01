@@ -314,6 +314,7 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.lastRecoveryErrorAt = d.lastRecoveryErrorAt;
     s.lastBoundMachineRecoveryAt = d.lastBoundMachineRecoveryAt;
     s.instanceFeatures = d.instanceFeatures;
+    s.controllerCapabilitiesVersion = d.controllerCapabilitiesVersion;
     s.gmailNotificationsEnabled = d.gmailNotificationsEnabled;
     s.gmailLastHistoryId = d.gmailLastHistoryId;
     s.gmailPushOidcEmail = d.gmailPushOidcEmail;
@@ -421,6 +422,7 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.lastRecoveryErrorAt = null;
   s.lastBoundMachineRecoveryAt = null;
   s.instanceFeatures = [];
+  s.controllerCapabilitiesVersion = null;
   s.gmailNotificationsEnabled = false;
   s.gmailLastHistoryId = null;
   s.gmailPushOidcEmail = null;
@@ -514,6 +516,7 @@ export function createMutableState(): InstanceMutableState {
     lastRecoveryErrorAt: null,
     lastBoundMachineRecoveryAt: null,
     instanceFeatures: [],
+    controllerCapabilitiesVersion: null,
     gmailNotificationsEnabled: false,
     gmailLastHistoryId: null,
     gmailPushOidcEmail: null,

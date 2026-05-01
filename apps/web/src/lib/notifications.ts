@@ -254,10 +254,14 @@ async function generateByokProvidersNotification(
     const names = {
       anthropic: 'Claude API Key',
       bedrock: 'Amazon Bedrock',
+      chutes: 'Chutes API Key',
+      fireworks: 'Fireworks API Key',
       gemini: 'Google AI API Key',
       'openai-native': 'OpenAI API Key',
+      moonshot: 'Moonshot AI API Key',
       minimax: 'MiniMax Coding Plan',
       mistral: 'Mistral AI API Key',
+      novita: 'Novita AI API Key',
       xai: 'xAI API Key',
       zai: 'GLM Coding Plan',
     } as Record<string, string>;

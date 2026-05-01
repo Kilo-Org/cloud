@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+const nonEmptyStringSchema = z.string().min(1);
+
 /**
  * Schema for the `data` blob attached to Expo push notifications.
  * This crosses the OS boundary as untyped JSON, so it MUST be
@@ -8,9 +10,9 @@ import { z } from 'zod';
 export const pushDataSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('chat.message'),
-    sandboxId: z.string(),
-    conversationId: z.string(),
-    messageId: z.string(),
+    sandboxId: nonEmptyStringSchema,
+    conversationId: nonEmptyStringSchema,
+    messageId: nonEmptyStringSchema,
   }),
   z.object({
     type: z.literal('instance-lifecycle'),

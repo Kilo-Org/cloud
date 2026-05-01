@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pushDataSchema } from '@kilocode/notifications';
 
 import { notificationPathForData } from './notification-path';
 
@@ -32,5 +33,52 @@ describe('notificationPathForData', () => {
         sandboxId: 'ki_deadbeef',
       })
     ).toBe('/(app)/chat/ki_deadbeef');
+  });
+});
+
+describe('pushDataSchema', () => {
+  it('rejects empty chat notification IDs', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'chat.message',
+        sandboxId: '',
+        conversationId: 'conversation-1',
+        messageId: 'message-1',
+      }).success
+    ).toBe(false);
+    expect(
+      pushDataSchema.safeParse({
+        type: 'chat.message',
+        sandboxId: 'sandbox-1',
+        conversationId: '',
+        messageId: 'message-1',
+      }).success
+    ).toBe(false);
+    expect(
+      pushDataSchema.safeParse({
+        type: 'chat.message',
+        sandboxId: 'sandbox-1',
+        conversationId: 'conversation-1',
+        messageId: '',
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts valid chat and lifecycle notification data', () => {
+    expect(
+      pushDataSchema.safeParse({
+        type: 'chat.message',
+        sandboxId: 'sandbox-1',
+        conversationId: 'conversation-1',
+        messageId: 'message-1',
+      }).success
+    ).toBe(true);
+    expect(
+      pushDataSchema.safeParse({
+        type: 'instance-lifecycle',
+        event: 'ready',
+        sandboxId: 'sandbox-1',
+      }).success
+    ).toBe(true);
   });
 });

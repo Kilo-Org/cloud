@@ -1,5 +1,10 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import {
+  createMarkReadState,
+  finishMarkReadAttempt,
+  shouldStartMarkReadAttempt,
+  startMarkReadAttempt,
+  succeedMarkReadAttempt,
   useAddReaction,
   useDeleteMessage,
   useEditMessage,
@@ -200,17 +205,27 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
 
   const activeAndFocused = useAppActiveAndFocused();
   const markRead = useMarkRead(client);
-  const lastMarkedRef = useRef<string | null>(null);
+  const markReadStateRef = useRef(createMarkReadState());
   useEffect(() => {
     if (!activeAndFocused) {
       return;
     }
     const marker = `${conversationId}:${latestMessageId ?? 'empty'}`;
-    if (lastMarkedRef.current === marker) {
+    const state = markReadStateRef.current;
+    if (!shouldStartMarkReadAttempt(state, marker)) {
       return;
     }
-    lastMarkedRef.current = marker;
-    markRead(sandboxId, conversationId);
+    startMarkReadAttempt(state, marker);
+    void (async () => {
+      try {
+        await markRead(sandboxId, conversationId);
+        succeedMarkReadAttempt(state, marker);
+      } catch {
+        // useMarkRead already surfaces the mutation error to the user.
+      } finally {
+        finishMarkReadAttempt(state, marker);
+      }
+    })();
   }, [activeAndFocused, conversationId, latestMessageId, markRead, sandboxId]);
 
   useFocusEffect(

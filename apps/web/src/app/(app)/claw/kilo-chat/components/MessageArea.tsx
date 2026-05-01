@@ -27,9 +27,14 @@ import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
 import { useDocumentVisible } from '@/hooks/useDocumentVisible';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
 import {
+  createMarkReadState,
+  finishMarkReadAttempt,
   useConversationDetail,
   useRenameConversation,
   useMarkConversationRead,
+  shouldStartMarkReadAttempt,
+  startMarkReadAttempt,
+  succeedMarkReadAttempt,
 } from '../hooks/useConversations';
 import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
@@ -152,17 +157,30 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const sendTyping = useTypingSender(kiloChatClient, conversationId);
 
   const markRead = useMarkConversationRead(kiloChatClient);
-  const lastMarkedRef = useRef<string | null>(null);
+  const markReadStateRef = useRef(createMarkReadState());
+  const markCurrentConversationRead = useCallback(() => {
+    const marker = `${conversationId}:${latestMessageId ?? 'empty'}`;
+    const state = markReadStateRef.current;
+    if (!shouldStartMarkReadAttempt(state, marker)) {
+      return;
+    }
+    startMarkReadAttempt(state, marker);
+    markRead.mutate(conversationId, {
+      onSuccess: () => {
+        succeedMarkReadAttempt(state, marker);
+      },
+      onSettled: () => {
+        finishMarkReadAttempt(state, marker);
+      },
+    });
+  }, [conversationId, latestMessageId, markRead.mutate]);
 
   // Mark conversation as read when opened and whenever visible hydration or
   // realtime receipt advances the newest message.
   useEffect(() => {
     if (!visible) return;
-    const marker = `${conversationId}:${latestMessageId ?? 'empty'}`;
-    if (lastMarkedRef.current === marker) return;
-    lastMarkedRef.current = marker;
-    markRead.mutate(conversationId);
-  }, [conversationId, latestMessageId, markRead.mutate, visible]);
+    markCurrentConversationRead();
+  }, [markCurrentConversationRead, visible]);
 
   // Register side-effect handlers that don't mutate the message cache
   // (cache updates are handled by useMessageCacheUpdater).
@@ -186,10 +204,10 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     return eventService.onReconnect(() => {
       void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'messages', conversationId] });
       if (visible) {
-        markRead.mutate(conversationId);
+        markCurrentConversationRead();
       }
     });
-  }, [conversationId, eventService, markRead.mutate, queryClient, visible]);
+  }, [conversationId, eventService, markCurrentConversationRead, queryClient, visible]);
 
   // Auto-scroll whenever content height changes (new messages, streaming
   // updates, image loads). A ResizeObserver on the inner content fires only

@@ -6,9 +6,7 @@ import { toast } from 'sonner-native';
 import {
   badgeBucketForConversation,
   type BadgeCountRow,
-  type MarkBadgeReadInput,
   type MarkBadgeReadResponse,
-  markBadgeReadResponseSchema,
 } from '@kilocode/notifications';
 import { type KiloChatClient } from '@kilocode/kilo-chat';
 import { useMarkConversationRead } from '@kilocode/kilo-chat-hooks';
@@ -17,6 +15,7 @@ import { NOTIFICATIONS_URL } from '@/lib/config';
 
 import { useCurrentUserId } from './use-current-user-id';
 import { useKiloChatTokenGetter } from './use-kilo-chat-token';
+import { markReadConversationAndBadge } from './mark-read-operation';
 
 type MarkReadContext = {
   previousBadges?: BadgeCountRow[];
@@ -40,21 +39,15 @@ export function useMarkRead(client: KiloChatClient) {
       conversationId,
       badgeBucket,
     }: MarkReadInput): Promise<MarkBadgeReadResponse> => {
-      await markConversationRead.mutateAsync(conversationId);
-      const token = await getToken();
-      const input = { badgeBucket } satisfies MarkBadgeReadInput;
-      const response = await fetch(`${NOTIFICATIONS_URL}/v1/badges/mark-read`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(input),
+      const result = await markReadConversationAndBadge({
+        conversationId,
+        badgeBucket,
+        notificationsUrl: NOTIFICATIONS_URL,
+        markConversationRead: markConversationRead.mutateAsync,
+        getToken,
+        fetchBadgeRead: fetch,
       });
-      if (!response.ok) {
-        throw new Error(`Failed to mark badge read: ${response.status}`);
-      }
-      return markBadgeReadResponseSchema.parse(await response.json());
+      return result;
     },
     onMutate: async ({ badgeBucket }): Promise<MarkReadContext> => {
       if (userId === null) {
@@ -90,12 +83,13 @@ export function useMarkRead(client: KiloChatClient) {
   });
 
   return useCallback(
-    (sandboxId: string, conversationId: string) => {
-      mutation.mutate({
+    async (sandboxId: string, conversationId: string) => {
+      const result = await mutation.mutateAsync({
         sandboxId,
         conversationId,
         badgeBucket: badgeBucketForConversation(sandboxId, conversationId),
       });
+      return result;
     },
     [mutation]
   );

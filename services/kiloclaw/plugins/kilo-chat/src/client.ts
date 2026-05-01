@@ -70,7 +70,10 @@ export type RemoveReactionParams = { messageId: string } & z.input<
   typeof reactionRequestBodySchema
 >;
 
-export type CreateConversationParams = z.input<typeof createBotConversationRequestSchema>;
+export type CreateConversationParams = Pick<
+  z.input<typeof createBotConversationRequestSchema>,
+  'title'
+>;
 export type CreateConversationResult = { conversationId: string };
 
 export type BotStatusParams = z.input<typeof botStatusRequestSchema>;
@@ -354,9 +357,6 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
       headers,
       body: JSON.stringify({
         ...(params.title !== undefined && { title: params.title }),
-        ...(params.additionalMembers !== undefined && {
-          additionalMembers: params.additionalMembers,
-        }),
       }),
     });
     if (!response.ok) {

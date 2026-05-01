@@ -205,6 +205,10 @@ export const renameConversationRequestSchema = z.object({
   title: conversationTitleSchema,
 });
 
+export const markConversationReadRequestSchema = z.object({
+  lastSeenMessageId: ulidSchema,
+});
+
 export const executeActionRequestSchema = z.object({
   groupId: actionGroupIdSchema,
   value: execApprovalDecisionSchema,

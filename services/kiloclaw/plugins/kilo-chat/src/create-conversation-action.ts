@@ -13,7 +13,6 @@ export async function handleKiloChatCreateConversationAction(
 
   const { conversationId } = await args.client.createConversation({
     title: name,
-    additionalMembers: undefined,
   });
 
   const text = name

@@ -1339,6 +1339,101 @@ describe('POST /bot/v1/sandboxes/:sandboxId/conversations', () => {
     expect(res.status).toBe(404);
   });
 
+  it('returns 400 when additionalMembers are provided', async () => {
+    const suffix = 'bot-create-conv-additional-members';
+    const sandboxId = `sandbox-${suffix}`;
+    grantSandbox(`user-${suffix}-owner`, sandboxId);
+
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    const testEnv = makeEnv();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: 'Group',
+          additionalMembers: [`user-${suffix}-other`],
+        }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json<{ error: string; invalidMembers?: string[] }>();
+    expect(body.error).toMatch(/additionalMembers/);
+    expect(body.invalidMembers).toEqual([`user-${suffix}-other`]);
+  });
+
+  it('does not let a non-member resolve actions in a bot-created conversation', async () => {
+    const suffix = 'bot-create-conv-action-auth';
+    const sandboxId = `sandbox-${suffix}`;
+    grantSandbox(`user-${suffix}-owner`, sandboxId);
+
+    const botApp = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    const testEnv = makeEnv();
+
+    const convRes = await botApp.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: 'Actions' }),
+      },
+      testEnv
+    );
+    expect(convRes.status).toBe(201);
+    const { conversationId } = await convRes.json<{ conversationId: string }>();
+
+    const msgRes = await botApp.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'actions',
+              groupId: 'g1',
+              actions: [{ value: 'allow-once', label: 'Allow', style: 'primary' }],
+            },
+          ],
+        }),
+      },
+      testEnv
+    );
+    expect(msgRes.status).toBe(201);
+    const { messageId } = await msgRes.json<{ messageId: string }>();
+
+    const userAppBase = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+    userAppBase.use('*', async (c, next) => {
+      c.set('callerId', `user-${suffix}-other`);
+      c.set('callerKind', 'user');
+      await next();
+    });
+    userAppBase.post(
+      '/v1/conversations/:conversationId/messages/:messageId/execute-action',
+      handleExecuteAction
+    );
+    const userApp = withTestExecutionCtx(userAppBase);
+
+    const execRes = await userApp.request(
+      `/v1/conversations/${conversationId}/messages/${messageId}/execute-action`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ groupId: 'g1', value: 'allow-once' }),
+      },
+      testEnv
+    );
+
+    expect(execRes.status).toBe(403);
+  });
+
   it('returns 400 for invalid JSON', async () => {
     const suffix = 'bot-create-conv-badjson';
     const sandboxId = `sandbox-${suffix}`;

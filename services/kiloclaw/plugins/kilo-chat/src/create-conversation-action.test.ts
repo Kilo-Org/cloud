@@ -31,7 +31,6 @@ describe('handleKiloChatCreateConversationAction', () => {
 
     expect(client.createConversation).toHaveBeenCalledWith({
       title: 'Project Discussion',
-      additionalMembers: undefined,
     });
     expect(result.content[0].text).toBe('Created conversation "Project Discussion" (01NEWCONV)');
   });
@@ -46,7 +45,6 @@ describe('handleKiloChatCreateConversationAction', () => {
 
     expect(client.createConversation).toHaveBeenCalledWith({
       title: undefined,
-      additionalMembers: undefined,
     });
     expect(result.content[0].text).toBe('Created conversation 01NEWCONV');
   });
@@ -61,7 +59,6 @@ describe('handleKiloChatCreateConversationAction', () => {
 
     expect(client.createConversation).toHaveBeenCalledWith({
       title: 'Group',
-      additionalMembers: undefined,
     });
   });
 });

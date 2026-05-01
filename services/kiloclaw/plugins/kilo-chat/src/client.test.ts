@@ -613,7 +613,7 @@ describe('createConversation', () => {
     expect(body).toEqual({ title: 'My Chat' });
   });
 
-  it('includes additionalMembers in body when provided', async () => {
+  it('does not include unsupported additionalMembers in body when provided', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
@@ -626,12 +626,13 @@ describe('createConversation', () => {
       fetchImpl,
     });
 
-    await client.createConversation({
+    const params = {
       title: 'Group',
       additionalMembers: ['user_1', 'user_2'],
-    });
+    };
+    await client.createConversation(params);
     const body = JSON.parse(String(calls[0].init.body));
-    expect(body.additionalMembers).toEqual(['user_1', 'user_2']);
+    expect(body).toEqual({ title: 'Group' });
   });
 
   it('throws on non-2xx response', async () => {

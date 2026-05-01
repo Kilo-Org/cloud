@@ -26,6 +26,15 @@ type SlackIntegrationDetailsProps = {
   error?: string;
 };
 
+const slackConnectionErrorMessages: Record<string, string> = {
+  workspace_already_connected:
+    'This Slack workspace is already connected to another Kilo account or organization. Disconnect it there before connecting it here.',
+};
+
+function getSlackConnectionErrorMessage(error: string): string {
+  return slackConnectionErrorMessages[error] ?? `Connection failed: ${error}`;
+}
+
 export function SlackIntegrationDetails({
   organizationId,
   success,
@@ -127,7 +136,7 @@ export function SlackIntegrationDetails({
       toast.success('Slack connected successfully!');
     }
     if (error) {
-      toast.error(`Connection failed: ${error}`);
+      toast.error(getSlackConnectionErrorMessage(error));
     }
   }, [success, error]);
 
@@ -243,6 +252,14 @@ export function SlackIntegrationDetails({
 
   return (
     <div className="space-y-6">
+      {error && (
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Could not connect Slack</AlertTitle>
+          <AlertDescription>{getSlackConnectionErrorMessage(error)}</AlertDescription>
+        </Alert>
+      )}
+
       {isInstalled && missingScopes.length > 0 && (
         <Alert variant="warning">
           <AlertTriangle className="h-4 w-4" />

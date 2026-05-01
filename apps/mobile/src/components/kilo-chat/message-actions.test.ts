@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildMessageActionSheetOptions } from './message-actions';
+import { buildMessageActionSheetOptions, getSelectedMessageAction } from './message-actions';
 
 describe('buildMessageActionSheetOptions', () => {
   it('offers first-reaction choices for messages with no reactions', () => {
@@ -49,5 +49,29 @@ describe('buildMessageActionSheetOptions', () => {
 
     expect(replyableOptions.options).toContain('Reply');
     expect(failedDeliveryOptions.options).not.toContain('Reply');
+  });
+
+  it('keeps reply as the first action when reactions are disabled', () => {
+    const actionSheet = buildMessageActionSheetOptions({
+      isOwnMessage: false,
+      canReact: false,
+      canReply: true,
+    });
+
+    expect(actionSheet.options).toEqual(['Reply', 'Cancel']);
+    expect(actionSheet.actions[0]).toEqual({ kind: 'reply', label: 'Reply' });
+  });
+
+  it('resolves selected action by action identity instead of raw option index', () => {
+    const actionSheet = buildMessageActionSheetOptions({
+      isOwnMessage: false,
+      canReact: false,
+      canReply: true,
+    });
+
+    const selectedAction = getSelectedMessageAction(actionSheet, 0);
+
+    expect(selectedAction).toEqual({ kind: 'reply', label: 'Reply' });
+    expect(selectedAction?.kind).not.toBe('reaction');
   });
 });

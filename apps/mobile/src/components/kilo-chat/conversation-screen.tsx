@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { ConversationHeader } from './conversation-header';
-import { buildMessageActionSheetOptions, FIRST_REACTION_EMOJIS } from './message-actions';
+import { buildMessageActionSheetOptions, getSelectedMessageAction } from './message-actions';
 import { MessageInput } from './message-input';
 import { MessageList } from './message-list';
 import { buildSendMessageVariables } from './message-presentation';
@@ -162,13 +162,14 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           containerStyle: { paddingBottom: bottom },
         },
         index => {
-          if (index === undefined || index === actionSheet.cancelButtonIndex) {
+          const selectedAction = getSelectedMessageAction(actionSheet, index);
+          if (!selectedAction) {
             return;
           }
-          const reactionEmoji = FIRST_REACTION_EMOJIS[index];
-          if (reactionEmoji) {
+
+          if (selectedAction.kind === 'reaction') {
             addReaction.mutate(
-              { messageId: message.id, emoji: reactionEmoji },
+              { messageId: message.id, emoji: selectedAction.emoji },
               {
                 onError: err => {
                   toast.error(formatKiloChatError(err, 'Failed to add reaction'));
@@ -177,36 +178,34 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
             );
             return;
           }
-          const selected = actionSheet.options[index];
-          if (selected === 'Reply') {
+          if (selectedAction.kind === 'reply') {
             setEditingMessage(null);
             setReplyingTo(message);
             return;
           }
-          if (selected === 'Edit') {
+          if (selectedAction.kind === 'edit') {
             setReplyingTo(null);
             setEditingMessage(message);
             return;
           }
-          if (selected === 'Delete') {
-            Alert.alert('Delete message?', 'This will remove the message from the conversation.', [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => {
-                  deleteMessage.mutate(
-                    { messageId: message.id, conversationId },
-                    {
-                      onError: err => {
-                        toast.error(formatKiloChatError(err, 'Failed to delete message'));
-                      },
-                    }
-                  );
-                },
+
+          Alert.alert('Delete message?', 'This will remove the message from the conversation.', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: () => {
+                deleteMessage.mutate(
+                  { messageId: message.id, conversationId },
+                  {
+                    onError: err => {
+                      toast.error(formatKiloChatError(err, 'Failed to delete message'));
+                    },
+                  }
+                );
               },
-            ]);
-          }
+            },
+          ]);
         }
       );
     },

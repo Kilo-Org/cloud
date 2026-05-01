@@ -6,10 +6,12 @@ import { type Message } from '@kilocode/kilo-chat';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { applyMessageInputTextChange, submitMessageInputDraft } from './message-input-state';
 import { getReplyPreviewText } from './message-presentation';
 
 type Props = {
   onSend: (text: string, inReplyToMessageId?: string) => void;
+  onTyping?: () => void;
   disabled?: boolean;
   initialText?: string;
   onCancelEdit?: () => void;
@@ -19,6 +21,7 @@ type Props = {
 
 export function MessageInput({
   onSend,
+  onTyping,
   disabled,
   initialText = '',
   onCancelEdit,
@@ -31,14 +34,13 @@ export function MessageInput({
   const inputRef = useRef<TextInput>(null);
 
   const submit = () => {
-    const text = valueRef.current.trim();
-    if (!text) {
-      return;
-    }
-    onSend(text, replyingTo?.id);
-    valueRef.current = '';
-    inputRef.current?.clear();
-    setCanSend(false);
+    submitMessageInputDraft({
+      valueRef,
+      replyingToMessageId: replyingTo?.id,
+      onSend,
+      clearInput: () => inputRef.current?.clear(),
+      setCanSend,
+    });
   };
 
   return (
@@ -72,8 +74,12 @@ export function MessageInput({
           defaultValue={initialText}
           multiline
           onChangeText={t => {
-            valueRef.current = t;
-            setCanSend(t.trim().length > 0);
+            applyMessageInputTextChange({
+              text: t,
+              valueRef,
+              setCanSend,
+              onTyping,
+            });
           }}
           onSubmitEditing={submit}
         />

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import {
   createMarkReadState,
@@ -27,11 +28,13 @@ import { MessageList } from './message-list';
 import { buildSendMessageVariables } from './message-presentation';
 import { useConversationPresence } from './hooks/use-conversation-presence';
 import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
+import { useMobileTypingState, useTypingSender } from './hooks/use-typing';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';
 import { useMarkRead } from './hooks/use-mark-read';
 import { useMessageCacheUpdater, useMessages, useSendMessage } from './hooks/use-messages';
 import { useCurrentUserId } from './hooks/use-current-user-id';
+import { TypingIndicator } from './typing-indicator';
 import { setActiveChatLocation } from '@/lib/notifications';
 
 type Props = { sandboxId: string; conversationId: string; conversationTitle: string };
@@ -67,6 +70,13 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const executeAction = useExecuteAction(client, conversationId, currentUserId);
   const addReaction = useAddReaction(client, conversationId, currentUserId);
   const removeReaction = useRemoveReaction(client, conversationId, currentUserId);
+  const { typingMembers, clearTypingForMember } = useMobileTypingState({
+    client,
+    currentUserId,
+    sandboxId,
+    conversationId,
+  });
+  const sendTyping = useTypingSender(client, conversationId);
   const editingText = useMemo(
     () => (editingMessage ? editableText(editingMessage) : ''),
     [editingMessage]
@@ -225,7 +235,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
     client,
     sandboxId,
     conversationId,
-    undefined,
+    clearTypingForMember,
     handleActionFailed,
     handleMessageDeliveryFailed
   );
@@ -281,9 +291,11 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           onLongPressMessage={handleLongPressMessage}
           onReactionPress={handleReactionPress}
         />
+        <TypingIndicator typingMembers={typingMembers} />
         <MessageInput
           key={editingMessage?.id ?? 'compose'}
           onSend={handleSend}
+          onTyping={sendTyping}
           disabled={sendMutation.isPending || editMessage.isPending}
           initialText={editingText}
           replyingTo={replyingTo}

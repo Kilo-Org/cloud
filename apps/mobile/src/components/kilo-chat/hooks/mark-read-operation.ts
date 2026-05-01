@@ -6,22 +6,27 @@ import {
 
 type MarkReadConversationAndBadgeInput = {
   conversationId: string;
+  lastSeenMessageId: string;
   badgeBucket: string;
   notificationsUrl: string;
-  markConversationRead: (conversationId: string) => Promise<unknown>;
+  markConversationRead: (input: {
+    conversationId: string;
+    lastSeenMessageId: string;
+  }) => Promise<unknown>;
   getToken: () => Promise<string>;
   fetchBadgeRead: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 };
 
 export async function markReadConversationAndBadge({
   conversationId,
+  lastSeenMessageId,
   badgeBucket,
   notificationsUrl,
   markConversationRead,
   getToken,
   fetchBadgeRead,
 }: MarkReadConversationAndBadgeInput): Promise<MarkBadgeReadResponse> {
-  await markConversationRead(conversationId);
+  await markConversationRead({ conversationId, lastSeenMessageId });
   const token = await getToken();
   const input = { badgeBucket } satisfies MarkBadgeReadInput;
   const response = await fetchBadgeRead(`${notificationsUrl}/v1/badges/mark-read`, {

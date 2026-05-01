@@ -25,6 +25,7 @@ type MarkReadContext = {
 type MarkReadInput = {
   sandboxId: string;
   conversationId: string;
+  lastSeenMessageId: string;
   badgeBucket: string;
 };
 
@@ -37,10 +38,12 @@ export function useMarkRead(client: KiloChatClient) {
   const mutation = useMutation({
     mutationFn: async ({
       conversationId,
+      lastSeenMessageId,
       badgeBucket,
     }: MarkReadInput): Promise<MarkBadgeReadResponse> => {
       const result = await markReadConversationAndBadge({
         conversationId,
+        lastSeenMessageId,
         badgeBucket,
         notificationsUrl: NOTIFICATIONS_URL,
         markConversationRead: markConversationRead.mutateAsync,
@@ -83,10 +86,11 @@ export function useMarkRead(client: KiloChatClient) {
   });
 
   return useCallback(
-    async (sandboxId: string, conversationId: string) => {
+    async (sandboxId: string, conversationId: string, lastSeenMessageId: string) => {
       const result = await mutation.mutateAsync({
         sandboxId,
         conversationId,
+        lastSeenMessageId,
         badgeBucket: badgeBucketForConversation(sandboxId, conversationId),
       });
       return result;

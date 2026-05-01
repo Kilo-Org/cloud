@@ -159,20 +159,26 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const markRead = useMarkConversationRead(kiloChatClient);
   const markReadStateRef = useRef(createMarkReadState());
   const markCurrentConversationRead = useCallback(() => {
-    const marker = `${conversationId}:${latestMessageId ?? 'empty'}`;
+    if (latestMessageId === null) {
+      return;
+    }
+    const marker = `${conversationId}:${latestMessageId}`;
     const state = markReadStateRef.current;
     if (!shouldStartMarkReadAttempt(state, marker)) {
       return;
     }
     startMarkReadAttempt(state, marker);
-    markRead.mutate(conversationId, {
-      onSuccess: () => {
-        succeedMarkReadAttempt(state, marker);
-      },
-      onSettled: () => {
-        finishMarkReadAttempt(state, marker);
-      },
-    });
+    markRead.mutate(
+      { conversationId, lastSeenMessageId: latestMessageId },
+      {
+        onSuccess: () => {
+          succeedMarkReadAttempt(state, marker);
+        },
+        onSettled: () => {
+          finishMarkReadAttempt(state, marker);
+        },
+      }
+    );
   }, [conversationId, latestMessageId, markRead.mutate]);
 
   // Mark conversation as read when opened and whenever visible hydration or

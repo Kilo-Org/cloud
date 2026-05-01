@@ -243,10 +243,10 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const markRead = useMarkRead(client);
   const markReadStateRef = useRef(createMarkReadState());
   useEffect(() => {
-    if (!activeAndFocused) {
+    if (!activeAndFocused || latestMessageId === null) {
       return;
     }
-    const marker = `${conversationId}:${latestMessageId ?? 'empty'}`;
+    const marker = `${conversationId}:${latestMessageId}`;
     const state = markReadStateRef.current;
     if (!shouldStartMarkReadAttempt(state, marker)) {
       return;
@@ -254,7 +254,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
     startMarkReadAttempt(state, marker);
     void (async () => {
       try {
-        await markRead(sandboxId, conversationId);
+        await markRead(sandboxId, conversationId, latestMessageId);
         succeedMarkReadAttempt(state, marker);
       } catch {
         // useMarkRead already surfaces the mutation error to the user.

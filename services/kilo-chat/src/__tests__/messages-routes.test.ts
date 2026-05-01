@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
+import { ulidToTimestamp } from '@kilocode/kilo-chat';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
 import { makeApp } from './helpers';
@@ -940,10 +941,15 @@ describe('recipient conversation read state after message delivery', () => {
       deliveredEnv
     );
     expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
 
     const markReadRes = await recipientApp.request(
       `/v1/conversations/${conversationId}/mark-read`,
-      { method: 'POST' },
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: messageId }),
+      },
       deliveredEnv
     );
     expect(markReadRes.status).toBe(204);
@@ -956,6 +962,66 @@ describe('recipient conversation read state after message delivery', () => {
     }
     expect(conversation.lastActivityAt).not.toBeNull();
     expect(conversation.lastReadAt).not.toBeNull();
+  });
+
+  it('marks recipients read only through the latest message the client observed', async () => {
+    const { conversationId, recipientId, sandboxId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-stale-read');
+
+    const firstMessageRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Message A' }],
+        }),
+      },
+      deliveredEnv
+    );
+    expect(firstMessageRes.status).toBe(201);
+    const { messageId: firstMessageId } = await firstMessageRes.json<{ messageId: string }>();
+
+    await new Promise(resolve => setTimeout(resolve, 2));
+
+    const secondMessageRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Message B' }],
+        }),
+      },
+      deliveredEnv
+    );
+    expect(secondMessageRes.status).toBe(201);
+
+    const markReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: firstMessageId }),
+      },
+      deliveredEnv
+    );
+    expect(markReadRes.status).toBe(204);
+
+    const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
+    const after = await recipientMemberStub.listConversations({ sandboxId });
+    const conversation = after.conversations.find(c => c.conversationId === conversationId);
+    if (!conversation) {
+      throw new Error('Expected recipient membership conversation');
+    }
+    const lastActivityAt = conversation.lastActivityAt;
+    if (lastActivityAt === null) {
+      throw new Error('Expected recipient conversation activity');
+    }
+    expect(conversation.lastReadAt).toBe(ulidToTimestamp(firstMessageId));
+    expect(conversation.lastReadAt).toBeLessThan(lastActivityAt);
   });
 });
 

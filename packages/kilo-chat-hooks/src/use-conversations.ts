@@ -5,6 +5,7 @@ import type {
   CreateConversationRequest,
   ConversationListItem,
   ConversationListResponse,
+  MarkConversationReadRequest,
 } from '@kilocode/kilo-chat';
 
 import { conversationKey, conversationsKey, conversationsKeyAll, messagesKey } from './query-keys';
@@ -163,8 +164,12 @@ export function applyConversationActivityToPages(
 export function useMarkConversationRead(client: KiloChatClient) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (conversationId: string) => client.markConversationRead(conversationId),
-    onMutate: conversationId => {
+    mutationFn: ({
+      conversationId,
+      lastSeenMessageId,
+    }: MarkConversationReadRequest & { conversationId: string }) =>
+      client.markConversationRead(conversationId, { lastSeenMessageId }),
+    onMutate: ({ conversationId }) => {
       // Optimistically set lastReadAt = now in all cached conversation lists
       const now = Date.now();
       const queryKey = conversationsKeyAll();

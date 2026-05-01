@@ -43,6 +43,7 @@ describe('markReadConversationAndBadge', () => {
     await expect(
       markReadConversationAndBadge({
         conversationId: 'conversation-1',
+        lastSeenMessageId: 'message-1',
         badgeBucket: 'bucket-1',
         notificationsUrl: 'https://notifications.example',
         markConversationRead: async () => {

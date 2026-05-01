@@ -33,6 +33,11 @@ export type ListConversationsResult = {
   nextCursor: string | null;
 };
 
+export type MarkReadAtLeastResult = {
+  applied: boolean;
+  lastReadAt: number | null;
+};
+
 export class MembershipDO extends DurableObject<Env> {
   private db;
 
@@ -122,6 +127,29 @@ export class MembershipDO extends DurableObject<Env> {
       .set({ last_read_at: readAt })
       .where(eq(conversations.conversation_id, conversationId))
       .run();
+  }
+
+  markReadAtLeast(conversationId: string, readAt: number): MarkReadAtLeastResult {
+    const row = this.db
+      .select({ lastReadAt: conversations.last_read_at })
+      .from(conversations)
+      .where(eq(conversations.conversation_id, conversationId))
+      .get();
+
+    if (!row) {
+      return { applied: false, lastReadAt: null };
+    }
+    if (row.lastReadAt !== null && row.lastReadAt >= readAt) {
+      return { applied: false, lastReadAt: row.lastReadAt };
+    }
+
+    this.db
+      .update(conversations)
+      .set({ last_read_at: readAt })
+      .where(eq(conversations.conversation_id, conversationId))
+      .run();
+
+    return { applied: true, lastReadAt: readAt };
   }
 
   updateLastActivityAndMarkRead(conversationId: string, at: number): void {

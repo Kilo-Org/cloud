@@ -17,6 +17,7 @@ import {
   ulidSchema,
   createConversationRequestSchema,
   listConversationsQuerySchema,
+  markConversationReadRequestSchema,
   renameConversationRequestSchema,
   decodeConversationCursor,
 } from '@kilocode/kilo-chat';
@@ -172,10 +173,27 @@ export function registerConversationRoutes(
     }
     const conversationId = idParam.data;
 
+    let rawBody: unknown;
+    try {
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON' }, 400);
+    }
+
+    const body = markConversationReadRequestSchema.safeParse(rawBody);
+    if (!body.success) {
+      return c.json({ error: 'Invalid request', issues: body.error.issues }, 400);
+    }
+
     const callerId = c.get('callerId');
-    const result = await markReadFor(c.env, callerId, { conversationId }, makeSchedule(c));
+    const result = await markReadFor(
+      c.env,
+      callerId,
+      { conversationId, lastSeenMessageId: body.data.lastSeenMessageId },
+      makeSchedule(c)
+    );
     if (!result.ok) {
-      return c.json({ error: result.error }, 403);
+      return c.json({ error: result.error }, result.code === 'invalid' ? 400 : 403);
     }
 
     return c.body(null, 204);

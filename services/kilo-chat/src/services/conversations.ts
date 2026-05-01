@@ -4,6 +4,7 @@
  */
 
 import { ulid } from 'ulid';
+import { ulidToTimestamp } from '@kilocode/kilo-chat';
 import { withDORetry } from '@kilocode/worker-utils';
 import {
   extractConversationContext,
@@ -327,9 +328,12 @@ export async function leaveConversationFor(
 
 export type MarkReadParams = {
   conversationId: string;
+  lastSeenMessageId: string;
 };
 
-export type MarkReadResult = { ok: true } | { ok: false; code: 'forbidden'; error: string };
+export type MarkReadResult =
+  | { ok: true }
+  | { ok: false; code: 'forbidden' | 'invalid'; error: string };
 
 export async function markReadFor(
   env: Env,
@@ -337,9 +341,10 @@ export async function markReadFor(
   params: MarkReadParams,
   ctx: DeferCtx
 ): Promise<MarkReadResult> {
-  const { conversationId } = params;
+  const { conversationId, lastSeenMessageId } = params;
 
   // Single getInfo() call for both membership check and context extraction.
+  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
   const info = await withDORetry(
     () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
     stub => stub.getInfo(),
@@ -349,19 +354,28 @@ export async function markReadFor(
     return { ok: false, code: 'forbidden', error: 'Forbidden' };
   }
 
-  const now = Date.now();
-  await withDORetry(
+  const message = await withDORetry(
+    () => convStub,
+    stub => stub.getMessage(lastSeenMessageId),
+    'ConversationDO.getMessage'
+  );
+  if (!message) {
+    return { ok: false, code: 'invalid', error: 'Message does not belong to conversation' };
+  }
+
+  const lastReadAt = ulidToTimestamp(lastSeenMessageId);
+  const readResult = await withDORetry(
     () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId)),
-    stub => stub.markRead(conversationId, now),
+    stub => stub.markReadAtLeast(conversationId, lastReadAt),
     'MembershipDO.markRead'
   );
 
   const { sandboxId } = extractConversationContext(info.members);
-  if (sandboxId) {
+  if (sandboxId && readResult.applied) {
     const pushPromise = pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
       conversationId,
       memberId: userId,
-      lastReadAt: now,
+      lastReadAt,
     });
     ctx.waitUntil(pushPromise);
   }

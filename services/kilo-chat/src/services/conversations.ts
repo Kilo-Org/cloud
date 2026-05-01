@@ -5,7 +5,8 @@
 
 import { ulid } from 'ulid';
 import { ulidToTimestamp } from '@kilocode/kilo-chat';
-import { withDORetry } from '@kilocode/worker-utils';
+import { badgeBucketForConversation } from '@kilocode/notifications';
+import { formatError, withDORetry } from '@kilocode/worker-utils';
 import {
   extractConversationContext,
   extractSandboxId,
@@ -15,6 +16,7 @@ import {
 import { lookupSandboxOwnerUserId, userOwnsSandbox } from './sandbox-ownership';
 import type { DeferCtx } from './messages';
 import type { ConversationDO, UpdateTitleIfMemberResult } from '../do/conversation-do';
+import { logger } from '../util/logger';
 
 // ─── partial-failure rollback helpers ──────────────────────────────────────
 
@@ -364,13 +366,26 @@ export async function markReadFor(
   );
 
   const { sandboxId } = extractConversationContext(info.members);
-  if (sandboxId && readResult.applied) {
-    const pushPromise = pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
-      conversationId,
-      memberId: userId,
-      lastReadAt,
-    });
-    ctx.waitUntil(pushPromise);
+  if (sandboxId) {
+    const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
+    ctx.waitUntil(
+      env.NOTIFICATIONS.clearBadgeBucketForUser({ userId, badgeBucket }).catch(err => {
+        logger.error('clearBadgeBucketForUser failed', {
+          sandboxId,
+          conversationId,
+          ...formatError(err),
+        });
+      })
+    );
+
+    if (readResult.applied) {
+      const pushPromise = pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
+        conversationId,
+        memberId: userId,
+        lastReadAt,
+      });
+      ctx.waitUntil(pushPromise);
+    }
   }
 
   return { ok: true };

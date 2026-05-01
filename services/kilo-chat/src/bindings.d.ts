@@ -1,6 +1,8 @@
 import type { z } from 'zod';
 import type { chatWebhookRpcSchema, KiloChatEventName, KiloChatEventOf } from '@kilocode/kilo-chat';
 import type {
+  ClearBadgeBucketForUserInput,
+  ClearBadgeBucketForUserOutput,
   SendPushForConversationInput,
   SendPushForConversationOutput,
 } from '@kilocode/notifications';
@@ -31,6 +33,9 @@ declare global {
       sendPushForConversation(
         input: SendPushForConversationInput
       ): Promise<SendPushForConversationOutput>;
+      clearBadgeBucketForUser(
+        input: ClearBadgeBucketForUserInput
+      ): Promise<ClearBadgeBucketForUserOutput>;
     };
   }
 }

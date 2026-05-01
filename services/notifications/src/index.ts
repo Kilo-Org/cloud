@@ -10,7 +10,10 @@ import { useWorkersLogger } from 'workers-tagged-logger';
 import { presenceContextForConversation } from '@kilocode/event-service';
 import {
   badgeBucketForConversation,
+  clearBadgeBucketForUserInputSchema,
   markBadgeReadInputSchema,
+  type ClearBadgeBucketForUserInput,
+  type ClearBadgeBucketForUserOutput,
   type DispatchPushInput,
   type DispatchPushOutcome,
   type SendInstanceLifecycleNotificationParams,
@@ -164,6 +167,17 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
           this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
         ) as unknown as RecipientDOStub,
     });
+  }
+
+  async clearBadgeBucketForUser(
+    input: ClearBadgeBucketForUserInput
+  ): Promise<ClearBadgeBucketForUserOutput> {
+    const parsedInput = clearBadgeBucketForUserInputSchema.parse(input);
+    const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
+      this.env.NOTIFICATION_CHANNEL_DO.idFromName(parsedInput.userId)
+    );
+    const badgeCount = await stub.markBucketRead(parsedInput.badgeBucket);
+    return { badgeCount };
   }
 
   async sendInstanceLifecycleNotification(

@@ -61,6 +61,15 @@ export const markBadgeReadResponseSchema = z.object({
 });
 export type MarkBadgeReadResponse = z.infer<typeof markBadgeReadResponseSchema>;
 
+export const clearBadgeBucketForUserInputSchema = z.object({
+  userId: z.string().min(1),
+  badgeBucket: badgeBucketSchema,
+});
+export type ClearBadgeBucketForUserInput = z.infer<typeof clearBadgeBucketForUserInputSchema>;
+
+export const clearBadgeBucketForUserOutputSchema = markBadgeReadResponseSchema;
+export type ClearBadgeBucketForUserOutput = z.infer<typeof clearBadgeBucketForUserOutputSchema>;
+
 // ── sendInstanceLifecycleNotification ───────────────────────────────
 
 export const instanceLifecycleEventSchema = z.enum(['ready', 'start_failed']);

@@ -147,4 +147,18 @@ describe('badge HTTP routes', () => {
       expect(remaining).toEqual([['bucket:conv2', 5]]);
     });
   });
+
+  describe('clearBadgeBucketForUser RPC', () => {
+    it('clears the requested user bucket and returns the new total', async () => {
+      const userId = 'user-rpc-mark';
+      await seedBuckets(getDO(userId), { conv1: 2, conv2: 5 });
+
+      await expect(
+        env.SELF.clearBadgeBucketForUser({ userId, badgeBucket: 'conv1' })
+      ).resolves.toEqual({ badgeCount: 5 });
+
+      const remaining = await getDO(userId).listNonZeroBuckets();
+      expect(remaining).toEqual([{ badgeBucket: 'conv2', badgeCount: 5 }]);
+    });
+  });
 });

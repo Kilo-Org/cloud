@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, vi } from 'vitest';
 import { ulidToTimestamp } from '@kilocode/kilo-chat';
+import { badgeBucketForConversation } from '@kilocode/notifications';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
 import { postCommitFanOut } from '../services/messages';
@@ -18,6 +19,16 @@ type RecordingKiloclaw = typeof env.KILOCLAW & {
   __clearWebhookCalls(): Promise<void>;
 };
 const recordingKiloclaw = env.KILOCLAW as RecordingKiloclaw;
+
+type RecordingNotifications = typeof env.NOTIFICATIONS & {
+  __incrementBadgeBucket(input: {
+    userId: string;
+    badgeBucket: string;
+    delta: number;
+  }): Promise<void>;
+  __listNonZeroBuckets(userId: string): Promise<Array<{ badgeBucket: string; badgeCount: number }>>;
+};
+const recordingNotifications = env.NOTIFICATIONS as RecordingNotifications;
 
 async function waitForWebhookCalls(
   predicate: (calls: Array<Record<string, unknown>>) => boolean,
@@ -1029,6 +1040,57 @@ describe('recipient conversation read state after message delivery', () => {
     }
     expect(conversation.lastReadAt).toBe(ulidToTimestamp(firstMessageId));
     expect(conversation.lastReadAt).toBeLessThan(lastActivityAt);
+  });
+
+  it('clears stale notification buckets when recipients mark a conversation read', async () => {
+    const { conversationId, recipientId, sandboxId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-badge-clear');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      deliveredEnv
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const firstMarkReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: messageId }),
+      },
+      deliveredEnv
+    );
+    expect(firstMarkReadRes.status).toBe(204);
+
+    const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
+    await recordingNotifications.__incrementBadgeBucket({
+      userId: recipientId,
+      badgeBucket,
+      delta: 1,
+    });
+    await expect(recordingNotifications.__listNonZeroBuckets(recipientId)).resolves.toEqual([
+      { badgeBucket, badgeCount: 1 },
+    ]);
+
+    const secondMarkReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: messageId }),
+      },
+      deliveredEnv
+    );
+    expect(secondMarkReadRes.status).toBe(204);
+
+    await expect(recordingNotifications.__listNonZeroBuckets(recipientId)).resolves.toEqual([]);
   });
 });
 

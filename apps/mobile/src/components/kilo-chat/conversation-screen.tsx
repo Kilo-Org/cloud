@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { ConversationHeader } from './conversation-header';
+import { executeActionWithMobileFeedback } from './execute-action-feedback';
 import { buildMessageActionSheetOptions, getSelectedMessageAction } from './message-actions';
 import { MessageInput } from './message-input';
 import { MessageList } from './message-list';
@@ -138,7 +139,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   );
   const handleExecuteAction = useCallback(
     (message: Message, groupId: string, value: ExecApprovalDecision) => {
-      executeAction.mutate({ messageId: message.id, groupId, value });
+      executeActionWithMobileFeedback({ executeAction, message, groupId, value });
     },
     [executeAction]
   );

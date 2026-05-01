@@ -28,4 +28,18 @@ SET
   "updated_at" = now()
 FROM duplicate_slack_installations
 WHERE "platform_integrations"."id" = duplicate_slack_installations."id";--> statement-breakpoint
+UPDATE "platform_integrations"
+SET
+  "integration_status" = 'suspended',
+  "suspended_at" = coalesce(
+    "suspended_at",
+    ("metadata"->>'duplicate_slack_platform_installation_detached_at')::timestamptz,
+    now()
+  ),
+  "suspended_by" = coalesce("suspended_by", 'duplicate_slack_workspace_migration'),
+  "updated_at" = now()
+WHERE "platform" = 'slack'
+  AND "platform_installation_id" IS NULL
+  AND "metadata" ? 'duplicate_slack_platform_installation_id'
+  AND "integration_status" IS DISTINCT FROM 'suspended';--> statement-breakpoint
 CREATE UNIQUE INDEX "UQ_platform_integrations_slack_platform_inst" ON "platform_integrations" USING btree ("platform","platform_installation_id") WHERE "platform_integrations"."platform" = 'slack' AND "platform_integrations"."platform_installation_id" IS NOT NULL;

@@ -4,7 +4,10 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import type { Owner } from '@/lib/integrations/core/types';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { upsertSlackInstallation } from '@/lib/integrations/slack-service';
+import {
+  SlackWorkspaceAlreadyConnectedError,
+  upsertSlackInstallation,
+} from '@/lib/integrations/slack-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
@@ -128,7 +131,17 @@ export async function GET(request: NextRequest) {
     const { teamId, installation } = await slackAdapter.handleOAuthCallback(patchedRequest);
 
     // 8. Store installation in database
-    await upsertSlackInstallation({ owner, teamId, installation });
+    try {
+      await upsertSlackInstallation({ owner, teamId, installation });
+    } catch (error) {
+      if (error instanceof SlackWorkspaceAlreadyConnectedError) {
+        return NextResponse.redirect(
+          new URL(buildSlackRedirectPath(state, 'error=workspace_already_connected'), APP_URL)
+        );
+      }
+
+      throw error;
+    }
 
     // 9. Redirect to success page
     const successPath =

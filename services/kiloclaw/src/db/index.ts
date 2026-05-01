@@ -201,6 +201,29 @@ export async function markInstanceDestroyed(db: WorkerDb, userId: string, sandbo
   });
 }
 
+/**
+ * Sync the active instance's tracked_image_tag column from DO state.
+ * No-op at the SQL level when the value already matches (IS DISTINCT FROM).
+ */
+export async function syncTrackedImageTag(
+  db: WorkerDb,
+  userId: string,
+  sandboxId: string,
+  trackedImageTag: string | null
+) {
+  await db
+    .update(kiloclaw_instances)
+    .set({ tracked_image_tag: trackedImageTag })
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.destroyed_at),
+        sql`${kiloclaw_instances.tracked_image_tag} IS DISTINCT FROM ${trackedImageTag}`
+      )
+    );
+}
+
 export async function getGoogleOAuthConnectionByInstanceId(db: WorkerDb, instanceId: string) {
   return await db
     .select()

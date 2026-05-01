@@ -1,5 +1,5 @@
 {
-  "id": "70c51b5f-a9b9-4573-a6fc-98667b039360",
+  "id": "c225381f-febe-4048-a82f-3a506b8f4d56",
   "prevId": "ec49ba08-673e-479f-a8a2-490c71ad9186",
   "version": "7",
   "dialect": "postgresql",
@@ -3216,6 +3216,67 @@
           "value": "(\n        (\"byok_api_keys\".\"kilo_user_id\" IS NOT NULL AND \"byok_api_keys\".\"organization_id\" IS NULL) OR\n        (\"byok_api_keys\".\"kilo_user_id\" IS NULL AND \"byok_api_keys\".\"organization_id\" IS NOT NULL)\n      )"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.channel_badge_counts": {
+      "name": "channel_badge_counts",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel_id": {
+          "name": "channel_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "badge_count": {
+          "name": "badge_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "channel_badge_counts_user_id_kilocode_users_id_fk": {
+          "name": "channel_badge_counts_user_id_kilocode_users_id_fk",
+          "tableFrom": "channel_badge_counts",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "channel_badge_counts_user_id_channel_id_pk": {
+          "name": "channel_badge_counts_user_id_channel_id_pk",
+          "columns": [
+            "user_id",
+            "channel_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.cli_sessions": {
@@ -9640,6 +9701,12 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "tracked_image_tag": {
+          "name": "tracked_image_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -9699,6 +9766,22 @@
           ],
           "isUnique": false,
           "where": "\"kiloclaw_instances\".\"organization_id\" IS NOT NULL AND \"kiloclaw_instances\".\"destroyed_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_instances_tracked_image_tag": {
+          "name": "IDX_kiloclaw_instances_tracked_image_tag",
+          "columns": [
+            {
+              "expression": "tracked_image_tag",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_instances\".\"destroyed_at\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}

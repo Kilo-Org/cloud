@@ -7,6 +7,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_cli_runs,
   kiloclaw_version_pins,
+  kiloclaw_image_catalog,
   kilocode_users,
 } from '@kilocode/db/schema';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
@@ -60,6 +61,13 @@ import {
 } from 'drizzle-orm';
 
 const initiatingAdminUsers = alias(kilocode_users, 'initiating_admin_users');
+const pinnedByUsers = alias(kilocode_users, 'pinned_by_users');
+
+/**
+ * Sentinel for `imageTag` filter — matches rows where `tracked_image_tag IS NULL`
+ * (DO alarm hasn't ticked yet, hibernated DOs).
+ */
+const IMAGE_TAG_FILTER_UNKNOWN = '__unknown__';
 
 const ListInstancesSchema = z.object({
   offset: z.number().min(0).default(0),
@@ -70,6 +78,7 @@ const ListInstancesSchema = z.object({
   status: z
     .enum(['all', 'active', 'inactive_trial_stopped', 'suspended', 'destroyed'])
     .default('all'),
+  imageTag: z.string().max(128).optional(),
 });
 
 const DetectOrphansSchema = z.object({
@@ -324,6 +333,20 @@ export type AdminKiloclawInstance = {
    * `kilocode_users` (per user, applies across all of their instances).
    */
   user_kiloclaw_early_access: boolean;
+  /**
+   * The image tag the DO last reported running. Denormalized from DO state by
+   * the alarm reconciler. Null when the DO hasn't ticked since the column was
+   * added (≤30min after first deploy) or for hibernated DOs.
+   */
+  tracked_image_tag: string | null;
+  /**
+   * Active version pin, if any. Null when the instance has no pin row.
+   */
+  pin: {
+    image_tag: string;
+    pinned_by_user_id: string;
+    is_admin_pin: boolean;
+  } | null;
 };
 
 export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
@@ -342,6 +365,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         suspended_at: kiloclaw_subscriptions.suspended_at,
         subscription_id: kiloclaw_subscriptions.id,
         subscription_status: kiloclaw_subscriptions.status,
+        pin_image_tag: kiloclaw_version_pins.image_tag,
+        pin_pinned_by: kiloclaw_version_pins.pinned_by,
+        pin_pinned_by_is_admin: pinnedByUsers.is_admin,
       })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
@@ -349,6 +375,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         kiloclaw_subscriptions,
         eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       )
+      .leftJoin(kiloclaw_version_pins, eq(kiloclaw_version_pins.instance_id, kiloclaw_instances.id))
+      .leftJoin(pinnedByUsers, eq(pinnedByUsers.id, kiloclaw_version_pins.pinned_by))
       .where(eq(kiloclaw_instances.id, input.id))
       .limit(1);
 
@@ -375,6 +403,15 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       subscription_id: result.subscription_id ?? null,
       subscription_status: result.subscription_status ?? null,
       user_kiloclaw_early_access: result.user_kiloclaw_early_access ?? false,
+      tracked_image_tag: result.instance.tracked_image_tag,
+      pin:
+        result.pin_image_tag && result.pin_pinned_by
+          ? {
+              image_tag: result.pin_image_tag,
+              pinned_by_user_id: result.pin_pinned_by,
+              is_admin_pin: result.pin_pinned_by_is_admin ?? false,
+            }
+          : null,
     };
 
     const inboundEmailAddress = await getInboundEmailAddressForInstance(instance.id);
@@ -461,7 +498,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   list: adminProcedure.input(ListInstancesSchema).query(async ({ input }) => {
-    const { offset, limit, sortBy, sortOrder, search, status } = input;
+    const { offset, limit, sortBy, sortOrder, search, status, imageTag } = input;
     const searchTerm = search?.trim() || '';
 
     const conditions: SQL[] = [];
@@ -501,6 +538,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       conditions.push(isNotNull(kiloclaw_instances.destroyed_at));
     }
 
+    if (imageTag === IMAGE_TAG_FILTER_UNKNOWN) {
+      conditions.push(isNull(kiloclaw_instances.tracked_image_tag));
+    } else if (imageTag) {
+      conditions.push(eq(kiloclaw_instances.tracked_image_tag, imageTag));
+    }
+
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
     const orderFunction = sortOrder === 'asc' ? asc : desc;
@@ -514,6 +557,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         suspended_at: kiloclaw_subscriptions.suspended_at,
         subscription_id: kiloclaw_subscriptions.id,
         subscription_status: kiloclaw_subscriptions.status,
+        pin_image_tag: kiloclaw_version_pins.image_tag,
+        pin_pinned_by: kiloclaw_version_pins.pinned_by,
+        pin_pinned_by_is_admin: pinnedByUsers.is_admin,
       })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
@@ -521,6 +567,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         kiloclaw_subscriptions,
         eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       )
+      .leftJoin(kiloclaw_version_pins, eq(kiloclaw_version_pins.instance_id, kiloclaw_instances.id))
+      .leftJoin(pinnedByUsers, eq(pinnedByUsers.id, kiloclaw_version_pins.pinned_by))
       .where(whereCondition)
       .orderBy(orderCondition)
       .limit(limit)
@@ -558,6 +606,15 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       subscription_id: row.subscription_id ?? null,
       subscription_status: row.subscription_status ?? null,
       user_kiloclaw_early_access: row.user_kiloclaw_early_access ?? false,
+      tracked_image_tag: row.instance.tracked_image_tag,
+      pin:
+        row.pin_image_tag && row.pin_pinned_by
+          ? {
+              image_tag: row.pin_image_tag,
+              pinned_by_user_id: row.pin_pinned_by,
+              is_admin_pin: row.pin_pinned_by_is_admin ?? false,
+            }
+          : null,
     }));
 
     return {
@@ -1317,6 +1374,253 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         console.error('Failed to restart machine for user:', row.user.id, err);
         throwKiloclawAdminError(err, fallbackMessage);
       }
+    }),
+
+  /**
+   * Apply a version change across many instances in one call. Thin partition +
+   * concurrency layer over the same primitive `restartMachine` uses
+   * (pin-clear + worker restart). Synchronous: returns when every instance has
+   * been processed.
+   *
+   * Partition order matters — an instance with multiple disqualifying
+   * conditions reports the most actionable reason. `destroyed` outranks
+   * `pinned_*`, `pinned_*` outranks `already_on_target`.
+   */
+  bulkChangeVersion: adminProcedure
+    .input(
+      z.object({
+        // Practical limit: the UI only allows per-page selection, so 500
+        // leaves ample headroom while keeping the inArray clause performant.
+        // If a future "select all across pages" feature lands, revisit.
+        instanceIds: z.array(z.string().uuid()).min(1).max(500),
+        imageTag: z
+          .string()
+          .min(1)
+          .max(128, 'Image tag too long')
+          .regex(
+            /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/,
+            'Image tag must be alphanumeric with dots, hyphens, or underscores'
+          ),
+        // When true, deletes any existing pin (user-set OR admin-set) before
+        // restarting. Same semantics as restartMachine.acknowledgeOverride —
+        // single toggle covers both pin types per Phase 1.5 Decision #5.
+        overridePins: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // 1. Validate target tag in catalog. Worker would happily redeploy a
+      // disabled tag, so the explicit guard lives here.
+      const [catalogEntry] = await db
+        .select({
+          image_tag: kiloclaw_image_catalog.image_tag,
+          status: kiloclaw_image_catalog.status,
+        })
+        .from(kiloclaw_image_catalog)
+        .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag))
+        .limit(1);
+
+      if (!catalogEntry) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Target image tag not found in catalog: ${input.imageTag}`,
+        });
+      }
+      if (catalogEntry.status === 'disabled') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Target image tag is disabled: ${input.imageTag}`,
+        });
+      }
+
+      // 2. One SELECT to gather instance + pin + admin-status per id.
+      // is_admin lives on kilocode_users — there is no separate admin_users
+      // table.
+      const rows = await db
+        .select({
+          instance_id: kiloclaw_instances.id,
+          user_id: kiloclaw_instances.user_id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+          destroyed_at: kiloclaw_instances.destroyed_at,
+          tracked_image_tag: kiloclaw_instances.tracked_image_tag,
+          pin_id: kiloclaw_version_pins.id,
+          pin_pinned_by: kiloclaw_version_pins.pinned_by,
+          pin_updated_at: kiloclaw_version_pins.updated_at,
+          pin_pinned_by_is_admin: pinnedByUsers.is_admin,
+        })
+        .from(kiloclaw_instances)
+        .leftJoin(
+          kiloclaw_version_pins,
+          eq(kiloclaw_version_pins.instance_id, kiloclaw_instances.id)
+        )
+        .leftJoin(pinnedByUsers, eq(pinnedByUsers.id, kiloclaw_version_pins.pinned_by))
+        .where(inArray(kiloclaw_instances.id, input.instanceIds));
+
+      // Look up owning users in one shot — generateApiToken needs a full
+      // kilocode_users row. Map by id for O(1) lookup in the apply loop.
+      const ownerUserIds = Array.from(new Set(rows.map(r => r.user_id)));
+      const ownerUsers =
+        ownerUserIds.length > 0
+          ? await db.select().from(kilocode_users).where(inArray(kilocode_users.id, ownerUserIds))
+          : [];
+      const ownerUserById = new Map(ownerUsers.map(u => [u.id, u]));
+
+      // 3. Partition. Order: destroyed → pinned_by_admin → pinned_by_user →
+      // already_on_target → apply.
+      type ApplyTarget = (typeof rows)[number] & { ownerUserRecord: (typeof ownerUsers)[number] };
+      type SkipReason =
+        | 'destroyed'
+        | 'pinned_by_user'
+        | 'pinned_by_admin'
+        | 'already_on_target'
+        | 'pin_changed_in_flight';
+
+      type ApplyOutcome = { status: 'applied' } | { status: 'skipped'; reason: SkipReason };
+
+      const applied: string[] = [];
+      const skipped: Array<{ instanceId: string; reason: SkipReason }> = [];
+      const failed: Array<{ instanceId: string; error: string }> = [];
+      const applyQueue: ApplyTarget[] = [];
+
+      // Track which input ids matched a row — anything missing surfaces in
+      // failed[{ error: 'not_found' }].
+      const seenIds = new Set(rows.map(r => r.instance_id));
+      for (const id of input.instanceIds) {
+        if (!seenIds.has(id)) {
+          failed.push({ instanceId: id, error: 'not_found' });
+        }
+      }
+
+      for (const row of rows) {
+        if (row.destroyed_at) {
+          skipped.push({ instanceId: row.instance_id, reason: 'destroyed' });
+          continue;
+        }
+        if (row.pin_id && !input.overridePins) {
+          skipped.push({
+            instanceId: row.instance_id,
+            reason: row.pin_pinned_by_is_admin ? 'pinned_by_admin' : 'pinned_by_user',
+          });
+          continue;
+        }
+        if (row.tracked_image_tag === input.imageTag) {
+          skipped.push({ instanceId: row.instance_id, reason: 'already_on_target' });
+          continue;
+        }
+        const ownerUserRecord = ownerUserById.get(row.user_id);
+        if (!ownerUserRecord) {
+          failed.push({
+            instanceId: row.instance_id,
+            error: 'owner user not found',
+          });
+          continue;
+        }
+        applyQueue.push({ ...row, ownerUserRecord });
+      }
+
+      // 4. Apply with bounded concurrency. Manual chunking matches the
+      // detectOrphans pattern already in this router.
+      const CONCURRENCY = 10;
+
+      const applyOne = async (target: ApplyTarget): Promise<ApplyOutcome> => {
+        if (target.pin_id && input.overridePins) {
+          // Atomic delete tied to id + updated_at — same three-predicate
+          // guard restartMachine uses. Catches both replacement (different
+          // id) and in-place updates (same id, newer updated_at).
+          const deleted = await db
+            .delete(kiloclaw_version_pins)
+            .where(
+              and(
+                eq(kiloclaw_version_pins.instance_id, target.instance_id),
+                eq(kiloclaw_version_pins.id, target.pin_id),
+                target.pin_updated_at
+                  ? eq(kiloclaw_version_pins.updated_at, target.pin_updated_at)
+                  : isNull(kiloclaw_version_pins.updated_at)
+              )
+            )
+            .returning({ id: kiloclaw_version_pins.id });
+
+          // CAS miss: a new pin row was written between the partition
+          // SELECT and this delete (the user replaced or updated their
+          // pin). Skip rather than override the user's fresh write.
+          // Surfacing as `pin_changed_in_flight` keeps DB pin and DO
+          // state aligned and lets the admin re-run with the now-current
+          // pin information visible in the table.
+          if (deleted.length === 0) {
+            return { status: 'skipped', reason: 'pin_changed_in_flight' };
+          }
+          await pushPinToWorker(target.user_id, target.instance_id, null);
+        }
+
+        const token = generateApiToken(target.ownerUserRecord, undefined, {
+          expiresIn: TOKEN_EXPIRY.fiveMinutes,
+        });
+        const client = new KiloClawUserClient(token);
+        await client.restartMachine(
+          { imageTag: input.imageTag },
+          {
+            userId: target.user_id,
+            instanceId: workerInstanceId({
+              id: target.instance_id,
+              sandbox_id: target.sandbox_id,
+            }),
+          }
+        );
+        return { status: 'applied' };
+      };
+
+      for (let i = 0; i < applyQueue.length; i += CONCURRENCY) {
+        const batch = applyQueue.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(batch.map(applyOne));
+        for (let j = 0; j < batch.length; j += 1) {
+          const target = batch[j];
+          const r = results[j];
+          if (r.status === 'fulfilled') {
+            if (r.value.status === 'applied') {
+              applied.push(target.instance_id);
+            } else {
+              skipped.push({ instanceId: target.instance_id, reason: r.value.reason });
+            }
+          } else {
+            const err = r.reason;
+            const message =
+              err instanceof KiloClawApiError
+                ? getKiloclawApiErrorPayload(err, 'restart failed').message
+                : err instanceof Error
+                  ? err.message
+                  : 'restart failed';
+            failed.push({ instanceId: target.instance_id, error: message });
+          }
+        }
+      }
+
+      // Audit log: bulk version changes can touch up to 500 user instances
+      // and override pins. Record the action for accountability. The audit
+      // log uses target_user_id = ctx.user.id (the actor) since the
+      // schema column is non-null and this is a multi-user action; the
+      // applied/skipped/failed instance ids land in metadata. Fire-and-
+      // forget pattern matches the rest of this router.
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.instances.bulk_change_version',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: ctx.user.id,
+          message: `Bulk version change: tag=${input.imageTag} overridePins=${input.overridePins} applied=${applied.length} skipped=${skipped.length} failed=${failed.length}`,
+          metadata: {
+            imageTag: input.imageTag,
+            overridePins: input.overridePins,
+            requestedInstanceIds: input.instanceIds,
+            appliedInstanceIds: applied,
+            skipped,
+            failed,
+          },
+        });
+      } catch (auditErr) {
+        console.error('Failed to write audit log for bulkChangeVersion:', auditErr);
+      }
+
+      return { applied, skipped, failed };
     }),
 
   destroyFlyMachine: adminProcedure

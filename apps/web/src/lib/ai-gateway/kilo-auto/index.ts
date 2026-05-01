@@ -110,6 +110,7 @@ export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
   supports_images: true,
   supports_pdf: true,
   opencode_settings: {
+    ai_sdk_provider: 'anthropic',
     family: 'claude',
     prompt: 'anthropic',
   },

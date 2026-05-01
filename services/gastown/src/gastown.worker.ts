@@ -146,6 +146,8 @@ import {
   handleContainerReady,
   handleDrainStatus,
 } from './handlers/town-eviction.handler';
+import { handleRefreshGitToken } from './handlers/refresh-git-token.handler';
+import { handleRefreshContainerToken } from './handlers/town-container-token.handler';
 
 export { GastownUserDO } from './dos/GastownUser.do';
 export { GastownOrgDO } from './dos/GastownOrg.do';
@@ -497,6 +499,16 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/nudge-delivered', c =>
 // Agent-to-agent nudge: any authenticated agent can nudge another agent in the rig
 app.post('/api/towns/:townId/rigs/:rigId/nudge', c => handleNudge(c, c.req.param()));
 
+// ── Refresh Git Token ──────────────────────────────────────────────────
+// Called by the container when a GIT_TOKEN (GitHub App installation token,
+// 1h TTL) expires mid-task. Returns a fresh token resolved via the
+// standard chain. Authenticated with the container-scoped JWT.
+app.post('/api/towns/:townId/rigs/:rigId/refresh-git-token', c =>
+  instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/refresh-git-token', () =>
+    handleRefreshGitToken(c, c.req.param())
+  )
+);
+
 // ── Agent Events ─────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/agent-events', c =>
@@ -582,6 +594,12 @@ app.post('/api/towns/:townId/container-eviction', c =>
 app.post('/api/towns/:townId/container-ready', c =>
   instrumented(c, 'POST /api/towns/:townId/container-ready', () =>
     handleContainerReady(c, c.req.param())
+  )
+);
+
+app.post('/api/towns/:townId/refresh-container-token', c =>
+  instrumented(c, 'POST /api/towns/:townId/refresh-container-token', () =>
+    handleRefreshContainerToken(c, c.req.param())
   )
 );
 
@@ -1043,6 +1061,7 @@ app.use(
     endpoint: '/trpc',
     createContext: (_opts: unknown, c: Context<GastownEnv>) => ({
       env: c.env,
+      executionCtx: c.executionCtx,
       userId: c.get('kiloUserId') ?? '',
       isAdmin: c.get('kiloIsAdmin') ?? false,
       apiTokenPepper: c.get('kiloApiTokenPepper') ?? null,

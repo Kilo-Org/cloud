@@ -1,7 +1,21 @@
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import {
+  CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
+  CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
+  CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
+} from '@/lib/ai-gateway/providers/anthropic.constants';
+import { GEMINI_PRO_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/google';
+import { KIMI_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import { GPT_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {
+  '~anthropic/claude-opus-latest': CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
+  '~anthropic/claude-sonnet-latest': CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
+  '~anthropic/claude-haiku-latest': CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID,
+  '~openai/gpt-latest': GPT_CURRENT_VERCEL_MODEL_ID,
+  '~moonshotai/kimi-latest': KIMI_CURRENT_VERCEL_MODEL_ID,
+  '~google/gemini-pro-latest': GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
   'arcee-ai/trinity-large-preview:free': 'arcee-ai/trinity-large-preview',
   'mistralai/codestral-2508': 'mistral/codestral',
   'mistralai/devstral-2512': 'mistral/devstral-2',
@@ -10,7 +24,6 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'x-ai/grok-4-fast': 'xai/grok-4-fast-reasoning',
   'x-ai/grok-4.1-fast': 'xai/grok-4.1-fast-reasoning',
   'x-ai/grok-4.20-beta': 'xai/grok-4.20-reasoning',
-  // Mistral date-suffixed → Vercel clean names
   'mistralai/ministral-14b-2512': 'mistral/ministral-14b',
   'mistralai/ministral-3b-2512': 'mistral/ministral-3b',
   'mistralai/ministral-8b-2512': 'mistral/ministral-8b',
@@ -19,7 +32,6 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'mistralai/mistral-medium-3.1': 'mistral/mistral-medium',
   'mistralai/mistral-small-2603': 'mistral/mistral-small',
   'mistralai/pixtral-large-2411': 'mistral/pixtral-large',
-  // Qwen name format: qwen3-Xb → qwen-3-Xb
   'qwen/qwen3-14b': 'alibaba/qwen-3-14b',
   'qwen/qwen3-235b-a22b': 'alibaba/qwen-3-235b',
   'qwen/qwen3-30b-a3b': 'alibaba/qwen-3-30b',

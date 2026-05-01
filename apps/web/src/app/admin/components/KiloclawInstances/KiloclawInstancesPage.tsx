@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,9 +34,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ChevronLeft, ChevronRight, X, Bomb } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Info, X, Bomb } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
+import { BulkChangeVersionDialog } from './BulkChangeVersionDialog';
 import {
   ComposedChart,
   Bar,
@@ -51,6 +53,14 @@ import { formatRelativeTime } from './shared';
 type SortField = 'created_at' | 'destroyed_at';
 type SortOrder = 'asc' | 'desc';
 type StatusFilter = 'all' | 'active' | 'inactive_trial_stopped' | 'suspended' | 'destroyed';
+
+/**
+ * Sentinel value for the version filter that matches rows whose
+ * `tracked_image_tag` is null (alarm hasn't ticked / hibernated DOs).
+ * Must match the backend constant in admin-kiloclaw-instances-router.ts.
+ */
+const IMAGE_TAG_FILTER_UNKNOWN = '__unknown__';
+const IMAGE_TAG_FILTER_ALL = '__all__';
 
 const subscriptionBadgeClass: Record<KiloClawSubscriptionStatus, string> = {
   active: 'border-green-500/30 bg-green-500/15 text-green-400',
@@ -92,75 +102,45 @@ type OverviewData = {
   avgLifespanMinutes: number | null;
 };
 
+function StatPill({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="flex flex-1 flex-col gap-0.5">
+      <span className="text-muted-foreground text-[11px] font-semibold tracking-[0.06em] uppercase">
+        {label}
+      </span>
+      <span className="text-2xl font-bold tabular-nums">{value}</span>
+      {hint && <span className="text-muted-foreground text-xs">{hint}</span>}
+    </div>
+  );
+}
+
 function OverviewStatsCards({ data }: { data: OverviewData }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Total Instances</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{data.totalInstances.toLocaleString()}</div>
-          <p className="text-muted-foreground text-xs">
-            {data.last24hCreated} last 24h &middot; {data.last7dCreated} last 7d
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Active Instances</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{data.activeInstances.toLocaleString()}</div>
-          <p className="text-muted-foreground text-xs">
-            {data.destroyedInstances.toLocaleString()} destroyed
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Inactive Trial Stops</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">
-            {data.inactiveTrialStoppedInstances.toLocaleString()}
-          </div>
-          <p className="text-muted-foreground text-xs">Stopped without suspending billing access</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Suspended Instances</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{data.suspendedInstances.toLocaleString()}</div>
-          <p className="text-muted-foreground text-xs">Suspended by billing lifecycle</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Unique Users</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{data.uniqueUsers.toLocaleString()}</div>
-          <p className="text-muted-foreground text-xs">{data.activeUsers7d} active in last 7d</p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Avg Lifespan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatLifespan(data.avgLifespanMinutes)}</div>
-          <p className="text-muted-foreground text-xs">Average time before destroyed</p>
-        </CardContent>
-      </Card>
-    </div>
+    <Card>
+      <CardContent className="flex flex-wrap gap-x-8 gap-y-4 py-4">
+        <StatPill
+          label="Total"
+          value={data.totalInstances.toLocaleString()}
+          hint={`+${data.last24hCreated} 24h · +${data.last7dCreated} 7d`}
+        />
+        <StatPill
+          label="Active"
+          value={data.activeInstances.toLocaleString()}
+          hint={`${data.destroyedInstances.toLocaleString()} destroyed`}
+        />
+        <StatPill
+          label="Inactive trial"
+          value={data.inactiveTrialStoppedInstances.toLocaleString()}
+        />
+        <StatPill label="Suspended" value={data.suspendedInstances.toLocaleString()} />
+        <StatPill
+          label="Unique users"
+          value={data.uniqueUsers.toLocaleString()}
+          hint={`${data.activeUsers7d} active 7d`}
+        />
+        <StatPill label="Avg lifespan" value={formatLifespan(data.avgLifespanMinutes)} />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -234,38 +214,21 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Daily Instances</CardTitle>
-        <CardDescription>Instances created and destroyed per day (last 30 days)</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="date"
-                angle={-45}
-                textAnchor="end"
-                height={60}
-                className="text-xs"
-                tick={{ fontSize: 10 }}
-              />
-              <YAxis domain={[0, yAxisMax]} tick={{ fontSize: 10 }} />
-              <Tooltip content={<CustomTooltip />} />
-              {showCreated && <Bar dataKey="created" fill="#22c55e" name="Created" />}
-              {showDestroyed && <Bar dataKey="destroyed" fill="#ef4444" name="Destroyed" />}
-            </ComposedChart>
-          </ResponsiveContainer>
+      <CardHeader className="flex flex-row items-baseline justify-between gap-4 space-y-0 py-3">
+        <div className="flex items-baseline gap-3">
+          <CardTitle className="text-sm font-medium">Daily Instances</CardTitle>
+          <CardDescription className="text-xs">
+            Created and destroyed per day (last 30 days)
+          </CardDescription>
         </div>
-        <div className="mt-4 flex items-center justify-center gap-6 text-sm">
+        <div className="flex items-center gap-4 text-xs">
           <button
             type="button"
-            className="flex cursor-pointer items-center gap-2"
+            className="flex cursor-pointer items-center gap-1.5"
             onClick={() => setShowCreated(prev => !prev)}
           >
             <div
-              className={`h-3 w-3 rounded-sm bg-green-500 transition-opacity ${showCreated ? 'opacity-100' : 'opacity-30'}`}
+              className={`h-2.5 w-2.5 rounded-sm bg-green-500 transition-opacity ${showCreated ? 'opacity-100' : 'opacity-30'}`}
             />
             <span
               className={`text-muted-foreground transition-opacity ${showCreated ? 'opacity-100' : 'line-through opacity-50'}`}
@@ -275,11 +238,11 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
           </button>
           <button
             type="button"
-            className="flex cursor-pointer items-center gap-2"
+            className="flex cursor-pointer items-center gap-1.5"
             onClick={() => setShowDestroyed(prev => !prev)}
           >
             <div
-              className={`h-3 w-3 rounded-sm bg-red-500 transition-opacity ${showDestroyed ? 'opacity-100' : 'opacity-30'}`}
+              className={`h-2.5 w-2.5 rounded-sm bg-red-500 transition-opacity ${showDestroyed ? 'opacity-100' : 'opacity-30'}`}
             />
             <span
               className={`text-muted-foreground transition-opacity ${showDestroyed ? 'opacity-100' : 'line-through opacity-50'}`}
@@ -287,6 +250,25 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
               Destroyed
             </span>
           </button>
+        </div>
+      </CardHeader>
+      <CardContent className="pb-3">
+        <div className="h-[140px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis
+                dataKey="date"
+                interval="preserveStartEnd"
+                minTickGap={24}
+                tick={{ fontSize: 10 }}
+              />
+              <YAxis domain={[0, yAxisMax]} width={28} tick={{ fontSize: 10 }} />
+              <Tooltip content={<CustomTooltip />} />
+              {showCreated && <Bar dataKey="created" fill="#22c55e" name="Created" />}
+              {showDestroyed && <Bar dataKey="destroyed" fill="#ef4444" name="Destroyed" />}
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       </CardContent>
     </Card>
@@ -368,11 +350,14 @@ export function KiloclawInstancesPage() {
       sortOrder: (searchParams.get('sortOrder') || 'desc') as SortOrder,
       search: searchParams.get('search') || '',
       status: (searchParams.get('status') || 'all') as StatusFilter,
+      imageTag: searchParams.get('imageTag') || '',
     }),
     [searchParams]
   );
 
   const [searchInput, setSearchInput] = useState(queryStringState.search);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
 
   const offset = (queryStringState.page - 1) * queryStringState.limit;
 
@@ -384,11 +369,21 @@ export function KiloclawInstancesPage() {
       sortOrder: queryStringState.sortOrder,
       search: queryStringState.search,
       status: queryStringState.status,
+      imageTag: queryStringState.imageTag || undefined,
     })
   );
 
   const { data: statsData } = useQuery(
     trpc.admin.kiloclawInstances.stats.queryOptions({ days: 30 })
+  );
+
+  // Populates the version filter dropdown. Same call the single-instance
+  // "Change version…" dialog uses on KiloclawInstanceDetail.
+  const { data: versionsData } = useQuery(
+    trpc.admin.kiloclawVersions.listVersions.queryOptions({
+      status: 'available',
+      limit: 100,
+    })
   );
 
   type QueryStringState = typeof queryStringState;
@@ -423,6 +418,32 @@ export function KiloclawInstancesPage() {
     },
     [pushWith]
   );
+
+  const handleImageTagChange = useCallback(
+    (value: string) => {
+      // The Select uses sentinel values for "All" and "(unknown)" because
+      // shadcn's Select rejects empty-string values.
+      const next = value === IMAGE_TAG_FILTER_ALL ? '' : value;
+      pushWith({ imageTag: next, page: 1 });
+    },
+    [pushWith]
+  );
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
 
   const handleSort = useCallback(
     (field: SortField) => {
@@ -466,14 +487,53 @@ export function KiloclawInstancesPage() {
 
   const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
 
+  const versions = versionsData?.items || [];
+
+  const allVisibleSelected = instances.length > 0 && instances.every(i => selectedIds.has(i.id));
+  const someVisibleSelected = !allVisibleSelected && instances.some(i => selectedIds.has(i.id));
+
+  const toggleSelectAllVisible = () => {
+    setSelectedIds(prev => {
+      if (allVisibleSelected) {
+        const next = new Set(prev);
+        for (const i of instances) next.delete(i.id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const i of instances) next.add(i.id);
+      return next;
+    });
+  };
+
+  // Selection persists across filter/sort/pagination changes. Show a hint
+  // when some selected ids are not in the current page so admins don't lose
+  // track of work-in-flight.
+  const visibleSelectedCount = instances.reduce((n, i) => (selectedIds.has(i.id) ? n + 1 : n), 0);
+  const offscreenSelectedCount = selectedIds.size - visibleSelectedCount;
+
+  // The bulk dialog needs the full row data (tracked_image_tag, pin, etc.)
+  // for its summary panel. We only reliably have rows for the current page,
+  // so the dialog operates on the intersection of selectedIds × instances.
+  const selectedInstances = instances.filter(i => selectedIds.has(i.id));
+
+  // Map image_tag → openclaw_version so the Version column can pair the
+  // technical image tag with its human-meaningful semver. Built from the
+  // already-fetched listVersions data so this costs nothing extra. Tags
+  // not in the active catalog (e.g. disabled or removed) fall back to
+  // just the image_tag.
+  const openclawVersionByImageTag = useMemo(
+    () => new Map(versions.map(v => [v.image_tag, v.openclaw_version])),
+    [versions]
+  );
+
   return (
     <div className="flex w-full flex-col gap-y-6">
       {/* Dashboard Section */}
       {statsData && (
-        <>
+        <div className="space-y-4">
           <OverviewStatsCards data={statsData.overview} />
           {statsData.dailyChart.length > 0 && <DailyChart data={statsData.dailyChart} />}
-        </>
+        </div>
       )}
 
       {/* Filters */}
@@ -497,7 +557,7 @@ export function KiloclawInstancesPage() {
               </button>
             )}
           </div>
-          <Button type="submit" disabled={isFetching}>
+          <Button type="submit" variant="secondary" disabled={isFetching}>
             Search
           </Button>
         </form>
@@ -515,17 +575,79 @@ export function KiloclawInstancesPage() {
           </SelectContent>
         </Select>
 
+        <Select
+          value={queryStringState.imageTag || IMAGE_TAG_FILTER_ALL}
+          onValueChange={handleImageTagChange}
+        >
+          <SelectTrigger className="w-[220px]">
+            <SelectValue placeholder="Version" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={IMAGE_TAG_FILTER_ALL}>All Versions</SelectItem>
+            <SelectItem value={IMAGE_TAG_FILTER_UNKNOWN}>(unknown)</SelectItem>
+            {versions.map(v => (
+              <SelectItem
+                key={v.image_tag}
+                value={v.image_tag}
+                textValue={`${v.openclaw_version} ${v.image_tag}${v.is_latest ? ' (latest)' : ''}`}
+              >
+                <span className="font-medium">{v.openclaw_version}</span>
+                <span className="text-muted-foreground ml-2 font-mono text-xs">{v.image_tag}</span>
+                {v.is_latest && (
+                  <span className="text-muted-foreground ml-2 text-xs">(latest)</span>
+                )}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <DevNukeAllButton />
       </div>
+
+      {/* Bulk action bar — always rendered so the affordance is discoverable.
+          Empty state shows a muted hint; active state shows count + buttons.
+          Mirrors the pattern on KiloclawVersionsPage. */}
+      {selectedIds.size === 0 ? (
+        <div className="text-muted-foreground border-border/60 flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs">
+          <Info className="h-3 w-3 opacity-60" />
+          <span>Use the checkboxes to select rows for bulk version changes.</span>
+        </div>
+      ) : (
+        <div className="bg-muted/30 flex items-center gap-3 rounded-md border px-3 py-2">
+          <span className="text-sm">
+            <span className="font-medium">{selectedIds.size}</span> selected
+            {offscreenSelectedCount > 0 && (
+              <span className="text-muted-foreground ml-2">
+                ({offscreenSelectedCount} not visible on this page)
+              </span>
+            )}
+          </span>
+          <Button size="sm" onClick={() => setBulkDialogOpen(true)}>
+            Change version…
+          </Button>
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={
+                    allVisibleSelected ? true : someVisibleSelected ? 'indeterminate' : false
+                  }
+                  onCheckedChange={toggleSelectAllVisible}
+                  aria-label="Select all visible instances"
+                />
+              </TableHead>
               <TableHead>User</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Sandbox ID</TableHead>
+              <TableHead>Version</TableHead>
+              <TableHead>Pin</TableHead>
               <TableHead>Subscription</TableHead>
               <TableHead>Status</TableHead>
               <TableHead
@@ -537,6 +659,7 @@ export function KiloclawInstancesPage() {
                   <span className="ml-1">{queryStringState.sortOrder === 'asc' ? '↑' : '↓'}</span>
                 )}
               </TableHead>
+              <TableHead>Sandbox ID</TableHead>
               <TableHead
                 className="hover:bg-muted/50 cursor-pointer"
                 onClick={() => handleSort('destroyed_at')}
@@ -551,13 +674,13 @@ export function KiloclawInstancesPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={9} className="h-24 text-center">
                   Loading instances...
                 </TableCell>
               </TableRow>
             ) : instances.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={9} className="h-24 text-center">
                   No instances found.
                 </TableCell>
               </TableRow>
@@ -576,6 +699,16 @@ export function KiloclawInstancesPage() {
                     }
                   }}
                 >
+                  <TableCell
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                    onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={selectedIds.has(instance.id)}
+                      onCheckedChange={() => toggleSelect(instance.id)}
+                      aria-label={`Select instance ${instance.sandbox_id}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <Link
                       href={`/admin/users/${encodeURIComponent(instance.user_id)}`}
@@ -585,31 +718,40 @@ export function KiloclawInstancesPage() {
                       {instance.user_email || instance.user_id}
                     </Link>
                   </TableCell>
-                  <TableCell>
-                    {instance.organization_id ? (
-                      <Badge
-                        variant="outline"
-                        className="border-blue-500/30 bg-blue-500/15 text-blue-400"
-                      >
-                        Org
-                      </Badge>
+                  <TableCell className="text-xs">
+                    {instance.tracked_image_tag ? (
+                      <div className="flex flex-col" title={instance.tracked_image_tag}>
+                        {openclawVersionByImageTag.get(instance.tracked_image_tag) && (
+                          <span className="font-medium">
+                            {openclawVersionByImageTag.get(instance.tracked_image_tag)}
+                          </span>
+                        )}
+                        <span className="text-muted-foreground font-mono">
+                          {instance.tracked_image_tag}
+                        </span>
+                      </div>
                     ) : (
-                      <Badge
-                        variant="outline"
-                        className="border-gray-500/30 bg-gray-500/10 text-gray-400"
-                      >
-                        Personal
-                      </Badge>
+                      <span className="text-muted-foreground">(unknown)</span>
                     )}
                   </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    <span
-                      className="block truncate"
-                      style={{ maxWidth: '200px' }}
-                      title={instance.sandbox_id}
-                    >
-                      {instance.sandbox_id}
-                    </span>
+                  <TableCell>
+                    {instance.pin ? (
+                      <Badge
+                        variant="outline"
+                        className={
+                          instance.pin.is_admin_pin
+                            ? 'border-transparent bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/20'
+                            : 'border-transparent bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/20'
+                        }
+                        title={`Pinned to ${instance.pin.image_tag} by ${
+                          instance.pin.is_admin_pin ? 'admin' : 'user'
+                        }`}
+                      >
+                        {instance.pin.is_admin_pin ? 'Admin pin' : 'User pin'}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {instance.subscription_status ? (
@@ -642,6 +784,15 @@ export function KiloclawInstancesPage() {
                     title={new Date(instance.created_at).toLocaleString()}
                   >
                     {formatRelativeTime(instance.created_at)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground font-mono text-xs">
+                    <span
+                      className="block truncate"
+                      style={{ maxWidth: '110px' }}
+                      title={instance.sandbox_id}
+                    >
+                      {instance.sandbox_id}
+                    </span>
                   </TableCell>
                   <TableCell
                     className="text-muted-foreground text-sm"
@@ -691,6 +842,17 @@ export function KiloclawInstancesPage() {
           </Button>
         </div>
       </div>
+
+      <BulkChangeVersionDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        selectedIds={Array.from(selectedIds)}
+        visibleSelectedInstances={selectedInstances}
+        availableVersions={versions}
+        onApplied={() => {
+          clearSelection();
+        }}
+      />
     </div>
   );
 }

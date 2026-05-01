@@ -10,6 +10,7 @@ import {
   RESTARTING_TIMEOUT_MS,
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
   getProactiveRefreshThresholdMs,
 } from '../../config';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../../utils/env-encryption';
@@ -888,12 +889,17 @@ export async function syncStatusWithFly(
     if (state.lastStartedAt === null) {
       state.lastStartedAt = Date.now();
     }
+    // Reconcile may be the first path to observe that a machine reached its
+    // running state, so keep the capability marker coupled to the observed
+    // running transition here as well.
+    state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
     await ctx.storage.put(
       storageUpdate({
         status: 'running',
         startingAt: null,
         healthCheckFailCount: 0,
         lastStartedAt: state.lastStartedAt,
+        controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
       })
     );
     return {};
@@ -1103,6 +1109,7 @@ export async function markRestartSuccessful(
   state.healthCheckFailCount = 0;
   state.lastRestartErrorMessage = null;
   state.lastRestartErrorAt = null;
+  state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
   await ctx.storage.put(
     storageUpdate({
       status: 'running',
@@ -1113,6 +1120,7 @@ export async function markRestartSuccessful(
       healthCheckFailCount: 0,
       lastRestartErrorMessage: null,
       lastRestartErrorAt: null,
+      controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
     })
   );
 }

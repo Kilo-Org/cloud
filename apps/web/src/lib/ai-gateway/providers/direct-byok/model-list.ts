@@ -11,7 +11,7 @@ import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 type CachedEnhancedModelListOptions = {
   providerId: DirectUserByokInferenceProviderId;
   recommendedModels: ReadonlyArray<DirectByokModel>;
-  variants: Record<string, OpenCodeVariant> | null;
+  variants?: Record<string, OpenCodeVariant>;
 };
 
 export function cachedEnhancedDirectByokModelList({
@@ -40,7 +40,7 @@ function enhanceDirectByokModelList({
 }: {
   recommendedModels: ReadonlyArray<DirectByokModel>;
   remainingModels: ReadonlyArray<DirectByokModel>;
-  variants: Record<string, OpenCodeVariant> | null;
+  variants?: Record<string, OpenCodeVariant>;
 }): ReadonlyArray<DirectByokModel> {
   const seenIds = new Set<string>();
   return [...recommendedModels, ...remainingModels]
@@ -50,7 +50,7 @@ function enhanceDirectByokModelList({
       if (recommendedModels.some(m => m.id === model.id)) flags.add('recommended');
       return {
         ...model,
-        flags: [...flags],
+        flags: flags.size > 0 ? [...flags] : undefined,
         variants: model.variants ?? variants,
       };
     });

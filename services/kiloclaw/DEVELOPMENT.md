@@ -574,8 +574,8 @@ User browser ──[JWT cookie]──> catch-all proxy ───┤
   and calls an RPC method.
 - **User routes** (`/api/kiloclaw/*`): JWT cookie auth. Returns user's config/status.
 - **Catch-all proxy**: JWT cookie auth. Resolves the user's per-user sandbox and
-  proxies HTTP/WebSocket to the OpenClaw gateway inside the container. Auto-recovers
-  crashed instances on the next request.
+  proxies HTTP/WebSocket to the OpenClaw gateway inside the container. Unexpected
+  stopped-machine recovery is handled by the reconciliation alarm, not by proxy requests.
 - **Admin routes** (`/api/admin/*`): JWT cookie auth. Storage sync, gateway restart.
   Delegates to the DO via RPC.
 

@@ -250,6 +250,7 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.cli_run.start',
   'kiloclaw.cli_run.cancel',
   'kiloclaw.orphan.destroy',
+  'kiloclaw.instances.bulk_change_version',
 ]);
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
@@ -693,6 +694,7 @@ export const OpenCodePromptSchema = z.enum([
   'anthropic',
   'trinity',
   'anthropic_without_todo',
+  'gpt55',
 ]);
 
 export type OpenCodePrompt = z.infer<typeof OpenCodePromptSchema>;
@@ -809,7 +811,6 @@ export const ModelSchema = z.object({
 export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 
 export const EndpointSchema = z.object({
-  provider_name: z.string(),
   tag: z.string(),
   context_length: z.number(),
 });

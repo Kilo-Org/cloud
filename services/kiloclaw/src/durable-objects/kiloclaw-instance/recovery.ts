@@ -1,7 +1,7 @@
 import type { PersistedState } from '../../schemas/instance-config';
 import type { KiloClawEnv } from '../../types';
 import * as fly from '../../fly/client';
-import { PREVIOUS_VOLUME_RETENTION_MS } from '../../config';
+import { PREVIOUS_VOLUME_RETENTION_MS, WORKER_CONTROLLER_CAPABILITIES_VERSION } from '../../config';
 import * as regionHelpers from '../regions';
 import { buildRuntimeSpec, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
 import type { InstanceMutableState } from './types';
@@ -289,6 +289,7 @@ export async function completeUnexpectedStopRecovery(runtime: RecoveryRuntime): 
   state.lastStartedAt = now;
   state.lastRecoveryErrorMessage = null;
   state.lastRecoveryErrorAt = null;
+  state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
   await runtime.persist({
     status: 'running',
     flyMachineId: state.flyMachineId,
@@ -302,6 +303,7 @@ export async function completeUnexpectedStopRecovery(runtime: RecoveryRuntime): 
     lastStartedAt: now,
     lastRecoveryErrorMessage: null,
     lastRecoveryErrorAt: null,
+    controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
   });
 
   runtime.emitEvent({

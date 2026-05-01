@@ -18,10 +18,8 @@ export default {
       {
         id: 'glm-5.1',
         name: 'GLM-5.1',
-        flags: [],
         context_length: 200000,
         max_completion_tokens: 131072,
-        variants: null,
       },
     ],
     variants: REASONING_VARIANTS_BINARY,

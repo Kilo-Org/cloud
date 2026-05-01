@@ -50,6 +50,7 @@ import {
   OPENCLAW_BUILTIN_DEFAULT_MODEL,
   RESTARTING_TIMEOUT_MS,
   STARTING_TIMEOUT_MS,
+  WORKER_CONTROLLER_CAPABILITIES_VERSION,
 } from '../../config';
 import {
   SECRET_CATALOG,
@@ -93,7 +94,11 @@ import {
   reconcileMachineMount,
   markRestartSuccessful,
 } from './reconcile';
-import { restoreFromPostgres, markDestroyedInPostgresHelper } from './postgres';
+import {
+  restoreFromPostgres,
+  markDestroyedInPostgresHelper,
+  syncTrackedImageTagToPostgresHelper,
+} from './postgres';
 import {
   dispatchReadyPush,
   LIFECYCLE_NOTIFICATION_RESET,
@@ -2067,6 +2072,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.healthCheckFailCount = 0;
     this.s.lastStartErrorMessage = null;
     this.s.lastStartErrorAt = null;
+    this.s.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
     await this.persist({
       status: 'running',
       startingAt: null,
@@ -2076,6 +2082,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyMachineId: this.s.flyMachineId,
       lastStartErrorMessage: null,
       lastStartErrorAt: null,
+      controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
     });
 
     await this.syncGoogleWorkspaceConfig('instance_started');
@@ -2479,6 +2486,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     botNature: string | null;
     botVibe: string | null;
     botEmoji: string | null;
+    controllerCapabilitiesVersion: number | null;
   }> {
     await this.loadState();
 
@@ -2536,6 +2544,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       botNature: this.s.botNature,
       botVibe: this.s.botVibe,
       botEmoji: this.s.botEmoji,
+      controllerCapabilitiesVersion: this.s.controllerCapabilitiesVersion,
     };
   }
 
@@ -3462,6 +3471,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.status) return;
+
+    // Best-effort denormalize trackedImageTag → kiloclaw_instances.tracked_image_tag so
+    // admin tooling can filter populations by current running version via SQL. Fire-and-
+    // forget; Postgres failures must never break alarm reconciliation. Skipped when the
+    // sandbox isn't set yet (pre-provision).
+    if (this.s.sandboxId) {
+      this.ctx.waitUntil(
+        syncTrackedImageTagToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
+      );
+    }
 
     // Skip reconciliation during restore — the queue worker owns the lifecycle.
     // Detect stuck restores: if restoreStartedAt is set and older than 30 min,

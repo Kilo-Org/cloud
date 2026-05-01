@@ -99,3 +99,63 @@ export function verifyContainerJWT(
     return { success: false, error: 'Token validation failed' };
   }
 }
+
+// Maximum tolerated "past-expiry" window for a container JWT presented
+// to the refresh endpoint. Past this, the token must be re-minted by the
+// TownDO (via ensureContainerToken), not bootstrapped by the container
+// itself. Keeps the renewable window bounded instead of "forever as long
+// as the signature is valid".
+const CONTAINER_REFRESH_GRACE_SECONDS = 24 * 3600;
+
+/**
+ * Verify a container-scoped JWT, tolerating tokens that have just expired.
+ *
+ * Used exclusively by endpoints whose purpose is to mint a replacement
+ * token for a container whose current one has expired. The signature
+ * still has to be valid, so this only accepts tokens we previously
+ * issued — an attacker cannot forge a fresh payload.
+ *
+ * Accepts tokens up to `CONTAINER_REFRESH_GRACE_SECONDS` past their
+ * `exp` claim. Beyond that, the token is considered truly dead and the
+ * refresh request is rejected — this bounds the window during which a
+ * stolen long-expired token could be turned into a fresh one.
+ */
+export function verifyContainerJWTAllowExpired(
+  token: string,
+  secret: string
+):
+  | { success: true; payload: ContainerJWTPayload; expired: boolean }
+  | {
+      success: false;
+      error: string;
+    } {
+  try {
+    const raw = jwt.verify(token, secret, {
+      algorithms: ['HS256'],
+      ignoreExpiration: true,
+    });
+    const parsed = ContainerJWTPayload.safeParse(raw);
+    if (!parsed.success) {
+      return { success: false, error: 'Invalid container token payload' };
+    }
+    const decoded = jwt.decode(token);
+    const exp =
+      decoded && typeof decoded === 'object' && 'exp' in decoded && typeof decoded.exp === 'number'
+        ? decoded.exp
+        : null;
+    if (exp === null) {
+      return { success: false, error: 'Token missing exp claim' };
+    }
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const secondsPastExpiry = nowSeconds - exp;
+    if (secondsPastExpiry > CONTAINER_REFRESH_GRACE_SECONDS) {
+      return { success: false, error: 'Token expired beyond refresh grace period' };
+    }
+    return { success: true, payload: parsed.data, expired: secondsPastExpiry > 0 };
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return { success: false, error: 'Invalid token signature' };
+    }
+    return { success: false, error: 'Token validation failed' };
+  }
+}

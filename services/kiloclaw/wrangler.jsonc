@@ -19,6 +19,15 @@
       "zone_name": "kilosessions.ai",
       "custom_domain": true,
     },
+    // Wildcard route for per-instance name-based virtual hosting.
+    // Custom Domains do not support wildcard hostnames, so we use a route
+    // pattern instead. Requires a proxied wildcard DNS record on
+    // `*.kiloclaw.ai` and a cert whose SAN covers `*.kiloclaw.ai`.
+    // See .plans/namebasedrouting.md for rollout strategy.
+    {
+      "pattern": "*.kiloclaw.ai/*",
+      "zone_name": "kiloclaw.ai",
+    },
   ],
 
   "durable_objects": {
@@ -126,6 +135,12 @@
     "NF_IMAGE_PATH_TEMPLATE": "ghcr.io/kilo-org/kiloclaw:{tag}",
     "NF_IMAGE_CREDENTIALS_ID": "kiloclaw",
     "BACKEND_API_URL": "https://app.kilo.ai",
+    // Shared, non-per-instance origins. OpenClaw's origin check
+    // (src/gateway/origin-check.ts) does exact string matching only —
+    // wildcard host patterns like `https://*.kiloclaw.ai` would be stored
+    // as literals and never match. For per-instance virtual hosting,
+    // `buildEnvVars` in src/gateway/env.ts appends
+    // `https://<instanceId>.kiloclaw.ai` per-instance at machine build time.
     "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
     "KILOCLAW_CHECKIN_URL": "https://claw.kilosessions.ai/api/controller/checkin",
     "KILOCHAT_BASE_URL": "https://chat.kiloapps.io",

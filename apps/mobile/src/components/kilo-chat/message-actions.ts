@@ -3,11 +3,13 @@ export const FIRST_REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉'] as const
 type BuildMessageActionSheetOptionsInput = {
   isOwnMessage: boolean;
   canReact: boolean;
+  canReply: boolean;
 };
 
 export function buildMessageActionSheetOptions({
   isOwnMessage,
   canReact,
+  canReply,
 }: BuildMessageActionSheetOptionsInput): {
   options: string[];
   cancelButtonIndex: number;
@@ -15,6 +17,7 @@ export function buildMessageActionSheetOptions({
 } {
   const options = [
     ...(canReact ? FIRST_REACTION_EMOJIS.map(emoji => `${emoji} React`) : []),
+    ...(canReply ? ['Reply'] : []),
     ...(isOwnMessage ? ['Edit', 'Delete'] : []),
     'Cancel',
   ];

@@ -23,6 +23,7 @@ import { ConversationHeader } from './conversation-header';
 import { buildMessageActionSheetOptions, FIRST_REACTION_EMOJIS } from './message-actions';
 import { MessageInput } from './message-input';
 import { MessageList } from './message-list';
+import { buildSendMessageVariables } from './message-presentation';
 import { useConversationPresence } from './hooks/use-conversation-presence';
 import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
@@ -47,6 +48,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
   const messagesQuery = useMessages(client, conversationId);
   const messages = messagesQuery.data?.messages ?? [];
@@ -69,7 +71,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
     [editingMessage]
   );
   const handleSend = useCallback(
-    (text: string) => {
+    (text: string, inReplyToMessageId?: string) => {
       if (editingMessage) {
         editMessage.mutate(
           {
@@ -89,11 +91,19 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
         );
         return;
       }
-      sendMutation.mutate({
-        conversationId,
-        content: [{ type: 'text', text }],
-        clientId: Crypto.randomUUID(),
-      });
+      sendMutation.mutate(
+        buildSendMessageVariables({
+          conversationId,
+          text,
+          clientId: Crypto.randomUUID(),
+          inReplyToMessageId,
+        }),
+        {
+          onSuccess: () => {
+            setReplyingTo(null);
+          },
+        }
+      );
     },
     [conversationId, editMessage, editingMessage, sendMutation]
   );
@@ -141,6 +151,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       const actionSheet = buildMessageActionSheetOptions({
         isOwnMessage,
         canReact: currentUserId !== null,
+        canReply: !message.deliveryFailed,
       });
       showActionSheetWithOptions(
         {
@@ -167,7 +178,13 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
             return;
           }
           const selected = actionSheet.options[index];
+          if (selected === 'Reply') {
+            setEditingMessage(null);
+            setReplyingTo(message);
+            return;
+          }
           if (selected === 'Edit') {
+            setReplyingTo(null);
             setEditingMessage(message);
             return;
           }
@@ -201,7 +218,17 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const handleActionFailed = useCallback(() => {
     toast.error("Couldn't reach the bot — please try again");
   }, []);
-  useMessageCacheUpdater(client, sandboxId, conversationId, undefined, handleActionFailed);
+  const handleMessageDeliveryFailed = useCallback(() => {
+    toast.error('Message could not be delivered to the bot');
+  }, []);
+  useMessageCacheUpdater(
+    client,
+    sandboxId,
+    conversationId,
+    undefined,
+    handleActionFailed,
+    handleMessageDeliveryFailed
+  );
 
   const activeAndFocused = useAppActiveAndFocused();
   const markRead = useMarkRead(client);
@@ -259,6 +286,14 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           onSend={handleSend}
           disabled={sendMutation.isPending || editMessage.isPending}
           initialText={editingText}
+          replyingTo={replyingTo}
+          onCancelReply={
+            replyingTo
+              ? () => {
+                  setReplyingTo(null);
+                }
+              : undefined
+          }
           onCancelEdit={
             editingMessage
               ? () => {

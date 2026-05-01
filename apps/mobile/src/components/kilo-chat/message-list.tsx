@@ -1,5 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
+import { useMemo } from 'react';
 import { View } from 'react-native';
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
@@ -30,6 +31,10 @@ export function MessageList({
   // FlashList v2 does not support `inverted`; instead we use maintainVisibleContentPosition
   // with startRenderingFromBottom, which expects chronological order.
   const chronological = messages;
+  const messageMap = useMemo(
+    () => new Map(chronological.map(message => [message.id, message])),
+    [chronological]
+  );
 
   return (
     <FlashList
@@ -48,6 +53,9 @@ export function MessageList({
             isFromMe={currentUserId !== null && item.senderId === currentUserId}
             showAuthor={showAuthor}
             isExecutingAction={isExecutingAction}
+            replyToMessage={
+              item.inReplyToMessageId ? (messageMap.get(item.inReplyToMessageId) ?? null) : null
+            }
             onExecuteAction={onExecuteAction}
             onReactionPress={onReactionPress}
             onLongPress={onLongPressMessage}

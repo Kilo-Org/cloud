@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
+import { getDeliveryFailureLabel, getReplyPreviewText } from './message-presentation';
 
 type Props = {
   message: Message;
@@ -12,6 +13,7 @@ type Props = {
   isFromMe: boolean;
   showAuthor: boolean;
   isExecutingAction: boolean;
+  replyToMessage?: Message | null;
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
   onReactionPress: (message: Message, emoji: string) => void;
   onLongPress?: (m: Message) => void;
@@ -39,6 +41,7 @@ function MessageBubbleComponent({
   isFromMe,
   showAuthor,
   isExecutingAction,
+  replyToMessage,
   onExecuteAction,
   onReactionPress,
   onLongPress,
@@ -55,6 +58,7 @@ function MessageBubbleComponent({
   }
 
   const textColor = isFromMe ? 'text-primary-foreground' : 'text-foreground';
+  const deliveryFailureLabel = getDeliveryFailureLabel(message);
 
   return (
     <Pressable
@@ -86,6 +90,18 @@ function MessageBubbleComponent({
           <Text className={cn('text-sm italic opacity-50', textColor)}>[deleted message]</Text>
         ) : (
           <>
+            {replyToMessage && (
+              <View
+                className={cn(
+                  'mb-2 border-l-2 py-1 pl-2',
+                  isFromMe ? 'border-primary-foreground' : 'border-muted-foreground'
+                )}
+              >
+                <Text numberOfLines={2} className={cn('text-xs opacity-80', textColor)}>
+                  {getReplyPreviewText(replyToMessage)}
+                </Text>
+              </View>
+            )}
             {message.content.map((block, index) => {
               if (block.type === 'text') {
                 return (
@@ -124,6 +140,11 @@ function MessageBubbleComponent({
                 </View>
               );
             })}
+            {deliveryFailureLabel && (
+              <Text className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">
+                {deliveryFailureLabel}
+              </Text>
+            )}
           </>
         )}
 

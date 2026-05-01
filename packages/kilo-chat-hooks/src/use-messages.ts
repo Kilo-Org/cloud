@@ -413,7 +413,8 @@ export function useMessageCacheUpdater(
   // this conversation, after the optimistic resolved-state has been rolled
   // back. The shared package is platform-agnostic, so the user-visible
   // message lives at the call site (web: sonner toast; mobile: native toast).
-  onActionFailed?: () => void
+  onActionFailed?: () => void,
+  onMessageDeliveryFailed?: () => void
 ): void {
   const queryClient = useQueryClient();
 
@@ -459,6 +460,7 @@ export function useMessageCacheUpdater(
         if (!old) return old;
         return updateMessageInPages(old, e.messageId, msg => ({ ...msg, deliveryFailed: true }));
       });
+      onMessageDeliveryFailed?.();
     };
 
     const onActionDeliveryFailed = (ctx: string, e: ActionDeliveryFailedEvent) => {
@@ -511,5 +513,13 @@ export function useMessageCacheUpdater(
     return () => {
       for (const off of offs) off();
     };
-  }, [client, sandboxId, conversationId, queryClient, onHumanMessageCreated, onActionFailed]);
+  }, [
+    client,
+    sandboxId,
+    conversationId,
+    queryClient,
+    onHumanMessageCreated,
+    onActionFailed,
+    onMessageDeliveryFailed,
+  ]);
 }

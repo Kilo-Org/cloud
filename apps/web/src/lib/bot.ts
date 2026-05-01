@@ -98,19 +98,18 @@ function isSlackAppUninstalledPayload(payload: unknown): payload is SlackAppUnin
   );
 }
 
-async function handleSlackAppUninstalled(
-  teamId: string,
-  chatBot: Chat,
-  slackAdapter: SlackAdapter
-): Promise<void> {
-  await deleteInstallationByTeamId(teamId, {
-    deleteChatSdkInstallation: async teamId => {
-      await slackAdapter.deleteInstallation(teamId);
-    },
-    deleteChatSdkIdentityCache: async teamId => {
-      await unlinkTeamKiloUsers(chatBot.getState(), 'slack', teamId);
-    },
-  });
+async function handleSlackAppUninstalled(teamId: string, chatBot: Chat): Promise<void> {
+  try {
+    await deleteInstallationByTeamId(teamId);
+    await slackAdapter.deleteInstallation(teamId);
+    await unlinkTeamKiloUsers(chatBot.getState(), 'slack', teamId);
+  } catch (error) {
+    captureException(error, {
+      level: 'error',
+      tags: { component: 'kilo-bot', op: 'slack-app-uninstalled' },
+      extra: { teamId },
+    });
+  }
 }
 
 async function handleSlackWebhook(
@@ -136,7 +135,7 @@ async function handleSlackWebhook(
 
   if (isSlackAppUninstalledPayload(payload)) {
     try {
-      await handleSlackAppUninstalled(payload.team_id, chatBot, slackAdapter);
+      await handleSlackAppUninstalled(payload.team_id, chatBot);
     } catch (error) {
       console.error('[Bot] Failed to handle Slack app_uninstalled event:', error);
       captureException(error, {

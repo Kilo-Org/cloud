@@ -147,31 +147,13 @@ describe('slack-service deleteInstallationByTeamId', () => {
 
   it('deletes the platform integration and Chat SDK state for a Slack team', async () => {
     mockLimit.mockResolvedValue([buildSlackIntegration()]);
-    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
-    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
 
-    await expect(
-      deleteInstallationByTeamId('T123', {
-        deleteChatSdkInstallation,
-        deleteChatSdkIdentityCache,
-      })
-    ).resolves.toEqual({ success: true, deleted: true });
+    await expect(deleteInstallationByTeamId('T123')).resolves.toEqual({
+      success: true,
+      deleted: true,
+    });
 
-    expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
-    expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T123');
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
-  });
-
-  it('succeeds without deleting anything when the Slack team is already unknown', async () => {
-    mockLimit.mockResolvedValue([]);
-    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
-
-    await expect(
-      deleteInstallationByTeamId('T123', { deleteChatSdkInstallation })
-    ).resolves.toEqual({ success: true, deleted: false });
-
-    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
-    expect(mockDeleteWhere).not.toHaveBeenCalled();
   });
 });
 

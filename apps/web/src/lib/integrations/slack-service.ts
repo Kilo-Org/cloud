@@ -264,18 +264,12 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   return { success: true };
 }
 
-export async function deleteInstallationByTeamId(
-  teamId: string,
-  options: SlackUninstallOptions = {}
-) {
+export async function deleteInstallationByTeamId(teamId: string) {
   const integration = await getInstallationByTeamId(teamId);
 
   if (!integration) {
     return { success: true, deleted: false };
   }
-
-  await options.deleteChatSdkInstallation?.(teamId);
-  await options.deleteChatSdkIdentityCache?.(teamId);
 
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 

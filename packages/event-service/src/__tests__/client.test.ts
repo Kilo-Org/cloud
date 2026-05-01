@@ -259,11 +259,11 @@ describe('EventServiceClient', () => {
     }
   });
 
-  it('stops after bounded auth recovery attempts keep failing', async () => {
+  it('stops after an explicit unauthorized stop decision', async () => {
     vi.useFakeTimers();
     try {
-      const retryAuth = (): 'retry' => 'retry';
-      const onUnauthorized = vi.fn(retryAuth);
+      const stopAuth = (): 'stop' => 'stop';
+      const onUnauthorized = vi.fn(stopAuth);
       const WebSocketMock = function (url: string, protocols?: string | string[]) {
         lastMockWs = new MockWebSocket(url, protocols);
         allMockWs.push(lastMockWs);
@@ -286,15 +286,69 @@ describe('EventServiceClient', () => {
       });
 
       await client.connect();
-      await vi.advanceTimersByTimeAsync(2_000);
 
-      expect(onUnauthorized).toHaveBeenCalledTimes(2);
-      expect(allMockWs).toHaveLength(2);
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(allMockWs).toHaveLength(1);
       expect(client.isConnected()).toBe(false);
 
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(allMockWs).toHaveLength(2);
+      expect(allMockWs).toHaveLength(1);
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps reconnecting after configured auth recovery is consumed by pre-open failures', async () => {
+    vi.useFakeTimers();
+    const reconnectDelay = vi.spyOn(Math, 'random').mockReturnValue(1);
+    try {
+      const retryAuth = (): 'retry' => 'retry';
+      const onUnauthorized = vi.fn(retryAuth);
+      let wsCount = 0;
+      const WebSocketMock = function (url: string, protocols?: string | string[]) {
+        lastMockWs = new MockWebSocket(url, protocols);
+        allMockWs.push(lastMockWs);
+        wsCount++;
+        if (wsCount <= 2) {
+          lastMockWs.readyState = 0; // CONNECTING
+          void Promise.resolve().then(() => {
+            lastMockWs.triggerError();
+            lastMockWs.triggerClose();
+          });
+        } else {
+          void Promise.resolve().then(() => lastMockWs.triggerOpen());
+        }
+        return lastMockWs;
+      };
+      WebSocketMock.OPEN = 1;
+      WebSocketMock.CLOSING = 2;
+      WebSocketMock.CLOSED = 3;
+      vi.stubGlobal('WebSocket', WebSocketMock);
+
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken: () => Promise.resolve('h.p.s'),
+        onUnauthorized,
+      });
+      client.subscribe(['room:configured']);
+
+      await client.connect();
+      expect(client.isConnected()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(allMockWs).toHaveLength(2);
+      expect(client.isConnected()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(allMockWs).toHaveLength(3);
+      expect(client.isConnected()).toBe(true);
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(allMockWs[2]?.sent.map(s => JSON.parse(s) as unknown)).toContainEqual({
+        type: 'context.subscribe',
+        contexts: ['room:configured'],
+      });
+    } finally {
+      reconnectDelay.mockRestore();
       vi.useRealTimers();
     }
   });

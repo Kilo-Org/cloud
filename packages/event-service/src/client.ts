@@ -94,12 +94,12 @@ export class EventServiceClient {
       return false;
     }
 
+    if (this.authRecoveryAttempts >= MAX_AUTH_RECOVERY_ATTEMPTS) {
+      return false;
+    }
+
     const decision = await this.onUnauthorized();
-    if (
-      decision === 'stop' ||
-      this.destroyed ||
-      this.authRecoveryAttempts >= MAX_AUTH_RECOVERY_ATTEMPTS
-    ) {
+    if (decision === 'stop' || this.destroyed) {
       this.stopAfterUnauthorized();
       return true;
     }

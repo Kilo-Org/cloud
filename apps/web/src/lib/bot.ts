@@ -37,6 +37,11 @@ const SLACK_ASSISTANT_SUGGESTED_PROMPTS = [
 
 const ASSISTANT_PROMPTS_TITLE = 'Try asking Kilo Bot';
 
+const SLACK_CHANNEL_INVITE_MESSAGE = {
+  markdown:
+    "Hey, I'm Kilo, an AI coding assistant. Mention me in this channel when you want help investigating bugs, reviewing PRs, explaining code, or starting implementation work. AI can make mistakes, so please review responses before relying on them. Sessions created with Kilo from Slack are stored at https://app.kilo.ai.",
+} as const;
+
 export function buildSlackAppHomeView() {
   return {
     type: 'home',
@@ -49,7 +54,7 @@ export function buildSlackAppHomeView() {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: 'Turn Slack messages into focused coding work. Ask Kilo to investigate bugs, review pull requests, explain code, or start a Cloud Agent session in your connected repositories.',
+          text: "I'm Kilo, an AI coding assistant that turns Slack messages into focused coding work. Ask me to investigate bugs, review pull requests, explain code, or start a Cloud Agent session in your connected repositories. AI can make mistakes, so please review responses before relying on them. Sessions created with Kilo from Slack are stored at https://app.kilo.ai.",
         },
       },
       {
@@ -238,6 +243,25 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
           extra: { userId: event.userId, channelId: event.channelId },
         });
       }
+    }
+  });
+
+  chatBot.onMemberJoinedChannel(async event => {
+    if (!(event.adapter instanceof SlackAdapter)) return;
+    if (event.userId !== event.adapter.botUserId) return;
+
+    try {
+      await event.adapter.postMessage(event.channelId, SLACK_CHANNEL_INVITE_MESSAGE);
+    } catch (error) {
+      console.error('[Bot] Failed to post Slack channel invite message:', error);
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'member-joined-channel' },
+        extra: {
+          channelId: event.channelId,
+          inviterId: event.inviterId,
+          userId: event.userId,
+        },
+      });
     }
   });
 

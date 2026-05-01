@@ -1,18 +1,29 @@
-WITH ranked_slack_installations AS (
-  SELECT
-    "id",
-    "platform_installation_id",
-    row_number() OVER (
-      PARTITION BY "platform_installation_id"
-      ORDER BY ("integration_status" = 'active') DESC, "updated_at" DESC NULLS LAST, "installed_at" DESC NULLS LAST, "created_at" DESC NULLS LAST, "id" DESC
-    ) AS "row_number"
+WITH duplicate_slack_workspaces AS (
+  SELECT "platform_installation_id"
   FROM "platform_integrations"
   WHERE "platform" = 'slack'
     AND "platform_installation_id" IS NOT NULL
+  GROUP BY "platform_installation_id"
+  HAVING count(*) > 1
+), kept_slack_installations AS (
+  SELECT DISTINCT ON (duplicate_slack_workspaces."platform_installation_id")
+    duplicate_slack_workspaces."platform_installation_id",
+    kept_installation."id"
+  FROM duplicate_slack_workspaces
+  CROSS JOIN LATERAL (
+    SELECT "id"
+    FROM "platform_integrations"
+    WHERE "platform" = 'slack'
+      AND "platform_installation_id" = duplicate_slack_workspaces."platform_installation_id"
+    LIMIT 1
+  ) kept_installation
 ), duplicate_slack_installations AS (
-  SELECT "id", "platform_installation_id"
-  FROM ranked_slack_installations
-  WHERE "row_number" > 1
+  SELECT platform_integrations."id", platform_integrations."platform_installation_id"
+  FROM "platform_integrations"
+  JOIN kept_slack_installations
+    ON platform_integrations."platform_installation_id" = kept_slack_installations."platform_installation_id"
+  WHERE platform_integrations."platform" = 'slack'
+    AND platform_integrations."id" <> kept_slack_installations."id"
 )
 UPDATE "platform_integrations"
 SET

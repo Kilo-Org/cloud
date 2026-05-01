@@ -32,10 +32,16 @@ export class NotificationChannelDO extends DurableObject<Env> {
     const isRetry = existing?.stage === 'pending';
 
     // 2. Presence
-    const inContext = await this.env.EVENT_SERVICE.isUserInContext(
-      input.userId,
-      input.presenceContext
-    );
+    let inContext = false;
+    try {
+      inContext = await this.env.EVENT_SERVICE.isUserInContext(input.userId, input.presenceContext);
+    } catch (err) {
+      console.warn('Presence lookup failed while dispatching push; continuing delivery', {
+        presenceContext: input.presenceContext,
+        badgeBucket: input.badge?.badgeBucket,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     if (inContext) return { kind: 'suppressed_presence' };
 
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);

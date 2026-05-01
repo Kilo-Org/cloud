@@ -101,6 +101,40 @@ describe('NotificationChannelDO.dispatchPush', () => {
     await expect(stub.listNonZeroBuckets()).resolves.toEqual([]);
   });
 
+  it('delivers and increments badges when presence lookup rejects', async () => {
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockRejectedValueOnce(new Error('rpc down'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const stub = getDO('user-presence-fail-open');
+
+    try {
+      const result = await stub.dispatchPush(
+        baseInput({
+          userId: 'user-presence-fail-open',
+          idempotencyKey: 'k-presence-fail-open',
+        })
+      );
+
+      expect(result.kind).toBe('delivered');
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Presence lookup failed while dispatching push; continuing delivery',
+        {
+          presenceContext: '/presence/kiloclaw/sb1/conv1',
+          badgeBucket: 'conv1',
+          error: 'rpc down',
+        }
+      );
+      expect(sendPushNotifications).toHaveBeenCalledOnce();
+      const stored = await runInDurableObject(stub, async (_inst, state) => ({
+        bucket: await state.storage.get<number>('bucket:conv1'),
+        total: await state.storage.get<number>('total'),
+      }));
+      expect(stored).toEqual({ bucket: 1, total: 1 });
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('delivers, increments bucket in DO storage, writes idempotency key', async () => {
     installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(false);

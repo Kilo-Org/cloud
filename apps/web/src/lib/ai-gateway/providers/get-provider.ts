@@ -78,6 +78,54 @@ async function checkDirectBYOK(
   };
 }
 
+async function checkCustomLlm(
+  requestedModel: string,
+  organizationId: string
+): Promise<{ provider: Provider; userByok: null; bypassAccessCheck: true } | null> {
+  const [row] = await db
+    .select()
+    .from(custom_llm2)
+    .where(eq(custom_llm2.public_id, requestedModel));
+  const parsedCustomLlm = CustomLlmDefinitionSchema.safeParse(row?.definition);
+  if (row && !parsedCustomLlm.success) {
+    console.log('Failed to parse custom llm definition', parsedCustomLlm.error);
+  }
+  const customLlm = parsedCustomLlm.data;
+  if (!customLlm || !customLlm.organization_ids.includes(organizationId)) {
+    return null;
+  }
+  return {
+    provider: {
+      id: 'custom',
+      apiUrl: customLlm.base_url,
+      apiKey: customLlm.api_key,
+      supportedChatApis: inferSupportedChatApis(
+        customLlm.opencode_settings?.ai_sdk_provider,
+        customLlm.openclaw_settings?.api_adapter
+      ),
+      transformRequest(context) {
+        if (customLlm.remove_from_body) {
+          const body = context.request.body as Record<string, unknown>;
+          for (const key of customLlm.remove_from_body ?? []) {
+            delete body[key];
+          }
+        }
+        Object.assign(context.request.body, customLlm.extra_body ?? {});
+        Object.assign(context.extraHeaders, customLlm.extra_headers ?? {});
+        context.request.body.model = customLlm.internal_id;
+        if (customLlm.add_cache_breakpoints) {
+          addCacheBreakpoints(context.request);
+        }
+        if (customLlm.inject_reasoning_into_content) {
+          injectReasoningIntoContent(context.request);
+        }
+      },
+    },
+    userByok: null,
+    bypassAccessCheck: true,
+  };
+}
+
 async function checkVercelBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
@@ -113,46 +161,9 @@ export async function getProvider(
   }
 
   if (requestedModel.startsWith('kilo-internal/') && organizationId) {
-    const [row] = await db
-      .select()
-      .from(custom_llm2)
-      .where(eq(custom_llm2.public_id, requestedModel));
-    const parsedCustomLlm = CustomLlmDefinitionSchema.safeParse(row?.definition);
-    if (row && !parsedCustomLlm.success) {
-      console.log('Failed to parse custom llm definition', parsedCustomLlm.error);
-    }
-    const customLlm = parsedCustomLlm.data;
-    if (customLlm && customLlm.organization_ids.includes(organizationId)) {
-      return {
-        provider: {
-          id: 'custom',
-          apiUrl: customLlm.base_url,
-          apiKey: customLlm.api_key,
-          supportedChatApis: inferSupportedChatApis(
-            customLlm.opencode_settings?.ai_sdk_provider,
-            customLlm.openclaw_settings?.api_adapter
-          ),
-          transformRequest(context) {
-            if (customLlm.remove_from_body) {
-              const body = context.request.body as Record<string, unknown>;
-              for (const key of customLlm.remove_from_body ?? []) {
-                delete body[key];
-              }
-            }
-            Object.assign(context.request.body, customLlm.extra_body ?? {});
-            Object.assign(context.extraHeaders, customLlm.extra_headers ?? {});
-            context.request.body.model = customLlm.internal_id;
-            if (customLlm.add_cache_breakpoints) {
-              addCacheBreakpoints(context.request);
-            }
-            if (customLlm.inject_reasoning_into_content) {
-              injectReasoningIntoContent(context.request);
-            }
-          },
-        },
-        userByok: null,
-        bypassAccessCheck: true,
-      };
+    const customLlmResult = await checkCustomLlm(requestedModel, organizationId);
+    if (customLlmResult) {
+      return customLlmResult;
     }
   }
 

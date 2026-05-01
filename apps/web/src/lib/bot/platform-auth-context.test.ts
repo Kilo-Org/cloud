@@ -69,8 +69,9 @@ describe('withBotPlatformAuthContext', () => {
     });
   });
 
-  it('wraps Slack callbacks with the installation access token', async () => {
+  it('wraps Slack callbacks with the installation bot token', async () => {
     const fn = jest.fn(async () => 'result');
+    mockGetInstallation.mockResolvedValue({ botToken: 'xoxb-stored' });
 
     const result = await withBotPlatformAuthContext(createPlatformIntegration(), fn);
 
@@ -78,20 +79,6 @@ describe('withBotPlatformAuthContext', () => {
     expect(mockBotModule.bot.initialize).toHaveBeenCalledTimes(1);
     expect(mockBotModule.bot.registerSingleton).toHaveBeenCalledTimes(1);
     expect(mockBotModule.bot.getAdapter).toHaveBeenCalledWith(PLATFORM.SLACK);
-    expect(mockWithBotToken).toHaveBeenCalledWith('xoxb-current', expect.any(Function));
-    expect(fn).toHaveBeenCalledTimes(1);
-  });
-
-  it('falls back to the Chat SDK Slack installation token', async () => {
-    const fn = jest.fn(async () => 'result');
-    mockGetInstallation.mockResolvedValue({ botToken: 'xoxb-stored' });
-
-    const result = await withBotPlatformAuthContext(
-      createPlatformIntegration({ metadata: {} }),
-      fn
-    );
-
-    expect(result).toBe('result');
     expect(mockGetInstallation).toHaveBeenCalledWith('T123');
     expect(mockWithBotToken).toHaveBeenCalledWith('xoxb-stored', expect.any(Function));
     expect(fn).toHaveBeenCalledTimes(1);

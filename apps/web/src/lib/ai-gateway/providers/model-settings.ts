@@ -2,7 +2,7 @@ import { isClaudeModel, isOpusModel } from '@/lib/ai-gateway/providers/anthropic
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { qwen36ModelIds } from '@/lib/ai-gateway/providers/qwen';
+import { isAlibabaDirectModel } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import { isGrok4Model, isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
@@ -63,7 +63,12 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
-  if (isKimiModel(model) || isGlmModel(model) || qwen36ModelIds.has(model) || isGemmaModel(model)) {
+  if (
+    isKimiModel(model) ||
+    isGlmModel(model) ||
+    isAlibabaDirectModel(model) ||
+    isGemmaModel(model)
+  ) {
     return REASONING_VARIANTS_BINARY;
   }
   if (model === seed_20_code_free_model.public_id) {
@@ -92,7 +97,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
 }
 
 function getAiSdkProvider(model: string): CustomLlmProvider | undefined {
-  if (qwen36ModelIds.has(model)) {
+  if (isAlibabaDirectModel(model)) {
     // with 'openai' (Responses) prompt caching doesn't work
     // with 'openai-compatible' (Chat Completions) cost is wrong (cache writes are not counted)
     return 'alibaba';

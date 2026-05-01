@@ -192,11 +192,17 @@ export const qwen36_27b_model: KiloExclusiveModel = {
   exclusive_to: [],
 };
 
-export const qwen36_models: ReadonlyArray<KiloExclusiveModel> = [
+export const alibabaDirectModels: ReadonlyArray<KiloExclusiveModel> = [
   qwen36_plus_model,
   qwen36_flash_model,
   qwen36_max_preview_model,
   qwen36_27b_model,
 ];
 
-export const qwen36ModelIds: ReadonlySet<string> = new Set(qwen36_models.map(m => m.public_id));
+const alibabaDirectModelIds: ReadonlySet<string> = new Set(
+  alibabaDirectModels.map(m => m.public_id)
+);
+
+export function isAlibabaDirectModel(model: string): boolean {
+  return alibabaDirectModelIds.has(model);
+}

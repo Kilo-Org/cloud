@@ -198,7 +198,12 @@ export function BulkChangeVersionDialog({
   const overrideRequiresConfirm = overridePins;
   const confirmMatches = !overrideRequiresConfirm || confirmInput === CONFIRM_TOKEN;
   const isPending = bulkChange.isPending || bulkSchedule.isPending;
-  const canApply = targetTag !== '' && confirmMatches && !isPending && result === null;
+  // In schedule mode also require a non-empty datetime — the input has
+  // `required` for browser validation but we still guard here so a
+  // programmatic submit can't fall into `new Date("")` → RangeError.
+  const scheduleDateValid = mode !== 'scheduled' || scheduledAt !== '';
+  const canApply =
+    targetTag !== '' && confirmMatches && scheduleDateValid && !isPending && result === null;
 
   const onApply = () => {
     if (!targetTag) return;
@@ -212,6 +217,7 @@ export function BulkChangeVersionDialog({
     }
     // Scheduled path — convert local datetime-local to UTC ISO.
     const local = new Date(scheduledAt);
+    if (Number.isNaN(local.getTime())) return;
     bulkSchedule.mutate({
       actionType: 'version_change',
       instanceIds: selectedIds,
@@ -295,6 +301,9 @@ export function BulkChangeVersionDialog({
                     value={scheduledAt}
                     onChange={e => setScheduledAt(e.target.value)}
                     disabled={isPending}
+                    // Without `required`, an admin can clear the field
+                    // and submit; new Date("") throws RangeError below.
+                    required
                   />
                 </div>
                 <p className="text-muted-foreground text-xs">

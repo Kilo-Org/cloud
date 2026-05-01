@@ -27,7 +27,7 @@ import {
   type WorkerDb,
 } from '../../db';
 import { kiloclaw_instances, kiloclaw_scheduled_actions } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { doLog, doWarn, toLoggable } from './log';
 import { applyVersionChangeForTarget } from './version-change-apply';
 
@@ -68,12 +68,26 @@ export async function runScheduledActionApply(ctx: ApplyContext): Promise<{ proc
   // Resolve instance id from sandbox id. The DB helper takes an
   // instance id (uuid); the DO tracks sandboxId primarily. Look up
   // kiloclaw_instances by sandbox_id.
+  //
+  // Index hit: when userId is present we filter on (user_id, sandbox_id,
+  // destroyed_at IS NULL) which exactly matches the partial composite
+  // UQ_kiloclaw_instances_active index. Without userId there is no
+  // standalone sandbox_id index, so we fall back to the bare lookup —
+  // that's only legacy DOs without a userId, which shouldn't have
+  // scheduled actions anyway.
   let resolvedInstanceId: string | null = null;
   try {
+    const where = ctx.state.userId
+      ? and(
+          eq(kiloclaw_instances.user_id, ctx.state.userId),
+          eq(kiloclaw_instances.sandbox_id, ctx.state.sandboxId),
+          isNull(kiloclaw_instances.destroyed_at)
+        )
+      : eq(kiloclaw_instances.sandbox_id, ctx.state.sandboxId);
     const [row] = await db
       .select({ id: kiloclaw_instances.id })
       .from(kiloclaw_instances)
-      .where(eq(kiloclaw_instances.sandbox_id, ctx.state.sandboxId))
+      .where(where)
       .limit(1);
     resolvedInstanceId = row?.id ?? null;
   } catch (err) {

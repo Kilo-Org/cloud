@@ -1920,18 +1920,28 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       // other wake or the schedule's existence — the next user-initiated
       // activity on the instance will eventually re-arm.
       const internalClient = new KiloClawInternalClient();
-      await Promise.all(
-        liveInstanceRows.map(async r => {
-          try {
-            await internalClient.wakeScheduledAction(r.owner_id, r.instance.id);
-          } catch (wakeErr) {
-            console.error(
-              `Failed to wake DO after scheduleAction (instance=${r.instance.id}):`,
-              wakeErr
-            );
-          }
-        })
-      );
+      // Batched concurrency. With the 500-instance cap, a flat
+      // Promise.all could open 500 outbound sockets simultaneously
+      // against the CF Worker. Keep the burst bounded so we don't
+      // exhaust Node's pool or hold 500 futures open under a slow
+      // worker. Best-effort + per-batch try/catch — a failure on one
+      // wake doesn't block any other.
+      const wakeConcurrency = 20;
+      for (let i = 0; i < liveInstanceRows.length; i += wakeConcurrency) {
+        const batch = liveInstanceRows.slice(i, i + wakeConcurrency);
+        await Promise.all(
+          batch.map(async r => {
+            try {
+              await internalClient.wakeScheduledAction(r.owner_id, r.instance.id);
+            } catch (wakeErr) {
+              console.error(
+                `Failed to wake DO after scheduleAction (instance=${r.instance.id}):`,
+                wakeErr
+              );
+            }
+          })
+        );
+      }
 
       return { id: result.id, stageId: result.stageId };
     }),
@@ -2180,11 +2190,11 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
    * action keeps running for the other targets).
    *
    * Atomic CAS on (scheduled_action_id, instance_id, status='pending').
-   * Bumps the parent + stage skipped counters. Does NOT promote the
-   * parent to 'completed' even if this cancellation makes the pending
-   * count zero — the next DO alarm pass calls
-   * maybePromoteScheduledActionsToCompleted, so a single tick of drift
-   * is acceptable to keep this path lightweight.
+   * Bumps the parent + stage skipped counters and runs the same
+   * promotion sweep as the DO alarm path so that an action whose
+   * targets are *all* individually cancelled here doesn't stay in
+   * 'scheduled' forever (the alarm-path sweep only fires when due
+   * rows are processed).
    */
   cancelScheduledActionTarget: adminProcedure
     .input(
@@ -2235,6 +2245,43 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             skipped_count: sql`${kiloclaw_scheduled_actions.skipped_count} + 1`,
           })
           .where(eq(kiloclaw_scheduled_actions.id, input.scheduledActionId));
+
+        // Promote stage + parent if no pending targets remain. Without
+        // this, an action whose targets are all individually cancelled
+        // via this path stays in 'scheduled' forever — the DO alarm
+        // path's findDueScheduledActionTargetsForInstance returns 0
+        // rows so its post-pass promotion sweep never runs. Mirrors
+        // services/kiloclaw/src/db/index.ts maybePromoteScheduledActionsToCompleted
+        // (kept inline rather than imported because that helper takes
+        // a WorkerDb, not a tx).
+        await tx.execute(sql`
+          UPDATE kiloclaw_scheduled_action_stages s
+          SET status = CASE
+                WHEN s.applied_count > 0 OR s.skipped_count > 0 THEN 'completed'
+                ELSE 'failed'
+              END,
+              completed_at = COALESCE(s.completed_at, now())
+          WHERE s.scheduled_action_id = ${input.scheduledActionId}
+            AND s.status IN ('pending', 'running')
+            AND NOT EXISTS (
+              SELECT 1 FROM kiloclaw_scheduled_action_targets t
+              WHERE t.stage_id = s.id AND t.status = 'pending'
+            )
+        `);
+        await tx.execute(sql`
+          UPDATE kiloclaw_scheduled_actions a
+          SET status = CASE
+                WHEN a.applied_count > 0 OR a.skipped_count > 0 THEN 'completed'
+                ELSE 'failed'
+              END,
+              completed_at = COALESCE(a.completed_at, now())
+          WHERE a.id = ${input.scheduledActionId}
+            AND a.status IN ('scheduled', 'running')
+            AND NOT EXISTS (
+              SELECT 1 FROM kiloclaw_scheduled_action_targets t
+              WHERE t.scheduled_action_id = a.id AND t.status = 'pending'
+            )
+        `);
 
         return { cancelled: true as const };
       });

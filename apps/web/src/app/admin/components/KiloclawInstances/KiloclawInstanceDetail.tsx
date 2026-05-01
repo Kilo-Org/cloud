@@ -3519,6 +3519,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     value={changeVersionScheduledAt}
                     onChange={e => setChangeVersionScheduledAt(e.target.value)}
                     disabled={isSchedulingVersionChange}
+                    // Without `required`, an admin can clear the field
+                    // and submit; new Date("") below throws RangeError.
+                    required
                   />
                   <p className="text-muted-foreground text-xs">
                     Fires on the next instance reconcile alarm tick after this time (cadence ~5
@@ -3608,8 +3611,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   }
                   // Scheduled path. The datetime-local input is in the
                   // admin's local zone; convert to UTC ISO for the
-                  // backend.
+                  // backend. Belt-and-suspenders parse-validity check
+                  // even though the input has `required` — programmatic
+                  // submits can bypass browser validation.
                   const local = new Date(changeVersionScheduledAt);
+                  if (Number.isNaN(local.getTime())) return;
                   void scheduleVersionChange({
                     actionType: 'version_change',
                     instanceIds: [data.id],
@@ -3622,6 +3628,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   !changeVersionSelectedTag ||
                   isChangingVersion ||
                   isSchedulingVersionChange ||
+                  // Block submit when scheduled mode has no datetime.
+                  (changeVersionMode === 'scheduled' && !changeVersionScheduledAt) ||
                   // Block scheduling when a pending action already
                   // exists. Apply Now stays enabled — that path is
                   // immediate and orthogonal to the schedule conflict.

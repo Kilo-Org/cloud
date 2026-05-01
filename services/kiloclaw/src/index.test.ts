@@ -94,6 +94,8 @@ describe('platform route env validation', () => {
         HYPERDRIVE: { connectionString: 'postgresql://fake' },
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
       } as never,
       { waitUntil: vi.fn() } as never
@@ -123,6 +125,8 @@ describe('platform route env validation', () => {
         KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
         HYPERDRIVE: { connectionString: 'postgresql://fake' },
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
       } as never,
       { waitUntil: vi.fn() } as never
@@ -153,6 +157,8 @@ describe('controller google env validation', () => {
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
       } as never,
       { waitUntil: vi.fn() } as never
     );
@@ -174,6 +180,8 @@ describe('controller google env validation', () => {
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         GOOGLE_WORKSPACE_OAUTH_CLIENT_ID: 'client-id',
         GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET: 'client-secret',
         GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY: 'refresh-key',
@@ -216,6 +224,8 @@ describe('proxy recovering state', () => {
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
         FLY_APP_NAME: 'test-app',
         KILOCLAW_REGISTRY: {
@@ -267,6 +277,8 @@ describe('kilo-chat webhook delivery', () => {
       {
         KILOCLAW_INSTANCE: instanceNamespace,
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
       } as never,
       {} as never
     );
@@ -354,6 +366,8 @@ describe('proxy routing target usage', () => {
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
         FLY_APP_NAME: 'test-app',
         KILOCLAW_REGISTRY: {
@@ -407,6 +421,8 @@ describe('proxy routing target usage', () => {
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
         FLY_APP_NAME: 'test-app',
         KILOCLAW_INSTANCE: {
@@ -448,6 +464,8 @@ describe('proxy routing target usage', () => {
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         KILOCLAW_INSTANCE: {
           idFromName: vi.fn().mockReturnValue('instance-id'),
           get: vi.fn().mockReturnValue(instanceStub),
@@ -499,6 +517,8 @@ describe('proxy routing target usage', () => {
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
         FLY_APP_NAME: 'test-app',
         KILOCLAW_REGISTRY: {
@@ -563,6 +583,8 @@ describe('proxy routing target usage', () => {
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
         FLY_APP_NAME: 'test-app',
         KILOCLAW_REGISTRY: {
@@ -600,10 +622,10 @@ describe('host-based routing', () => {
   const baseEnv = () => ({
     NEXTAUTH_SECRET: 'nextauth-secret',
     GATEWAY_TOKEN_SECRET: 'gateway-secret',
-    FLY_API_TOKEN: 'fly-token',
-    FLY_APP_NAME: 'test-app',
     KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
     KILOCLAW_INSTANCE_URL_SCHEME: 'https',
+    FLY_API_TOKEN: 'fly-token',
+    FLY_APP_NAME: 'test-app',
   });
 
   it('routes an instance-keyed host to the owning DO and proxies through', async () => {

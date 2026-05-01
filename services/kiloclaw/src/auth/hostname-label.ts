@@ -34,15 +34,30 @@ export type HostSuffixEnv = {
   KILOCLAW_INSTANCE_URL_SCHEME?: string;
 };
 
-const DEFAULT_HOST_SUFFIX = '.kiloclaw.ai';
-const DEFAULT_URL_SCHEME = 'https';
+/**
+ * No silent fallback: a misconfigured worker should fail loudly rather than
+ * inject `.kiloclaw.ai` / `https` into machine origins that were supposed to
+ * use a preview-specific or dev suffix. The canonical production values live
+ * in `services/kiloclaw/wrangler.jsonc` under `vars`, so this only throws
+ * when the var was explicitly cleared (unit test fixtures, malformed
+ * preview config, etc.). `validateRequiredEnv` on the catch-all middleware
+ * chain rejects requests with a 503 before this path is reached in a
+ * normal request flow.
+ */
+function requireEnv(env: HostSuffixEnv, key: keyof HostSuffixEnv): string {
+  const value = env[key];
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`${key} is not set; refuse to fall back to a default host suffix/scheme`);
+  }
+  return value;
+}
 
 function hostSuffix(env: HostSuffixEnv): string {
-  return env.KILOCLAW_INSTANCE_HOST_SUFFIX ?? DEFAULT_HOST_SUFFIX;
+  return requireEnv(env, 'KILOCLAW_INSTANCE_HOST_SUFFIX');
 }
 
 function urlScheme(env: HostSuffixEnv): string {
-  return env.KILOCLAW_INSTANCE_URL_SCHEME ?? DEFAULT_URL_SCHEME;
+  return requireEnv(env, 'KILOCLAW_INSTANCE_URL_SCHEME');
 }
 
 const BASE32_HEX_ALPHABET = '0123456789abcdefghijklmnopqrstuv';

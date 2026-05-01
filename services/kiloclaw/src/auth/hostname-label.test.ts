@@ -125,12 +125,32 @@ describe('sandboxIdFromHostnameLabel', () => {
   });
 });
 
+const PROD_ENV = {
+  KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+  KILOCLAW_INSTANCE_URL_SCHEME: 'https',
+};
+
 describe('instanceUrl', () => {
-  it('uses the default suffix and scheme when env is empty', () => {
-    expect(instanceUrl('i-abc123', {})).toBe('https://i-abc123.kiloclaw.ai');
+  it('throws when the suffix/scheme env vars are missing (no silent fallback)', () => {
+    // Scheme is evaluated before suffix in the template literal, so an empty
+    // env surfaces the scheme error first.
+    expect(() => instanceUrl('i-abc123', {})).toThrow(/KILOCLAW_INSTANCE_URL_SCHEME/);
+    expect(() => instanceUrl('i-abc123', { KILOCLAW_INSTANCE_URL_SCHEME: 'https' })).toThrow(
+      /KILOCLAW_INSTANCE_HOST_SUFFIX/
+    );
+    expect(() =>
+      instanceUrl('i-abc123', { KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai' })
+    ).toThrow(/KILOCLAW_INSTANCE_URL_SCHEME/);
+    expect(() =>
+      instanceUrl('i-abc123', {
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '',
+        KILOCLAW_INSTANCE_URL_SCHEME: '',
+      })
+    ).toThrow(/KILOCLAW_INSTANCE_URL_SCHEME/);
   });
 
-  it('honours an explicit suffix and scheme', () => {
+  it('composes URL from explicit suffix and scheme', () => {
+    expect(instanceUrl('i-abc123', PROD_ENV)).toBe('https://i-abc123.kiloclaw.ai');
     expect(
       instanceUrl('i-abc123', {
         KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.localhost:8795',
@@ -143,37 +163,43 @@ describe('instanceUrl', () => {
     const sandboxId = sandboxIdFromInstanceId('550e8400-e29b-41d4-a716-446655440000');
     const label = hostnameLabelFromSandboxId(sandboxId);
     expect(label).not.toBeNull();
-    expect(instanceUrl(label ?? '', {})).toBe(
+    expect(instanceUrl(label ?? '', PROD_ENV)).toBe(
       'https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai'
     );
   });
 });
 
 describe('parseInstanceHost', () => {
+  it('throws when the suffix env var is missing (no silent fallback)', () => {
+    expect(() => parseInstanceHost('i-abc.kiloclaw.ai', {})).toThrow(
+      /KILOCLAW_INSTANCE_HOST_SUFFIX/
+    );
+  });
+
   it('returns the label for a matching host', () => {
-    expect(parseInstanceHost('i-abc123.kiloclaw.ai', {})).toBe('i-abc123');
-    expect(parseInstanceHost('u-deadbeef.kiloclaw.ai', {})).toBe('u-deadbeef');
+    expect(parseInstanceHost('i-abc123.kiloclaw.ai', PROD_ENV)).toBe('i-abc123');
+    expect(parseInstanceHost('u-deadbeef.kiloclaw.ai', PROD_ENV)).toBe('u-deadbeef');
   });
 
   it('is case-insensitive and lowercases the returned label', () => {
-    expect(parseInstanceHost('I-ABC123.KILOCLAW.AI', {})).toBe('i-abc123');
-    expect(parseInstanceHost('I-ABC123.KiloClaw.Ai', {})).toBe('i-abc123');
+    expect(parseInstanceHost('I-ABC123.KILOCLAW.AI', PROD_ENV)).toBe('i-abc123');
+    expect(parseInstanceHost('I-ABC123.KiloClaw.Ai', PROD_ENV)).toBe('i-abc123');
   });
 
   it('returns null when the host does not end with the suffix', () => {
-    expect(parseInstanceHost('claw.kilosessions.ai', {})).toBeNull();
-    expect(parseInstanceHost('localhost:8795', {})).toBeNull();
-    expect(parseInstanceHost('marketing.kiloclaw.com', {})).toBeNull();
+    expect(parseInstanceHost('claw.kilosessions.ai', PROD_ENV)).toBeNull();
+    expect(parseInstanceHost('localhost:8795', PROD_ENV)).toBeNull();
+    expect(parseInstanceHost('marketing.kiloclaw.com', PROD_ENV)).toBeNull();
   });
 
   it('rejects bare suffix with no label', () => {
-    expect(parseInstanceHost('.kiloclaw.ai', {})).toBeNull();
-    expect(parseInstanceHost('kiloclaw.ai', {})).toBeNull();
+    expect(parseInstanceHost('.kiloclaw.ai', PROD_ENV)).toBeNull();
+    expect(parseInstanceHost('kiloclaw.ai', PROD_ENV)).toBeNull();
   });
 
   it('rejects multi-label subdomains', () => {
-    expect(parseInstanceHost('foo.bar.kiloclaw.ai', {})).toBeNull();
-    expect(parseInstanceHost('a.b.c.kiloclaw.ai', {})).toBeNull();
+    expect(parseInstanceHost('foo.bar.kiloclaw.ai', PROD_ENV)).toBeNull();
+    expect(parseInstanceHost('a.b.c.kiloclaw.ai', PROD_ENV)).toBeNull();
   });
 
   it('works with a dev suffix including a port', () => {

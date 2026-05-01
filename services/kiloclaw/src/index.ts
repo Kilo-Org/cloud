@@ -130,6 +130,11 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   const missing: string[] = [];
   if (!env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
   if (!env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
+  // Per-instance virtual-hosting config. Canonical values live in
+  // wrangler.jsonc `vars`; when unset (e.g. a misconfigured preview),
+  // reject requests rather than silently fall back to prod defaults.
+  if (!env.KILOCLAW_INSTANCE_HOST_SUFFIX) missing.push('KILOCLAW_INSTANCE_HOST_SUFFIX');
+  if (!env.KILOCLAW_INSTANCE_URL_SCHEME) missing.push('KILOCLAW_INSTANCE_URL_SCHEME');
   return missing;
 }
 

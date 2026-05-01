@@ -248,9 +248,23 @@ export async function buildEnvVars(
   }
   const perInstanceLabel = hostnameLabelFromSandboxId(sandboxId);
   if (perInstanceLabel) {
-    const perInstanceOrigin = instanceUrl(perInstanceLabel, env);
-    if (!originEntries.includes(perInstanceOrigin)) {
-      originEntries.push(perInstanceOrigin);
+    // buildEnvVars runs at machine provision/start time, which is outside
+    // the normal request-middleware chain, so validateRequiredEnv has not
+    // run. Guard explicitly: if the suffix/scheme aren't configured, log
+    // and skip per-instance origin injection rather than aborting the
+    // machine boot. The catch-all proxy refuses requests when the vars
+    // are missing anyway, so the skipped origin wouldn't have been
+    // reachable.
+    try {
+      const perInstanceOrigin = instanceUrl(perInstanceLabel, env);
+      if (!originEntries.includes(perInstanceOrigin)) {
+        originEntries.push(perInstanceOrigin);
+      }
+    } catch (err) {
+      console.warn(
+        '[buildEnvVars] Skipping per-instance origin injection — host config missing:',
+        err instanceof Error ? err.message : err
+      );
     }
   }
   if (originEntries.length > 0) {

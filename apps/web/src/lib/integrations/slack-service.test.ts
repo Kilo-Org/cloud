@@ -39,6 +39,7 @@ jest.mock('@slack/web-api', () => ({
 import type { Owner } from '@/lib/integrations/core/types';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import {
+  deleteInstallationByTeamId,
   getMissingSlackScopes,
   SLACK_SCOPES,
   testConnection,
@@ -134,6 +135,43 @@ describe('slack-service uninstallApp', () => {
 
     expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T456');
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('slack-service deleteInstallationByTeamId', () => {
+  beforeEach(() => {
+    mockLimit.mockReset();
+    mockDeleteWhere.mockReset();
+    mockDeleteWhere.mockResolvedValue(undefined);
+  });
+
+  it('deletes the platform integration and Chat SDK state for a Slack team', async () => {
+    mockLimit.mockResolvedValue([buildSlackIntegration()]);
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+    const deleteChatSdkIdentityCache = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await expect(
+      deleteInstallationByTeamId('T123', {
+        deleteChatSdkInstallation,
+        deleteChatSdkIdentityCache,
+      })
+    ).resolves.toEqual({ success: true, deleted: true });
+
+    expect(deleteChatSdkInstallation).toHaveBeenCalledWith('T123');
+    expect(deleteChatSdkIdentityCache).toHaveBeenCalledWith('T123');
+    expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('succeeds without deleting anything when the Slack team is already unknown', async () => {
+    mockLimit.mockResolvedValue([]);
+    const deleteChatSdkInstallation = jest.fn(async (_teamId: string): Promise<void> => {});
+
+    await expect(
+      deleteInstallationByTeamId('T123', { deleteChatSdkInstallation })
+    ).resolves.toEqual({ success: true, deleted: false });
+
+    expect(deleteChatSdkInstallation).not.toHaveBeenCalled();
+    expect(mockDeleteWhere).not.toHaveBeenCalled();
   });
 });
 

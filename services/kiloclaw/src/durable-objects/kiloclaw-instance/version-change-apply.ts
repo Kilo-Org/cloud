@@ -71,6 +71,7 @@ export async function applyVersionChangeForTarget(args: {
   // their pin between our SELECT and the DELETE — record skipped so
   // the admin can reschedule with fresh information rather than
   // silently overriding the user's new write.
+  let pinWasDeleted = false;
   if (pin && target.override_pins) {
     const result = await deleteVersionPinWithCAS(db, {
       instance_id: pin.instance_id,
@@ -83,6 +84,7 @@ export async function applyVersionChangeForTarget(args: {
       });
       return { kind: 'skipped', reason: 'pin_changed_in_flight' };
     }
+    pinWasDeleted = true;
     doLog(state, 'version_change apply: pin overridden', {
       instanceId: target.instance_id,
       previousPinTag: pin.image_tag,
@@ -91,8 +93,20 @@ export async function applyVersionChangeForTarget(args: {
 
   // 3. Trigger the worker restart on the target tag. The DO's
   // restartMachine entry point flips status to 'restarting' and
-  // dispatches the actual redeploy via waitUntil.
-  await restartCurrentInstance(target.target_image_tag);
+  // dispatches the actual redeploy via waitUntil. If we already
+  // deleted the pin and the restart fails, surface that in the
+  // error message — otherwise the failed-target row will look like
+  // a clean retry candidate when in fact the pin has already been
+  // consumed and a retry would silently take effect with no override
+  // confirmation.
+  try {
+    await restartCurrentInstance(target.target_image_tag);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `restart failed${pinWasDeleted ? ' (pin was already removed during this apply)' : ''}: ${detail}`
+    );
+  }
 
   return { kind: 'applied' };
 }

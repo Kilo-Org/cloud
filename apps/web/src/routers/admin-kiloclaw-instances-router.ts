@@ -1743,11 +1743,58 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           message: `Instance not found: ${missing.join(', ')}`,
         });
       }
-      const destroyed = instanceRows.filter(r => r.instance.destroyed_at);
-      if (destroyed.length > 0) {
+
+      // Silently drop destroyed instances. Mirrors bulkChangeVersion's
+      // partition shape (destroyed surfaces as `skipped:destroyed` in
+      // its result), but for the schedule path we just filter — there's
+      // no apply-time partition until the action fires. The bulk dialog
+      // already shows the destroyed count in its summary panel so the
+      // admin sees what's being filtered. If every instance is destroyed
+      // we have nothing to schedule; reject with a clear message.
+      const liveInstanceRows = instanceRows.filter(r => !r.instance.destroyed_at);
+      if (liveInstanceRows.length === 0) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Cannot schedule action on destroyed instance(s): ${destroyed.map(r => r.instance.id).join(', ')}`,
+          message: 'All target instances are destroyed; nothing to schedule',
+        });
+      }
+      const liveInstanceIds = liveInstanceRows.map(r => r.instance.id);
+      const liveResolvedById = new Map(liveInstanceRows.map(r => [r.instance.id, r]));
+
+      // Reject if any of the live instances already has a pending
+      // scheduled action. We don't support 1+N concurrent schedules per
+      // instance — the admin should cancel the existing one first if
+      // they want to reschedule. This is enforced here rather than via
+      // a unique partial index because multi-stage rollouts (post-PR-4)
+      // will legitimately have multiple targets per instance under the
+      // same parent action; a partial index keyed only on
+      // (instance_id, status='pending') would block that case too.
+      const existingPending = await db
+        .select({
+          instance_id: kiloclaw_scheduled_action_targets.instance_id,
+          scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
+        })
+        .from(kiloclaw_scheduled_action_targets)
+        .innerJoin(
+          kiloclaw_scheduled_actions,
+          eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
+        )
+        .where(
+          and(
+            inArray(kiloclaw_scheduled_action_targets.instance_id, liveInstanceIds),
+            eq(kiloclaw_scheduled_action_targets.status, 'pending'),
+            inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+          )
+        );
+
+      if (existingPending.length > 0) {
+        const conflictIds = Array.from(new Set(existingPending.map(e => e.instance_id)));
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            conflictIds.length === 1
+              ? `Instance ${conflictIds[0]} already has a pending scheduled action; cancel it first`
+              : `${conflictIds.length} instances already have pending scheduled actions; cancel those first: ${conflictIds.join(', ')}`,
         });
       }
 
@@ -1770,7 +1817,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             reason: input.reason ?? null,
             status: 'scheduled',
             created_by: ctx.user.id,
-            total_count: uniqueInstanceIds.length,
+            total_count: liveInstanceIds.length,
           })
           .returning({ id: kiloclaw_scheduled_actions.id });
 
@@ -1785,10 +1832,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           .returning({ id: kiloclaw_scheduled_action_stages.id });
 
         await tx.insert(kiloclaw_scheduled_action_targets).values(
-          uniqueInstanceIds.map(id => {
-            const row = resolvedById.get(id);
-            // resolvedById is built from instanceRows (all uniqueInstanceIds
-            // resolve after the missing check above), so this is non-null.
+          liveInstanceIds.map(id => {
+            const row = liveResolvedById.get(id);
+            // liveResolvedById is built from liveInstanceRows (filtered
+            // above), so every id resolves.
             if (!row) throw new Error(`unresolved instance ${id}`);
             return {
               scheduled_action_id: parentRow.id,
@@ -1817,9 +1864,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             ? `version_change → ${input.imageTag}${input.overridePins ? ' (override_pins=true)' : ''}`
             : 'scheduled_restart';
         const countLabel =
-          uniqueInstanceIds.length === 1
-            ? `instance ${uniqueInstanceIds[0]}`
-            : `${uniqueInstanceIds.length} instances`;
+          liveInstanceIds.length === 1
+            ? `instance ${liveInstanceIds[0]}`
+            : `${liveInstanceIds.length} instances`;
+        // Surface the silent-filter in metadata so an audit reader can
+        // see what was dropped.
+        const filteredDestroyed = uniqueInstanceIds.filter(id => !liveResolvedById.has(id));
         await createKiloClawAdminAuditLog({
           action: 'kiloclaw.scheduled_action.created',
           actor_id: ctx.user.id,
@@ -1829,21 +1879,30 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           // for bulk fall back to the actor (sentinel — real owners are
           // in metadata.instanceIds).
           target_user_id:
-            uniqueInstanceIds.length === 1
-              ? (resolvedById.get(uniqueInstanceIds[0])?.owner_id ?? ctx.user.id)
+            liveInstanceIds.length === 1
+              ? (liveResolvedById.get(liveInstanceIds[0])?.owner_id ?? ctx.user.id)
               : ctx.user.id,
           message: `Scheduled ${messageDetail} for ${countLabel} at ${input.scheduledAt}`,
           metadata: {
             scheduledActionId: result.id,
             actionType: input.actionType,
-            instanceIds: uniqueInstanceIds,
+            instanceIds: liveInstanceIds,
+            ...(filteredDestroyed.length > 0
+              ? { filteredDestroyedInstanceIds: filteredDestroyed }
+              : {}),
             scheduledAt: input.scheduledAt,
             reason: input.reason ?? null,
-            // Action-type-specific metadata
+            // Action-type-specific metadata. For version_change we also
+            // capture each instance's tracked tag at schedule time so
+            // the audit trail records the from→to per instance, even if
+            // the targets table is later mutated or hard-deleted.
             ...(input.actionType === 'version_change'
               ? {
                   imageTag: input.imageTag,
                   overridePins: input.overridePins,
+                  instanceSourceTags: Object.fromEntries(
+                    liveInstanceRows.map(r => [r.instance.id, r.instance.tracked_image_tag ?? null])
+                  ),
                 }
               : {}),
           },
@@ -1862,7 +1921,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       // activity on the instance will eventually re-arm.
       const internalClient = new KiloClawInternalClient();
       await Promise.all(
-        instanceRows.map(async r => {
+        liveInstanceRows.map(async r => {
           try {
             await internalClient.wakeScheduledAction(r.owner_id, r.instance.id);
           } catch (wakeErr) {
@@ -2011,6 +2070,10 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         .where(eq(kiloclaw_scheduled_action_stages.scheduled_action_id, input.id))
         .orderBy(asc(kiloclaw_scheduled_action_stages.stage_index));
 
+      // Target fetch is intentionally unpaginated: scheduleAction caps
+      // instanceIds at 500, so the worst-case response here is 500 rows
+      // joined to kilocode_users and kiloclaw_instances. If that cap is
+      // ever raised significantly, paginate here.
       const targets = await db
         .select({
           target: kiloclaw_scheduled_action_targets,
@@ -2034,6 +2097,169 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           instance_sandbox_id: t.instance_sandbox_id,
         })),
       };
+    }),
+
+  /**
+   * Pending scheduled actions for a single instance. Powers the
+   * "upcoming scheduled action" indicator on the instance detail page.
+   * Returns the per-target row joined to its parent action and stage,
+   * filtered to pending targets whose parent is still actionable.
+   * Ordered by scheduled_at ascending so the soonest is first.
+   */
+  listUpcomingScheduledActionsForInstance: adminProcedure
+    .input(z.object({ instanceId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      // Two aliased joins on kiloclaw_image_catalog so the response
+      // can include openclaw_version for both source and target tags
+      // — drives the "source (OpenClaw vX) → target (OpenClaw vY)"
+      // display. Left joins because the catalog row could be missing
+      // (deleted) for an old source tag.
+      const sourceCatalog = alias(kiloclaw_image_catalog, 'source_catalog');
+      const targetCatalog = alias(kiloclaw_image_catalog, 'target_catalog');
+
+      const rows = await db
+        .select({
+          target: kiloclaw_scheduled_action_targets,
+          action: kiloclaw_scheduled_actions,
+          stage: kiloclaw_scheduled_action_stages,
+          source_openclaw_version: sourceCatalog.openclaw_version,
+          target_openclaw_version: targetCatalog.openclaw_version,
+        })
+        .from(kiloclaw_scheduled_action_targets)
+        .innerJoin(
+          kiloclaw_scheduled_actions,
+          eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
+        )
+        .leftJoin(
+          kiloclaw_scheduled_action_stages,
+          eq(kiloclaw_scheduled_action_stages.id, kiloclaw_scheduled_action_targets.stage_id)
+        )
+        .leftJoin(
+          sourceCatalog,
+          eq(sourceCatalog.image_tag, kiloclaw_scheduled_action_targets.source_image_tag)
+        )
+        .leftJoin(
+          targetCatalog,
+          eq(targetCatalog.image_tag, kiloclaw_scheduled_action_targets.target_image_tag)
+        )
+        .where(
+          and(
+            eq(kiloclaw_scheduled_action_targets.instance_id, input.instanceId),
+            eq(kiloclaw_scheduled_action_targets.status, 'pending'),
+            inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+          )
+        )
+        .orderBy(asc(kiloclaw_scheduled_action_stages.scheduled_at));
+
+      // Per-action total target count so the UI can distinguish single
+      // vs bulk and offer "cancel only this instance" vs "cancel entire
+      // batch". Pulled from the parent's stamped total_count rather than
+      // a fresh COUNT(*) — admin-cancel-target paths decrement it as
+      // they go (TBD), but for now total_count is the at-schedule-time
+      // size, which is what the UX needs.
+      return {
+        items: rows.map(r => ({
+          scheduled_action_id: r.action.id,
+          action_type: r.action.action_type,
+          target_image_tag: r.target.target_image_tag ?? r.action.target_image_tag,
+          target_openclaw_version: r.target_openclaw_version,
+          source_image_tag: r.target.source_image_tag,
+          source_openclaw_version: r.source_openclaw_version,
+          override_pins: r.action.override_pins,
+          scheduled_at: r.stage?.scheduled_at ?? null,
+          parent_status: r.action.status,
+          target_count: r.action.total_count,
+        })),
+      };
+    }),
+
+  /**
+   * Cancel a single target row inside a scheduled action. Used by the
+   * per-instance "Upcoming scheduled action" indicator when the admin
+   * wants to drop just one instance from a bulk schedule (the parent
+   * action keeps running for the other targets).
+   *
+   * Atomic CAS on (scheduled_action_id, instance_id, status='pending').
+   * Bumps the parent + stage skipped counters. Does NOT promote the
+   * parent to 'completed' even if this cancellation makes the pending
+   * count zero — the next DO alarm pass calls
+   * maybePromoteScheduledActionsToCompleted, so a single tick of drift
+   * is acceptable to keep this path lightweight.
+   */
+  cancelScheduledActionTarget: adminProcedure
+    .input(
+      z.object({
+        scheduledActionId: z.string().uuid(),
+        instanceId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await db.transaction(async tx => {
+        const [updated] = await tx
+          .update(kiloclaw_scheduled_action_targets)
+          .set({
+            status: 'skipped',
+            skip_reason: 'cancelled',
+          })
+          .where(
+            and(
+              eq(kiloclaw_scheduled_action_targets.scheduled_action_id, input.scheduledActionId),
+              eq(kiloclaw_scheduled_action_targets.instance_id, input.instanceId),
+              eq(kiloclaw_scheduled_action_targets.status, 'pending')
+            )
+          )
+          .returning({
+            id: kiloclaw_scheduled_action_targets.id,
+            stage_id: kiloclaw_scheduled_action_targets.stage_id,
+          });
+
+        if (!updated) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'No pending scheduled-action target for this (action, instance)',
+          });
+        }
+
+        if (updated.stage_id) {
+          await tx
+            .update(kiloclaw_scheduled_action_stages)
+            .set({
+              skipped_count: sql`${kiloclaw_scheduled_action_stages.skipped_count} + 1`,
+            })
+            .where(eq(kiloclaw_scheduled_action_stages.id, updated.stage_id));
+        }
+
+        await tx
+          .update(kiloclaw_scheduled_actions)
+          .set({
+            skipped_count: sql`${kiloclaw_scheduled_actions.skipped_count} + 1`,
+          })
+          .where(eq(kiloclaw_scheduled_actions.id, input.scheduledActionId));
+
+        return { cancelled: true as const };
+      });
+
+      // Audit. Reuses the existing 'cancelled' action with metadata
+      // indicating per-target scope.
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.scheduled_action.cancelled',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: ctx.user.id,
+          message: `Cancelled scheduled action ${input.scheduledActionId} for instance ${input.instanceId} only`,
+          metadata: {
+            scope: 'target',
+            scheduledActionId: input.scheduledActionId,
+            instanceId: input.instanceId,
+          },
+        });
+      } catch (auditErr) {
+        console.error('Failed to write audit log for cancelScheduledActionTarget:', auditErr);
+      }
+
+      return result;
     }),
 
   /**

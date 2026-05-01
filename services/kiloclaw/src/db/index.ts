@@ -403,7 +403,13 @@ export async function recordScheduledActionTargetOutcome(
 ): Promise<void> {
   const now = sql`now()`;
 
-  await db
+  // Use RETURNING so we can short-circuit the counter increments when
+  // the CAS UPDATE was a no-op. Cloudflare's DO model lets a subsequent
+  // alarm() reach the handler while a previous waitUntil pass is still
+  // outstanding; both passes can call this with the same pending target,
+  // only one wins the CAS, but without this guard both would still
+  // increment the stage/parent counters and double-count.
+  const updated = await db
     .update(kiloclaw_scheduled_action_targets)
     .set({
       status: args.outcome,
@@ -416,7 +422,13 @@ export async function recordScheduledActionTargetOutcome(
         eq(kiloclaw_scheduled_action_targets.id, args.target_id),
         eq(kiloclaw_scheduled_action_targets.status, 'pending')
       )
-    );
+    )
+    .returning({ id: kiloclaw_scheduled_action_targets.id });
+
+  if (updated.length === 0) {
+    // Another pass already claimed this target. Don't bump counters.
+    return;
+  }
 
   const counterField =
     args.outcome === 'applied'
@@ -465,10 +477,16 @@ export async function maybePromoteScheduledActionsToCompleted(
     sql`, `
   );
 
-  // Stages: complete any stage whose pending target count is 0.
+  // Promotion rule: when no targets remain pending, transition to
+  // 'completed' if anything was applied or skipped, otherwise 'failed'.
+  // This prevents an action where every target hit a dispatch error
+  // from rendering as a green "completed" badge.
   await db.execute(sql`
     UPDATE kiloclaw_scheduled_action_stages s
-    SET status = 'completed',
+    SET status = CASE
+          WHEN s.applied_count > 0 OR s.skipped_count > 0 THEN 'completed'
+          ELSE 'failed'
+        END,
         completed_at = COALESCE(s.completed_at, now())
     WHERE s.scheduled_action_id IN (${idList})
       AND s.status IN ('pending', 'running')
@@ -478,10 +496,12 @@ export async function maybePromoteScheduledActionsToCompleted(
       )
   `);
 
-  // Parents: complete any parent whose pending target count is 0.
   await db.execute(sql`
     UPDATE kiloclaw_scheduled_actions a
-    SET status = 'completed',
+    SET status = CASE
+          WHEN a.applied_count > 0 OR a.skipped_count > 0 THEN 'completed'
+          ELSE 'failed'
+        END,
         completed_at = COALESCE(a.completed_at, now())
     WHERE a.id IN (${idList})
       AND a.status IN ('scheduled', 'running')

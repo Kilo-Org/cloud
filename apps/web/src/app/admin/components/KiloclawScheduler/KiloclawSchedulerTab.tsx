@@ -236,6 +236,11 @@ export function KiloclawSchedulerTab() {
             the scheduled time. Cadence is roughly 5 minutes for running instances (longer for
             hibernated). Treat the chosen time as a "no earlier than" bound, not an exact fire time.
           </div>
+          <div className="mt-2">
+            <strong>Notifications:</strong> not implemented yet. End users get no warning before
+            their session is interrupted at the scheduled time. Use cautiously on customer instances
+            until the notifications work lands.
+          </div>
         </AlertDescription>
       </Alert>
 
@@ -630,6 +635,7 @@ export function KiloclawSchedulerTab() {
                     <TableRow>
                       <TableHead>Instance</TableHead>
                       <TableHead>User</TableHead>
+                      <TableHead>From → To</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Detail</TableHead>
                     </TableRow>
@@ -646,6 +652,22 @@ export function KiloclawSchedulerTab() {
                         </TableCell>
                         <TableCell className="text-xs">
                           <span className="text-muted-foreground">{t.user_email ?? t.user_id}</span>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {t.target_image_tag ? (
+                            <span>
+                              <span className="text-muted-foreground">
+                                {t.source_image_tag ?? '—'}
+                              </span>
+                              <span className="text-muted-foreground mx-1">→</span>
+                              <span>{t.target_image_tag}</span>
+                            </span>
+                          ) : (
+                            // scheduled_restart targets have no target tag.
+                            <span className="text-muted-foreground">
+                              {t.source_image_tag ?? '—'}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusBadgeClass[t.status] ?? ''}>

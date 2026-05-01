@@ -63,6 +63,7 @@ import {
   ShieldAlert,
   Activity,
   Copy,
+  CalendarClock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -1308,6 +1309,17 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     })
   );
 
+  // Pending scheduled actions targeting this instance. Powers the
+  // upcoming-action indicator inside the Runtime Controls card. The
+  // mutation hooks below also invalidate this on success so a freshly
+  // scheduled or cancelled action surfaces immediately.
+  const { data: upcomingScheduledActionsData } = useQuery(
+    trpc.admin.kiloclawInstances.listUpcomingScheduledActionsForInstance.queryOptions({
+      instanceId,
+    })
+  );
+  const upcomingScheduledActions = upcomingScheduledActionsData?.items ?? [];
+
   const sandboxId = data?.sandbox_id;
   const aeDiskUsage = useControllerTelemetryDiskUsage(sandboxId ?? '');
   const aeRow = aeDiskUsage.data?.data?.[0];
@@ -1623,12 +1635,63 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.listScheduledActions.queryKey(),
         });
+        // Refresh the upcoming-action indicator on this page.
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.listUpcomingScheduledActionsForInstance.queryKey(),
+        });
       },
       onError: err => {
         toast.error(`Failed to schedule: ${err.message}`);
       },
     })
   );
+
+  // Cancel a scheduled action from the indicator on this page.
+  const { mutate: cancelScheduledAction, isPending: isCancellingScheduledAction } = useMutation(
+    trpc.admin.kiloclawInstances.cancelScheduledAction.mutationOptions({
+      onSuccess: () => {
+        toast.success('Scheduled action cancelled');
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.listUpcomingScheduledActionsForInstance.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.listScheduledActions.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to cancel: ${err.message}`);
+      },
+    })
+  );
+
+  // Per-target cancel — drops just this instance from a bulk schedule.
+  const { mutate: cancelScheduledActionTarget, isPending: isCancellingScheduledActionTarget } =
+    useMutation(
+      trpc.admin.kiloclawInstances.cancelScheduledActionTarget.mutationOptions({
+        onSuccess: () => {
+          toast.success('Cancelled this instance from the scheduled action');
+          void queryClient.invalidateQueries({
+            queryKey:
+              trpc.admin.kiloclawInstances.listUpcomingScheduledActionsForInstance.queryKey(),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: trpc.admin.kiloclawInstances.listScheduledActions.queryKey(),
+          });
+        },
+        onError: err => {
+          toast.error(`Failed to cancel: ${err.message}`);
+        },
+      })
+    );
+
+  // Cancel-confirm dialog state. Holds the action being cancelled so the
+  // dialog can show the right context (single-instance vs bulk).
+  type CancelDialogTarget = {
+    scheduledActionId: string;
+    actionType: 'scheduled_restart' | 'version_change';
+    targetCount: number;
+  };
+  const [cancelDialogTarget, setCancelDialogTarget] = useState<CancelDialogTarget | null>(null);
 
   const {
     mutateAsync: destroyFlyMachine,
@@ -2033,6 +2096,95 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   </span>
                 ) : (
                   '—'
+                )}
+              </DetailField>
+            </div>
+
+            <div className="flex items-start gap-2">
+              <CalendarClock className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+              <DetailField label="Upcoming scheduled action">
+                {upcomingScheduledActions.length === 0 ? (
+                  <span className="text-muted-foreground">None</span>
+                ) : upcomingScheduledActions.length === 1 ? (
+                  <div className="flex flex-col gap-1">
+                    {/* Row 1: action_type + run-at + Cancel. Yellow on
+                        action_type per design.md status palette
+                        (warnings/attention). Inline emphasis since this
+                        lives in a detail row, not a status pill. */}
+                    <div className="flex flex-wrap items-center gap-x-2">
+                      <code className="font-mono text-sm font-medium text-yellow-400">
+                        {upcomingScheduledActions[0].action_type}
+                      </code>
+                      {upcomingScheduledActions[0].scheduled_at && (
+                        <span
+                          className="text-foreground font-mono text-sm"
+                          title={new Date(
+                            upcomingScheduledActions[0].scheduled_at
+                          ).toLocaleString()}
+                        >
+                          at {new Date(upcomingScheduledActions[0].scheduled_at).toLocaleString()}
+                        </span>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-xs"
+                        onClick={() =>
+                          setCancelDialogTarget({
+                            scheduledActionId: upcomingScheduledActions[0].scheduled_action_id,
+                            actionType: upcomingScheduledActions[0].action_type,
+                            targetCount: upcomingScheduledActions[0].target_count,
+                          })
+                        }
+                        disabled={isCancellingScheduledAction || isCancellingScheduledActionTarget}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                    {/* Row 2: source → target tag (version_change only).
+                        Each tag is rendered as `image_tag (OpenClaw vN)`
+                        when the catalog still has the version. */}
+                    {upcomingScheduledActions[0].target_image_tag && (
+                      <div className="text-muted-foreground font-mono text-xs">
+                        {upcomingScheduledActions[0].source_image_tag ? (
+                          <>
+                            {upcomingScheduledActions[0].source_image_tag}
+                            {upcomingScheduledActions[0].source_openclaw_version && (
+                              <span>
+                                {' '}
+                                (OpenClaw {upcomingScheduledActions[0].source_openclaw_version})
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                        <span className="mx-1">→</span>
+                        {upcomingScheduledActions[0].target_image_tag}
+                        {upcomingScheduledActions[0].target_openclaw_version && (
+                          <span>
+                            {' '}
+                            (OpenClaw {upcomingScheduledActions[0].target_openclaw_version})
+                          </span>
+                        )}
+                        {upcomingScheduledActions[0].override_pins ? (
+                          <span className="ml-2 text-yellow-400">override pins</span>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="flex flex-wrap items-center gap-x-2">
+                    <span className="font-medium text-yellow-400">
+                      {upcomingScheduledActions.length} upcoming
+                    </span>
+                    <Link
+                      href={`/admin/kiloclaw?tab=scheduler`}
+                      className="text-blue-600 text-xs hover:underline"
+                    >
+                      view all
+                    </Link>
+                  </span>
                 )}
               </DetailField>
             </div>
@@ -2777,7 +2929,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={machineActionPending || machineRestartBlocked || !hasRuntime}
+                    disabled={
+                      machineActionPending ||
+                      machineRestartBlocked ||
+                      !hasRuntime ||
+                      !!data.destroyed_at
+                    }
                     onClick={() => {
                       // Pre-flight: if a pin exists, route through the
                       // Change Version dialog so the admin can see and
@@ -2808,7 +2965,15 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={machineActionPending || machineRestartBlocked || !hasRuntime}
+                    // Disable on destroyed instances. The backend rejects
+                    // both immediate and scheduled paths anyway; better to
+                    // not surface a button that always errors out.
+                    disabled={
+                      machineActionPending ||
+                      machineRestartBlocked ||
+                      !hasRuntime ||
+                      !!data.destroyed_at
+                    }
                     onClick={() => setChangeVersionDialogOpen(true)}
                   >
                     {isChangingVersion ? (
@@ -3100,6 +3265,112 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           </DialogContent>
         </Dialog>
 
+        {/* Cancel scheduled action confirm dialog. Single-instance
+            schedules just confirm; bulk schedules give the admin two
+            choices — "cancel only this instance" (drops just this
+            target) or "cancel entire batch" (cancels parent + all
+            targets). The latter is destructive across instances and
+            never something we want to do as a single click. */}
+        <Dialog
+          open={cancelDialogTarget !== null}
+          onOpenChange={open => {
+            if (!open) setCancelDialogTarget(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-[520px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CalendarClock className="h-5 w-5" />
+                Cancel scheduled action
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                {cancelDialogTarget && cancelDialogTarget.targetCount > 1 ? (
+                  <>
+                    This is a bulk{' '}
+                    <code className="font-mono">{cancelDialogTarget.actionType}</code> targeting{' '}
+                    <strong className="text-foreground">
+                      {cancelDialogTarget.targetCount} instances
+                    </strong>
+                    . Choose whether to cancel only this instance or the entire batch.
+                  </>
+                ) : (
+                  <>
+                    Cancel this scheduled{' '}
+                    <code className="font-mono">{cancelDialogTarget?.actionType}</code>?
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            {cancelDialogTarget && cancelDialogTarget.targetCount > 1 ? (
+              // Bulk case: 3 buttons can't fit a single 520px row, so
+              // stack vertically. Each option gets equal visual weight
+              // (full width) and the two cancel choices read as
+              // distinct alternatives rather than one cramped bar.
+              <DialogFooter className="flex flex-col gap-2 sm:flex-col sm:space-x-0">
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  disabled={isCancellingScheduledAction || isCancellingScheduledActionTarget}
+                  onClick={() => {
+                    cancelScheduledAction({ id: cancelDialogTarget.scheduledActionId });
+                    setCancelDialogTarget(null);
+                  }}
+                >
+                  {isCancellingScheduledAction && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                  Cancel entire batch ({cancelDialogTarget.targetCount} instances)
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={isCancellingScheduledAction || isCancellingScheduledActionTarget}
+                  onClick={() => {
+                    cancelScheduledActionTarget({
+                      scheduledActionId: cancelDialogTarget.scheduledActionId,
+                      instanceId,
+                    });
+                    setCancelDialogTarget(null);
+                  }}
+                >
+                  {isCancellingScheduledActionTarget && (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  )}
+                  Cancel only this instance
+                </Button>
+                <DialogClose asChild>
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    disabled={isCancellingScheduledAction || isCancellingScheduledActionTarget}
+                  >
+                    Keep scheduled
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            ) : (
+              // Single-instance case: 2 buttons fit fine on one row.
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="secondary" disabled={isCancellingScheduledAction}>
+                    Keep scheduled
+                  </Button>
+                </DialogClose>
+                <Button
+                  variant="destructive"
+                  disabled={isCancellingScheduledAction}
+                  onClick={() => {
+                    if (!cancelDialogTarget) return;
+                    cancelScheduledAction({ id: cancelDialogTarget.scheduledActionId });
+                    setCancelDialogTarget(null);
+                  }}
+                >
+                  {isCancellingScheduledAction && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                  Cancel scheduled action
+                </Button>
+              </DialogFooter>
+            )}
+          </DialogContent>
+        </Dialog>
+
         {/* Upgrade-to-Latest confirm dialog. The button used to fire
             immediately; an active end-user session would be interrupted
             with no warning. The confirm step is a thin gate so it's
@@ -3190,6 +3461,35 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {/* Surface any existing pending scheduled action so the
+                  admin sees the conflict before submitting. The backend
+                  rejects with CONFLICT (one pending schedule per
+                  instance), so we'd hit a confusing error toast
+                  otherwise. */}
+              {upcomingScheduledActions.length > 0 && (
+                <Alert className="border-yellow-500/30 bg-yellow-500/5">
+                  <CalendarClock className="h-4 w-4 text-yellow-400" />
+                  <AlertDescription>
+                    This instance already has a pending{' '}
+                    <code className="font-mono text-xs text-yellow-400">
+                      {upcomingScheduledActions[0].action_type}
+                    </code>
+                    {upcomingScheduledActions[0].scheduled_at ? (
+                      <>
+                        {' '}
+                        scheduled for{' '}
+                        <span className="font-mono">
+                          {`${new Date(upcomingScheduledActions[0].scheduled_at).toLocaleString()}.`}
+                        </span>
+                      </>
+                    ) : (
+                      '.'
+                    )}{' '}
+                    Cancel it on the instance page before scheduling a new one. Apply Now is still
+                    allowed and will run immediately regardless.
+                  </AlertDescription>
+                </Alert>
+              )}
               <Tabs
                 value={changeVersionMode}
                 onValueChange={v => setChangeVersionMode(v as 'now' | 'scheduled')}
@@ -3202,6 +3502,14 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   Applies immediately. End-user session is interrupted with no notice.
                 </TabsContent>
                 <TabsContent value="scheduled" className="mt-3 space-y-2">
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Notifications aren't implemented yet — the end user gets no warning before
+                      their session is interrupted at the scheduled time. Use cautiously on customer
+                      instances until the notifications work lands.
+                    </AlertDescription>
+                  </Alert>
                   <label htmlFor="change-version-scheduled-at" className="text-sm font-medium">
                     Scheduled at (local time)
                   </label>
@@ -3311,7 +3619,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   });
                 }}
                 disabled={
-                  !changeVersionSelectedTag || isChangingVersion || isSchedulingVersionChange
+                  !changeVersionSelectedTag ||
+                  isChangingVersion ||
+                  isSchedulingVersionChange ||
+                  // Block scheduling when a pending action already
+                  // exists. Apply Now stays enabled — that path is
+                  // immediate and orthogonal to the schedule conflict.
+                  (changeVersionMode === 'scheduled' && upcomingScheduledActions.length > 0)
                 }
               >
                 {(isChangingVersion || isSchedulingVersionChange) && (

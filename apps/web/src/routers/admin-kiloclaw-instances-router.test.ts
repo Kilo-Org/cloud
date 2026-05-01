@@ -2017,7 +2017,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       expect(userIdByInstance.get(secondInstance.id)).toBe(secondUser.id);
     });
 
-    it('rejects bulk request when any instance is destroyed', async () => {
+    it('silently filters destroyed instances from a bulk schedule', async () => {
       const [destroyedInstance] = await db
         .insert(kiloclaw_instances)
         .values({
@@ -2028,15 +2028,87 @@ describe('admin.kiloclawInstances scheduled actions', () => {
         .returning({ id: kiloclaw_instances.id });
 
       const caller = await createCallerForUser(adminUser.id);
+      const result = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId, destroyedInstance.id],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      // Only the live instance becomes a target; total_count reflects
+      // the post-filter size.
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, result.id));
+      expect(parent.total_count).toBe(1);
+
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, result.id));
+      expect(targets).toHaveLength(1);
+      expect(targets[0].instance_id).toBe(testInstanceId);
+
+      // Audit metadata captures what was filtered so the trail is
+      // self-explanatory.
+      const logs = await db
+        .select()
+        .from(kiloclaw_admin_audit_logs)
+        .where(
+          and(
+            eq(kiloclaw_admin_audit_logs.actor_id, adminUser.id),
+            eq(kiloclaw_admin_audit_logs.action, 'kiloclaw.scheduled_action.created')
+          )
+        );
+      expect(logs).toHaveLength(1);
+      expect(logs[0].metadata).toMatchObject({
+        instanceIds: [testInstanceId],
+        filteredDestroyedInstanceIds: [destroyedInstance.id],
+      });
+    });
+
+    it('rejects when every instance is destroyed (nothing to schedule)', async () => {
+      const [destroyedInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: regularUser.id,
+          sandbox_id: `test-all-dead-${Date.now()}`,
+          destroyed_at: new Date().toISOString(),
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      const caller = await createCallerForUser(adminUser.id);
       await expect(
         caller.admin.kiloclawInstances.scheduleAction({
           actionType: 'scheduled_restart',
-          instanceIds: [testInstanceId, destroyedInstance.id],
+          instanceIds: [destroyedInstance.id],
           scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
         })
       ).rejects.toMatchObject({
         code: 'BAD_REQUEST',
-        message: expect.stringContaining(destroyedInstance.id),
+        message: expect.stringContaining('destroyed'),
+      });
+    });
+
+    it('rejects with CONFLICT when an instance already has a pending scheduled action', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      // First schedule succeeds.
+      await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+      // Second schedule on the same instance is rejected — we don't
+      // support 1+N concurrent schedules per instance.
+      await expect(
+        caller.admin.kiloclawInstances.scheduleAction({
+          actionType: 'scheduled_restart',
+          instanceIds: [testInstanceId],
+          scheduledAt: new Date(Date.now() + 120 * 60_000).toISOString(),
+        })
+      ).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: expect.stringContaining('pending scheduled action'),
       });
     });
 

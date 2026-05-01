@@ -279,6 +279,14 @@ export function BulkChangeVersionDialog({
                 </Alert>
               </TabsContent>
               <TabsContent value="scheduled" className="mt-3 space-y-2">
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Notifications aren't implemented yet — end users get no warning before their
+                    session is interrupted at the scheduled time. Use cautiously on customer
+                    instances until the notifications work lands.
+                  </AlertDescription>
+                </Alert>
                 <div className="space-y-2">
                   <Label htmlFor="bulk-scheduled-at">Scheduled at (local time)</Label>
                   <Input

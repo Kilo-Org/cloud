@@ -61,15 +61,10 @@ export async function handleRequestLogging(params: {
         apiRequestLogId[0].id
       );
     } catch (e) {
-      try {
-        logExceptInTest(
-          `[handleRequestLogging] failed to insert api_request_log (user=${user?.id}, status=${clonedResponse.status}, model=${model}) (truncated): ${String(e).substring(0, 4000)}`
-        );
-      } catch (inner) {
-        logExceptInTest(
-          `[handleRequestLogging] failed to log failure (truncated): ${String(inner).substring(0, 4000)} original (truncated): ${String(e).substring(0, 4000)}`
-        );
-      }
+      const cause = e instanceof Error ? e.cause : undefined;
+      logExceptInTest(
+        `[handleRequestLogging] failed to insert api_request_log (user=${user?.id}, status=${clonedResponse.status}, model=${model}) (truncated): ${String(e).substring(0, 4000)} cause (truncated): ${String(cause).substring(0, 4000)}`
+      );
     }
   });
 }

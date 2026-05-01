@@ -59,18 +59,25 @@ export const actionItemSchema = z.object({
   value: execApprovalDecisionSchema,
 });
 
+export const actionResolutionSchema = z.object({
+  value: execApprovalDecisionSchema,
+  resolvedBy: nonEmptyStringSchema,
+  resolvedAt: nonNegativeIntegerSchema,
+});
+
+export const inputActionsBlockSchema = z.object({
+  type: z.literal('actions'),
+  groupId: actionGroupIdSchema,
+  actions: z.array(actionItemSchema).min(1).max(10),
+  resolved: z.never().optional(),
+});
+
 export const actionsBlockSchema = z
   .object({
     type: z.literal('actions'),
     groupId: actionGroupIdSchema,
     actions: z.array(actionItemSchema).max(10),
-    resolved: z
-      .object({
-        value: execApprovalDecisionSchema,
-        resolvedBy: z.string(),
-        resolvedAt: z.number(),
-      })
-      .optional(),
+    resolved: actionResolutionSchema.optional(),
   })
   .refine(block => block.resolved !== undefined || block.actions.length >= 1, {
     message: 'actions must contain at least one item unless the block is resolved',
@@ -85,6 +92,11 @@ export const textBlockSchema = z.object({
 export const contentBlockSchema = z.discriminatedUnion('type', [
   textBlockSchema,
   actionsBlockSchema,
+]);
+
+export const inputContentBlockSchema = z.discriminatedUnion('type', [
+  textBlockSchema,
+  inputActionsBlockSchema,
 ]);
 
 // ── Reactions ───────────────────────────────────────────────────────
@@ -163,7 +175,7 @@ export const okResponseSchema = z.object({ ok: z.literal(true) });
 
 export const createMessageRequestSchema = z.object({
   conversationId: ulidSchema,
-  content: z.array(contentBlockSchema).min(1).max(20),
+  content: z.array(inputContentBlockSchema).min(1).max(20),
   inReplyToMessageId: ulidSchema.optional(),
   clientId: ulidSchema.optional(),
 });
@@ -175,7 +187,7 @@ export const createMessageResponseSchema = z.object({
 
 export const editMessageRequestSchema = z.object({
   conversationId: ulidSchema,
-  content: z.array(contentBlockSchema).min(1).max(20),
+  content: z.array(inputContentBlockSchema).min(1).max(20),
   timestamp: z.number().int().positive(),
 });
 

@@ -532,6 +532,55 @@ describe('ConversationDO', () => {
       if (!result.ok) return;
       expect(result.messageSenderId).toBe('bot-primary');
     });
+
+    it('stores server-owned resolution metadata for clients', async () => {
+      const stub = getStub('conv-execaction-resolved-content');
+      await stub.initialize({
+        id: 'conv-execaction-resolved-content',
+        title: 'Action Chat',
+        createdBy: 'user-alice',
+        createdAt: 1000,
+        members: [
+          { id: 'user-alice', kind: 'user' as const },
+          { id: 'bot-primary', kind: 'bot' as const },
+        ],
+      });
+      const create = await stub.createMessage({
+        senderId: 'bot-primary',
+        content: [
+          {
+            type: 'actions' as const,
+            groupId: 'g1',
+            actions: [
+              { value: 'allow-once', label: 'Allow', style: 'primary' as const },
+              { value: 'deny', label: 'Deny', style: 'danger' as const },
+            ],
+          },
+        ],
+      });
+      expect(create.ok).toBe(true);
+      if (!create.ok) return;
+
+      const beforeExecute = Date.now();
+      const result = await stub.executeAction({
+        messageId: create.messageId,
+        memberId: 'user-alice',
+        groupId: 'g1',
+        value: 'deny',
+      });
+      expect(result.ok).toBe(true);
+
+      const after = await stub.listMessages({ limit: 10 });
+      const message = after.messages.find(m => m.id === create.messageId);
+      expect(message).toBeDefined();
+      if (!message) return;
+      const actionsBlock = message.content.find(block => block.type === 'actions');
+      expect(actionsBlock).toBeDefined();
+      if (!actionsBlock || actionsBlock.type !== 'actions') return;
+      expect(actionsBlock.resolved?.value).toBe('deny');
+      expect(actionsBlock.resolved?.resolvedBy).toBe('user-alice');
+      expect(actionsBlock.resolved?.resolvedAt).toBeGreaterThanOrEqual(beforeExecute);
+    });
   });
 
   describe('revertActionResolution', () => {

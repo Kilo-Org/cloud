@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ulid } from 'ulid';
-import type { Message, ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
+import type {
+  Message,
+  ContentBlock,
+  EditMessageRequest,
+  ExecApprovalDecision,
+} from '@kilocode/kilo-chat';
 import {
   useMessages,
   useSendMessage,
@@ -45,6 +50,19 @@ import { MessageCircle, ArrowDown } from 'lucide-react';
 type MessageAreaProps = {
   conversationId: string;
 };
+
+function toEditableContent(content: ContentBlock[]): EditMessageRequest['content'] {
+  return content.map(block => {
+    if (block.type === 'actions') {
+      return {
+        type: 'actions',
+        groupId: block.groupId,
+        actions: block.actions,
+      };
+    }
+    return block;
+  });
+}
 
 export function MessageArea({ conversationId }: MessageAreaProps) {
   const { currentUserId, instanceStatus, assistantName, sandboxId, eventService, kiloChatClient } =
@@ -232,7 +250,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const handleEdit = useCallback(
     (messageId: string, content: ContentBlock[]) => {
       editMessage.mutate(
-        { messageId, conversationId, content, timestamp: Date.now() },
+        { messageId, conversationId, content: toEditableContent(content), timestamp: Date.now() },
         {
           onError: err => {
             if (err instanceof KiloChatApiError && err.status === 409) {

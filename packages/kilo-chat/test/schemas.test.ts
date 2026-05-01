@@ -168,6 +168,33 @@ describe('text content blocks — trim and reject empty', () => {
         if (block.type === 'text') expect(block.text).toBe('hi');
       }
     });
+
+    it('rejects caller-supplied action resolution metadata', () => {
+      const res = createMessageRequestSchema.safeParse({
+        conversationId: validConversationId,
+        content: [
+          {
+            type: 'actions',
+            groupId: 'approval',
+            actions: [{ label: 'Allow', style: 'primary', value: 'allow-once' }],
+            resolved: {
+              value: 'allow-once',
+              resolvedBy: 'user-alice',
+              resolvedAt: Date.now(),
+            },
+          },
+        ],
+      });
+      expect(res.success).toBe(false);
+    });
+
+    it('rejects empty action input blocks', () => {
+      const res = createMessageRequestSchema.safeParse({
+        conversationId: validConversationId,
+        content: [{ type: 'actions', groupId: 'approval', actions: [] }],
+      });
+      expect(res.success).toBe(false);
+    });
   });
 
   describe('editMessageRequestSchema', () => {
@@ -191,6 +218,26 @@ describe('text content blocks — trim and reject empty', () => {
         const block = res.data.content[0];
         if (block.type === 'text') expect(block.text).toBe('edited');
       }
+    });
+
+    it('rejects caller-supplied action resolution metadata', () => {
+      const res = editMessageRequestSchema.safeParse({
+        conversationId: validConversationId,
+        content: [
+          {
+            type: 'actions',
+            groupId: 'approval',
+            actions: [{ label: 'Deny', style: 'danger', value: 'deny' }],
+            resolved: {
+              value: 'deny',
+              resolvedBy: 'user-alice',
+              resolvedAt: Date.now(),
+            },
+          },
+        ],
+        timestamp: Date.now(),
+      });
+      expect(res.success).toBe(false);
     });
   });
 });

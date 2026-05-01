@@ -457,7 +457,9 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
                 message={msg}
                 isOwn={currentUserId !== null && msg.senderId === currentUserId}
                 replyToMessage={
-                  msg.inReplyToMessageId ? (messageMap.get(msg.inReplyToMessageId) ?? null) : null
+                  msg.inReplyToMessageId
+                    ? (messageMap.get(msg.inReplyToMessageId) ?? msg.replyTo)
+                    : null
                 }
                 pendingDeleteId={pendingDeleteId}
                 onEdit={handleEdit}

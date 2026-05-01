@@ -54,7 +54,9 @@ export function MessageList({
             showAuthor={showAuthor}
             isExecutingAction={isExecutingAction}
             replyToMessage={
-              item.inReplyToMessageId ? (messageMap.get(item.inReplyToMessageId) ?? null) : null
+              item.inReplyToMessageId
+                ? (messageMap.get(item.inReplyToMessageId) ?? item.replyTo)
+                : null
             }
             onExecuteAction={onExecuteAction}
             onReactionPress={onReactionPress}

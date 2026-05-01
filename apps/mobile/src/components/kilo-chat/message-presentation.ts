@@ -1,7 +1,12 @@
-import { type CreateMessageRequest, type Message } from '@kilocode/kilo-chat';
+import {
+  type CreateMessageRequest,
+  type Message,
+  type ReplyToMessageSnapshot,
+} from '@kilocode/kilo-chat';
 import { ulid } from 'ulid';
 
 export type SendMessageVariables = CreateMessageRequest & { clientId: string };
+export type ReplyPreviewSource = Message | ReplyToMessageSnapshot;
 
 type BuildSendMessageVariablesInput = {
   conversationId: string;
@@ -38,9 +43,12 @@ export function contentBlocksToPreviewText(content: Message['content']): string 
   return preview || 'Message';
 }
 
-export function getReplyPreviewText(replyToMessage: Message): string {
+export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string {
   if (replyToMessage.deleted) {
     return '[deleted message]';
+  }
+  if ('previewText' in replyToMessage) {
+    return replyToMessage.previewText ?? 'Message';
   }
   return contentBlocksToPreviewText(replyToMessage.content);
 }

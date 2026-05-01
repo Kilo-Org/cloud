@@ -24,6 +24,7 @@ function actionMessage(overrides: Partial<Message> = {}): Message {
       },
     ],
     inReplyToMessageId: null,
+    replyTo: null,
     updatedAt: null,
     clientUpdatedAt: null,
     deleted: false,

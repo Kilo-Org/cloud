@@ -122,6 +122,36 @@ describe('ConversationDO', () => {
     expect(page2).toHaveLength(0);
   });
 
+  it('listMessages - includes a reply snapshot when parent is outside the page', async () => {
+    const stub = getStub('conv-list-reply-snapshot');
+    await stub.initialize(BASE_PARAMS);
+    const parent = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Parent context' }],
+    });
+    expect(parent.ok).toBe(true);
+    if (!parent.ok) return;
+
+    const reply = await stub.createMessage({
+      senderId: 'bot-1',
+      content: [{ type: 'text', text: 'Reply body' }],
+      inReplyToMessageId: parent.messageId,
+    });
+    expect(reply.ok).toBe(true);
+    if (!reply.ok) return;
+
+    const { messages } = await stub.listMessages({ limit: 1 });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0].id).toBe(reply.messageId);
+    expect(messages[0].replyTo).toEqual({
+      messageId: parent.messageId,
+      senderId: 'user-alice',
+      deleted: false,
+      previewText: 'Parent context',
+    });
+  });
+
   it('editMessage - edits message with newer timestamp', async () => {
     const stub = getStub('conv-edit-1');
     await stub.initialize(BASE_PARAMS);

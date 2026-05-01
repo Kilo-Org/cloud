@@ -6,6 +6,7 @@ import type {
   textBlockSchema,
   contentBlockSchema,
   reactionSummarySchema,
+  replyToMessageSnapshotSchema,
   messageSchema,
   conversationListItemSchema,
   conversationDetailSchema,
@@ -83,6 +84,7 @@ export type BotConversationSummary = z.infer<typeof botConversationSummarySchema
 
 // ── Messages ────────────────────────────────────────────────────────
 export type Message = z.infer<typeof messageSchema>;
+export type ReplyToMessageSnapshot = z.infer<typeof replyToMessageSnapshotSchema>;
 
 // ── Events ──────────────────────────────────────────────────────────
 export type MessageCreatedEvent = z.infer<typeof messageCreatedEventSchema>;

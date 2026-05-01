@@ -1,9 +1,11 @@
-import type {
-  ContentBlock,
-  ActionsBlock,
-  Message,
-  ReactionSummary,
-  ExecApprovalDecision,
+import {
+  contentBlocksToText,
+  type ContentBlock,
+  type ActionsBlock,
+  type Message,
+  type ReactionSummary,
+  type ExecApprovalDecision,
+  type ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
 import { DurableObject } from 'cloudflare:workers';
 import { logger } from '../util/logger';
@@ -36,6 +38,31 @@ import { eq, lt, desc, and, sql, inArray } from 'drizzle-orm';
 import { conversation, members, messages, reactions } from '../db/conversation-schema';
 import migrations from '../../drizzle/conversation/migrations';
 import { monotonicFactory } from 'ulid';
+
+const REPLY_PREVIEW_MAX_CHARS = 160;
+
+type StoredMessageRow = typeof messages.$inferSelect;
+
+function buildReplySnapshot(
+  messageId: string,
+  parent: StoredMessageRow | undefined
+): ReplyToMessageSnapshot {
+  if (!parent) {
+    return { messageId, senderId: null, deleted: true, previewText: null };
+  }
+
+  if (parent.deleted === 1) {
+    return { messageId, senderId: parent.sender_id, deleted: true, previewText: null };
+  }
+
+  const preview = contentBlocksToText(parseStoredContent(parent.content, parent.id)).trim();
+  return {
+    messageId,
+    senderId: parent.sender_id,
+    deleted: false,
+    previewText: (preview || 'Message').slice(0, REPLY_PREVIEW_MAX_CHARS),
+  };
+}
 
 export type MemberContext = {
   humanMemberIds: string[];
@@ -370,6 +397,15 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     const ids = rows.map(r => r.id);
+    const replyParentIds = [
+      ...new Set(rows.flatMap(r => (r.in_reply_to_message_id ? [r.in_reply_to_message_id] : []))),
+    ];
+    const replyParentRows =
+      replyParentIds.length > 0
+        ? this.db.select().from(messages).where(inArray(messages.id, replyParentIds)).all()
+        : [];
+    const replyParentById = new Map(replyParentRows.map(row => [row.id, row]));
+
     const reactionRows = this.db
       .select()
       .from(reactions)
@@ -395,6 +431,12 @@ export class ConversationDO extends DurableObject<Env> {
         senderId: row.sender_id,
         content: row.deleted === 1 ? [] : parseStoredContent(row.content, row.id),
         inReplyToMessageId: row.in_reply_to_message_id,
+        replyTo: row.in_reply_to_message_id
+          ? buildReplySnapshot(
+              row.in_reply_to_message_id,
+              replyParentById.get(row.in_reply_to_message_id)
+            )
+          : null,
         updatedAt: row.updated_at,
         clientUpdatedAt: row.client_updated_at,
         deleted: row.deleted === 1,

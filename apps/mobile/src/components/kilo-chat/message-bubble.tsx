@@ -5,7 +5,11 @@ import { Pressable, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
-import { getDeliveryFailureLabel, getReplyPreviewText } from './message-presentation';
+import {
+  getDeliveryFailureLabel,
+  getReplyPreviewText,
+  type ReplyPreviewSource,
+} from './message-presentation';
 
 type Props = {
   message: Message;
@@ -13,7 +17,7 @@ type Props = {
   isFromMe: boolean;
   showAuthor: boolean;
   isExecutingAction: boolean;
-  replyToMessage?: Message | null;
+  replyToMessage?: ReplyPreviewSource | null;
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
   onReactionPress: (message: Message, emoji: string) => void;
   onLongPress?: (m: Message) => void;

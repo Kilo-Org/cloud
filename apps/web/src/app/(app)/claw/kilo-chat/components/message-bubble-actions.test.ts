@@ -7,6 +7,7 @@ const baseMessage = {
   senderId: 'user-1',
   content: [{ type: 'text', text: 'hello' }],
   inReplyToMessageId: null,
+  replyTo: null,
   updatedAt: null,
   clientUpdatedAt: null,
   deleted: false,

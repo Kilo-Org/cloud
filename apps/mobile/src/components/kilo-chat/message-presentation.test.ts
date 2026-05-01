@@ -14,6 +14,7 @@ function message(overrides: Partial<Message> = {}): Message {
     senderId: 'user-1',
     content: [{ type: 'text', text: 'hello' }],
     inReplyToMessageId: null,
+    replyTo: null,
     updatedAt: null,
     clientUpdatedAt: null,
     deleted: false,
@@ -60,6 +61,17 @@ describe('getReplyPreviewText', () => {
 
   it('uses a deleted-message label for deleted parents', () => {
     expect(getReplyPreviewText(message({ deleted: true }))).toBe('[deleted message]');
+  });
+
+  it('uses unloaded parent snapshot text for a reply preview', () => {
+    expect(
+      getReplyPreviewText({
+        messageId: 'parent-1',
+        senderId: 'user-1',
+        deleted: false,
+        previewText: 'snapshot parent text',
+      })
+    ).toBe('snapshot parent text');
   });
 });
 

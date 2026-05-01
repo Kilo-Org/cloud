@@ -7,7 +7,12 @@ import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile, Copy } from 'lucid
 import { EmojiQuickPick } from './EmojiQuickPick';
 import { EmojiPicker } from './EmojiPicker';
 import { ReactionPills } from './ReactionPills';
-import type { Message, ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
+import type {
+  Message,
+  ContentBlock,
+  ExecApprovalDecision,
+  ReplyToMessageSnapshot,
+} from '@kilocode/kilo-chat';
 import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
@@ -33,7 +38,7 @@ const MemoizedMarkdown = memo(function MemoizedMarkdown({ content }: { content: 
 type MessageBubbleProps = {
   message: Message;
   isOwn: boolean;
-  replyToMessage?: Message | null;
+  replyToMessage?: Message | ReplyToMessageSnapshot | null;
   pendingDeleteId: string | null;
   onEdit: (messageId: string, content: ContentBlock[]) => void;
   onDelete: (messageId: string) => void;
@@ -46,6 +51,14 @@ type MessageBubbleProps = {
   actionPending?: boolean;
   currentUserId: string | null;
 };
+
+function getReplyPreviewText(replyToMessage: Message | ReplyToMessageSnapshot): string {
+  const preview =
+    'previewText' in replyToMessage
+      ? (replyToMessage.previewText ?? 'Message')
+      : contentBlocksToText(replyToMessage.content);
+  return preview.length > 60 ? `${preview.slice(0, 60)}...` : preview;
+}
 
 export const MessageBubble = memo(function MessageBubble({
   message,
@@ -227,12 +240,7 @@ export const MessageBubble = memo(function MessageBubble({
             {replyToMessage.deleted ? (
               <span className="italic opacity-70">original message deleted</span>
             ) : (
-              <span>
-                {(() => {
-                  const preview = contentBlocksToText(replyToMessage.content);
-                  return preview.length > 60 ? `${preview.slice(0, 60)}...` : preview;
-                })()}
-              </span>
+              <span>{getReplyPreviewText(replyToMessage)}</span>
             )}
           </div>
         )}

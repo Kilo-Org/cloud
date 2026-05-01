@@ -17,6 +17,7 @@ function message(id: string): Message {
     senderId: 'user:1',
     content: [{ type: 'text', text: id }],
     inReplyToMessageId: null,
+    replyTo: null,
     updatedAt: null,
     clientUpdatedAt: null,
     deleted: false,

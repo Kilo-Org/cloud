@@ -4,7 +4,7 @@ import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { isAlibabaDirectModel } from '@/lib/ai-gateway/providers/qwen';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
-import { isGrok4Model, isGrokModel } from '@/lib/ai-gateway/providers/xai';
+import { isGrokModel, isGrokToggleableReasoningModel } from '@/lib/ai-gateway/providers/xai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import type {
   CustomLlmProvider,
@@ -66,6 +66,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (
     isKimiModel(model) ||
     isGlmModel(model) ||
+    isGrokToggleableReasoningModel(model) ||
     isAlibabaDirectModel(model) ||
     isGemmaModel(model)
   ) {
@@ -85,12 +86,6 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
       low: { reasoning: { enabled: true, effort: 'low' } },
       medium: { reasoning: { enabled: true, effort: 'medium' } },
       high: { reasoning: { enabled: true, effort: 'high' } },
-    };
-  }
-  if (isGrok4Model(model)) {
-    return {
-      'non-reasoning': { reasoning: { enabled: false, effort: 'none' } },
-      reasoning: { reasoning: { enabled: true, effort: 'medium' } },
     };
   }
   return undefined;

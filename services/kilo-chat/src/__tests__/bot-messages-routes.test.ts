@@ -539,6 +539,39 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 when edit content includes caller-supplied action resolution', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-edit-resolved-actions');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'actions',
+              groupId: 'approval-1',
+              actions: [],
+              resolved: {
+                value: 'deny',
+                resolvedBy: 'user-1',
+                resolvedAt: 1,
+              },
+            },
+          ],
+          timestamp: Date.now(),
+        }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+  });
+
   it("returns 403 when editing another bot's message", async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-edit-forbidden');
     // messageId was created by the user in setupData; the bot is a member but didn't author it

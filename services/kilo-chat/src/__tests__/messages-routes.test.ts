@@ -337,6 +337,37 @@ describe('PATCH /v1/messages/:id', () => {
     expect(editRes.status).toBe(409);
   });
 
+  it('returns 400 when edit content includes caller-supplied action resolution', async () => {
+    const { conversationId, userApp } = await createConversation('msg-edit-resolved-actions');
+
+    const editRes = await userApp.request(
+      '/v1/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'actions',
+              groupId: 'approval-1',
+              actions: [],
+              resolved: {
+                value: 'deny',
+                resolvedBy: 'user-1',
+                resolvedAt: 1,
+              },
+            },
+          ],
+          timestamp: Date.now(),
+        }),
+      },
+      env
+    );
+
+    expect(editRes.status).toBe(400);
+  });
+
   it('returns 403 when non-sender tries to edit', async () => {
     const {
       conversationId,

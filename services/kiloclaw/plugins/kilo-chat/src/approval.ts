@@ -108,17 +108,11 @@ function buildResolvedBlocks(view: ResolvedApprovalView): ContentBlock[] {
 
 function buildExpiredBlocks(view: ExpiredApprovalView): ContentBlock[] {
   const textBlock: ContentBlock = { type: 'text', text: buildMetadataText(view) + '\n\n_Expired_' };
-  const actionsBlock: ActionsBlock = {
-    type: 'actions',
-    groupId: view.approvalId,
-    actions: [],
-    resolved: {
-      value: 'expired',
-      resolvedBy: 'system',
-      resolvedAt: Date.now(),
-    },
-  };
-  return [textBlock, actionsBlock];
+  return [textBlock];
+}
+
+function hasResolvedActionsBlock(payload: ContentBlock[]): boolean {
+  return payload.some(block => block.type === 'actions' && block.resolved !== undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +187,8 @@ const nativeRuntime: ChannelApprovalNativeRuntimeAdapter<
     },
 
     updateEntry: async ({ entry, payload }) => {
+      if (hasResolvedActionsBlock(payload)) return;
+
       const client = makeClient();
       const result = await client.editMessage({
         conversationId: entry.conversationId,

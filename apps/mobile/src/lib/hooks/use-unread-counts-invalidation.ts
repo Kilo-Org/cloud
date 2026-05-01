@@ -15,8 +15,9 @@ import { parseNotificationData } from '@/lib/notifications';
  * - App returns to active state → invalidate (pushes received while
  *   backgrounded don't fire the received-listener).
  *
- * Mounted once inside `RootLayoutNav` so it covers every screen, including
- * when the dashboard is not rendered yet.
+ * Mounted once inside the authenticated app layout so it can read the
+ * Kilo Chat current-user context while still covering dashboard and chat
+ * screens.
  */
 export function useUnreadCountsInvalidation() {
   const queryClient = useQueryClient();

@@ -1,8 +1,6 @@
-import { type ReactNode } from 'react';
-
 import { Stack } from 'expo-router';
 
-import { useAppPresence } from '@/components/kilo-chat/hooks/use-app-presence';
+import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -11,7 +9,7 @@ export default function AppLayout() {
 
   return (
     <KiloChatProvider>
-      <PresenceMount>
+      <KiloChatPresenceMount>
         <Stack
           screenOptions={{
             contentStyle: { backgroundColor: colors.background },
@@ -77,12 +75,7 @@ export default function AppLayout() {
             }}
           />
         </Stack>
-      </PresenceMount>
+      </KiloChatPresenceMount>
     </KiloChatProvider>
   );
-}
-
-function PresenceMount({ children }: { children: ReactNode }) {
-  useAppPresence();
-  return <>{children}</>;
 }

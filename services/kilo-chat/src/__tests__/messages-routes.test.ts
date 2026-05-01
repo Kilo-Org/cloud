@@ -1,8 +1,9 @@
 import { env } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ulidToTimestamp } from '@kilocode/kilo-chat';
 import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
+import { postCommitFanOut } from '../services/messages';
 import { makeApp } from './helpers';
 
 function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
@@ -1069,5 +1070,97 @@ describe('auto-title on first message', () => {
 
     const { messages } = await convStub.listMessages({ limit: 10 });
     expect(messages).toHaveLength(1);
+  });
+
+  it('keeps the first auto-title when a later fan-out also observed no title', async () => {
+    const userId = 'user-autotitle-race';
+    const sandboxId = 'sandbox-autotitle-race';
+    const botId = `bot:kiloclaw:${sandboxId}`;
+    const conversationId = ulid();
+    const joinedAt = Date.now();
+    const members: Array<{ id: string; kind: 'user' | 'bot' }> = [
+      { id: userId, kind: 'user' },
+      { id: botId, kind: 'bot' },
+    ];
+
+    const convStub = getConvStub(conversationId);
+    const initResult = await convStub.initialize({
+      id: conversationId,
+      title: null,
+      createdBy: userId,
+      createdAt: joinedAt,
+      members,
+    });
+    expect(initResult).toEqual({ ok: true });
+
+    for (const member of members) {
+      await env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)).addConversation({
+        conversationId,
+        title: null,
+        sandboxId,
+        joinedAt,
+      });
+    }
+
+    const staleInfo = {
+      id: conversationId,
+      title: null,
+      createdBy: userId,
+      createdAt: joinedAt,
+      members,
+    };
+    const pushedEvents: Array<{ event: string; payload: unknown }> = [];
+    const pushEvent = vi.fn(
+      async (_userId: string, _context: string, event: string, payload: unknown) => {
+        pushedEvents.push({ event, payload });
+        return true;
+      }
+    );
+    const eventEnv = {
+      ...env,
+      EVENT_SERVICE: {
+        fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+        connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+        pushEvent,
+      },
+    } satisfies Env;
+
+    await postCommitFanOut(
+      eventEnv,
+      staleInfo,
+      userId,
+      conversationId,
+      ulid(),
+      [{ type: 'text', text: 'First title' }],
+      undefined,
+      undefined
+    );
+    await postCommitFanOut(
+      eventEnv,
+      staleInfo,
+      userId,
+      conversationId,
+      ulid(),
+      [{ type: 'text', text: 'Second title' }],
+      undefined,
+      undefined
+    );
+
+    const infoAfter = await convStub.getInfo();
+    expect(infoAfter!.title).toBe('First title');
+
+    const userMembership = await env.MEMBERSHIP_DO.get(
+      env.MEMBERSHIP_DO.idFromName(userId)
+    ).listConversations({ sandboxId });
+    const botMembership = await env.MEMBERSHIP_DO.get(
+      env.MEMBERSHIP_DO.idFromName(botId)
+    ).listConversations({ sandboxId });
+    expect(userMembership.conversations[0].title).toBe('First title');
+    expect(botMembership.conversations[0].title).toBe('First title');
+
+    const renamedPayloads = pushedEvents
+      .filter(pushedEvent => pushedEvent.event === 'conversation.renamed')
+      .map(pushedEvent => pushedEvent.payload);
+    expect(renamedPayloads).toEqual([{ conversationId, title: 'First title' }]);
   });
 });

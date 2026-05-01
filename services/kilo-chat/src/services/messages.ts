@@ -99,7 +99,7 @@ export async function createMessageFor(
   return { ok: true, messageId, clientId };
 }
 
-async function postCommitFanOut(
+export async function postCommitFanOut(
   env: Env,
   info: ConversationInfo,
   callerId: string,
@@ -186,16 +186,18 @@ async function postCommitFanOut(
   const autoTitle = computeAutoTitle();
 
   // Persist the auto-title on the ConversationDO in parallel with fan-out.
-  const conversationDoTitleWrite = async () => {
-    if (autoTitle === null) return;
+  const conversationDoTitleWrite = async (): Promise<boolean> => {
+    if (autoTitle === null) return false;
     try {
-      await withDORetry(
+      const result = await withDORetry(
         () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-        stub => stub.updateTitleInternal(autoTitle),
-        'ConversationDO.updateTitleInternal'
+        stub => stub.updateTitleIfNullInternal(autoTitle),
+        'ConversationDO.updateTitleIfNullInternal'
       );
+      return result.applied;
     } catch (err) {
       logger.error('Failed to auto-title conversation on ConversationDO', formatError(err));
+      return false;
     }
   };
 
@@ -227,7 +229,12 @@ async function postCommitFanOut(
 
   // Run webhook delivery, ConversationDO title write, and event push in
   // parallel; membership updates run after commit side effects settle.
-  await Promise.all([webhookDelivery(), conversationDoTitleWrite(), pushMessageEvents()]);
+  const [, autoTitleApplied] = await Promise.all([
+    webhookDelivery(),
+    conversationDoTitleWrite(),
+    pushMessageEvents(),
+  ]);
+  const appliedAutoTitle = autoTitleApplied ? autoTitle : null;
 
   // ── Block C: Single MembershipDO RPC per member ──────────────────────
   // Combines autoTitle, lastActivityAt, and lastReadAt into one round-trip.
@@ -246,7 +253,7 @@ async function postCommitFanOut(
         stub =>
           stub.applyPostCommit({
             conversationId,
-            ...(autoTitle !== null && { title: autoTitle }),
+            ...(appliedAutoTitle !== null && { title: appliedAutoTitle }),
             activityAt: now,
             markRead: isSender,
           }),
@@ -263,11 +270,11 @@ async function postCommitFanOut(
   // ── Block D: Instance-level conversation events ──────────────────────
   if (sandboxId) {
     const instanceEvents: Promise<unknown>[] = [];
-    if (autoTitle !== null) {
+    if (appliedAutoTitle !== null) {
       instanceEvents.push(
         pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
           conversationId,
-          title: autoTitle,
+          title: appliedAutoTitle,
         })
       );
     }
@@ -305,7 +312,7 @@ async function postCommitFanOut(
       const senderUserId = isSenderHuman ? callerId : null;
       const bodyPreview = contentBlocksToText(content).slice(0, 200);
       const sandboxLabel = await fetchSandboxLabel(env.HYPERDRIVE.connectionString, sandboxId);
-      const conversationTitle = info.title ?? autoTitle ?? 'Untitled';
+      const conversationTitle = info.title ?? appliedAutoTitle ?? 'Untitled';
       await env.NOTIFICATIONS.sendPushForConversation({
         conversationId,
         sandboxId,

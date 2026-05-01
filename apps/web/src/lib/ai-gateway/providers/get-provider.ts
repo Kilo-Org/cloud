@@ -74,7 +74,7 @@ async function checkDirectBYOK(
       },
     } satisfies Provider,
     userByok,
-    bypassAccessCheck: false,
+    bypassAccessCheck: true,
   };
 }
 

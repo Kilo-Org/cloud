@@ -299,16 +299,19 @@ export async function upsertSlackInstallation({
 export async function uninstallApp(owner: Owner, options: SlackUninstallOptions = {}) {
   const integration = await getInstallation(owner);
 
-  if (!integration || integration.integration_status !== INTEGRATION_STATUS.ACTIVE) {
+  if (!integration) {
     throw new TRPCError({
       code: 'NOT_FOUND',
       message: 'Slack installation not found',
     });
   }
 
+  const shouldDeleteSlackInstallation =
+    integration.integration_status === INTEGRATION_STATUS.ACTIVE;
+
   // Revoke the token if we have one
   const metadata = integration.metadata as { access_token?: string } | null;
-  if (metadata?.access_token) {
+  if (shouldDeleteSlackInstallation && metadata?.access_token) {
     try {
       await revokeSlackToken(metadata.access_token);
     } catch (error) {
@@ -317,7 +320,10 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   }
 
   const teamId = integration.platform_installation_id ?? integration.platform_account_id;
-  if (options.deleteChatSdkInstallation || options.deleteChatSdkIdentityCache) {
+  if (
+    shouldDeleteSlackInstallation &&
+    (options.deleteChatSdkInstallation || options.deleteChatSdkIdentityCache)
+  ) {
     if (!teamId) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

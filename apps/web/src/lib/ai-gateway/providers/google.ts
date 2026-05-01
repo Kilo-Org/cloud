@@ -68,3 +68,7 @@ export function applyGoogleModelSettings(provider: ProviderId, requestToMutate: 
     delete lineRanges.items;
   }
 }
+
+export const GEMINI_PRO_CURRENT_MODEL_ID = 'google/gemini-3.1-pro-preview';
+
+export const GEMINI_PRO_CURRENT_VERCEL_MODEL_ID = GEMINI_PRO_CURRENT_MODEL_ID;

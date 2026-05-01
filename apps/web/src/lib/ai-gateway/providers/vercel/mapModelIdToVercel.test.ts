@@ -66,12 +66,9 @@ describe('mapModelIdToVercel', () => {
       ['x-ai/grok-4-fast', 'xai/grok-4-fast-non-reasoning'],
       ['x-ai/grok-4.1-fast', 'xai/grok-4.1-fast-non-reasoning'],
       ['x-ai/grok-4.20-beta', 'xai/grok-4.20-non-reasoning'],
-    ])(
-      'maps %s to %s when reasoning is explicitly disabled',
-      (input, expected) => {
-        expect(mapModelIdToVercel(input, true)).toBe(expected);
-      }
-    );
+    ])('maps %s to %s when reasoning is explicitly disabled', (input, expected) => {
+      expect(mapModelIdToVercel(input, true)).toBe(expected);
+    });
 
     it('does not rewrite a mapped target that does not end with -reasoning', () => {
       expect(mapModelIdToVercel('mistralai/codestral-2508', true)).toBe('mistral/codestral');
@@ -87,9 +84,7 @@ describe('mapModelIdToVercel', () => {
 
     it('rewrites the mistralai/ prefix to mistral/', () => {
       // not covered by the hardcoded mapping
-      expect(mapModelIdToVercel('mistralai/some-new-model', false)).toBe(
-        'mistral/some-new-model'
-      );
+      expect(mapModelIdToVercel('mistralai/some-new-model', false)).toBe('mistral/some-new-model');
     });
 
     it('rewrites the qwen/ prefix to alibaba/', () => {

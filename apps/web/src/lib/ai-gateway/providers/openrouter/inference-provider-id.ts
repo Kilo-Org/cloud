@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import { stripModelTilde } from '@/lib/ai-gateway/providers/model-prefix';
 import { isGptOssModel } from '@/lib/ai-gateway/providers/openai';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
@@ -211,7 +210,7 @@ export function inferVercelFirstPartyInferenceProviderForModel(
 ): VercelInferenceProviderId | null {
   return isGptOssModel(model)
     ? null
-    : (modelPrefixToVercelInferenceProviderMapping[stripModelTilde(model).split('/')[0]] ?? null);
+    : (modelPrefixToVercelInferenceProviderMapping[model.split('/')[0]] ?? null);
 }
 
 export const AwsCredentialsSchema = z.object({

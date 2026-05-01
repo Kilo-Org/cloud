@@ -726,7 +726,7 @@ describe('host-based routing', () => {
     expect(response.status).toBe(403);
   });
 
-  it('returns 302 to the legacy host when the instance is pre-cutover (v1)', async () => {
+  it('returns 404 with a restart hint when the instance is pre-cutover (v1)', async () => {
     const instanceStub = {
       getStatus: vi.fn().mockResolvedValue({
         userId: 'user-1',
@@ -752,15 +752,14 @@ describe('host-based routing', () => {
       { waitUntil: vi.fn() } as never
     );
 
-    expect(response.status).toBe(302);
-    expect(response.headers.get('Location')).toBe('https://claw.kilosessions.ai/some/path?x=1');
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not available on this host',
+      hint: 'This instance needs a restart before it can be reached at its per-instance hostname. Use the legacy URL for now.',
+    });
   });
 
-  it('v1 fallback preserves a `//`-prefixed path literally (no open redirect)', async () => {
-    // Regression: `new URL('//evil.example/path', 'https://claw.kilosessions.ai')`
-    // resolves to `https://evil.example/path` (scheme-relative). The fix uses
-    // the URL pathname/search setters so the leading `//` stays in the path
-    // component and the host stays on claw.kilosessions.ai.
+  it('also 404s pre-cutover instances when the v1 status has controllerCapabilitiesVersion=1 explicitly', async () => {
     const instanceStub = {
       getStatus: vi.fn().mockResolvedValue({
         userId: 'user-1',
@@ -775,7 +774,7 @@ describe('host-based routing', () => {
     };
 
     const response = await app.fetch(
-      new Request('https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai//evil.example/path?x=1'),
+      new Request('https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai/'),
       {
         ...baseEnv(),
         KILOCLAW_INSTANCE: {
@@ -786,11 +785,7 @@ describe('host-based routing', () => {
       { waitUntil: vi.fn() } as never
     );
 
-    expect(response.status).toBe(302);
-    const location = response.headers.get('Location');
-    expect(location).not.toBeNull();
-    expect(new URL(location ?? '').host).toBe('claw.kilosessions.ai');
-    expect(location).toBe('https://claw.kilosessions.ai//evil.example/path?x=1');
+    expect(response.status).toBe(404);
   });
 
   it('returns 404 for unparseable labels within the instance-host space', async () => {

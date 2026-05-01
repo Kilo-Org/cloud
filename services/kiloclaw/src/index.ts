@@ -738,8 +738,8 @@ function resolveHostRouteDoKey(label: string): { doKey: string; sandboxId: strin
  *   - instance not provisioned / no runtime → 404
  *   - capability version < current (v1 machines lack the per-instance origin
  *     in their openclaw allowlist, so WS upgrades would fail origin check)
- *     → 302 redirect to `https://claw.kilosessions.ai<path><query>` so the
- *     user continues on the legacy host until the instance restarts onto v2
+ *     → 404 with a restart hint so the user knows the per-instance host
+ *     needs a machine restart; the legacy host keeps working meanwhile
  *   - otherwise → proxy via `proxyThroughTarget`
  */
 async function handleHostBasedRoute(c: Context<AppEnv>): Promise<Response | null> {
@@ -793,19 +793,20 @@ async function handleHostBasedRoute(c: Context<AppEnv>): Promise<Response | null
 
   // Capability gate. v1 machines don't have `<label>.<suffix>` in their
   // OPENCLAW_ALLOWED_ORIGINS, so WebSocket upgrades from this host would be
-  // rejected by openclaw's exact-match origin check. Bounce the user to the
-  // legacy host — they'll keep working until a restart brings the instance
-  // to v2.
+  // rejected by openclaw's exact-match origin check. Refuse the request on
+  // the per-instance host so broken-at-runtime traffic never reaches the
+  // machine; the user can continue via the legacy host
+  // (`claw.kilosessions.ai`) and the instance rolls onto v2 on its next
+  // restart.
   const version = status.controllerCapabilitiesVersion ?? 1;
   if (version < WORKER_CONTROLLER_CAPABILITIES_VERSION) {
-    // Build via URL setters rather than `new URL(relative, base)`: a pathname
-    // like `//evil.example/path` passed as a relative URL string would be
-    // interpreted as scheme-relative and redirect off-host. The setter
-    // treats it as the path component verbatim.
-    const legacy = new URL('https://claw.kilosessions.ai');
-    legacy.pathname = url.pathname;
-    legacy.search = url.search;
-    return c.redirect(legacy.toString(), 302);
+    return c.json(
+      {
+        error: 'Instance not available on this host',
+        hint: 'This instance needs a restart before it can be reached at its per-instance hostname. Use the legacy URL for now.',
+      },
+      404
+    );
   }
 
   if (status.status === 'destroying') {

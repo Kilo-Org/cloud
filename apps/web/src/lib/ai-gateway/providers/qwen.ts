@@ -51,8 +51,7 @@ function makeTieredPricing(
   return {
     ...firstTier,
     calculate_mUsd: (usage: Usage) => {
-      const totalInput =
-        usage.uncachedInputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
+      const totalInput = usage.uncachedInputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
       const bracket = discounted.find(t => totalInput <= t.maxInputTokens);
       return costForTier(usage, bracket ? bracket.price : lastTier);
     },
@@ -109,7 +108,7 @@ export const qwen36_flash_model: KiloExclusiveModel = {
   public_id: 'qwen/qwen3.6-flash',
   display_name: 'Qwen: Qwen3.6 Flash',
   description:
-    "The Qwen3.6 native vision-language Flash model series delivers a significant performance boost over the 3.5-Flash version. This model particularly excels in agentic coding capabilities, substantially outperforming its predecessor on multiple code-agent benchmarks, as well as in mathematical and code reasoning. In terms of vision, it features markedly improved spatial intelligence, with especially notable enhancements in object localization and object detection. Note: a surcharge applies to long-context workloads exceeding 256K input tokens.",
+    'The Qwen3.6 native vision-language Flash model series delivers a significant performance boost over the 3.5-Flash version. This model particularly excels in agentic coding capabilities, substantially outperforming its predecessor on multiple code-agent benchmarks, as well as in mathematical and code reasoning. In terms of vision, it features markedly improved spatial intelligence, with especially notable enhancements in object localization and object detection. Note: a surcharge applies to long-context workloads exceeding 256K input tokens.',
   context_length: 1_000_000,
   max_completion_tokens: 65_536,
   status: 'public',

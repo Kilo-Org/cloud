@@ -63,12 +63,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
         .map(effort => [effort, { reasoning: { enabled: effort !== 'none', effort } }])
     );
   }
-  if (
-    isKimiModel(model) ||
-    isGlmModel(model) ||
-    qwen36ModelIds.has(model) ||
-    isGemmaModel(model)
-  ) {
+  if (isKimiModel(model) || isGlmModel(model) || qwen36ModelIds.has(model) || isGemmaModel(model)) {
     return REASONING_VARIANTS_BINARY;
   }
   if (model === seed_20_code_free_model.public_id) {

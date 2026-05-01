@@ -1816,6 +1816,80 @@ export async function refreshTokenForAllAgents(): Promise<
 }
 
 /**
+ * Minimal shape of `client.session` needed by {@link applyModelToSession}.
+ * Defined structurally so tests can pass a fake without pulling in the
+ * whole KiloClient type.
+ */
+type SessionPromptClient = {
+  session: {
+    prompt: (args: {
+      path: { id: string };
+      body: {
+        parts: Array<{ type: 'text'; text: string }>;
+        model: { providerID: string; modelID: string };
+        noReply?: boolean;
+      };
+    }) => Promise<unknown>;
+  };
+};
+
+/**
+ * Push a model selection onto a mayor session.
+ *
+ * For a freshly created session, sends the startup prompt together with
+ * the model param so the first turn runs the configured model.
+ *
+ * For a resumed session the startup prompt MUST NOT be replayed (it
+ * would recreate the duplicate turn regression fixed by 9785570b9),
+ * but the per-session model on the SDK server still needs to be updated
+ * so the next user turn uses the newly-selected model. We do this by
+ * sending a `noReply: true` prompt that carries only the model param;
+ * the SDK treats this as a state update and does not trigger the model.
+ *
+ * Errors on the resumed path are swallowed: if pushing the model fails,
+ * the mayor falls back to whichever model the SDK server loaded from
+ * KILO_CONFIG_CONTENT at startup, which we have already updated.
+ */
+export async function applyModelToSession(params: {
+  client: SessionPromptClient;
+  sessionId: string;
+  model: string;
+  prompt: string;
+  resumedSession: boolean;
+}): Promise<void> {
+  const { client, sessionId, model, prompt, resumedSession } = params;
+  const modelParam = { providerID: 'kilo', modelID: model };
+  if (!resumedSession) {
+    await client.session.prompt({
+      path: { id: sessionId },
+      body: {
+        parts: [{ type: 'text', text: prompt }],
+        model: modelParam,
+      },
+    });
+    return;
+  }
+  try {
+    await client.session.prompt({
+      path: { id: sessionId },
+      body: {
+        parts: [{ type: 'text', text: '' }],
+        model: modelParam,
+        noReply: true,
+      },
+    });
+    console.log(
+      `${MANAGER_LOG} updateAgentModel: pushed model=${model} to resumed session ${sessionId}`
+    );
+  } catch (err) {
+    console.warn(
+      `${MANAGER_LOG} updateAgentModel: failed to push model to resumed session ${sessionId}:`,
+      err
+    );
+  }
+}
+
+/**
  * Update the model for a running agent by restarting its SDK server with
  * new KILO_CONFIG_CONTENT. The kilo serve child process reads the model
  * from KILO_CONFIG_CONTENT at startup (highest config precedence after
@@ -1958,16 +2032,13 @@ export async function updateAgentModel(
     const prompt = conversationHistory
       ? `${conversationHistory}\n\n${MAYOR_STARTUP_PROMPT}`
       : MAYOR_STARTUP_PROMPT;
-    if (!resumedSession) {
-      const modelParam = { providerID: 'kilo', modelID: model };
-      await client.session.prompt({
-        path: { id: agent.sessionId },
-        body: {
-          parts: [{ type: 'text', text: prompt }],
-          model: modelParam,
-        },
-      });
-    }
+    await applyModelToSession({
+      client,
+      sessionId: agent.sessionId,
+      model,
+      prompt,
+      resumedSession,
+    });
     agent.messageCount = 1;
 
     // 6. New server is healthy — now tear down the old one.

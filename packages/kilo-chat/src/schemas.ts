@@ -12,13 +12,16 @@ export const ACTION_LABEL_MAX_CHARS = 200;
 // ── Primitives ──────────────────────────────────────────────────────
 
 export const ulidSchema = z.string().ulid();
+export const nonNegativeIntegerSchema = z.number().int().nonnegative();
 
 const SANDBOX_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 export const sandboxIdSchema = z.string().regex(SANDBOX_ID_PATTERN, 'Invalid sandboxId');
+export const nonEmptyStringSchema = z.string().min(1);
 
 // Approval decision values produced by openclaw's approval runtime. Kept in
 // lockstep with `ExecApprovalDecision` from `openclaw/plugin-sdk/approval-runtime`.
 export const execApprovalDecisionSchema = z.enum(['allow-once', 'allow-always', 'deny']);
+export const actionGroupIdSchema = z.string().min(1).max(ACTION_LABEL_MAX_CHARS);
 
 // Accepts strings up to `max` chars, trims leading/trailing whitespace, and
 // rejects values that become empty after trimming. Control characters are
@@ -59,7 +62,7 @@ export const actionItemSchema = z.object({
 export const actionsBlockSchema = z
   .object({
     type: z.literal('actions'),
-    groupId: z.string().min(1).max(ACTION_LABEL_MAX_CHARS),
+    groupId: actionGroupIdSchema,
     actions: z.array(actionItemSchema).max(10),
     resolved: z
       .object({
@@ -189,7 +192,7 @@ export const renameConversationRequestSchema = z.object({
 });
 
 export const executeActionRequestSchema = z.object({
-  groupId: z.string().min(1).max(ACTION_LABEL_MAX_CHARS),
+  groupId: actionGroupIdSchema,
   value: execApprovalDecisionSchema,
 });
 

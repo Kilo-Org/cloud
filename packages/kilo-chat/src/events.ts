@@ -1,97 +1,105 @@
 import { z } from 'zod';
-import { contentBlockSchema } from './schemas';
+import {
+  actionGroupIdSchema,
+  contentBlockSchema,
+  execApprovalDecisionSchema,
+  nonEmptyStringSchema,
+  nonNegativeIntegerSchema,
+  sandboxIdSchema,
+  ulidSchema,
+} from './schemas';
 
 // ── Per-event payload schemas ───────────────────────────────────────
 
 export const messageCreatedEventSchema = z.object({
-  messageId: z.string(),
-  senderId: z.string(),
+  messageId: ulidSchema,
+  senderId: nonEmptyStringSchema,
   content: z.array(contentBlockSchema),
-  inReplyToMessageId: z.string().nullable(),
-  clientId: z.string().nullable(),
+  inReplyToMessageId: ulidSchema.nullable(),
+  clientId: ulidSchema.nullable(),
 });
 
 export const messageUpdatedEventSchema = z.object({
-  messageId: z.string(),
+  messageId: ulidSchema,
   content: z.array(contentBlockSchema),
-  clientUpdatedAt: z.number().nullable(),
+  clientUpdatedAt: nonNegativeIntegerSchema.nullable(),
 });
 
 export const messageDeletedEventSchema = z.object({
-  messageId: z.string(),
+  messageId: ulidSchema,
 });
 
 export const messageDeliveryFailedEventSchema = z.object({
-  messageId: z.string(),
+  messageId: ulidSchema,
 });
 
 export const typingEventSchema = z.object({
-  memberId: z.string(),
+  memberId: nonEmptyStringSchema,
 });
 
 export const reactionAddedEventSchema = z.object({
-  messageId: z.string(),
-  memberId: z.string(),
+  messageId: ulidSchema,
+  memberId: nonEmptyStringSchema,
   emoji: z.string(),
 });
 
 export const reactionRemovedEventSchema = z.object({
-  messageId: z.string(),
-  memberId: z.string(),
+  messageId: ulidSchema,
+  memberId: nonEmptyStringSchema,
   emoji: z.string(),
 });
 
 export const conversationCreatedEventSchema = z.object({
-  conversationId: z.string(),
+  conversationId: ulidSchema,
 });
 
 export const conversationRenamedEventSchema = z.object({
-  conversationId: z.string(),
+  conversationId: ulidSchema,
   title: z.string(),
 });
 
 export const conversationLeftEventSchema = z.object({
-  conversationId: z.string(),
+  conversationId: ulidSchema,
 });
 
 export const conversationReadEventSchema = z.object({
-  conversationId: z.string(),
-  memberId: z.string(),
-  lastReadAt: z.number(),
+  conversationId: ulidSchema,
+  memberId: nonEmptyStringSchema,
+  lastReadAt: nonNegativeIntegerSchema,
 });
 
 export const conversationActivityEventSchema = z.object({
-  conversationId: z.string(),
-  lastActivityAt: z.number(),
+  conversationId: ulidSchema,
+  lastActivityAt: nonNegativeIntegerSchema,
 });
 
 export const actionExecutedEventSchema = z.object({
-  conversationId: z.string(),
-  messageId: z.string(),
-  groupId: z.string(),
-  value: z.string(),
-  executedBy: z.string(),
+  conversationId: ulidSchema,
+  messageId: ulidSchema,
+  groupId: actionGroupIdSchema,
+  value: execApprovalDecisionSchema,
+  executedBy: nonEmptyStringSchema,
 });
 
 export const actionDeliveryFailedEventSchema = z.object({
-  conversationId: z.string(),
-  messageId: z.string(),
-  groupId: z.string(),
+  conversationId: ulidSchema,
+  messageId: ulidSchema,
+  groupId: actionGroupIdSchema,
 });
 
 export const botStatusEventSchema = z.object({
-  sandboxId: z.string(),
+  sandboxId: sandboxIdSchema,
   online: z.boolean(),
-  at: z.number(),
+  at: nonNegativeIntegerSchema,
 });
 
 export const conversationStatusEventSchema = z.object({
-  conversationId: z.string(),
-  contextTokens: z.number(),
-  contextWindow: z.number(),
+  conversationId: ulidSchema,
+  contextTokens: nonNegativeIntegerSchema,
+  contextWindow: nonNegativeIntegerSchema,
   model: z.string().nullable(),
   provider: z.string().nullable(),
-  at: z.number(),
+  at: nonNegativeIntegerSchema,
 });
 
 // ── Discriminated union keyed on `event` literal ────────────────────

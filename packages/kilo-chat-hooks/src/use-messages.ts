@@ -303,6 +303,18 @@ export function messageFromCreatedEvent(e: MessageCreatedEvent): Message {
   };
 }
 
+function mergeCreatedMessageIntoCachedRow(created: Message, cached: Message): Message {
+  return {
+    ...created,
+    content: cached.clientUpdatedAt !== null ? cached.content : created.content,
+    updatedAt: cached.updatedAt ?? created.updatedAt,
+    clientUpdatedAt: cached.clientUpdatedAt ?? created.clientUpdatedAt,
+    deleted: cached.deleted || created.deleted,
+    deliveryFailed: cached.deliveryFailed || created.deliveryFailed,
+    reactions: cached.reactions.length > 0 ? cached.reactions : created.reactions,
+  };
+}
+
 export function applyMessageCreatedEventToPages<TPageParam>(
   old: InfiniteData<Message[], TPageParam>,
   e: MessageCreatedEvent
@@ -315,7 +327,9 @@ export function applyMessageCreatedEventToPages<TPageParam>(
     if (replacedPending !== old) return replacedPending;
   }
 
-  const replacedExisting = replaceMessageAndOrderNewestPage(old, e.messageId, () => newMessage);
+  const replacedExisting = replaceMessageAndOrderNewestPage(old, e.messageId, cached =>
+    mergeCreatedMessageIntoCachedRow(newMessage, cached)
+  );
   if (replacedExisting !== old) return replacedExisting;
 
   for (const page of old.pages) {

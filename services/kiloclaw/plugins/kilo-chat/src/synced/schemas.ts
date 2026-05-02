@@ -111,11 +111,19 @@ export const reactionSummarySchema = z.object({
 
 // ── Messages ────────────────────────────────────────────────────────
 
+export const replyToMessageSnapshotSchema = z.object({
+  messageId: z.string(),
+  senderId: z.string().nullable(),
+  deleted: z.boolean(),
+  previewText: z.string().nullable(),
+});
+
 export const messageSchema = z.object({
   id: z.string(),
   senderId: z.string(),
   content: z.array(contentBlockSchema),
   inReplyToMessageId: z.string().nullable(),
+  replyTo: replyToMessageSnapshotSchema.nullable(),
   updatedAt: z.number().nullable(),
   clientUpdatedAt: z.number().nullable(),
   deleted: z.boolean(),

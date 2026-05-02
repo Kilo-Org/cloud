@@ -19,11 +19,20 @@ fly auth docker
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 KILOCLAW_DIR="$(dirname "$SCRIPT_DIR")"
 
+# shellcheck source=services/kiloclaw/scripts/dev-image-mode.sh
+. "$SCRIPT_DIR/dev-image-mode.sh"
+
 # Parse --local flag
 USE_LOCAL=false
-for arg in "$@"; do
-  case "$arg" in
-    --local) USE_LOCAL=true; shift ;;
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --local)
+      USE_LOCAL=true
+      shift
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -31,24 +40,7 @@ done
 LOCAL_OPENCLAW_TARBALL=""
 if [ "$USE_LOCAL" = true ]; then
   DOCKERFILE="$KILOCLAW_DIR/Dockerfile.local"
-  # Validate that exactly one tarball exists in openclaw-build/. Dockerfile.local
-  # copies openclaw-*.tgz to a single file path, so multiple matches are ambiguous.
-  LOCAL_OPENCLAW_TARBALLS=$(find "$KILOCLAW_DIR/openclaw-build" -maxdepth 1 -type f -name 'openclaw-*.tgz' | sort)
-  LOCAL_OPENCLAW_TARBALL_COUNT=$(printf '%s\n' "$LOCAL_OPENCLAW_TARBALLS" | sed '/^$/d' | wc -l | tr -d ' ')
-  if [ "$LOCAL_OPENCLAW_TARBALL_COUNT" -eq 0 ]; then
-    echo "Error: No openclaw-*.tgz found in openclaw-build/." >&2
-    echo "Build your fork first:" >&2
-    echo "  cd /path/to/openclaw && pnpm build && npm pack" >&2
-    echo "  cp openclaw-*.tgz $(cd "$KILOCLAW_DIR" && pwd)/openclaw-build/" >&2
-    exit 1
-  fi
-  if [ "$LOCAL_OPENCLAW_TARBALL_COUNT" -gt 1 ]; then
-    echo "Error: Multiple openclaw-*.tgz files found in openclaw-build/." >&2
-    echo "$LOCAL_OPENCLAW_TARBALLS" >&2
-    echo "Keep exactly one tarball so Dockerfile.local and the content hash use the same input." >&2
-    exit 1
-  fi
-  LOCAL_OPENCLAW_TARBALL="$LOCAL_OPENCLAW_TARBALLS"
+  LOCAL_OPENCLAW_TARBALL="$(kiloclaw_resolve_local_openclaw_tarball "$KILOCLAW_DIR")"
   echo "Using Dockerfile.local with $(basename "$LOCAL_OPENCLAW_TARBALL")"
 else
   DOCKERFILE="$KILOCLAW_DIR/Dockerfile"
@@ -138,18 +130,15 @@ fi
 
 if [ "$USE_LOCAL" = true ]; then
   CONTENT_HASH="$("$KILOCLAW_DIR/scripts/image-content-hash.sh" --hash --dockerfile Dockerfile.local --openclaw-tarball "$LOCAL_OPENCLAW_TARBALL")"
+  CONTENT_MODE="local"
 else
   CONTENT_HASH="$("$KILOCLAW_DIR/scripts/image-content-hash.sh" --hash --dockerfile Dockerfile)"
+  CONTENT_MODE="production"
 fi
 
 if [ -f "$KILOCLAW_DIR/.dev.vars" ] && [ -n "$CONTENT_HASH" ]; then
-  if grep -q '^FLY_IMAGE_CONTENT_HASH=' "$KILOCLAW_DIR/.dev.vars"; then
-    sed "s/^FLY_IMAGE_CONTENT_HASH=.*/FLY_IMAGE_CONTENT_HASH=$CONTENT_HASH/" \
-      "$KILOCLAW_DIR/.dev.vars" > "$KILOCLAW_DIR/.dev.vars.tmp"
-    mv "$KILOCLAW_DIR/.dev.vars.tmp" "$KILOCLAW_DIR/.dev.vars"
-  else
-    echo "FLY_IMAGE_CONTENT_HASH=$CONTENT_HASH" >> "$KILOCLAW_DIR/.dev.vars"
-  fi
+  kiloclaw_set_dev_var "$KILOCLAW_DIR/.dev.vars" FLY_IMAGE_CONTENT_HASH "$CONTENT_HASH"
+  kiloclaw_set_dev_var "$KILOCLAW_DIR/.dev.vars" FLY_IMAGE_CONTENT_MODE "$CONTENT_MODE"
 fi
 
 echo ""
@@ -162,6 +151,7 @@ if [ -n "$OPENCLAW_VERSION" ]; then
 fi
 if [ -n "$CONTENT_HASH" ]; then
   echo "FLY_IMAGE_CONTENT_HASH=$CONTENT_HASH"
+  echo "FLY_IMAGE_CONTENT_MODE=$CONTENT_MODE"
 fi
 echo ""
 echo "Done. Restart wrangler dev to pick up the new tag."

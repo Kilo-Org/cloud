@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { and, eq, desc, sql } from 'drizzle-orm';
+import { and, eq, desc, sql, type SQL } from 'drizzle-orm';
 import { encodeConversationCursor, type ConversationCursor } from '@kilocode/kilo-chat';
 import { conversations } from '../db/membership-schema';
 import migrations from '../../drizzle/membership/migrations';
@@ -171,13 +171,12 @@ export class MembershipDO extends DurableObject<Env> {
   /**
    * Combined post-commit update for a single message. Always updates
    * `last_activity_at`; optionally updates `conversation_title` and
-   * `last_read_at` in the same statement so each member DO receives one
-   * round-trip per message instead of three.
+   * `last_read_at` in one SQLite update per message.
    *
    * Semantics:
    * - `title === undefined` → do not touch the title column.
    * - `title === null`      → clear the title (rare; auto-title always passes a string).
-   * - `markRead === true`   → set `last_read_at = activityAt` (user had active WS).
+   * - `markRead === true`   → advance `last_read_at` to at least `activityAt`.
    */
   applyPostCommit(params: {
     conversationId: string;
@@ -185,29 +184,16 @@ export class MembershipDO extends DurableObject<Env> {
     activityAt: number;
     markRead: boolean;
   }): void {
-    const existing = this.db
-      .select({
-        lastActivityAt: conversations.last_activity_at,
-        lastReadAt: conversations.last_read_at,
-      })
-      .from(conversations)
-      .where(eq(conversations.conversation_id, params.conversationId))
-      .get();
-
-    if (!existing) {
-      return;
-    }
-
     const set: {
-      last_activity_at: number;
+      last_activity_at: SQL<number>;
       conversation_title?: string | null;
-      last_read_at?: number;
+      last_read_at?: SQL<number>;
     } = {
-      last_activity_at: Math.max(existing.lastActivityAt ?? params.activityAt, params.activityAt),
+      last_activity_at: sql<number>`max(coalesce(${conversations.last_activity_at}, ${params.activityAt}), ${params.activityAt})`,
     };
     if (params.title !== undefined) set.conversation_title = params.title;
     if (params.markRead) {
-      set.last_read_at = Math.max(existing.lastReadAt ?? params.activityAt, params.activityAt);
+      set.last_read_at = sql<number>`max(coalesce(${conversations.last_read_at}, ${params.activityAt}), ${params.activityAt})`;
     }
 
     this.db

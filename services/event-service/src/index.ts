@@ -2,6 +2,7 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { useWorkersLogger } from 'workers-tagged-logger';
+import { z } from 'zod';
 import type { MiddlewareHandler } from 'hono';
 import type { ConnectTicketResponse } from '@kilocode/event-service';
 import { extractBearerToken } from '@kilocode/worker-utils';
@@ -16,6 +17,7 @@ const app = new Hono<{ Bindings: Env }>();
 const ACCEPTED_WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 const CONNECTION_TICKET_TTL_MS = 30_000;
 const ALLOWED_BROWSER_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
+const connectTicketQuerySchema = z.object({ ticket: z.string().min(1) });
 
 app.use(
   '/connect/*',
@@ -94,12 +96,12 @@ app.get('/connect', async c => {
     return c.json({ error: 'Expected WebSocket upgrade' }, 426);
   }
 
-  const ticket = c.req.query('ticket');
-  if (!ticket) {
+  const query = connectTicketQuerySchema.safeParse({ ticket: c.req.query('ticket') });
+  if (!query.success) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  const userId = await consumeConnectionTicket(c.env, ticket);
+  const userId = await consumeConnectionTicket(c.env, query.data.ticket);
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401);
   }

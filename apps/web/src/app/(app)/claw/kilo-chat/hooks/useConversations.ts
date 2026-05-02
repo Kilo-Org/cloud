@@ -14,5 +14,6 @@ export {
   applyConversationReadToPages,
   updateConversationPages,
   filterConversationPages,
+  conversationsKey,
 } from '@kilocode/kilo-chat-hooks';
 export type { ConversationListInfiniteData } from '@kilocode/kilo-chat-hooks';

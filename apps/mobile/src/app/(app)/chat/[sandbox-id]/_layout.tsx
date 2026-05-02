@@ -1,5 +1,18 @@
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
+
+import { useInstanceEventSubscription } from '@/components/kilo-chat/hooks/use-instance-event-subscription';
+
+export function ChatSandboxInstanceEventSubscriptionMount() {
+  const { 'sandbox-id': sandboxId } = useLocalSearchParams<{ 'sandbox-id': string }>();
+  useInstanceEventSubscription(sandboxId);
+  return null;
+}
 
 export default function ChatSandboxLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <>
+      <ChatSandboxInstanceEventSubscriptionMount />
+      <Stack screenOptions={{ headerShown: false }} />
+    </>
+  );
 }

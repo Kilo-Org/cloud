@@ -12,7 +12,6 @@ import { timeAgo } from '@/lib/utils';
 import { EmptyConversationList } from './empty-conversation-list';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useConversations, useCreateConversation } from './hooks/use-conversations';
-import { useInstanceEventSubscription } from './hooks/use-instance-event-subscription';
 import { useInstancePresence } from './hooks/use-instance-presence';
 
 type Props = {
@@ -76,7 +75,6 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
 
-  useInstanceEventSubscription(sandboxId);
   useInstancePresence(sandboxId);
 
   function handleRowPress(conversationId: string) {

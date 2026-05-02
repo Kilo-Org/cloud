@@ -1,9 +1,9 @@
-import type { ConversationListItem } from '@kilocode/kilo-chat';
+import type { ConversationDetail, ConversationListItem } from '@kilocode/kilo-chat';
 import { ulidToTimestamp } from '@kilocode/kilo-chat';
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 
-import { conversationsKey } from './query-keys';
+import { conversationKey, conversationsKey } from './query-keys';
 import {
   applyConversationActivityToPages,
   applyConversationCreatedToPages,
@@ -32,6 +32,17 @@ function conversation(
     lastActivityAt: overrides.lastActivityAt ?? null,
     lastReadAt: overrides.lastReadAt ?? null,
     joinedAt: overrides.joinedAt ?? 1,
+  };
+}
+
+function conversationDetail(overrides: Partial<ConversationDetail> = {}): ConversationDetail {
+  return {
+    id: 'conversation-a',
+    title: 'Original conversation',
+    createdBy: 'user-1',
+    createdAt: 1710000000000,
+    members: [{ id: 'user-1', kind: 'user' }],
+    ...overrides,
   };
 }
 
@@ -295,6 +306,25 @@ describe('settleRenameConversation', () => {
 
     expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+  });
+
+  it('updates active conversation detail title without waiting for an event', () => {
+    const queryClient = new QueryClient();
+    const detailKey = conversationKey('conversation-a');
+    queryClient.setQueryData<ConversationDetail>(
+      detailKey,
+      conversationDetail({ id: 'conversation-a', title: 'Original conversation' })
+    );
+
+    settleRenameConversation(queryClient, {
+      sandboxId: 'sandbox-a',
+      conversationId: 'conversation-a',
+      title: 'Renamed conversation',
+    });
+
+    expect(queryClient.getQueryData<ConversationDetail>(detailKey)?.title).toBe(
+      'Renamed conversation'
+    );
   });
 });
 

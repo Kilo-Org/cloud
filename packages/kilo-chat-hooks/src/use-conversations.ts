@@ -10,6 +10,7 @@ import {
 import type {
   CreateConversationRequest,
   CreateConversationResponse,
+  ConversationDetail,
   ConversationListItem,
   ConversationListResponse,
   MarkConversationReadRequest,
@@ -331,6 +332,11 @@ export function settleRenameConversation(
   queryClient: QueryClient,
   variables: RenameConversationMutationVariables
 ): void {
+  const detailKey = conversationKey(variables.conversationId);
+  queryClient.setQueryData<ConversationDetail>(detailKey, old =>
+    old ? { ...old, title: variables.title } : old
+  );
+  void queryClient.invalidateQueries({ queryKey: detailKey });
   void queryClient.invalidateQueries({
     queryKey: conversationListInvalidationKey(variables.sandboxId),
   });

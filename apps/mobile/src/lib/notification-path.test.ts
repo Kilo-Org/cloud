@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pushDataSchema } from '@kilocode/notifications';
 
+import { CHAT_STACK_ROUTE_NAME } from './app-stack-routes';
 import { notificationPathForData } from './notification-path';
 
 describe('notificationPathForData', () => {
@@ -13,6 +14,18 @@ describe('notificationPathForData', () => {
         messageId: 'message-1',
       })
     ).toBe('/(app)/chat/sandbox-1/conversation-1');
+  });
+
+  it('keeps the registered stack route on the sandbox-id chat segment', () => {
+    expect(CHAT_STACK_ROUTE_NAME).toBe('chat/[sandbox-id]');
+    expect(
+      notificationPathForData({
+        type: 'chat.message',
+        sandboxId: 'sandbox-1',
+        conversationId: 'conversation-1',
+        messageId: 'message-1',
+      })
+    ).toContain('/chat/sandbox-1/');
   });
 
   it('routes ready lifecycle notifications with legacy sandbox IDs to the sandbox chat screen', () => {

@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
+import { CHAT_STACK_ROUTE_NAME } from '@/lib/app-stack-routes';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function AppLayout() {
@@ -19,7 +20,7 @@ export default function AppLayout() {
           }}
         >
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="chat/[instance-id]" />
+          <Stack.Screen name={CHAT_STACK_ROUTE_NAME} />
           <Stack.Screen
             name="chat/instance-picker"
             options={{

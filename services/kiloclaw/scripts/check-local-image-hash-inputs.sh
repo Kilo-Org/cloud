@@ -33,6 +33,7 @@ assert_not_contains() {
 }
 
 assert_contains '^Dockerfile.local$'
+assert_contains '^\.dockerignore$'
 assert_contains '^openclaw-build/openclaw-hash-input-check\.tgz$'
 assert_contains '^controller/src/index.ts$'
 assert_not_contains '^Dockerfile$'

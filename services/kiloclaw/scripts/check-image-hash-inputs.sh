@@ -33,6 +33,7 @@ assert_not_contains() {
 }
 
 assert_contains '^Dockerfile$'
+assert_contains '^\.dockerignore$'
 assert_contains '^plugins/kilo-chat/src/index.ts$'
 assert_not_contains '(^|/)node_modules/'
 assert_not_contains '^plugins/[^/]+/dist/'

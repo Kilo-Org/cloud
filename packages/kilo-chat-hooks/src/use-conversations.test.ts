@@ -10,6 +10,7 @@ import {
   applyOptimisticMarkConversationRead,
   rollbackOptimisticMarkConversationRead,
   settleMarkConversationRead,
+  settleCreateConversation,
   type ConversationListInfiniteData,
 } from './use-conversations';
 
@@ -186,6 +187,41 @@ describe('applyConversationCreatedToPages', () => {
 
     expect(result.applied).toBe(false);
     expect(result.data).toBe(data);
+  });
+});
+
+describe('settleCreateConversation', () => {
+  it('invalidates only the target sandbox when create fallback cannot patch it', () => {
+    const queryClient = new QueryClient();
+    const activeKey = conversationsKey('sandbox-a');
+    const otherKey = conversationsKey('sandbox-b');
+
+    queryClient.setQueryData(
+      activeKey,
+      conversationsData(
+        [[conversation('conversation-a', { lastActivityAt: 300, joinedAt: 300 })]],
+        ['cursor-1']
+      )
+    );
+    queryClient.setQueryData(
+      otherKey,
+      conversationsData(
+        [[conversation('conversation-b', { lastActivityAt: 300, joinedAt: 300 })]],
+        [null]
+      )
+    );
+
+    settleCreateConversation(
+      queryClient,
+      { sandboxId: 'sandbox-a' },
+      {
+        conversationId: 'conversation-created',
+        conversation: conversation('conversation-created', { lastActivityAt: null, joinedAt: 100 }),
+      }
+    );
+
+    expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
   });
 });
 

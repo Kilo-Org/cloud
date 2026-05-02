@@ -3,6 +3,7 @@ import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query'
 import { ulidToTimestamp, type KiloChatClient } from '@kilocode/kilo-chat';
 import type {
   CreateConversationRequest,
+  CreateConversationResponse,
   ConversationListItem,
   ConversationListResponse,
   MarkConversationReadRequest,
@@ -57,30 +58,7 @@ export function useCreateConversation(client: KiloChatClient, options?: Mutation
   return useMutation({
     mutationFn: (req: CreateConversationRequest) => client.createConversation(req),
     onSuccess: (response, variables) => {
-      let invalidationRequired = false;
-      let matchedEntryCount = 0;
-      const previousEntries = queryClient.getQueriesData<ConversationListInfiniteData>({
-        queryKey: conversationsKeyAll(),
-      });
-
-      for (const [entryQueryKey, data] of previousEntries) {
-        const sandboxId = conversationListSandboxIdFromQueryKey(entryQueryKey);
-        if (sandboxId !== variables.sandboxId && sandboxId !== null) {
-          continue;
-        }
-        matchedEntryCount += 1;
-
-        const result = applyConversationCreatedToPages(data, response.conversation);
-        if (!result.applied) {
-          invalidationRequired = true;
-        } else {
-          queryClient.setQueryData<ConversationListInfiniteData>(entryQueryKey, result.data);
-        }
-      }
-
-      if (invalidationRequired || matchedEntryCount === 0) {
-        void queryClient.invalidateQueries({ queryKey: conversationsKeyAll() });
-      }
+      settleCreateConversation(queryClient, variables, response);
     },
     onError: options?.onError,
   });
@@ -264,6 +242,47 @@ export function applyConversationCreatedToPages(
     },
     applied: true,
   };
+}
+
+export function settleCreateConversation(
+  queryClient: QueryClient,
+  variables: CreateConversationRequest,
+  response: CreateConversationResponse
+): void {
+  let targetInvalidationRequired = false;
+  let catchAllInvalidationRequired = false;
+  let matchedTargetEntryCount = 0;
+  const previousEntries = queryClient.getQueriesData<ConversationListInfiniteData>({
+    queryKey: conversationsKeyAll(),
+  });
+
+  for (const [entryQueryKey, data] of previousEntries) {
+    const sandboxId = conversationListSandboxIdFromQueryKey(entryQueryKey);
+    if (sandboxId !== variables.sandboxId && sandboxId !== null) {
+      continue;
+    }
+    if (sandboxId === variables.sandboxId) {
+      matchedTargetEntryCount += 1;
+    }
+
+    const result = applyConversationCreatedToPages(data, response.conversation);
+    if (!result.applied) {
+      if (sandboxId === null) {
+        catchAllInvalidationRequired = true;
+      } else {
+        targetInvalidationRequired = true;
+      }
+    } else {
+      queryClient.setQueryData<ConversationListInfiniteData>(entryQueryKey, result.data);
+    }
+  }
+
+  if (targetInvalidationRequired || matchedTargetEntryCount === 0) {
+    void queryClient.invalidateQueries({ queryKey: conversationsKey(variables.sandboxId) });
+  }
+  if (catchAllInvalidationRequired) {
+    void queryClient.invalidateQueries({ queryKey: conversationsKey(null) });
+  }
 }
 
 export function applyConversationReadToPages(

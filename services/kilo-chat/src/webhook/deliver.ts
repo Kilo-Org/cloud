@@ -8,7 +8,11 @@ import { formatError, withDORetry } from '@kilocode/worker-utils';
 import type { z } from 'zod';
 import { logger, withLogTags } from '../util/logger';
 import { getConversationContext, pushEventToHumanMembers } from '../services/event-push';
-import type { ConversationDO, NotifyDeliveryFailedResult } from '../do/conversation-do';
+import type {
+  ConversationDO,
+  NotifyDeliveryFailedResult,
+  RevertActionResolutionResult,
+} from '../do/conversation-do';
 
 type MessageCreatedPayload = z.infer<typeof messageCreatedWebhookSchema>;
 type ActionExecutedWebhookPayload = z.infer<typeof actionExecutedWebhookSchema>;
@@ -156,16 +160,20 @@ export async function notifyActionDeliveryFailed(
     convContext?: ConversationEventContext;
   }
 ): Promise<void> {
-  await withDORetry(
+  const result = await withDORetry<DurableObjectStub<ConversationDO>, RevertActionResolutionResult>(
     () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(params.conversationId)),
     async stub => {
-      await stub.revertActionResolution({
+      const result: RevertActionResolutionResult = await stub.revertActionResolution({
         messageId: params.messageId,
         groupId: params.groupId,
       });
+      return result;
     },
     'ConversationDO.revertActionResolution'
   );
+  if (!result.ok) {
+    return;
+  }
 
   const ctx = params.convContext ?? (await getConversationContext(env, params.conversationId));
   if (ctx?.sandboxId) {

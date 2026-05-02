@@ -5,6 +5,7 @@ import type { ConversationDO } from '../do/conversation-do';
 import {
   deliverActionExecutedToBot,
   deliverToBot,
+  notifyActionDeliveryFailed,
   notifyMessageDeliveryFailed,
 } from '../webhook/deliver';
 
@@ -37,6 +38,70 @@ function makeEnvWithConvStub(
       }),
     },
   } as unknown as Env;
+}
+
+function makeEnvWithPushEvent(pushEvent: ReturnType<typeof vi.fn>): Env {
+  return {
+    ...env,
+    EVENT_SERVICE: {
+      fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+      connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+      pushEvent,
+    } satisfies Env['EVENT_SERVICE'],
+  } satisfies Env;
+}
+
+async function setupActionMessage(params?: {
+  conversationId?: string;
+  resolved?: boolean;
+}): Promise<{
+  conversationId: string;
+  sandboxId: string;
+  userId: string;
+  botId: string;
+  messageId: string;
+  stub: DurableObjectStub<ConversationDO>;
+}> {
+  const sandboxId = 'sandbox-action-delivery';
+  const conversationId = params?.conversationId ?? ulid();
+  const userId = 'user-action-delivery';
+  const botId = `bot:kiloclaw:${sandboxId}`;
+  const stub = getConvStub(conversationId);
+  await stub.initialize({
+    id: conversationId,
+    title: 'Action delivery',
+    createdBy: userId,
+    createdAt: Date.now(),
+    members: [
+      { id: userId, kind: 'user' },
+      { id: botId, kind: 'bot' },
+    ],
+  });
+  const create = await stub.createMessage({
+    senderId: botId,
+    content: [
+      {
+        type: 'actions',
+        groupId: 'g1',
+        actions: [{ value: 'allow-once', label: 'Allow', style: 'primary' }],
+      },
+    ],
+  });
+  if (!create.ok) {
+    throw new Error('Expected action message creation to succeed');
+  }
+  if (params?.resolved !== false) {
+    const execute = await stub.executeAction({
+      messageId: create.messageId,
+      memberId: userId,
+      groupId: 'g1',
+      value: 'allow-once',
+    });
+    if (!execute.ok) {
+      throw new Error('Expected action execution to succeed');
+    }
+  }
+  return { conversationId, sandboxId, userId, botId, messageId: create.messageId, stub };
 }
 
 describe('deliverToBot', () => {
@@ -218,41 +283,8 @@ describe('deliverToBot', () => {
 
 describe('deliverActionExecutedToBot', () => {
   it('reverts resolved action content and pushes delivery_failed after permanent RPC failure', async () => {
-    const sandboxId = 'sandbox-action-delivery';
-    const conversationId = ulid();
-    const userId = 'user-action-delivery';
-    const botId = `bot:kiloclaw:${sandboxId}`;
-    const stub = getConvStub(conversationId);
-    await stub.initialize({
-      id: conversationId,
-      title: 'Action delivery',
-      createdBy: userId,
-      createdAt: Date.now(),
-      members: [
-        { id: userId, kind: 'user' },
-        { id: botId, kind: 'bot' },
-      ],
-    });
-    const create = await stub.createMessage({
-      senderId: botId,
-      content: [
-        {
-          type: 'actions',
-          groupId: 'g1',
-          actions: [{ value: 'allow-once', label: 'Allow', style: 'primary' }],
-        },
-      ],
-    });
-    if (!create.ok) {
-      throw new Error('Expected action message creation to succeed');
-    }
-    const execute = await stub.executeAction({
-      messageId: create.messageId,
-      memberId: userId,
-      groupId: 'g1',
-      value: 'allow-once',
-    });
-    expect(execute.ok).toBe(true);
+    const { sandboxId, conversationId, userId, botId, messageId, stub } =
+      await setupActionMessage();
 
     const deliverChatWebhook = vi.fn().mockRejectedValue(new Error('bot down'));
     const pushEvent = vi.fn().mockResolvedValue(false);
@@ -274,7 +306,7 @@ describe('deliverActionExecutedToBot', () => {
       type: 'action.executed',
       targetBotId: botId,
       conversationId,
-      messageId: create.messageId,
+      messageId,
       groupId: 'g1',
       value: 'allow-once',
       executedBy: userId,
@@ -283,7 +315,7 @@ describe('deliverActionExecutedToBot', () => {
 
     expect(deliverChatWebhook).toHaveBeenCalledTimes(3);
     const after = await stub.listMessages({ limit: 10 });
-    const message = after.messages.find(m => m.id === create.messageId);
+    const message = after.messages.find(m => m.id === messageId);
     if (!message) {
       throw new Error('Expected action message to remain stored');
     }
@@ -296,7 +328,59 @@ describe('deliverActionExecutedToBot', () => {
       userId,
       `/kiloclaw/${sandboxId}/${conversationId}`,
       'action.delivery_failed',
-      { conversationId, messageId: create.messageId, groupId: 'g1' }
+      { conversationId, messageId, groupId: 'g1' }
     );
+  });
+
+  it('does not push action.delivery_failed when the message is missing', async () => {
+    const pushEvent = vi.fn().mockResolvedValue(false);
+
+    await notifyActionDeliveryFailed(makeEnvWithPushEvent(pushEvent), {
+      conversationId: ulid(),
+      messageId: 'missing-message',
+      groupId: 'g1',
+      convContext: {
+        humanMemberIds: ['user-action-delivery'],
+        sandboxId: 'sandbox-action-delivery',
+      },
+    });
+
+    expect(pushEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not push action.delivery_failed when the message was deleted', async () => {
+    const { conversationId, messageId, botId, stub } = await setupActionMessage();
+    const deleteResult = await stub.deleteMessage({ messageId, senderId: botId });
+    expect(deleteResult.ok).toBe(true);
+    const pushEvent = vi.fn().mockResolvedValue(false);
+
+    await notifyActionDeliveryFailed(makeEnvWithPushEvent(pushEvent), {
+      conversationId,
+      messageId,
+      groupId: 'g1',
+      convContext: {
+        humanMemberIds: ['user-action-delivery'],
+        sandboxId: 'sandbox-action-delivery',
+      },
+    });
+
+    expect(pushEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not push action.delivery_failed when the action group is no longer present', async () => {
+    const { conversationId, messageId } = await setupActionMessage({ resolved: false });
+    const pushEvent = vi.fn().mockResolvedValue(false);
+
+    await notifyActionDeliveryFailed(makeEnvWithPushEvent(pushEvent), {
+      conversationId,
+      messageId,
+      groupId: 'removed-group',
+      convContext: {
+        humanMemberIds: ['user-action-delivery'],
+        sandboxId: 'sandbox-action-delivery',
+      },
+    });
+
+    expect(pushEvent).not.toHaveBeenCalled();
   });
 });

@@ -91,6 +91,11 @@ export const sendInstanceLifecycleNotificationOutputSchema = z.object({
   sent: z.number().int().nonnegative(),
   staleTokens: z.number().int().nonnegative(),
   receiptCount: z.number().int().nonnegative(),
+  ticketErrors: z.object({
+    total: z.number().int().nonnegative(),
+    retryable: z.number().int().nonnegative(),
+    terminal: z.number().int().nonnegative(),
+  }),
 });
 export type SendInstanceLifecycleNotificationResult = z.infer<
   typeof sendInstanceLifecycleNotificationOutputSchema

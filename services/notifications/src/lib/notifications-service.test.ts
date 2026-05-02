@@ -8,6 +8,8 @@ import {
   type SendInstanceLifecycleNotificationParams,
 } from './instance-lifecycle-push';
 
+const emptyTicketErrors = { total: 0, retryable: 0, terminal: 0 } as const;
+
 function baseParams(
   overrides: Partial<SendInstanceLifecycleNotificationParams> = {}
 ): SendInstanceLifecycleNotificationParams {
@@ -138,7 +140,13 @@ describe('dispatchInstanceLifecyclePush', () => {
 
     const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
 
-    expect(result).toEqual({ tokenCount: 2, sent: 2, staleTokens: 0, receiptCount: 2 });
+    expect(result).toEqual({
+      tokenCount: 2,
+      sent: 2,
+      staleTokens: 0,
+      receiptCount: 2,
+      ticketErrors: emptyTicketErrors,
+    });
     expect(calls.getTokenQueries).toEqual(['user-1']);
     expect(calls.sentMessages).toHaveLength(1);
     expect(calls.sentMessages[0]).toHaveLength(2);
@@ -154,7 +162,13 @@ describe('dispatchInstanceLifecyclePush', () => {
 
     const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
 
-    expect(result).toEqual({ tokenCount: 0, sent: 0, staleTokens: 0, receiptCount: 0 });
+    expect(result).toEqual({
+      tokenCount: 0,
+      sent: 0,
+      staleTokens: 0,
+      receiptCount: 0,
+      ticketErrors: emptyTicketErrors,
+    });
     expect(calls.sentMessages).toHaveLength(0);
     expect(calls.enqueuedReceipts).toHaveLength(0);
     expect(calls.deletedTokens).toHaveLength(0);
@@ -176,8 +190,50 @@ describe('dispatchInstanceLifecyclePush', () => {
 
     const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
 
-    expect(result).toEqual({ tokenCount: 2, sent: 1, staleTokens: 1, receiptCount: 1 });
+    expect(result).toEqual({
+      tokenCount: 2,
+      sent: 1,
+      staleTokens: 1,
+      receiptCount: 1,
+      ticketErrors: emptyTicketErrors,
+    });
     expect(calls.deletedTokens).toEqual([['ExponentPushToken[bbb]']]);
+  });
+
+  it('surfaces non-stale ticket error counts without token details', async () => {
+    const { deps, calls } = fakeDeps({
+      sendPush: async () => ({
+        ticketTokenPairs: [],
+        staleTokens: [],
+        ticketErrors: [
+          {
+            token: 'ExponentPushToken[aaa]',
+            errorCode: 'MessageTooBig',
+            message: 'Message is too big',
+            retryable: false,
+          },
+          {
+            token: 'ExponentPushToken[bbb]',
+            errorCode: 'MessageRateExceeded',
+            message: 'Rate exceeded',
+            retryable: true,
+          },
+        ],
+      }),
+    });
+
+    const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
+
+    expect(result).toEqual({
+      tokenCount: 2,
+      sent: 0,
+      staleTokens: 0,
+      receiptCount: 0,
+      ticketErrors: { total: 2, retryable: 1, terminal: 1 },
+    });
+    expect(calls.deletedTokens).toHaveLength(0);
+    expect(calls.enqueuedReceipts).toHaveLength(0);
+    expect(JSON.stringify(result)).not.toContain('ExponentPushToken');
   });
 
   it('skips receipt enqueue when every ticket was a failure', async () => {
@@ -191,7 +247,13 @@ describe('dispatchInstanceLifecyclePush', () => {
 
     const result = await dispatchInstanceLifecyclePush(baseParams(), deps);
 
-    expect(result).toEqual({ tokenCount: 2, sent: 0, staleTokens: 2, receiptCount: 0 });
+    expect(result).toEqual({
+      tokenCount: 2,
+      sent: 0,
+      staleTokens: 2,
+      receiptCount: 0,
+      ticketErrors: emptyTicketErrors,
+    });
     expect(calls.deletedTokens).toEqual([['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]']]);
     expect(calls.enqueuedReceipts).toHaveLength(0);
   });

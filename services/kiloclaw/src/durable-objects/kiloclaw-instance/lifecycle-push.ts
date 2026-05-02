@@ -18,6 +18,7 @@ import type { KiloClawEnv } from '../../types';
 import type { InstanceMutableState } from './types';
 import { storageUpdate } from './state';
 import { doLog, doWarn, toLoggable } from './log';
+import type { SendInstanceLifecycleNotificationResult } from '../../notifications-binding';
 
 /**
  * Reset shape for the lifecycle notification flags. Spread this into storage
@@ -45,6 +46,31 @@ const START_FAILURE_BODIES: Record<StartFailureLabel, string> = {
 };
 
 const GENERIC_START_FAILURE_BODY = 'Start failed.';
+
+function logLifecyclePushResult(
+  state: InstanceMutableState,
+  message: string,
+  result: SendInstanceLifecycleNotificationResult,
+  details: Record<string, unknown>
+): void {
+  const baseDetails = {
+    ...details,
+    tokenCount: result.tokenCount,
+    sent: result.sent,
+    staleTokens: result.staleTokens,
+    receiptCount: result.receiptCount,
+    ticketErrors: result.ticketErrors.total,
+    retryableTicketErrors: result.ticketErrors.retryable,
+    terminalTicketErrors: result.ticketErrors.terminal,
+  };
+
+  if (result.ticketErrors.total > 0) {
+    doWarn(state, `${message} with ticket errors`, baseDetails);
+    return;
+  }
+
+  doLog(state, message, baseDetails);
+}
 
 /**
  * Map a reconcile failure label to a short user-facing sentence. Unknown
@@ -109,13 +135,9 @@ export async function dispatchReadyPush(
       event: 'ready',
       instanceName,
     });
-    doLog(state, 'ready push dispatch completed', {
+    logLifecyclePushResult(state, 'ready push dispatch completed', result, {
       event: 'ready',
       sandboxId: state.sandboxId,
-      tokenCount: result.tokenCount,
-      sent: result.sent,
-      staleTokens: result.staleTokens,
-      receiptCount: result.receiptCount,
     });
   } catch (err) {
     doWarn(state, 'ready push dispatch failed (non-fatal)', {
@@ -154,14 +176,10 @@ export async function maybeDispatchStartFailurePush(
       instanceName,
       errorMessage: errorText,
     });
-    doLog(state, 'start failure push dispatch completed', {
+    logLifecyclePushResult(state, 'start failure push dispatch completed', result, {
       event: 'start_failed',
       sandboxId: state.sandboxId,
       label,
-      tokenCount: result.tokenCount,
-      sent: result.sent,
-      staleTokens: result.staleTokens,
-      receiptCount: result.receiptCount,
     });
   } catch (err) {
     doWarn(state, 'start failure push dispatch failed (non-fatal)', {

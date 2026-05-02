@@ -20,6 +20,7 @@ export type {
 } from '@kilocode/notifications';
 
 const BODY_MAX_LENGTH = 100;
+const EMPTY_TICKET_ERRORS = { total: 0, retryable: 0, terminal: 0 } as const;
 
 function truncate(text: string, max = BODY_MAX_LENGTH): string {
   if (text.length <= max) return text;
@@ -81,11 +82,17 @@ export async function dispatchInstanceLifecyclePush(
 
   const tokens = await deps.getTokens(parsed.userId);
   if (tokens.length === 0) {
-    return { tokenCount: 0, sent: 0, staleTokens: 0, receiptCount: 0 };
+    return {
+      tokenCount: 0,
+      sent: 0,
+      staleTokens: 0,
+      receiptCount: 0,
+      ticketErrors: EMPTY_TICKET_ERRORS,
+    };
   }
 
   const messages = buildInstanceLifecycleMessages(tokens, parsed);
-  const { ticketTokenPairs, staleTokens } = await deps.sendPush(messages);
+  const { ticketTokenPairs, staleTokens, ticketErrors } = await deps.sendPush(messages);
 
   if (staleTokens.length > 0) {
     await deps.deleteStaleTokens(staleTokens);
@@ -100,5 +107,10 @@ export async function dispatchInstanceLifecyclePush(
     sent: ticketTokenPairs.length,
     staleTokens: staleTokens.length,
     receiptCount: ticketTokenPairs.length,
+    ticketErrors: {
+      total: ticketErrors.length,
+      retryable: ticketErrors.filter(ticketError => ticketError.retryable).length,
+      terminal: ticketErrors.filter(ticketError => !ticketError.retryable).length,
+    },
   };
 }

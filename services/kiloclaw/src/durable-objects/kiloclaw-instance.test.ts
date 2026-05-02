@@ -9213,12 +9213,29 @@ type LifecyclePushCall = {
   errorMessage?: string;
 };
 
-function createFakeNotificationsBinding(): {
+type LifecyclePushResult = {
+  tokenCount: number;
+  sent: number;
+  staleTokens: number;
+  receiptCount: number;
+  ticketErrors: {
+    total: number;
+    retryable: number;
+    terminal: number;
+  };
+};
+
+const cleanLifecyclePushResult = {
+  tokenCount: 1,
+  sent: 1,
+  staleTokens: 0,
+  receiptCount: 1,
+  ticketErrors: { total: 0, retryable: 0, terminal: 0 },
+} satisfies LifecyclePushResult;
+
+function createFakeNotificationsBinding(result: LifecyclePushResult = cleanLifecyclePushResult): {
   binding: {
-    sendInstanceLifecycleNotification: (params: LifecyclePushCall) => Promise<{
-      sent: number;
-      staleTokens: number;
-    }>;
+    sendInstanceLifecycleNotification: (params: LifecyclePushCall) => Promise<LifecyclePushResult>;
   };
   calls: LifecyclePushCall[];
 } {
@@ -9227,7 +9244,7 @@ function createFakeNotificationsBinding(): {
     binding: {
       sendInstanceLifecycleNotification: async (params: LifecyclePushCall) => {
         calls.push(params);
-        return { tokenCount: 1, sent: 1, staleTokens: 0, receiptCount: 1 };
+        return result;
       },
     },
     calls,
@@ -9266,6 +9283,43 @@ describe('instance ready push', () => {
     await Promise.all(waitUntilPromises);
 
     expect(calls).toHaveLength(0);
+  });
+
+  it('logs ticket-error ready dispatches as warnings instead of clean completions', async () => {
+    const env = createFakeEnv();
+    const { binding } = createFakeNotificationsBinding({
+      tokenCount: 2,
+      sent: 1,
+      staleTokens: 0,
+      receiptCount: 1,
+      ticketErrors: { total: 1, retryable: 0, terminal: 1 },
+    });
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    const warningCall = (console.warn as Mock).mock.calls.find(
+      (c: unknown[]) =>
+        typeof c[0] === 'string' &&
+        c[0].includes('ready push dispatch completed with ticket errors')
+    );
+    if (!warningCall) throw new Error('Expected ready push ticket-error warning');
+    const payload = JSON.parse(warningCall[0] as string) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      level: 'warn',
+      message: 'ready push dispatch completed with ticket errors',
+      tokenCount: 2,
+      sent: 1,
+      staleTokens: 0,
+      receiptCount: 1,
+      ticketErrors: 1,
+      retryableTicketErrors: 0,
+      terminalTicketErrors: 1,
+    });
   });
 
   it('does not dispatch when provisioned > 6h ago', async () => {

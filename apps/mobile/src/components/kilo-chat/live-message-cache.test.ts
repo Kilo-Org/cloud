@@ -46,11 +46,11 @@ function actionMessage(
 describe('applyMessageCreatedEventToPages', () => {
   it('adds bot-created messages to the open conversation cache', () => {
     const data: InfiniteData<Message[], string | undefined> = {
-      pages: [[message('existing')]],
+      pages: [[message('01HX0000000000000000000000')]],
       pageParams: [undefined],
     };
     const event = {
-      messageId: 'bot-message',
+      messageId: '01HX0000000000000000000001',
       senderId: 'bot:sandbox-1',
       content: [{ type: 'text', text: 'hello from bot' }],
       inReplyToMessageId: null,
@@ -60,7 +60,58 @@ describe('applyMessageCreatedEventToPages', () => {
 
     const result = applyMessageCreatedEventToPages(data, event);
 
-    expect(result.pages[0]?.map(m => m.id)).toEqual(['bot-message', 'existing']);
+    expect(result.pages[0]?.map(m => m.id)).toEqual([
+      '01HX0000000000000000000001',
+      '01HX0000000000000000000000',
+    ]);
+  });
+
+  it('keeps the newest page ordered when an older remote message arrives after a newer one', () => {
+    const newerRemote = message('01HX0000000000000000000002');
+    const data: InfiniteData<Message[], string | undefined> = {
+      pages: [[newerRemote]],
+      pageParams: [undefined],
+    };
+    const event = {
+      messageId: '01HX0000000000000000000001',
+      senderId: 'bot:sandbox-1',
+      content: [{ type: 'text', text: 'older delayed message' }],
+      inReplyToMessageId: null,
+      replyTo: null,
+      clientId: null,
+    } satisfies MessageCreatedEvent;
+
+    const result = applyMessageCreatedEventToPages(data, event);
+
+    expect(result.pages[0]?.map(m => m.id)).toEqual([
+      '01HX0000000000000000000002',
+      '01HX0000000000000000000001',
+    ]);
+  });
+
+  it('keeps pending messages in place while ordering delayed remote messages', () => {
+    const newerRemote = message('01HX0000000000000000000002');
+    const pendingLocal = message('pending-client-1');
+    const data: InfiniteData<Message[], string | undefined> = {
+      pages: [[newerRemote, pendingLocal]],
+      pageParams: [undefined],
+    };
+    const event = {
+      messageId: '01HX0000000000000000000001',
+      senderId: 'bot:sandbox-1',
+      content: [{ type: 'text', text: 'older delayed message' }],
+      inReplyToMessageId: null,
+      replyTo: null,
+      clientId: null,
+    } satisfies MessageCreatedEvent;
+
+    const result = applyMessageCreatedEventToPages(data, event);
+
+    expect(result.pages[0]?.map(m => m.id)).toEqual([
+      '01HX0000000000000000000002',
+      '01HX0000000000000000000001',
+      'pending-client-1',
+    ]);
   });
 
   it('preserves reply snapshots from created events when the parent is not loaded', () => {

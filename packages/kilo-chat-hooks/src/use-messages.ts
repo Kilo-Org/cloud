@@ -321,7 +321,8 @@ export function applyMessageCreatedEventToPages<TPageParam>(
   }
 
   const firstPage = old.pages[0] ?? [];
-  return { ...old, pages: [[newMessage, ...firstPage], ...old.pages.slice(1)] };
+  const orderedFirstPage = orderNewestLoadedPageByServerId([newMessage, ...firstPage]);
+  return { ...old, pages: [orderedFirstPage, ...old.pages.slice(1)] };
 }
 
 export function useSendMessage(

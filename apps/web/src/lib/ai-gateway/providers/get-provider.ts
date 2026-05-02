@@ -172,8 +172,12 @@ export async function getProvider(
     Object.values(PROVIDERS).find(p => p.id === kiloExclusiveModel?.gateway) ??
     PROVIDERS.OPENROUTER;
 
+  const eligibleForVercelRouting =
+    !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
+
   if (
     defaultProvider.id === 'openrouter' &&
+    eligibleForVercelRouting &&
     (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
   ) {
     return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, bypassAccessCheck: false };

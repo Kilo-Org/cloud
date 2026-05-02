@@ -5,7 +5,7 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
-export type KiloExclusiveModelFlag = 'reasoning' | 'vision' | 'stealth';
+export type KiloExclusiveModelFlag = 'reasoning' | 'vision' | 'stealth' | 'vercel-routing';
 
 export type Usage = {
   uncachedInputTokens: number;

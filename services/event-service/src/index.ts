@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
+import type { ConnectTicketResponse } from '@kilocode/event-service';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { authenticateToken } from './auth';
 import { logger } from './util/logger';
@@ -82,7 +83,8 @@ app.post('/connect-ticket', async c => {
     return c.json({ error: 'Ticket mint failed' }, 500);
   }
 
-  return c.json({ ticket });
+  const response = { ticket } satisfies ConnectTicketResponse;
+  return c.json(response);
 });
 
 app.get('/connect', async c => {

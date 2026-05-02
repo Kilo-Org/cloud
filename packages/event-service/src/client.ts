@@ -1,5 +1,5 @@
 import type { ClientMessage, EventServiceConfig } from './types';
-import { serverMessageSchema } from './schemas';
+import { connectTicketResponseSchema, serverMessageSchema } from './schemas';
 
 const WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 
@@ -59,16 +59,7 @@ async function fetchConnectionTicket(wsBase: string, token: string): Promise<str
     throw new Error('Failed to mint WebSocket connection ticket');
   }
 
-  const body: unknown = await response.json();
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    !('ticket' in body) ||
-    typeof body.ticket !== 'string' ||
-    body.ticket.length === 0
-  ) {
-    throw new Error('Invalid WebSocket connection ticket response');
-  }
+  const body = connectTicketResponseSchema.parse(await response.json());
   return body.ticket;
 }
 

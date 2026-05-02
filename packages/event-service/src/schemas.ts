@@ -40,3 +40,9 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
   eventMessageSchema,
   errorMessageSchema,
 ]);
+
+// ── HTTP Responses ─────────────────────────────────────────────────
+
+export const connectTicketResponseSchema = z.object({
+  ticket: z.string().min(1),
+});

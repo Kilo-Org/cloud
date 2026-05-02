@@ -51,7 +51,7 @@ export type SendTypingParams = { conversationId: string };
 export type ListMessagesParams = { conversationId: string } & z.input<
   typeof listMessagesQuerySchema
 >;
-export type ListMessagesResult = { messages: Message[] };
+export type ListMessagesResult = z.infer<typeof botListMessagesResponseSchema>;
 export type GetMembersParams = { conversationId: string };
 export type GetMembersResult = BotGetMembersResponse;
 

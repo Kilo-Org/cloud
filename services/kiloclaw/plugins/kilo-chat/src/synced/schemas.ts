@@ -370,4 +370,6 @@ export const botListConversationsResponseSchema = z.object({
 
 export const botListMessagesResponseSchema = z.object({
   messages: z.array(messageSchema),
+  hasMore: z.boolean(),
+  nextCursor: z.string().nullable(),
 });

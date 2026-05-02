@@ -416,6 +416,7 @@ describe('listMessages', () => {
         senderId: 'u1',
         content: [{ type: 'text', text: 'hello' }],
         inReplyToMessageId: null,
+        replyTo: null,
         updatedAt: null,
         clientUpdatedAt: null,
         deleted: false,
@@ -426,7 +427,14 @@ describe('listMessages', () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
-      return new Response(JSON.stringify({ messages }), { status: 200 });
+      return new Response(
+        JSON.stringify({
+          messages,
+          hasMore: true,
+          nextCursor: 'cursor-next',
+        }),
+        { status: 200 }
+      );
     }) as typeof fetch;
 
     const client = createKiloChatClient({
@@ -436,7 +444,7 @@ describe('listMessages', () => {
     });
 
     const result = await client.listMessages({ conversationId: 'C1' });
-    expect(result).toEqual({ messages });
+    expect(result).toEqual({ messages, hasMore: true, nextCursor: 'cursor-next' });
     expect(calls[0].url).toBe('http://ctrl/_kilo/kilo-chat/conversations/C1/messages');
     expect(calls[0].init.method).toBe('GET');
     const headers = calls[0].init.headers as Record<string, string>;
@@ -447,7 +455,9 @@ describe('listMessages', () => {
     const calls: Array<string> = [];
     const fetchImpl = (async (url: string | URL) => {
       calls.push(String(url));
-      return new Response(JSON.stringify({ messages: [] }), { status: 200 });
+      return new Response(JSON.stringify({ messages: [], hasMore: false, nextCursor: null }), {
+        status: 200,
+      });
     }) as typeof fetch;
 
     const client = createKiloChatClient({

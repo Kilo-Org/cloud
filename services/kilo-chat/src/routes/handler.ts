@@ -409,7 +409,7 @@ export async function handleListMessages(c: HonoCtx) {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
-  return c.json({ messages: result.messages } satisfies MessageListResponse);
+  return c.json(result satisfies MessageListResponse);
 }
 
 // ─── getMembers ──────────────────────────────────────────────────────────────

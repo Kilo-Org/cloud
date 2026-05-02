@@ -103,13 +103,25 @@ describe('KiloChatClient', () => {
     });
 
     it('sends pagination params as query string', async () => {
-      const fetch = mockFetch(200, { messages: [] });
+      const fetch = mockFetch(200, { messages: [], hasMore: false, nextCursor: null });
       const client = new KiloChatClient(createMockConfig(fetch));
       await client.listMessages('conv-1', { before: 'cursor-id', limit: 25 });
       expect(fetch).toHaveBeenCalledWith(
         'https://chat.example.com/v1/conversations/conv-1/messages?before=cursor-id&limit=25',
         expect.anything()
       );
+    });
+
+    it('returns an explicit page from listMessagesPage', async () => {
+      const page = {
+        messages: [],
+        hasMore: true,
+        nextCursor: '01HXYZ00000ABCDEFGHJKMNPQS',
+      };
+      const fetch = mockFetch(200, page);
+      const client = new KiloChatClient(createMockConfig(fetch));
+
+      await expect(client.listMessagesPage('conv-1', { limit: 25 })).resolves.toEqual(page);
     });
   });
 

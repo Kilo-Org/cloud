@@ -27,6 +27,7 @@ import {
 import type {
   KiloChatClientConfig,
   ConversationListResponse,
+  MessageListResponse,
   ConversationDetailResponse,
   CreateConversationRequest,
   CreateConversationResponse,
@@ -260,11 +261,18 @@ export class KiloChatClient {
     conversationId: string,
     opts?: z.input<typeof listMessagesQuerySchema>
   ): Promise<Message[]> {
-    const res = await this.httpRequest(`/v1/conversations/${conversationId}/messages`, {
+    const res = await this.listMessagesPage(conversationId, opts);
+    return res.messages;
+  }
+
+  async listMessagesPage(
+    conversationId: string,
+    opts?: z.input<typeof listMessagesQuerySchema>
+  ): Promise<MessageListResponse> {
+    return this.httpRequest(`/v1/conversations/${conversationId}/messages`, {
       query: { before: opts?.before, limit: opts?.limit },
       schema: messageListResponseSchema,
     });
-    return res.messages;
   }
 
   // ── Typed event subscriptions ─────────────────────────────────────────────

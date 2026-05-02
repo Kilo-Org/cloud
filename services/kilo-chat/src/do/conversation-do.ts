@@ -134,6 +134,8 @@ export type MessageRow = Message;
 
 export type ListMessagesResult = {
   messages: MessageRow[];
+  hasMore: boolean;
+  nextCursor: string | null;
 };
 
 export type EditMessageParams = {
@@ -353,6 +355,14 @@ export class ConversationDO extends DurableObject<Env> {
     return { humanMemberIds, sandboxId };
   }
 
+  private getMemberContextIfActive(memberId: string): MemberContext | null {
+    const activeMembers = this.getActiveMemberRows();
+    if (!activeMembers.some(member => member.id === memberId)) {
+      return null;
+    }
+    return this.getMemberContextFromRows(activeMembers);
+  }
+
   private getMemberContext(): MemberContext {
     return this.getMemberContextFromRows(this.getActiveMemberRows());
   }
@@ -444,16 +454,22 @@ export class ConversationDO extends DurableObject<Env> {
   listMessages(params: ListMessagesParams): ListMessagesResult {
     const query = this.db.select().from(messages);
 
-    const rows = params.before
+    const rowsWithSentinel = params.before
       ? query
           .where(lt(messages.id, params.before))
           .orderBy(desc(messages.id))
-          .limit(params.limit)
+          .limit(params.limit + 1)
           .all()
-      : query.orderBy(desc(messages.id)).limit(params.limit).all();
+      : query
+          .orderBy(desc(messages.id))
+          .limit(params.limit + 1)
+          .all();
 
+    const hasMore = rowsWithSentinel.length > params.limit;
+    const rows = rowsWithSentinel.slice(0, params.limit);
+    const nextCursor = hasMore ? (rows[rows.length - 1]?.id ?? null) : null;
     if (rows.length === 0) {
-      return { messages: [] };
+      return { messages: [], hasMore: false, nextCursor: null };
     }
 
     const ids = rows.map(r => r.id);
@@ -503,6 +519,8 @@ export class ConversationDO extends DurableObject<Env> {
         deliveryFailed: row.delivery_failed === 1,
         reactions: reactionsByMessage.get(row.id) ?? [],
       })),
+      hasMore,
+      nextCursor,
     };
   }
 
@@ -533,7 +551,8 @@ export class ConversationDO extends DurableObject<Env> {
       };
     }
 
-    if (!this.isMember(params.senderId)) {
+    const memberContext = this.getMemberContextIfActive(params.senderId);
+    if (!memberContext) {
       return {
         ok: false,
         code: 'forbidden',
@@ -563,17 +582,18 @@ export class ConversationDO extends DurableObject<Env> {
       ok: true,
       stale: false,
       messageId: params.messageId,
-      memberContext: this.getMemberContext(),
+      memberContext,
     };
   }
 
   setTyping(
     memberId: string
   ): { ok: true; memberContext: MemberContext } | { ok: false; error: string } {
-    if (!this.isMember(memberId)) {
+    const memberContext = this.getMemberContextIfActive(memberId);
+    if (!memberContext) {
       return { ok: false, error: 'Not a member' };
     }
-    return { ok: true, memberContext: this.getMemberContext() };
+    return { ok: true, memberContext };
   }
 
   deleteMessage(params: DeleteMessageParams): DeleteMessageResult {
@@ -594,7 +614,8 @@ export class ConversationDO extends DurableObject<Env> {
       };
     }
 
-    if (!this.isMember(params.senderId)) {
+    const memberContext = this.getMemberContextIfActive(params.senderId);
+    if (!memberContext) {
       return {
         ok: false,
         code: 'forbidden',
@@ -604,7 +625,7 @@ export class ConversationDO extends DurableObject<Env> {
 
     // Already deleted — idempotent success (only for the original sender)
     if (row.deleted === 1) {
-      return { ok: true, memberContext: this.getMemberContext() };
+      return { ok: true, memberContext };
     }
 
     this.db
@@ -613,7 +634,7 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
-    return { ok: true, memberContext: this.getMemberContext() };
+    return { ok: true, memberContext };
   }
 
   executeAction(params: ExecuteActionParams): ExecuteActionResult {
@@ -661,7 +682,8 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   addReaction(params: AddReactionParams): AddReactionResult {
-    if (!this.isMember(params.memberId)) {
+    const memberContext = this.getMemberContextIfActive(params.memberId);
+    if (!memberContext) {
       return { ok: false, code: 'forbidden' as const, error: 'Not a member' };
     }
     const message = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
@@ -698,7 +720,7 @@ export class ConversationDO extends DurableObject<Env> {
             removed_id: null,
           })
           .run();
-        return { ok: true, added: true, id, memberContext: this.getMemberContext() };
+        return { ok: true, added: true, id, memberContext };
       }
 
       if (existing.deleted_at === null) {
@@ -718,7 +740,7 @@ export class ConversationDO extends DurableObject<Env> {
           )
         )
         .run();
-      return { ok: true, added: true, id, memberContext: this.getMemberContext() };
+      return { ok: true, added: true, id, memberContext };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {
         return { ok: false, code: 'internal', error: err.message };
@@ -728,7 +750,8 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   removeReaction(params: RemoveReactionParams): RemoveReactionResult {
-    if (!this.isMember(params.memberId)) {
+    const memberContext = this.getMemberContextIfActive(params.memberId);
+    if (!memberContext) {
       return { ok: false, code: 'forbidden' as const, error: 'Not a member' };
     }
     const message = this.db.select().from(messages).where(eq(messages.id, params.messageId)).get();
@@ -777,7 +800,7 @@ export class ConversationDO extends DurableObject<Env> {
         ok: true,
         removed: true,
         removed_id: removedId,
-        memberContext: this.getMemberContext(),
+        memberContext,
       };
     } catch (err) {
       if (err instanceof Error && /constraint/i.test(err.message)) {

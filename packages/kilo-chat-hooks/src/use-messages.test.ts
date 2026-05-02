@@ -6,6 +6,8 @@ import {
   applyReactionRemovedResponseToPages,
   applyReactionRemovedMutationToPages,
   createReactionOperationTracker,
+  getNextMessagesPageParam,
+  messagesFromListPage,
   rollbackEditMessageError,
 } from './use-messages';
 import { messagesKey } from './query-keys';
@@ -138,5 +140,31 @@ describe('edit rollback errors', () => {
     const query = queryClient.getQueryCache().find({ queryKey });
     expect(result?.pages[0]?.[0]).toEqual(original);
     expect(query?.state.isInvalidated).toBe(true);
+  });
+});
+
+describe('message pagination helpers', () => {
+  it('uses the server-provided next cursor when present', () => {
+    const messages = [
+      message({ id: '01KQK8F2222222222222222222' }),
+      message({ id: '01KQK8F1111111111111111111' }),
+    ];
+    const page = messagesFromListPage({
+      messages,
+      hasMore: true,
+      nextCursor: '01KQK8F1111111111111111111',
+    });
+
+    expect(getNextMessagesPageParam(page)).toBe('01KQK8F1111111111111111111');
+  });
+
+  it('stops when the server says there are no more messages', () => {
+    const page = messagesFromListPage({
+      messages: [message({ id: '01KQK8G1111111111111111111' })],
+      hasMore: false,
+      nextCursor: null,
+    });
+
+    expect(getNextMessagesPageParam(page)).toBeUndefined();
   });
 });

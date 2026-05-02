@@ -15,6 +15,7 @@ import type {
   ReactionAddedEvent,
   ReactionRemovedEvent,
   RemoveReactionResponse,
+  MessageListResponse,
 } from '@kilocode/kilo-chat';
 import { useEffect } from 'react';
 import { kiloclawConversationContext } from '@kilocode/event-service';
@@ -22,6 +23,28 @@ import { kiloclawConversationContext } from '@kilocode/event-service';
 import { messagesKey } from './query-keys';
 
 export const PAGE_SIZE = 50;
+
+const messagePageMetadata = new WeakMap<
+  Message[],
+  Pick<MessageListResponse, 'hasMore' | 'nextCursor'>
+>();
+
+export function messagesFromListPage(page: MessageListResponse): Message[] {
+  messagePageMetadata.set(page.messages, {
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+  });
+  return page.messages;
+}
+
+export function getNextMessagesPageParam(lastPage: Message[]): string | undefined {
+  const metadata = messagePageMetadata.get(lastPage);
+  if (metadata) {
+    return metadata.hasMore ? (metadata.nextCursor ?? undefined) : undefined;
+  }
+  if (lastPage.length < PAGE_SIZE) return undefined;
+  return lastPage[lastPage.length - 1]?.id;
+}
 
 export function applyReactionAdded(
   reactions: ReactionSummary[],
@@ -406,13 +429,14 @@ export function useMessages(client: KiloChatClient, conversationId: string | nul
   return useInfiniteQuery({
     queryKey: messagesKey(conversationId),
     queryFn: async ({ pageParam }) => {
-      return client.listMessages(conversationId ?? '', { before: pageParam, limit: PAGE_SIZE });
+      const page = await client.listMessagesPage(conversationId ?? '', {
+        before: pageParam,
+        limit: PAGE_SIZE,
+      });
+      return messagesFromListPage(page);
     },
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: lastPage => {
-      if (lastPage.length < PAGE_SIZE) return undefined;
-      return lastPage[lastPage.length - 1]?.id;
-    },
+    getNextPageParam: getNextMessagesPageParam,
     enabled: !!conversationId,
     select: data => ({
       ...data,

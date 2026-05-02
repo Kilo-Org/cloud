@@ -253,6 +253,8 @@ export const conversationListResponseSchema = z.object({
 
 export const messageListResponseSchema = z.object({
   messages: z.array(messageSchema),
+  hasMore: z.boolean().default(false),
+  nextCursor: ulidSchema.nullable().default(null),
 });
 
 export const conversationDetailResponseSchema = conversationDetailSchema;

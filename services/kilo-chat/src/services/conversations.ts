@@ -372,7 +372,7 @@ export async function markReadFor(
       stub => stub.getLatestNonDeletedMessageId(),
       'ConversationDO.getLatestNonDeletedMessageId'
     );
-    if (latestMessageId !== null && lastSeenMessageId >= latestMessageId) {
+    if (latestMessageId === null || lastSeenMessageId >= latestMessageId) {
       const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
       ctx.waitUntil(
         env.NOTIFICATIONS.clearBadgeBucketForUser({ userId, badgeBucket }).catch(err => {

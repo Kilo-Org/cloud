@@ -1184,6 +1184,55 @@ describe('recipient conversation read state after message delivery', () => {
     ]);
   });
 
+  it('clears notification buckets when marking read through a deleted final message', async () => {
+    const { conversationId, recipientId, sandboxId, userId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-deleted-badge-clear');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      deliveredEnv
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
+    await recordingNotifications.__incrementBadgeBucket({
+      userId: recipientId,
+      badgeBucket,
+      delta: 1,
+    });
+
+    const deleteQs = new URLSearchParams({ conversationId });
+    const deleteRes = await userApp.request(
+      `/v1/messages/${messageId}?${deleteQs.toString()}`,
+      {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+      },
+      deliveredEnv
+    );
+    expect(deleteRes.status).toBe(204);
+
+    const markReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: messageId }),
+      },
+      deliveredEnv
+    );
+    expect(markReadRes.status).toBe(204);
+
+    await expect(recordingNotifications.__listNonZeroBuckets(recipientId)).resolves.toEqual([]);
+    await expect(recordingNotifications.__listNonZeroBuckets(userId)).resolves.toEqual([]);
+  });
+
   it('clears stale notification buckets when recipients mark a conversation read', async () => {
     const { conversationId, recipientId, sandboxId, userApp, recipientApp, deliveredEnv } =
       await createMultiHumanConversation('msg-recipient-badge-clear');

@@ -195,6 +195,8 @@ export type ExecuteActionResult =
       ok: true;
       content: ContentBlock[];
       messageSenderId: string;
+      memberContext: MemberContext;
+      targetBotId: string | null;
       resolved: {
         groupId: string;
         value: ExecApprovalDecision;
@@ -675,7 +677,8 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   executeAction(params: ExecuteActionParams): ExecuteActionResult {
-    if (!this.isMember(params.memberId)) {
+    const activeMembers = this.getActiveMemberRows();
+    if (!activeMembers.some(member => member.id === params.memberId)) {
       return { ok: false, code: 'forbidden', error: 'Not a member' };
     }
 
@@ -720,6 +723,12 @@ export class ConversationDO extends DurableObject<Env> {
       ok: true,
       content,
       messageSenderId: row.sender_id,
+      memberContext: this.getMemberContextFromRows(activeMembers),
+      targetBotId: activeMembers.some(
+        member => member.id === row.sender_id && member.kind === 'bot'
+      )
+        ? row.sender_id
+        : null,
       resolved: { groupId: params.groupId, ...resolved },
     };
   }

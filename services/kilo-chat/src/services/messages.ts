@@ -517,45 +517,42 @@ export async function executeActionFor(
     return { ok: false, code: result.code, error: result.error };
   }
 
-  // Fetch conversation info once for both event push and webhook delivery
-  const info = await convStub.getInfo();
-  if (info) {
-    const convContext = extractConversationContext(info.members);
+  const convContext = result.memberContext;
+  const sandboxId = convContext.sandboxId;
+  if (sandboxId) {
     const fanOut = async () => {
-      if (convContext.sandboxId) {
-        await pushEventToHumanMembers(
-          env,
-          conversationId,
-          convContext.sandboxId,
-          convContext.humanMemberIds,
-          'message.updated',
-          { messageId, content: result.content, clientUpdatedAt: null }
-        );
+      await pushEventToHumanMembers(
+        env,
+        conversationId,
+        sandboxId,
+        convContext.humanMemberIds,
+        'message.updated',
+        { messageId, content: result.content, clientUpdatedAt: null }
+      );
 
-        // Deliver action.executed webhook only to the bot that authored the
-        // message holding the resolved actions block. Other bots in the
-        // conversation did not present these buttons and must not see the user's
-        // decision. Enqueued on the ConversationDO's chain so it's ordered
-        // relative to any message webhooks in the same conversation.
-        const author = info.members.find(m => m.id === result.messageSenderId && m.kind === 'bot');
-        if (author) {
-          await withDORetry(
-            () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-            stub =>
-              stub.enqueueActionExecutedWebhook({
-                type: 'action.executed',
-                targetBotId: author.id,
-                conversationId,
-                messageId,
-                groupId,
-                value,
-                executedBy: callerId,
-                executedAt: new Date().toISOString(),
-                convContext,
-              }),
-            'ConversationDO.enqueueActionExecutedWebhook'
-          );
-        }
+      // Deliver action.executed webhook only to the active bot that authored
+      // the message holding the resolved actions block. Other bots in the
+      // conversation did not present these buttons and must not see the user's
+      // decision. Enqueued on the ConversationDO's chain so it's ordered
+      // relative to any message webhooks in the same conversation.
+      const targetBotId = result.targetBotId;
+      if (targetBotId) {
+        await withDORetry(
+          () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+          stub =>
+            stub.enqueueActionExecutedWebhook({
+              type: 'action.executed',
+              targetBotId,
+              conversationId,
+              messageId,
+              groupId,
+              value,
+              executedBy: callerId,
+              executedAt: new Date().toISOString(),
+              convContext,
+            }),
+          'ConversationDO.enqueueActionExecutedWebhook'
+        );
       }
     };
     ctx.waitUntil(fanOut());

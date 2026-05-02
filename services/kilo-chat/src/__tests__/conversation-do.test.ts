@@ -726,6 +726,92 @@ describe('ConversationDO', () => {
       expect(result.messageSenderId).toBe('bot-primary');
     });
 
+    it('returns fanout context and active author bot target', async () => {
+      const stub = getStub('conv-execaction-context');
+      await stub.initialize({
+        id: 'conv-execaction-context',
+        title: 'Action Chat',
+        createdBy: 'user-alice',
+        createdAt: 1000,
+        members: [
+          { id: 'user-alice', kind: 'user' as const },
+          { id: 'bot:kiloclaw:sandbox-action-context', kind: 'bot' as const },
+          { id: 'bot:kiloclaw:sandbox-other', kind: 'bot' as const },
+        ],
+      });
+      const create = await stub.createMessage({
+        senderId: 'bot:kiloclaw:sandbox-action-context',
+        content: [
+          {
+            type: 'actions' as const,
+            groupId: 'g1',
+            actions: [{ value: 'allow-once', label: 'Allow', style: 'primary' as const }],
+          },
+        ],
+      });
+      expect(create.ok).toBe(true);
+      if (!create.ok) return;
+
+      const result = await stub.executeAction({
+        messageId: create.messageId,
+        memberId: 'user-alice',
+        groupId: 'g1',
+        value: 'allow-once',
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.memberContext).toEqual({
+        humanMemberIds: ['user-alice'],
+        sandboxId: 'sandbox-action-context',
+      });
+      expect(result.targetBotId).toBe('bot:kiloclaw:sandbox-action-context');
+    });
+
+    it('does not target action webhooks when the author bot is no longer active', async () => {
+      const stub = getStub('conv-execaction-left-author');
+      const authorBotId = 'bot:kiloclaw:sandbox-left-author';
+      await stub.initialize({
+        id: 'conv-execaction-left-author',
+        title: 'Action Chat',
+        createdBy: 'user-alice',
+        createdAt: 1000,
+        members: [
+          { id: 'user-alice', kind: 'user' as const },
+          { id: authorBotId, kind: 'bot' as const },
+          { id: 'bot:kiloclaw:sandbox-still-active', kind: 'bot' as const },
+        ],
+      });
+      const create = await stub.createMessage({
+        senderId: authorBotId,
+        content: [
+          {
+            type: 'actions' as const,
+            groupId: 'g1',
+            actions: [{ value: 'deny', label: 'Deny', style: 'danger' as const }],
+          },
+        ],
+      });
+      expect(create.ok).toBe(true);
+      if (!create.ok) return;
+      await stub.leaveMember(authorBotId);
+
+      const result = await stub.executeAction({
+        messageId: create.messageId,
+        memberId: 'user-alice',
+        groupId: 'g1',
+        value: 'deny',
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.memberContext).toEqual({
+        humanMemberIds: ['user-alice'],
+        sandboxId: 'sandbox-still-active',
+      });
+      expect(result.targetBotId).toBeNull();
+    });
+
     it('stores server-owned resolution metadata for clients', async () => {
       const stub = getStub('conv-execaction-resolved-content');
       await stub.initialize({

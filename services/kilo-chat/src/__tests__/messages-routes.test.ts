@@ -1390,6 +1390,57 @@ describe('POST /v1/conversations/:conversationId/messages/:messageId/execute-act
       resolvedAt: body.resolved.resolvedAt,
     });
   });
+
+  it('does not enqueue action.executed when the author bot has left', async () => {
+    await recordingKiloclaw.__clearWebhookCalls();
+    const conversationId = ulid();
+    const userId = 'user-execute-left-author';
+    const authorBotId = 'bot:kiloclaw:sandbox-execute-left-author';
+    const activeBotId = 'bot:kiloclaw:sandbox-execute-still-active';
+    const userApp = makeApp(userId, 'user');
+    const convStub = getConvStub(conversationId);
+    await convStub.initialize({
+      id: conversationId,
+      title: 'Action Chat',
+      createdBy: userId,
+      createdAt: Date.now(),
+      members: [
+        { id: userId, kind: 'user' },
+        { id: authorBotId, kind: 'bot' },
+        { id: activeBotId, kind: 'bot' },
+      ],
+    });
+    const create = await convStub.createMessage({
+      senderId: authorBotId,
+      content: [
+        {
+          type: 'actions',
+          groupId: 'approval',
+          actions: [{ value: 'deny', label: 'Deny', style: 'danger' }],
+        },
+      ],
+    });
+    expect(create.ok).toBe(true);
+    if (!create.ok) return;
+    await convStub.leaveMember(authorBotId);
+
+    const res = await userApp.request(
+      `/v1/conversations/${conversationId}/messages/${create.messageId}/execute-action`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ groupId: 'approval', value: 'deny' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(200);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const calls = await recordingKiloclaw.__recordedWebhookCalls();
+    expect(
+      calls.some(call => call.conversationId === conversationId && call.type === 'action.executed')
+    ).toBe(false);
+  });
 });
 
 describe('auto-title on first message', () => {

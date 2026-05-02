@@ -157,7 +157,9 @@ export function updateMessageInPages<TPageParam>(
     const updatedPage = page.slice();
     const message = updatedPage[messageIndex];
     if (!message) return old;
-    updatedPage[messageIndex] = updater(message);
+    const updatedMessage = updater(message);
+    if (updatedMessage === message) return old;
+    updatedPage[messageIndex] = updatedMessage;
     pages[pageIndex] = updatedPage;
     return { ...old, pages };
   }
@@ -323,6 +325,27 @@ export function applyMessageCreatedEventToPages<TPageParam>(
   const firstPage = old.pages[0] ?? [];
   const orderedFirstPage = orderNewestLoadedPageByServerId([newMessage, ...firstPage]);
   return { ...old, pages: [orderedFirstPage, ...old.pages.slice(1)] };
+}
+
+export function applyMessageUpdatedEventToPages<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  e: MessageUpdatedEvent
+): InfiniteData<Message[], TPageParam> {
+  return updateMessageInPages(old, e.messageId, msg => {
+    if (
+      e.clientUpdatedAt !== null &&
+      msg.clientUpdatedAt !== null &&
+      e.clientUpdatedAt < msg.clientUpdatedAt
+    ) {
+      return msg;
+    }
+
+    return {
+      ...msg,
+      content: e.content,
+      clientUpdatedAt: e.clientUpdatedAt ?? msg.clientUpdatedAt,
+    };
+  });
 }
 
 export function useSendMessage(
@@ -647,11 +670,7 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, e.messageId, msg => ({
-          ...msg,
-          content: e.content,
-          clientUpdatedAt: e.clientUpdatedAt,
-        }));
+        return applyMessageUpdatedEventToPages(old, e);
       });
     };
 

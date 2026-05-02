@@ -1,6 +1,8 @@
-import type { InfiniteData } from '@tanstack/react-query';
 import type { Message, MessageCreatedEvent } from '@kilocode/kilo-chat';
-import { applyMessageCreatedEventToPages } from '@kilocode/kilo-chat-hooks';
+import {
+  applyMessageCreatedEventToPages,
+  type MessageInfiniteData,
+} from '@kilocode/kilo-chat-hooks';
 
 const serverMessageId = '01K8ZB8B3H9BRWZ6KCN39AX09G';
 const clientId = 'client-1';
@@ -46,9 +48,9 @@ function message(overrides: Partial<Message> = {}): Message {
   };
 }
 
-function pagesFor(cachedMessage: Message): InfiniteData<Message[], unknown> {
+function pagesFor(cachedMessage: Message): MessageInfiniteData<unknown> {
   return {
-    pages: [[cachedMessage]],
+    pages: [{ messages: [cachedMessage], hasMore: false, nextCursor: null }],
     pageParams: [undefined],
   };
 }
@@ -65,10 +67,10 @@ function createdEvent(overrides: Partial<MessageCreatedEvent> = {}): MessageCrea
   };
 }
 
-function firstMessage(result: InfiniteData<Message[], unknown>): Message {
+function firstMessage(result: MessageInfiniteData<unknown>): Message {
   const firstPage = result.pages[0];
   if (!firstPage) throw new Error('expected first page');
-  const cachedMessage = firstPage[0];
+  const cachedMessage = firstPage.messages[0];
   if (!cachedMessage) throw new Error('expected first message');
   return cachedMessage;
 }

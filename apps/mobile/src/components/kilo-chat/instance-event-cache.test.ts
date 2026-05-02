@@ -3,12 +3,11 @@ import {
   applyConversationCreatedToPages,
   applyConversationReadToPages,
   applyMarkConversationReadRollbackToPages,
+  shouldApplyConversationRead,
   type ConversationListInfiniteData,
   updateConversationPages,
 } from '@kilocode/kilo-chat-hooks';
 import { describe, expect, it } from 'vitest';
-
-import { shouldApplyConversationRead } from './hooks/instance-event-cache';
 
 function conversation(
   conversationId: string,

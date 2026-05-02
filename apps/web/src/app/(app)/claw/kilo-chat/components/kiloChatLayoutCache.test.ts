@@ -7,8 +7,12 @@ import type {
   ConversationReadEvent,
   ConversationRenamedEvent,
 } from '@kilocode/kilo-chat';
-import { conversationsKey, type ConversationListInfiniteData } from '../hooks/useConversations';
-import { registerKiloChatLayoutEventCacheHandlers } from './kiloChatLayoutCache';
+import {
+  conversationsKey,
+  registerConversationListCacheHandlers,
+  type ConversationListInfiniteData,
+} from '@kilocode/kilo-chat-hooks';
+import { kiloclawInstanceContext } from '@kilocode/event-service';
 
 type ConversationActivityHandler = (ctx: string, event: ConversationActivityEvent) => void;
 type ConversationCreatedHandler = (ctx: string, event: ConversationCreatedEvent) => void;
@@ -62,7 +66,7 @@ function createFakeKiloChatClient(): FakeKiloChatClient & {
       };
     },
     emitActivity: event => {
-      activityHandler?.('ctx', event);
+      activityHandler?.(kiloclawInstanceContext('sandbox-active'), event);
     },
   };
 }
@@ -106,12 +110,13 @@ describe('KiloChatLayout cache subscriptions', () => {
       ])
     );
 
-    registerKiloChatLayoutEventCacheHandlers({
+    registerConversationListCacheHandlers({
       currentUserId: 'member-1',
       eventService,
       kiloChatClient,
       queryClient,
       queryKey: activeKey,
+      sandboxId: 'sandbox-active',
     });
 
     kiloChatClient.emitActivity({

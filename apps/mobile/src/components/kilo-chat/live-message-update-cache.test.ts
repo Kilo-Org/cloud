@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { type InfiniteData } from '@tanstack/react-query';
 import { type Message, type MessageUpdatedEvent } from '@kilocode/kilo-chat';
 
-import { applyMessageUpdatedEventToPages } from '@kilocode/kilo-chat-hooks';
+import {
+  applyMessageUpdatedEventToPages,
+  type MessageInfiniteData,
+} from '@kilocode/kilo-chat-hooks';
 
 function message(id: string): Message {
   return {
@@ -43,8 +45,8 @@ describe('applyMessageUpdatedEventToPages', () => {
       content: [{ type: 'text', text: 'newer content' }],
       clientUpdatedAt: 2,
     };
-    const data: InfiniteData<Message[], string | undefined> = {
-      pages: [[newerMessage]],
+    const data: MessageInfiniteData = {
+      pages: [{ messages: [newerMessage], hasMore: false, nextCursor: null }],
       pageParams: [undefined],
     };
     const event = {
@@ -56,7 +58,7 @@ describe('applyMessageUpdatedEventToPages', () => {
     const result = applyMessageUpdatedEventToPages(data, event);
 
     expect(result).toBe(data);
-    expect(result.pages[0]?.[0]).toEqual(newerMessage);
+    expect(result.pages[0]?.messages[0]).toEqual(newerMessage);
   });
 
   it('applies null-timestamp action resolution updates to edited cached messages', () => {
@@ -69,8 +71,8 @@ describe('applyMessageUpdatedEventToPages', () => {
       resolvedBy: 'user-1',
       resolvedAt: 3,
     }).content;
-    const data: InfiniteData<Message[], string | undefined> = {
-      pages: [[cachedMessage]],
+    const data: MessageInfiniteData = {
+      pages: [{ messages: [cachedMessage], hasMore: false, nextCursor: null }],
       pageParams: [undefined],
     };
     const event = {
@@ -81,7 +83,7 @@ describe('applyMessageUpdatedEventToPages', () => {
 
     const result = applyMessageUpdatedEventToPages(data, event);
 
-    expect(result.pages[0]?.[0]?.content).toEqual(resolvedContent);
-    expect(result.pages[0]?.[0]?.clientUpdatedAt).toBe(2);
+    expect(result.pages[0]?.messages[0]?.content).toEqual(resolvedContent);
+    expect(result.pages[0]?.messages[0]?.clientUpdatedAt).toBe(2);
   });
 });

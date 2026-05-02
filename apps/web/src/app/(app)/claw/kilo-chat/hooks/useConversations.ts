@@ -13,6 +13,8 @@ export {
   applyConversationActivityToPages,
   applyConversationCreatedToPages,
   applyConversationReadToPages,
+  registerConversationListCacheHandlers,
+  shouldApplyConversationRead,
   updateConversationPages,
   filterConversationPages,
   conversationsKey,

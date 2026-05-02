@@ -3,151 +3,40 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import {
-  conversationActivityEventSchema,
-  conversationCreatedEventSchema,
-  conversationLeftEventSchema,
-  conversationReadEventSchema,
-  conversationRenamedEventSchema,
-} from '@kilocode/kilo-chat';
-import {
-  applyConversationActivityToPages,
-  applyConversationCreatedToPages,
-  applyConversationReadToPages,
   botStatusKey,
-  conversationKey,
-  type ConversationListInfiniteData,
   conversationsKey,
-  filterConversationPages,
-  updateConversationPages,
+  registerConversationListCacheHandlers,
 } from '@kilocode/kilo-chat-hooks';
 
-import { shouldApplyConversationRead } from './instance-event-cache';
 import { useEventSubscription } from './use-event-subscription';
 import { useCurrentUserId } from './use-current-user-id';
-import { useEventServiceClient } from './use-kilo-chat-client';
+import { useEventServiceClient, useKiloChatClient } from './use-kilo-chat-client';
 
 export function useInstanceEventSubscription(sandboxId: string | undefined) {
   const qc = useQueryClient();
   const eventService = useEventServiceClient();
+  const kiloChatClient = useKiloChatClient();
   const currentUserId = useCurrentUserId();
   const ctx = sandboxId ? kiloclawInstanceContext(sandboxId) : null;
   const queryKey = useMemo(() => conversationsKey(sandboxId ?? null), [sandboxId]);
-
-  // conversation.* events are published on the instance context to keep the
-  // conversation list (last-activity, unread, title, membership) current while
-  // the user is on the list. message.* events fire on conversation contexts,
-  // not here.
-  const handleCreated = useCallback(
-    (payload: unknown) => {
-      const result = conversationCreatedEventSchema.safeParse(payload);
-      if (!result.success) {
-        return;
-      }
-      const event = result.data;
-      const createdResult = applyConversationCreatedToPages(
-        qc.getQueryData<ConversationListInfiniteData>(queryKey),
-        event.conversation
-      );
-      if (!createdResult.applied) {
-        void qc.invalidateQueries({ queryKey });
-        return;
-      }
-      qc.setQueryData<ConversationListInfiniteData>(queryKey, createdResult.data);
-    },
-    [qc, queryKey]
-  );
-
-  const handleLeft = useCallback(
-    (payload: unknown) => {
-      const result = conversationLeftEventSchema.safeParse(payload);
-      if (!result.success) {
-        return;
-      }
-      const event = result.data;
-      qc.setQueryData<ConversationListInfiniteData>(queryKey, old =>
-        filterConversationPages(
-          old,
-          conversation => conversation.conversationId !== event.conversationId
-        )
-      );
-    },
-    [qc, queryKey]
-  );
-
-  const handleRenamed = useCallback(
-    (payload: unknown) => {
-      const result = conversationRenamedEventSchema.safeParse(payload);
-      if (!result.success) {
-        return;
-      }
-      const event = result.data;
-      qc.setQueryData<ConversationListInfiniteData>(queryKey, old =>
-        updateConversationPages(old, conversation =>
-          conversation.conversationId === event.conversationId
-            ? { ...conversation, title: event.title }
-            : conversation
-        )
-      );
-      void qc.invalidateQueries({ queryKey: conversationKey(event.conversationId) });
-    },
-    [qc, queryKey]
-  );
-
-  const handleRead = useCallback(
-    (payload: unknown) => {
-      const result = conversationReadEventSchema.safeParse(payload);
-      if (!result.success) {
-        return;
-      }
-      const event = result.data;
-      if (!shouldApplyConversationRead(currentUserId, event.memberId)) {
-        return;
-      }
-      qc.setQueryData<ConversationListInfiniteData>(
-        queryKey,
-        old => applyConversationReadToPages(old, event).data
-      );
-    },
-    [currentUserId, qc, queryKey]
-  );
-
-  const handleActivity = useCallback(
-    (payload: unknown) => {
-      const result = conversationActivityEventSchema.safeParse(payload);
-      if (!result.success) {
-        return;
-      }
-      const event = result.data;
-      const activityResult = applyConversationActivityToPages(
-        qc.getQueryData<ConversationListInfiniteData>(queryKey),
-        event
-      );
-      if (!activityResult.applied) {
-        void qc.invalidateQueries({ queryKey });
-        return;
-      }
-      qc.setQueryData<ConversationListInfiniteData>(queryKey, activityResult.data);
-    },
-    [qc, queryKey]
-  );
 
   const invalidateBotStatus = useCallback(() => {
     void qc.invalidateQueries({ queryKey: botStatusKey(sandboxId ?? null) });
   }, [qc, sandboxId]);
 
-  useEventSubscription(ctx, 'conversation.created', handleCreated);
-  useEventSubscription(ctx, 'conversation.left', handleLeft);
-  useEventSubscription(ctx, 'conversation.renamed', handleRenamed);
-  useEventSubscription(ctx, 'conversation.read', handleRead);
-  useEventSubscription(ctx, 'conversation.activity', handleActivity);
   useEventSubscription(ctx, 'bot.status', invalidateBotStatus);
 
   useEffect(() => {
     if (!sandboxId) {
       return undefined;
     }
-    return eventService.onReconnect(() => {
-      void qc.invalidateQueries({ queryKey });
+    return registerConversationListCacheHandlers({
+      currentUserId,
+      eventService,
+      kiloChatClient,
+      queryClient: qc,
+      queryKey,
+      sandboxId,
     });
-  }, [eventService, qc, queryKey, sandboxId]);
+  }, [currentUserId, eventService, kiloChatClient, qc, queryKey, sandboxId]);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type InfiniteData, QueryClient } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import { type Message, type MessageCreatedEvent } from '@kilocode/kilo-chat';
 
 import {
@@ -8,8 +8,23 @@ import {
   latestMarkReadMessageId,
   messagesKey,
   restoreMessageInCache,
+  type MessageInfiniteData,
   updateMessageInPages,
 } from '@kilocode/kilo-chat-hooks';
+
+function messageData(
+  pages: Message[][],
+  pageParams: Array<string | undefined> = [undefined]
+): MessageInfiniteData {
+  return {
+    pages: pages.map((messages, index) => ({
+      messages,
+      hasMore: index < pages.length - 1,
+      nextCursor: index < pages.length - 1 ? (pageParams[index + 1] ?? null) : null,
+    })),
+    pageParams,
+  };
+}
 
 function message(id: string): Message {
   return {
@@ -45,10 +60,7 @@ function actionMessage(
 
 describe('applyMessageCreatedEventToPages', () => {
   it('adds bot-created messages to the open conversation cache', () => {
-    const data: InfiniteData<Message[], string | undefined> = {
-      pages: [[message('01HX0000000000000000000000')]],
-      pageParams: [undefined],
-    };
+    const data = messageData([[message('01HX0000000000000000000000')]]);
     const event = {
       messageId: '01HX0000000000000000000001',
       senderId: 'bot:sandbox-1',
@@ -60,7 +72,7 @@ describe('applyMessageCreatedEventToPages', () => {
 
     const result = applyMessageCreatedEventToPages(data, event);
 
-    expect(result.pages[0]?.map(m => m.id)).toEqual([
+    expect(result.pages[0]?.messages.map(m => m.id)).toEqual([
       '01HX0000000000000000000001',
       '01HX0000000000000000000000',
     ]);
@@ -68,10 +80,7 @@ describe('applyMessageCreatedEventToPages', () => {
 
   it('keeps the newest page ordered when an older remote message arrives after a newer one', () => {
     const newerRemote = message('01HX0000000000000000000002');
-    const data: InfiniteData<Message[], string | undefined> = {
-      pages: [[newerRemote]],
-      pageParams: [undefined],
-    };
+    const data = messageData([[newerRemote]]);
     const event = {
       messageId: '01HX0000000000000000000001',
       senderId: 'bot:sandbox-1',
@@ -83,7 +92,7 @@ describe('applyMessageCreatedEventToPages', () => {
 
     const result = applyMessageCreatedEventToPages(data, event);
 
-    expect(result.pages[0]?.map(m => m.id)).toEqual([
+    expect(result.pages[0]?.messages.map(m => m.id)).toEqual([
       '01HX0000000000000000000002',
       '01HX0000000000000000000001',
     ]);
@@ -92,10 +101,7 @@ describe('applyMessageCreatedEventToPages', () => {
   it('keeps pending messages in place while ordering delayed remote messages', () => {
     const newerRemote = message('01HX0000000000000000000002');
     const pendingLocal = message('pending-client-1');
-    const data: InfiniteData<Message[], string | undefined> = {
-      pages: [[newerRemote, pendingLocal]],
-      pageParams: [undefined],
-    };
+    const data = messageData([[newerRemote, pendingLocal]]);
     const event = {
       messageId: '01HX0000000000000000000001',
       senderId: 'bot:sandbox-1',
@@ -107,7 +113,7 @@ describe('applyMessageCreatedEventToPages', () => {
 
     const result = applyMessageCreatedEventToPages(data, event);
 
-    expect(result.pages[0]?.map(m => m.id)).toEqual([
+    expect(result.pages[0]?.messages.map(m => m.id)).toEqual([
       '01HX0000000000000000000002',
       '01HX0000000000000000000001',
       'pending-client-1',
@@ -115,10 +121,7 @@ describe('applyMessageCreatedEventToPages', () => {
   });
 
   it('preserves reply snapshots from created events when the parent is not loaded', () => {
-    const data: InfiniteData<Message[], string | undefined> = {
-      pages: [[message('existing')]],
-      pageParams: [undefined],
-    };
+    const data = messageData([[message('existing')]]);
     const replyTo = {
       messageId: 'parent-outside-loaded-pages',
       senderId: 'user:parent',
@@ -136,16 +139,13 @@ describe('applyMessageCreatedEventToPages', () => {
 
     const result = applyMessageCreatedEventToPages(data, event);
 
-    expect(result.pages[0]?.[0]?.replyTo).toEqual(replyTo);
+    expect(result.pages[0]?.messages[0]?.replyTo).toEqual(replyTo);
   });
 
   it('repositions resolved optimistic messages by newest server id', () => {
     const remoteOlder = message('01HX0000000000000000000000');
     const pendingLocal = message('pending-client-1');
-    const data: InfiniteData<Message[], string | undefined> = {
-      pages: [[remoteOlder, pendingLocal]],
-      pageParams: [undefined],
-    };
+    const data = messageData([[remoteOlder, pendingLocal]]);
     const event = {
       messageId: '01HX0000000000000000000001',
       senderId: 'user:1',
@@ -157,7 +157,7 @@ describe('applyMessageCreatedEventToPages', () => {
 
     const result = applyMessageCreatedEventToPages(data, event);
 
-    expect(result.pages[0]?.map(m => m.id)).toEqual([
+    expect(result.pages[0]?.messages.map(m => m.id)).toEqual([
       '01HX0000000000000000000001',
       '01HX0000000000000000000000',
     ]);
@@ -166,10 +166,7 @@ describe('applyMessageCreatedEventToPages', () => {
 
 describe('updateMessageInPages', () => {
   it('returns the same cache object when the target message is absent', () => {
-    const data: InfiniteData<Message[], string | undefined> = {
-      pages: [[message('m1')], [message('m2')]],
-      pageParams: [undefined, 'm1'],
-    };
+    const data = messageData([[message('m1')], [message('m2')]], [undefined, 'm1']);
 
     const result = updateMessageInPages(data, 'missing', msg => ({ ...msg, deleted: true }));
 
@@ -177,9 +174,9 @@ describe('updateMessageInPages', () => {
   });
 
   it('copies only the pages array and containing page when updating a message', () => {
-    const firstPage = [message('m1')];
-    const secondPage = [message('m2')];
-    const data: InfiniteData<Message[], string | undefined> = {
+    const firstPage = { messages: [message('m1')], hasMore: true, nextCursor: 'm1' };
+    const secondPage = { messages: [message('m2')], hasMore: false, nextCursor: null };
+    const data: MessageInfiniteData = {
       pages: [firstPage, secondPage],
       pageParams: [undefined, 'm1'],
     };
@@ -190,7 +187,7 @@ describe('updateMessageInPages', () => {
     expect(result.pages).not.toBe(data.pages);
     expect(result.pages[0]).toBe(firstPage);
     expect(result.pages[1]).not.toBe(secondPage);
-    expect(result.pages[1]?.[0]?.deleted).toBe(true);
+    expect(result.pages[1]?.messages[0]?.deleted).toBe(true);
   });
 });
 
@@ -204,10 +201,7 @@ describe('shared optimistic rollback helpers', () => {
       content: [{ type: 'text' as const, text: 'edited' }],
       deleted: true,
     };
-    queryClient.setQueryData<InfiniteData<Message[], string | undefined>>(queryKey, {
-      pages: [[optimistic]],
-      pageParams: [undefined],
-    });
+    queryClient.setQueryData<MessageInfiniteData>(queryKey, messageData([[optimistic]]));
 
     const restored = restoreMessageInCache(
       queryClient,
@@ -216,9 +210,9 @@ describe('shared optimistic rollback helpers', () => {
       current => JSON.stringify(current) === JSON.stringify(optimistic)
     );
 
-    const result = queryClient.getQueryData<InfiniteData<Message[], string | undefined>>(queryKey);
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
     expect(restored).toBe(true);
-    expect(result?.pages[0]?.[0]).toEqual(original);
+    expect(result?.pages[0]?.messages[0]).toEqual(original);
   });
 
   it('leaves server-resolved actions intact when failed rollback sees newer content', () => {
@@ -235,10 +229,7 @@ describe('shared optimistic rollback helpers', () => {
       resolvedBy: 'user-winning-request',
       resolvedAt: 2,
     });
-    queryClient.setQueryData<InfiniteData<Message[], string | undefined>>(queryKey, {
-      pages: [[serverResolved]],
-      pageParams: [undefined],
-    });
+    queryClient.setQueryData<MessageInfiniteData>(queryKey, messageData([[serverResolved]]));
 
     const restored = restoreMessageInCache(queryClient, queryKey, original, current =>
       current.content.some(block => {
@@ -256,9 +247,9 @@ describe('shared optimistic rollback helpers', () => {
       })
     );
 
-    const result = queryClient.getQueryData<InfiniteData<Message[], string | undefined>>(queryKey);
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
     expect(restored).toBe(false);
-    expect(result?.pages[0]?.[0]).toEqual(serverResolved);
+    expect(result?.pages[0]?.messages[0]).toEqual(serverResolved);
   });
 
   it('leaves server-updated text intact when failed edit rollback sees newer content', () => {
@@ -275,10 +266,7 @@ describe('shared optimistic rollback helpers', () => {
       content: [{ type: 'text', text: 'server edit' }],
       clientUpdatedAt: 2,
     };
-    queryClient.setQueryData<InfiniteData<Message[], string | undefined>>(queryKey, {
-      pages: [[serverUpdated]],
-      pageParams: [undefined],
-    });
+    queryClient.setQueryData<MessageInfiniteData>(queryKey, messageData([[serverUpdated]]));
 
     const restored = restoreMessageInCache(
       queryClient,
@@ -289,9 +277,9 @@ describe('shared optimistic rollback helpers', () => {
         current.clientUpdatedAt === optimistic.clientUpdatedAt
     );
 
-    const result = queryClient.getQueryData<InfiniteData<Message[], string | undefined>>(queryKey);
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
     expect(restored).toBe(false);
-    expect(result?.pages[0]?.[0]).toEqual(serverUpdated);
+    expect(result?.pages[0]?.messages[0]).toEqual(serverUpdated);
   });
 
   it('creates the first reaction summary when adding a new emoji', () => {

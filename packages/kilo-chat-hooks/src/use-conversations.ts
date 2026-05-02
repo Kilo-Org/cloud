@@ -1,6 +1,12 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
-import { ulidToTimestamp, type KiloChatClient } from '@kilocode/kilo-chat';
+import { kiloclawInstanceContext } from '@kilocode/event-service';
+import {
+  ulidToTimestamp,
+  type ConversationActivityEvent,
+  type ConversationCreatedEvent,
+  type KiloChatClient,
+} from '@kilocode/kilo-chat';
 import type {
   CreateConversationRequest,
   CreateConversationResponse,
@@ -29,6 +35,28 @@ function conversationListSandboxIdFromQueryKey(queryKey: QueryKey): string | nul
 function conversationListInvalidationKey(sandboxId: string | null): QueryKey {
   return sandboxId === null ? conversationsKeyAll() : conversationsKey(sandboxId);
 }
+
+type KiloChatConversationEventClient = Pick<
+  KiloChatClient,
+  | 'onConversationCreated'
+  | 'onConversationRenamed'
+  | 'onConversationLeft'
+  | 'onConversationRead'
+  | 'onConversationActivity'
+>;
+
+type ReconnectEventService = {
+  onReconnect: (handler: () => void) => () => void;
+};
+
+type RegisterConversationListCacheHandlersOptions = {
+  currentUserId: string | null;
+  eventService: ReconnectEventService;
+  kiloChatClient: KiloChatConversationEventClient;
+  queryClient: QueryClient;
+  queryKey: QueryKey;
+  sandboxId: string | null;
+};
 
 export function useConversations(client: KiloChatClient, sandboxId: string | null) {
   return useInfiniteQuery({
@@ -343,6 +371,104 @@ export function applyConversationReadToPages(
   return {
     data: foundNewerOrEqualState ? data : next,
     applied: foundConversation,
+  };
+}
+
+export function shouldApplyConversationRead(
+  currentUserId: string | null,
+  memberId: string
+): boolean {
+  return currentUserId !== null && currentUserId === memberId;
+}
+
+function invalidateConversationListQuery(queryClient: QueryClient, queryKey: QueryKey): void {
+  void queryClient.invalidateQueries({ queryKey });
+}
+
+export function registerConversationListCacheHandlers({
+  currentUserId,
+  eventService,
+  kiloChatClient,
+  queryClient,
+  queryKey,
+  sandboxId,
+}: RegisterConversationListCacheHandlersOptions): () => void {
+  const expectedContext = sandboxId ? kiloclawInstanceContext(sandboxId) : null;
+
+  function matchesContext(ctx: string): boolean {
+    return expectedContext === null || ctx === expectedContext;
+  }
+
+  function patchCreated(event: ConversationCreatedEvent): void {
+    const result = applyConversationCreatedToPages(
+      queryClient.getQueryData<ConversationListInfiniteData>(queryKey),
+      event.conversation
+    );
+    if (!result.applied) {
+      invalidateConversationListQuery(queryClient, queryKey);
+      return;
+    }
+    queryClient.setQueryData<ConversationListInfiniteData>(queryKey, result.data);
+  }
+
+  function patchActivity(event: ConversationActivityEvent): void {
+    const result = applyConversationActivityToPages(
+      queryClient.getQueryData<ConversationListInfiniteData>(queryKey),
+      event
+    );
+    if (!result.applied) {
+      invalidateConversationListQuery(queryClient, queryKey);
+      return;
+    }
+    queryClient.setQueryData<ConversationListInfiniteData>(queryKey, result.data);
+  }
+
+  const offs = [
+    kiloChatClient.onConversationCreated((ctx, event) => {
+      if (!matchesContext(ctx)) return;
+      patchCreated(event);
+    }),
+    kiloChatClient.onConversationRenamed((ctx, event) => {
+      if (!matchesContext(ctx)) return;
+      queryClient.setQueryData<ConversationListInfiniteData>(queryKey, old =>
+        updateConversationPages(old, conversation =>
+          conversation.conversationId === event.conversationId
+            ? { ...conversation, title: event.title }
+            : conversation
+        )
+      );
+      invalidateConversationListQuery(queryClient, conversationKey(event.conversationId));
+    }),
+    kiloChatClient.onConversationLeft((ctx, event) => {
+      if (!matchesContext(ctx)) return;
+      queryClient.setQueryData<ConversationListInfiniteData>(queryKey, old =>
+        filterConversationPages(
+          old,
+          conversation => conversation.conversationId !== event.conversationId
+        )
+      );
+    }),
+    kiloChatClient.onConversationRead((ctx, event) => {
+      if (!matchesContext(ctx)) return;
+      if (!shouldApplyConversationRead(currentUserId, event.memberId)) return;
+      queryClient.setQueryData<ConversationListInfiniteData>(
+        queryKey,
+        old => applyConversationReadToPages(old, event).data
+      );
+    }),
+    kiloChatClient.onConversationActivity((ctx, event) => {
+      if (!matchesContext(ctx)) return;
+      patchActivity(event);
+    }),
+    eventService.onReconnect(() => {
+      invalidateConversationListQuery(queryClient, queryKey);
+    }),
+  ];
+
+  return () => {
+    for (const off of offs) {
+      off();
+    }
   };
 }
 

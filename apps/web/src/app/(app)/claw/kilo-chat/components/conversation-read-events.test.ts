@@ -1,4 +1,4 @@
-import { shouldApplyConversationRead } from './conversation-read-events';
+import { shouldApplyConversationRead } from '@kilocode/kilo-chat-hooks';
 
 describe('shouldApplyConversationRead', () => {
   it('waits for the current user id before applying own read events', () => {

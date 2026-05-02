@@ -18,8 +18,8 @@ import {
   conversationsKey,
   filterConversationPages,
   type ConversationListInfiniteData,
+  registerConversationListCacheHandlers,
 } from '../hooks/useConversations';
-import { registerKiloChatLayoutEventCacheHandlers } from './kiloChatLayoutCache';
 
 // ── Layout component ────────────────────────────────────────────────
 type KiloChatLayoutProps = {
@@ -63,14 +63,15 @@ export function KiloChatLayout({
   // Update loaded conversation-list cache rows in-place when instance events arrive.
   // Unknown conversations still invalidate so they can be fetched into the list.
   useEffect(() => {
-    return registerKiloChatLayoutEventCacheHandlers({
+    return registerConversationListCacheHandlers({
       currentUserId,
       eventService,
       kiloChatClient,
       queryClient,
       queryKey: conversationsQueryKey,
+      sandboxId,
     });
-  }, [currentUserId, eventService, kiloChatClient, queryClient, conversationsQueryKey]);
+  }, [currentUserId, eventService, kiloChatClient, queryClient, conversationsQueryKey, sandboxId]);
 
   const createConversation = useCreateConversation(kiloChatClient);
   const renameConversation = useRenameConversation(kiloChatClient);

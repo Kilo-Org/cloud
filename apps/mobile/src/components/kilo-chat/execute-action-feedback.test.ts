@@ -1,6 +1,10 @@
-import { type InfiniteData, QueryClient } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import { type Message } from '@kilocode/kilo-chat';
-import { messagesKey, restoreMessageInCache } from '@kilocode/kilo-chat-hooks';
+import {
+  messagesKey,
+  restoreMessageInCache,
+  type MessageInfiniteData,
+} from '@kilocode/kilo-chat-hooks';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner-native';
 
@@ -76,14 +80,14 @@ describe('executeActionWithMobileFeedback', () => {
         },
       ],
     });
-    queryClient.setQueryData<InfiniteData<Message[], string | undefined>>(queryKey, {
-      pages: [[optimistic]],
+    queryClient.setQueryData<MessageInfiniteData>(queryKey, {
+      pages: [{ messages: [optimistic], hasMore: false, nextCursor: null }],
       pageParams: [undefined],
     });
 
     restoreMessageInCache(queryClient, queryKey, original);
 
-    const result = queryClient.getQueryData<InfiniteData<Message[], string | undefined>>(queryKey);
-    expect(result?.pages[0]?.[0]).toEqual(original);
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
+    expect(result?.pages[0]?.messages[0]).toEqual(original);
   });
 });

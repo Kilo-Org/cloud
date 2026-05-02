@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { type InfiniteData } from '@tanstack/react-query';
 import { type Message } from '@kilocode/kilo-chat';
 
 import {
   applyReactionAddedEventToPages,
   applyReactionRemovedEventToPages,
   createReactionOperationTracker,
+  type MessageInfiniteData,
 } from '@kilocode/kilo-chat-hooks';
 
 function message(id: string, reactions: Message['reactions'] = []): Message {
@@ -23,9 +23,9 @@ function message(id: string, reactions: Message['reactions'] = []): Message {
   };
 }
 
-function pages(cachedMessage: Message): InfiniteData<Message[], string | undefined> {
+function pages(cachedMessage: Message): MessageInfiniteData {
   return {
-    pages: [[cachedMessage]],
+    pages: [{ messages: [cachedMessage], hasMore: false, nextCursor: null }],
     pageParams: [undefined],
   };
 }
@@ -48,7 +48,7 @@ describe('reaction operation cache ordering', () => {
       memberId: 'user-1',
     });
 
-    expect(afterStaleAdd.pages[0]?.[0]?.reactions).toEqual([]);
+    expect(afterStaleAdd.pages[0]?.messages[0]?.reactions).toEqual([]);
   });
 
   it('applies a newer reaction add after an older remove for the same member', () => {
@@ -68,7 +68,7 @@ describe('reaction operation cache ordering', () => {
       memberId: 'user-1',
     });
 
-    expect(afterAdd.pages[0]?.[0]?.reactions).toEqual([
+    expect(afterAdd.pages[0]?.messages[0]?.reactions).toEqual([
       { emoji: '👍', count: 1, memberIds: ['user-1'] },
     ]);
   });
@@ -90,7 +90,7 @@ describe('reaction operation cache ordering', () => {
       memberId: 'user-2',
     });
 
-    expect(afterUserTwo.pages[0]?.[0]?.reactions).toEqual([
+    expect(afterUserTwo.pages[0]?.messages[0]?.reactions).toEqual([
       { emoji: '👍', count: 2, memberIds: ['user-1', 'user-2'] },
     ]);
   });

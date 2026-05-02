@@ -60,11 +60,8 @@ export function KiloChatLayout({
     sandboxId
   );
 
-  // Update conversation list cache in-place when activity events arrive.
-  // For cursor pagination, events targeting conversations outside page 1 are
-  // ignored by an in-place patch, so the list appears stale. Invalidate the
-  // cache so the affected conversation either appears at the top (new/active)
-  // or re-sorts correctly once refetched.
+  // Update loaded conversation-list cache rows in-place when instance events arrive.
+  // Unknown conversations still invalidate so they can be fetched into the list.
   useEffect(() => {
     return registerKiloChatLayoutEventCacheHandlers({
       currentUserId,

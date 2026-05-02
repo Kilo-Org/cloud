@@ -139,33 +139,46 @@ export function applyConversationActivityToPages(
   data: ConversationListInfiniteData | undefined,
   activity: ConversationActivity
 ): ApplyConversationListPatchResult {
-  const firstPage = data?.pages[0];
-  if (!data || !firstPage?.conversations.some(c => c.conversationId === activity.conversationId)) {
+  if (!data) {
     return { data, applied: false };
   }
 
-  const current = firstPage.conversations.find(c => c.conversationId === activity.conversationId);
+  const current = data.pages
+    .flatMap(page => page.conversations)
+    .find(c => c.conversationId === activity.conversationId);
+  if (!current) {
+    return { data, applied: false };
+  }
+
   if (current && conversationActivitySortValue(current) > activity.lastActivityAt) {
     return { data, applied: true };
   }
 
+  const sortedConversations = data.pages
+    .flatMap(page => page.conversations)
+    .map(c =>
+      c.conversationId === activity.conversationId
+        ? { ...c, lastActivityAt: activity.lastActivityAt }
+        : c
+    )
+    .sort(compareConversationsByActivity);
+
+  let nextConversationOffset = 0;
+
   return {
     data: {
       ...data,
-      pages: data.pages.map((page, index) =>
-        index === 0
-          ? {
-              ...page,
-              conversations: page.conversations
-                .map(c =>
-                  c.conversationId === activity.conversationId
-                    ? { ...c, lastActivityAt: activity.lastActivityAt }
-                    : c
-                )
-                .sort(compareConversationsByActivity),
-            }
-          : page
-      ),
+      pages: data.pages.map(page => {
+        const conversations = sortedConversations.slice(
+          nextConversationOffset,
+          nextConversationOffset + page.conversations.length
+        );
+        nextConversationOffset += page.conversations.length;
+        return {
+          ...page,
+          conversations,
+        };
+      }),
     },
     applied: true,
   };

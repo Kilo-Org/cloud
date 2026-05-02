@@ -233,7 +233,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   return (
     <div
-      className={`group flex px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
+      className={`group flex [content-visibility:auto] [contain-intrinsic-size:0_120px] px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => {
         if (!showFullPicker) {

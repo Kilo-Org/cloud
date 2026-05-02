@@ -17,6 +17,7 @@ import {
   useRenameConversation,
   useLeaveConversation,
   applyConversationActivityToPages,
+  applyConversationReadToPages,
   updateConversationPages,
   filterConversationPages,
   type ConversationListInfiniteData,
@@ -106,10 +107,9 @@ export function KiloChatLayout({
         // should see their own sidebar row's `lastReadAt` advance — without
         // this filter, Alice marking read would also move Bob's `lastReadAt`.
         if (!shouldApplyConversationRead(currentUserId, e.memberId)) return;
-        queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
-          updateConversationPages(old, c =>
-            c.conversationId === e.conversationId ? { ...c, lastReadAt: e.lastReadAt } : c
-          )
+        queryClient.setQueriesData<ConversationListInfiniteData>(
+          { queryKey },
+          old => applyConversationReadToPages(old, e).data
         );
       }),
       kiloChatClient.onConversationActivity((_ctx, e) => {

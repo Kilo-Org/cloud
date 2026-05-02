@@ -1,5 +1,6 @@
 import {
   applyConversationActivityToPages,
+  applyConversationReadToPages,
   applyMarkConversationReadRollbackToPages,
   type ConversationListInfiniteData,
   updateConversationPages,
@@ -102,6 +103,66 @@ describe('instance event cache helpers', () => {
       '01ARZ3NDEKTSV4RRFFQ69G5FA2',
       '01ARZ3NDEKTSV4RRFFQ69G5FA1',
     ]);
+  });
+
+  it('ignores stale activity for a first-page conversation without invalidating', () => {
+    const data: ConversationListInfiniteData = {
+      pages: [
+        {
+          conversations: [
+            conversation('01ARZ3NDEKTSV4RRFFQ69G5FA1', { lastActivityAt: 200, joinedAt: 100 }),
+            conversation('01ARZ3NDEKTSV4RRFFQ69G5FA2', { lastActivityAt: 150, joinedAt: 150 }),
+          ],
+          hasMore: false,
+          nextCursor: null,
+        },
+      ],
+      pageParams: [null],
+    };
+
+    const result = applyConversationActivityToPages(data, {
+      conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FA1',
+      lastActivityAt: 100,
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.data).toBe(data);
+    expect(result.data?.pages[0]?.conversations.map(c => c.conversationId)).toEqual([
+      '01ARZ3NDEKTSV4RRFFQ69G5FA1',
+      '01ARZ3NDEKTSV4RRFFQ69G5FA2',
+    ]);
+    expect(result.data?.pages[0]?.conversations[0]?.lastActivityAt).toBe(200);
+  });
+
+  it('ignores stale read updates and applies newer read updates', () => {
+    const data: ConversationListInfiniteData = {
+      pages: [
+        {
+          conversations: [
+            conversation('01ARZ3NDEKTSV4RRFFQ69G5FA1', { lastReadAt: 200 }),
+            conversation('01ARZ3NDEKTSV4RRFFQ69G5FA2', { lastReadAt: null }),
+          ],
+          hasMore: false,
+          nextCursor: null,
+        },
+      ],
+      pageParams: [null],
+    };
+
+    const stale = applyConversationReadToPages(data, {
+      conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FA1',
+      lastReadAt: 100,
+    });
+    const newer = applyConversationReadToPages(stale.data, {
+      conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FA1',
+      lastReadAt: 300,
+    });
+
+    expect(stale.applied).toBe(true);
+    expect(stale.data).toBe(data);
+    expect(stale.data?.pages[0]?.conversations[0]?.lastReadAt).toBe(200);
+    expect(newer.applied).toBe(true);
+    expect(newer.data?.pages[0]?.conversations[0]?.lastReadAt).toBe(300);
   });
 
   it('leaves newer read state intact when a failed optimistic mark-read rolls back', () => {

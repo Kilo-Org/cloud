@@ -229,6 +229,50 @@ describe('MembershipDO', () => {
       const entry = conversations.find(c => c.conversationId === 'conv-apc');
       expect(entry!.title).toBe('Keep me');
     });
+
+    it('does not lower last_activity_at when an older post-commit update arrives later', async () => {
+      const stub = getStub('user-apc-activity-monotonic');
+      await stub.addConversation({
+        conversationId: 'conv-apc',
+        title: null,
+        sandboxId: 'sandbox-1',
+        joinedAt: 1000,
+      });
+
+      await stub.applyPostCommit({ conversationId: 'conv-apc', activityAt: 200, markRead: false });
+      await stub.applyPostCommit({ conversationId: 'conv-apc', activityAt: 100, markRead: false });
+
+      const { conversations } = await stub.listConversations();
+      expect(conversations).toContainEqual(
+        expect.objectContaining({
+          conversationId: 'conv-apc',
+          lastActivityAt: 200,
+          lastReadAt: null,
+        })
+      );
+    });
+
+    it('does not lower last_activity_at or last_read_at when an older read update arrives later', async () => {
+      const stub = getStub('user-apc-read-monotonic');
+      await stub.addConversation({
+        conversationId: 'conv-apc',
+        title: null,
+        sandboxId: 'sandbox-1',
+        joinedAt: 1000,
+      });
+
+      await stub.applyPostCommit({ conversationId: 'conv-apc', activityAt: 200, markRead: true });
+      await stub.applyPostCommit({ conversationId: 'conv-apc', activityAt: 100, markRead: true });
+
+      const { conversations } = await stub.listConversations();
+      expect(conversations).toContainEqual(
+        expect.objectContaining({
+          conversationId: 'conv-apc',
+          lastActivityAt: 200,
+          lastReadAt: 200,
+        })
+      );
+    });
   });
 
   describe('cursor pagination', () => {

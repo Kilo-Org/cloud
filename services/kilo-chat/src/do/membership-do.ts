@@ -185,13 +185,30 @@ export class MembershipDO extends DurableObject<Env> {
     activityAt: number;
     markRead: boolean;
   }): void {
+    const existing = this.db
+      .select({
+        lastActivityAt: conversations.last_activity_at,
+        lastReadAt: conversations.last_read_at,
+      })
+      .from(conversations)
+      .where(eq(conversations.conversation_id, params.conversationId))
+      .get();
+
+    if (!existing) {
+      return;
+    }
+
     const set: {
       last_activity_at: number;
       conversation_title?: string | null;
       last_read_at?: number;
-    } = { last_activity_at: params.activityAt };
+    } = {
+      last_activity_at: Math.max(existing.lastActivityAt ?? params.activityAt, params.activityAt),
+    };
     if (params.title !== undefined) set.conversation_title = params.title;
-    if (params.markRead) set.last_read_at = params.activityAt;
+    if (params.markRead) {
+      set.last_read_at = Math.max(existing.lastReadAt ?? params.activityAt, params.activityAt);
+    }
 
     this.db
       .update(conversations)

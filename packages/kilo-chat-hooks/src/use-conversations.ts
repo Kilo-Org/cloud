@@ -114,9 +114,14 @@ type ConversationActivity = {
   lastActivityAt: number;
 };
 
-type ApplyConversationActivityResult = {
+type ApplyConversationListPatchResult = {
   data: ConversationListInfiniteData | undefined;
   applied: boolean;
+};
+
+type ConversationRead = {
+  conversationId: string;
+  lastReadAt: number;
 };
 
 function conversationActivitySortValue(conversation: ConversationListItem): number {
@@ -133,10 +138,15 @@ function compareConversationsByActivity(a: ConversationListItem, b: Conversation
 export function applyConversationActivityToPages(
   data: ConversationListInfiniteData | undefined,
   activity: ConversationActivity
-): ApplyConversationActivityResult {
+): ApplyConversationListPatchResult {
   const firstPage = data?.pages[0];
   if (!data || !firstPage?.conversations.some(c => c.conversationId === activity.conversationId)) {
     return { data, applied: false };
+  }
+
+  const current = firstPage.conversations.find(c => c.conversationId === activity.conversationId);
+  if (current && conversationActivitySortValue(current) > activity.lastActivityAt) {
+    return { data, applied: true };
   }
 
   return {
@@ -158,6 +168,33 @@ export function applyConversationActivityToPages(
       ),
     },
     applied: true,
+  };
+}
+
+export function applyConversationReadToPages(
+  data: ConversationListInfiniteData | undefined,
+  read: ConversationRead
+): ApplyConversationListPatchResult {
+  let foundConversation = false;
+  let foundNewerOrEqualState = false;
+
+  const next = updateConversationPages(data, conversation => {
+    if (conversation.conversationId !== read.conversationId) {
+      return conversation;
+    }
+
+    foundConversation = true;
+    if (conversation.lastReadAt !== null && conversation.lastReadAt >= read.lastReadAt) {
+      foundNewerOrEqualState = true;
+      return conversation;
+    }
+
+    return { ...conversation, lastReadAt: read.lastReadAt };
+  });
+
+  return {
+    data: foundNewerOrEqualState ? data : next,
+    applied: foundConversation,
   };
 }
 

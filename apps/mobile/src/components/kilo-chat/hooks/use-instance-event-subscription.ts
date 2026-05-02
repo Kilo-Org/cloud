@@ -11,6 +11,7 @@ import {
 } from '@kilocode/kilo-chat';
 import {
   applyConversationActivityToPages,
+  applyConversationReadToPages,
   botStatusKey,
   conversationKey,
   type ConversationListInfiniteData,
@@ -97,12 +98,9 @@ export function useInstanceEventSubscription(sandboxId: string | undefined) {
       if (!shouldApplyConversationRead(currentUserId, event.memberId)) {
         return;
       }
-      qc.setQueryData<ConversationListInfiniteData>(queryKey, old =>
-        updateConversationPages(old, conversation =>
-          conversation.conversationId === event.conversationId
-            ? { ...conversation, lastReadAt: event.lastReadAt }
-            : conversation
-        )
+      qc.setQueryData<ConversationListInfiniteData>(
+        queryKey,
+        old => applyConversationReadToPages(old, event).data
       );
     },
     [currentUserId, qc, queryKey]

@@ -160,13 +160,19 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   // Bots are excluded inside the hook because their streaming uses
   // message.created for every token chunk and relies on typing.stopped to
   // signal stream completion.
+  const handleActionFailed = useCallback(() => {
+    toast.error("Couldn't reach the bot — please try again");
+  }, []);
+  const handleMessageDeliveryFailed = useCallback(() => {
+    toast.error('Message could not be delivered to the bot');
+  }, []);
   useMessageCacheUpdater(
     kiloChatClient,
     sandboxId,
     conversationId,
     clearTypingForMember,
-    () => toast.error("Couldn't reach the bot — please try again"),
-    () => toast.error('Message could not be delivered to the bot')
+    handleActionFailed,
+    handleMessageDeliveryFailed
   );
   const sendTyping = useTypingSender(kiloChatClient, conversationId);
 

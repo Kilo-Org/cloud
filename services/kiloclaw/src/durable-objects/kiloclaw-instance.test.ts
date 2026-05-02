@@ -9207,7 +9207,6 @@ describe('tryMarkInstanceReady', () => {
 
 type LifecyclePushCall = {
   userId: string;
-  instanceId: string;
   sandboxId: string;
   event: 'ready' | 'start_failed';
   instanceName: string | null;
@@ -9251,7 +9250,7 @@ describe('instance ready push', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].event).toBe('ready');
     expect(calls[0].userId).toBe('user-1');
-    expect(calls[0].instanceId).toBe('sandbox-1');
+    expect(calls[0].sandboxId).toBe('sandbox-1');
     expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
   });
 
@@ -9341,7 +9340,7 @@ describe('instance start-failed push', () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0].event).toBe('start_failed');
-    expect(calls[0].instanceId).toBe('sandbox-1');
+    expect(calls[0].sandboxId).toBe('sandbox-1');
     expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
   });
 

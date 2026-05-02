@@ -21,6 +21,19 @@ function mockFetch(status: number, body: unknown): typeof globalThis.fetch {
 }
 
 describe('KiloChatClient', () => {
+  const sentMessage = {
+    id: 'm1',
+    senderId: 'user-1',
+    content: [{ type: 'text' as const, text: 'hi' }],
+    inReplyToMessageId: null,
+    replyTo: null,
+    updatedAt: null,
+    clientUpdatedAt: null,
+    deleted: false,
+    deliveryFailed: false,
+    reactions: [],
+  };
+
   describe('listConversations', () => {
     it('sends GET /v1/conversations with auth header', async () => {
       const fetch = mockFetch(200, {
@@ -127,13 +140,13 @@ describe('KiloChatClient', () => {
 
   describe('sendMessage', () => {
     it('sends POST /v1/messages', async () => {
-      const fetch = mockFetch(201, { messageId: 'm1' });
+      const fetch = mockFetch(201, { messageId: 'm1', message: sentMessage });
       const client = new KiloChatClient(createMockConfig(fetch));
       const res = await client.sendMessage({
         conversationId: 'c1',
         content: [{ type: 'text', text: 'hi' }],
       });
-      expect(res).toEqual({ messageId: 'm1' });
+      expect(res).toEqual({ messageId: 'm1', message: sentMessage });
     });
 
     it('does not emit unhandled rejections after handled send failures', async () => {
@@ -143,7 +156,11 @@ describe('KiloChatClient', () => {
       const fetch = vi
         .fn<typeof globalThis.fetch>()
         .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'boom' }), { status: 500 }))
-        .mockResolvedValueOnce(new Response(JSON.stringify({ messageId: 'm2' }), { status: 201 }));
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ messageId: 'm2', message: { ...sentMessage, id: 'm2' } }), {
+            status: 201,
+          })
+        );
       const client = new KiloChatClient(createMockConfig(fetch));
 
       try {
@@ -163,7 +180,7 @@ describe('KiloChatClient', () => {
           content: [{ type: 'text', text: 'retry' }],
         });
 
-        expect(res).toEqual({ messageId: 'm2' });
+        expect(res).toEqual({ messageId: 'm2', message: { ...sentMessage, id: 'm2' } });
         expect(fetch).toHaveBeenCalledTimes(2);
         expect(fetch).toHaveBeenNthCalledWith(
           2,

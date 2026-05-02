@@ -13,6 +13,7 @@ import {
   filterClearedBadgeBucket,
   markReadConversation,
 } from './hooks/mark-read-operation';
+import { reconcileHydratedBadgeCount, totalBadgeCount } from '@/lib/badge-hydration';
 
 type UpdateBadgeRows = (
   queryKey: readonly ['badges', string],
@@ -166,6 +167,54 @@ describe('markReadConversation', () => {
     expect(applied).toBe(false);
     expect(updateBadgeRows).toHaveBeenCalledOnce();
     expect(updateBadgeRows).toHaveBeenCalledWith(['badges', 'user-1'], expect.any(Function));
+    expect(setBadgeCount).not.toHaveBeenCalled();
+  });
+});
+
+describe('badge hydration reconciliation', () => {
+  it('totals all hydrated badge buckets for the native OS badge', () => {
+    expect(
+      totalBadgeCount([
+        { badgeBucket: 'kiloclaw:sandbox-1', badgeCount: 2 },
+        { badgeBucket: 'kiloclaw:sandbox-1:conversation-1', badgeCount: 3 },
+      ])
+    ).toBe(5);
+  });
+
+  it('updates the native OS badge when hydration is still fresh', () => {
+    const setBadgeCount = vi.fn<(badgeCount: number) => Promise<boolean>>(async () => {
+      const result = await Promise.resolve(true);
+      return result;
+    });
+
+    const applied = reconcileHydratedBadgeCount({
+      badgeRows: [
+        { badgeBucket: 'kiloclaw:sandbox-1', badgeCount: 2 },
+        { badgeBucket: 'kiloclaw:sandbox-1:conversation-1', badgeCount: 3 },
+      ],
+      startBadgeFreshnessEpoch: 10,
+      currentBadgeFreshnessEpoch: 10,
+      setBadgeCount,
+    });
+
+    expect(applied).toBe(true);
+    expect(setBadgeCount).toHaveBeenCalledWith(5);
+  });
+
+  it('does not overwrite a newer native OS badge update from stale hydration', () => {
+    const setBadgeCount = vi.fn<(badgeCount: number) => Promise<boolean>>(async () => {
+      const result = await Promise.resolve(true);
+      return result;
+    });
+
+    const applied = reconcileHydratedBadgeCount({
+      badgeRows: [{ badgeBucket: 'kiloclaw:sandbox-1', badgeCount: 4 }],
+      startBadgeFreshnessEpoch: 10,
+      currentBadgeFreshnessEpoch: 11,
+      setBadgeCount,
+    });
+
+    expect(applied).toBe(false);
     expect(setBadgeCount).not.toHaveBeenCalled();
   });
 });

@@ -9,7 +9,7 @@ import { useMarkConversationRead } from '@kilocode/kilo-chat-hooks';
 
 import { useCurrentUserId } from './use-current-user-id';
 import { applyBadgeClearResult, markReadConversation } from './mark-read-operation';
-import { readBadgeFreshnessEpoch } from '@/lib/badge-freshness';
+import { advanceBadgeFreshnessEpoch, readBadgeFreshnessEpoch } from '@/lib/badge-freshness';
 
 type MarkReadInput = {
   sandboxId: string;
@@ -39,7 +39,7 @@ export function useMarkRead(client: KiloChatClient) {
     onError: error => {
       toast.error(error.message);
     },
-    onMutate: () => ({ startBadgeFreshnessEpoch: readBadgeFreshnessEpoch() }),
+    onMutate: () => ({ startBadgeFreshnessEpoch: advanceBadgeFreshnessEpoch() }),
     onSuccess: (result, _variables, context) => {
       const currentBadgeFreshnessEpoch = readBadgeFreshnessEpoch();
       applyBadgeClearResult({

@@ -1,5 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
+import { useCallback } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -71,6 +72,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const createConversation = useCreateConversation(client);
 
   const conversations = listQuery.data?.conversations ?? [];
+  const hasNextPage = listQuery.hasNextPage;
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
 
@@ -91,6 +93,12 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       }
     );
   }
+
+  const fetchMoreConversations = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage({ cancelRefetch: false });
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return (
     <View className="flex-1">
@@ -113,9 +121,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
               </View>
             ) : null
           }
-          onEndReached={() => {
-            void fetchNextPage();
-          }}
+          onEndReached={fetchMoreConversations}
           onEndReachedThreshold={0.5}
         />
       </Animated.View>

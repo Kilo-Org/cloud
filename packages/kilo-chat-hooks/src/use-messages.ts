@@ -30,9 +30,30 @@ const messagePageMetadata = new WeakMap<
   Message[],
   Pick<MessageListResponse, 'hasMore' | 'nextCursor'>
 >();
+const messagePageMetadataProperty = '__kiloChatPageMetadata';
+
+type MessagePageMetadata = Pick<MessageListResponse, 'hasMore' | 'nextCursor'>;
+type MessagePageWithMetadata = Message[] & {
+  [messagePageMetadataProperty]?: MessagePageMetadata;
+};
+
+function setMessagePageMetadata(page: Message[], metadata: MessagePageMetadata): void {
+  messagePageMetadata.set(page, metadata);
+  Object.defineProperty(page, messagePageMetadataProperty, {
+    value: metadata,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
+function getMessagePageMetadata(page: Message[]): MessagePageMetadata | undefined {
+  return (
+    messagePageMetadata.get(page) ?? (page as MessagePageWithMetadata)[messagePageMetadataProperty]
+  );
+}
 
 export function messagesFromListPage(page: MessageListResponse): Message[] {
-  messagePageMetadata.set(page.messages, {
+  setMessagePageMetadata(page.messages, {
     hasMore: page.hasMore,
     nextCursor: page.nextCursor,
   });
@@ -40,12 +61,20 @@ export function messagesFromListPage(page: MessageListResponse): Message[] {
 }
 
 export function getNextMessagesPageParam(lastPage: Message[]): string | undefined {
-  const metadata = messagePageMetadata.get(lastPage);
+  const metadata = getMessagePageMetadata(lastPage);
   if (metadata) {
     return metadata.hasMore ? (metadata.nextCursor ?? undefined) : undefined;
   }
   if (lastPage.length < PAGE_SIZE) return undefined;
   return lastPage[lastPage.length - 1]?.id;
+}
+
+function preserveMessagePageMetadata(source: Message[], replacement: Message[]): Message[] {
+  const metadata = getMessagePageMetadata(source);
+  if (metadata) {
+    setMessagePageMetadata(replacement, metadata);
+  }
+  return replacement;
 }
 
 export function applyReactionAdded(
@@ -237,7 +266,7 @@ export function restoreMessageInCache(
       const pages = old.pages.slice();
       const updatedPage = page.slice();
       updatedPage[messageIndex] = snapshot;
-      pages[pageIndex] = updatedPage;
+      pages[pageIndex] = preserveMessagePageMetadata(page, updatedPage);
       restored = true;
       return { ...old, pages };
     }
@@ -260,7 +289,12 @@ export function removeMessageFromCache(
     if (!old) return old;
     return {
       ...old,
-      pages: old.pages.map(page => page.filter(msg => msg.id !== messageId)),
+      pages: old.pages.map(page =>
+        preserveMessagePageMetadata(
+          page,
+          page.filter(msg => msg.id !== messageId)
+        )
+      ),
     };
   });
 }
@@ -297,7 +331,7 @@ export function updateMessageInPages<TPageParam>(
     const updatedMessage = updater(message);
     if (updatedMessage === message) return old;
     updatedPage[messageIndex] = updatedMessage;
-    pages[pageIndex] = updatedPage;
+    pages[pageIndex] = preserveMessagePageMetadata(page, updatedPage);
     return { ...old, pages };
   }
   return old;
@@ -421,7 +455,9 @@ export function replaceMessageAndOrderNewestPage<TPageParam>(
     const message = updatedPage[messageIndex];
     if (!message) return old;
     updatedPage[messageIndex] = updater(message);
-    pages[pageIndex] = pageIndex === 0 ? orderNewestLoadedPageByServerId(updatedPage) : updatedPage;
+    const replacementPage =
+      pageIndex === 0 ? orderNewestLoadedPageByServerId(updatedPage) : updatedPage;
+    pages[pageIndex] = preserveMessagePageMetadata(page, replacementPage);
     return { ...old, pages };
   }
   return old;
@@ -503,7 +539,10 @@ export function applyMessageCreatedEventToPages<TPageParam>(
 
   const firstPage = old.pages[0] ?? [];
   const orderedFirstPage = orderNewestLoadedPageByServerId([newMessage, ...firstPage]);
-  return { ...old, pages: [orderedFirstPage, ...old.pages.slice(1)] };
+  return {
+    ...old,
+    pages: [preserveMessagePageMetadata(firstPage, orderedFirstPage), ...old.pages.slice(1)],
+  };
 }
 
 export function applyCreateMessageResponseToPages<TPageParam>(
@@ -574,7 +613,13 @@ export function useSendMessage(
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         const firstPage = old.pages[0] ?? [];
-        return { ...old, pages: [[optimisticMessage, ...firstPage], ...old.pages.slice(1)] };
+        return {
+          ...old,
+          pages: [
+            preserveMessagePageMetadata(firstPage, [optimisticMessage, ...firstPage]),
+            ...old.pages.slice(1),
+          ],
+        };
       });
       return { queryKey, pendingId };
     },

@@ -11,7 +11,9 @@ import {
   createReactionOperationTracker,
   getNextMessagesPageParam,
   messagesFromListPage,
+  removeMessageFromCache,
   rollbackEditMessageError,
+  updateMessageInPages,
 } from './use-messages';
 import { messagesKey } from './query-keys';
 
@@ -147,6 +149,12 @@ describe('edit rollback errors', () => {
 });
 
 describe('message pagination helpers', () => {
+  function fullPage(prefix: string): Message[] {
+    return Array.from({ length: 50 }, (_, index) =>
+      message({ id: `${prefix}-${String(index).padStart(2, '0')}` })
+    );
+  }
+
   it('uses the server-provided next cursor when present', () => {
     const messages = [
       message({ id: '01KQK8F2222222222222222222' }),
@@ -169,6 +177,86 @@ describe('message pagination helpers', () => {
     });
 
     expect(getNextMessagesPageParam(page)).toBeUndefined();
+  });
+
+  it('preserves terminal-page metadata when replacing cached messages', () => {
+    const page = messagesFromListPage({
+      messages: fullPage('01KQK8P'),
+      hasMore: false,
+      nextCursor: null,
+    });
+    const initial: InfiniteData<Message[]> = {
+      pageParams: [undefined],
+      pages: [page],
+    };
+
+    const updated = updateMessageInPages(initial, page[0]?.id ?? '', msg => ({
+      ...msg,
+      content: [{ type: 'text', text: 'updated' }],
+    }));
+    const replaced = applyCreateMessageResponseToPages(updated, page[1]?.id ?? '', {
+      messageId: '01KQK8P-server',
+      clientId: '01KQK8P-client',
+      message: message({ id: '01KQK8P-server' }),
+    });
+
+    expect(getNextMessagesPageParam(updated.pages[0] ?? [])).toBeUndefined();
+    expect(getNextMessagesPageParam(replaced.pages[0] ?? [])).toBeUndefined();
+  });
+
+  it('preserves server next cursors when replacing or extending the newest page', () => {
+    const page = messagesFromListPage({
+      messages: fullPage('01KQK8Q'),
+      hasMore: true,
+      nextCursor: 'server-cursor-after-01KQK8Q',
+    });
+    const initial: InfiniteData<Message[]> = {
+      pageParams: [undefined],
+      pages: [page],
+    };
+
+    const afterEventMerge = applyMessageCreatedEventToPages(initial, {
+      messageId: page[0]?.id ?? '',
+      senderId: 'user-sender',
+      content: [{ type: 'text', text: 'merged' }],
+      inReplyToMessageId: null,
+      replyTo: null,
+      clientId: null,
+    });
+    const afterNewMessage = applyMessageCreatedEventToPages(afterEventMerge, {
+      messageId: '01KQK8Q-newer',
+      senderId: 'user-sender',
+      content: [{ type: 'text', text: 'newest' }],
+      inReplyToMessageId: null,
+      replyTo: null,
+      clientId: null,
+    });
+
+    expect(getNextMessagesPageParam(afterEventMerge.pages[0] ?? [])).toBe(
+      'server-cursor-after-01KQK8Q'
+    );
+    expect(getNextMessagesPageParam(afterNewMessage.pages[0] ?? [])).toBe(
+      'server-cursor-after-01KQK8Q'
+    );
+  });
+
+  it('preserves page metadata when removing a cached message', () => {
+    const queryClient = new QueryClient();
+    const queryKey = messagesKey('01KQK8R1111111111111111111');
+    const page = messagesFromListPage({
+      messages: fullPage('01KQK8R'),
+      hasMore: true,
+      nextCursor: 'server-cursor-after-01KQK8R',
+    });
+    queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, {
+      pageParams: [undefined],
+      pages: [page],
+    });
+
+    removeMessageFromCache(queryClient, queryKey, page[0]?.id ?? '');
+
+    const result = queryClient.getQueryData<InfiniteData<Message[]>>(queryKey);
+    expect(getNextMessagesPageParam(result?.pages[0] ?? [])).toBe('server-cursor-after-01KQK8R');
   });
 });
 

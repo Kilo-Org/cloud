@@ -220,6 +220,20 @@ function applyActionResolution(
   };
 }
 
+function mergeCreatedContentIntoCachedRow(created: Message, cached: Message): Message['content'] {
+  if (cached.clientUpdatedAt !== null) return cached.content;
+
+  return created.content.map(block => {
+    if (block.type !== 'actions') return block;
+    if (block.resolved) return block;
+
+    const cachedResolution = findActionResolution(cached, block.groupId);
+    if (!cachedResolution) return block;
+
+    return { ...block, resolved: cachedResolution };
+  });
+}
+
 function errorCode(error: unknown): string | null {
   if (!(error instanceof KiloChatApiError)) return null;
   const body = error.body;
@@ -306,7 +320,7 @@ export function messageFromCreatedEvent(e: MessageCreatedEvent): Message {
 function mergeCreatedMessageIntoCachedRow(created: Message, cached: Message): Message {
   return {
     ...created,
-    content: cached.clientUpdatedAt !== null ? cached.content : created.content,
+    content: mergeCreatedContentIntoCachedRow(created, cached),
     updatedAt: cached.updatedAt ?? created.updatedAt,
     clientUpdatedAt: cached.clientUpdatedAt ?? created.clientUpdatedAt,
     deleted: cached.deleted || created.deleted,

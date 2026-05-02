@@ -9,6 +9,27 @@ function textContent(text: string): Message['content'] {
   return [{ type: 'text', text }];
 }
 
+function actionContent(resolved = false): Message['content'] {
+  const actionBlock = {
+    type: 'actions',
+    groupId: 'approval-1',
+    actions: [{ label: 'Allow once', style: 'primary', value: 'allow-once' }],
+  } satisfies Message['content'][number];
+
+  if (!resolved) return [actionBlock];
+
+  return [
+    {
+      ...actionBlock,
+      resolved: {
+        value: 'allow-once',
+        resolvedBy: 'user-2',
+        resolvedAt: 1710000003000,
+      },
+    },
+  ];
+}
+
 function message(overrides: Partial<Message> = {}): Message {
   return {
     id: serverMessageId,
@@ -116,6 +137,17 @@ describe('applyMessageCreatedEventToPages', () => {
       content: textContent('server text'),
       deliveryFailed: true,
     });
+  });
+
+  it('preserves resolved actions that arrive before a delayed create', () => {
+    const cached = pagesFor(message({ content: actionContent(true) }));
+
+    const result = applyMessageCreatedEventToPages(
+      cached,
+      createdEvent({ content: actionContent(false) })
+    );
+
+    expect(firstMessage(result).content).toEqual(actionContent(true));
   });
 
   it('still replaces pending optimistic rows with the server create snapshot', () => {

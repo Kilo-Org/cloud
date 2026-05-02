@@ -387,6 +387,17 @@ export class ConversationDO extends DurableObject<Env> {
     };
   }
 
+  getLatestNonDeletedMessageId(): string | null {
+    const row = this.db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.deleted, 0))
+      .orderBy(desc(messages.id))
+      .limit(1)
+      .get();
+    return row?.id ?? null;
+  }
+
   listMessages(params: ListMessagesParams): ListMessagesResult {
     const query = this.db.select().from(messages);
 

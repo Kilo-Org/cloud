@@ -367,16 +367,23 @@ export async function markReadFor(
 
   const { sandboxId } = extractConversationContext(info.members);
   if (sandboxId) {
-    const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
-    ctx.waitUntil(
-      env.NOTIFICATIONS.clearBadgeBucketForUser({ userId, badgeBucket }).catch(err => {
-        logger.error('clearBadgeBucketForUser failed', {
-          sandboxId,
-          conversationId,
-          ...formatError(err),
-        });
-      })
+    const latestMessageId = await withDORetry(
+      () => convStub,
+      stub => stub.getLatestNonDeletedMessageId(),
+      'ConversationDO.getLatestNonDeletedMessageId'
     );
+    if (latestMessageId !== null && lastSeenMessageId >= latestMessageId) {
+      const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
+      ctx.waitUntil(
+        env.NOTIFICATIONS.clearBadgeBucketForUser({ userId, badgeBucket }).catch(err => {
+          logger.error('clearBadgeBucketForUser failed', {
+            sandboxId,
+            conversationId,
+            ...formatError(err),
+          });
+        })
+      );
+    }
 
     if (readResult.applied) {
       const pushPromise = pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {

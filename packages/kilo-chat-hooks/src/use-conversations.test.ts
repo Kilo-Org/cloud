@@ -8,7 +8,9 @@ import {
   applyConversationActivityToPages,
   applyConversationCreatedToPages,
   applyConversationReadToPages,
+  applyOptimisticLeaveConversation,
   applyOptimisticMarkConversationRead,
+  rollbackOptimisticLeaveConversation,
   rollbackOptimisticMarkConversationRead,
   settleLeaveConversation,
   settleMarkConversationRead,
@@ -350,6 +352,77 @@ describe('settleLeaveConversation', () => {
 
     expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+  });
+});
+
+describe('optimistic leave conversation rollback', () => {
+  it('restores only the removed row while preserving newer sidebar patches', () => {
+    const queryClient = new QueryClient();
+    const activeKey = conversationsKey('sandbox-a');
+
+    queryClient.setQueryData(
+      activeKey,
+      conversationsData(
+        [
+          [
+            conversation('conversation-leave', { lastActivityAt: 300, joinedAt: 300 }),
+            conversation('conversation-active', { lastActivityAt: 200, joinedAt: 200 }),
+            conversation('conversation-quiet', { lastActivityAt: 100, joinedAt: 100 }),
+          ],
+        ],
+        [null]
+      )
+    );
+
+    const context = applyOptimisticLeaveConversation(queryClient, {
+      sandboxId: 'sandbox-a',
+      conversationId: 'conversation-leave',
+    });
+    const activityResult = applyConversationActivityToPages(queryClient.getQueryData(activeKey), {
+      conversationId: 'conversation-quiet',
+      lastActivityAt: 500,
+    });
+    queryClient.setQueryData(activeKey, activityResult.data);
+    const createResult = applyConversationCreatedToPages(
+      queryClient.getQueryData(activeKey),
+      conversation('conversation-created', { lastActivityAt: 450, joinedAt: 450 })
+    );
+    queryClient.setQueryData(activeKey, createResult.data);
+    queryClient.setQueryData<ConversationListInfiniteData>(activeKey, old =>
+      old
+        ? {
+            ...old,
+            pages: old.pages.map(page => ({
+              ...page,
+              conversations: page.conversations.map(current =>
+                current.conversationId === 'conversation-active'
+                  ? { ...current, title: 'Renamed while leave was pending' }
+                  : current
+              ),
+            })),
+          }
+        : old
+    );
+
+    rollbackOptimisticLeaveConversation(queryClient, context);
+
+    const conversations =
+      queryClient
+        .getQueryData<ConversationListInfiniteData>(activeKey)
+        ?.pages.flatMap(page => page.conversations) ?? [];
+    expect(conversations.map(current => current.conversationId)).toEqual([
+      'conversation-quiet',
+      'conversation-created',
+      'conversation-leave',
+      'conversation-active',
+    ]);
+    expect(
+      conversations.find(current => current.conversationId === 'conversation-quiet')
+    ).toMatchObject({ lastActivityAt: 500 });
+    expect(
+      conversations.find(current => current.conversationId === 'conversation-active')
+    ).toMatchObject({ title: 'Renamed while leave was pending' });
+    expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(false);
   });
 });
 

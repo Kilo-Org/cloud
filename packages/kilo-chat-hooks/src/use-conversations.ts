@@ -124,6 +124,10 @@ export function useLeaveConversation(client: KiloChatClient) {
   return useMutation({
     mutationFn: (variables: LeaveConversationMutationVariables) =>
       client.leaveConversation(variables.conversationId),
+    onMutate: variables => applyOptimisticLeaveConversation(queryClient, variables),
+    onError: (_err, _variables, context) => {
+      rollbackOptimisticLeaveConversation(queryClient, context);
+    },
     onSuccess: (_data, variables) => {
       settleLeaveConversation(queryClient, variables);
     },
@@ -351,6 +355,81 @@ export function settleLeaveConversation(
   void queryClient.invalidateQueries({
     queryKey: conversationListInvalidationKey(variables.sandboxId),
   });
+}
+
+type LeaveConversationQueryRollback = {
+  queryKey: QueryKey;
+  conversation: ConversationListItem;
+};
+
+type LeaveConversationMutationContext = {
+  rollbacks: LeaveConversationQueryRollback[];
+  invalidationQueryKey: QueryKey;
+};
+
+export function applyOptimisticLeaveConversation(
+  queryClient: QueryClient,
+  variables: LeaveConversationMutationVariables
+): LeaveConversationMutationContext {
+  const queryKey = conversationListInvalidationKey(variables.sandboxId);
+  const rollbacks: LeaveConversationQueryRollback[] = [];
+  const previousEntries = queryClient.getQueriesData<ConversationListInfiniteData>({
+    queryKey,
+  });
+
+  for (const [entryQueryKey, data] of previousEntries) {
+    const previousConversation = data?.pages
+      .flatMap(page => page.conversations)
+      .find(conversation => conversation.conversationId === variables.conversationId);
+
+    if (!previousConversation) {
+      continue;
+    }
+
+    rollbacks.push({
+      queryKey: entryQueryKey,
+      conversation: previousConversation,
+    });
+
+    queryClient.setQueryData<ConversationListInfiniteData>(entryQueryKey, old =>
+      filterConversationPages(
+        old,
+        conversation => conversation.conversationId !== variables.conversationId
+      )
+    );
+  }
+
+  return { rollbacks, invalidationQueryKey: queryKey };
+}
+
+export function rollbackOptimisticLeaveConversation(
+  queryClient: QueryClient,
+  context: LeaveConversationMutationContext | undefined
+): void {
+  let shouldInvalidate = false;
+
+  for (const rollback of context?.rollbacks ?? []) {
+    const current = queryClient.getQueryData<ConversationListInfiniteData>(rollback.queryKey);
+    const alreadyRestored = current?.pages
+      .flatMap(page => page.conversations)
+      .some(conversation => conversation.conversationId === rollback.conversation.conversationId);
+
+    if (alreadyRestored) {
+      continue;
+    }
+
+    const result = applyConversationCreatedToPages(current, rollback.conversation);
+    if (!result.applied) {
+      shouldInvalidate = true;
+      continue;
+    }
+
+    queryClient.setQueryData<ConversationListInfiniteData>(rollback.queryKey, result.data);
+  }
+
+  if (shouldInvalidate && context) {
+    void queryClient.invalidateQueries({ queryKey: context.invalidationQueryKey });
+  }
 }
 
 export function applyConversationReadToPages(

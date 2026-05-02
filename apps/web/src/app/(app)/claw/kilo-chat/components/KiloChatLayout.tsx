@@ -16,8 +16,6 @@ import {
   useRenameConversation,
   useLeaveConversation,
   conversationsKey,
-  filterConversationPages,
-  type ConversationListInfiniteData,
   registerConversationListCacheHandlers,
 } from '../hooks/useConversations';
 
@@ -95,46 +93,24 @@ export function KiloChatLayout({
 
   const handleLeave = useCallback(
     (conversationId: string) => {
-      // Mark as leaving so child queries disable themselves immediately
+      const isActiveConversation = params?.conversationId === conversationId;
       setLeavingConversationId(conversationId);
-      // Optimistically remove the row before the router.push fires. When the
-      // user leaves the *active* conversation, router navigation concurrent
-      // with the mutation's onSuccess invalidateQueries left the row stale
-      // in the sidebar until a full page reload. Patching the cache up-front
-      // mirrors what onConversationLeft does for other members.
-      const previous = queryClient.getQueriesData<ConversationListInfiniteData>({
-        queryKey: conversationsQueryKey,
-      });
-      queryClient.setQueriesData<ConversationListInfiniteData>(
-        { queryKey: conversationsQueryKey },
-        old => filterConversationPages(old, c => c.conversationId !== conversationId)
-      );
-      if (params?.conversationId === conversationId) {
-        router.push(basePath);
-      }
       leaveConversation.mutate(
         { sandboxId, conversationId },
         {
           onSettled: () => setLeavingConversationId(null),
-          onError: err => {
-            // Restore the row on failure so the user can retry
-            for (const [key, data] of previous) {
-              queryClient.setQueryData(key, data);
+          onSuccess: () => {
+            if (isActiveConversation) {
+              router.push(basePath);
             }
+          },
+          onError: err => {
             toast.error(formatKiloChatError(err, 'Failed to leave conversation'));
           },
         }
       );
     },
-    [
-      sandboxId,
-      leaveConversation.mutate,
-      params?.conversationId,
-      queryClient,
-      conversationsQueryKey,
-      router,
-      basePath,
-    ]
+    [sandboxId, leaveConversation.mutate, params?.conversationId, router, basePath]
   );
 
   const handleNewConversation = useCallback(() => {

@@ -219,10 +219,13 @@ export const markConversationReadRequestSchema = z.object({
 });
 
 export const badgeClearResponseSchema = z.object({
+  badgeBucket: z.string().min(1),
   badgeCount: nonNegativeIntegerSchema,
 });
 
 export const markConversationReadResponseSchema = okResponseSchema.extend({
+  applied: z.boolean(),
+  lastReadAt: nonNegativeIntegerSchema,
   badgeClear: badgeClearResponseSchema.nullable(),
 });
 

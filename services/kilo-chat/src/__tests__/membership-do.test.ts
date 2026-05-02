@@ -112,14 +112,14 @@ describe('MembershipDO', () => {
       expect(await getLastReadAt(stub, 'conv-1')).toBe(5000);
     });
 
-    it('ignores an equal read marker without reading the current value back', async () => {
+    it('ignores an equal read marker and returns the current value', async () => {
       const stub = getStub('user-mark-read-at-least-equal');
       await addConversation(stub, 'conv-1');
       await stub.markReadAtLeast('conv-1', 5000);
 
       const result = await stub.markReadAtLeast('conv-1', 5000);
 
-      expect(result).toEqual({ applied: false, lastReadAt: null });
+      expect(result).toEqual({ applied: false, lastReadAt: 5000 });
       expect(await getLastReadAt(stub, 'conv-1')).toBe(5000);
     });
 
@@ -130,7 +130,7 @@ describe('MembershipDO', () => {
 
       const result = await stub.markReadAtLeast('conv-1', 4000);
 
-      expect(result).toEqual({ applied: false, lastReadAt: null });
+      expect(result).toEqual({ applied: false, lastReadAt: 5000 });
       expect(await getLastReadAt(stub, 'conv-1')).toBe(5000);
     });
 

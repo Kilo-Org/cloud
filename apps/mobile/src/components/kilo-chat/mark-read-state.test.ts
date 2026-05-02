@@ -68,13 +68,13 @@ describe('markReadConversation', () => {
         markConversationRead: async () => {
           await Promise.resolve();
           membershipReadCount += 1;
-          return { ok: true, badgeClear: null };
+          return { ok: true, applied: true, lastReadAt: 1, badgeClear: null };
         },
       });
       succeedMarkReadAttempt(state, marker);
       finishMarkReadAttempt(state, marker);
 
-      expect(result).toEqual({ ok: true, badgeClear: null });
+      expect(result).toEqual({ ok: true, applied: true, lastReadAt: 1, badgeClear: null });
       expect(membershipReadCount).toBe(1);
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(shouldStartMarkReadAttempt(state, marker)).toBe(false);
@@ -89,20 +89,19 @@ describe('markReadConversation', () => {
       { badgeBucket: 'bucket-2', badgeCount: 1 },
     ];
 
-    expect(filterClearedBadgeBucket(badgeRows, 'bucket-1', null)).toBe(badgeRows);
+    expect(filterClearedBadgeBucket(badgeRows, null)).toBe(badgeRows);
   });
 
-  it('removes only the cleared badge row when the Kilo Chat response includes a badge count', () => {
+  it('removes only the returned cleared badge row', () => {
     expect(
       filterClearedBadgeBucket(
         [
           { badgeBucket: 'bucket-1', badgeCount: 2 },
           { badgeBucket: 'bucket-2', badgeCount: 1 },
         ],
-        'bucket-1',
-        { badgeCount: 1 }
+        { badgeBucket: 'bucket-2', badgeCount: 1 }
       )
-    ).toEqual([{ badgeBucket: 'bucket-2', badgeCount: 1 }]);
+    ).toEqual([{ badgeBucket: 'bucket-1', badgeCount: 2 }]);
   });
 
   it('does not update badge cache or OS badge count when badgeClear is null', () => {
@@ -113,7 +112,6 @@ describe('markReadConversation', () => {
     });
 
     const applied = applyBadgeClearResult({
-      badgeBucket: 'bucket-1',
       badgeClear: null,
       startBadgeFreshnessEpoch: 0,
       currentBadgeFreshnessEpoch: 0,
@@ -135,8 +133,7 @@ describe('markReadConversation', () => {
     });
 
     const applied = applyBadgeClearResult({
-      badgeBucket: 'bucket-1',
-      badgeClear: { badgeCount: 3 },
+      badgeClear: { badgeBucket: 'server-bucket', badgeCount: 3 },
       startBadgeFreshnessEpoch: 4,
       currentBadgeFreshnessEpoch: 4,
       userId: 'user-1',
@@ -158,8 +155,7 @@ describe('markReadConversation', () => {
     });
 
     const applied = applyBadgeClearResult({
-      badgeBucket: 'bucket-1',
-      badgeClear: { badgeCount: 0 },
+      badgeClear: { badgeBucket: 'server-bucket', badgeCount: 0 },
       startBadgeFreshnessEpoch: 8,
       currentBadgeFreshnessEpoch: 9,
       userId: 'user-1',

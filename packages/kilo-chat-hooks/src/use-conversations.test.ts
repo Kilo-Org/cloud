@@ -9,6 +9,7 @@ import {
   applyConversationCreatedToPages,
   applyOptimisticMarkConversationRead,
   rollbackOptimisticMarkConversationRead,
+  settleMarkConversationRead,
   type ConversationListInfiniteData,
 } from './use-conversations';
 
@@ -248,5 +249,57 @@ describe('applyOptimisticMarkConversationRead', () => {
 
     expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+  });
+
+  it('does not optimistically move a newer read marker backwards', () => {
+    const queryClient = new QueryClient();
+    const activeKey = conversationsKey('sandbox-a');
+    const messageId = '01K8ZB8B3H9BRWZ6KCN39AX09G';
+    const optimisticReadAt = ulidToTimestamp(messageId);
+
+    queryClient.setQueryData(
+      activeKey,
+      conversationsData(
+        [[{ ...conversation('conversation-1', {}), lastReadAt: optimisticReadAt + 1 }]],
+        [null]
+      )
+    );
+
+    applyOptimisticMarkConversationRead(queryClient, {
+      sandboxId: 'sandbox-a',
+      conversationId: 'conversation-1',
+      lastSeenMessageId: messageId,
+    });
+
+    expect(firstConversationLastReadAt(queryClient.getQueryData(activeKey))).toBe(
+      optimisticReadAt + 1
+    );
+  });
+
+  it('settles optimistic read state from the server response', () => {
+    const queryClient = new QueryClient();
+    const activeKey = conversationsKey('sandbox-a');
+    const messageId = '01K8ZB8B3H9BRWZ6KCN39AX09G';
+    const serverReadAt = ulidToTimestamp(messageId);
+
+    queryClient.setQueryData(
+      activeKey,
+      conversationsData([[conversation('conversation-1', {})]], [null])
+    );
+    const context = applyOptimisticMarkConversationRead(queryClient, {
+      sandboxId: 'sandbox-a',
+      conversationId: 'conversation-1',
+      lastSeenMessageId: messageId,
+    });
+
+    settleMarkConversationRead(queryClient, context, {
+      ok: true,
+      applied: true,
+      lastReadAt: serverReadAt,
+      badgeClear: null,
+    });
+
+    expect(firstConversationLastReadAt(queryClient.getQueryData(activeKey))).toBe(serverReadAt);
+    expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(false);
   });
 });

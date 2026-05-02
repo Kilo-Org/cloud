@@ -343,11 +343,12 @@ export type MarkReadParams = {
 };
 
 type BadgeClearResult = {
+  badgeBucket: string;
   badgeCount: number;
 };
 
 export type MarkReadResult =
-  | { ok: true; badgeClear: BadgeClearResult | null }
+  | { ok: true; applied: boolean; lastReadAt: number; badgeClear: BadgeClearResult | null }
   | { ok: false; code: 'forbidden' | 'invalid'; error: string };
 
 export async function markReadFor(
@@ -368,12 +369,13 @@ export async function markReadFor(
     return { ok: false, code: resolved.code, error: resolved.error };
   }
 
-  const lastReadAt = ulidToTimestamp(lastSeenMessageId);
+  const requestedLastReadAt = ulidToTimestamp(lastSeenMessageId);
   const readResult = await withDORetry(
     () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId)),
-    stub => stub.markReadAtLeast(conversationId, lastReadAt),
+    stub => stub.markReadAtLeast(conversationId, requestedLastReadAt),
     'MembershipDO.markRead'
   );
+  const lastReadAt = readResult.lastReadAt ?? requestedLastReadAt;
 
   const { sandboxId } = resolved;
   let badgeClear: BadgeClearResult | null = null;
@@ -384,7 +386,11 @@ export async function markReadFor(
     ) {
       const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
       try {
-        badgeClear = await env.NOTIFICATIONS.clearBadgeBucketForUser({ userId, badgeBucket });
+        const clearResult = await env.NOTIFICATIONS.clearBadgeBucketForUser({
+          userId,
+          badgeBucket,
+        });
+        badgeClear = { ...clearResult, badgeBucket };
       } catch (err) {
         logger.error('clearBadgeBucketForUser failed', {
           sandboxId,
@@ -404,5 +410,5 @@ export async function markReadFor(
     }
   }
 
-  return { ok: true, badgeClear };
+  return { ok: true, applied: readResult.applied, lastReadAt, badgeClear };
 }

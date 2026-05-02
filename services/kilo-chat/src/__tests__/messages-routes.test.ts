@@ -1050,7 +1050,15 @@ describe('recipient conversation read state after message delivery', () => {
       deliveredEnv
     );
     expect(markReadRes.status).toBe(200);
-    await expect(markReadRes.json()).resolves.toEqual({ ok: true, badgeClear: { badgeCount: 0 } });
+    await expect(markReadRes.json()).resolves.toEqual({
+      ok: true,
+      applied: true,
+      lastReadAt: ulidToTimestamp(messageId),
+      badgeClear: {
+        badgeBucket: badgeBucketForConversation(sandboxId, conversationId),
+        badgeCount: 0,
+      },
+    });
 
     const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
     const after = await recipientMemberStub.listConversations({ sandboxId });
@@ -1113,7 +1121,12 @@ describe('recipient conversation read state after message delivery', () => {
       deliveredEnv
     );
     expect(markReadRes.status).toBe(200);
-    await expect(markReadRes.json()).resolves.toEqual({ ok: true, badgeClear: null });
+    await expect(markReadRes.json()).resolves.toEqual({
+      ok: true,
+      applied: true,
+      lastReadAt: ulidToTimestamp(firstMessageId),
+      badgeClear: null,
+    });
 
     const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
     const after = await recipientMemberStub.listConversations({ sandboxId });
@@ -1181,7 +1194,12 @@ describe('recipient conversation read state after message delivery', () => {
       deliveredEnv
     );
     expect(markReadRes.status).toBe(200);
-    await expect(markReadRes.json()).resolves.toEqual({ ok: true, badgeClear: null });
+    await expect(markReadRes.json()).resolves.toEqual({
+      ok: true,
+      applied: true,
+      lastReadAt: ulidToTimestamp(firstMessageId),
+      badgeClear: null,
+    });
 
     const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
     const after = await recipientMemberStub.listConversations({ sandboxId });
@@ -1244,7 +1262,12 @@ describe('recipient conversation read state after message delivery', () => {
       deliveredEnv
     );
     expect(markReadRes.status).toBe(200);
-    await expect(markReadRes.json()).resolves.toEqual({ ok: true, badgeClear: { badgeCount: 0 } });
+    await expect(markReadRes.json()).resolves.toEqual({
+      ok: true,
+      applied: true,
+      lastReadAt: ulidToTimestamp(messageId),
+      badgeClear: { badgeBucket, badgeCount: 0 },
+    });
 
     await expect(recordingNotifications.__listNonZeroBuckets(recipientId)).resolves.toEqual([]);
     await expect(recordingNotifications.__listNonZeroBuckets(userId)).resolves.toEqual([]);
@@ -1276,12 +1299,14 @@ describe('recipient conversation read state after message delivery', () => {
       deliveredEnv
     );
     expect(firstMarkReadRes.status).toBe(200);
+    const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
     await expect(firstMarkReadRes.json()).resolves.toEqual({
       ok: true,
-      badgeClear: { badgeCount: 0 },
+      applied: true,
+      lastReadAt: ulidToTimestamp(messageId),
+      badgeClear: { badgeBucket, badgeCount: 0 },
     });
 
-    const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
     await recordingNotifications.__incrementBadgeBucket({
       userId: recipientId,
       badgeBucket,
@@ -1303,7 +1328,9 @@ describe('recipient conversation read state after message delivery', () => {
     expect(secondMarkReadRes.status).toBe(200);
     await expect(secondMarkReadRes.json()).resolves.toEqual({
       ok: true,
-      badgeClear: { badgeCount: 0 },
+      applied: false,
+      lastReadAt: ulidToTimestamp(messageId),
+      badgeClear: { badgeBucket, badgeCount: 0 },
     });
 
     await expect(recordingNotifications.__listNonZeroBuckets(recipientId)).resolves.toEqual([]);

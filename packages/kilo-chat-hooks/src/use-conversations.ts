@@ -6,6 +6,7 @@ import type {
   ConversationListItem,
   ConversationListResponse,
   MarkConversationReadRequest,
+  MarkConversationReadResponse,
 } from '@kilocode/kilo-chat';
 
 import { conversationKey, conversationsKey, conversationsKeyAll, messagesKey } from './query-keys';
@@ -369,7 +370,8 @@ export function applyOptimisticMarkConversationRead(
 
     queryClient.setQueryData<ConversationListInfiniteData>(entryQueryKey, old =>
       updateConversationPages(old, conversation =>
-        conversation.conversationId === conversationId
+        conversation.conversationId === conversationId &&
+        (conversation.lastReadAt === null || conversation.lastReadAt < optimisticReadAt)
           ? { ...conversation, lastReadAt: optimisticReadAt }
           : conversation
       )
@@ -400,6 +402,31 @@ export function rollbackOptimisticMarkConversationRead(
   }
 }
 
+export function settleMarkConversationRead(
+  queryClient: QueryClient,
+  context: MarkConversationReadMutationContext | undefined,
+  response: MarkConversationReadResponse
+): void {
+  let shouldInvalidate = false;
+
+  for (const rollback of context?.rollbacks ?? []) {
+    const current = queryClient.getQueryData<ConversationListInfiniteData>(rollback.queryKey);
+    const result = applyConversationReadToPages(current, {
+      conversationId: rollback.conversationId,
+      lastReadAt: response.lastReadAt,
+    });
+    if (!result.applied) {
+      shouldInvalidate = true;
+    } else {
+      queryClient.setQueryData<ConversationListInfiniteData>(rollback.queryKey, result.data);
+    }
+  }
+
+  if (shouldInvalidate && context) {
+    void queryClient.invalidateQueries({ queryKey: context.invalidationQueryKey });
+  }
+}
+
 export function useMarkConversationRead(client: KiloChatClient) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -408,6 +435,9 @@ export function useMarkConversationRead(client: KiloChatClient) {
     onMutate: variables => applyOptimisticMarkConversationRead(queryClient, variables),
     onError: (_err, _variables, context) => {
       rollbackOptimisticMarkConversationRead(queryClient, context);
+    },
+    onSuccess: (response, _variables, context) => {
+      settleMarkConversationRead(queryClient, context, response);
     },
   });
 }

@@ -4,7 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { toast } from 'sonner-native';
 
 import { type KiloChatClient, type MarkConversationReadResponse } from '@kilocode/kilo-chat';
-import { badgeBucketForConversation, type BadgeCountRow } from '@kilocode/notifications';
+import { type BadgeCountRow } from '@kilocode/notifications';
 import { useMarkConversationRead } from '@kilocode/kilo-chat-hooks';
 
 import { useCurrentUserId } from './use-current-user-id';
@@ -15,7 +15,6 @@ type MarkReadInput = {
   sandboxId: string;
   conversationId: string;
   lastSeenMessageId: string;
-  badgeBucket: string;
 };
 
 export function useMarkRead(client: KiloChatClient) {
@@ -41,10 +40,9 @@ export function useMarkRead(client: KiloChatClient) {
       toast.error(error.message);
     },
     onMutate: () => ({ startBadgeFreshnessEpoch: readBadgeFreshnessEpoch() }),
-    onSuccess: (result, { badgeBucket }, context) => {
+    onSuccess: (result, _variables, context) => {
       const currentBadgeFreshnessEpoch = readBadgeFreshnessEpoch();
       applyBadgeClearResult({
-        badgeBucket,
         badgeClear: result.badgeClear,
         startBadgeFreshnessEpoch: context.startBadgeFreshnessEpoch,
         currentBadgeFreshnessEpoch,
@@ -68,7 +66,6 @@ export function useMarkRead(client: KiloChatClient) {
         sandboxId,
         conversationId,
         lastSeenMessageId,
-        badgeBucket: badgeBucketForConversation(sandboxId, conversationId),
       });
       return result;
     },

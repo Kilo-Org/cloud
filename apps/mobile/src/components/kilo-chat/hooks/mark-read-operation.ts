@@ -23,7 +23,6 @@ export async function markReadConversation({
 }
 
 type ApplyBadgeClearResultInput = {
-  badgeBucket: string;
   badgeClear: MarkConversationReadResponse['badgeClear'];
   startBadgeFreshnessEpoch: number;
   currentBadgeFreshnessEpoch: number;
@@ -37,18 +36,16 @@ type ApplyBadgeClearResultInput = {
 
 export function filterClearedBadgeBucket(
   badges: BadgeCountRow[] | undefined,
-  badgeBucket: string,
   badgeClear: MarkConversationReadResponse['badgeClear']
 ): BadgeCountRow[] | undefined {
   if (badgeClear === null) {
     return badges;
   }
 
-  return badges?.filter(row => row.badgeBucket !== badgeBucket);
+  return badges?.filter(row => row.badgeBucket !== badgeClear.badgeBucket);
 }
 
 export function applyBadgeClearResult({
-  badgeBucket,
   badgeClear,
   startBadgeFreshnessEpoch,
   currentBadgeFreshnessEpoch,
@@ -61,9 +58,7 @@ export function applyBadgeClearResult({
   }
 
   if (userId !== null) {
-    updateBadgeRows(['badges', userId], badges =>
-      filterClearedBadgeBucket(badges, badgeBucket, badgeClear)
-    );
+    updateBadgeRows(['badges', userId], badges => filterClearedBadgeBucket(badges, badgeClear));
   }
 
   if (currentBadgeFreshnessEpoch !== startBadgeFreshnessEpoch) {

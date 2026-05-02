@@ -143,7 +143,12 @@ export class MembershipDO extends DurableObject<Env> {
       .get();
 
     if (!row) {
-      return { applied: false, lastReadAt: null };
+      const existing = this.db
+        .select({ lastReadAt: conversations.last_read_at })
+        .from(conversations)
+        .where(eq(conversations.conversation_id, conversationId))
+        .get();
+      return { applied: false, lastReadAt: existing?.lastReadAt ?? null };
     }
 
     return { applied: true, lastReadAt: row.lastReadAt };

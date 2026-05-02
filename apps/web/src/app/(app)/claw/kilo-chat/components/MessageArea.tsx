@@ -437,7 +437,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       const trimmed = renameText.trim();
       if (trimmed) {
         renameConversation.mutate(
-          { conversationId, title: trimmed },
+          { sandboxId, conversationId, title: trimmed },
           { onError: err => toast.error(formatKiloChatError(err, 'Failed to rename conversation')) }
         );
       }
@@ -452,7 +452,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     const trimmed = renameText.trim();
     if (trimmed && trimmed !== title) {
       renameConversation.mutate(
-        { conversationId, title: trimmed },
+        { sandboxId, conversationId, title: trimmed },
         { onError: err => toast.error(formatKiloChatError(err, 'Failed to rename conversation')) }
       );
     }

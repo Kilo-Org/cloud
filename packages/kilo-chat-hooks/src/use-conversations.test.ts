@@ -9,8 +9,10 @@ import {
   applyConversationCreatedToPages,
   applyOptimisticMarkConversationRead,
   rollbackOptimisticMarkConversationRead,
+  settleLeaveConversation,
   settleMarkConversationRead,
   settleCreateConversation,
+  settleRenameConversation,
   type ConversationListInfiniteData,
 } from './use-conversations';
 
@@ -219,6 +221,57 @@ describe('settleCreateConversation', () => {
         conversation: conversation('conversation-created', { lastActivityAt: null, joinedAt: 100 }),
       }
     );
+
+    expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+  });
+});
+
+describe('settleRenameConversation', () => {
+  it('invalidates only the target sandbox when sandbox context is provided', () => {
+    const queryClient = new QueryClient();
+    const activeKey = conversationsKey('sandbox-a');
+    const otherKey = conversationsKey('sandbox-b');
+
+    queryClient.setQueryData(
+      activeKey,
+      conversationsData([[conversation('conversation-a', {})]], [null])
+    );
+    queryClient.setQueryData(
+      otherKey,
+      conversationsData([[conversation('conversation-b', {})]], [null])
+    );
+
+    settleRenameConversation(queryClient, {
+      sandboxId: 'sandbox-a',
+      conversationId: 'conversation-a',
+      title: 'Renamed conversation',
+    });
+
+    expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+  });
+});
+
+describe('settleLeaveConversation', () => {
+  it('invalidates only the target sandbox when sandbox context is provided', () => {
+    const queryClient = new QueryClient();
+    const activeKey = conversationsKey('sandbox-a');
+    const otherKey = conversationsKey('sandbox-b');
+
+    queryClient.setQueryData(
+      activeKey,
+      conversationsData([[conversation('conversation-a', {})]], [null])
+    );
+    queryClient.setQueryData(
+      otherKey,
+      conversationsData([[conversation('conversation-b', {})]], [null])
+    );
+
+    settleLeaveConversation(queryClient, {
+      sandboxId: 'sandbox-a',
+      conversationId: 'conversation-a',
+    });
 
     expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);

@@ -79,11 +79,11 @@ export function KiloChatLayout({
   const handleRename = useCallback(
     (conversationId: string, title: string) => {
       renameConversation.mutate(
-        { conversationId, title },
+        { sandboxId, conversationId, title },
         { onError: err => toast.error(formatKiloChatError(err, 'Failed to rename conversation')) }
       );
     },
-    [renameConversation.mutate]
+    [sandboxId, renameConversation.mutate]
   );
 
   const handleLeave = useCallback(
@@ -105,18 +105,22 @@ export function KiloChatLayout({
       if (params?.conversationId === conversationId) {
         router.push(basePath);
       }
-      leaveConversation.mutate(conversationId, {
-        onSettled: () => setLeavingConversationId(null),
-        onError: err => {
-          // Restore the row on failure so the user can retry
-          for (const [key, data] of previous) {
-            queryClient.setQueryData(key, data);
-          }
-          toast.error(formatKiloChatError(err, 'Failed to leave conversation'));
-        },
-      });
+      leaveConversation.mutate(
+        { sandboxId, conversationId },
+        {
+          onSettled: () => setLeavingConversationId(null),
+          onError: err => {
+            // Restore the row on failure so the user can retry
+            for (const [key, data] of previous) {
+              queryClient.setQueryData(key, data);
+            }
+            toast.error(formatKiloChatError(err, 'Failed to leave conversation'));
+          },
+        }
+      );
     },
     [
+      sandboxId,
       leaveConversation.mutate,
       params?.conversationId,
       queryClient,

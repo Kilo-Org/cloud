@@ -26,6 +26,10 @@ function conversationListSandboxIdFromQueryKey(queryKey: QueryKey): string | nul
   return undefined;
 }
 
+function conversationListInvalidationKey(sandboxId: string | null): QueryKey {
+  return sandboxId === null ? conversationsKeyAll() : conversationsKey(sandboxId);
+}
+
 export function useConversations(client: KiloChatClient, sandboxId: string | null) {
   return useInfiniteQuery({
     queryKey: conversationsKey(sandboxId),
@@ -64,25 +68,35 @@ export function useCreateConversation(client: KiloChatClient, options?: Mutation
   });
 }
 
+type RenameConversationMutationVariables = {
+  conversationId: string;
+  title: string;
+  sandboxId: string | null;
+};
+
 export function useRenameConversation(client: KiloChatClient) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ conversationId, title }: { conversationId: string; title: string }) =>
-      client.renameConversation(conversationId, { title }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: conversationsKeyAll() });
+    mutationFn: (variables: RenameConversationMutationVariables) =>
+      client.renameConversation(variables.conversationId, { title: variables.title }),
+    onSuccess: (_data, variables) => {
+      settleRenameConversation(queryClient, variables);
     },
   });
 }
 
+type LeaveConversationMutationVariables = {
+  conversationId: string;
+  sandboxId: string | null;
+};
+
 export function useLeaveConversation(client: KiloChatClient) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (conversationId: string) => client.leaveConversation(conversationId),
-    onSuccess: (_data, conversationId) => {
-      queryClient.removeQueries({ queryKey: conversationKey(conversationId) });
-      queryClient.removeQueries({ queryKey: messagesKey(conversationId) });
-      void queryClient.invalidateQueries({ queryKey: conversationsKeyAll() });
+    mutationFn: (variables: LeaveConversationMutationVariables) =>
+      client.leaveConversation(variables.conversationId),
+    onSuccess: (_data, variables) => {
+      settleLeaveConversation(queryClient, variables);
     },
   });
 }
@@ -285,6 +299,26 @@ export function settleCreateConversation(
   }
 }
 
+export function settleRenameConversation(
+  queryClient: QueryClient,
+  variables: RenameConversationMutationVariables
+): void {
+  void queryClient.invalidateQueries({
+    queryKey: conversationListInvalidationKey(variables.sandboxId),
+  });
+}
+
+export function settleLeaveConversation(
+  queryClient: QueryClient,
+  variables: LeaveConversationMutationVariables
+): void {
+  queryClient.removeQueries({ queryKey: conversationKey(variables.conversationId) });
+  queryClient.removeQueries({ queryKey: messagesKey(variables.conversationId) });
+  void queryClient.invalidateQueries({
+    queryKey: conversationListInvalidationKey(variables.sandboxId),
+  });
+}
+
 export function applyConversationReadToPages(
   data: ConversationListInfiniteData | undefined,
   read: ConversationRead
@@ -365,7 +399,7 @@ type MarkConversationReadMutationVariables = MarkConversationReadRequest & {
 };
 
 function markConversationReadQueryKey(sandboxId: string | null): QueryKey {
-  return sandboxId === null ? conversationsKeyAll() : conversationsKey(sandboxId);
+  return conversationListInvalidationKey(sandboxId);
 }
 
 export function applyOptimisticMarkConversationRead(

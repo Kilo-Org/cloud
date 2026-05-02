@@ -62,6 +62,11 @@ import {
   tryStartPendingAction,
   type PendingAction,
 } from '@kilocode/kilo-chat-hooks';
+import {
+  applyPrependScrollAnchor,
+  capturePrependScrollAnchor,
+  type PrependScrollAnchorSnapshot,
+} from './message-scroll-anchor';
 import { MessageCircle, ArrowDown } from 'lucide-react';
 
 type MessageAreaProps = {
@@ -112,6 +117,8 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
+  const pendingPrependScrollAnchorRef = useRef<PrependScrollAnchorSnapshot | null>(null);
+  const wasFetchingNextPageRef = useRef(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -294,6 +301,29 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const wasFetchingNextPage = wasFetchingNextPageRef.current;
+    wasFetchingNextPageRef.current = isFetchingNextPage;
+
+    if (!wasFetchingNextPage || isFetchingNextPage) {
+      return;
+    }
+
+    const snapshot = pendingPrependScrollAnchorRef.current;
+    pendingPrependScrollAnchorRef.current = null;
+    if (!snapshot) {
+      return;
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      applyPrependScrollAnchor(el, snapshot);
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [isFetchingNextPage]);
+
   // Track scroll position to detect user scrolling away from bottom
   function handleScroll() {
     const el = scrollRef.current;
@@ -301,6 +331,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
 
     // Load more on scroll to top
     if (el.scrollTop < 50 && hasNextPage && !isFetchingNextPage) {
+      pendingPrependScrollAnchorRef.current = capturePrependScrollAnchor(el);
       void fetchNextPage();
     }
 

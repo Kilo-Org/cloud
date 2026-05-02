@@ -6,6 +6,7 @@ const validConversationId = '01HXYZ00000ABCDEFGHJKMNPQR';
 const validMessageId = '01HXYZ00000ABCDEFGHJKMNPQS';
 const validReplyMessageId = '01HXYZ00000ABCDEFGHJKMNPQT';
 const validClientId = '01HXYZ00000ABCDEFGHJKMNPQV';
+const validOperationId = '01HXYZ00000ABCDEFGHJKMNPQW';
 const uuidClientId = '8bb5a00b-98a3-4910-bda3-2669bcde23bc';
 
 describe('kilo chat event payload schemas', () => {
@@ -158,6 +159,7 @@ describe('kilo chat event payload schemas', () => {
     expect(
       reactionAddedSchema.safeParse({
         messageId: validMessageId,
+        operationId: validOperationId,
         memberId: 'user-1',
         emoji: '',
       }).success
@@ -165,6 +167,7 @@ describe('kilo chat event payload schemas', () => {
     expect(
       reactionAddedSchema.safeParse({
         messageId: validMessageId,
+        operationId: validOperationId,
         memberId: 'user-1',
         emoji: 'a'.repeat(65),
       }).success
@@ -172,8 +175,46 @@ describe('kilo chat event payload schemas', () => {
     expect(
       reactionRemovedSchema.safeParse({
         messageId: validMessageId,
+        operationId: validOperationId,
         memberId: 'user-1',
         emoji: 'ok\u0000',
+      }).success
+    ).toBe(false);
+  });
+
+  it('requires valid operation ids for reaction events', () => {
+    const reactionAddedSchema = getKiloChatEventPayloadSchema('reaction.added');
+    const reactionRemovedSchema = getKiloChatEventPayloadSchema('reaction.removed');
+
+    expect(
+      reactionAddedSchema.safeParse({
+        messageId: validMessageId,
+        operationId: validOperationId,
+        memberId: 'user-1',
+        emoji: '👍',
+      }).success
+    ).toBe(true);
+    expect(
+      reactionRemovedSchema.safeParse({
+        messageId: validMessageId,
+        operationId: validOperationId,
+        memberId: 'user-1',
+        emoji: '👍',
+      }).success
+    ).toBe(true);
+    expect(
+      reactionAddedSchema.safeParse({
+        messageId: validMessageId,
+        memberId: 'user-1',
+        emoji: '👍',
+      }).success
+    ).toBe(false);
+    expect(
+      reactionRemovedSchema.safeParse({
+        messageId: validMessageId,
+        operationId: 'not-a-ulid',
+        memberId: 'user-1',
+        emoji: '👍',
       }).success
     ).toBe(false);
   });

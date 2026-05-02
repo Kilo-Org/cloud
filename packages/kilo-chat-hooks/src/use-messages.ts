@@ -51,6 +51,59 @@ export function applyReactionRemoved(
     .filter(r => r.count > 0);
 }
 
+export type ReactionOperationTracker = Map<string, string>;
+
+export function createReactionOperationTracker(): ReactionOperationTracker {
+  return new Map();
+}
+
+function reactionOperationKey(
+  conversationId: string,
+  event: Pick<ReactionAddedEvent | ReactionRemovedEvent, 'messageId' | 'emoji' | 'memberId'>
+): string {
+  return JSON.stringify([conversationId, event.messageId, event.emoji, event.memberId]);
+}
+
+function recordFreshReactionOperation(
+  latestOperations: ReactionOperationTracker,
+  conversationId: string,
+  event: ReactionAddedEvent | ReactionRemovedEvent
+): boolean {
+  const key = reactionOperationKey(conversationId, event);
+  const latestOperationId = latestOperations.get(key);
+  if (latestOperationId && event.operationId < latestOperationId) {
+    return false;
+  }
+  latestOperations.set(key, event.operationId);
+  return true;
+}
+
+export function applyReactionAddedEventToPages<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  conversationId: string,
+  latestOperations: ReactionOperationTracker,
+  event: ReactionAddedEvent
+): InfiniteData<Message[], TPageParam> {
+  if (!recordFreshReactionOperation(latestOperations, conversationId, event)) return old;
+  return updateMessageInPages(old, event.messageId, msg => ({
+    ...msg,
+    reactions: applyReactionAdded(msg.reactions, event.emoji, event.memberId),
+  }));
+}
+
+export function applyReactionRemovedEventToPages<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  conversationId: string,
+  latestOperations: ReactionOperationTracker,
+  event: ReactionRemovedEvent
+): InfiniteData<Message[], TPageParam> {
+  if (!recordFreshReactionOperation(latestOperations, conversationId, event)) return old;
+  return updateMessageInPages(old, event.messageId, msg => ({
+    ...msg,
+    reactions: applyReactionRemoved(msg.reactions, event.emoji, event.memberId),
+  }));
+}
+
 export function latestMarkReadMessageId(messages: readonly Pick<Message, 'id'>[]): string | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
@@ -682,6 +735,7 @@ export function useMessageCacheUpdater(
     if (!conversationId || !sandboxId) return;
     const queryKey = messagesKey(conversationId);
     const expectedContext = kiloclawConversationContext(sandboxId, conversationId);
+    const reactionOperations = createReactionOperationTracker();
 
     const onCreated = (ctx: string, e: MessageCreatedEvent) => {
       if (ctx !== expectedContext) return;
@@ -739,10 +793,7 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, e.messageId, msg => ({
-          ...msg,
-          reactions: applyReactionAdded(msg.reactions, e.emoji, e.memberId),
-        }));
+        return applyReactionAddedEventToPages(old, conversationId, reactionOperations, e);
       });
     };
 
@@ -750,10 +801,7 @@ export function useMessageCacheUpdater(
       if (ctx !== expectedContext) return;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return updateMessageInPages(old, e.messageId, msg => ({
-          ...msg,
-          reactions: applyReactionRemoved(msg.reactions, e.emoji, e.memberId),
-        }));
+        return applyReactionRemovedEventToPages(old, conversationId, reactionOperations, e);
       });
     };
 

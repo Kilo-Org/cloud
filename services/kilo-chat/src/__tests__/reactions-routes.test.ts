@@ -1,8 +1,44 @@
 import { env } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { kiloclawConversationContext } from '@kilocode/event-service';
+import {
+  getKiloChatEventPayloadSchema,
+  type ReactionAddedEvent,
+  type ReactionRemovedEvent,
+} from '@kilocode/kilo-chat';
+import { describe, it, expect, vi } from 'vitest';
 import { makeApp } from './helpers';
 
-async function setup(suffix: string) {
+function collectReactionPushes() {
+  const added: ReactionAddedEvent[] = [];
+  const removed: ReactionRemovedEvent[] = [];
+  const pushEvent = vi.fn(
+    async (_userId: string, _context: string, event: string, payload: unknown) => {
+      if (event === 'reaction.added') {
+        const parsed = getKiloChatEventPayloadSchema('reaction.added').safeParse(payload);
+        if (parsed.success) added.push(parsed.data);
+      }
+      if (event === 'reaction.removed') {
+        const parsed = getKiloChatEventPayloadSchema('reaction.removed').safeParse(payload);
+        if (parsed.success) removed.push(parsed.data);
+      }
+      return true;
+    }
+  );
+  return { pushEvent, added, removed };
+}
+
+function envWithPushEvent(pushEvent: ReturnType<typeof vi.fn>): Env {
+  return {
+    ...env,
+    EVENT_SERVICE: {
+      fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+      connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+      pushEvent,
+    },
+  } satisfies Env;
+}
+
+async function setup(suffix: string, testEnv: Env = env) {
   const userId = `user-${suffix}`;
   const sandboxId = `sandbox-${suffix}`;
   const botId = `bot:kiloclaw:${sandboxId}`;
@@ -15,7 +51,7 @@ async function setup(suffix: string) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sandboxId, title: suffix }),
     },
-    env
+    testEnv
   );
   expect(convRes.status).toBe(201);
   const { conversationId } = await convRes.json<{ conversationId: string }>();
@@ -27,12 +63,12 @@ async function setup(suffix: string) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ conversationId, content: [{ type: 'text', text: 'hello' }] }),
     },
-    env
+    testEnv
   );
   expect(msgRes.status).toBe(201);
   const { messageId } = await msgRes.json<{ messageId: string }>();
 
-  return { userId, botId, conversationId, messageId, userApp };
+  return { userId, sandboxId, botId, conversationId, messageId, userApp };
 }
 
 describe('POST /v1/messages/:id/reactions', () => {
@@ -50,6 +86,48 @@ describe('POST /v1/messages/:id/reactions', () => {
     expect(res.status).toBe(201);
     const body = await res.json<{ id: string }>();
     expect(body.id).toMatch(/^[0-9A-Z]{26}$/);
+  });
+
+  it('pushes reaction.added events with the add operation id', async () => {
+    const { pushEvent, added } = collectReactionPushes();
+    const testEnv = envWithPushEvent(pushEvent);
+    const { userId, sandboxId, conversationId, messageId, userApp } = await setup(
+      'rx-post-event',
+      testEnv
+    );
+    pushEvent.mockClear();
+
+    const res = await userApp.request(
+      `/v1/messages/${messageId}/reactions`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, emoji: '👍' }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json<{ id: string }>();
+    expect(pushEvent).toHaveBeenCalledWith(
+      userId,
+      kiloclawConversationContext(sandboxId, conversationId),
+      'reaction.added',
+      {
+        messageId,
+        operationId: body.id,
+        memberId: userId,
+        emoji: '👍',
+      }
+    );
+    expect(added).toEqual([
+      {
+        messageId,
+        operationId: body.id,
+        memberId: userId,
+        emoji: '👍',
+      },
+    ]);
   });
 
   it('200 on duplicate add with the same id', async () => {
@@ -184,6 +262,56 @@ describe('DELETE /v1/messages/:id/reactions', () => {
       env
     );
     expect(res.status).toBe(204);
+  });
+
+  it('pushes reaction.removed events with the remove operation id', async () => {
+    const { pushEvent, added, removed } = collectReactionPushes();
+    const testEnv = envWithPushEvent(pushEvent);
+    const { userId, sandboxId, conversationId, messageId, userApp } = await setup(
+      'rx-del-event',
+      testEnv
+    );
+    const addRes = await userApp.request(
+      `/v1/messages/${messageId}/reactions`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, emoji: '👍' }),
+      },
+      testEnv
+    );
+    const addBody = await addRes.json<{ id: string }>();
+    added.length = 0;
+    removed.length = 0;
+    pushEvent.mockClear();
+
+    const qs = new URLSearchParams({ conversationId, emoji: '👍' });
+    const res = await userApp.request(
+      `/v1/messages/${messageId}/reactions?${qs.toString()}`,
+      { method: 'DELETE' },
+      testEnv
+    );
+
+    expect(res.status).toBe(204);
+    expect(pushEvent).toHaveBeenCalledOnce();
+    expect(pushEvent).toHaveBeenCalledWith(
+      userId,
+      kiloclawConversationContext(sandboxId, conversationId),
+      'reaction.removed',
+      expect.objectContaining({
+        messageId,
+        memberId: userId,
+        emoji: '👍',
+      })
+    );
+    expect(removed).toHaveLength(1);
+    expect(removed[0]).toMatchObject({
+      messageId,
+      memberId: userId,
+      emoji: '👍',
+    });
+    expect(removed[0]?.operationId).toMatch(/^[0-9A-Z]{26}$/);
+    expect(removed[0]?.operationId).not.toBe(addBody.id);
   });
 
   it('204 even when reaction never existed (idempotent)', async () => {

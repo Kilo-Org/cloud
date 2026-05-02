@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
 import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
+import { advanceBadgeFreshnessEpoch } from '@/lib/badge-freshness';
 import { parseNotificationData } from '@/lib/notifications';
 
 /**
@@ -29,6 +30,7 @@ export function useUnreadCountsInvalidation() {
     }
 
     const invalidate = () => {
+      advanceBadgeFreshnessEpoch();
       void queryClient.invalidateQueries({
         queryKey: ['badges', userId],
       });

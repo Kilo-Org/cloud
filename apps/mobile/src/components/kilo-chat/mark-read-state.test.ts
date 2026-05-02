@@ -114,6 +114,8 @@ describe('markReadConversation', () => {
     const applied = applyBadgeClearResult({
       badgeBucket: 'bucket-1',
       badgeClear: null,
+      startBadgeFreshnessEpoch: 0,
+      currentBadgeFreshnessEpoch: 0,
       userId: 'user-1',
       updateBadgeRows,
       setBadgeCount,
@@ -124,7 +126,7 @@ describe('markReadConversation', () => {
     expect(setBadgeCount).not.toHaveBeenCalled();
   });
 
-  it('updates badge cache and OS badge count when badgeClear includes a count', () => {
+  it('updates badge cache and OS badge count when badgeClear includes a count with unchanged freshness', () => {
     const updateBadgeRows = createUpdateBadgeRowsMock();
     const setBadgeCount = vi.fn<(badgeCount: number) => Promise<boolean>>(async () => {
       const result = await Promise.resolve(true);
@@ -134,6 +136,8 @@ describe('markReadConversation', () => {
     const applied = applyBadgeClearResult({
       badgeBucket: 'bucket-1',
       badgeClear: { badgeCount: 3 },
+      startBadgeFreshnessEpoch: 4,
+      currentBadgeFreshnessEpoch: 4,
       userId: 'user-1',
       updateBadgeRows,
       setBadgeCount,
@@ -143,5 +147,28 @@ describe('markReadConversation', () => {
     expect(updateBadgeRows).toHaveBeenCalledOnce();
     expect(updateBadgeRows).toHaveBeenCalledWith(['badges', 'user-1'], expect.any(Function));
     expect(setBadgeCount).toHaveBeenCalledWith(3);
+  });
+
+  it('keeps badge cache updates but skips stale OS badge counts when freshness advanced', () => {
+    const updateBadgeRows = createUpdateBadgeRowsMock();
+    const setBadgeCount = vi.fn<(badgeCount: number) => Promise<boolean>>(async () => {
+      const result = await Promise.resolve(true);
+      return result;
+    });
+
+    const applied = applyBadgeClearResult({
+      badgeBucket: 'bucket-1',
+      badgeClear: { badgeCount: 0 },
+      startBadgeFreshnessEpoch: 8,
+      currentBadgeFreshnessEpoch: 9,
+      userId: 'user-1',
+      updateBadgeRows,
+      setBadgeCount,
+    });
+
+    expect(applied).toBe(false);
+    expect(updateBadgeRows).toHaveBeenCalledOnce();
+    expect(updateBadgeRows).toHaveBeenCalledWith(['badges', 'user-1'], expect.any(Function));
+    expect(setBadgeCount).not.toHaveBeenCalled();
   });
 });

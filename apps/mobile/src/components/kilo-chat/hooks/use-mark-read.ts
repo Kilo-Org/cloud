@@ -9,6 +9,7 @@ import { useMarkConversationRead } from '@kilocode/kilo-chat-hooks';
 
 import { useCurrentUserId } from './use-current-user-id';
 import { applyBadgeClearResult, markReadConversation } from './mark-read-operation';
+import { readBadgeFreshnessEpoch } from '@/lib/badge-freshness';
 
 type MarkReadInput = {
   sandboxId: string;
@@ -37,10 +38,14 @@ export function useMarkRead(client: KiloChatClient) {
     onError: error => {
       toast.error(error.message);
     },
-    onSuccess: (result, { badgeBucket }) => {
+    onMutate: () => ({ startBadgeFreshnessEpoch: readBadgeFreshnessEpoch() }),
+    onSuccess: (result, { badgeBucket }, context) => {
+      const currentBadgeFreshnessEpoch = readBadgeFreshnessEpoch();
       applyBadgeClearResult({
         badgeBucket,
         badgeClear: result.badgeClear,
+        startBadgeFreshnessEpoch: context.startBadgeFreshnessEpoch,
+        currentBadgeFreshnessEpoch,
         userId,
         updateBadgeRows: (queryKey, updater) => {
           queryClient.setQueryData<BadgeCountRow[]>(queryKey, updater);

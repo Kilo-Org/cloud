@@ -3,8 +3,8 @@ import {
   applyConversationCreatedToPages,
   applyConversationReadToPages,
   applyMarkConversationReadRollbackToPages,
-  shouldApplyConversationRead,
   type ConversationListInfiniteData,
+  shouldApplyConversationRead,
   updateConversationPages,
 } from '@kilocode/kilo-chat-hooks';
 import { describe, expect, it } from 'vitest';

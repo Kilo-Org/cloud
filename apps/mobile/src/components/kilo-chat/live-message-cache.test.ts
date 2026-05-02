@@ -6,15 +6,15 @@ import {
   applyMessageCreatedEventToPages,
   applyReactionAdded,
   latestMarkReadMessageId,
+  type MessageInfiniteData,
   messagesKey,
   restoreMessageInCache,
-  type MessageInfiniteData,
   updateMessageInPages,
 } from '@kilocode/kilo-chat-hooks';
 
 function messageData(
   pages: Message[][],
-  pageParams: Array<string | undefined> = [undefined]
+  pageParams: (string | undefined)[] = [undefined]
 ): MessageInfiniteData {
   return {
     pages: pages.map((messages, index) => ({

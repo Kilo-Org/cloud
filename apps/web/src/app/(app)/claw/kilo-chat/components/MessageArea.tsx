@@ -50,7 +50,7 @@ import {
   clearMarkReadRetry,
   createMarkReadRetryState,
   scheduleMarkReadRetry,
-} from './message-area-mark-read-retry';
+} from '@kilocode/kilo-chat-hooks';
 import {
   KiloChatApiError,
   formatKiloChatError,
@@ -218,7 +218,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
             scheduleMarkReadRetry(markReadRetryStateRef.current, {
               marker,
               currentMarker: () => currentMarkReadMarkerRef.current,
-              isVisible: () => visibleRef.current,
+              isActive: () => visibleRef.current,
               lastSucceededMarker: () => markReadStateRef.current.lastSucceededMarker,
               retry: () => markCurrentConversationReadRef.current(),
             });

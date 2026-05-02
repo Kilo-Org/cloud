@@ -1,9 +1,9 @@
 import { QueryClient } from '@tanstack/react-query';
 import { type Message } from '@kilocode/kilo-chat';
 import {
+  type MessageInfiniteData,
   messagesKey,
   restoreMessageInCache,
-  type MessageInfiniteData,
 } from '@kilocode/kilo-chat-hooks';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner-native';

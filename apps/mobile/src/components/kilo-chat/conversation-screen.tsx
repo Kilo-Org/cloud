@@ -1,7 +1,10 @@
 /* eslint-disable max-lines */
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import {
+  attemptMarkCurrentConversationRead,
+  clearMarkReadRetry,
   clearPendingAction,
+  createMarkReadRetryState,
   createMarkReadState,
   latestMarkReadMessageId,
   type PendingAction,
@@ -20,11 +23,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { ConversationHeader } from './conversation-header';
-import {
-  attemptMarkCurrentConversationRead,
-  clearMarkReadRetry,
-  createMarkReadRetryState,
-} from './conversation-mark-read';
 import { resolveMobileMessageInputAvailability } from './bot-send-state';
 import { executeActionWithMobileFeedback } from './execute-action-feedback';
 import { buildMessageActionSheetOptions, getSelectedMessageAction } from './message-actions';
@@ -318,7 +316,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       markReadState: markReadStateRef.current,
       retryState: markReadRetryStateRef.current,
       currentMarker: () => currentMarkReadMarkerRef.current,
-      activeAndFocused: () => activeAndFocusedRef.current,
+      isActive: () => activeAndFocusedRef.current,
       markRead: async () => {
         await markRead(sandboxId, conversationId, latestMessageId);
       },

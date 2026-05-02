@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createMarkReadState } from '@kilocode/kilo-chat-hooks';
 import {
   attemptMarkCurrentConversationRead,
   clearMarkReadRetry,
   createMarkReadRetryState,
+  createMarkReadState,
   MARK_READ_RETRY_DELAY_MS,
   MARK_READ_RETRY_LIMIT,
   scheduleMarkReadRetry,
-} from './conversation-mark-read';
+} from './mark-read-state';
 
-describe('attemptMarkCurrentConversationRead', () => {
+describe('mark-read retry helpers', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -19,7 +19,7 @@ describe('attemptMarkCurrentConversationRead', () => {
     vi.useRealTimers();
   });
 
-  it('retries the same focused latest message after the first mark-read attempt rejects', async () => {
+  it('retries the same active marker after the first mark-read attempt rejects', async () => {
     const markReadState = createMarkReadState();
     const retryState = createMarkReadRetryState();
     const marker = 'conversation-1:message-1';
@@ -30,8 +30,8 @@ describe('attemptMarkCurrentConversationRead', () => {
         marker,
         markReadState,
         retryState,
-        activeAndFocused: () => true,
         currentMarker: () => marker,
+        isActive: () => true,
         markRead: async () => {
           await Promise.resolve();
           markReadAttemptCount += 1;
@@ -54,28 +54,26 @@ describe('attemptMarkCurrentConversationRead', () => {
     clearMarkReadRetry(retryState);
   });
 
-  it('does not retry a marker after the retry limit is reached', () => {
+  it('caps retries for a marker that keeps failing', () => {
     const retryState = createMarkReadRetryState();
     const retry = vi.fn();
 
-    for (let i = 0; i < MARK_READ_RETRY_LIMIT + 1; i += 1) {
+    for (let attempt = 0; attempt < MARK_READ_RETRY_LIMIT + 1; attempt += 1) {
       scheduleMarkReadRetry(retryState, {
         marker: 'conversation-1:message-1',
         currentMarker: () => 'conversation-1:message-1',
-        activeAndFocused: () => true,
+        isActive: () => true,
         lastSucceededMarker: () => null,
-        retry: () => {
-          retry();
-        },
+        retry,
       });
-      vi.advanceTimersByTime(MARK_READ_RETRY_DELAY_MS * (i + 1));
+      vi.advanceTimersByTime(MARK_READ_RETRY_DELAY_MS * (attempt + 1));
     }
 
     expect(retry).toHaveBeenCalledTimes(MARK_READ_RETRY_LIMIT);
     clearMarkReadRetry(retryState);
   });
 
-  it('does not retry when the marker is stale or the screen is inactive', () => {
+  it('does not retry when the marker is stale or inactive', () => {
     const staleRetryState = createMarkReadRetryState();
     const inactiveRetryState = createMarkReadRetryState();
     const retry = vi.fn();
@@ -83,20 +81,16 @@ describe('attemptMarkCurrentConversationRead', () => {
     scheduleMarkReadRetry(staleRetryState, {
       marker: 'conversation-1:message-1',
       currentMarker: () => 'conversation-1:message-2',
-      activeAndFocused: () => true,
+      isActive: () => true,
       lastSucceededMarker: () => null,
-      retry: () => {
-        retry();
-      },
+      retry,
     });
     scheduleMarkReadRetry(inactiveRetryState, {
       marker: 'conversation-1:message-1',
       currentMarker: () => 'conversation-1:message-1',
-      activeAndFocused: () => false,
+      isActive: () => false,
       lastSucceededMarker: () => null,
-      retry: () => {
-        retry();
-      },
+      retry,
     });
 
     vi.advanceTimersByTime(MARK_READ_RETRY_DELAY_MS);

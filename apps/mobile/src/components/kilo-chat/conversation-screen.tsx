@@ -2,11 +2,7 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import {
   createMarkReadState,
-  finishMarkReadAttempt,
   latestMarkReadMessageId,
-  shouldStartMarkReadAttempt,
-  startMarkReadAttempt,
-  succeedMarkReadAttempt,
   useAddReaction,
   useDeleteMessage,
   useEditMessage,
@@ -21,6 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { ConversationHeader } from './conversation-header';
+import {
+  attemptMarkCurrentConversationRead,
+  clearMarkReadRetry,
+  createMarkReadRetryState,
+} from './conversation-mark-read';
 import { resolveMobileMessageInputAvailability } from './bot-send-state';
 import { executeActionWithMobileFeedback } from './execute-action-feedback';
 import { buildMessageActionSheetOptions, getSelectedMessageAction } from './message-actions';
@@ -272,27 +273,62 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const activeAndFocused = useAppActiveAndFocused();
   const markRead = useMarkRead(client);
   const markReadStateRef = useRef(createMarkReadState());
-  useEffect(() => {
-    if (!activeAndFocused || latestMessageId === null) {
+  const markReadRetryStateRef = useRef(createMarkReadRetryState());
+  const currentMarkReadMarker =
+    latestMessageId === null ? null : `${conversationId}:${latestMessageId}`;
+  const currentMarkReadMarkerRef = useRef<string | null>(currentMarkReadMarker);
+  const activeAndFocusedRef = useRef(activeAndFocused);
+  const markCurrentConversationReadRef = useRef<(() => void) | null>(null);
+  currentMarkReadMarkerRef.current = currentMarkReadMarker;
+  activeAndFocusedRef.current = activeAndFocused;
+
+  const markCurrentConversationRead = useCallback(() => {
+    if (latestMessageId === null || currentMarkReadMarker === null) {
       return;
     }
-    const marker = `${conversationId}:${latestMessageId}`;
-    const state = markReadStateRef.current;
-    if (!shouldStartMarkReadAttempt(state, marker)) {
-      return;
-    }
-    startMarkReadAttempt(state, marker);
-    void (async () => {
-      try {
+    const marker = currentMarkReadMarker;
+    void attemptMarkCurrentConversationRead({
+      marker,
+      markReadState: markReadStateRef.current,
+      retryState: markReadRetryStateRef.current,
+      currentMarker: () => currentMarkReadMarkerRef.current,
+      activeAndFocused: () => activeAndFocusedRef.current,
+      markRead: async () => {
         await markRead(sandboxId, conversationId, latestMessageId);
-        succeedMarkReadAttempt(state, marker);
-      } catch {
-        // useMarkRead already surfaces the mutation error to the user.
-      } finally {
-        finishMarkReadAttempt(state, marker);
-      }
-    })();
-  }, [activeAndFocused, conversationId, latestMessageId, markRead, sandboxId]);
+      },
+      retry: () => {
+        markCurrentConversationReadRef.current?.();
+      },
+    });
+  }, [conversationId, currentMarkReadMarker, latestMessageId, markRead, sandboxId]);
+  markCurrentConversationReadRef.current = markCurrentConversationRead;
+
+  useEffect(() => {
+    if (!activeAndFocused || currentMarkReadMarker === null) {
+      clearMarkReadRetry(markReadRetryStateRef.current);
+      return;
+    }
+    if (
+      markReadRetryStateRef.current.marker !== null &&
+      markReadRetryStateRef.current.marker !== currentMarkReadMarker
+    ) {
+      clearMarkReadRetry(markReadRetryStateRef.current);
+    }
+  }, [activeAndFocused, currentMarkReadMarker]);
+
+  useEffect(() => {
+    const retryState = markReadRetryStateRef.current;
+    return () => {
+      clearMarkReadRetry(retryState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeAndFocused) {
+      return;
+    }
+    markCurrentConversationRead();
+  }, [activeAndFocused, markCurrentConversationRead]);
 
   useFocusEffect(
     useCallback(() => {

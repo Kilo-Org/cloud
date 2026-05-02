@@ -34,6 +34,31 @@ function message(overrides: Partial<Message>): Message {
   };
 }
 
+function textContent(text: string): Message['content'] {
+  return [{ type: 'text', text }];
+}
+
+function actionContent(resolved = false): Message['content'] {
+  const actionBlock = {
+    type: 'actions',
+    groupId: 'approval-1',
+    actions: [{ label: 'Allow once', style: 'primary', value: 'allow-once' }],
+  } satisfies Message['content'][number];
+
+  if (!resolved) return [actionBlock];
+
+  return [
+    {
+      ...actionBlock,
+      resolved: {
+        value: 'allow-once',
+        resolvedBy: 'user-2',
+        resolvedAt: 1710000003000,
+      },
+    },
+  ];
+}
+
 function messagePage(
   messages: Message[],
   overrides: Partial<MessageListResponse> = {}
@@ -44,6 +69,10 @@ function messagePage(
     nextCursor: null,
     ...overrides,
   };
+}
+
+function firstMessage(result: MessageInfiniteData): Message | undefined {
+  return result.pages[0]?.messages[0];
 }
 
 describe('reaction operation ordering', () => {
@@ -121,6 +150,189 @@ describe('reaction operation ordering', () => {
     );
 
     expect(afterDelayedAdd.pages[0]?.messages[0]?.reactions).toEqual([]);
+  });
+});
+
+describe('applyMessageCreatedEventToPages', () => {
+  it('preserves a delete that arrives before a delayed create', () => {
+    const messageId = '01KQK8S2222222222222222222';
+    const cached: MessageInfiniteData = {
+      pageParams: [undefined],
+      pages: [messagePage([message({ id: messageId, deleted: true, updatedAt: 1710000001000 })])],
+    };
+
+    const result = applyMessageCreatedEventToPages(cached, {
+      messageId,
+      senderId: 'user-sender',
+      content: textContent('server text'),
+      inReplyToMessageId: '01KQK8S1111111111111111111',
+      replyTo: null,
+      clientId: 'client-1',
+    });
+
+    expect(firstMessage(result)).toMatchObject({
+      id: '01KQK8S2222222222222222222',
+      senderId: 'user-sender',
+      content: textContent('server text'),
+      inReplyToMessageId: '01KQK8S1111111111111111111',
+      updatedAt: 1710000001000,
+      clientUpdatedAt: null,
+      deleted: true,
+      deliveryFailed: false,
+      reactions: [],
+    });
+  });
+
+  it('preserves edited content and timestamps when an edit arrives before a delayed create', () => {
+    const messageId = '01KQK8T2222222222222222222';
+    const cached: MessageInfiniteData = {
+      pageParams: [undefined],
+      pages: [
+        messagePage([
+          message({
+            id: messageId,
+            content: textContent('edited text'),
+            updatedAt: 1710000002000,
+            clientUpdatedAt: 1710000001500,
+          }),
+        ]),
+      ],
+    };
+
+    const result = applyMessageCreatedEventToPages(cached, {
+      messageId,
+      senderId: 'user-sender',
+      content: textContent('server text'),
+      inReplyToMessageId: null,
+      replyTo: null,
+      clientId: 'client-1',
+    });
+
+    expect(firstMessage(result)).toMatchObject({
+      id: '01KQK8T2222222222222222222',
+      senderId: 'user-sender',
+      content: textContent('edited text'),
+      updatedAt: 1710000002000,
+      clientUpdatedAt: 1710000001500,
+      deleted: false,
+      deliveryFailed: false,
+      reactions: [],
+    });
+  });
+
+  it('preserves reactions that arrive before a delayed create', () => {
+    const messageId = '01KQK8U2222222222222222222';
+    const reactions = [{ emoji: '+1', count: 1, memberIds: ['user-2'] }];
+    const cached: MessageInfiniteData = {
+      pageParams: [undefined],
+      pages: [messagePage([message({ id: messageId, reactions })])],
+    };
+
+    const result = applyMessageCreatedEventToPages(cached, {
+      messageId,
+      senderId: 'user-sender',
+      content: textContent('server text'),
+      inReplyToMessageId: null,
+      replyTo: null,
+      clientId: 'client-1',
+    });
+
+    expect(firstMessage(result)).toMatchObject({
+      id: '01KQK8U2222222222222222222',
+      content: textContent('server text'),
+      reactions,
+    });
+  });
+
+  it('preserves delivery failure that arrives before a delayed create', () => {
+    const messageId = '01KQK8V2222222222222222222';
+    const cached: MessageInfiniteData = {
+      pageParams: [undefined],
+      pages: [messagePage([message({ id: messageId, deliveryFailed: true })])],
+    };
+
+    const result = applyMessageCreatedEventToPages(cached, {
+      messageId,
+      senderId: 'user-sender',
+      content: textContent('server text'),
+      inReplyToMessageId: null,
+      replyTo: null,
+      clientId: 'client-1',
+    });
+
+    expect(firstMessage(result)).toMatchObject({
+      id: '01KQK8V2222222222222222222',
+      content: textContent('server text'),
+      deliveryFailed: true,
+    });
+  });
+
+  it('preserves resolved actions that arrive before a delayed create', () => {
+    const messageId = '01KQK8W2222222222222222222';
+    const cached: MessageInfiniteData = {
+      pageParams: [undefined],
+      pages: [
+        messagePage([
+          message({
+            id: messageId,
+            content: actionContent(true),
+          }),
+        ]),
+      ],
+    };
+
+    const result = applyMessageCreatedEventToPages(cached, {
+      messageId,
+      senderId: 'user-sender',
+      content: actionContent(false),
+      inReplyToMessageId: null,
+      replyTo: null,
+      clientId: 'client-1',
+    });
+
+    expect(firstMessage(result)?.content).toEqual(actionContent(true));
+  });
+
+  it('still replaces pending optimistic rows with the server create snapshot', () => {
+    const pendingId = 'pending-client-1';
+    const result = applyMessageCreatedEventToPages(
+      {
+        pageParams: [undefined],
+        pages: [
+          messagePage([
+            message({
+              id: pendingId,
+              senderId: '',
+              content: textContent('draft'),
+              inReplyToMessageId: null,
+              deliveryFailed: true,
+              reactions: [{ emoji: '+1', count: 1, memberIds: ['user-2'] }],
+            }),
+          ]),
+        ],
+      },
+      {
+        messageId: '01KQK8X2222222222222222222',
+        senderId: 'user-1',
+        content: textContent('server text'),
+        inReplyToMessageId: '01KQK8X1111111111111111111',
+        replyTo: null,
+        clientId: 'client-1',
+      }
+    );
+
+    expect(firstMessage(result)).toEqual({
+      id: '01KQK8X2222222222222222222',
+      senderId: 'user-1',
+      content: textContent('server text'),
+      inReplyToMessageId: '01KQK8X1111111111111111111',
+      replyTo: null,
+      updatedAt: null,
+      clientUpdatedAt: null,
+      deleted: false,
+      deliveryFailed: false,
+      reactions: [],
+    });
   });
 });
 

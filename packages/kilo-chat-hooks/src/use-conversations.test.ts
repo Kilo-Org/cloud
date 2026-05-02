@@ -7,6 +7,7 @@ import { conversationsKey } from './query-keys';
 import {
   applyConversationActivityToPages,
   applyConversationCreatedToPages,
+  applyConversationReadToPages,
   applyOptimisticMarkConversationRead,
   rollbackOptimisticMarkConversationRead,
   settleLeaveConversation,
@@ -14,12 +15,14 @@ import {
   settleCreateConversation,
   settleRenameConversation,
   type ConversationListInfiniteData,
+  shouldApplyConversationRead,
 } from './use-conversations';
 
 function conversation(
   conversationId: string,
   overrides: {
     lastActivityAt?: number | null;
+    lastReadAt?: number | null;
     joinedAt?: number;
   }
 ): ConversationListItem {
@@ -27,7 +30,7 @@ function conversation(
     conversationId,
     title: null,
     lastActivityAt: overrides.lastActivityAt ?? null,
-    lastReadAt: null,
+    lastReadAt: overrides.lastReadAt ?? null,
     joinedAt: overrides.joinedAt ?? 1,
   };
 }
@@ -192,6 +195,48 @@ describe('applyConversationCreatedToPages', () => {
   });
 });
 
+describe('conversation read helpers', () => {
+  it('applies conversation.read only for the current user', () => {
+    expect(shouldApplyConversationRead('reader', 'reader')).toBe(true);
+    expect(shouldApplyConversationRead('reader', 'other')).toBe(false);
+    expect(shouldApplyConversationRead(null, 'reader')).toBe(false);
+  });
+
+  it('ignores stale read updates and applies newer read updates', () => {
+    const data = conversationsData(
+      [
+        [
+          conversation('conversation-a', { lastReadAt: 200, joinedAt: 200 }),
+          conversation('conversation-b', { lastReadAt: null, joinedAt: 100 }),
+        ],
+      ],
+      [null]
+    );
+
+    const stale = applyConversationReadToPages(data, {
+      conversationId: 'conversation-a',
+      lastReadAt: 100,
+    });
+    const newer = applyConversationReadToPages(stale.data, {
+      conversationId: 'conversation-a',
+      lastReadAt: 300,
+    });
+
+    expect(stale.applied).toBe(true);
+    expect(stale.data).toBe(data);
+    expect(
+      stale.data?.pages[0]?.conversations.find(
+        current => current.conversationId === 'conversation-a'
+      )?.lastReadAt
+    ).toBe(200);
+    expect(
+      newer.data?.pages[0]?.conversations.find(
+        current => current.conversationId === 'conversation-a'
+      )?.lastReadAt
+    ).toBe(300);
+  });
+});
+
 describe('settleCreateConversation', () => {
   it('invalidates only the target sandbox when create fallback cannot patch it', () => {
     const queryClient = new QueryClient();
@@ -336,6 +381,9 @@ describe('applyOptimisticMarkConversationRead', () => {
 
     rollbackOptimisticMarkConversationRead(queryClient, context);
 
+    expect(firstConversationLastReadAt(queryClient.getQueryData(activeKey))).toBe(
+      optimisticReadAt + 1
+    );
     expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
   });

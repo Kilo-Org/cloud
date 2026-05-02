@@ -56,6 +56,12 @@ import {
   formatKiloChatError,
   CONVERSATION_TITLE_MAX_CHARS,
 } from '@kilocode/kilo-chat';
+import {
+  clearPendingAction,
+  pendingActionGroupIdForMessage,
+  tryStartPendingAction,
+  type PendingAction,
+} from '@kilocode/kilo-chat-hooks';
 import { MessageCircle, ArrowDown } from 'lucide-react';
 
 type MessageAreaProps = {
@@ -111,6 +117,8 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isRenamingTitle, setIsRenamingTitle] = useState(false);
   const [renameText, setRenameText] = useState('');
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const pendingActionRef = useRef<PendingAction | null>(null);
 
   const visible = useDocumentVisible();
 
@@ -396,9 +404,20 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
 
   const handleExecuteAction = useCallback(
     (messageId: string, groupId: string, value: ExecApprovalDecision) => {
+      const nextPendingAction = { messageId, groupId };
+      if (!tryStartPendingAction(pendingActionRef, nextPendingAction)) {
+        return;
+      }
+      setPendingAction(pendingActionRef.current);
       executeAction.mutate(
         { messageId, groupId, value },
-        { onError: err => toast.error(formatKiloChatError(err, 'Failed to execute action')) }
+        {
+          onError: err => toast.error(formatKiloChatError(err, 'Failed to execute action')),
+          onSettled: () => {
+            clearPendingAction(pendingActionRef, nextPendingAction);
+            setPendingAction(pendingActionRef.current);
+          },
+        }
       );
     },
     [executeAction.mutate]
@@ -524,7 +543,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
                 onAddReaction={handleAddReaction}
                 onRemoveReaction={handleRemoveReaction}
                 onExecuteAction={handleExecuteAction}
-                actionPending={executeAction.isPending}
+                pendingActionGroupId={pendingActionGroupIdForMessage(pendingAction, msg.id)}
                 currentUserId={currentUserId}
               />
             ))}

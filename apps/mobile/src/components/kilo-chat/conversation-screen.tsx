@@ -1,8 +1,11 @@
 /* eslint-disable max-lines */
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import {
+  clearPendingAction,
   createMarkReadState,
   latestMarkReadMessageId,
+  type PendingAction,
+  tryStartPendingAction,
   useAddReaction,
   useDeleteMessage,
   useEditMessage,
@@ -64,6 +67,8 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const { bottom } = useSafeAreaInsets();
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const pendingActionRef = useRef<PendingAction | null>(null);
   const instanceContext = useInstanceContext(sandboxId);
   const instanceStatusQuery = useKiloClawStatus(
     instanceContext.organizationId,
@@ -181,7 +186,21 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   );
   const handleExecuteAction = useCallback(
     (message: Message, groupId: string, value: ExecApprovalDecision) => {
-      executeActionWithMobileFeedback({ executeAction, message, groupId, value });
+      const nextPendingAction = { messageId: message.id, groupId };
+      if (!tryStartPendingAction(pendingActionRef, nextPendingAction)) {
+        return;
+      }
+      setPendingAction(pendingActionRef.current);
+      executeActionWithMobileFeedback({
+        executeAction,
+        message,
+        groupId,
+        value,
+        onSettled: () => {
+          clearPendingAction(pendingActionRef, nextPendingAction);
+          setPendingAction(pendingActionRef.current);
+        },
+      });
     },
     [executeAction]
   );
@@ -358,7 +377,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           currentUserId={currentUserId}
           fetchOlder={fetchOlder}
           hasOlder={hasOlder}
-          isExecutingAction={executeAction.isPending}
+          pendingAction={pendingAction}
           onExecuteAction={handleExecuteAction}
           onLongPressMessage={handleLongPressMessage}
           onReactionPress={handleReactionPress}

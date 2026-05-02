@@ -10,7 +10,10 @@ type ExecuteActionVariables = {
 type ExecuteActionMutation = {
   mutate: (
     variables: ExecuteActionVariables,
-    options?: { onError?: (err: unknown) => void }
+    options?: {
+      onError?: (err: unknown) => void;
+      onSettled?: () => void;
+    }
   ) => void;
 };
 
@@ -19,18 +22,19 @@ export function executeActionWithMobileFeedback({
   message,
   groupId,
   value,
+  onSettled,
 }: {
   executeAction: ExecuteActionMutation;
   message: Message;
   groupId: string;
   value: ExecApprovalDecision;
+  onSettled?: () => void;
 }) {
-  executeAction.mutate(
-    { messageId: message.id, groupId, value },
-    {
-      onError: err => {
-        toast.error(formatKiloChatError(err, 'Failed to execute action'));
-      },
-    }
-  );
+  const options = {
+    onError: (err: unknown) => {
+      toast.error(formatKiloChatError(err, 'Failed to execute action'));
+    },
+    ...(onSettled ? { onSettled } : {}),
+  };
+  executeAction.mutate({ messageId: message.id, groupId, value }, options);
 }

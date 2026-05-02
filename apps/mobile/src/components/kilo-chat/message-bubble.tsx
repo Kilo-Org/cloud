@@ -17,7 +17,7 @@ type Props = {
   currentUserId: string | null;
   isFromMe: boolean;
   showAuthor: boolean;
-  isExecutingAction: boolean;
+  pendingActionGroupId: string | null;
   replyToMessage?: ReplyPreviewSource | null;
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
   onReactionPress: (message: Message, emoji: string) => void;
@@ -45,7 +45,7 @@ function MessageBubbleComponent({
   currentUserId,
   isFromMe,
   showAuthor,
-  isExecutingAction,
+  pendingActionGroupId,
   replyToMessage,
   onExecuteAction,
   onReactionPress,
@@ -134,7 +134,7 @@ function MessageBubbleComponent({
                       key={action.value}
                       variant={actionStyleToVariant(action.style)}
                       size="sm"
-                      disabled={isExecutingAction}
+                      disabled={pendingActionGroupId === block.groupId}
                       onPress={() => {
                         handleExecuteAction(block.groupId, action.value);
                       }}

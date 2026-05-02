@@ -1,5 +1,6 @@
 import { FlashList } from '@shopify/flash-list';
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
+import { type PendingAction, pendingActionGroupIdForMessage } from '@kilocode/kilo-chat-hooks';
 import { useMemo } from 'react';
 import { View } from 'react-native';
 
@@ -11,7 +12,7 @@ type Props = {
   currentUserId: string | null;
   fetchOlder?: () => void;
   hasOlder?: boolean;
-  isExecutingAction: boolean;
+  pendingAction: PendingAction | null;
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
   onReactionPress: (message: Message, emoji: string) => void;
   onLongPressMessage?: (m: Message) => void;
@@ -22,7 +23,7 @@ export function MessageList({
   currentUserId,
   fetchOlder,
   hasOlder,
-  isExecutingAction,
+  pendingAction,
   onExecuteAction,
   onReactionPress,
   onLongPressMessage,
@@ -52,7 +53,7 @@ export function MessageList({
             currentUserId={currentUserId}
             isFromMe={currentUserId !== null && item.senderId === currentUserId}
             showAuthor={showAuthor}
-            isExecutingAction={isExecutingAction}
+            pendingActionGroupId={pendingActionGroupIdForMessage(pendingAction, item.id)}
             replyToMessage={
               item.inReplyToMessageId
                 ? (messageMap.get(item.inReplyToMessageId) ?? item.replyTo)

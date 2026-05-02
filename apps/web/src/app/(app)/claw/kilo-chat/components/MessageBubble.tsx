@@ -51,7 +51,7 @@ type MessageBubbleProps = {
   onAddReaction: (messageId: string, emoji: string) => void;
   onRemoveReaction: (messageId: string, emoji: string) => void;
   onExecuteAction: (messageId: string, groupId: string, value: ExecApprovalDecision) => void;
-  actionPending?: boolean;
+  pendingActionGroupId: string | null;
   currentUserId: string | null;
 };
 
@@ -76,7 +76,7 @@ export const MessageBubble = memo(function MessageBubble({
   onAddReaction,
   onRemoveReaction,
   onExecuteAction,
-  actionPending,
+  pendingActionGroupId,
   currentUserId,
 }: MessageBubbleProps) {
   const { assistantName } = useKiloChatContext();
@@ -390,7 +390,10 @@ export const MessageBubble = memo(function MessageBubble({
                       {actionsBlock.actions.map(action => (
                         <button
                           key={action.value}
-                          disabled={actionPending || !actionAvailability.canExecuteAction}
+                          disabled={
+                            pendingActionGroupId === actionsBlock.groupId ||
+                            !actionAvailability.canExecuteAction
+                          }
                           onClick={() =>
                             actionAvailability.canExecuteAction &&
                             onExecuteAction(message.id, actionsBlock.groupId, action.value)

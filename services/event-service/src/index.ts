@@ -13,12 +13,16 @@ export { ConnectionTicketDO } from './do/connection-ticket-do';
 const app = new Hono<{ Bindings: Env }>();
 const ACCEPTED_WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 const CONNECTION_TICKET_TTL_MS = 30_000;
+const ALLOWED_BROWSER_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
 
-app.use('/connect/*', cors({ origin: ['https://kilo.ai', 'https://app.kilo.ai'] }));
+app.use(
+  '/connect/*',
+  cors({ origin: origin => (ALLOWED_BROWSER_ORIGINS.includes(origin) ? origin : null) })
+);
 app.use(
   '/connect-ticket',
   cors({
-    origin: ['https://kilo.ai', 'https://app.kilo.ai'],
+    origin: origin => (ALLOWED_BROWSER_ORIGINS.includes(origin) ? origin : null),
     allowMethods: ['POST', 'OPTIONS'],
     allowHeaders: ['Authorization'],
   })

@@ -46,6 +46,21 @@ describe('event-service WebSocket connection tickets', () => {
     vi.spyOn(env.NEXTAUTH_SECRET, 'get').mockResolvedValue(TEST_JWT_SECRET);
   });
 
+  it('allows local web origin preflight for connect-ticket authorization', async () => {
+    const res = await SELF.fetch('https://events.test/connect-ticket', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'http://localhost:3000',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'Authorization',
+      },
+    });
+
+    expect(res.status).toBe(204);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3000');
+    expect(res.headers.get('Access-Control-Allow-Headers')).toContain('Authorization');
+  });
+
   it('mints an opaque ticket instead of returning a JWT-shaped credential', async () => {
     const ticket = await mintTicket('user-ticket-mint');
 

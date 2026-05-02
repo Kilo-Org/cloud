@@ -7,6 +7,7 @@ import type { ConnectTicketResponse } from '@kilocode/event-service';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { authenticateToken } from './auth';
 import { logger } from './util/logger';
+import type { TicketMintRequest } from './do/connection-ticket-do';
 
 export { UserSessionDO } from './do/user-session-do';
 export { ConnectionTicketDO } from './do/connection-ticket-do';
@@ -45,12 +46,13 @@ function acceptsWebSocketProtocol(header: string | undefined): boolean {
 async function mintConnectionTicket(env: Env, userId: string): Promise<string | null> {
   const ticket = crypto.randomUUID();
   const stub = env.CONNECTION_TICKET_DO.get(env.CONNECTION_TICKET_DO.idFromName(ticket));
+  const body = {
+    userId,
+    expiresAt: Date.now() + CONNECTION_TICKET_TTL_MS,
+  } satisfies TicketMintRequest;
   const res = await stub.fetch('https://ticket.local/mint', {
     method: 'POST',
-    body: JSON.stringify({
-      userId,
-      expiresAt: Date.now() + CONNECTION_TICKET_TTL_MS,
-    }),
+    body: JSON.stringify(body),
   });
   return res.ok ? ticket : null;
 }

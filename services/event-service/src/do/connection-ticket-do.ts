@@ -7,7 +7,10 @@ const ticketStateSchema = z.object({
   consumed: z.boolean().optional(),
 });
 
+const ticketMintRequestSchema = ticketStateSchema.omit({ consumed: true });
+
 type TicketState = z.infer<typeof ticketStateSchema>;
+export type TicketMintRequest = z.infer<typeof ticketMintRequestSchema>;
 
 export class ConnectionTicketDO extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
@@ -23,7 +26,9 @@ export class ConnectionTicketDO extends DurableObject<Env> {
 
   private async mint(request: Request): Promise<Response> {
     const body: unknown = await request.json().catch(() => null);
-    const parsed = ticketStateSchema.omit({ consumed: true }).safeParse(body);
+    // This DO still exposes an HTTP-shaped fetch endpoint, so validate the
+    // serialized JSON even though the caller is internal service code.
+    const parsed = ticketMintRequestSchema.safeParse(body);
     if (!parsed.success) {
       return new Response('Invalid ticket', { status: 400 });
     }

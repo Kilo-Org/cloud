@@ -359,7 +359,7 @@ export async function markReadFor(
     'MembershipDO.markRead'
   );
 
-  const { sandboxId } = extractConversationContext(resolved.info.members);
+  const { sandboxId } = resolved;
   let badgeClear: BadgeClearResult | null = null;
   if (sandboxId) {
     if (

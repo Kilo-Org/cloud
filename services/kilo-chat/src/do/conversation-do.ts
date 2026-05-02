@@ -61,6 +61,11 @@ export type MemberContext = {
   sandboxId: string | null;
 };
 
+type ActiveMemberRow = {
+  id: string;
+  kind: 'user' | 'bot';
+};
+
 export type InitializeParams = {
   id: string;
   title: string | null;
@@ -120,7 +125,7 @@ export type GetMessageResult = {
 export type ResolveMarkReadResult =
   | {
       ok: true;
-      info: ConversationInfo;
+      sandboxId: string | null;
       latestNonDeletedMessageId: string | null;
     }
   | { ok: false; code: 'forbidden' | 'invalid'; error: string };
@@ -311,18 +316,14 @@ export class ConversationDO extends DurableObject<Env> {
     const convRow = this.db.select().from(conversation).get();
     if (!convRow) return null;
 
-    const memberRows = this.db
-      .select()
-      .from(members)
-      .where(sql`${members.left_at} IS NULL`)
-      .all();
+    const memberRows = this.getActiveMemberRows();
 
     return {
       id: convRow.id,
       title: convRow.title,
       createdBy: convRow.created_by,
       createdAt: convRow.created_at,
-      members: memberRows.map(m => ({ id: m.id, kind: m.kind as 'user' | 'bot' })),
+      members: memberRows,
     };
   }
 
@@ -335,18 +336,25 @@ export class ConversationDO extends DurableObject<Env> {
     return row !== undefined;
   }
 
-  private getMemberContext(): MemberContext {
-    const activeMembers = this.db
+  private getActiveMemberRows(): ActiveMemberRow[] {
+    return this.db
       .select({ id: members.id, kind: members.kind })
       .from(members)
       .where(sql`${members.left_at} IS NULL`)
-      .all();
+      .all()
+      .map(member => ({ id: member.id, kind: member.kind === 'user' ? 'user' : 'bot' }));
+  }
 
+  private getMemberContextFromRows(activeMembers: ActiveMemberRow[]): MemberContext {
     const humanMemberIds = activeMembers.filter(m => m.kind === 'user').map(m => m.id);
     const botMember = activeMembers.find(m => m.kind === 'bot');
     const sandboxId = botMember ? (botMember.id.match(/^bot:kiloclaw:(.+)$/)?.[1] ?? null) : null;
 
     return { humanMemberIds, sandboxId };
+  }
+
+  private getMemberContext(): MemberContext {
+    return this.getMemberContextFromRows(this.getActiveMemberRows());
   }
 
   createMessage(params: CreateMessageParams): CreateMessageResult {
@@ -408,8 +416,8 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   resolveMarkRead(memberId: string, lastSeenMessageId: string): ResolveMarkReadResult {
-    const info = this.getInfo();
-    if (!info || !info.members.some(member => member.id === memberId)) {
+    const activeMembers = this.getActiveMemberRows();
+    if (!activeMembers.some(member => member.id === memberId)) {
       return { ok: false, code: 'forbidden', error: 'Forbidden' };
     }
 
@@ -428,7 +436,7 @@ export class ConversationDO extends DurableObject<Env> {
 
     return {
       ok: true,
-      info,
+      sandboxId: this.getMemberContextFromRows(activeMembers).sandboxId,
       latestNonDeletedMessageId: this.getLatestNonDeletedMessageId(),
     };
   }

@@ -562,7 +562,14 @@ describe('ConversationDO', () => {
 
   it('resolveMarkRead - accepts deleted markers and returns the latest non-deleted marker', async () => {
     const stub = getStub('conv-resolve-read-deleted');
-    await stub.initialize(BASE_PARAMS);
+    const sandboxId = 'sandbox-resolve-read-deleted';
+    await stub.initialize({
+      ...BASE_PARAMS,
+      members: [
+        { id: 'user-alice', kind: 'user' as const },
+        { id: `bot:kiloclaw:${sandboxId}`, kind: 'bot' as const },
+      ],
+    });
     const first = await stub.createMessage({
       senderId: 'user-alice',
       content: [{ type: 'text', text: 'First' }],
@@ -579,13 +586,7 @@ describe('ConversationDO', () => {
 
     await expect(stub.resolveMarkRead('user-alice', second.messageId)).resolves.toEqual({
       ok: true,
-      info: {
-        id: BASE_PARAMS.id,
-        title: BASE_PARAMS.title,
-        createdBy: BASE_PARAMS.createdBy,
-        createdAt: BASE_PARAMS.createdAt,
-        members: BASE_PARAMS.members,
-      },
+      sandboxId,
       latestNonDeletedMessageId: first.messageId,
     });
   });

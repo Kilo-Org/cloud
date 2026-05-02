@@ -1,6 +1,8 @@
 import {
   applyConversationActivityToPages,
+  applyMarkConversationReadRollbackToPages,
   type ConversationListInfiniteData,
+  updateConversationPages,
 } from '@kilocode/kilo-chat-hooks';
 import { describe, expect, it } from 'vitest';
 
@@ -13,6 +15,7 @@ function conversation(
   conversationId: string,
   overrides: {
     lastActivityAt?: number | null;
+    lastReadAt?: number | null;
     joinedAt?: number;
   } = {}
 ) {
@@ -20,7 +23,7 @@ function conversation(
     conversationId,
     title: null,
     lastActivityAt: overrides.lastActivityAt ?? null,
-    lastReadAt: null,
+    lastReadAt: overrides.lastReadAt ?? null,
     joinedAt: overrides.joinedAt ?? 1,
   };
 }
@@ -99,5 +102,35 @@ describe('instance event cache helpers', () => {
       '01ARZ3NDEKTSV4RRFFQ69G5FA2',
       '01ARZ3NDEKTSV4RRFFQ69G5FA1',
     ]);
+  });
+
+  it('leaves newer read state intact when a failed optimistic mark-read rolls back', () => {
+    const data: ConversationListInfiniteData = {
+      pages: [
+        {
+          conversations: [conversation('01ARZ3NDEKTSV4RRFFQ69G5FA1')],
+          hasMore: false,
+          nextCursor: null,
+        },
+      ],
+      pageParams: [null],
+    };
+    const optimisticReadAt = 100;
+    const newerReadAt = 200;
+    const optimistic = updateConversationPages(data, c =>
+      c.conversationId === '01ARZ3NDEKTSV4RRFFQ69G5FA1' ? { ...c, lastReadAt: optimisticReadAt } : c
+    );
+    const withNewerRead = updateConversationPages(optimistic, c =>
+      c.conversationId === '01ARZ3NDEKTSV4RRFFQ69G5FA1' ? { ...c, lastReadAt: newerReadAt } : c
+    );
+
+    const result = applyMarkConversationReadRollbackToPages(withNewerRead, {
+      conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FA1',
+      previousLastReadAt: null,
+      optimisticReadAt,
+    });
+
+    expect(result.invalidationRequired).toBe(true);
+    expect(result.data?.pages[0]?.conversations[0]?.lastReadAt).toBe(newerReadAt);
   });
 });

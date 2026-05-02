@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import type { InfiniteData } from '@tanstack/react-query';
-import type { KiloChatClient } from '@kilocode/kilo-chat';
+import type { InfiniteData, QueryKey } from '@tanstack/react-query';
+import { ulidToTimestamp, type KiloChatClient } from '@kilocode/kilo-chat';
 import type {
   CreateConversationRequest,
   ConversationListItem,
@@ -161,6 +161,52 @@ export function applyConversationActivityToPages(
   };
 }
 
+type MarkConversationReadRollback = {
+  conversationId: string;
+  previousLastReadAt: number | null;
+  optimisticReadAt: number;
+};
+
+type ApplyMarkConversationReadRollbackResult = {
+  data: ConversationListInfiniteData | undefined;
+  invalidationRequired: boolean;
+};
+
+export function applyMarkConversationReadRollbackToPages(
+  data: ConversationListInfiniteData | undefined,
+  rollback: MarkConversationReadRollback
+): ApplyMarkConversationReadRollbackResult {
+  let foundConversation = false;
+  let foundNewerState = false;
+
+  const next = updateConversationPages(data, conversation => {
+    if (conversation.conversationId !== rollback.conversationId) {
+      return conversation;
+    }
+
+    foundConversation = true;
+    if (conversation.lastReadAt !== rollback.optimisticReadAt) {
+      foundNewerState = true;
+      return conversation;
+    }
+
+    return { ...conversation, lastReadAt: rollback.previousLastReadAt };
+  });
+
+  return {
+    data: next,
+    invalidationRequired: foundConversation && foundNewerState,
+  };
+}
+
+type MarkConversationReadQueryRollback = MarkConversationReadRollback & {
+  queryKey: QueryKey;
+};
+
+type MarkConversationReadMutationContext = {
+  rollbacks: MarkConversationReadQueryRollback[];
+};
+
 export function useMarkConversationRead(client: KiloChatClient) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -169,23 +215,56 @@ export function useMarkConversationRead(client: KiloChatClient) {
       lastSeenMessageId,
     }: MarkConversationReadRequest & { conversationId: string }) =>
       client.markConversationRead(conversationId, { lastSeenMessageId }),
-    onMutate: ({ conversationId }) => {
-      // Optimistically set lastReadAt = now in all cached conversation lists
-      const now = Date.now();
+    onMutate: ({ conversationId, lastSeenMessageId }): MarkConversationReadMutationContext => {
+      const optimisticReadAt = ulidToTimestamp(lastSeenMessageId);
       const queryKey = conversationsKeyAll();
-      const previous = queryClient.getQueriesData<ConversationListInfiniteData>({ queryKey });
-      queryClient.setQueriesData<ConversationListInfiniteData>({ queryKey }, old =>
-        updateConversationPages(old, c =>
-          c.conversationId === conversationId ? { ...c, lastReadAt: now } : c
-        )
-      );
-      return { previous };
+      const rollbacks: MarkConversationReadQueryRollback[] = [];
+      const previousEntries = queryClient.getQueriesData<ConversationListInfiniteData>({
+        queryKey,
+      });
+
+      for (const [entryQueryKey, data] of previousEntries) {
+        const previousConversation = data?.pages
+          .flatMap(page => page.conversations)
+          .find(conversation => conversation.conversationId === conversationId);
+
+        if (!previousConversation) {
+          continue;
+        }
+
+        rollbacks.push({
+          queryKey: entryQueryKey,
+          conversationId,
+          previousLastReadAt: previousConversation.lastReadAt,
+          optimisticReadAt,
+        });
+
+        queryClient.setQueryData<ConversationListInfiniteData>(entryQueryKey, old =>
+          updateConversationPages(old, conversation =>
+            conversation.conversationId === conversationId
+              ? { ...conversation, lastReadAt: optimisticReadAt }
+              : conversation
+          )
+        );
+      }
+
+      return { rollbacks };
     },
     onError: (_err, _variables, context) => {
-      if (context?.previous) {
-        for (const [key, data] of context.previous) {
-          queryClient.setQueryData(key, data);
+      let shouldInvalidate = false;
+
+      for (const rollback of context?.rollbacks ?? []) {
+        const current = queryClient.getQueryData<ConversationListInfiniteData>(rollback.queryKey);
+        const result = applyMarkConversationReadRollbackToPages(current, rollback);
+        if (result.invalidationRequired) {
+          shouldInvalidate = true;
+        } else {
+          queryClient.setQueryData<ConversationListInfiniteData>(rollback.queryKey, result.data);
         }
+      }
+
+      if (shouldInvalidate) {
+        void queryClient.invalidateQueries({ queryKey: conversationsKeyAll() });
       }
     },
   });

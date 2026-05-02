@@ -16,6 +16,18 @@ vi.mock('../services/user-lookup', () => ({
   })),
 }));
 
+vi.mock('@kilocode/db/client', () => ({
+  getWorkerDb: vi.fn(() => ({
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => [{ api_token_pepper: null }],
+        }),
+      }),
+    }),
+  })),
+}));
+
 // sandbox-lookup imports @kilocode/db/client → pg which doesn't work in the
 // Workers runtime. Mock globally so module resolution succeeds.
 vi.mock('../services/sandbox-lookup', () => ({

@@ -7,7 +7,9 @@ declare namespace Cloudflare {
 		durableNamespaces: "UserSessionDO";
 	}
 	interface Env {
+		HYPERDRIVE: Hyperdrive;
 		NEXTAUTH_SECRET: SecretsStoreSecret;
+		WORKER_ENV: "production";
 		USER_SESSION_DO: DurableObjectNamespace<import("./src/index").UserSessionDO>;
 	}
 }

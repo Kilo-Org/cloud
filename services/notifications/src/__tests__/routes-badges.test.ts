@@ -27,6 +27,8 @@ async function tokenFor(userId: string): Promise<string> {
     pepper: null,
     secret: TEST_JWT_SECRET,
     expiresInSeconds: 3600,
+    env: 'production',
+    extra: { tokenSource: 'kilo-chat' },
   });
   return token;
 }

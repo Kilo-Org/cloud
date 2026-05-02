@@ -1,11 +1,28 @@
 import { createMiddleware } from 'hono/factory';
-import { extractBearerToken, getCachedSecret, verifyKiloToken } from '@kilocode/worker-utils';
+import { getWorkerDb } from '@kilocode/db/client';
+import { kilocode_users } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
+import { extractBearerToken, getCachedSecret, verifyKiloChatToken } from '@kilocode/worker-utils';
 import { logger } from './util/logger';
 
 export type AuthContext = {
   callerId: string;
   callerKind: 'user' | 'bot';
 };
+
+async function findUserPepper(
+  connectionString: string,
+  userId: string
+): Promise<string | null | undefined> {
+  const db = getWorkerDb(connectionString);
+  const rows = await db
+    .select({ api_token_pepper: kilocode_users.api_token_pepper })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId))
+    .limit(1);
+  const row = rows[0];
+  return row ? (row.api_token_pepper ?? null) : undefined;
+}
 
 /**
  * Public HTTP auth for kilo-chat — humans only. The bearer is a Kilo JWT
@@ -26,10 +43,15 @@ export const authMiddleware = createMiddleware<{
 
   try {
     const jwtSecret = await getCachedSecret(c.env.NEXTAUTH_SECRET, 'NEXTAUTH_SECRET');
-    const payload = await verifyKiloToken(token, jwtSecret);
-    c.set('callerId', payload.kiloUserId);
+    const payload = await verifyKiloChatToken(token, jwtSecret, c.env.WORKER_ENV);
+    const currentPepper = await findUserPepper(c.env.HYPERDRIVE.connectionString, payload.userId);
+    if (currentPepper === undefined || currentPepper !== payload.pepper) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    c.set('callerId', payload.userId);
     c.set('callerKind', 'user');
-    logger.setTags({ callerId: payload.kiloUserId, callerKind: 'user' });
+    logger.setTags({ callerId: payload.userId, callerKind: 'user' });
     return next();
   } catch {
     return c.json({ error: 'Unauthorized' }, 401);

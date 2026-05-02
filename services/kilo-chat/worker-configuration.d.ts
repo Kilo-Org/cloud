@@ -10,6 +10,7 @@ declare namespace Cloudflare {
 		HYPERDRIVE: Hyperdrive;
 		NEXTAUTH_SECRET: SecretsStoreSecret;
 		GATEWAY_TOKEN_SECRET: SecretsStoreSecret;
+		WORKER_ENV: "production";
 		CONVERSATION_DO: DurableObjectNamespace<import("./src/index").ConversationDO>;
 		MEMBERSHIP_DO: DurableObjectNamespace<import("./src/index").MembershipDO>;
 		SANDBOX_STATUS_DO: DurableObjectNamespace<import("./src/index").SandboxStatusDO>;

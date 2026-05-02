@@ -8,6 +8,7 @@
   "dev": { "port": 8804 },
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
+  "vars": { "WORKER_ENV": "production" },
 
   "routes": [
     {

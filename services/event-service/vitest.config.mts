@@ -6,6 +6,7 @@ const kCurrentWorker = Symbol.for('miniflare.kCurrentWorker');
 
 export default defineWorkersConfig({
   test: {
+    setupFiles: ['./src/__tests__/setup.ts'],
     poolOptions: {
       workers: {
         wrangler: { configPath: './wrangler.jsonc' },

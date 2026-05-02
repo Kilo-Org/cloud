@@ -9,6 +9,7 @@
   "logpush": true,
   "placement": { "mode": "smart" },
   "dev": { "port": 8808 },
+  "vars": { "WORKER_ENV": "production" },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "routes": [
     {

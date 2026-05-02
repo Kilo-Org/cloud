@@ -11,6 +11,7 @@ declare namespace Cloudflare {
 		RECEIPTS_QUEUE: Queue;
 		EXPO_ACCESS_TOKEN: SecretsStoreSecret;
 		NEXTAUTH_SECRET: SecretsStoreSecret;
+		WORKER_ENV: "production";
 		NOTIFICATION_CHANNEL_DO: DurableObjectNamespace<import("./src/index").NotificationChannelDO>;
 		EVENT_SERVICE: Fetcher /* event-service */;
 	}

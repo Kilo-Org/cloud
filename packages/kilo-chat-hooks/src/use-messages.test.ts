@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { QueryClient, type InfiniteData } from '@tanstack/react-query';
-import { KiloChatApiError, type Message } from '@kilocode/kilo-chat';
+import { QueryClient } from '@tanstack/react-query';
+import { KiloChatApiError, type Message, type MessageListResponse } from '@kilocode/kilo-chat';
 import {
   applyExecuteActionResponseToPages,
   applyCreateMessageResponseToPages,
   applyMessageCreatedEventToPages,
+  type MessageInfiniteData,
   applyReactionAddedEventToPages,
   applyReactionRemovedResponseToPages,
   applyReactionRemovedMutationToPages,
@@ -33,21 +34,33 @@ function message(overrides: Partial<Message>): Message {
   };
 }
 
+function messagePage(
+  messages: Message[],
+  overrides: Partial<MessageListResponse> = {}
+): MessageListResponse {
+  return {
+    messages,
+    hasMore: false,
+    nextCursor: null,
+    ...overrides,
+  };
+}
+
 describe('reaction operation ordering', () => {
   it('keeps a successful local remove ahead of an older delayed add event', () => {
     const conversationId = '01KQK8A1111111111111111111';
     const messageId = '01KQK8A2222222222222222222';
     const currentUserId = 'user-current';
     const tracker = createReactionOperationTracker();
-    const initial: InfiniteData<Message[]> = {
+    const initial: MessageInfiniteData = {
       pageParams: [undefined],
       pages: [
-        [
+        messagePage([
           message({
             id: messageId,
             reactions: [{ emoji: '👍', count: 1, memberIds: [currentUserId] }],
           }),
-        ],
+        ]),
       ],
     };
 
@@ -69,7 +82,7 @@ describe('reaction operation ordering', () => {
       }
     );
 
-    expect(afterDelayedAdd.pages[0]?.[0]?.reactions).toEqual([]);
+    expect(afterDelayedAdd.pages[0]?.messages[0]?.reactions).toEqual([]);
   });
 
   it('keeps a no-op remove tombstone ahead of an older delayed add event', () => {
@@ -77,15 +90,15 @@ describe('reaction operation ordering', () => {
     const messageId = '01KQK8C2222222222222222222';
     const currentUserId = 'user-current';
     const tracker = createReactionOperationTracker();
-    const initial: InfiniteData<Message[]> = {
+    const initial: MessageInfiniteData = {
       pageParams: [undefined],
       pages: [
-        [
+        messagePage([
           message({
             id: messageId,
             reactions: [{ emoji: '👍', count: 1, memberIds: [currentUserId] }],
           }),
-        ],
+        ]),
       ],
     };
 
@@ -107,7 +120,7 @@ describe('reaction operation ordering', () => {
       }
     );
 
-    expect(afterDelayedAdd.pages[0]?.[0]?.reactions).toEqual([]);
+    expect(afterDelayedAdd.pages[0]?.messages[0]?.reactions).toEqual([]);
   });
 });
 
@@ -125,9 +138,9 @@ describe('edit rollback errors', () => {
       content: [{ type: 'text', text: 'losing edit' }],
       clientUpdatedAt: 2,
     });
-    queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, {
+    queryClient.setQueryData<MessageInfiniteData>(queryKey, {
       pageParams: [undefined],
-      pages: [[optimistic]],
+      pages: [messagePage([optimistic])],
     });
 
     rollbackEditMessageError(
@@ -141,9 +154,9 @@ describe('edit rollback errors', () => {
       })
     );
 
-    const result = queryClient.getQueryData<InfiniteData<Message[]>>(queryKey);
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
     const query = queryClient.getQueryCache().find({ queryKey });
-    expect(result?.pages[0]?.[0]).toEqual(original);
+    expect(result?.pages[0]?.messages[0]).toEqual(original);
     expect(query?.state.isInvalidated).toBe(true);
   });
 });
@@ -185,23 +198,23 @@ describe('message pagination helpers', () => {
       hasMore: false,
       nextCursor: null,
     });
-    const initial: InfiniteData<Message[]> = {
+    const initial: MessageInfiniteData = {
       pageParams: [undefined],
       pages: [page],
     };
 
-    const updated = updateMessageInPages(initial, page[0]?.id ?? '', msg => ({
+    const updated = updateMessageInPages(initial, page.messages[0]?.id ?? '', msg => ({
       ...msg,
       content: [{ type: 'text', text: 'updated' }],
     }));
-    const replaced = applyCreateMessageResponseToPages(updated, page[1]?.id ?? '', {
+    const replaced = applyCreateMessageResponseToPages(updated, page.messages[1]?.id ?? '', {
       messageId: '01KQK8P-server',
       clientId: '01KQK8P-client',
       message: message({ id: '01KQK8P-server' }),
     });
 
-    expect(getNextMessagesPageParam(updated.pages[0] ?? [])).toBeUndefined();
-    expect(getNextMessagesPageParam(replaced.pages[0] ?? [])).toBeUndefined();
+    expect(getNextMessagesPageParam(updated.pages[0] ?? messagePage([]))).toBeUndefined();
+    expect(getNextMessagesPageParam(replaced.pages[0] ?? messagePage([]))).toBeUndefined();
   });
 
   it('preserves server next cursors when replacing or extending the newest page', () => {
@@ -210,13 +223,13 @@ describe('message pagination helpers', () => {
       hasMore: true,
       nextCursor: 'server-cursor-after-01KQK8Q',
     });
-    const initial: InfiniteData<Message[]> = {
+    const initial: MessageInfiniteData = {
       pageParams: [undefined],
       pages: [page],
     };
 
     const afterEventMerge = applyMessageCreatedEventToPages(initial, {
-      messageId: page[0]?.id ?? '',
+      messageId: page.messages[0]?.id ?? '',
       senderId: 'user-sender',
       content: [{ type: 'text', text: 'merged' }],
       inReplyToMessageId: null,
@@ -232,10 +245,10 @@ describe('message pagination helpers', () => {
       clientId: null,
     });
 
-    expect(getNextMessagesPageParam(afterEventMerge.pages[0] ?? [])).toBe(
+    expect(getNextMessagesPageParam(afterEventMerge.pages[0] ?? messagePage([]))).toBe(
       'server-cursor-after-01KQK8Q'
     );
-    expect(getNextMessagesPageParam(afterNewMessage.pages[0] ?? [])).toBe(
+    expect(getNextMessagesPageParam(afterNewMessage.pages[0] ?? messagePage([]))).toBe(
       'server-cursor-after-01KQK8Q'
     );
   });
@@ -248,15 +261,17 @@ describe('message pagination helpers', () => {
       hasMore: true,
       nextCursor: 'server-cursor-after-01KQK8R',
     });
-    queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, {
+    queryClient.setQueryData<MessageInfiniteData>(queryKey, {
       pageParams: [undefined],
       pages: [page],
     });
 
-    removeMessageFromCache(queryClient, queryKey, page[0]?.id ?? '');
+    removeMessageFromCache(queryClient, queryKey, page.messages[0]?.id ?? '');
 
-    const result = queryClient.getQueryData<InfiniteData<Message[]>>(queryKey);
-    expect(getNextMessagesPageParam(result?.pages[0] ?? [])).toBe('server-cursor-after-01KQK8R');
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
+    expect(getNextMessagesPageParam(result?.pages[0] ?? messagePage([]))).toBe(
+      'server-cursor-after-01KQK8R'
+    );
   });
 });
 
@@ -275,10 +290,10 @@ describe('send message cache settlement', () => {
         previewText: 'parent context',
       },
     });
-    const initial: InfiniteData<Message[]> = {
+    const initial: MessageInfiniteData = {
       pageParams: [undefined],
       pages: [
-        [
+        messagePage([
           message({
             id: pendingId,
             senderId: 'user-current',
@@ -286,7 +301,7 @@ describe('send message cache settlement', () => {
             inReplyToMessageId: '01KQK8H0000000000000000000',
             replyTo: null,
           }),
-        ],
+        ]),
       ],
     };
 
@@ -304,18 +319,18 @@ describe('send message cache settlement', () => {
       clientId: '01KQK8H1111111111111111111',
     });
 
-    expect(fromResponse.pages[0]).toEqual([serverMessage]);
-    expect(fromEvent.pages[0]).toEqual([serverMessage]);
+    expect(fromResponse.pages[0]?.messages).toEqual([serverMessage]);
+    expect(fromEvent.pages[0]?.messages).toEqual([serverMessage]);
   });
 });
 
 describe('execute action cache settlement', () => {
   it('replaces optimistic resolved content with the server response', () => {
     const messageId = '01KQK8H2222222222222222222';
-    const initial: InfiniteData<Message[]> = {
+    const initial: MessageInfiniteData = {
       pageParams: [undefined],
       pages: [
-        [
+        messagePage([
           message({
             id: messageId,
             content: [
@@ -327,7 +342,7 @@ describe('execute action cache settlement', () => {
               },
             ],
           }),
-        ],
+        ]),
       ],
     };
 
@@ -350,7 +365,7 @@ describe('execute action cache settlement', () => {
       },
     });
 
-    expect(result.pages[0]?.[0]?.content).toEqual([
+    expect(result.pages[0]?.messages[0]?.content).toEqual([
       {
         type: 'actions',
         groupId: 'approval',

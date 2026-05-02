@@ -184,8 +184,8 @@ export async function approvePairingRequest(
       'POST',
       ControllerPairingApproveResponseSchema,
       { channel, code },
-      // TEMPORARY: 180s timeout — openclaw 2026.4.15 CLI startup is ~65s
-      // (jiti loader churn). Revert to default 30s once openclaw startup is fixed.
+      // TEMPORARY: 180s timeout while OpenClaw CLI startup can exceed 60s on
+      // shared-cpu instances. Revert once full-image startup is consistently fast.
       { timeoutMs: 180_000 }
     );
   } catch (error) {
@@ -389,8 +389,8 @@ export async function approveDevicePairingRequest(
       'POST',
       ControllerPairingApproveResponseSchema,
       { requestId },
-      // TEMPORARY: 180s timeout — openclaw 2026.4.15 CLI startup is ~65s
-      // (jiti loader churn). Revert to default 30s once openclaw startup is fixed.
+      // TEMPORARY: 180s timeout while OpenClaw CLI startup can exceed 60s on
+      // shared-cpu instances. Revert once full-image startup is consistently fast.
       { timeoutMs: 180_000 }
     );
   } catch (error) {

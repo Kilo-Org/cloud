@@ -81,6 +81,7 @@ describe('KiloChatClient', () => {
           senderId: 'u1',
           content: [{ type: 'text', text: 'hello' }],
           inReplyToMessageId: null,
+          replyTo: null,
           updatedAt: null,
           clientUpdatedAt: null,
           deleted: false,
@@ -114,6 +115,45 @@ describe('KiloChatClient', () => {
         content: [{ type: 'text', text: 'hi' }],
       });
       expect(res).toEqual({ messageId: 'm1' });
+    });
+
+    it('does not emit unhandled rejections after handled send failures', async () => {
+      const unhandledRejection = vi.fn<(reason: unknown) => void>();
+      process.on('unhandledRejection', unhandledRejection);
+
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'boom' }), { status: 500 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ messageId: 'm2' }), { status: 201 }));
+      const client = new KiloChatClient(createMockConfig(fetch));
+
+      try {
+        await expect(
+          client.sendMessage({
+            conversationId: 'c1',
+            content: [{ type: 'text', text: 'fail' }],
+          })
+        ).rejects.toThrow(KiloChatApiError);
+
+        await new Promise(resolve => setImmediate(resolve));
+        await Promise.resolve();
+        expect(unhandledRejection).not.toHaveBeenCalled();
+
+        const res = await client.sendMessage({
+          conversationId: 'c1',
+          content: [{ type: 'text', text: 'retry' }],
+        });
+
+        expect(res).toEqual({ messageId: 'm2' });
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(fetch).toHaveBeenNthCalledWith(
+          2,
+          'https://chat.example.com/v1/messages',
+          expect.objectContaining({ method: 'POST' })
+        );
+      } finally {
+        process.off('unhandledRejection', unhandledRejection);
+      }
     });
   });
 

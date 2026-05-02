@@ -100,11 +100,12 @@ export class KiloChatClient {
     this.sendQueues.set(req.conversationId, next);
     // Best-effort cleanup so the map doesn't grow unbounded for long-lived
     // clients. Only clear if this send is still the tail.
-    void next.finally(() => {
+    const cleanup = (): void => {
       if (this.sendQueues.get(req.conversationId) === next) {
         this.sendQueues.delete(req.conversationId);
       }
-    });
+    };
+    void next.then(cleanup, cleanup);
     return next;
   }
 

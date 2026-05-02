@@ -2,6 +2,7 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ConversationDO } from '../do/conversation-do';
 import { makeApp } from './helpers';
+import { logger } from '../util/logger';
 
 // fetchSandboxLabel hits Hyperdrive/pg. Mock it so the push call site doesn't
 // need a real DB. Individual tests can override per-test as needed.
@@ -169,5 +170,55 @@ describe('kilo-chat publishes push on message.created', () => {
     expect(sendRes.status).toBe(201);
     const body = await sendRes.json<{ messageId: string }>();
     expect(body.messageId).toBeTruthy();
+  });
+
+  it('logs returned per-recipient push failures without blocking the send', async () => {
+    vi.spyOn(env.NOTIFICATIONS, 'sendPushForConversation').mockResolvedValue({
+      perRecipient: [{ userId: 'user-push-failed-other', outcome: 'failed' }],
+    });
+    const logSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+    const senderId = 'user-push-failed-sender';
+    const otherId = 'user-push-failed-other';
+    const sandboxId = 'sandbox-push-failed';
+    const conversationId = '01KQD0T86WRTBR2NXX0VX3MY1N';
+    const botId = `bot:kiloclaw:${sandboxId}`;
+
+    const convStub: DurableObjectStub<ConversationDO> = env.CONVERSATION_DO.get(
+      env.CONVERSATION_DO.idFromName(conversationId)
+    );
+    const initRes = await convStub.initialize({
+      id: conversationId,
+      title: 'Returned failure',
+      createdBy: senderId,
+      createdAt: Date.now(),
+      members: [
+        { id: senderId, kind: 'user' },
+        { id: otherId, kind: 'user' },
+        { id: botId, kind: 'bot' },
+      ],
+    });
+    expect(initRes.ok).toBe(true);
+
+    const senderApp = makeApp(senderId, 'user');
+    const sendRes = await senderApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      env
+    );
+    expect(sendRes.status).toBe(201);
+    const { messageId } = await sendRes.json<{ messageId: string }>();
+
+    await waitForCalls(logSpy);
+    expect(logSpy).toHaveBeenCalledWith('sendPushForConversation returned failed outcomes', {
+      conversationId,
+      sandboxId,
+      messageId,
+      failedRecipients: [{ userId: otherId, outcome: 'failed' }],
+    });
   });
 });

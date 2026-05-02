@@ -343,7 +343,7 @@ export async function postCommitFanOut(
       const bodyPreview = contentBlocksToText(content).slice(0, 200);
       const sandboxLabel = await fetchSandboxLabel(env.HYPERDRIVE.connectionString, sandboxId);
       const conversationTitle = info.title ?? appliedAutoTitle ?? 'Untitled';
-      await env.NOTIFICATIONS.sendPushForConversation({
+      const pushResult = await env.NOTIFICATIONS.sendPushForConversation({
         conversationId,
         sandboxId,
         senderUserId,
@@ -352,6 +352,17 @@ export async function postCommitFanOut(
         bodyPreview,
         messageId,
       });
+      const failedRecipients = pushResult.perRecipient.filter(
+        result => result.outcome === 'failed'
+      );
+      if (failedRecipients.length > 0) {
+        logger.error('sendPushForConversation returned failed outcomes', {
+          conversationId,
+          sandboxId,
+          messageId,
+          failedRecipients,
+        });
+      }
     } catch (err) {
       logger.error('sendPushForConversation failed', formatError(err));
     }

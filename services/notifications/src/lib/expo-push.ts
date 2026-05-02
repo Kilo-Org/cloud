@@ -13,6 +13,31 @@ export type SendResult = {
   staleTokens: string[];
 };
 
+type ExpoClient = InstanceType<typeof Expo>;
+type ExpoPushChunk = Parameters<ExpoClient['sendPushNotificationsAsync']>[0];
+type ExpoPushTicket = Awaited<ReturnType<ExpoClient['sendPushNotificationsAsync']>>[number];
+
+const TRANSIENT_SEND_RETRY_DELAYS_MS = [100, 500];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function sendChunkWithTransientRetry(
+  expo: ExpoClient,
+  chunk: ExpoPushChunk
+): Promise<ExpoPushTicket[]> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await expo.sendPushNotificationsAsync(chunk);
+    } catch (err) {
+      const delayMs = TRANSIENT_SEND_RETRY_DELAYS_MS[attempt];
+      if (delayMs === undefined) throw err;
+      await sleep(delayMs);
+    }
+  }
+}
+
 export async function sendPushNotifications(
   messages: ExpoPushMessage[],
   accessToken: string
@@ -26,7 +51,7 @@ export async function sendPushNotifications(
   const staleTokens: string[] = [];
 
   for (const chunk of chunks) {
-    const tickets = await expo.sendPushNotificationsAsync(chunk);
+    const tickets = await sendChunkWithTransientRetry(expo, chunk);
 
     for (let i = 0; i < tickets.length; i++) {
       const ticket = tickets[i];

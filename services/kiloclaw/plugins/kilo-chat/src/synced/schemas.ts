@@ -344,6 +344,10 @@ export const actionDeliveryFailedRequestSchema = z.object({
   reason: z.string().max(1000).optional(),
 });
 
+export const typingRequestSchema = z.object({
+  conversationId: z.string().min(1),
+});
+
 export const createBotConversationRequestSchema = z.object({
   title: conversationTitleSchema.optional(),
   additionalMembers: z.array(z.string().min(1)).max(20).optional(),

@@ -8,6 +8,7 @@ import {
   editMessageRequestSchema,
   CONVERSATION_TITLE_MAX_CHARS,
   MESSAGE_TEXT_MAX_CHARS,
+  typingRequestSchema,
   botStatusRecordSchema,
   botStatusRequestSchema,
   conversationStatusRecordSchema,
@@ -336,5 +337,13 @@ describe('status schemas', () => {
         updatedAt: 0,
       }).success
     ).toBe(true);
+  });
+});
+
+describe('plugin client request schemas', () => {
+  it('requires a non-empty conversationId for typing requests', () => {
+    expect(typingRequestSchema.safeParse({ conversationId: 'c1' }).success).toBe(true);
+    expect(typingRequestSchema.safeParse({ conversationId: '' }).success).toBe(false);
+    expect(typingRequestSchema.safeParse({}).success).toBe(false);
   });
 });

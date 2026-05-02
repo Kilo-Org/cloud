@@ -19,6 +19,7 @@ import {
   messageDeliveryFailedRequestSchema,
   reactionRequestBodySchema,
   renameConversationRequestSchema,
+  typingRequestSchema,
   type botConversationSummarySchema,
   type contentBlockSchema,
   type enrichedConversationMemberSchema,
@@ -46,7 +47,7 @@ export type EditMessageParams = { messageId: string } & z.input<typeof editMessa
 
 export type DeleteMessageParams = { messageId: string } & z.input<typeof deleteMessageQuerySchema>;
 
-export type SendTypingParams = { conversationId: string };
+export type SendTypingParams = z.input<typeof typingRequestSchema>;
 
 export type ListMessagesParams = { conversationId: string } & z.input<
   typeof listMessagesQuerySchema
@@ -202,9 +203,9 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller PATCH responded ${response.status}: ${await response.text()}`
       );
     }
-    const body = editMessageResponseSchema.parse(await response.json());
+    const responseBody = editMessageResponseSchema.parse(await response.json());
     return {
-      messageId: body.messageId ?? params.messageId,
+      messageId: responseBody.messageId ?? params.messageId,
       stale: false,
     };
   }
@@ -227,7 +228,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   async function sendTyping(params: SendTypingParams): Promise<void> {
     const body = {
       conversationId: params.conversationId,
-    } satisfies SendTypingParams;
+    } satisfies z.input<typeof typingRequestSchema>;
 
     const response = await fetchImpl(`${base}/_kilo/kilo-chat/typing`, {
       method: 'POST',
@@ -245,7 +246,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   async function sendTypingStop(params: SendTypingParams): Promise<void> {
     const body = {
       conversationId: params.conversationId,
-    } satisfies SendTypingParams;
+    } satisfies z.input<typeof typingRequestSchema>;
 
     const response = await fetchImpl(`${base}/_kilo/kilo-chat/typing/stop`, {
       method: 'POST',

@@ -280,6 +280,33 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
     expect(pushEvent).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when the diagnostic body has an invalid shape', async () => {
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const { sandboxId, conversationId, messageId, testEnv } = await setupData(
+      'bot-msg-df-invalid-body',
+      pushEvent
+    );
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    pushEvent.mockClear();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason: 123 }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json<{ error: string; issues: unknown[] }>();
+    expect(body.error).toBe('Invalid request');
+    expect(body.issues.length).toBeGreaterThan(0);
+    expect(pushEvent).not.toHaveBeenCalled();
+  });
+
   it('returns 401 without auth token', async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-msg-df-noauth');
     const app = makeBotApp();

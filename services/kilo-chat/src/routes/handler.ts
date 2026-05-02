@@ -250,14 +250,20 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
   const membership = await assertCallerIsMember(c, convId.data, callerId);
   if (!membership.ok) return membership.response;
 
-  // Accept empty body. Validate when present but never fail on shape.
+  // Existing clients may omit this diagnostic body; validate it when supplied.
   let body: unknown = {};
-  try {
-    body = await c.req.json();
-  } catch {
-    body = {};
+  const rawBody = await c.req.text();
+  if (rawBody.length > 0) {
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return c.json({ error: 'Invalid JSON' }, 400);
+    }
   }
-  messageDeliveryFailedRequestSchema.safeParse(body);
+  const parsed = messageDeliveryFailedRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400);
+  }
 
   const result = await notifyMessageDeliveryFailed(c.env, {
     conversationId: convId.data,

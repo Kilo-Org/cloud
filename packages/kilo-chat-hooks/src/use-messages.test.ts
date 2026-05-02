@@ -3,6 +3,8 @@ import { QueryClient, type InfiniteData } from '@tanstack/react-query';
 import { KiloChatApiError, type Message } from '@kilocode/kilo-chat';
 import {
   applyExecuteActionResponseToPages,
+  applyCreateMessageResponseToPages,
+  applyMessageCreatedEventToPages,
   applyReactionAddedEventToPages,
   applyReactionRemovedResponseToPages,
   applyReactionRemovedMutationToPages,
@@ -167,6 +169,55 @@ describe('message pagination helpers', () => {
     });
 
     expect(getNextMessagesPageParam(page)).toBeUndefined();
+  });
+});
+
+describe('send message cache settlement', () => {
+  it('replaces a pending reply with the canonical server message before the live event', () => {
+    const pendingId = 'pending-01KQK8H1111111111111111111';
+    const serverMessage = message({
+      id: '01KQK8H2222222222222222222',
+      senderId: 'user-current',
+      content: [{ type: 'text', text: 'reply from server' }],
+      inReplyToMessageId: '01KQK8H0000000000000000000',
+      replyTo: {
+        messageId: '01KQK8H0000000000000000000',
+        senderId: 'bot-parent',
+        deleted: false,
+        previewText: 'parent context',
+      },
+    });
+    const initial: InfiniteData<Message[]> = {
+      pageParams: [undefined],
+      pages: [
+        [
+          message({
+            id: pendingId,
+            senderId: 'user-current',
+            content: [{ type: 'text', text: 'reply from server' }],
+            inReplyToMessageId: '01KQK8H0000000000000000000',
+            replyTo: null,
+          }),
+        ],
+      ],
+    };
+
+    const fromResponse = applyCreateMessageResponseToPages(initial, pendingId, {
+      messageId: serverMessage.id,
+      clientId: '01KQK8H1111111111111111111',
+      message: serverMessage,
+    });
+    const fromEvent = applyMessageCreatedEventToPages(fromResponse, {
+      messageId: serverMessage.id,
+      senderId: serverMessage.senderId,
+      content: serverMessage.content,
+      inReplyToMessageId: serverMessage.inReplyToMessageId,
+      replyTo: serverMessage.replyTo,
+      clientId: '01KQK8H1111111111111111111',
+    });
+
+    expect(fromResponse.pages[0]).toEqual([serverMessage]);
+    expect(fromEvent.pages[0]).toEqual([serverMessage]);
   });
 });
 

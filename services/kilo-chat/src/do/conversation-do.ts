@@ -56,6 +56,30 @@ function buildReplySnapshot(
   );
 }
 
+function storedMessageRowToMessage(
+  row: StoredMessageRow,
+  replyParentById: Map<string, StoredMessageRow>,
+  reactionsByMessage: Map<string, ReactionSummary[]>
+): Message {
+  return {
+    id: row.id,
+    senderId: row.sender_id,
+    content: row.deleted === 1 ? [] : parseStoredContent(row.content, row.id),
+    inReplyToMessageId: row.in_reply_to_message_id,
+    replyTo: row.in_reply_to_message_id
+      ? buildReplySnapshot(
+          row.in_reply_to_message_id,
+          replyParentById.get(row.in_reply_to_message_id)
+        )
+      : null,
+    updatedAt: row.updated_at,
+    clientUpdatedAt: row.client_updated_at,
+    deleted: row.deleted === 1,
+    deliveryFailed: row.delivery_failed === 1,
+    reactions: reactionsByMessage.get(row.id) ?? [],
+  };
+}
+
 export type MemberContext = {
   humanMemberIds: string[];
   sandboxId: string | null;
@@ -105,7 +129,7 @@ export type CreateMessageParams = {
 };
 
 export type CreateMessageResult =
-  | { ok: true; messageId: string; info: ConversationInfo }
+  | { ok: true; messageId: string; message: MessageRow; info: ConversationInfo }
   | { ok: false; code: 'forbidden' | 'internal'; error: string };
 
 export type ListMessagesParams = {
@@ -410,7 +434,24 @@ export class ConversationDO extends DurableObject<Env> {
       throw err;
     }
 
-    return { ok: true, messageId, info };
+    const row = this.db.select().from(messages).where(eq(messages.id, messageId)).get();
+    if (!row) {
+      return { ok: false, code: 'internal', error: `Message ${messageId} was not created` };
+    }
+
+    const replyParentRow = row.in_reply_to_message_id
+      ? this.db.select().from(messages).where(eq(messages.id, row.in_reply_to_message_id)).get()
+      : undefined;
+    const replyParentById = replyParentRow
+      ? new Map([[replyParentRow.id, replyParentRow]])
+      : new Map<string, StoredMessageRow>();
+
+    return {
+      ok: true,
+      messageId,
+      message: storedMessageRowToMessage(row, replyParentById, new Map()),
+      info,
+    };
   }
 
   getMessage(messageId: string): GetMessageResult {
@@ -512,23 +553,9 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     return {
-      messages: rows.map(row => ({
-        id: row.id,
-        senderId: row.sender_id,
-        content: row.deleted === 1 ? [] : parseStoredContent(row.content, row.id),
-        inReplyToMessageId: row.in_reply_to_message_id,
-        replyTo: row.in_reply_to_message_id
-          ? buildReplySnapshot(
-              row.in_reply_to_message_id,
-              replyParentById.get(row.in_reply_to_message_id)
-            )
-          : null,
-        updatedAt: row.updated_at,
-        clientUpdatedAt: row.client_updated_at,
-        deleted: row.deleted === 1,
-        deliveryFailed: row.delivery_failed === 1,
-        reactions: reactionsByMessage.get(row.id) ?? [],
-      })),
+      messages: rows.map(row =>
+        storedMessageRowToMessage(row, replyParentById, reactionsByMessage)
+      ),
       hasMore,
       nextCursor,
     };

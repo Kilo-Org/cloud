@@ -1,6 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
 import { __pluginInternals, kiloChatPlugin } from './channel';
 
+function createMessageResponse(messageId = 'm42') {
+  return {
+    messageId,
+    message: {
+      id: messageId,
+      senderId: 'bot-1',
+      content: [{ type: 'text' as const, text: 'hi' }],
+      inReplyToMessageId: null,
+      replyTo: null,
+      updatedAt: null,
+      clientUpdatedAt: null,
+      deleted: false,
+      deliveryFailed: false,
+      reactions: [],
+    },
+  };
+}
+
 describe('kilo-chat plugin', () => {
   it('resolveAccount returns the provided accountId (null for single-account plugin)', () => {
     const cfg = { channels: { 'kilo-chat': { enabled: true } } } as never;
@@ -26,7 +44,7 @@ describe('kilo-chat outbound.sendText', () => {
   it('calls the controller send endpoint and returns messageId', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ messageId: 'm42' }), {
+        new Response(JSON.stringify(createMessageResponse()), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
@@ -53,7 +71,7 @@ describe('kilo-chat outbound.sendText', () => {
   it('passes replyToId as inReplyToMessageId to createMessage', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ messageId: 'm42' }), {
+        new Response(JSON.stringify(createMessageResponse()), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })

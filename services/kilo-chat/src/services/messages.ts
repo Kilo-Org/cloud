@@ -12,6 +12,7 @@ import {
   ulidToTimestamp,
   type ContentBlock,
   type ExecApprovalDecision,
+  type Message,
   type ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
@@ -77,7 +78,7 @@ export type CreateMessageParams = {
   clientId?: string;
 };
 
-export type CreateMessageOk = { ok: true; messageId: string; clientId?: string };
+export type CreateMessageOk = { ok: true; messageId: string; message: Message; clientId?: string };
 export type CreateMessageErr = {
   ok: false;
   code: 'forbidden' | 'internal';
@@ -105,7 +106,7 @@ export async function createMessageFor(
     return { ok: false, code: 'internal' as const, error: result.error };
   }
 
-  const { messageId, info } = result;
+  const { messageId, message, info } = result;
 
   const fanOut = postCommitFanOut(
     env,
@@ -120,7 +121,7 @@ export async function createMessageFor(
 
   ctx.waitUntil(fanOut);
 
-  return { ok: true, messageId, clientId };
+  return { ok: true, messageId, message, clientId };
 }
 
 export async function postCommitFanOut(

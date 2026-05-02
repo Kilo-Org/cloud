@@ -220,6 +220,43 @@ describe('ConversationDO', () => {
     });
   });
 
+  it('createMessage - returns the canonical created reply message', async () => {
+    const stub = getStub('conv-create-reply-message');
+    await stub.initialize(BASE_PARAMS);
+    const parent = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Parent context' }],
+    });
+    expect(parent.ok).toBe(true);
+    if (!parent.ok) return;
+
+    const reply = await stub.createMessage({
+      senderId: 'bot-1',
+      content: [{ type: 'text', text: 'Reply body' }],
+      inReplyToMessageId: parent.messageId,
+    });
+
+    expect(reply.ok).toBe(true);
+    if (!reply.ok) return;
+    expect(reply.message).toEqual({
+      id: reply.messageId,
+      senderId: 'bot-1',
+      content: [{ type: 'text', text: 'Reply body' }],
+      inReplyToMessageId: parent.messageId,
+      replyTo: {
+        messageId: parent.messageId,
+        senderId: 'user-alice',
+        deleted: false,
+        previewText: 'Parent context',
+      },
+      updatedAt: null,
+      clientUpdatedAt: null,
+      deleted: false,
+      deliveryFailed: false,
+      reactions: [],
+    });
+  });
+
   it('editMessage - edits message with newer timestamp', async () => {
     const stub = getStub('conv-edit-1');
     await stub.initialize(BASE_PARAMS);

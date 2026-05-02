@@ -132,7 +132,11 @@ export async function handleCreateMessage(c: HonoCtx) {
     return c.json({ error: result.error }, 500);
   }
   return c.json(
-    { messageId: result.messageId, clientId: result.clientId } satisfies CreateMessageResponse,
+    {
+      messageId: result.messageId,
+      clientId: result.clientId,
+      message: result.message,
+    } satisfies CreateMessageResponse,
     201
   );
 }

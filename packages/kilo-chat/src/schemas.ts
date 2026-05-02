@@ -194,6 +194,7 @@ export const createMessageRequestSchema = z.object({
 export const createMessageResponseSchema = z.object({
   messageId: z.string().min(1),
   clientId: z.string().optional(),
+  message: messageSchema,
 });
 
 export const editMessageRequestSchema = z.object({

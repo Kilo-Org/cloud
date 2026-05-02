@@ -16,6 +16,7 @@ import type {
   ReactionRemovedEvent,
   RemoveReactionResponse,
   MessageListResponse,
+  CreateMessageResponse,
   ExecuteActionResponse,
 } from '@kilocode/kilo-chat';
 import { useEffect } from 'react';
@@ -505,6 +506,14 @@ export function applyMessageCreatedEventToPages<TPageParam>(
   return { ...old, pages: [orderedFirstPage, ...old.pages.slice(1)] };
 }
 
+export function applyCreateMessageResponseToPages<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  pendingId: string,
+  response: CreateMessageResponse
+): InfiniteData<Message[], TPageParam> {
+  return replaceMessageAndOrderNewestPage(old, pendingId, () => response.message);
+}
+
 export function applyMessageUpdatedEventToPages<TPageParam>(
   old: InfiniteData<Message[], TPageParam>,
   e: MessageUpdatedEvent
@@ -574,10 +583,7 @@ export function useSendMessage(
       const { queryKey, pendingId } = context;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return replaceMessageAndOrderNewestPage(old, pendingId, msg => ({
-          ...msg,
-          id: response.messageId,
-        }));
+        return applyCreateMessageResponseToPages(old, pendingId, response);
       });
     },
     onError: (err, _variables, context) => {

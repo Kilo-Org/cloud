@@ -37,9 +37,45 @@ describe('nextMessageInputStateAfterSend', () => {
   it('preserves draft text and reply target after failed send', () => {
     const replyingTo = message({ id: 'reply-target' });
 
-    expect(nextMessageInputStateAfterSend({ text: 'retry me', replyingTo }, false)).toStrictEqual({
-      text: 'retry me',
-      replyingTo,
-    });
+    expect(
+      nextMessageInputStateAfterSend(
+        { text: 'retry me', replyingTo },
+        { text: 'retry me', replyingTo },
+        false
+      )
+    ).toStrictEqual({ text: 'retry me', replyingTo });
+  });
+
+  it('keeps a newer draft after a deferred send succeeds', () => {
+    expect(
+      nextMessageInputStateAfterSend(
+        { text: 'newer draft', replyingTo: null },
+        { text: 'sent draft', replyingTo: null },
+        true
+      )
+    ).toStrictEqual({ text: 'newer draft', replyingTo: null });
+  });
+
+  it('keeps a newer draft after a deferred send fails', () => {
+    expect(
+      nextMessageInputStateAfterSend(
+        { text: 'newer draft', replyingTo: null },
+        { text: 'sent draft', replyingTo: null },
+        false
+      )
+    ).toStrictEqual({ text: 'newer draft', replyingTo: null });
+  });
+
+  it('keeps a newer reply target after a deferred send succeeds', () => {
+    const submittedReply = message({ id: 'submitted-reply' });
+    const newerReply = message({ id: 'newer-reply' });
+
+    expect(
+      nextMessageInputStateAfterSend(
+        { text: 'sent draft', replyingTo: newerReply },
+        { text: 'sent draft', replyingTo: submittedReply },
+        true
+      )
+    ).toStrictEqual({ text: '', replyingTo: newerReply });
   });
 });

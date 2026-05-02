@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Send } from 'lucide-react';
 import type { Message } from '@kilocode/kilo-chat';
 import { MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
@@ -34,12 +34,22 @@ type MessageInputSubmissionState = {
   replyingTo: Message | null;
 };
 
+function sameReplyTarget(left: Message | null, right: Message | null): boolean {
+  return (left?.id ?? null) === (right?.id ?? null);
+}
+
 export function nextMessageInputStateAfterSend(
-  state: MessageInputSubmissionState,
+  currentState: MessageInputSubmissionState,
+  submittedState: MessageInputSubmissionState,
   sendSucceeded: boolean
 ): MessageInputSubmissionState {
-  if (!sendSucceeded) return state;
-  return { text: '', replyingTo: null };
+  if (!sendSucceeded) return currentState;
+  return {
+    text: currentState.text === submittedState.text ? '' : currentState.text,
+    replyingTo: sameReplyTarget(currentState.replyingTo, submittedState.replyingTo)
+      ? null
+      : currentState.replyingTo,
+  };
 }
 
 export function MessageInput({
@@ -55,10 +65,15 @@ export function MessageInput({
   const [text, setText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const latestStateRef = useRef<MessageInputSubmissionState>({ text: '', replyingTo: null });
 
   useEffect(() => {
     if (replyingTo) textareaRef.current?.focus();
   }, [replyingTo]);
+
+  useLayoutEffect(() => {
+    latestStateRef.current = { text, replyingTo };
+  }, [text, replyingTo]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -77,12 +92,15 @@ export function MessageInput({
     if (isSubmitting) return;
     if (!canSubmitMessageInput(currentUserId, canSend, overLimit, text)) return;
     const trimmed = text.trim();
+    const submittedState = { text, replyingTo };
     setIsSubmitting(true);
     try {
       const sendSucceeded = await onSend(trimmed, replyingTo?.id);
-      const nextState = nextMessageInputStateAfterSend({ text, replyingTo }, sendSucceeded);
+      const currentState = latestStateRef.current;
+      const nextState = nextMessageInputStateAfterSend(currentState, submittedState, sendSucceeded);
+      latestStateRef.current = nextState;
       setText(nextState.text);
-      if (nextState.replyingTo === null) onCancelReply();
+      if (currentState.replyingTo !== null && nextState.replyingTo === null) onCancelReply();
     } finally {
       setIsSubmitting(false);
       textareaRef.current?.focus();
@@ -115,6 +133,7 @@ export function MessageInput({
           placeholder={placeholder}
           value={text}
           onChange={e => {
+            latestStateRef.current = { ...latestStateRef.current, text: e.target.value };
             setText(e.target.value);
             onTyping();
           }}

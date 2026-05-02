@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import type { InfiniteData, QueryClient } from '@tanstack/react-query';
+import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
 import { KiloChatApiError, type KiloChatClient } from '@kilocode/kilo-chat';
 import type {
   Message,
@@ -471,6 +471,12 @@ type MutationErrorOptions = {
   onError?: (error: unknown) => void;
 };
 
+type SendMessageMutationContext = {
+  queryKey: QueryKey;
+  pendingId: string;
+  seededColdCache: boolean;
+};
+
 export function messageFromCreatedEvent(e: MessageCreatedEvent): Message {
   return {
     id: e.messageId,
@@ -603,6 +609,43 @@ export function applyOptimisticMessageToPages(
   };
 }
 
+export function applyOptimisticSendMessageToCache(
+  queryClient: QueryClient,
+  queryKey: QueryKey,
+  pendingId: string,
+  optimisticMessage: Message
+): SendMessageMutationContext {
+  const seededColdCache = queryClient.getQueryData<MessageInfiniteData>(queryKey) === undefined;
+  queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
+    return applyOptimisticMessageToPages(old, optimisticMessage);
+  });
+  return { queryKey, pendingId, seededColdCache };
+}
+
+function invalidateColdSeededMessages(
+  queryClient: QueryClient,
+  context: SendMessageMutationContext
+): void {
+  if (context.seededColdCache) {
+    void queryClient.invalidateQueries({ queryKey: context.queryKey });
+  }
+}
+
+export function settleSendMessageSuccess(
+  queryClient: QueryClient,
+  response: CreateMessageResponse,
+  context: SendMessageMutationContext
+): void {
+  queryClient.setQueryData<MessageInfiniteData>(context.queryKey, old => {
+    return applyCreateMessageResponseToPages(
+      old ?? createEmptyMessageInfiniteData(),
+      context.pendingId,
+      response
+    );
+  });
+  invalidateColdSeededMessages(queryClient, context);
+}
+
 export function useSendMessage(
   client: KiloChatClient,
   conversationId: string | null,
@@ -629,25 +672,16 @@ export function useSendMessage(
         deliveryFailed: false,
         reactions: [],
       };
-      queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
-        return applyOptimisticMessageToPages(old, optimisticMessage);
-      });
-      return { queryKey, pendingId };
+      return applyOptimisticSendMessageToCache(queryClient, queryKey, pendingId, optimisticMessage);
     },
     onSuccess: (response, _variables, context) => {
       if (!context) return;
-      const { queryKey, pendingId } = context;
-      queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
-        return applyCreateMessageResponseToPages(
-          old ?? createEmptyMessageInfiniteData(),
-          pendingId,
-          response
-        );
-      });
+      settleSendMessageSuccess(queryClient, response, context);
     },
     onError: (err, _variables, context) => {
       if (!context) return;
       removeMessageFromCache(queryClient, context.queryKey, context.pendingId);
+      invalidateColdSeededMessages(queryClient, context);
       options?.onError?.(err);
     },
   });

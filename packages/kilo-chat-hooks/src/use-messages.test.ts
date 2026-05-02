@@ -11,11 +11,13 @@ import {
   applyReactionAddedEventToPages,
   applyReactionRemovedResponseToPages,
   applyReactionRemovedMutationToPages,
+  applyOptimisticSendMessageToCache,
   createReactionOperationTracker,
   getNextMessagesPageParam,
   messagesFromListPage,
   removeMessageFromCache,
   rollbackEditMessageError,
+  settleSendMessageSuccess,
   updateMessageInPages,
 } from './use-messages';
 import { messagesKey } from './query-keys';
@@ -532,6 +534,45 @@ describe('send message cache settlement', () => {
       pageParams: [undefined],
       pages: [messagePage([serverMessage])],
     });
+  });
+
+  it('invalidates messages after a cold-cache send settles', () => {
+    const queryClient = new QueryClient();
+    const queryKey = messagesKey('01KQK8Y0000000000000000002');
+    const pendingId = 'pending-01KQK8Y1111111111111111112';
+    const optimisticMessage = message({
+      id: pendingId,
+      senderId: 'user-current',
+      content: textContent('sent before history loads'),
+    });
+    const serverMessage = message({
+      id: '01KQK8Y2222222222222222223',
+      senderId: 'user-current',
+      content: textContent('server settled'),
+    });
+
+    const context = applyOptimisticSendMessageToCache(
+      queryClient,
+      queryKey,
+      pendingId,
+      optimisticMessage
+    );
+    settleSendMessageSuccess(
+      queryClient,
+      {
+        messageId: serverMessage.id,
+        clientId: '01KQK8Y1111111111111111112',
+        message: serverMessage,
+      },
+      context
+    );
+
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
+    expect(result).toEqual({
+      pageParams: [undefined],
+      pages: [messagePage([serverMessage])],
+    });
+    expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(true);
   });
 
   it('creates the first page for message.created events when the messages cache is cold', () => {

@@ -123,26 +123,9 @@ else
 fi
 
 # ---------- Store content hash of image sources ----------
-# Mirrors the find list used in deploy-kiloclaw.yml and dev-start.sh.
+# Mirrors the source list used in deploy-kiloclaw.yml and dev-start.sh.
 
-# Resolve sha command once (xargs can't invoke shell functions).
-if command -v sha256sum >/dev/null 2>&1; then
-  _SHA="sha256sum"
-else
-  _SHA="shasum -a 256"
-fi
-
-CONTENT_HASH=$(
-  cd "$KILOCLAW_DIR" \
-  && find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ plugins/kilo-chat/ plugins/kiloclaw-morning-briefing/ skills/ \
-       openclaw-pairing-list.js openclaw-device-pairing-list.js \
-       -type f 2>/dev/null \
-  | sort \
-  | xargs $_SHA \
-  | $_SHA \
-  | cut -d' ' -f1 \
-  | cut -c1-12
-)
+CONTENT_HASH="$("$KILOCLAW_DIR/scripts/image-content-hash.sh" --hash --dockerfile Dockerfile)"
 
 if [ -f "$KILOCLAW_DIR/.dev.vars" ] && [ -n "$CONTENT_HASH" ]; then
   if grep -q '^FLY_IMAGE_CONTENT_HASH=' "$KILOCLAW_DIR/.dev.vars"; then

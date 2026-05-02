@@ -519,25 +519,8 @@ fi
 
 # ---------- Detect controller image changes ----------
 
-# Compute a content hash of all files baked into the Docker image (mirrors
-# the CI hash in deploy-kiloclaw.yml).  Resolve the sha command once so
-# xargs can invoke it (shell functions are invisible to xargs).
-if command -v sha256sum &>/dev/null; then
-  _SHA="sha256sum"
-else
-  _SHA="shasum -a 256"
-fi
-
 compute_image_hash() {
-  (cd "$KILOCLAW_DIR" \
-    && find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ plugins/kilo-chat/ plugins/kiloclaw-morning-briefing/ skills/ \
-         openclaw-pairing-list.js openclaw-device-pairing-list.js \
-         -type f 2>/dev/null \
-    | sort \
-    | xargs $_SHA \
-    | $_SHA \
-    | cut -d' ' -f1 \
-    | cut -c1-12)
+  "$KILOCLAW_DIR/scripts/image-content-hash.sh" --hash --dockerfile Dockerfile
 }
 
 CURRENT_IMAGE_HASH="$(compute_image_hash)"

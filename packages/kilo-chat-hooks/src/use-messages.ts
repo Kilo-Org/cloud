@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import type { InfiniteData } from '@tanstack/react-query';
-import type { KiloChatClient } from '@kilocode/kilo-chat';
+import { KiloChatApiError, type KiloChatClient } from '@kilocode/kilo-chat';
 import type {
   Message,
   ReactionSummary,
@@ -61,20 +61,52 @@ export function latestMarkReadMessageId(messages: readonly Pick<Message, 'id'>[]
   return null;
 }
 
+type RestoreMessageGuard = (current: Message) => boolean;
+type ActionsBlock = Extract<Message['content'][number], { type: 'actions' }>;
+type ActionResolution = NonNullable<ActionsBlock['resolved']>;
+
+function jsonValuesEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function messagesEqual(left: Message, right: Message): boolean {
+  return jsonValuesEqual(left, right);
+}
+
 /**
- * Splice a snapshotted message back into the current cache state. If the
- * message no longer exists in any page (e.g. a concurrent delete event), the
- * cache is left unchanged so we do not resurrect it.
+ * Splice a snapshotted message back into the current cache state. Callers with
+ * optimistic mutations can pass a guard so newer live events are not replaced
+ * by stale snapshots.
  */
 export function restoreMessageInCache(
   queryClient: ReturnType<typeof useQueryClient>,
   queryKey: readonly unknown[],
-  snapshot: Message
-): void {
+  snapshot: Message,
+  shouldRestore?: RestoreMessageGuard
+): boolean {
+  let restored = false;
   queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
     if (!old) return old;
-    return updateMessageInPages(old, snapshot.id, () => snapshot);
+    for (let pageIndex = 0; pageIndex < old.pages.length; pageIndex++) {
+      const page = old.pages[pageIndex];
+      if (!page) continue;
+      const messageIndex = page.findIndex(msg => msg.id === snapshot.id);
+      if (messageIndex === -1) continue;
+
+      const current = page[messageIndex];
+      if (!current) return old;
+      if (shouldRestore && !shouldRestore(current)) return old;
+
+      const pages = old.pages.slice();
+      const updatedPage = page.slice();
+      updatedPage[messageIndex] = snapshot;
+      pages[pageIndex] = updatedPage;
+      restored = true;
+      return { ...old, pages };
+    }
+    return old;
   });
+  return restored;
 }
 
 /**
@@ -130,6 +162,67 @@ export function updateMessageInPages<TPageParam>(
     return { ...old, pages };
   }
   return old;
+}
+
+function restoreOptimisticMessage(
+  queryClient: ReturnType<typeof useQueryClient>,
+  queryKey: readonly unknown[],
+  snapshot: Message | undefined,
+  optimisticMessage: Message | undefined
+): boolean {
+  if (!snapshot || !optimisticMessage) return false;
+  return restoreMessageInCache(queryClient, queryKey, snapshot, current =>
+    messagesEqual(current, optimisticMessage)
+  );
+}
+
+function invalidateMessages(
+  queryClient: ReturnType<typeof useQueryClient>,
+  queryKey: readonly unknown[]
+): void {
+  void queryClient.invalidateQueries({ queryKey });
+}
+
+function actionResolutionMatches(
+  current: ActionResolution | undefined,
+  expected: ActionResolution
+): boolean {
+  return (
+    current?.value === expected.value &&
+    current.resolvedBy === expected.resolvedBy &&
+    current.resolvedAt === expected.resolvedAt
+  );
+}
+
+function findActionResolution(message: Message, groupId: string): ActionResolution | undefined {
+  for (const block of message.content) {
+    if (block.type !== 'actions') continue;
+    if (block.groupId !== groupId) continue;
+    return block.resolved;
+  }
+  return undefined;
+}
+
+function applyActionResolution(
+  message: Message,
+  groupId: string,
+  resolution: ActionResolution
+): Message {
+  return {
+    ...message,
+    content: message.content.map(block => {
+      if (block.type !== 'actions') return block;
+      if (block.groupId !== groupId) return block;
+      return { ...block, resolved: resolution };
+    }),
+  };
+}
+
+function errorCode(error: unknown): string | null {
+  if (!(error instanceof KiloChatApiError)) return null;
+  const body = error.body;
+  if (typeof body !== 'object' || body === null || !('error' in body)) return null;
+  return typeof body.error === 'string' ? body.error : null;
 }
 
 function orderNewestLoadedPageByServerId(page: Message[]): Message[] {
@@ -293,6 +386,9 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
+      const optimisticMessage = snapshot
+        ? { ...snapshot, content: variables.content, clientUpdatedAt: variables.timestamp }
+        : undefined;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, variables.messageId, msg => ({
@@ -301,11 +397,17 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
           clientUpdatedAt: variables.timestamp,
         }));
       });
-      return { queryKey, snapshot };
+      return { queryKey, snapshot, optimisticMessage };
     },
     onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
-      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+      if (!context) return;
+      const restored = restoreOptimisticMessage(
+        queryClient,
+        context.queryKey,
+        context.snapshot,
+        context.optimisticMessage
+      );
+      if (!restored) invalidateMessages(queryClient, context.queryKey);
     },
   });
 }
@@ -320,15 +422,22 @@ export function useDeleteMessage(client: KiloChatClient, conversationId: string 
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
+      const optimisticMessage = snapshot ? { ...snapshot, deleted: true } : undefined;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, variables.messageId, msg => ({ ...msg, deleted: true }));
       });
-      return { queryKey, snapshot };
+      return { queryKey, snapshot, optimisticMessage };
     },
     onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
-      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+      if (!context) return;
+      const restored = restoreOptimisticMessage(
+        queryClient,
+        context.queryKey,
+        context.snapshot,
+        context.optimisticMessage
+      );
+      if (!restored) invalidateMessages(queryClient, context.queryKey);
     },
   });
 }
@@ -347,6 +456,12 @@ export function useAddReaction(
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
+      const optimisticMessage = snapshot
+        ? {
+            ...snapshot,
+            reactions: applyReactionAdded(snapshot.reactions, variables.emoji, currentUserId),
+          }
+        : undefined;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, variables.messageId, msg => ({
@@ -354,11 +469,17 @@ export function useAddReaction(
           reactions: applyReactionAdded(msg.reactions, variables.emoji, currentUserId),
         }));
       });
-      return { queryKey, snapshot };
+      return { queryKey, snapshot, optimisticMessage };
     },
     onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
-      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+      if (!context) return;
+      const restored = restoreOptimisticMessage(
+        queryClient,
+        context.queryKey,
+        context.snapshot,
+        context.optimisticMessage
+      );
+      if (!restored) invalidateMessages(queryClient, context.queryKey);
     },
   });
 }
@@ -377,6 +498,12 @@ export function useRemoveReaction(
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
+      const optimisticMessage = snapshot
+        ? {
+            ...snapshot,
+            reactions: applyReactionRemoved(snapshot.reactions, variables.emoji, currentUserId),
+          }
+        : undefined;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, variables.messageId, msg => ({
@@ -384,11 +511,17 @@ export function useRemoveReaction(
           reactions: applyReactionRemoved(msg.reactions, variables.emoji, currentUserId),
         }));
       });
-      return { queryKey, snapshot };
+      return { queryKey, snapshot, optimisticMessage };
     },
     onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
-      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+      if (!context) return;
+      const restored = restoreOptimisticMessage(
+        queryClient,
+        context.queryKey,
+        context.snapshot,
+        context.optimisticMessage
+      );
+      if (!restored) invalidateMessages(queryClient, context.queryKey);
     },
   });
 }
@@ -414,7 +547,14 @@ export function useExecuteAction(
       const queryKey = messagesKey(conversationId);
       await queryClient.cancelQueries({ queryKey });
       const snapshot = findMessageInCache(queryClient, queryKey, variables.messageId);
-      // Optimistically mark the action as resolved
+      const optimisticResolution = {
+        value: variables.value,
+        resolvedBy: currentUserId,
+        resolvedAt: Date.now(),
+      };
+      const optimisticMessage = snapshot
+        ? applyActionResolution(snapshot, variables.groupId, optimisticResolution)
+        : undefined;
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
         return updateMessageInPages(old, variables.messageId, msg => ({
@@ -424,20 +564,34 @@ export function useExecuteAction(
             if (block.groupId !== variables.groupId) return block;
             return {
               ...block,
-              resolved: {
-                value: variables.value,
-                resolvedBy: currentUserId,
-                resolvedAt: Date.now(),
-              },
+              resolved: optimisticResolution,
             };
           }),
         }));
       });
-      return { queryKey, snapshot };
+      return { queryKey, snapshot, optimisticMessage, optimisticResolution };
     },
-    onError: (_err, _variables, context) => {
-      if (!context?.snapshot) return;
-      restoreMessageInCache(queryClient, context.queryKey, context.snapshot);
+    onError: (err, variables, context) => {
+      if (!context?.snapshot || !context.optimisticMessage) return;
+      const { optimisticMessage, snapshot } = context;
+      const restored = restoreMessageInCache(queryClient, context.queryKey, snapshot, current =>
+        messagesEqual(current, optimisticMessage)
+      );
+      if (restored) return;
+      if (errorCode(err) !== 'already_resolved') {
+        invalidateMessages(queryClient, context.queryKey);
+        return;
+      }
+      const current = findMessageInCache(queryClient, context.queryKey, variables.messageId);
+      const currentResolution = current
+        ? findActionResolution(current, variables.groupId)
+        : undefined;
+      if (
+        !currentResolution ||
+        actionResolutionMatches(currentResolution, context.optimisticResolution)
+      ) {
+        invalidateMessages(queryClient, context.queryKey);
+      }
     },
   });
 }

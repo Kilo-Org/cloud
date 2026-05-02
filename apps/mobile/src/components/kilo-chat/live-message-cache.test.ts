@@ -26,6 +26,23 @@ function message(id: string): Message {
   };
 }
 
+function actionMessage(
+  resolved?: NonNullable<Extract<Message['content'][number], { type: 'actions' }>['resolved']>
+): Message {
+  return {
+    ...message('action-message'),
+    senderId: 'bot:sandbox-1',
+    content: [
+      {
+        type: 'actions',
+        groupId: 'approval-1',
+        actions: [{ label: 'Allow once', style: 'primary', value: 'allow-once' }],
+        resolved,
+      },
+    ],
+  };
+}
+
 describe('applyMessageCreatedEventToPages', () => {
   it('adds bot-created messages to the open conversation cache', () => {
     const data: InfiniteData<Message[], string | undefined> = {
@@ -141,10 +158,89 @@ describe('shared optimistic rollback helpers', () => {
       pageParams: [undefined],
     });
 
-    restoreMessageInCache(queryClient, queryKey, original);
+    const restored = restoreMessageInCache(
+      queryClient,
+      queryKey,
+      original,
+      current => JSON.stringify(current) === JSON.stringify(optimistic)
+    );
 
     const result = queryClient.getQueryData<InfiniteData<Message[], string | undefined>>(queryKey);
+    expect(restored).toBe(true);
     expect(result?.pages[0]?.[0]).toEqual(original);
+  });
+
+  it('leaves server-resolved actions intact when failed rollback sees newer content', () => {
+    const queryClient = new QueryClient();
+    const queryKey = messagesKey('conv-action-race');
+    const original = actionMessage();
+    const optimisticResolution = {
+      value: 'allow-once',
+      resolvedBy: 'user-losing-request',
+      resolvedAt: 1,
+    };
+    const serverResolved = actionMessage({
+      value: 'deny',
+      resolvedBy: 'user-winning-request',
+      resolvedAt: 2,
+    });
+    queryClient.setQueryData<InfiniteData<Message[], string | undefined>>(queryKey, {
+      pages: [[serverResolved]],
+      pageParams: [undefined],
+    });
+
+    const restored = restoreMessageInCache(queryClient, queryKey, original, current =>
+      current.content.some(block => {
+        if (block.type !== 'actions') {
+          return false;
+        }
+        if (block.groupId !== 'approval-1') {
+          return false;
+        }
+        return (
+          block.resolved?.value === optimisticResolution.value &&
+          block.resolved.resolvedBy === optimisticResolution.resolvedBy &&
+          block.resolved.resolvedAt === optimisticResolution.resolvedAt
+        );
+      })
+    );
+
+    const result = queryClient.getQueryData<InfiniteData<Message[], string | undefined>>(queryKey);
+    expect(restored).toBe(false);
+    expect(result?.pages[0]?.[0]).toEqual(serverResolved);
+  });
+
+  it('leaves server-updated text intact when failed edit rollback sees newer content', () => {
+    const queryClient = new QueryClient();
+    const queryKey = messagesKey('conv-edit-race');
+    const original = message('m1');
+    const optimistic: Message = {
+      ...original,
+      content: [{ type: 'text', text: 'optimistic edit' }],
+      clientUpdatedAt: 1,
+    };
+    const serverUpdated: Message = {
+      ...original,
+      content: [{ type: 'text', text: 'server edit' }],
+      clientUpdatedAt: 2,
+    };
+    queryClient.setQueryData<InfiniteData<Message[], string | undefined>>(queryKey, {
+      pages: [[serverUpdated]],
+      pageParams: [undefined],
+    });
+
+    const restored = restoreMessageInCache(
+      queryClient,
+      queryKey,
+      original,
+      current =>
+        JSON.stringify(current.content) === JSON.stringify(optimistic.content) &&
+        current.clientUpdatedAt === optimistic.clientUpdatedAt
+    );
+
+    const result = queryClient.getQueryData<InfiniteData<Message[], string | undefined>>(queryKey);
+    expect(restored).toBe(false);
+    expect(result?.pages[0]?.[0]).toEqual(serverUpdated);
   });
 
   it('creates the first reaction summary when adding a new emoji', () => {

@@ -7,7 +7,7 @@ import { MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 import { ReplyPreview } from './ReplyPreview';
 
 type MessageInputProps = {
-  onSend: (text: string, inReplyToMessageId?: string) => void;
+  onSend: (text: string, inReplyToMessageId?: string) => Promise<boolean>;
   onTyping: () => void;
   replyingTo: Message | null;
   onCancelReply: () => void;
@@ -29,6 +29,19 @@ export function canSubmitMessageInput(
   return currentUserId !== null && canSend && !overLimit && text.trim().length > 0;
 }
 
+type MessageInputSubmissionState = {
+  text: string;
+  replyingTo: Message | null;
+};
+
+export function nextMessageInputStateAfterSend(
+  state: MessageInputSubmissionState,
+  sendSucceeded: boolean
+): MessageInputSubmissionState {
+  if (!sendSucceeded) return state;
+  return { text: '', replyingTo: null };
+}
+
 export function MessageInput({
   onSend,
   onTyping,
@@ -40,6 +53,7 @@ export function MessageInput({
   disabledReason,
 }: MessageInputProps) {
   const [text, setText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -59,19 +73,26 @@ export function MessageInput({
   const effectiveDisabledReason =
     currentUserId === null ? 'Loading user...' : (disabledReason ?? 'Sending is disabled');
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    if (isSubmitting) return;
     if (!canSubmitMessageInput(currentUserId, canSend, overLimit, text)) return;
     const trimmed = text.trim();
-    onSend(trimmed, replyingTo?.id);
-    setText('');
-    onCancelReply();
-    textareaRef.current?.focus();
+    setIsSubmitting(true);
+    try {
+      const sendSucceeded = await onSend(trimmed, replyingTo?.id);
+      const nextState = nextMessageInputStateAfterSend({ text, replyingTo }, sendSucceeded);
+      setText(nextState.text);
+      if (nextState.replyingTo === null) onCancelReply();
+    } finally {
+      setIsSubmitting(false);
+      textareaRef.current?.focus();
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      void handleSubmit();
     }
   }
 
@@ -104,7 +125,7 @@ export function MessageInput({
         />
         <button
           onClick={handleSubmit}
-          disabled={!canSubmitMessageInput(currentUserId, canSend, overLimit, text)}
+          disabled={isSubmitting || !canSubmitMessageInput(currentUserId, canSend, overLimit, text)}
           className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg p-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
           title={inputEnabled ? 'Send' : effectiveDisabledReason}
         >

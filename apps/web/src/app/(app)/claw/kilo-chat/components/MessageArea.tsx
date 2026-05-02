@@ -354,20 +354,23 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   }
 
   const handleSend = useCallback(
-    (text: string, inReplyToMessageId?: string) => {
+    async (text: string, inReplyToMessageId?: string): Promise<boolean> => {
       autoScrollRef.current = true;
       setShowScrollButton(false);
-      sendMessage.mutate(
-        {
+      try {
+        await sendMessage.mutateAsync({
           conversationId,
           content: [{ type: 'text', text }],
           inReplyToMessageId,
           clientId: ulid(),
-        },
-        { onError: err => toast.error(formatKiloChatError(err, 'Failed to send message')) }
-      );
+        });
+        return true;
+      } catch (err) {
+        toast.error(formatKiloChatError(err, 'Failed to send message'));
+        return false;
+      }
     },
-    [sendMessage.mutate, conversationId]
+    [sendMessage.mutateAsync, conversationId]
   );
 
   const handleEdit = useCallback(

@@ -4,9 +4,15 @@ import {
   CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { GEMINI_PRO_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/google';
+import {
+  GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
+  GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
+} from '@/lib/ai-gateway/providers/google';
 import { KIMI_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { GPT_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
+import {
+  GPT_CURRENT_VERCEL_MODEL_ID,
+  GPT_MINI_CURRENT_VERCEL_MODEL_ID,
+} from '@/lib/ai-gateway/providers/openai';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
 describe('mapModelIdToVercel', () => {
@@ -16,8 +22,10 @@ describe('mapModelIdToVercel', () => {
       ['~anthropic/claude-sonnet-latest', CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID],
       ['~anthropic/claude-haiku-latest', CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID],
       ['~openai/gpt-latest', GPT_CURRENT_VERCEL_MODEL_ID],
+      ['~openai/gpt-mini-latest', GPT_MINI_CURRENT_VERCEL_MODEL_ID],
       ['~moonshotai/kimi-latest', KIMI_CURRENT_VERCEL_MODEL_ID],
       ['~google/gemini-pro-latest', GEMINI_PRO_CURRENT_VERCEL_MODEL_ID],
+      ['~google/gemini-flash-latest', GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID],
     ])('maps %s to the current Vercel model id', (input, expected) => {
       expect(mapModelIdToVercel(input, false)).toBe(expected);
     });
@@ -31,7 +39,6 @@ describe('mapModelIdToVercel', () => {
 
   describe('hardcoded OpenRouter → Vercel mapping', () => {
     it.each([
-      ['arcee-ai/trinity-large-preview:free', 'arcee-ai/trinity-large-preview'],
       ['mistralai/codestral-2508', 'mistral/codestral'],
       ['mistralai/devstral-2512', 'mistral/devstral-2'],
       ['mistralai/mistral-embed-2312', 'mistral/mistral-embed'],

@@ -14,6 +14,22 @@ function decode(encoded: string) {
   return cursor;
 }
 
+async function addConversation(stub: DurableObjectStub<MembershipDO>, conversationId: string) {
+  await stub.addConversation({
+    conversationId,
+    title: null,
+    sandboxId: 'sandbox-1',
+    joinedAt: 1000,
+  });
+}
+
+async function getLastReadAt(stub: DurableObjectStub<MembershipDO>, conversationId: string) {
+  const { conversations } = await stub.listConversations();
+  const entry = conversations.find(c => c.conversationId === conversationId);
+  if (!entry) throw new Error(`missing conversation ${conversationId}`);
+  return entry.lastReadAt;
+}
+
 describe('MembershipDO', () => {
   it('returns empty list initially', async () => {
     const stub = getStub('user-1');
@@ -78,16 +94,53 @@ describe('MembershipDO', () => {
 
   it('marks a conversation as read', async () => {
     const stub = getStub('user-mark-read');
-    await stub.addConversation({
-      conversationId: 'conv-1',
-      title: null,
-      sandboxId: 'sandbox-1',
-      joinedAt: 1000,
-    });
+    await addConversation(stub, 'conv-1');
     await stub.updateLastActivity('conv-1', 5000);
     await stub.markRead('conv-1', 4500);
     const result = await stub.listConversations();
     expect(result.conversations[0].lastReadAt).toBe(4500);
+  });
+
+  describe('markReadAtLeast', () => {
+    it('advances from a null read marker', async () => {
+      const stub = getStub('user-mark-read-at-least-null');
+      await addConversation(stub, 'conv-1');
+
+      const result = await stub.markReadAtLeast('conv-1', 5000);
+
+      expect(result).toEqual({ applied: true, lastReadAt: 5000 });
+      expect(await getLastReadAt(stub, 'conv-1')).toBe(5000);
+    });
+
+    it('ignores an equal read marker without reading the current value back', async () => {
+      const stub = getStub('user-mark-read-at-least-equal');
+      await addConversation(stub, 'conv-1');
+      await stub.markReadAtLeast('conv-1', 5000);
+
+      const result = await stub.markReadAtLeast('conv-1', 5000);
+
+      expect(result).toEqual({ applied: false, lastReadAt: null });
+      expect(await getLastReadAt(stub, 'conv-1')).toBe(5000);
+    });
+
+    it('ignores an older read marker without lowering the stored marker', async () => {
+      const stub = getStub('user-mark-read-at-least-older');
+      await addConversation(stub, 'conv-1');
+      await stub.markReadAtLeast('conv-1', 5000);
+
+      const result = await stub.markReadAtLeast('conv-1', 4000);
+
+      expect(result).toEqual({ applied: false, lastReadAt: null });
+      expect(await getLastReadAt(stub, 'conv-1')).toBe(5000);
+    });
+
+    it('returns not applied for a missing conversation', async () => {
+      const stub = getStub('user-mark-read-at-least-missing');
+
+      const result = await stub.markReadAtLeast('missing-conversation', 5000);
+
+      expect(result).toEqual({ applied: false, lastReadAt: null });
+    });
   });
 
   it('removes a conversation', async () => {

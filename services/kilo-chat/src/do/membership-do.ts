@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
-import { and, eq, desc, sql, type SQL } from 'drizzle-orm';
+import { and, eq, desc, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import { encodeConversationCursor, type ConversationCursor } from '@kilocode/kilo-chat';
 import { conversations } from '../db/membership-schema';
 import migrations from '../../drizzle/membership/migrations';
@@ -131,25 +131,22 @@ export class MembershipDO extends DurableObject<Env> {
 
   markReadAtLeast(conversationId: string, readAt: number): MarkReadAtLeastResult {
     const row = this.db
-      .select({ lastReadAt: conversations.last_read_at })
-      .from(conversations)
-      .where(eq(conversations.conversation_id, conversationId))
+      .update(conversations)
+      .set({ last_read_at: readAt })
+      .where(
+        and(
+          eq(conversations.conversation_id, conversationId),
+          or(isNull(conversations.last_read_at), lt(conversations.last_read_at, readAt))
+        )
+      )
+      .returning({ lastReadAt: conversations.last_read_at })
       .get();
 
     if (!row) {
       return { applied: false, lastReadAt: null };
     }
-    if (row.lastReadAt !== null && row.lastReadAt >= readAt) {
-      return { applied: false, lastReadAt: row.lastReadAt };
-    }
 
-    this.db
-      .update(conversations)
-      .set({ last_read_at: readAt })
-      .where(eq(conversations.conversation_id, conversationId))
-      .run();
-
-    return { applied: true, lastReadAt: readAt };
+    return { applied: true, lastReadAt: row.lastReadAt };
   }
 
   updateLastActivityAndMarkRead(conversationId: string, at: number): void {

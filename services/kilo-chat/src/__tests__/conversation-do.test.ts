@@ -536,6 +536,60 @@ describe('ConversationDO', () => {
     expect(msg!.content).toEqual([]);
   });
 
+  it('resolveMarkRead - rejects non-members and invalid markers', async () => {
+    const stub = getStub('conv-resolve-read-invalid');
+    await stub.initialize(BASE_PARAMS);
+    const created = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Hello!' }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    await expect(stub.resolveMarkRead('user-stranger', created.messageId)).resolves.toEqual({
+      ok: false,
+      code: 'forbidden',
+      error: 'Forbidden',
+    });
+    await expect(stub.resolveMarkRead('user-alice', '01KQM1HQZPNQ7RZYFGMSEZ82A8')).resolves.toEqual(
+      {
+        ok: false,
+        code: 'invalid',
+        error: 'Message does not belong to conversation',
+      }
+    );
+  });
+
+  it('resolveMarkRead - accepts deleted markers and returns the latest non-deleted marker', async () => {
+    const stub = getStub('conv-resolve-read-deleted');
+    await stub.initialize(BASE_PARAMS);
+    const first = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'First' }],
+    });
+    const second = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Second' }],
+    });
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+
+    await stub.deleteMessage({ messageId: second.messageId, senderId: 'user-alice' });
+
+    await expect(stub.resolveMarkRead('user-alice', second.messageId)).resolves.toEqual({
+      ok: true,
+      info: {
+        id: BASE_PARAMS.id,
+        title: BASE_PARAMS.title,
+        createdBy: BASE_PARAMS.createdBy,
+        createdAt: BASE_PARAMS.createdAt,
+        members: BASE_PARAMS.members,
+      },
+      latestNonDeletedMessageId: first.messageId,
+    });
+  });
+
   describe('executeAction', () => {
     it('returns messageSenderId so caller can target just the author bot', async () => {
       const stub = getStub('conv-execaction-sender');

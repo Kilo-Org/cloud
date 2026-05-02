@@ -342,24 +342,14 @@ export async function markReadFor(
 ): Promise<MarkReadResult> {
   const { conversationId, lastSeenMessageId } = params;
 
-  // Single getInfo() call for both membership check and context extraction.
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
-  const info = await withDORetry(
-    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-    stub => stub.getInfo(),
-    'ConversationDO.getInfo'
-  );
-  if (!info || !info.members.some(m => m.id === userId)) {
-    return { ok: false, code: 'forbidden', error: 'Forbidden' };
-  }
-
-  const message = await withDORetry(
+  const resolved = await withDORetry(
     () => convStub,
-    stub => stub.getMessage(lastSeenMessageId),
-    'ConversationDO.getMessage'
+    async stub => stub.resolveMarkRead(userId, lastSeenMessageId),
+    'ConversationDO.resolveMarkRead'
   );
-  if (!message) {
-    return { ok: false, code: 'invalid', error: 'Message does not belong to conversation' };
+  if (!resolved.ok) {
+    return { ok: false, code: resolved.code, error: resolved.error };
   }
 
   const lastReadAt = ulidToTimestamp(lastSeenMessageId);
@@ -369,15 +359,13 @@ export async function markReadFor(
     'MembershipDO.markRead'
   );
 
-  const { sandboxId } = extractConversationContext(info.members);
+  const { sandboxId } = extractConversationContext(resolved.info.members);
   let badgeClear: BadgeClearResult | null = null;
   if (sandboxId) {
-    const latestMessageId = await withDORetry(
-      () => convStub,
-      stub => stub.getLatestNonDeletedMessageId(),
-      'ConversationDO.getLatestNonDeletedMessageId'
-    );
-    if (latestMessageId === null || lastSeenMessageId >= latestMessageId) {
+    if (
+      resolved.latestNonDeletedMessageId === null ||
+      lastSeenMessageId >= resolved.latestNonDeletedMessageId
+    ) {
       const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
       try {
         badgeClear = await env.NOTIFICATIONS.clearBadgeBucketForUser({ userId, badgeBucket });

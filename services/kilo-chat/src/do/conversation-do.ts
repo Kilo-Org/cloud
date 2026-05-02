@@ -117,6 +117,14 @@ export type GetMessageResult = {
   deleted: boolean;
 } | null;
 
+export type ResolveMarkReadResult =
+  | {
+      ok: true;
+      info: ConversationInfo;
+      latestNonDeletedMessageId: string | null;
+    }
+  | { ok: false; code: 'forbidden' | 'invalid'; error: string };
+
 export type MessageRow = Message;
 
 export type ListMessagesResult = {
@@ -397,6 +405,32 @@ export class ConversationDO extends DurableObject<Env> {
       .limit(1)
       .get();
     return row?.id ?? null;
+  }
+
+  resolveMarkRead(memberId: string, lastSeenMessageId: string): ResolveMarkReadResult {
+    const info = this.getInfo();
+    if (!info || !info.members.some(member => member.id === memberId)) {
+      return { ok: false, code: 'forbidden', error: 'Forbidden' };
+    }
+
+    const marker = this.db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.id, lastSeenMessageId))
+      .get();
+    if (!marker) {
+      return {
+        ok: false,
+        code: 'invalid',
+        error: 'Message does not belong to conversation',
+      };
+    }
+
+    return {
+      ok: true,
+      info,
+      latestNonDeletedMessageId: this.getLatestNonDeletedMessageId(),
+    };
   }
 
   listMessages(params: ListMessagesParams): ListMessagesResult {

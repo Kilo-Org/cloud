@@ -36,8 +36,22 @@ function grantSandbox(userId: string, sandboxId: string) {
 const SECRET = 'test-gateway-secret';
 
 /** Build an env that has all DO bindings from the test harness plus the secret. */
-function makeEnv(): Env {
-  return { ...env, GATEWAY_TOKEN_SECRET: { get: () => Promise.resolve(SECRET) } } as unknown as Env;
+function makeEnv(pushEvent?: ReturnType<typeof vi.fn>): Env {
+  const baseEnv = {
+    ...env,
+    GATEWAY_TOKEN_SECRET: { get: () => Promise.resolve(SECRET) },
+  } as unknown as Env;
+  if (!pushEvent) {
+    return baseEnv;
+  }
+  return {
+    ...baseEnv,
+    EVENT_SERVICE: {
+      fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+      connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+      pushEvent,
+    } satisfies Env['EVENT_SERVICE'],
+  };
 }
 
 /** App with bot auth middleware + bot routes. Also registers conversation + message
@@ -316,7 +330,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
 // ─── POST .../actions/:groupId/delivery-failed ─────────────────────────────
 
 describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed', () => {
-  async function setupWithResolvedAction(suffix: string) {
+  async function setupWithResolvedAction(suffix: string, pushEvent?: ReturnType<typeof vi.fn>) {
     const userId = `user-${suffix}`;
     const sandboxId = `sandbox-${suffix}`;
     grantSandbox(userId, sandboxId);
@@ -336,7 +350,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
     );
     const setupApp = withTestExecutionCtx(setupAppBase);
 
-    const testEnv = makeEnv();
+    const testEnv = makeEnv(pushEvent);
 
     const convRes = await setupApp.request(
       '/v1/conversations',
@@ -406,9 +420,13 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
   });
 
   it('is idempotent when already unresolved', async () => {
-    const { sandboxId, conversationId, messageId, testEnv, token } =
-      await setupWithResolvedAction('bot-act-df-idem');
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const { sandboxId, conversationId, messageId, testEnv, token } = await setupWithResolvedAction(
+      'bot-act-df-idem',
+      pushEvent
+    );
     const app = makeBotApp();
+    pushEvent.mockClear();
 
     const first = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/g1/delivery-failed`,
@@ -420,6 +438,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       testEnv
     );
     expect(first.status).toBe(202);
+    expect(pushEvent).toHaveBeenCalledOnce();
 
     const second = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/g1/delivery-failed`,
@@ -431,6 +450,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       testEnv
     );
     expect(second.status).toBe(202);
+    expect(pushEvent).toHaveBeenCalledOnce();
   });
 
   it('returns 400 for missing messageId body', async () => {

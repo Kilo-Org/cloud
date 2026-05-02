@@ -295,6 +295,9 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
   if (!result.ok) {
     return c.json({ error: result.error }, 404);
   }
+  if (!result.reverted) {
+    return c.json({}, 202);
+  }
 
   const ctx = await getConversationContext(c.env, convId.data);
   if (ctx?.sandboxId) {

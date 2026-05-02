@@ -657,6 +657,9 @@ describe('ConversationDO', () => {
 
       const result = await stub.revertActionResolution({ messageId, groupId: 'g1' });
       expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.reverted).toBe(true);
+      }
 
       const after = await stub.listMessages({ limit: 10 });
       const actions = after.messages[0].content.find(b => b.type === 'actions') as {
@@ -669,8 +672,14 @@ describe('ConversationDO', () => {
       const { stub, messageId } = await setupResolved('conv-revert-idem');
       const first = await stub.revertActionResolution({ messageId, groupId: 'g1' });
       expect(first.ok).toBe(true);
+      if (first.ok) {
+        expect(first.reverted).toBe(true);
+      }
       const second = await stub.revertActionResolution({ messageId, groupId: 'g1' });
       expect(second.ok).toBe(true);
+      if (second.ok) {
+        expect(second.reverted).toBe(false);
+      }
     });
 
     it('returns not_found for unknown messageId', async () => {

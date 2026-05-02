@@ -383,4 +383,21 @@ describe('deliverActionExecutedToBot', () => {
 
     expect(pushEvent).not.toHaveBeenCalled();
   });
+
+  it('does not push action.delivery_failed when the action group is already unresolved', async () => {
+    const { conversationId, messageId } = await setupActionMessage({ resolved: false });
+    const pushEvent = vi.fn().mockResolvedValue(false);
+
+    await notifyActionDeliveryFailed(makeEnvWithPushEvent(pushEvent), {
+      conversationId,
+      messageId,
+      groupId: 'g1',
+      convContext: {
+        humanMemberIds: ['user-action-delivery'],
+        sandboxId: 'sandbox-action-delivery',
+      },
+    });
+
+    expect(pushEvent).not.toHaveBeenCalled();
+  });
 });

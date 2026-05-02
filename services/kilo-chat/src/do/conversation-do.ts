@@ -160,7 +160,7 @@ export type ExecuteActionResult =
     };
 
 export type RevertActionResolutionResult =
-  | { ok: true }
+  | { ok: true; reverted: boolean }
   | { ok: false; code: 'not_found'; error: string };
 
 export type NotifyDeliveryFailedResult =
@@ -248,7 +248,7 @@ export class ConversationDO extends DurableObject<Env> {
     }
     // Idempotent: already unresolved is a no-op success.
     if (!actionsBlock.resolved) {
-      return { ok: true };
+      return { ok: true, reverted: false };
     }
     actionsBlock.resolved = undefined;
     const newVersion = row.version + 1;
@@ -261,7 +261,7 @@ export class ConversationDO extends DurableObject<Env> {
       })
       .where(eq(messages.id, params.messageId))
       .run();
-    return { ok: true };
+    return { ok: true, reverted: true };
   }
 
   initialize(params: InitializeParams): { ok: true } | { ok: false; error: string } {

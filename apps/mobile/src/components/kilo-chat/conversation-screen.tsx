@@ -10,6 +10,7 @@ import {
   type PendingAction,
   tryStartPendingAction,
   useAddReaction,
+  useBotStatus,
   useDeleteMessage,
   useEditMessage,
   useExecuteAction,
@@ -39,7 +40,6 @@ import { useConversationEventSubscription } from './hooks/use-conversation-event
 import { useMobileTypingState, useTypingSender } from './hooks/use-typing';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';
-import { useBotStatus } from './hooks/use-bot-status';
 import { useMarkRead } from './hooks/use-mark-read';
 import { useMessageCacheUpdater, useMessages, useSendMessage } from './hooks/use-messages';
 import { useNowTicker } from './hooks/use-now-ticker';

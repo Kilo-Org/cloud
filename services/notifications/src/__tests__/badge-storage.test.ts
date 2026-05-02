@@ -65,6 +65,31 @@ describe('NotificationChannelDO badge storage helpers', () => {
     expect(aggregate).toBe(5);
   });
 
+  it('markBucketRead does not create aggregate storage for a missing bucket', async () => {
+    const stub = getDO('user-mark-missing');
+
+    expect(await stub.markBucketRead('does-not-exist')).toBe(0);
+
+    const stored = await runInDurableObject(stub, async (_inst, state) => {
+      const entries = await state.storage.list();
+      return Array.from(entries.entries());
+    });
+    expect(stored).toEqual([]);
+  });
+
+  it('markBucketRead does not create aggregate storage for an empty bucket', async () => {
+    const stub = getDO('user-mark-empty');
+    await runInDurableObject(stub, (_inst, state) => state.storage.put<number>('bucket:empty', 0));
+
+    expect(await stub.markBucketRead('empty')).toBe(0);
+
+    const stored = await runInDurableObject(stub, async (_inst, state) => {
+      const entries = await state.storage.list();
+      return Array.from(entries.entries());
+    });
+    expect(stored).toEqual([['bucket:empty', 0]]);
+  });
+
   it('markBucketRead is idempotent and returns the running total', async () => {
     const stub = getDO('user-mark-twice');
     await seedBuckets(stub, { conv1: 3, conv2: 1 });

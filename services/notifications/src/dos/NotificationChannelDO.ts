@@ -130,10 +130,12 @@ export class NotificationChannelDO extends DurableObject<Env> {
   async markBucketRead(bucket: string): Promise<number> {
     const key = `${BUCKET_PREFIX}${bucket}`;
     const current = (await this.ctx.storage.get<number>(key)) ?? 0;
-    const total = await this.getTotal();
-    if (current > 0) {
-      await this.ctx.storage.delete(key);
+    if (current <= 0) {
+      return this.getTotalWithoutPersisting();
     }
+
+    const total = await this.getTotal();
+    await this.ctx.storage.delete(key);
     const nextTotal = Math.max(0, total - current);
     await this.ctx.storage.put<number>(TOTAL_KEY, nextTotal);
     return nextTotal;
@@ -211,6 +213,16 @@ export class NotificationChannelDO extends DurableObject<Env> {
     let total = 0;
     for (const value of entries.values()) total += value;
     await this.ctx.storage.put<number>(TOTAL_KEY, total);
+    return total;
+  }
+
+  private async getTotalWithoutPersisting(): Promise<number> {
+    const stored = await this.ctx.storage.get<number>(TOTAL_KEY);
+    if (stored !== undefined) return stored;
+
+    const entries = await this.ctx.storage.list<number>({ prefix: BUCKET_PREFIX });
+    let total = 0;
+    for (const value of entries.values()) total += value;
     return total;
   }
 }

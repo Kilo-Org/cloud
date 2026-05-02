@@ -190,6 +190,34 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(stored).toEqual({ bucket: 1, total: 1 });
   });
 
+  it('does not reread the aggregate total after a non-retry badge increment', async () => {
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValueOnce(false);
+    const stub = getDO('user-total-read-once');
+    const input = baseInput({
+      userId: 'user-total-read-once',
+      idempotencyKey: 'k-total-read-once',
+    });
+
+    const result = await runInDurableObject(stub, async (instance, state) => {
+      const originalGet = state.storage.get.bind(state.storage);
+      let totalReads = 0;
+      state.storage.get = (<T = unknown>(key: string | string[]) => {
+        if (Array.isArray(key)) return originalGet<T>(key);
+        if (key === 'total') totalReads++;
+        return originalGet<T>(key);
+      }) as typeof state.storage.get;
+
+      const outcome = await instance.dispatchPush(input);
+      return { outcome, totalReads };
+    });
+
+    expect(result.outcome.kind).toBe('delivered');
+    expect(result.totalReads).toBe(1);
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages[0].badge).toBe(1);
+  });
+
   it('accumulates bucket counts across deliveries and exposes total via badge', async () => {
     installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);

@@ -67,9 +67,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
         // Also schedule cleanup at this point — if Expo keeps failing and
         // no future push ever lands, `pending` would otherwise leak.
         await this.ensureCleanupAlarm(ts);
-        await this.incrementBucket(input.badge.badgeBucket, input.badge.delta);
+        badgeTotal = await this.incrementBucket(input.badge.badgeBucket, input.badge.delta);
+      } else {
+        badgeTotal = await this.getTotal();
       }
-      badgeTotal = await this.getTotal();
     }
 
     // 4. Tokens. Missing Expo tokens only means no OS push can be sent; the
@@ -184,7 +185,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
   // Read-modify-write of a bucket counter. The DO is single-threaded, so
   // this is race-free without explicit locking.
-  private async incrementBucket(bucket: string, delta: number): Promise<void> {
+  private async incrementBucket(bucket: string, delta: number): Promise<number> {
     const key = `${BUCKET_PREFIX}${bucket}`;
     const total = await this.getTotal();
     const current = (await this.ctx.storage.get<number>(key)) ?? 0;
@@ -195,7 +196,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
       await this.ctx.storage.put<number>(key, next);
     }
 
-    await this.ctx.storage.put<number>(TOTAL_KEY, Math.max(0, total + delta));
+    const nextTotal = Math.max(0, total + delta);
+    await this.ctx.storage.put<number>(TOTAL_KEY, nextTotal);
+    return nextTotal;
   }
 
   // Aggregate badge count. Existing DOs without the aggregate fall back to one

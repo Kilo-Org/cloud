@@ -32,7 +32,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
     const parsedInput = dispatchPushInputSchema.parse(input);
     // 1. Idempotency. DO is single-threaded — requests for a given
-    //    user serialize on this instance. A `failed` outcome leaves the
+    //    user serialize on this instance. Retryable send failures leave the
     //    record at `pending` so upstream can retry the send without
     //    re-incrementing the badge.
     const idemKey = `${IDEM_PREFIX}${parsedInput.idempotencyKey}`;
@@ -141,7 +141,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
     }
 
     if (result.ticketErrors.length > 0) {
-      if (result.ticketErrors.every(ticketError => !ticketError.retryable)) {
+      const hasAcceptedTickets = result.ticketTokenPairs.length > 0;
+      const isTerminalFailure =
+        hasAcceptedTickets || result.ticketErrors.every(ticketError => !ticketError.retryable);
+      if (isTerminalFailure) {
         const ts = Date.now();
         await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'failed', ts });
         await this.ensureCleanupAlarm(ts);

@@ -387,6 +387,59 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(dbState.deleteCalls).toBe(1);
   });
 
+  it('terminalizes mixed accepted and retryable ticket errors to avoid resending accepted tokens', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-partial-ticket-error', token: 'tok-accepted' },
+        { user_id: 'user-partial-ticket-error', token: 'tok-rate-limited' },
+      ],
+    });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    vi.mocked(sendPushNotifications).mockResolvedValueOnce({
+      ticketTokenPairs: [{ ticketId: 'ticket-accepted', token: 'tok-accepted' }],
+      staleTokens: [],
+      ticketErrors: [
+        {
+          token: 'tok-rate-limited',
+          errorCode: 'MessageRateExceeded',
+          message: 'Rate limited',
+          retryable: true,
+        },
+      ],
+    });
+    const receiptSpy = vi.spyOn(env.RECEIPTS_QUEUE, 'send');
+    const stub = getDO('user-partial-ticket-error');
+    const input = baseInput({
+      userId: 'user-partial-ticket-error',
+      idempotencyKey: 'k-partial-ticket-error',
+    });
+
+    const first = await stub.dispatchPush(input);
+    const second = await stub.dispatchPush(input);
+
+    expect(first).toEqual({
+      kind: 'failed',
+      error: 'Expo rejected 1 push ticket',
+    });
+    expect(second).toEqual({ kind: 'duplicate' });
+    expect(sendPushNotifications).toHaveBeenCalledOnce();
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    expect(messages.map(message => message.to)).toEqual(['tok-accepted', 'tok-rate-limited']);
+    expect(messages.map(message => message.badge)).toEqual([1, 1]);
+    expect(receiptSpy).toHaveBeenCalledWith(
+      { ticketTokenPairs: [{ ticketId: 'ticket-accepted', token: 'tok-accepted' }] },
+      { delaySeconds: 900 }
+    );
+    await expect(stub.listNonZeroBuckets()).resolves.toEqual([
+      { badgeBucket: 'conv1', badgeCount: 1 },
+    ]);
+
+    const stored = await runInDurableObject(stub, async (_inst, state) =>
+      state.storage.get<{ stage: string; ts: number }>('idem:k-partial-ticket-error')
+    );
+    expect(stored).toMatchObject({ stage: 'failed' });
+  });
+
   it('accumulates bucket counts across deliveries and exposes total via badge', async () => {
     installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);

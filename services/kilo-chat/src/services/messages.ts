@@ -24,7 +24,7 @@ import {
   pushInstanceEventToUser,
 } from './event-push';
 import { fetchSandboxLabel } from './sandbox-lookup';
-import type { ConversationInfo } from '../do/conversation-do';
+import type { ConversationInfo, GetMessageResult } from '../do/conversation-do';
 
 export type DeferCtx = { waitUntil: (p: Promise<unknown>) => void };
 
@@ -50,18 +50,11 @@ function truncateByGrapheme(text: string, maxGraphemes: number): string {
   return text;
 }
 
-async function getReplyToSnapshot(
-  env: Env,
-  conversationId: string,
+function getReplyToSnapshot(
+  parent: GetMessageResult,
   inReplyToMessageId: string | undefined
-): Promise<ReplyToMessageSnapshot | null> {
+): ReplyToMessageSnapshot | null {
   if (!inReplyToMessageId) return null;
-
-  const parent = await withDORetry(
-    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-    stub => stub.getMessage(inReplyToMessageId),
-    'ConversationDO.getMessage'
-  );
 
   return buildReplyToMessageSnapshot(
     inReplyToMessageId,
@@ -144,6 +137,16 @@ export async function postCommitFanOut(
   const botMembers = info.members.filter(m => m.kind === 'bot' && m.id !== callerId);
   const activityAt = ulidToTimestamp(messageId);
   const isSenderHuman = humanMemberIds.includes(callerId);
+  let replyParentPromise: Promise<GetMessageResult> | null = null;
+  const getReplyParent = (): Promise<GetMessageResult> | null => {
+    if (inReplyToMessageId === undefined) return null;
+    replyParentPromise ??= withDORetry(
+      () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+      stub => stub.getMessage(inReplyToMessageId),
+      'ConversationDO.getMessage'
+    );
+    return replyParentPromise;
+  };
 
   // ── Block A: Deliver webhook to bot members ──────────────────────────
   // Webhook delivery is enqueued on the ConversationDO's per-conversation
@@ -156,12 +159,9 @@ export async function postCommitFanOut(
 
     let inReplyToBody: string | undefined;
     let inReplyToSender: string | undefined;
-    if (inReplyToMessageId) {
-      const parent = await withDORetry(
-        () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-        stub => stub.getMessage(inReplyToMessageId),
-        'ConversationDO.getMessage'
-      );
+    const replyParent = getReplyParent();
+    if (replyParent) {
+      const parent = await replyParent;
       if (parent && !parent.deleted) {
         inReplyToBody = parent.content
           .filter(
@@ -235,7 +235,9 @@ export async function postCommitFanOut(
   // ── Block B: Push message.created ────────────────────────────────────
   const pushMessageEvents = async (): Promise<void> => {
     if (!sandboxId) return;
-    const replyTo = await getReplyToSnapshot(env, conversationId, inReplyToMessageId);
+    const replyParent = getReplyParent();
+    const parent = replyParent ? await replyParent : null;
+    const replyTo = getReplyToSnapshot(parent, inReplyToMessageId);
 
     await pushEventToHumanMembers(
       env,

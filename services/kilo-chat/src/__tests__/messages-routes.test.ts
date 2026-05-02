@@ -1510,6 +1510,55 @@ describe('auto-title on first message', () => {
     ]);
   });
 
+  it('shares the reply parent lookup across webhook and message events', async () => {
+    const { conversationId, userId } = await createMultiHumanConversation('reply-shared-parent');
+    const convStub = getConvStub(conversationId);
+    const info = await convStub.getInfo();
+    expect(info).not.toBeNull();
+    if (!info) return;
+
+    const parent = await convStub.createMessage({
+      senderId: 'recipient-reply-shared-parent',
+      content: [{ type: 'text', text: 'Parent context' }],
+    });
+    expect(parent.ok).toBe(true);
+    if (!parent.ok) return;
+
+    const getMessage = vi.fn((messageId: string) => convStub.getMessage(messageId));
+    const countedConvStub = Object.assign(Object.create(convStub) as typeof convStub, {
+      getMessage,
+    });
+    const countedConversationDo = Object.assign(
+      Object.create(env.CONVERSATION_DO) as typeof env.CONVERSATION_DO,
+      {
+        get: () => countedConvStub,
+        idFromName: (name: string) => env.CONVERSATION_DO.idFromName(name),
+      }
+    );
+    const eventEnv = {
+      ...env,
+      CONVERSATION_DO: countedConversationDo,
+      EVENT_SERVICE: {
+        fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+        connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+        pushEvent: async () => true,
+      },
+    } satisfies Env;
+
+    await postCommitFanOut(
+      eventEnv,
+      info,
+      userId,
+      conversationId,
+      ulid(),
+      [{ type: 'text', text: 'Reply body' }],
+      parent.messageId,
+      undefined
+    );
+
+    expect(getMessage).toHaveBeenCalledOnce();
+  });
+
   it('does not publish automatic typing.stop events for human messages', async () => {
     const { conversationId, userId } = await createMultiHumanConversation('human-message-events');
     const convStub = getConvStub(conversationId);

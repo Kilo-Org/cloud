@@ -65,13 +65,13 @@ describe('POST /v1/conversations', () => {
     expect(body.conversationId).toBeTruthy();
     expect(typeof body.conversationId).toBe('string');
     expect(body.conversationId).toHaveLength(26);
-    expect(body.conversation).toEqual({
+    expect(body.conversation).toMatchObject({
       conversationId: body.conversationId,
       title: 'My Chat',
       lastActivityAt: null,
       lastReadAt: null,
-      joinedAt: expect.any(Number),
     });
+    expect(typeof body.conversation.joinedAt).toBe('number');
     expect(pushedEvents).toContainEqual({
       event: 'conversation.created',
       payload: {

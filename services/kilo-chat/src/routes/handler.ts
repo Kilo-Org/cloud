@@ -34,6 +34,7 @@ import type {
   BotGetMembersResponse,
   BotListConversationsResponse,
   CreateConversationResponse,
+  ExecuteActionResponse,
 } from '@kilocode/kilo-chat';
 import {
   ulidSchema,
@@ -230,7 +231,7 @@ export async function handleExecuteAction(c: HonoCtx) {
     return c.json({ error: result.error }, 500);
   }
 
-  return c.json({ ok: true } satisfies OkResponse);
+  return c.json(result satisfies ExecuteActionResponse);
 }
 
 // ─── messageDeliveryFailed (bot-reported) ───────────────────────────────────
@@ -567,7 +568,10 @@ export async function handleCreateBotConversation(c: HonoCtx) {
   }
 
   return c.json(
-    { conversationId: result.conversationId } satisfies CreateConversationResponse,
+    {
+      conversationId: result.conversationId,
+      conversation: result.conversation,
+    } satisfies CreateConversationResponse,
     201
   );
 }

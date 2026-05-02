@@ -1,6 +1,17 @@
 import type { ConversationMember } from '@kilocode/kilo-chat';
 
-export type ConversationRouteDecision = 'pending' | 'ready' | 'not-found' | 'redirect-no-instance';
+export type KiloChatInstanceRouteDecision =
+  | 'pending'
+  | 'ready'
+  | 'status-error'
+  | 'redirect-no-instance';
+
+export type ConversationRouteDecision =
+  | 'pending'
+  | 'ready'
+  | 'status-error'
+  | 'not-found'
+  | 'redirect-no-instance';
 
 const kiloclawBotMemberPrefix = 'bot:kiloclaw:';
 
@@ -17,19 +28,42 @@ export function conversationSandboxIdFromMembers(members: ConversationMember[]):
   return null;
 }
 
+export function kiloChatInstanceRouteDecision({
+  instanceStatus,
+  isInstanceError,
+  isInstanceLoading,
+}: {
+  instanceStatus: string | null;
+  isInstanceError: boolean;
+  isInstanceLoading: boolean;
+}): KiloChatInstanceRouteDecision {
+  if (isInstanceLoading) {
+    return 'pending';
+  }
+  if (isInstanceError) {
+    return 'status-error';
+  }
+  return instanceStatus ? 'ready' : 'redirect-no-instance';
+}
+
 export function conversationRouteDecision({
   conversationMembers,
+  isInstanceError,
   isInstanceLoading,
   isLeaving,
   routeSandboxId,
 }: {
   conversationMembers: ConversationMember[] | undefined;
+  isInstanceError: boolean;
   isInstanceLoading: boolean;
   isLeaving: boolean;
   routeSandboxId: string | null;
 }): ConversationRouteDecision {
   if (isLeaving) {
     return 'pending';
+  }
+  if (isInstanceError) {
+    return 'status-error';
   }
   if (routeSandboxId === null) {
     return isInstanceLoading ? 'pending' : 'redirect-no-instance';

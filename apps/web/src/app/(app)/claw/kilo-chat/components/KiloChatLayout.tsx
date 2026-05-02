@@ -28,6 +28,9 @@ type KiloChatLayoutProps = {
   basePath: string;
   noInstanceRedirect: string;
   isInstanceLoading: boolean;
+  isInstanceError: boolean;
+  instanceErrorMessage: string | null;
+  onRetryInstanceStatus: () => void;
   instanceStatus: string | null;
   assistantName: string | null;
   children: React.ReactNode;
@@ -39,6 +42,9 @@ export function KiloChatLayout({
   basePath,
   noInstanceRedirect,
   isInstanceLoading,
+  isInstanceError,
+  instanceErrorMessage,
+  onRetryInstanceStatus,
   instanceStatus,
   assistantName,
   children,
@@ -154,6 +160,9 @@ export function KiloChatLayout({
       basePath,
       noInstanceRedirect,
       isInstanceLoading,
+      isInstanceError,
+      instanceErrorMessage,
+      onRetryInstanceStatus,
       eventService,
       kiloChatClient,
     }),
@@ -166,6 +175,9 @@ export function KiloChatLayout({
       basePath,
       noInstanceRedirect,
       isInstanceLoading,
+      isInstanceError,
+      instanceErrorMessage,
+      onRetryInstanceStatus,
       eventService,
       kiloChatClient,
     ]

@@ -7,6 +7,7 @@ import { KiloChatApiError } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from '../components/kiloChatContext';
 import { useConversationDetail } from '../hooks/useConversations';
 import { MessageArea } from '../components/MessageArea';
+import { KiloChatStatusError } from '../components/KiloChatStatusError';
 import { conversationRouteDecision } from './conversation-route-guard';
 
 export default function KiloChatConversationPage() {
@@ -17,16 +18,20 @@ export default function KiloChatConversationPage() {
     leavingConversationId,
     basePath,
     sandboxId,
+    isInstanceError,
+    instanceErrorMessage,
     isInstanceLoading,
     noInstanceRedirect,
+    onRetryInstanceStatus,
   } = useKiloChatContext();
   const isLeaving = leavingConversationId === params.conversationId;
   const conversationDetail = useConversationDetail(
     kiloChatClient,
-    isLeaving ? null : params.conversationId
+    isLeaving || isInstanceError ? null : params.conversationId
   );
   const routeDecision = conversationRouteDecision({
     conversationMembers: conversationDetail.data?.members,
+    isInstanceError,
     isInstanceLoading,
     isLeaving,
     routeSandboxId: sandboxId,
@@ -65,6 +70,9 @@ export default function KiloChatConversationPage() {
   ]);
 
   if (isLeaving || routeDecision !== 'ready') {
+    if (routeDecision === 'status-error') {
+      return <KiloChatStatusError message={instanceErrorMessage} onRetry={onRetryInstanceStatus} />;
+    }
     return null;
   }
 

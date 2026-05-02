@@ -4,16 +4,34 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MessagesSquare } from 'lucide-react';
 import { useKiloChatContext } from './components/kiloChatContext';
+import { KiloChatStatusError } from './components/KiloChatStatusError';
+import { kiloChatInstanceRouteDecision } from './[conversationId]/conversation-route-guard';
 
 export default function KiloChatIndexPage() {
   const router = useRouter();
-  const { instanceStatus, isInstanceLoading, noInstanceRedirect } = useKiloChatContext();
+  const {
+    instanceErrorMessage,
+    instanceStatus,
+    isInstanceError,
+    isInstanceLoading,
+    noInstanceRedirect,
+    onRetryInstanceStatus,
+  } = useKiloChatContext();
+  const routeDecision = kiloChatInstanceRouteDecision({
+    instanceStatus,
+    isInstanceError,
+    isInstanceLoading,
+  });
 
   useEffect(() => {
-    if (!isInstanceLoading && !instanceStatus) {
+    if (routeDecision === 'redirect-no-instance') {
       router.replace(noInstanceRedirect);
     }
-  }, [isInstanceLoading, instanceStatus, noInstanceRedirect, router]);
+  }, [noInstanceRedirect, routeDecision, router]);
+
+  if (routeDecision === 'status-error') {
+    return <KiloChatStatusError message={instanceErrorMessage} onRetry={onRetryInstanceStatus} />;
+  }
 
   return (
     <div className="flex h-full items-center justify-center">

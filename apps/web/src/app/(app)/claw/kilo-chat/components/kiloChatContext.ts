@@ -13,6 +13,9 @@ export type KiloChatContextValue = {
   basePath: string;
   noInstanceRedirect: string;
   isInstanceLoading: boolean;
+  isInstanceError: boolean;
+  instanceErrorMessage: string | null;
+  onRetryInstanceStatus: () => void;
   eventService: EventServiceClient;
   kiloChatClient: KiloChatClient;
 };

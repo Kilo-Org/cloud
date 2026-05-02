@@ -6,7 +6,9 @@ import { KiloChatLayout } from './components/KiloChatLayout';
 
 export default function KiloChatRootLayout({ children }: { children: React.ReactNode }) {
   const { data: user } = useUser();
-  const { data: status, isLoading } = useKiloClawStatus();
+  const { data: status, error, isError, isLoading, refetch } = useKiloClawStatus();
+  const instanceErrorMessage =
+    error instanceof Error ? error.message : error ? 'Unknown error' : null;
 
   return (
     <KiloChatLayout
@@ -16,6 +18,9 @@ export default function KiloChatRootLayout({ children }: { children: React.React
       noInstanceRedirect="/claw/new"
       instanceStatus={status?.status ?? null}
       isInstanceLoading={isLoading}
+      isInstanceError={isError}
+      instanceErrorMessage={instanceErrorMessage}
+      onRetryInstanceStatus={() => void refetch()}
       assistantName={status?.botName ?? null}
     >
       {children}

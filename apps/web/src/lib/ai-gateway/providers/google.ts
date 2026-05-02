@@ -20,7 +20,7 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   context_length: 262144,
   max_completion_tokens: 32768,
   status: 'hidden', // usable through kilo-auto
-  flags: ['vision'],
+  flags: ['vision', 'vercel-routing'],
   gateway: 'openrouter',
   internal_id: 'google/gemma-4-26b-a4b-it',
   pricing: null,

@@ -1,8 +1,8 @@
-export const FIRST_REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉'] as const;
+const FIRST_REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉'] as const;
 
 type ReactionEmoji = (typeof FIRST_REACTION_EMOJIS)[number];
 
-export type MessageAction =
+type MessageAction =
   | { kind: 'reaction'; label: string; emoji: ReactionEmoji }
   | { kind: 'reply'; label: 'Reply' }
   | { kind: 'edit'; label: 'Edit' }

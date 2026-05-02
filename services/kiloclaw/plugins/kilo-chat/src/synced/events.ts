@@ -43,12 +43,14 @@ export const typingEventSchema = z.object({
 
 export const reactionAddedEventSchema = z.object({
   messageId: ulidSchema,
+  operationId: ulidSchema,
   memberId: nonEmptyStringSchema,
   emoji: emojiSchema,
 });
 
 export const reactionRemovedEventSchema = z.object({
   messageId: ulidSchema,
+  operationId: ulidSchema,
   memberId: nonEmptyStringSchema,
   emoji: emojiSchema,
 });

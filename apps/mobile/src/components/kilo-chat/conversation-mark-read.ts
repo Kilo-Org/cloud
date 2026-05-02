@@ -9,7 +9,7 @@ import {
 export const MARK_READ_RETRY_LIMIT = 3;
 export const MARK_READ_RETRY_DELAY_MS = 250;
 
-export type MarkReadRetryState = {
+type MarkReadRetryState = {
   marker: string | null;
   attempts: number;
   timer: ReturnType<typeof setTimeout> | null;

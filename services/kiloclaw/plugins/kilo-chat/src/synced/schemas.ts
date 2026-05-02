@@ -217,6 +217,14 @@ export const markConversationReadRequestSchema = z.object({
   lastSeenMessageId: ulidSchema,
 });
 
+export const badgeClearResponseSchema = z.object({
+  badgeCount: nonNegativeIntegerSchema,
+});
+
+export const markConversationReadResponseSchema = okResponseSchema.extend({
+  badgeClear: badgeClearResponseSchema.nullable(),
+});
+
 export const executeActionRequestSchema = z.object({
   groupId: actionGroupIdSchema,
   value: execApprovalDecisionSchema,
@@ -230,6 +238,11 @@ export const reactionRequestBodySchema = z.object({
 export const addReactionResponseSchema = z.object({
   id: z.string().min(1),
 });
+
+export const removeReactionResponseSchema = z.discriminatedUnion('removed', [
+  z.object({ removed: z.literal(true), id: z.string().min(1) }),
+  z.object({ removed: z.literal(false), id: z.string().min(1).nullable() }),
+]);
 
 export const conversationListResponseSchema = z.object({
   conversations: z.array(conversationListItemSchema),

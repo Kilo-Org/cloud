@@ -5,7 +5,7 @@ import {
 } from '@kilocode/kilo-chat';
 import { ulid } from 'ulid';
 
-export type SendMessageVariables = CreateMessageRequest & { clientId: string };
+type SendMessageVariables = CreateMessageRequest & { clientId: string };
 export type ReplyPreviewSource = Message | ReplyToMessageSnapshot;
 
 type BuildSendMessageVariablesInput = {
@@ -34,7 +34,7 @@ export function createSendMessageClientId(): string {
   return ulid();
 }
 
-export function contentBlocksToPreviewText(content: Message['content']): string {
+function contentBlocksToPreviewText(content: Message['content']): string {
   const preview = content
     .filter(block => block.type === 'text')
     .map(block => block.text)

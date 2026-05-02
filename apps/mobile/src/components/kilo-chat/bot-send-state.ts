@@ -1,9 +1,9 @@
-export type BotPresence = {
+type BotPresence = {
   online: boolean;
   lastAt: number;
 };
 
-export type BotDisplayState = 'online' | 'idle' | 'offline' | 'unknown';
+type BotDisplayState = 'online' | 'idle' | 'offline' | 'unknown';
 
 type BotDisplay = {
   state: BotDisplayState;
@@ -16,7 +16,7 @@ type MessageInputAvailability = {
   disabledReason: string | null;
 };
 
-export function computeMobileBotDisplay(params: {
+function computeMobileBotDisplay(params: {
   instanceStatus: string | null;
   presence: BotPresence | undefined;
   now: number;

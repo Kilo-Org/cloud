@@ -321,6 +321,50 @@ describe('DELETE /v1/messages/:id/reactions', () => {
     expect(body).toEqual({ removed: true, id: removed[0]?.operationId });
   });
 
+  it('returns the first tombstone id for idempotent removes without a duplicate event', async () => {
+    const { pushEvent, removed } = collectReactionPushes();
+    const testEnv = envWithPushEvent(pushEvent);
+    const { conversationId, messageId, userApp } = await setup('rx-del-idempotent', testEnv);
+
+    const addRes = await userApp.request(
+      `/v1/messages/${messageId}/reactions`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, emoji: '👍' }),
+      },
+      testEnv
+    );
+    expect(addRes.status).toBe(201);
+
+    const qs = new URLSearchParams({ conversationId, emoji: '👍' });
+    const firstRemoveRes = await userApp.request(
+      `/v1/messages/${messageId}/reactions?${qs.toString()}`,
+      { method: 'DELETE' },
+      testEnv
+    );
+    expect(firstRemoveRes.status).toBe(200);
+    const firstRemoveBody = await firstRemoveRes.json<{ removed: boolean; id: string | null }>();
+    expect(firstRemoveBody.removed).toBe(true);
+    expect(firstRemoveBody.id).toMatch(/^[0-9A-Z]{26}$/);
+    expect(removed).toHaveLength(1);
+
+    pushEvent.mockClear();
+    const secondRemoveRes = await userApp.request(
+      `/v1/messages/${messageId}/reactions?${qs.toString()}`,
+      { method: 'DELETE' },
+      testEnv
+    );
+
+    expect(secondRemoveRes.status).toBe(200);
+    await expect(secondRemoveRes.json()).resolves.toEqual({
+      removed: false,
+      id: firstRemoveBody.id,
+    });
+    expect(pushEvent).not.toHaveBeenCalled();
+    expect(removed).toHaveLength(1);
+  });
+
   it('returns an explicit no-op shape when reaction never existed', async () => {
     const { conversationId, messageId, userApp } = await setup('rx-del-2');
     const qs = new URLSearchParams({ conversationId, emoji: '👍' });

@@ -59,7 +59,7 @@ export type RemoveReactionParams = {
 
 export type RemoveReactionResult =
   | { ok: true; removed: true; removed_id: string }
-  | { ok: true; removed: false }
+  | { ok: true; removed: false; id: string | null }
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export async function removeReactionFor(
@@ -97,8 +97,7 @@ export async function removeReactionFor(
     }
   }
 
-  if (!result.removed) {
-    return { ok: true, removed: false };
-  }
+  if (!result.removed) return { ok: true, removed: false, id: result.removed_id };
+
   return { ok: true, removed: true, removed_id: result.removed_id };
 }

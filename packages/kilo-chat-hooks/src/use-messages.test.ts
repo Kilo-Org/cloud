@@ -3,6 +3,7 @@ import type { InfiniteData } from '@tanstack/react-query';
 import type { Message } from '@kilocode/kilo-chat';
 import {
   applyReactionAddedEventToPages,
+  applyReactionRemovedResponseToPages,
   applyReactionRemovedMutationToPages,
   createReactionOperationTracker,
 } from './use-messages';
@@ -56,6 +57,44 @@ describe('reaction operation ordering', () => {
         emoji: '👍',
         memberId: currentUserId,
         operationId: '01KQK8A9999999999999999999',
+      }
+    );
+
+    expect(afterDelayedAdd.pages[0]?.[0]?.reactions).toEqual([]);
+  });
+
+  it('keeps a no-op remove tombstone ahead of an older delayed add event', () => {
+    const conversationId = '01KQK8C1111111111111111111';
+    const messageId = '01KQK8C2222222222222222222';
+    const currentUserId = 'user-current';
+    const tracker = createReactionOperationTracker();
+    const initial: InfiniteData<Message[]> = {
+      pageParams: [undefined],
+      pages: [
+        [
+          message({
+            id: messageId,
+            reactions: [{ emoji: '👍', count: 1, memberIds: [currentUserId] }],
+          }),
+        ],
+      ],
+    };
+
+    const afterNoOpRemove = applyReactionRemovedResponseToPages(initial, conversationId, tracker, {
+      messageId,
+      emoji: '👍',
+      memberId: currentUserId,
+      response: { removed: false, id: '01KQK8D0000000000000000000' },
+    });
+    const afterDelayedAdd = applyReactionAddedEventToPages(
+      afterNoOpRemove,
+      conversationId,
+      tracker,
+      {
+        messageId,
+        emoji: '👍',
+        memberId: currentUserId,
+        operationId: '01KQK8C9999999999999999999',
       }
     );
 

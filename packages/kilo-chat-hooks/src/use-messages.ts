@@ -14,6 +14,7 @@ import type {
   ActionDeliveryFailedEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
+  RemoveReactionResponse,
 } from '@kilocode/kilo-chat';
 import { useEffect } from 'react';
 import { kiloclawConversationContext } from '@kilocode/event-service';
@@ -143,6 +144,23 @@ export function applyReactionRemovedMutationToPages<TPageParam>(
     ...msg,
     reactions: applyReactionRemoved(msg.reactions, operation.emoji, operation.memberId),
   }));
+}
+
+export function applyReactionRemovedResponseToPages<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  conversationId: string,
+  latestOperations: ReactionOperationTracker,
+  operation: Pick<ReactionOperation, 'messageId' | 'emoji' | 'memberId'> & {
+    response: RemoveReactionResponse;
+  }
+): InfiniteData<Message[], TPageParam> {
+  if (operation.response.id === null) return old;
+  return applyReactionRemovedMutationToPages(old, conversationId, latestOperations, {
+    messageId: operation.messageId,
+    emoji: operation.emoji,
+    memberId: operation.memberId,
+    operationId: operation.response.id,
+  });
 }
 
 export function latestMarkReadMessageId(messages: readonly Pick<Message, 'id'>[]): string | null {
@@ -684,16 +702,16 @@ export function useRemoveReaction(
       if (!restored) invalidateMessages(queryClient, context.queryKey);
     },
     onSuccess: (result, variables) => {
-      if (!conversationId || currentUserId === null || !result.removed) return;
+      if (!conversationId || currentUserId === null || result.id === null) return;
       const queryKey = messagesKey(conversationId);
       const reactionOperations = getReactionOperationTracker(conversationId);
       queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
         if (!old) return old;
-        return applyReactionRemovedMutationToPages(old, conversationId, reactionOperations, {
+        return applyReactionRemovedResponseToPages(old, conversationId, reactionOperations, {
           messageId: variables.messageId,
           emoji: variables.emoji,
           memberId: currentUserId,
-          operationId: result.id,
+          response: result,
         });
       });
     },

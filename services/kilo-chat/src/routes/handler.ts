@@ -374,7 +374,7 @@ export async function handleRemoveReaction(c: HonoCtx) {
   }
   const response = result.removed
     ? ({ removed: true, id: result.removed_id } satisfies RemoveReactionResponse)
-    : ({ removed: false, id: null } satisfies RemoveReactionResponse);
+    : ({ removed: false, id: result.id } satisfies RemoveReactionResponse);
   return c.json(response, 200);
 }
 

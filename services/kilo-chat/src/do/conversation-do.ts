@@ -175,7 +175,7 @@ export type AddReactionResult =
 export type RemoveReactionParams = { messageId: string; memberId: string; emoji: string };
 export type RemoveReactionResult =
   | { ok: true; removed: true; removed_id: string; memberContext: MemberContext }
-  | { ok: true; removed: false }
+  | { ok: true; removed: false; removed_id: string | null }
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export class ConversationDO extends DurableObject<Env> {
@@ -694,20 +694,29 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     try {
-      const live = this.db
+      const existing = this.db
         .select()
         .from(reactions)
         .where(
           and(
             eq(reactions.message_id, params.messageId),
             eq(reactions.member_id, params.memberId),
-            eq(reactions.emoji, params.emoji),
-            sql`${reactions.deleted_at} IS NULL`
+            eq(reactions.emoji, params.emoji)
           )
         )
         .get();
 
-      if (!live) return { ok: true, removed: false };
+      if (!existing) return { ok: true, removed: false, removed_id: null };
+      if (existing.deleted_at !== null) {
+        if (existing.removed_id === null) {
+          return {
+            ok: false,
+            code: 'internal',
+            error: 'Deleted reaction is missing remove operation id',
+          };
+        }
+        return { ok: true, removed: false, removed_id: existing.removed_id };
+      }
 
       const removedId = this.nextUlid();
       this.db

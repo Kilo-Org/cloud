@@ -82,42 +82,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(sendPushNotifications).not.toHaveBeenCalled();
   });
 
-  it('rejects malformed runtime payloads before side effects', async () => {
-    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
-    const presenceSpy = vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
-    const stub = getDO('user-invalid-payload');
-    const invalidInput = {
-      ...baseInput({
-        userId: 'user-invalid-payload',
-        idempotencyKey: 'k-invalid-payload',
-      }),
-      push: {
-        title: 'T',
-        body: 'B',
-        data: { type: 'chat.message', sandboxId: '', conversationId: 'conv1', messageId: 'm1' },
-      },
-    } as DispatchPushInput;
-
-    const stored = await runInDurableObject(stub, async (instance, state) => {
-      let rejected = false;
-      try {
-        await instance.dispatchPush(invalidInput);
-      } catch {
-        rejected = true;
-      }
-      return {
-        rejected,
-        buckets: Array.from((await state.storage.list<number>({ prefix: 'bucket:' })).entries()),
-        total: await state.storage.get<number>('total'),
-        idem: await state.storage.get<{ stage: string; ts: number }>('idem:k-invalid-payload'),
-      };
-    });
-
-    expect(presenceSpy).not.toHaveBeenCalled();
-    expect(sendPushNotifications).not.toHaveBeenCalled();
-    expect(stored).toEqual({ rejected: true, buckets: [], total: undefined, idem: undefined });
-  });
-
   it('records presence suppression as terminal idempotency', async () => {
     installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     const presenceSpy = vi

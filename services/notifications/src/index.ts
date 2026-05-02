@@ -10,9 +10,7 @@ import { useWorkersLogger } from 'workers-tagged-logger';
 import { presenceContextForConversation } from '@kilocode/event-service';
 import {
   badgeBucketForConversation,
-  clearBadgeBucketForUserInputSchema,
   markBadgeReadInputSchema,
-  sendPushForConversationInputSchema,
   type ClearBadgeBucketForUserInput,
   type ClearBadgeBucketForUserOutput,
   type DispatchPushInput,
@@ -97,11 +95,10 @@ export async function sendPushForConversationCore(
     getRecipientDOStub: (userId: string) => RecipientDOStub;
   }
 ): Promise<SendPushForConversationOutput> {
-  const parsedInput = sendPushForConversationInputSchema.parse(input);
   const recipients: string[] = [];
   const seen = new Set<string>();
-  for (const id of parsedInput.recipientUserIds) {
-    if (id === parsedInput.senderUserId) continue;
+  for (const id of input.recipientUserIds) {
+    if (id === input.senderUserId) continue;
     if (seen.has(id)) continue;
     seen.add(id);
     recipients.push(id);
@@ -110,33 +107,28 @@ export async function sendPushForConversationCore(
   const results = await Promise.allSettled(
     recipients.map(async userId => {
       const stub = deps.getRecipientDOStub(userId);
-      const outcome = await stub.dispatchPush({
+      const dispatchInput = {
         userId,
-        presenceContext: presenceContextForConversation(
-          parsedInput.sandboxId,
-          parsedInput.conversationId
-        ),
-        idempotencyKey: `chat:${parsedInput.messageId}:${userId}`,
+        presenceContext: presenceContextForConversation(input.sandboxId, input.conversationId),
+        idempotencyKey: `chat:${input.messageId}:${userId}`,
         badge: {
-          badgeBucket: badgeBucketForConversation(
-            parsedInput.sandboxId,
-            parsedInput.conversationId
-          ),
+          badgeBucket: badgeBucketForConversation(input.sandboxId, input.conversationId),
           delta: 1,
         },
         push: {
-          title: parsedInput.title,
-          body: parsedInput.bodyPreview,
+          title: input.title,
+          body: input.bodyPreview,
           data: {
             type: 'chat.message',
-            sandboxId: parsedInput.sandboxId,
-            conversationId: parsedInput.conversationId,
-            messageId: parsedInput.messageId,
+            sandboxId: input.sandboxId,
+            conversationId: input.conversationId,
+            messageId: input.messageId,
           },
           sound: 'default',
           priority: 'high',
         },
-      });
+      } satisfies DispatchPushInput;
+      const outcome = await stub.dispatchPush(dispatchInput);
       return outcome.kind;
     })
   );
@@ -147,7 +139,7 @@ export async function sendPushForConversationCore(
       outcome: result?.status === 'fulfilled' ? result.value : 'failed',
     };
   });
-  return { perRecipient };
+  return { perRecipient } satisfies SendPushForConversationOutput;
 }
 
 /**
@@ -180,12 +172,11 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   async clearBadgeBucketForUser(
     input: ClearBadgeBucketForUserInput
   ): Promise<ClearBadgeBucketForUserOutput> {
-    const parsedInput = clearBadgeBucketForUserInputSchema.parse(input);
     const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
-      this.env.NOTIFICATION_CHANNEL_DO.idFromName(parsedInput.userId)
+      this.env.NOTIFICATION_CHANNEL_DO.idFromName(input.userId)
     );
-    const badgeCount = await stub.markBucketRead(parsedInput.badgeBucket);
-    return { badgeCount };
+    const badgeCount = await stub.markBucketRead(input.badgeBucket);
+    return { badgeCount } satisfies ClearBadgeBucketForUserOutput;
   }
 
   async sendInstanceLifecycleNotification(
@@ -209,7 +200,7 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
         return sendPushNotifications(messages, accessToken);
       },
       enqueueReceipts: async ticketTokenPairs => {
-        const receiptMsg: ReceiptCheckMessage = { ticketTokenPairs };
+        const receiptMsg = { ticketTokenPairs } satisfies ReceiptCheckMessage;
         await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
       },
     });

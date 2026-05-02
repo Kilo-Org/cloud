@@ -258,28 +258,6 @@ describe('dispatchInstanceLifecyclePush', () => {
     expect(calls.enqueuedReceipts).toHaveLength(0);
   });
 
-  it('rejects invalid params via zod before doing any IO', async () => {
-    const { deps, calls } = fakeDeps();
-
-    await expect(
-      dispatchInstanceLifecyclePush({ ...baseParams(), userId: '' }, deps)
-    ).rejects.toThrow();
-
-    expect(calls.getTokenQueries).toHaveLength(0);
-    expect(calls.sentMessages).toHaveLength(0);
-  });
-
-  it('rejects an empty sandboxId before doing any IO', async () => {
-    const { deps, calls } = fakeDeps();
-
-    await expect(
-      dispatchInstanceLifecyclePush({ ...baseParams(), sandboxId: '' }, deps)
-    ).rejects.toThrow();
-
-    expect(calls.getTokenQueries).toHaveLength(0);
-    expect(calls.sentMessages).toHaveLength(0);
-  });
-
   it('carries sandboxId as the only chat route id in the Expo data payload', async () => {
     const { deps, calls } = fakeDeps();
 

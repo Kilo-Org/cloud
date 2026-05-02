@@ -5,7 +5,6 @@
  */
 
 import {
-  sendInstanceLifecycleNotificationInputSchema,
   type InstanceLifecycleEvent,
   type SendInstanceLifecycleNotificationParams,
   type SendInstanceLifecycleNotificationResult,
@@ -49,18 +48,21 @@ export function buildInstanceLifecycleMessages(
   const title = buildTitle(params.event, params.instanceName);
   const body = buildBody(params.event, params.errorMessage);
 
-  return tokens.map(token => ({
-    to: token,
-    title,
-    body,
-    data: {
-      type: 'instance-lifecycle',
-      event: params.event,
-      sandboxId: params.sandboxId,
-    },
-    sound: 'default' as const,
-    priority: 'high' as const,
-  }));
+  return tokens.map(
+    token =>
+      ({
+        to: token,
+        title,
+        body,
+        data: {
+          type: 'instance-lifecycle',
+          event: params.event,
+          sandboxId: params.sandboxId,
+        },
+        sound: 'default',
+        priority: 'high',
+      }) satisfies ExpoPushMessage
+  );
 }
 
 export type LifecycleDispatchDeps = {
@@ -78,9 +80,7 @@ export async function dispatchInstanceLifecyclePush(
   params: SendInstanceLifecycleNotificationParams,
   deps: LifecycleDispatchDeps
 ): Promise<SendInstanceLifecycleNotificationResult> {
-  const parsed = sendInstanceLifecycleNotificationInputSchema.parse(params);
-
-  const tokens = await deps.getTokens(parsed.userId);
+  const tokens = await deps.getTokens(params.userId);
   if (tokens.length === 0) {
     return {
       tokenCount: 0,
@@ -88,10 +88,10 @@ export async function dispatchInstanceLifecyclePush(
       staleTokens: 0,
       receiptCount: 0,
       ticketErrors: EMPTY_TICKET_ERRORS,
-    };
+    } satisfies SendInstanceLifecycleNotificationResult;
   }
 
-  const messages = buildInstanceLifecycleMessages(tokens, parsed);
+  const messages = buildInstanceLifecycleMessages(tokens, params);
   const { ticketTokenPairs, staleTokens, ticketErrors } = await deps.sendPush(messages);
 
   if (staleTokens.length > 0) {
@@ -112,5 +112,5 @@ export async function dispatchInstanceLifecyclePush(
       retryable: ticketErrors.filter(ticketError => ticketError.retryable).length,
       terminal: ticketErrors.filter(ticketError => !ticketError.retryable).length,
     },
-  };
+  } satisfies SendInstanceLifecycleNotificationResult;
 }

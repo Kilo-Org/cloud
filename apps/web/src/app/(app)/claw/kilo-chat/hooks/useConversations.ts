@@ -11,6 +11,7 @@ export {
   startMarkReadAttempt,
   succeedMarkReadAttempt,
   applyConversationActivityToPages,
+  applyConversationCreatedToPages,
   applyConversationReadToPages,
   updateConversationPages,
   filterConversationPages,

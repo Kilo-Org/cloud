@@ -5,6 +5,7 @@
 
 import { ulid } from 'ulid';
 import { ulidToTimestamp } from '@kilocode/kilo-chat';
+import type { ConversationListItem } from '@kilocode/kilo-chat';
 import { badgeBucketForConversation } from '@kilocode/notifications';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import {
@@ -26,6 +27,16 @@ type MemberAddParams = {
   sandboxId: string;
   joinedAt: number;
 };
+
+function conversationListItemFromMemberParams(params: MemberAddParams): ConversationListItem {
+  return {
+    conversationId: params.conversationId,
+    title: params.title,
+    lastActivityAt: null,
+    lastReadAt: null,
+    joinedAt: params.joinedAt,
+  };
+}
 
 /**
  * Fan out `addConversation` to each member's MembershipDO. Accumulates the
@@ -78,7 +89,7 @@ export type CreateConversationParams = {
 };
 
 export type CreateConversationResult =
-  | { ok: true; conversationId: string }
+  | { ok: true; conversationId: string; conversation: ConversationListItem }
   | { ok: false; code: 'forbidden' | 'internal'; error: string };
 
 export async function createConversationFor(
@@ -126,12 +137,15 @@ export async function createConversationFor(
     throw err;
   }
 
+  const conversation = conversationListItemFromMemberParams(memberParams);
+
   // Notify all human members on the instance context so their conversation list updates.
   await pushInstanceEvent(env, params.sandboxId, [userId], 'conversation.created', {
     conversationId,
+    conversation,
   });
 
-  return { ok: true, conversationId };
+  return { ok: true, conversationId, conversation };
 }
 
 // ─── createBotConversation ─────────────────────────────────────────────────
@@ -143,7 +157,7 @@ export type CreateBotConversationParams = {
 };
 
 export type CreateBotConversationResult =
-  | { ok: true; conversationId: string }
+  | { ok: true; conversationId: string; conversation: ConversationListItem }
   | {
       ok: false;
       code: 'not_found' | 'invalid_members' | 'internal';
@@ -209,11 +223,13 @@ export async function createBotConversationFor(
   }
 
   const humanMemberIds = members.filter(m => m.kind === 'user').map(m => m.id);
+  const conversation = conversationListItemFromMemberParams(memberParams);
   await pushInstanceEvent(env, params.sandboxId, humanMemberIds, 'conversation.created', {
     conversationId,
+    conversation,
   });
 
-  return { ok: true, conversationId };
+  return { ok: true, conversationId, conversation };
 }
 
 // ─── renameConversation ────────────────────────────────────────────────────

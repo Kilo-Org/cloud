@@ -1,5 +1,6 @@
 import {
   applyConversationActivityToPages,
+  applyConversationCreatedToPages,
   applyConversationReadToPages,
   applyMarkConversationReadRollbackToPages,
   type ConversationListInfiniteData,
@@ -7,10 +8,7 @@ import {
 } from '@kilocode/kilo-chat-hooks';
 import { describe, expect, it } from 'vitest';
 
-import {
-  isConversationOnFirstPage,
-  shouldApplyConversationRead,
-} from './hooks/instance-event-cache';
+import { shouldApplyConversationRead } from './hooks/instance-event-cache';
 
 function conversation(
   conversationId: string,
@@ -30,7 +28,7 @@ function conversation(
 }
 
 describe('instance event cache helpers', () => {
-  it('only treats conversations in the first loaded page as locally patchable for created/activity', () => {
+  it('inserts conversation.created rows into patchable first-page windows', () => {
     const data: ConversationListInfiniteData = {
       pages: [
         { conversations: [conversation('first')], hasMore: true, nextCursor: 'cursor-1' },
@@ -39,9 +37,15 @@ describe('instance event cache helpers', () => {
       pageParams: [null, 'cursor-1'],
     };
 
-    expect(isConversationOnFirstPage(data, 'first')).toBe(true);
-    expect(isConversationOnFirstPage(data, 'second')).toBe(false);
-    expect(isConversationOnFirstPage(undefined, 'first')).toBe(false);
+    const result = applyConversationCreatedToPages(
+      data,
+      conversation('01ARZ3NDEKTSV4RRFFQ69G5FA9', { joinedAt: 2 })
+    );
+
+    expect(result.applied).toBe(true);
+    expect(result.data?.pages[0]?.conversations[0]?.conversationId).toBe(
+      '01ARZ3NDEKTSV4RRFFQ69G5FA9'
+    );
   });
 
   it('applies conversation.read only for the current user', () => {

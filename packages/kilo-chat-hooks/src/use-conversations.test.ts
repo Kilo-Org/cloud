@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { conversationsKey } from './query-keys';
 import {
   applyConversationActivityToPages,
+  applyConversationCreatedToPages,
   applyOptimisticMarkConversationRead,
   rollbackOptimisticMarkConversationRead,
   type ConversationListInfiniteData,
@@ -153,6 +154,37 @@ describe('applyConversationActivityToPages', () => {
       'conversation-c',
       'conversation-d',
     ]);
+  });
+});
+
+describe('applyConversationCreatedToPages', () => {
+  it('inserts a created conversation into the first loaded page in sorted order', () => {
+    const data = conversationsData(
+      [[conversation('conversation-a', { lastActivityAt: 100, joinedAt: 100 })]],
+      [null]
+    );
+    const created = conversation('conversation-b', { lastActivityAt: null, joinedAt: 200 });
+
+    const result = applyConversationCreatedToPages(data, created);
+
+    expect(result.applied).toBe(true);
+    expect(result.data?.pages[0]?.conversations.map(c => c.conversationId)).toEqual([
+      'conversation-b',
+      'conversation-a',
+    ]);
+  });
+
+  it('falls back to invalidation when the created row belongs beyond the loaded window', () => {
+    const data = conversationsData(
+      [[conversation('conversation-a', { lastActivityAt: 300, joinedAt: 300 })]],
+      ['cursor-1']
+    );
+    const created = conversation('conversation-b', { lastActivityAt: null, joinedAt: 100 });
+
+    const result = applyConversationCreatedToPages(data, created);
+
+    expect(result.applied).toBe(false);
+    expect(result.data).toBe(data);
   });
 });
 

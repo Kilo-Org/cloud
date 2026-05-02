@@ -8,6 +8,7 @@ import type {
 } from '@kilocode/kilo-chat';
 import {
   applyConversationActivityToPages,
+  applyConversationCreatedToPages,
   applyConversationReadToPages,
   filterConversationPages,
   type ConversationListInfiniteData,
@@ -48,15 +49,17 @@ export function registerKiloChatLayoutEventCacheHandlers({
   queryClient,
   queryKey,
 }: RegisterKiloChatLayoutEventCacheHandlersOptions): () => void {
-  function isOnFirstPage(conversationId: string): boolean {
-    const data = queryClient.getQueryData<ConversationListInfiniteData>(queryKey);
-    return data?.pages[0]?.conversations.some(c => c.conversationId === conversationId) ?? false;
-  }
-
   const offs = [
     kiloChatClient.onConversationCreated((_ctx, event) => {
-      if (isOnFirstPage(event.conversationId)) return;
-      void queryClient.invalidateQueries({ queryKey });
+      const result = applyConversationCreatedToPages(
+        queryClient.getQueryData<ConversationListInfiniteData>(queryKey),
+        event.conversation
+      );
+      if (!result.applied) {
+        void queryClient.invalidateQueries({ queryKey });
+        return;
+      }
+      queryClient.setQueryData<ConversationListInfiniteData>(queryKey, result.data);
     }),
     kiloChatClient.onConversationRenamed((_ctx, event) => {
       queryClient.setQueryData<ConversationListInfiniteData>(queryKey, old =>

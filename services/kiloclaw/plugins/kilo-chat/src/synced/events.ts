@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   actionGroupIdSchema,
+  conversationListItemSchema,
   conversationTitleSchema,
   contentBlockSchema,
   emojiSchema,
@@ -55,9 +56,12 @@ export const reactionRemovedEventSchema = z.object({
   emoji: emojiSchema,
 });
 
-export const conversationCreatedEventSchema = z.object({
-  conversationId: ulidSchema,
-});
+export const conversationCreatedEventSchema = z
+  .object({
+    conversationId: ulidSchema,
+    conversation: conversationListItemSchema,
+  })
+  .refine(event => event.conversation.conversationId === event.conversationId);
 
 export const conversationRenamedEventSchema = z.object({
   conversationId: ulidSchema,

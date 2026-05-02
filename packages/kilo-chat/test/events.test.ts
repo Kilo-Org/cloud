@@ -50,7 +50,47 @@ describe('kilo chat event payload schemas', () => {
     ).toBe(false);
 
     const conversationSchema = getKiloChatEventPayloadSchema('conversation.created');
-    expect(conversationSchema.safeParse({ conversationId: 'not-a-ulid' }).success).toBe(false);
+    expect(
+      conversationSchema.safeParse({
+        conversationId: 'not-a-ulid',
+        conversation: {
+          conversationId: 'not-a-ulid',
+          title: null,
+          lastActivityAt: null,
+          lastReadAt: null,
+          joinedAt: 1,
+        },
+      }).success
+    ).toBe(false);
+  });
+
+  it('validates conversation.created list rows', () => {
+    const conversationSchema = getKiloChatEventPayloadSchema('conversation.created');
+
+    expect(
+      conversationSchema.safeParse({
+        conversationId: validConversationId,
+        conversation: {
+          conversationId: validConversationId,
+          title: 'New chat',
+          lastActivityAt: null,
+          lastReadAt: null,
+          joinedAt: 1,
+        },
+      }).success
+    ).toBe(true);
+    expect(
+      conversationSchema.safeParse({
+        conversationId: validConversationId,
+        conversation: {
+          conversationId: validReplyMessageId,
+          title: 'New chat',
+          lastActivityAt: null,
+          lastReadAt: null,
+          joinedAt: 1,
+        },
+      }).success
+    ).toBe(false);
   });
 
   it('keeps actor and member identifiers non-empty without requiring ULIDs', () => {

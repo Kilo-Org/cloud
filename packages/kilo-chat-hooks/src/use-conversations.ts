@@ -47,8 +47,31 @@ export function useCreateConversation(client: KiloChatClient, options?: Mutation
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (req: CreateConversationRequest) => client.createConversation(req),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: conversationsKeyAll() });
+    onSuccess: (response, variables) => {
+      let invalidationRequired = false;
+      let matchedEntryCount = 0;
+      const previousEntries = queryClient.getQueriesData<ConversationListInfiniteData>({
+        queryKey: conversationsKeyAll(),
+      });
+
+      for (const [entryQueryKey, data] of previousEntries) {
+        const sandboxId = Array.isArray(entryQueryKey) ? entryQueryKey[2] : undefined;
+        if (sandboxId !== variables.sandboxId && sandboxId !== null) {
+          continue;
+        }
+        matchedEntryCount += 1;
+
+        const result = applyConversationCreatedToPages(data, response.conversation);
+        if (!result.applied) {
+          invalidationRequired = true;
+        } else {
+          queryClient.setQueryData<ConversationListInfiniteData>(entryQueryKey, result.data);
+        }
+      }
+
+      if (invalidationRequired || matchedEntryCount === 0) {
+        void queryClient.invalidateQueries({ queryKey: conversationsKeyAll() });
+      }
     },
     onError: options?.onError,
   });
@@ -178,6 +201,56 @@ export function applyConversationActivityToPages(
           ...page,
           conversations,
         };
+      }),
+    },
+    applied: true,
+  };
+}
+
+export function applyConversationCreatedToPages(
+  data: ConversationListInfiniteData | undefined,
+  created: ConversationListItem
+): ApplyConversationListPatchResult {
+  const firstPage = data?.pages[0];
+  if (!data || !firstPage) {
+    return { data, applied: false };
+  }
+
+  const loadedConversations = data.pages.flatMap(page => page.conversations);
+  if (loadedConversations.some(c => c.conversationId === created.conversationId)) {
+    return { data, applied: true };
+  }
+
+  const sortedConversations = [created, ...loadedConversations].sort(
+    compareConversationsByActivity
+  );
+  const createdIndex = sortedConversations.findIndex(
+    conversation => conversation.conversationId === created.conversationId
+  );
+  if (firstPage.hasMore && createdIndex >= firstPage.conversations.length) {
+    return { data, applied: false };
+  }
+
+  const lastPageIndex = data.pages.length - 1;
+  const lastPage = data.pages[lastPageIndex];
+  const loadedWindowSize = loadedConversations.length + (lastPage?.hasMore ? 0 : 1);
+  const nextLoadedWindow = sortedConversations.slice(0, loadedWindowSize);
+  let nextConversationOffset = 0;
+
+  return {
+    data: {
+      ...data,
+      pages: data.pages.map((page, index) => {
+        const pageSize =
+          index === lastPageIndex && !page.hasMore
+            ? page.conversations.length + 1
+            : page.conversations.length;
+        const conversations = nextLoadedWindow.slice(
+          nextConversationOffset,
+          nextConversationOffset + pageSize
+        );
+        nextConversationOffset += pageSize;
+        return { ...page, conversations };
       }),
     },
     applied: true,

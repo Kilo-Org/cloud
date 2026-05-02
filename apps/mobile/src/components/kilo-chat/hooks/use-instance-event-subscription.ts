@@ -11,6 +11,7 @@ import {
 } from '@kilocode/kilo-chat';
 import {
   applyConversationActivityToPages,
+  applyConversationCreatedToPages,
   applyConversationReadToPages,
   botStatusKey,
   conversationKey,
@@ -20,7 +21,7 @@ import {
   updateConversationPages,
 } from '@kilocode/kilo-chat-hooks';
 
-import { isConversationOnFirstPage, shouldApplyConversationRead } from './instance-event-cache';
+import { shouldApplyConversationRead } from './instance-event-cache';
 import { useEventSubscription } from './use-event-subscription';
 import { useCurrentUserId } from './use-current-user-id';
 import { useEventServiceClient } from './use-kilo-chat-client';
@@ -43,11 +44,15 @@ export function useInstanceEventSubscription(sandboxId: string | undefined) {
         return;
       }
       const event = result.data;
-      const data = qc.getQueryData<ConversationListInfiniteData>(queryKey);
-      if (isConversationOnFirstPage(data, event.conversationId)) {
+      const createdResult = applyConversationCreatedToPages(
+        qc.getQueryData<ConversationListInfiniteData>(queryKey),
+        event.conversation
+      );
+      if (!createdResult.applied) {
+        void qc.invalidateQueries({ queryKey });
         return;
       }
-      void qc.invalidateQueries({ queryKey });
+      qc.setQueryData<ConversationListInfiniteData>(queryKey, createdResult.data);
     },
     [qc, queryKey]
   );

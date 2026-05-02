@@ -54,7 +54,10 @@ export function registerConversationRoutes(
     }
 
     return c.json(
-      { conversationId: result.conversationId } satisfies CreateConversationResponse,
+      {
+        conversationId: result.conversationId,
+        conversation: result.conversation,
+      } satisfies CreateConversationResponse,
       201
     );
   });

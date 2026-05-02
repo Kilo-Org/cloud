@@ -158,16 +158,18 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   const headers = authHeaders(options.gatewayToken);
 
   async function createMessage(params: CreateMessageParams): Promise<CreateMessageResult> {
+    const body = {
+      conversationId: params.conversationId,
+      content: params.content,
+      ...(params.inReplyToMessageId !== undefined && {
+        inReplyToMessageId: params.inReplyToMessageId,
+      }),
+    } satisfies z.input<typeof createMessageRequestSchema>;
+
     const response = await fetchImpl(`${base}/_kilo/kilo-chat/send`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        conversationId: params.conversationId,
-        content: params.content,
-        ...(params.inReplyToMessageId !== undefined && {
-          inReplyToMessageId: params.inReplyToMessageId,
-        }),
-      }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       throw new Error(
@@ -178,16 +180,18 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   }
 
   async function editMessage(params: EditMessageParams): Promise<EditMessageResult> {
+    const body = {
+      conversationId: params.conversationId,
+      content: params.content,
+      timestamp: params.timestamp,
+    } satisfies z.input<typeof editMessageRequestSchema>;
+
     const response = await fetchImpl(
       `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}`,
       {
         method: 'PATCH',
         headers,
-        body: JSON.stringify({
-          conversationId: params.conversationId,
-          content: params.content,
-          timestamp: params.timestamp,
-        }),
+        body: JSON.stringify(body),
       }
     );
     if (response.status === 409) {
@@ -221,10 +225,14 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   }
 
   async function sendTyping(params: SendTypingParams): Promise<void> {
+    const body = {
+      conversationId: params.conversationId,
+    } satisfies SendTypingParams;
+
     const response = await fetchImpl(`${base}/_kilo/kilo-chat/typing`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ conversationId: params.conversationId }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       throw new Error(
@@ -235,10 +243,14 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   }
 
   async function sendTypingStop(params: SendTypingParams): Promise<void> {
+    const body = {
+      conversationId: params.conversationId,
+    } satisfies SendTypingParams;
+
     const response = await fetchImpl(`${base}/_kilo/kilo-chat/typing/stop`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ conversationId: params.conversationId }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       throw new Error(
@@ -249,12 +261,17 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   }
 
   async function addReaction(params: AddReactionParams): Promise<AddReactionResult> {
+    const body = {
+      conversationId: params.conversationId,
+      emoji: params.emoji,
+    } satisfies z.input<typeof reactionRequestBodySchema>;
+
     const response = await fetchImpl(
       `${base}/_kilo/kilo-chat/messages/${encodeURIComponent(params.messageId)}/reactions`,
       {
         method: 'POST',
         headers,
-        body: JSON.stringify({ conversationId: params.conversationId, emoji: params.emoji }),
+        body: JSON.stringify(body),
       }
     );
     if (!response.ok) {
@@ -316,12 +333,16 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   }
 
   async function renameConversation(params: RenameConversationParams): Promise<void> {
+    const body = {
+      title: params.title,
+    } satisfies z.input<typeof renameConversationRequestSchema>;
+
     const response = await fetchImpl(
       `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(params.conversationId)}`,
       {
         method: 'PATCH',
         headers,
-        body: JSON.stringify({ title: params.title }),
+        body: JSON.stringify(body),
       }
     );
     if (!response.ok) {
@@ -352,12 +373,14 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
   async function createConversation(
     params: CreateConversationParams
   ): Promise<CreateConversationResult> {
+    const body = {
+      ...(params.title !== undefined && { title: params.title }),
+    } satisfies z.input<typeof createBotConversationRequestSchema>;
+
     const response = await fetchImpl(`${base}/_kilo/kilo-chat/conversations`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        ...(params.title !== undefined && { title: params.title }),
-      }),
+      body: JSON.stringify(body),
     });
     if (!response.ok) {
       throw new Error(
@@ -374,10 +397,15 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
 
   async function sendBotStatus(params: BotStatusParams): Promise<void> {
     try {
+      const body = {
+        online: params.online,
+        at: params.at,
+      } satisfies z.input<typeof botStatusRequestSchema>;
+
       const response = await fetchImpl(`${base}/_kilo/kilo-chat/bot-status`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(params),
+        body: JSON.stringify(body),
       });
       if (!response.ok) {
         console.warn(
@@ -393,9 +421,16 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
 
   async function sendConversationStatus(params: ConversationStatusParams): Promise<void> {
     try {
-      const { conversationId, ...body } = params;
+      const body = {
+        contextTokens: params.contextTokens,
+        contextWindow: params.contextWindow,
+        model: params.model,
+        provider: params.provider,
+        at: params.at,
+      } satisfies z.input<typeof conversationStatusRequestSchema>;
+
       const response = await fetchImpl(
-        `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(conversationId)}/conversation-status`,
+        `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(params.conversationId)}/conversation-status`,
         {
           method: 'POST',
           headers,
@@ -418,6 +453,10 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     params: ReportMessageDeliveryFailedParams
   ): Promise<void> {
     try {
+      const body = {
+        ...(params.reason !== undefined && { reason: params.reason }),
+      } satisfies z.input<typeof messageDeliveryFailedRequestSchema>;
+
       const response = await fetchImpl(
         `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(
           params.conversationId
@@ -425,9 +464,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            ...(params.reason !== undefined && { reason: params.reason }),
-          }),
+          body: JSON.stringify(body),
         }
       );
       if (!response.ok) {
@@ -446,6 +483,11 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
     params: ReportActionDeliveryFailedParams
   ): Promise<void> {
     try {
+      const body = {
+        messageId: params.messageId,
+        ...(params.reason !== undefined && { reason: params.reason }),
+      } satisfies z.input<typeof actionDeliveryFailedRequestSchema>;
+
       const response = await fetchImpl(
         `${base}/_kilo/kilo-chat/conversations/${encodeURIComponent(
           params.conversationId
@@ -453,10 +495,7 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            messageId: params.messageId,
-            ...(params.reason !== undefined && { reason: params.reason }),
-          }),
+          body: JSON.stringify(body),
         }
       );
       if (!response.ok) {

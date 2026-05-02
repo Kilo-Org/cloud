@@ -8,7 +8,10 @@ import type { ConnectTicketResponse } from '@kilocode/event-service';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { authenticateToken } from './auth';
 import { logger } from './util/logger';
-import type { TicketMintRequest } from './do/connection-ticket-do';
+import {
+  connectionTicketConsumeResponseSchema,
+  type TicketMintRequest,
+} from './do/connection-ticket-do';
 
 export { UserSessionDO } from './do/user-session-do';
 export { ConnectionTicketDO } from './do/connection-ticket-do';
@@ -64,15 +67,8 @@ async function consumeConnectionTicket(env: Env, ticket: string): Promise<string
   const res = await stub.fetch('https://ticket.local/consume', { method: 'POST' });
   if (!res.ok) return null;
   const body: unknown = await res.json();
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    !('userId' in body) ||
-    typeof body.userId !== 'string'
-  ) {
-    return null;
-  }
-  return body.userId;
+  const parsed = connectionTicketConsumeResponseSchema.safeParse(body);
+  return parsed.success ? parsed.data.userId : null;
 }
 
 app.post('/connect-ticket', async c => {

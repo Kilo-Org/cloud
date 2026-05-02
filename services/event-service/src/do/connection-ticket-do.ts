@@ -8,9 +8,13 @@ const ticketStateSchema = z.object({
 });
 
 const ticketMintRequestSchema = ticketStateSchema.omit({ consumed: true });
+export const connectionTicketConsumeResponseSchema = z.object({
+  userId: z.string().min(1),
+});
 
 type TicketState = z.infer<typeof ticketStateSchema>;
 export type TicketMintRequest = z.infer<typeof ticketMintRequestSchema>;
+export type ConnectionTicketConsumeResponse = z.infer<typeof connectionTicketConsumeResponseSchema>;
 
 export class ConnectionTicketDO extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
@@ -54,6 +58,7 @@ export class ConnectionTicketDO extends DurableObject<Env> {
       return new Response('Unauthorized', { status: 401 });
     }
 
-    return Response.json({ userId });
+    const response = { userId } satisfies ConnectionTicketConsumeResponse;
+    return Response.json(response);
   }
 }

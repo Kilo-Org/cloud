@@ -404,6 +404,7 @@ jobs:
               echo "FLY_IMAGE_DIGEST=${DIGEST}"
             fi
             echo "OPENCLAW_VERSION=${OPENCLAW}"
+            echo "FLY_IMAGE_CONTENT_MODE=production"
             echo "FLY_IMAGE_CONTENT_HASH=${CONTENT}"
             echo '```'
             echo ""

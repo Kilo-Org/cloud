@@ -53,13 +53,14 @@ async function getModelUsageSinceTimeByUser(
 }
 
 /**
- * Check if an IP address is within the free model rate limit.
- * This applies to ALL free model requests, both anonymous and authenticated.
+ * Check if an anonymous IP address is within the free model rate limit.
+ * Only counts anonymous (unauthenticated) requests — authenticated requests
+ * are rate-limited per user via checkFreeModelRateLimitByUser.
  */
 export async function checkFreeModelRateLimit(ipAddress: string): Promise<RateLimitResult> {
   const windowStart = new Date(Date.now() - FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000);
 
-  const requestCount = await getModelUsageSinceTime(windowStart, ipAddress);
+  const requestCount = await getModelUsageSinceTime(windowStart, ipAddress, true);
 
   return {
     allowed: requestCount < FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
@@ -68,9 +69,7 @@ export async function checkFreeModelRateLimit(ipAddress: string): Promise<RateLi
 }
 
 /**
- * Check if a user is within the free model rate limit.
- * Used for server-side products (cloud-agent, code-review, app-builder)
- * where all requests share infrastructure IPs.
+ * Check if an authenticated user is within the free model rate limit.
  */
 export async function checkFreeModelRateLimitByUser(kiloUserId: string): Promise<RateLimitResult> {
   const windowStart = new Date(Date.now() - FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000);

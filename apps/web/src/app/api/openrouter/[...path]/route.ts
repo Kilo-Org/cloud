@@ -3,12 +3,7 @@ import { type NextRequest } from 'next/server';
 import { isOpenCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/ai-gateway/processUsage';
-import {
-  validateFeatureHeader,
-  FEATURE_HEADER,
-  isUserRateLimitedFeature,
-  type FeatureValue,
-} from '@/lib/feature-detection';
+import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import type {
   OpenRouterChatCompletionRequest,
   GatewayResponsesRequest,
@@ -79,7 +74,6 @@ import {
 } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
-import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
@@ -132,24 +126,11 @@ function extractPromptInfo(requestBodyParsed: GatewayRequest): PromptInfo {
 }
 
 async function resolveRateLimit(
-  feature: FeatureValue | null,
   ipAddress: string,
   authPromise: Promise<{ user: { id: string } | null }>
-): Promise<
-  | NextResponseType<unknown>
-  | { result: { allowed: boolean; requestCount: number }; subject: string }
-> {
-  if (isUserRateLimitedFeature(feature) && isCloudflareIP(ipAddress)) {
-    const { user } = await authPromise;
-    if (!user) {
-      return NextResponse.json(
-        {
-          error: 'Authentication required for this feature',
-          error_type: ProxyErrorType.authentication_required,
-        },
-        { status: 401 }
-      );
-    }
+): Promise<{ result: { allowed: boolean; requestCount: number }; subject: string }> {
+  const { user } = await authPromise;
+  if (user) {
     return {
       result: await checkFreeModelRateLimitByUser(user.id),
       subject: `user: ${user.id}`,
@@ -272,14 +253,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // For FREE models: check rate limit, log at start.
-  // Server-side products (cloud-agent, code-review, app-builder) rate-limit
-  // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
-  // All other products rate-limit per IP (fast pre-auth path).
+  // Authenticated requests rate-limit per user; anonymous requests rate-limit per IP.
   const isRateLimitedFreeModelRequest =
     isKiloExclusiveFreeModel(originalModelIdLowerCased) || autoModel === KILO_AUTO_FREE_MODEL.id;
   if (isRateLimitedFreeModelRequest) {
-    const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
-    if (rateLimit instanceof NextResponse) return rateLimit;
+    const rateLimit = await resolveRateLimit(ipAddress, authPromise);
 
     if (!rateLimit.result.allowed) {
       console.warn(

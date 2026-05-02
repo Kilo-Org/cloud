@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import {
+  canShowReactionPills,
   getDeliveryFailureLabel,
   getReplyPreviewText,
   type ReplyPreviewSource,
@@ -164,7 +165,7 @@ function MessageBubbleComponent({
         )}
       </View>
 
-      {message.reactions.length > 0 && (
+      {canShowReactionPills(message) && (
         <View
           className={cn(
             'mt-1 flex-row flex-wrap gap-1 px-1',

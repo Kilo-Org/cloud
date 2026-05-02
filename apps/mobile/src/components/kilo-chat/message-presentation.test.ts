@@ -3,6 +3,8 @@ import { createMessageRequestSchema, type Message } from '@kilocode/kilo-chat';
 
 import {
   buildSendMessageVariables,
+  canShowReactionPills,
+  canToggleReaction,
   createSendMessageClientId,
   getDeliveryFailureLabel,
   getReplyPreviewText,
@@ -78,5 +80,42 @@ describe('getReplyPreviewText', () => {
 describe('getDeliveryFailureLabel', () => {
   it('returns a visible failure label for failed delivery messages', () => {
     expect(getDeliveryFailureLabel(message({ deliveryFailed: true }))).toBe('Not delivered');
+  });
+});
+
+describe('canShowReactionPills', () => {
+  it('hides reactions for deleted messages', () => {
+    expect(
+      canShowReactionPills(
+        message({
+          deleted: true,
+          reactions: [{ emoji: '👍', count: 1, memberIds: ['user-1'] }],
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('shows reactions for non-deleted messages with reactions', () => {
+    expect(
+      canShowReactionPills(
+        message({
+          reactions: [{ emoji: '👍', count: 1, memberIds: ['user-1'] }],
+        })
+      )
+    ).toBe(true);
+  });
+});
+
+describe('canToggleReaction', () => {
+  it('blocks reaction toggles for deleted messages', () => {
+    expect(canToggleReaction(message({ deleted: true }), 'user-1')).toBe(false);
+  });
+
+  it('blocks reaction toggles when the current user is not loaded', () => {
+    expect(canToggleReaction(message(), null)).toBe(false);
+  });
+
+  it('allows reaction toggles for loaded users on delivered messages', () => {
+    expect(canToggleReaction(message(), 'user-1')).toBe(true);
   });
 });

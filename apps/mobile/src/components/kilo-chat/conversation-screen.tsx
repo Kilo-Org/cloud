@@ -28,7 +28,11 @@ import { buildMessageActionSheetOptions, getSelectedMessageAction } from './mess
 import { MessageInput } from './message-input';
 import { type MessageInputSubmitControls } from './message-input-state';
 import { MessageList } from './message-list';
-import { buildSendMessageVariables, createSendMessageClientId } from './message-presentation';
+import {
+  buildSendMessageVariables,
+  canToggleReaction,
+  createSendMessageClientId,
+} from './message-presentation';
 import { useConversationPresence } from './hooks/use-conversation-presence';
 import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
 import { useMobileTypingState, useTypingSender } from './hooks/use-typing';
@@ -148,7 +152,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   );
   const handleReactionPress = useCallback(
     (message: Message, emoji: string) => {
-      if (!currentUserId || message.deliveryFailed) {
+      if (!currentUserId || !canToggleReaction(message, currentUserId)) {
         return;
       }
       const hasReacted =

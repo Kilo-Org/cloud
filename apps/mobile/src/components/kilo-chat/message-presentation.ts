@@ -56,3 +56,11 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
 export function getDeliveryFailureLabel(message: Message): string | null {
   return message.deliveryFailed ? 'Not delivered' : null;
 }
+
+export function canShowReactionPills(message: Message): boolean {
+  return !message.deleted && message.reactions.length > 0;
+}
+
+export function canToggleReaction(message: Message, currentUserId: string | null): boolean {
+  return currentUserId !== null && !message.deleted && !message.deliveryFailed;
+}

@@ -1509,4 +1509,43 @@ describe('auto-title on first message', () => {
       },
     ]);
   });
+
+  it('does not publish automatic typing.stop events for human messages', async () => {
+    const { conversationId, userId } = await createMultiHumanConversation('human-message-events');
+    const convStub = getConvStub(conversationId);
+    const info = await convStub.getInfo();
+    expect(info).not.toBeNull();
+    if (!info) return;
+
+    const pushedEvents: Array<{ event: string; userId: string }> = [];
+    const pushEvent = vi.fn(async (eventUserId: string, _context: string, event: string) => {
+      pushedEvents.push({ event, userId: eventUserId });
+      return true;
+    });
+    const eventEnv = {
+      ...env,
+      EVENT_SERVICE: {
+        fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+        connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+        pushEvent,
+      },
+    } satisfies Env;
+
+    await postCommitFanOut(
+      eventEnv,
+      info,
+      userId,
+      conversationId,
+      ulid(),
+      [{ type: 'text', text: 'Hello humans' }],
+      undefined,
+      undefined
+    );
+
+    expect(pushedEvents.filter(pushedEvent => pushedEvent.event === 'message.created')).toEqual([
+      { event: 'message.created', userId },
+      { event: 'message.created', userId: 'recipient-human-message-events' },
+    ]);
+    expect(pushedEvents.some(pushedEvent => pushedEvent.event === 'typing.stop')).toBe(false);
+  });
 });

@@ -232,7 +232,7 @@ export async function postCommitFanOut(
     }
   };
 
-  // ── Block B: Push message.created + typing.stop ──────────────────────
+  // ── Block B: Push message.created ────────────────────────────────────
   const pushMessageEvents = async (): Promise<void> => {
     if (!sandboxId) return;
     const replyTo = await getReplyToSnapshot(env, conversationId, inReplyToMessageId);
@@ -252,12 +252,6 @@ export async function postCommitFanOut(
         clientId: clientId ?? null,
       }
     );
-
-    if (isSenderHuman) {
-      await pushEventToHumanMembers(env, conversationId, sandboxId, humanMemberIds, 'typing.stop', {
-        memberId: callerId,
-      });
-    }
   };
 
   // Run webhook delivery, ConversationDO title write, and event push in

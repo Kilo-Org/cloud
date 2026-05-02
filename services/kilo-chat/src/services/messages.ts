@@ -15,6 +15,7 @@ import {
   type Message,
   type ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
+import type { SendPushForConversationInput } from '@kilocode/notifications';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { contentBlocksToText } from '../util/content';
@@ -343,7 +344,7 @@ export async function postCommitFanOut(
       const bodyPreview = contentBlocksToText(content).slice(0, 200);
       const sandboxLabel = await fetchSandboxLabel(env.HYPERDRIVE.connectionString, sandboxId);
       const conversationTitle = info.title ?? appliedAutoTitle ?? 'Untitled';
-      const pushResult = await env.NOTIFICATIONS.sendPushForConversation({
+      const payload = {
         conversationId,
         sandboxId,
         senderUserId,
@@ -351,7 +352,8 @@ export async function postCommitFanOut(
         title: `${sandboxLabel} · ${conversationTitle}`,
         bodyPreview,
         messageId,
-      });
+      } satisfies SendPushForConversationInput;
+      const pushResult = await env.NOTIFICATIONS.sendPushForConversation(payload);
       const failedRecipients = pushResult.perRecipient.filter(
         result => result.outcome === 'failed'
       );

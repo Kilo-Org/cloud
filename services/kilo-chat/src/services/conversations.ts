@@ -7,6 +7,7 @@ import { ulid } from 'ulid';
 import { ulidToTimestamp } from '@kilocode/kilo-chat';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
 import { badgeBucketForConversation } from '@kilocode/notifications';
+import type { ClearBadgeBucketForUserInput } from '@kilocode/notifications';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import {
   extractConversationContext,
@@ -386,10 +387,11 @@ export async function markReadFor(
     ) {
       const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
       try {
-        const clearResult = await env.NOTIFICATIONS.clearBadgeBucketForUser({
+        const payload = {
           userId,
           badgeBucket,
-        });
+        } satisfies ClearBadgeBucketForUserInput;
+        const clearResult = await env.NOTIFICATIONS.clearBadgeBucketForUser(payload);
         badgeClear = { ...clearResult, badgeBucket };
       } catch (err) {
         logger.error('clearBadgeBucketForUser failed', {

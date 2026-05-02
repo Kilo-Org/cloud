@@ -18,7 +18,10 @@ import type { KiloClawEnv } from '../../types';
 import type { InstanceMutableState } from './types';
 import { storageUpdate } from './state';
 import { doLog, doWarn, toLoggable } from './log';
-import type { SendInstanceLifecycleNotificationResult } from '../../notifications-binding';
+import type {
+  SendInstanceLifecycleNotificationParams,
+  SendInstanceLifecycleNotificationResult,
+} from '../../notifications-binding';
 
 /**
  * Reset shape for the lifecycle notification flags. Spread this into storage
@@ -129,12 +132,13 @@ export async function dispatchReadyPush(
   const instanceName = await lookupInstanceName(env, state);
 
   try {
-    const result = await env.NOTIFICATIONS.sendInstanceLifecycleNotification({
+    const payload = {
       userId: state.userId,
       sandboxId: state.sandboxId,
       event: 'ready',
       instanceName,
-    });
+    } satisfies SendInstanceLifecycleNotificationParams;
+    const result = await env.NOTIFICATIONS.sendInstanceLifecycleNotification(payload);
     logLifecyclePushResult(state, 'ready push dispatch completed', result, {
       event: 'ready',
       sandboxId: state.sandboxId,
@@ -169,13 +173,14 @@ export async function maybeDispatchStartFailurePush(
   const errorText = formatStartFailureReason(label);
 
   try {
-    const result = await env.NOTIFICATIONS.sendInstanceLifecycleNotification({
+    const payload = {
       userId: state.userId,
       sandboxId: state.sandboxId,
       event: 'start_failed',
       instanceName,
       errorMessage: errorText,
-    });
+    } satisfies SendInstanceLifecycleNotificationParams;
+    const result = await env.NOTIFICATIONS.sendInstanceLifecycleNotification(payload);
     logLifecyclePushResult(state, 'start failure push dispatch completed', result, {
       event: 'start_failed',
       sandboxId: state.sandboxId,

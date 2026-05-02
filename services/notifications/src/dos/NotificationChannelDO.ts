@@ -15,9 +15,13 @@ type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
 // Idempotency record. `pending` means the badge was incremented for this
 // idempotency key but the Expo send did not (yet) succeed; on retry we must
-// skip the increment to avoid double-counting. `delivered`, `suppressed`, and
-// `failed` are terminal stages; further attempts are duplicates.
-type IdemRecord = { stage: 'pending' | 'delivered' | 'suppressed' | 'failed'; ts: number };
+// skip the increment to avoid double-counting. `delivered`, `suppressed`,
+// `no_tokens`, and `failed` are terminal stages; further attempts are
+// duplicates.
+type IdemRecord = {
+  stage: 'pending' | 'delivered' | 'suppressed' | 'no_tokens' | 'failed';
+  ts: number;
+};
 
 const IDEM_PREFIX = 'idem:';
 const BUCKET_PREFIX = 'bucket:';
@@ -36,6 +40,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
     if (
       existing?.stage === 'delivered' ||
       existing?.stage === 'suppressed' ||
+      existing?.stage === 'no_tokens' ||
       existing?.stage === 'failed'
     ) {
       return { kind: 'duplicate' };
@@ -95,7 +100,12 @@ export class NotificationChannelDO extends DurableObject<Env> {
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, parsedInput.userId));
 
-    if (tokens.length === 0) return { kind: 'no_tokens' };
+    if (tokens.length === 0) {
+      const ts = Date.now();
+      await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'no_tokens', ts });
+      await this.ensureCleanupAlarm(ts);
+      return { kind: 'no_tokens' };
+    }
 
     // 5. Send via Expo
     const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({

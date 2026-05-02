@@ -173,6 +173,28 @@ describe('NotificationChannelDO.dispatchPush', () => {
     await expect(stub.listNonZeroBuckets()).resolves.toEqual([]);
   });
 
+  it('does not send a late push when a no-token dispatch is replayed after token registration', async () => {
+    const dbState: DbState = { tokens: [] };
+    installDbMock(dbState);
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    const stub = getDO('user-no-token-replay');
+    const input = baseInput({
+      userId: 'user-no-token-replay',
+      idempotencyKey: 'k-no-token-replay',
+    });
+
+    const first = await stub.dispatchPush(input);
+    dbState.tokens.push({ user_id: 'user-no-token-replay', token: 'tok-after-first-dispatch' });
+    const second = await stub.dispatchPush(input);
+
+    expect(first.kind).toBe('no_tokens');
+    expect(second.kind).toBe('duplicate');
+    expect(sendPushNotifications).not.toHaveBeenCalled();
+    await expect(stub.listNonZeroBuckets()).resolves.toEqual([
+      { badgeBucket: 'conv1', badgeCount: 1 },
+    ]);
+  });
+
   it('delivers and increments badges when presence lookup rejects', async () => {
     installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockRejectedValueOnce(new Error('rpc down'));

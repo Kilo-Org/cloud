@@ -1,8 +1,13 @@
 import type { ConversationListItem } from '@kilocode/kilo-chat';
+import { ulidToTimestamp } from '@kilocode/kilo-chat';
+import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 
+import { conversationsKey } from './query-keys';
 import {
   applyConversationActivityToPages,
+  applyOptimisticMarkConversationRead,
+  rollbackOptimisticMarkConversationRead,
   type ConversationListInfiniteData,
 } from './use-conversations';
 
@@ -48,6 +53,12 @@ function expectCompleteLoadedOrder(
   expect(ids).toEqual(expectedIds);
   expect(new Set(ids).size).toBe(expectedIds.length);
   expect([...ids].sort()).toEqual([...expectedIds].sort());
+}
+
+function firstConversationLastReadAt(
+  data: ConversationListInfiniteData | undefined
+): number | null | undefined {
+  return data?.pages[0]?.conversations[0]?.lastReadAt;
 }
 
 describe('applyConversationActivityToPages', () => {
@@ -142,5 +153,68 @@ describe('applyConversationActivityToPages', () => {
       'conversation-c',
       'conversation-d',
     ]);
+  });
+});
+
+describe('applyOptimisticMarkConversationRead', () => {
+  it('patches only the active sandbox conversation query when sandbox context is provided', () => {
+    const queryClient = new QueryClient();
+    const activeKey = conversationsKey('sandbox-a');
+    const otherKey = conversationsKey('sandbox-b');
+    const messageId = '01K8ZB8B3H9BRWZ6KCN39AX09G';
+    const optimisticReadAt = ulidToTimestamp(messageId);
+
+    queryClient.setQueryData(
+      activeKey,
+      conversationsData([[conversation('conversation-1', {})]], [null])
+    );
+    queryClient.setQueryData(
+      otherKey,
+      conversationsData([[conversation('conversation-1', {})]], [null])
+    );
+
+    applyOptimisticMarkConversationRead(queryClient, {
+      sandboxId: 'sandbox-a',
+      conversationId: 'conversation-1',
+      lastSeenMessageId: messageId,
+    });
+
+    expect(firstConversationLastReadAt(queryClient.getQueryData(activeKey))).toBe(optimisticReadAt);
+    expect(firstConversationLastReadAt(queryClient.getQueryData(otherKey))).toBeNull();
+  });
+
+  it('invalidates only the active sandbox conversation query when rollback sees newer local state', () => {
+    const queryClient = new QueryClient();
+    const activeKey = conversationsKey('sandbox-a');
+    const otherKey = conversationsKey('sandbox-b');
+    const messageId = '01K8ZB8B3H9BRWZ6KCN39AX09G';
+    const optimisticReadAt = ulidToTimestamp(messageId);
+
+    queryClient.setQueryData(
+      activeKey,
+      conversationsData([[conversation('conversation-1', {})]], [null])
+    );
+    queryClient.setQueryData(
+      otherKey,
+      conversationsData([[conversation('conversation-1', {})]], [null])
+    );
+
+    const context = applyOptimisticMarkConversationRead(queryClient, {
+      sandboxId: 'sandbox-a',
+      conversationId: 'conversation-1',
+      lastSeenMessageId: messageId,
+    });
+    queryClient.setQueryData(
+      activeKey,
+      conversationsData(
+        [[{ ...conversation('conversation-1', {}), lastReadAt: optimisticReadAt + 1 }]],
+        [null]
+      )
+    );
+
+    rollbackOptimisticMarkConversationRead(queryClient, context);
+
+    expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
   });
 });

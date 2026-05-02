@@ -62,6 +62,7 @@ describe('markReadConversation', () => {
     try {
       startMarkReadAttempt(state, marker);
       const result = await markReadConversation({
+        sandboxId: 'sandbox-1',
         conversationId: 'conversation-1',
         lastSeenMessageId: 'message-1',
         markConversationRead: async () => {

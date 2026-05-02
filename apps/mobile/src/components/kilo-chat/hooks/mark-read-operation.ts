@@ -2,20 +2,23 @@ import { type MarkConversationReadResponse } from '@kilocode/kilo-chat';
 import { type BadgeCountRow } from '@kilocode/notifications';
 
 type MarkReadConversationInput = {
+  sandboxId: string;
   conversationId: string;
   lastSeenMessageId: string;
   markConversationRead: (input: {
+    sandboxId: string;
     conversationId: string;
     lastSeenMessageId: string;
   }) => Promise<MarkConversationReadResponse>;
 };
 
 export async function markReadConversation({
+  sandboxId,
   conversationId,
   lastSeenMessageId,
   markConversationRead,
 }: MarkReadConversationInput): Promise<MarkConversationReadResponse> {
-  const result = await markConversationRead({ conversationId, lastSeenMessageId });
+  const result = await markConversationRead({ sandboxId, conversationId, lastSeenMessageId });
   return result;
 }
 

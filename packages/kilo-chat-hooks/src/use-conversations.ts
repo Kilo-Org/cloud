@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import type { InfiniteData, QueryKey } from '@tanstack/react-query';
+import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
 import { ulidToTimestamp, type KiloChatClient } from '@kilocode/kilo-chat';
 import type {
   CreateConversationRequest,
@@ -255,67 +255,86 @@ type MarkConversationReadQueryRollback = MarkConversationReadRollback & {
 
 type MarkConversationReadMutationContext = {
   rollbacks: MarkConversationReadQueryRollback[];
+  invalidationQueryKey: QueryKey;
 };
+
+type MarkConversationReadMutationVariables = MarkConversationReadRequest & {
+  conversationId: string;
+  sandboxId: string | null;
+};
+
+function markConversationReadQueryKey(sandboxId: string | null): QueryKey {
+  return sandboxId === null ? conversationsKeyAll() : conversationsKey(sandboxId);
+}
+
+export function applyOptimisticMarkConversationRead(
+  queryClient: QueryClient,
+  { sandboxId, conversationId, lastSeenMessageId }: MarkConversationReadMutationVariables
+): MarkConversationReadMutationContext {
+  const optimisticReadAt = ulidToTimestamp(lastSeenMessageId);
+  const queryKey = markConversationReadQueryKey(sandboxId);
+  const rollbacks: MarkConversationReadQueryRollback[] = [];
+  const previousEntries = queryClient.getQueriesData<ConversationListInfiniteData>({
+    queryKey,
+  });
+
+  for (const [entryQueryKey, data] of previousEntries) {
+    const previousConversation = data?.pages
+      .flatMap(page => page.conversations)
+      .find(conversation => conversation.conversationId === conversationId);
+
+    if (!previousConversation) {
+      continue;
+    }
+
+    rollbacks.push({
+      queryKey: entryQueryKey,
+      conversationId,
+      previousLastReadAt: previousConversation.lastReadAt,
+      optimisticReadAt,
+    });
+
+    queryClient.setQueryData<ConversationListInfiniteData>(entryQueryKey, old =>
+      updateConversationPages(old, conversation =>
+        conversation.conversationId === conversationId
+          ? { ...conversation, lastReadAt: optimisticReadAt }
+          : conversation
+      )
+    );
+  }
+
+  return { rollbacks, invalidationQueryKey: queryKey };
+}
+
+export function rollbackOptimisticMarkConversationRead(
+  queryClient: QueryClient,
+  context: MarkConversationReadMutationContext | undefined
+): void {
+  let shouldInvalidate = false;
+
+  for (const rollback of context?.rollbacks ?? []) {
+    const current = queryClient.getQueryData<ConversationListInfiniteData>(rollback.queryKey);
+    const result = applyMarkConversationReadRollbackToPages(current, rollback);
+    if (result.invalidationRequired) {
+      shouldInvalidate = true;
+    } else {
+      queryClient.setQueryData<ConversationListInfiniteData>(rollback.queryKey, result.data);
+    }
+  }
+
+  if (shouldInvalidate && context) {
+    void queryClient.invalidateQueries({ queryKey: context.invalidationQueryKey });
+  }
+}
 
 export function useMarkConversationRead(client: KiloChatClient) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      conversationId,
-      lastSeenMessageId,
-    }: MarkConversationReadRequest & { conversationId: string }) =>
+    mutationFn: ({ conversationId, lastSeenMessageId }: MarkConversationReadMutationVariables) =>
       client.markConversationRead(conversationId, { lastSeenMessageId }),
-    onMutate: ({ conversationId, lastSeenMessageId }): MarkConversationReadMutationContext => {
-      const optimisticReadAt = ulidToTimestamp(lastSeenMessageId);
-      const queryKey = conversationsKeyAll();
-      const rollbacks: MarkConversationReadQueryRollback[] = [];
-      const previousEntries = queryClient.getQueriesData<ConversationListInfiniteData>({
-        queryKey,
-      });
-
-      for (const [entryQueryKey, data] of previousEntries) {
-        const previousConversation = data?.pages
-          .flatMap(page => page.conversations)
-          .find(conversation => conversation.conversationId === conversationId);
-
-        if (!previousConversation) {
-          continue;
-        }
-
-        rollbacks.push({
-          queryKey: entryQueryKey,
-          conversationId,
-          previousLastReadAt: previousConversation.lastReadAt,
-          optimisticReadAt,
-        });
-
-        queryClient.setQueryData<ConversationListInfiniteData>(entryQueryKey, old =>
-          updateConversationPages(old, conversation =>
-            conversation.conversationId === conversationId
-              ? { ...conversation, lastReadAt: optimisticReadAt }
-              : conversation
-          )
-        );
-      }
-
-      return { rollbacks };
-    },
+    onMutate: variables => applyOptimisticMarkConversationRead(queryClient, variables),
     onError: (_err, _variables, context) => {
-      let shouldInvalidate = false;
-
-      for (const rollback of context?.rollbacks ?? []) {
-        const current = queryClient.getQueryData<ConversationListInfiniteData>(rollback.queryKey);
-        const result = applyMarkConversationReadRollbackToPages(current, rollback);
-        if (result.invalidationRequired) {
-          shouldInvalidate = true;
-        } else {
-          queryClient.setQueryData<ConversationListInfiniteData>(rollback.queryKey, result.data);
-        }
-      }
-
-      if (shouldInvalidate) {
-        void queryClient.invalidateQueries({ queryKey: conversationsKeyAll() });
-      }
+      rollbackOptimisticMarkConversationRead(queryClient, context);
     },
   });
 }

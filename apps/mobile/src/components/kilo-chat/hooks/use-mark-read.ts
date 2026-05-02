@@ -25,10 +25,12 @@ export function useMarkRead(client: KiloChatClient) {
 
   const mutation = useMutation({
     mutationFn: async ({
+      sandboxId,
       conversationId,
       lastSeenMessageId,
     }: MarkReadInput): Promise<MarkConversationReadResponse> => {
       const result = await markReadConversation({
+        sandboxId,
         conversationId,
         lastSeenMessageId,
         markConversationRead: markConversationRead.mutateAsync,

@@ -198,7 +198,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     }
     startMarkReadAttempt(state, marker);
     markRead.mutate(
-      { conversationId, lastSeenMessageId: latestMessageId },
+      { sandboxId, conversationId, lastSeenMessageId: latestMessageId },
       {
         onSuccess: () => {
           succeedMarkReadAttempt(state, marker);
@@ -218,7 +218,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
         },
       }
     );
-  }, [conversationId, currentMarkReadMarker, latestMessageId, markRead.mutate]);
+  }, [conversationId, currentMarkReadMarker, latestMessageId, markRead.mutate, sandboxId]);
   markCurrentConversationReadRef.current = markCurrentConversationRead;
 
   useEffect(() => {

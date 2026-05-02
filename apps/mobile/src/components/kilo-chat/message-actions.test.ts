@@ -5,9 +5,10 @@ import { buildMessageActionSheetOptions, getSelectedMessageAction } from './mess
 describe('buildMessageActionSheetOptions', () => {
   it('offers first-reaction choices for messages with no reactions', () => {
     const options = buildMessageActionSheetOptions({
-      isOwnMessage: false,
       canReact: true,
       canReply: true,
+      canEdit: false,
+      canDelete: false,
     });
 
     expect(options.options).toContain('👍 React');
@@ -17,14 +18,16 @@ describe('buildMessageActionSheetOptions', () => {
 
   it('offers edit and delete actions only for own messages', () => {
     const ownOptions = buildMessageActionSheetOptions({
-      isOwnMessage: true,
       canReact: true,
       canReply: true,
+      canEdit: true,
+      canDelete: true,
     });
     const otherOptions = buildMessageActionSheetOptions({
-      isOwnMessage: false,
       canReact: true,
       canReply: true,
+      canEdit: false,
+      canDelete: false,
     });
 
     expect(ownOptions.options).toContain('Edit');
@@ -37,14 +40,16 @@ describe('buildMessageActionSheetOptions', () => {
 
   it('offers reply only when allowed for the message', () => {
     const replyableOptions = buildMessageActionSheetOptions({
-      isOwnMessage: false,
       canReact: true,
       canReply: true,
+      canEdit: false,
+      canDelete: false,
     });
     const failedDeliveryOptions = buildMessageActionSheetOptions({
-      isOwnMessage: false,
       canReact: true,
       canReply: false,
+      canEdit: false,
+      canDelete: false,
     });
 
     expect(replyableOptions.options).toContain('Reply');
@@ -53,9 +58,10 @@ describe('buildMessageActionSheetOptions', () => {
 
   it('keeps reply as the first action when reactions are disabled', () => {
     const actionSheet = buildMessageActionSheetOptions({
-      isOwnMessage: false,
       canReact: false,
       canReply: true,
+      canEdit: false,
+      canDelete: false,
     });
 
     expect(actionSheet.options).toEqual(['Reply', 'Cancel']);
@@ -64,9 +70,10 @@ describe('buildMessageActionSheetOptions', () => {
 
   it('resolves selected action by action identity instead of raw option index', () => {
     const actionSheet = buildMessageActionSheetOptions({
-      isOwnMessage: false,
       canReact: false,
       canReply: true,
+      canEdit: false,
+      canDelete: false,
     });
 
     const selectedAction = getSelectedMessageAction(actionSheet, 0);
@@ -77,9 +84,10 @@ describe('buildMessageActionSheetOptions', () => {
 
   it('offers no API-backed actions for pending messages', () => {
     const actionSheet = buildMessageActionSheetOptions({
-      isOwnMessage: true,
       canReact: true,
       canReply: true,
+      canEdit: true,
+      canDelete: true,
       isPendingMessage: true,
     });
 
@@ -87,5 +95,29 @@ describe('buildMessageActionSheetOptions', () => {
     expect(actionSheet.actions.every(action => action.kind === 'cancel')).toBe(true);
     expect(actionSheet.destructiveButtonIndex).toBeUndefined();
     expect(getSelectedMessageAction(actionSheet, 0)).toBeNull();
+  });
+
+  it('offers delete and cancel only for own delivery-failed messages', () => {
+    const actionSheet = buildMessageActionSheetOptions({
+      canReact: false,
+      canReply: false,
+      canEdit: false,
+      canDelete: true,
+    });
+
+    expect(actionSheet.options).toEqual(['Delete', 'Cancel']);
+    expect(actionSheet.destructiveButtonIndex).toBe(0);
+  });
+
+  it('offers cancel only for non-own delivery-failed messages', () => {
+    const actionSheet = buildMessageActionSheetOptions({
+      canReact: false,
+      canReply: false,
+      canEdit: false,
+      canDelete: false,
+    });
+
+    expect(actionSheet.options).toEqual(['Cancel']);
+    expect(actionSheet.destructiveButtonIndex).toBeUndefined();
   });
 });

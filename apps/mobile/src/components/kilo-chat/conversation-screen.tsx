@@ -148,7 +148,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   );
   const handleReactionPress = useCallback(
     (message: Message, emoji: string) => {
-      if (!currentUserId) {
+      if (!currentUserId || message.deliveryFailed) {
         return;
       }
       const hasReacted =
@@ -188,10 +188,13 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       }
       const isPendingMessage = message.id.startsWith('pending-');
       const isOwnMessage = currentUserId !== null && message.senderId === currentUserId;
+      const canUseApiBackedActions = !isPendingMessage;
+      const canMutateFailedMessage = !message.deliveryFailed;
       const actionSheet = buildMessageActionSheetOptions({
-        isOwnMessage,
-        canReact: currentUserId !== null,
-        canReply: !message.deliveryFailed,
+        canReact: currentUserId !== null && canMutateFailedMessage,
+        canReply: canMutateFailedMessage,
+        canEdit: canUseApiBackedActions && isOwnMessage && canMutateFailedMessage,
+        canDelete: canUseApiBackedActions && isOwnMessage,
         isPendingMessage,
       });
       showActionSheetWithOptions(

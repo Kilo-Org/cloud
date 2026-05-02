@@ -154,12 +154,19 @@ export class NotificationChannelDO extends DurableObject<Env> {
       };
     }
 
+    if (result.ticketTokenPairs.length === 0 && result.staleTokens.length > 0) {
+      const ts = Date.now();
+      await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'no_tokens', ts });
+      await this.ensureCleanupAlarm(ts);
+      return { kind: 'no_tokens' };
+    }
+
     // 6. Mark `delivered` so future retries short-circuit as duplicate.
     const ts = Date.now();
     await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'delivered', ts });
     await this.ensureCleanupAlarm(ts);
 
-    return { kind: 'delivered', tokenCount: tokens.length };
+    return { kind: 'delivered', tokenCount: result.ticketTokenPairs.length };
   }
 
   /**

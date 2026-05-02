@@ -16,6 +16,8 @@ vi.mock('../lib/expo-push', () => ({
 
 type DbState = {
   tokens: { user_id: string; token: string }[];
+  staleTokensToDelete?: string[];
+  deleteCalls?: number;
 };
 
 function installDbMock(state: DbState) {
@@ -33,7 +35,13 @@ function installDbMock(state: DbState) {
     insert: () => ({
       values: () => ({ onConflictDoUpdate: async () => undefined }),
     }),
-    delete: () => ({ where: async () => undefined }),
+    delete: () => ({
+      where: async () => {
+        state.deleteCalls = (state.deleteCalls ?? 0) + 1;
+        const staleTokens = new Set(state.staleTokensToDelete ?? []);
+        state.tokens = state.tokens.filter(row => !staleTokens.has(row.token));
+      },
+    }),
   };
   vi.spyOn(dbClient, 'getWorkerDb').mockReturnValue(
     fakeDb as unknown as ReturnType<typeof dbClient.getWorkerDb>
@@ -307,6 +315,76 @@ describe('NotificationChannelDO.dispatchPush', () => {
       state.storage.get<{ stage: string; ts: number }>('idem:k-ticket-error')
     );
     expect(stored).toMatchObject({ stage: 'failed' });
+  });
+
+  it('treats all-stale Expo ticket results as terminal no-token dispatches', async () => {
+    const dbState: DbState = {
+      tokens: [
+        { user_id: 'user-all-stale', token: 'tok-stale-1' },
+        { user_id: 'user-all-stale', token: 'tok-stale-2' },
+      ],
+      staleTokensToDelete: ['tok-stale-1', 'tok-stale-2'],
+    };
+    installDbMock(dbState);
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    vi.mocked(sendPushNotifications).mockResolvedValueOnce({
+      ticketTokenPairs: [],
+      staleTokens: ['tok-stale-1', 'tok-stale-2'],
+      ticketErrors: [],
+    });
+    const receiptSpy = vi.spyOn(env.RECEIPTS_QUEUE, 'send');
+    const stub = getDO('user-all-stale');
+    const input = baseInput({
+      userId: 'user-all-stale',
+      idempotencyKey: 'k-all-stale',
+    });
+
+    const first = await stub.dispatchPush(input);
+    const second = await stub.dispatchPush(input);
+
+    expect(first).toEqual({ kind: 'no_tokens' });
+    expect(second).toEqual({ kind: 'duplicate' });
+    expect(dbState.tokens).toEqual([]);
+    expect(dbState.deleteCalls).toBe(1);
+    expect(receiptSpy).not.toHaveBeenCalled();
+    await expect(stub.listNonZeroBuckets()).resolves.toEqual([
+      { badgeBucket: 'conv1', badgeCount: 1 },
+    ]);
+    await expect(stub.markBucketRead('conv1')).resolves.toBe(0);
+
+    const stored = await runInDurableObject(stub, async (_inst, state) =>
+      state.storage.get<{ stage: string; ts: number }>('idem:k-all-stale')
+    );
+    expect(stored).toMatchObject({ stage: 'no_tokens' });
+  });
+
+  it('reports delivered tokenCount from accepted Expo tickets after stale cleanup', async () => {
+    const dbState: DbState = {
+      tokens: [
+        { user_id: 'user-partial-stale', token: 'tok-accepted' },
+        { user_id: 'user-partial-stale', token: 'tok-stale' },
+      ],
+      staleTokensToDelete: ['tok-stale'],
+    };
+    installDbMock(dbState);
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    vi.mocked(sendPushNotifications).mockResolvedValueOnce({
+      ticketTokenPairs: [{ ticketId: 'ticket-accepted', token: 'tok-accepted' }],
+      staleTokens: ['tok-stale'],
+      ticketErrors: [],
+    });
+    const stub = getDO('user-partial-stale');
+
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-partial-stale',
+        idempotencyKey: 'k-partial-stale',
+      })
+    );
+
+    expect(result).toEqual({ kind: 'delivered', tokenCount: 1 });
+    expect(dbState.tokens).toEqual([{ user_id: 'user-partial-stale', token: 'tok-accepted' }]);
+    expect(dbState.deleteCalls).toBe(1);
   });
 
   it('accumulates bucket counts across deliveries and exposes total via badge', async () => {

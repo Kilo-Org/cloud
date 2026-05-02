@@ -11,7 +11,7 @@ type Props = {
   messages: Message[];
   currentUserId: string | null;
   fetchOlder?: () => void;
-  hasOlder?: boolean;
+  isFetchingOlder: boolean;
   pendingAction: PendingAction | null;
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
   onReactionPress: (message: Message, emoji: string) => void;
@@ -22,7 +22,7 @@ export function MessageList({
   messages,
   currentUserId,
   fetchOlder,
-  hasOlder,
+  isFetchingOlder,
   pendingAction,
   onExecuteAction,
   onReactionPress,
@@ -73,7 +73,7 @@ export function MessageList({
         startRenderingFromBottom: true,
       }}
       ListHeaderComponent={
-        hasOlder ? (
+        isFetchingOlder ? (
           <View className="px-4 py-2">
             <Skeleton className="h-16 rounded-md" />
           </View>

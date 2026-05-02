@@ -80,7 +80,6 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const messagesQuery = useMessages(client, conversationId);
   const messages = messagesQuery.data?.messages ?? [];
   const latestMessageId = latestMarkReadMessageId(messages);
-  const hasOlder = messagesQuery.hasNextPage;
   const fetchOlder = useCallback(() => {
     if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) {
       void messagesQuery.fetchNextPage();
@@ -374,7 +373,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           messages={messages}
           currentUserId={currentUserId}
           fetchOlder={fetchOlder}
-          hasOlder={hasOlder}
+          isFetchingOlder={messagesQuery.isFetchingNextPage}
           pendingAction={pendingAction}
           onExecuteAction={handleExecuteAction}
           onLongPressMessage={handleLongPressMessage}

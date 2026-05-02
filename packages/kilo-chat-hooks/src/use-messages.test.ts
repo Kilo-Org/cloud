@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { InfiniteData } from '@tanstack/react-query';
-import type { Message } from '@kilocode/kilo-chat';
+import { QueryClient, type InfiniteData } from '@tanstack/react-query';
+import { KiloChatApiError, type Message } from '@kilocode/kilo-chat';
 import {
   applyReactionAddedEventToPages,
   applyReactionRemovedResponseToPages,
   applyReactionRemovedMutationToPages,
   createReactionOperationTracker,
+  rollbackEditMessageError,
 } from './use-messages';
+import { messagesKey } from './query-keys';
 
 function message(overrides: Partial<Message>): Message {
   return {
@@ -99,5 +101,42 @@ describe('reaction operation ordering', () => {
     );
 
     expect(afterDelayedAdd.pages[0]?.[0]?.reactions).toEqual([]);
+  });
+});
+
+describe('edit rollback errors', () => {
+  it('restores the optimistic edit and invalidates messages on edit conflict', () => {
+    const queryClient = new QueryClient();
+    const queryKey = messagesKey('01KQK8E1111111111111111111');
+    const original = message({
+      id: '01KQK8E2222222222222222222',
+      content: [{ type: 'text', text: 'old local content' }],
+      clientUpdatedAt: 1,
+    });
+    const optimistic = message({
+      ...original,
+      content: [{ type: 'text', text: 'losing edit' }],
+      clientUpdatedAt: 2,
+    });
+    queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, {
+      pageParams: [undefined],
+      pages: [[optimistic]],
+    });
+
+    rollbackEditMessageError(
+      queryClient,
+      queryKey,
+      original,
+      optimistic,
+      new KiloChatApiError(409, {
+        error: 'edit_conflict',
+        messageId: original.id,
+      })
+    );
+
+    const result = queryClient.getQueryData<InfiniteData<Message[]>>(queryKey);
+    const query = queryClient.getQueryCache().find({ queryKey });
+    expect(result?.pages[0]?.[0]).toEqual(original);
+    expect(query?.state.isInvalidated).toBe(true);
   });
 });

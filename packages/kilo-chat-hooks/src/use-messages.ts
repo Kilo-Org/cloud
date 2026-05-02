@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import type { InfiniteData } from '@tanstack/react-query';
+import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 import { KiloChatApiError, type KiloChatClient } from '@kilocode/kilo-chat';
 import type {
   Message,
@@ -297,6 +297,19 @@ function invalidateMessages(
   void queryClient.invalidateQueries({ queryKey });
 }
 
+export function rollbackEditMessageError(
+  queryClient: QueryClient,
+  queryKey: readonly unknown[],
+  snapshot: Message | undefined,
+  optimisticMessage: Message | undefined,
+  err: unknown
+): void {
+  const restored = restoreOptimisticMessage(queryClient, queryKey, snapshot, optimisticMessage);
+  if (!restored || (err instanceof KiloChatApiError && err.status === 409)) {
+    invalidateMessages(queryClient, queryKey);
+  }
+}
+
 function actionResolutionMatches(
   current: ActionResolution | undefined,
   expected: ActionResolution
@@ -563,15 +576,15 @@ export function useEditMessage(client: KiloChatClient, conversationId: string | 
       });
       return { queryKey, snapshot, optimisticMessage };
     },
-    onError: (_err, _variables, context) => {
+    onError: (err, _variables, context) => {
       if (!context) return;
-      const restored = restoreOptimisticMessage(
+      rollbackEditMessageError(
         queryClient,
         context.queryKey,
         context.snapshot,
-        context.optimisticMessage
+        context.optimisticMessage,
+        err
       );
-      if (!restored) invalidateMessages(queryClient, context.queryKey);
     },
   });
 }

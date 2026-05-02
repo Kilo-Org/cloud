@@ -146,15 +146,19 @@ export async function getProvider(
   organizationId: string | undefined,
   taskId: string | undefined
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; bypassAccessCheck: boolean }> {
-  // Kilo-exclusive models must always be served by Kilo; user BYOK keys cannot be used for them.
-  const isKiloExclusive = isKiloExclusiveModel(requestedModel);
+  const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
+  if (directByokByok) {
+    return directByokByok;
+  }
 
-  if (!isKiloExclusive) {
-    const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
-    if (directByokByok) {
-      return directByokByok;
-    }
-
+  // Kilo-exclusive models are not routable through Vercel BYOK. The Vercel AI Gateway is only
+  // aware of upstream-native model IDs and API shapes for the providers it proxies, whereas
+  // our Kilo-exclusive models live behind generic OpenAI-compatible endpoints (Martian, direct
+  // Alibaba, etc.) with request/response transforms we apply ourselves. Those two worlds are
+  // incompatible, so we skip the Vercel BYOK lookup for Kilo-exclusive models and fall through
+  // to the model's declared gateway. Direct BYOK above is unaffected: it targets dedicated
+  // OpenAI-compatible providers by model ID prefix and does not overlap with these models.
+  if (!isKiloExclusiveModel(requestedModel)) {
     const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
     if (vercelByok) {
       return {

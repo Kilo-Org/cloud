@@ -50,6 +50,7 @@ import {
   deleteMessageQuerySchema,
   messageDeliveryFailedRequestSchema,
   actionDeliveryFailedRequestSchema,
+  actionGroupIdSchema,
   decodeConversationCursor,
 } from '@kilocode/kilo-chat';
 
@@ -281,8 +282,8 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
   const convId = parseConversationId(c);
   if (!convId.ok) return convId.response;
 
-  const groupIdRaw = c.req.param('groupId');
-  if (!groupIdRaw) {
+  const groupId = actionGroupIdSchema.safeParse(c.req.param('groupId'));
+  if (!groupId.success) {
     return c.json({ error: 'Invalid groupId' }, 400);
   }
 
@@ -303,7 +304,7 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
 
   const { messageId } = parsed.data;
   const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
-  const result = await convStub.revertActionResolution({ messageId, groupId: groupIdRaw });
+  const result = await convStub.revertActionResolution({ messageId, groupId: groupId.data });
   if (!result.ok) {
     return c.json({ error: result.error }, 404);
   }
@@ -319,7 +320,7 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
       ctx.sandboxId,
       ctx.humanMemberIds,
       'action.delivery_failed',
-      { conversationId: convId.data, messageId, groupId: groupIdRaw }
+      { conversationId: convId.data, messageId, groupId: groupId.data }
     );
   }
   return c.json({}, 202);

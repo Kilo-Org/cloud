@@ -511,6 +511,25 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 when groupId path param is invalid', async () => {
+    const { sandboxId, conversationId, messageId, testEnv, token } =
+      await setupWithResolvedAction('bot-act-df-bad-group');
+    const app = makeBotApp();
+    const groupId = 'g'.repeat(201);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/${groupId}/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ messageId }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+  });
+
   it('returns 404 when message is unknown', async () => {
     const { sandboxId, conversationId, testEnv, token } =
       await setupWithResolvedAction('bot-act-df-missing');

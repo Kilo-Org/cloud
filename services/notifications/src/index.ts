@@ -12,6 +12,7 @@ import {
   badgeBucketForConversation,
   clearBadgeBucketForUserInputSchema,
   markBadgeReadInputSchema,
+  sendPushForConversationInputSchema,
   type ClearBadgeBucketForUserInput,
   type ClearBadgeBucketForUserOutput,
   type DispatchPushInput,
@@ -96,10 +97,11 @@ export async function sendPushForConversationCore(
     getRecipientDOStub: (userId: string) => RecipientDOStub;
   }
 ): Promise<SendPushForConversationOutput> {
+  const parsedInput = sendPushForConversationInputSchema.parse(input);
   const recipients: string[] = [];
   const seen = new Set<string>();
-  for (const id of input.recipientUserIds) {
-    if (id === input.senderUserId) continue;
+  for (const id of parsedInput.recipientUserIds) {
+    if (id === parsedInput.senderUserId) continue;
     if (seen.has(id)) continue;
     seen.add(id);
     recipients.push(id);
@@ -110,20 +112,26 @@ export async function sendPushForConversationCore(
       const stub = deps.getRecipientDOStub(userId);
       const outcome = await stub.dispatchPush({
         userId,
-        presenceContext: presenceContextForConversation(input.sandboxId, input.conversationId),
-        idempotencyKey: `chat:${input.messageId}:${userId}`,
+        presenceContext: presenceContextForConversation(
+          parsedInput.sandboxId,
+          parsedInput.conversationId
+        ),
+        idempotencyKey: `chat:${parsedInput.messageId}:${userId}`,
         badge: {
-          badgeBucket: badgeBucketForConversation(input.sandboxId, input.conversationId),
+          badgeBucket: badgeBucketForConversation(
+            parsedInput.sandboxId,
+            parsedInput.conversationId
+          ),
           delta: 1,
         },
         push: {
-          title: input.title,
-          body: input.bodyPreview,
+          title: parsedInput.title,
+          body: parsedInput.bodyPreview,
           data: {
             type: 'chat.message',
-            sandboxId: input.sandboxId,
-            conversationId: input.conversationId,
-            messageId: input.messageId,
+            sandboxId: parsedInput.sandboxId,
+            conversationId: parsedInput.conversationId,
+            messageId: parsedInput.messageId,
           },
           sound: 'default',
           priority: 'high',

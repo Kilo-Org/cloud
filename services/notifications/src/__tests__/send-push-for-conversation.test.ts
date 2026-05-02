@@ -50,6 +50,29 @@ describe('NotificationsService.sendPushForConversation', () => {
     );
   });
 
+  it('rejects malformed runtime payloads before looking up recipient DOs', async () => {
+    const stubSpy = vi.fn(async (_input: DispatchPushInput) => ({
+      kind: 'delivered' as const,
+      tokenCount: 1,
+    }));
+    const getRecipientDOStub = vi.fn(() => ({
+      dispatchPush: stubSpy,
+    }));
+
+    await expect(
+      sendPushForConversationCore(
+        {
+          ...baseInput(),
+          recipientUserIds: [''],
+        } as SendPushForConversationInput,
+        { getRecipientDOStub }
+      )
+    ).rejects.toThrow();
+
+    expect(getRecipientDOStub).not.toHaveBeenCalled();
+    expect(stubSpy).not.toHaveBeenCalled();
+  });
+
   it('passes the right presence context and badge bucket', async () => {
     const stubSpy = vi.fn(async (_input: DispatchPushInput) => ({
       kind: 'delivered' as const,

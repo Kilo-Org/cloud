@@ -1,7 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getWorkerDb } from '@kilocode/db/client';
 import { user_push_tokens } from '@kilocode/db/schema';
-import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/notifications';
+import {
+  dispatchPushInputSchema,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+} from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 
 import type { ExpoPushMessage, TicketTokenPair } from '../lib/expo-push';
@@ -22,11 +26,12 @@ const IDEM_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export class NotificationChannelDO extends DurableObject<Env> {
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
+    const parsedInput = dispatchPushInputSchema.parse(input);
     // 1. Idempotency. DO is single-threaded — requests for a given
     //    user serialize on this instance. A `failed` outcome leaves the
     //    record at `pending` so upstream can retry the send without
     //    re-incrementing the badge.
-    const idemKey = `${IDEM_PREFIX}${input.idempotencyKey}`;
+    const idemKey = `${IDEM_PREFIX}${parsedInput.idempotencyKey}`;
     const existing = await this.ctx.storage.get<IdemRecord>(idemKey);
     if (existing?.stage === 'delivered' || existing?.stage === 'suppressed') {
       return { kind: 'duplicate' };
@@ -36,11 +41,14 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // 2. Presence
     let inContext = false;
     try {
-      inContext = await this.env.EVENT_SERVICE.isUserInContext(input.userId, input.presenceContext);
+      inContext = await this.env.EVENT_SERVICE.isUserInContext(
+        parsedInput.userId,
+        parsedInput.presenceContext
+      );
     } catch (err) {
       console.warn('Presence lookup failed while dispatching push; continuing delivery', {
-        presenceContext: input.presenceContext,
-        badgeBucket: input.badge?.badgeBucket,
+        presenceContext: parsedInput.presenceContext,
+        badgeBucket: parsedInput.badge?.badgeBucket,
         error: err instanceof Error ? err.message : String(err),
       });
     }
@@ -58,7 +66,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
     //    The total is recomputed in either case (other writers may have
     //    advanced it).
     let badgeTotal: number | undefined;
-    if (input.badge) {
+    if (parsedInput.badge) {
       if (!isRetry) {
         // Mark `pending` BEFORE the increment so any later failure path
         // is gated on the marker and a retry skips the increment.
@@ -67,7 +75,10 @@ export class NotificationChannelDO extends DurableObject<Env> {
         // Also schedule cleanup at this point — if Expo keeps failing and
         // no future push ever lands, `pending` would otherwise leak.
         await this.ensureCleanupAlarm(ts);
-        badgeTotal = await this.incrementBucket(input.badge.badgeBucket, input.badge.delta);
+        badgeTotal = await this.incrementBucket(
+          parsedInput.badge.badgeBucket,
+          parsedInput.badge.delta
+        );
       } else {
         badgeTotal = await this.getTotal();
       }
@@ -78,19 +89,19 @@ export class NotificationChannelDO extends DurableObject<Env> {
     const tokens = await db
       .select({ token: user_push_tokens.token })
       .from(user_push_tokens)
-      .where(eq(user_push_tokens.user_id, input.userId));
+      .where(eq(user_push_tokens.user_id, parsedInput.userId));
 
     if (tokens.length === 0) return { kind: 'no_tokens' };
 
     // 5. Send via Expo
     const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
       to: token,
-      title: input.push.title,
-      body: input.push.body,
-      data: input.push.data,
+      title: parsedInput.push.title,
+      body: parsedInput.push.body,
+      data: parsedInput.push.data,
       ...(badgeTotal !== undefined && { badge: badgeTotal }),
-      sound: input.push.sound ?? undefined,
-      priority: input.push.priority ?? 'default',
+      sound: parsedInput.push.sound ?? undefined,
+      priority: parsedInput.push.priority ?? 'default',
     }));
 
     const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();

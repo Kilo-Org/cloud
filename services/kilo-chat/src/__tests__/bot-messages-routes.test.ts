@@ -491,6 +491,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       testEnv
     );
     expect(second.status).toBe(202);
+    expect(await second.text()).toBe('');
     expect(pushEvent).toHaveBeenCalledOnce();
   });
 

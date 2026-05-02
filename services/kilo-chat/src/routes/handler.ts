@@ -309,7 +309,7 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
     return c.json({ error: result.error }, 404);
   }
   if (!result.reverted) {
-    return c.json({}, 202);
+    return c.body(null, 202);
   }
 
   const ctx = await getConversationContext(c.env, convId.data);

@@ -132,6 +132,14 @@ async function checkVercelBYOK(
   organizationId: string | undefined
 ): Promise<BYOKResult[] | null> {
   if (isAnonymousContext(user)) return null;
+  // Kilo-exclusive models are not routable through Vercel BYOK. Reasoning in particular
+  // breaks: the Vercel AI Gateway normalizes reasoning to each provider's upstream-native
+  // shape, whereas our Kilo-exclusive models are served through generic OpenAI-compatible
+  // endpoints (Martian, direct Alibaba, etc.) with reasoning transforms we apply ourselves.
+  // Routing them via Vercel bypasses those transforms and corrupts the response, so we skip
+  // the Vercel BYOK lookup entirely and let the caller fall through to the model's declared
+  // gateway.
+  if (isKiloExclusiveModel(requestedModel)) return null;
   const modelProviders = await getModelUserByokProviders(requestedModel);
   if (modelProviders.length === 0) return null;
   return organizationId
@@ -151,22 +159,13 @@ export async function getProvider(
     return directByokByok;
   }
 
-  // Kilo-exclusive models are not routable through Vercel BYOK. The Vercel AI Gateway is only
-  // aware of upstream-native model IDs and API shapes for the providers it proxies, whereas
-  // our Kilo-exclusive models live behind generic OpenAI-compatible endpoints (Martian, direct
-  // Alibaba, etc.) with request/response transforms we apply ourselves. Those two worlds are
-  // incompatible, so we skip the Vercel BYOK lookup for Kilo-exclusive models and fall through
-  // to the model's declared gateway. Direct BYOK above is unaffected: it targets dedicated
-  // OpenAI-compatible providers by model ID prefix and does not overlap with these models.
-  if (!isKiloExclusiveModel(requestedModel)) {
-    const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
-    if (vercelByok) {
-      return {
-        provider: PROVIDERS.VERCEL_AI_GATEWAY,
-        userByok: vercelByok,
-        bypassAccessCheck: false,
-      };
-    }
+  const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
+  if (vercelByok) {
+    return {
+      provider: PROVIDERS.VERCEL_AI_GATEWAY,
+      userByok: vercelByok,
+      bypassAccessCheck: false,
+    };
   }
 
   if (requestedModel.startsWith('kilo-internal/') && organizationId) {

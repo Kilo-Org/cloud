@@ -32,6 +32,13 @@ export type MessageInfiniteData<TPageParam = string | undefined> = InfiniteData<
   TPageParam
 >;
 
+export function createEmptyMessageInfiniteData(): MessageInfiniteData {
+  return {
+    pages: [{ messages: [], hasMore: false, nextCursor: null }],
+    pageParams: [undefined],
+  };
+}
+
 export function messagesFromListPage(page: MessageListResponse): MessagePage {
   return page;
 }
@@ -528,7 +535,25 @@ export function applyCreateMessageResponseToPages<TPageParam>(
   pendingId: string,
   response: CreateMessageResponse
 ): MessageInfiniteData<TPageParam> {
-  return replaceMessageAndOrderNewestPage(old, pendingId, () => response.message);
+  const replacedPending = replaceMessageAndOrderNewestPage(old, pendingId, () => response.message);
+  if (replacedPending !== old) return replacedPending;
+
+  const replacedExisting = replaceMessageAndOrderNewestPage(
+    old,
+    response.messageId,
+    () => response.message
+  );
+  if (replacedExisting !== old) return replacedExisting;
+
+  const firstPage = old.pages[0];
+  if (!firstPage) return old;
+  const orderedFirstPage = orderNewestLoadedPageByServerId(
+    withPageMessages(firstPage, [response.message, ...firstPage.messages])
+  );
+  return {
+    ...old,
+    pages: [orderedFirstPage, ...old.pages.slice(1)],
+  };
 }
 
 export function applyMessageUpdatedEventToPages<TPageParam>(
@@ -562,6 +587,22 @@ export function applyExecuteActionResponseToPages<TPageParam>(
   }));
 }
 
+export function applyOptimisticMessageToPages(
+  old: MessageInfiniteData | undefined,
+  optimisticMessage: Message
+): MessageInfiniteData {
+  const data = old && old.pages.length > 0 ? old : createEmptyMessageInfiniteData();
+  const firstPage = data.pages[0];
+  if (!firstPage) return data;
+  return {
+    ...data,
+    pages: [
+      withPageMessages(firstPage, [optimisticMessage, ...firstPage.messages]),
+      ...data.pages.slice(1),
+    ],
+  };
+}
+
 export function useSendMessage(
   client: KiloChatClient,
   conversationId: string | null,
@@ -589,16 +630,7 @@ export function useSendMessage(
         reactions: [],
       };
       queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
-        if (!old) return old;
-        const firstPage = old.pages[0];
-        if (!firstPage) return old;
-        return {
-          ...old,
-          pages: [
-            withPageMessages(firstPage, [optimisticMessage, ...firstPage.messages]),
-            ...old.pages.slice(1),
-          ],
-        };
+        return applyOptimisticMessageToPages(old, optimisticMessage);
       });
       return { queryKey, pendingId };
     },
@@ -606,8 +638,11 @@ export function useSendMessage(
       if (!context) return;
       const { queryKey, pendingId } = context;
       queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
-        if (!old) return old;
-        return applyCreateMessageResponseToPages(old, pendingId, response);
+        return applyCreateMessageResponseToPages(
+          old ?? createEmptyMessageInfiniteData(),
+          pendingId,
+          response
+        );
       });
     },
     onError: (err, _variables, context) => {
@@ -915,8 +950,7 @@ export function useMessageCacheUpdater(
         onHumanMessageCreated?.(ctx, e.senderId);
       }
       queryClient.setQueryData<MessageInfiniteData>(queryKey, old => {
-        if (!old) return old;
-        return applyMessageCreatedEventToPages(old, e);
+        return applyMessageCreatedEventToPages(old ?? createEmptyMessageInfiniteData(), e);
       });
     };
 

@@ -5,6 +5,8 @@ import {
   applyExecuteActionResponseToPages,
   applyCreateMessageResponseToPages,
   applyMessageCreatedEventToPages,
+  applyOptimisticMessageToPages,
+  createEmptyMessageInfiniteData,
   type MessageInfiniteData,
   applyReactionAddedEventToPages,
   applyReactionRemovedResponseToPages,
@@ -488,6 +490,80 @@ describe('message pagination helpers', () => {
 });
 
 describe('send message cache settlement', () => {
+  it('creates the first page for an optimistic send when the messages cache is cold', () => {
+    const queryClient = new QueryClient();
+    const queryKey = messagesKey('01KQK8Y0000000000000000000');
+    const optimisticMessage = message({
+      id: 'pending-01KQK8Y1111111111111111111',
+      senderId: 'user-current',
+      content: textContent('sent before load'),
+    });
+
+    queryClient.setQueryData<MessageInfiniteData>(queryKey, old =>
+      applyOptimisticMessageToPages(old, optimisticMessage)
+    );
+
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
+    expect(result).toEqual({
+      pageParams: [undefined],
+      pages: [messagePage([optimisticMessage])],
+    });
+  });
+
+  it('creates the first page for send success when no pending row was cached', () => {
+    const queryClient = new QueryClient();
+    const queryKey = messagesKey('01KQK8Y0000000000000000001');
+    const serverMessage = message({
+      id: '01KQK8Y2222222222222222222',
+      senderId: 'user-current',
+      content: textContent('server settled'),
+    });
+
+    queryClient.setQueryData<MessageInfiniteData>(queryKey, old =>
+      applyCreateMessageResponseToPages(old ?? createEmptyMessageInfiniteData(), 'pending', {
+        messageId: serverMessage.id,
+        clientId: '01KQK8Y1111111111111111111',
+        message: serverMessage,
+      })
+    );
+
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
+    expect(result).toEqual({
+      pageParams: [undefined],
+      pages: [messagePage([serverMessage])],
+    });
+  });
+
+  it('creates the first page for message.created events when the messages cache is cold', () => {
+    const queryClient = new QueryClient();
+    const queryKey = messagesKey('01KQK8Z0000000000000000000');
+
+    queryClient.setQueryData<MessageInfiniteData>(queryKey, old =>
+      applyMessageCreatedEventToPages(old ?? createEmptyMessageInfiniteData(), {
+        messageId: '01KQK8Z2222222222222222222',
+        senderId: 'user-current',
+        content: textContent('event settled'),
+        inReplyToMessageId: null,
+        replyTo: null,
+        clientId: null,
+      })
+    );
+
+    const result = queryClient.getQueryData<MessageInfiniteData>(queryKey);
+    expect(result).toEqual({
+      pageParams: [undefined],
+      pages: [
+        messagePage([
+          message({
+            id: '01KQK8Z2222222222222222222',
+            senderId: 'user-current',
+            content: textContent('event settled'),
+          }),
+        ]),
+      ],
+    });
+  });
+
   it('replaces a pending reply with the canonical server message before the live event', () => {
     const pendingId = 'pending-01KQK8H1111111111111111111';
     const serverMessage = message({

@@ -68,6 +68,21 @@ describe('ConversationDO', () => {
     }
   });
 
+  it('createMessage - returns internal when conversation is not initialized', async () => {
+    const stub = getStub('conv-create-uninitialized');
+
+    const result = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Hello!' }],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: 'internal',
+      error: 'Conversation not initialized',
+    });
+  });
+
   it('listMessages - reverse chronological order', async () => {
     const stub = getStub('conv-list-1');
     await stub.initialize(BASE_PARAMS);

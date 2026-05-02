@@ -342,7 +342,10 @@ export class ConversationDO extends DurableObject<Env> {
   }
 
   createMessage(params: CreateMessageParams): CreateMessageResult {
-    if (!this.isMember(params.senderId)) {
+    const info = this.getInfo();
+    if (!info) return { ok: false, code: 'internal', error: 'Conversation not initialized' };
+
+    if (!info.members.some(member => member.id === params.senderId)) {
       return {
         ok: false,
         code: 'forbidden',
@@ -371,8 +374,6 @@ export class ConversationDO extends DurableObject<Env> {
       throw err;
     }
 
-    const info = this.getInfo();
-    if (!info) return { ok: false, code: 'internal', error: 'Conversation not initialized' };
     return { ok: true, messageId, info };
   }
 

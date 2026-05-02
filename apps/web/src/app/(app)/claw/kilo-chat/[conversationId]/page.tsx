@@ -7,18 +7,41 @@ import { KiloChatApiError } from '@kilocode/kilo-chat';
 import { useKiloChatContext } from '../components/kiloChatContext';
 import { useConversationDetail } from '../hooks/useConversations';
 import { MessageArea } from '../components/MessageArea';
+import { conversationRouteDecision } from './conversation-route-guard';
 
 export default function KiloChatConversationPage() {
   const params = useParams<{ conversationId: string }>();
   const router = useRouter();
-  const { kiloChatClient, leavingConversationId, basePath } = useKiloChatContext();
+  const {
+    kiloChatClient,
+    leavingConversationId,
+    basePath,
+    sandboxId,
+    isInstanceLoading,
+    noInstanceRedirect,
+  } = useKiloChatContext();
   const isLeaving = leavingConversationId === params.conversationId;
   const conversationDetail = useConversationDetail(
     kiloChatClient,
     isLeaving ? null : params.conversationId
   );
+  const routeDecision = conversationRouteDecision({
+    conversationMembers: conversationDetail.data?.members,
+    isInstanceLoading,
+    isLeaving,
+    routeSandboxId: sandboxId,
+  });
 
   useEffect(() => {
+    if (routeDecision === 'redirect-no-instance') {
+      router.replace(noInstanceRedirect);
+      return;
+    }
+    if (routeDecision === 'not-found') {
+      toast.error('Conversation not found');
+      router.replace(basePath);
+      return;
+    }
     if (conversationDetail.isError && !isLeaving) {
       const status =
         conversationDetail.error instanceof KiloChatApiError
@@ -31,9 +54,17 @@ export default function KiloChatConversationPage() {
       toast.error(message);
       router.replace(basePath);
     }
-  }, [conversationDetail.isError, conversationDetail.error, isLeaving, router, basePath]);
+  }, [
+    conversationDetail.isError,
+    conversationDetail.error,
+    isLeaving,
+    router,
+    basePath,
+    noInstanceRedirect,
+    routeDecision,
+  ]);
 
-  if (isLeaving) {
+  if (isLeaving || routeDecision !== 'ready') {
     return null;
   }
 

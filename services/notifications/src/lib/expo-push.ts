@@ -8,9 +8,17 @@ export type TicketTokenPair = {
   token: string;
 };
 
+export type PushTicketError = {
+  token: string;
+  errorCode: string | undefined;
+  message: string;
+  retryable: boolean;
+};
+
 export type SendResult = {
   ticketTokenPairs: TicketTokenPair[];
   staleTokens: string[];
+  ticketErrors: PushTicketError[];
 };
 
 type ExpoClient = InstanceType<typeof Expo>;
@@ -18,6 +26,12 @@ type ExpoPushChunk = Parameters<ExpoClient['sendPushNotificationsAsync']>[0];
 type ExpoPushTicket = Awaited<ReturnType<ExpoClient['sendPushNotificationsAsync']>>[number];
 
 const TRANSIENT_SEND_RETRY_DELAYS_MS = [100, 500];
+const RETRYABLE_TICKET_ERROR_CODES = new Set(['MessageRateExceeded']);
+const TERMINAL_TICKET_ERROR_CODES = new Set([
+  'InvalidCredentials',
+  'MessageTooBig',
+  'MismatchSenderId',
+]);
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -38,17 +52,25 @@ async function sendChunkWithTransientRetry(
   }
 }
 
+function isRetryableTicketError(errorCode: string | undefined): boolean {
+  if (errorCode === undefined) return true;
+  if (RETRYABLE_TICKET_ERROR_CODES.has(errorCode)) return true;
+  if (TERMINAL_TICKET_ERROR_CODES.has(errorCode)) return false;
+  return true;
+}
+
 export async function sendPushNotifications(
   messages: ExpoPushMessage[],
   accessToken: string
 ): Promise<SendResult> {
-  if (messages.length === 0) return { ticketTokenPairs: [], staleTokens: [] };
+  if (messages.length === 0) return { ticketTokenPairs: [], staleTokens: [], ticketErrors: [] };
 
   const expo = new Expo({ accessToken });
   const chunks = expo.chunkPushNotifications(messages);
 
   const ticketTokenPairs: TicketTokenPair[] = [];
   const staleTokens: string[] = [];
+  const ticketErrors: PushTicketError[] = [];
 
   for (const chunk of chunks) {
     const tickets = await sendChunkWithTransientRetry(expo, chunk);
@@ -61,11 +83,19 @@ export async function sendPushNotifications(
         ticketTokenPairs.push({ ticketId: ticket.id, token });
       } else if (ticket.details?.error === 'DeviceNotRegistered') {
         staleTokens.push(token);
+      } else {
+        const errorCode = ticket.details?.error;
+        ticketErrors.push({
+          token,
+          errorCode,
+          message: ticket.message,
+          retryable: isRetryableTicketError(errorCode),
+        });
       }
     }
   }
 
-  return { ticketTokenPairs, staleTokens };
+  return { ticketTokenPairs, staleTokens, ticketErrors };
 }
 
 export async function checkPushReceipts(

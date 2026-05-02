@@ -8,8 +8,9 @@ import * as dbClient from '@kilocode/db/client';
 
 vi.mock('../lib/expo-push', () => ({
   sendPushNotifications: vi.fn(async () => ({
-    ticketTokenPairs: [{ ticket: { status: 'ok', id: 't1' }, token: 'tok1' }],
+    ticketTokenPairs: [{ ticketId: 't1', token: 'tok1' }],
     staleTokens: [],
+    ticketErrors: [],
   })),
 }));
 
@@ -252,6 +253,38 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(result.totalReads).toBe(1);
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
     expect(messages[0].badge).toBe(1);
+  });
+
+  it('returns failed and avoids delivered idempotency for non-stale Expo ticket errors', async () => {
+    installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    vi.mocked(sendPushNotifications).mockResolvedValueOnce({
+      ticketTokenPairs: [],
+      staleTokens: [],
+      ticketErrors: [
+        {
+          token: 'tok1',
+          errorCode: 'MessageTooBig',
+          message: 'Message is too big',
+          retryable: false,
+        },
+      ],
+    });
+    const stub = getDO('user-ticket-error');
+
+    const result = await stub.dispatchPush(
+      baseInput({ userId: 'user-ticket-error', idempotencyKey: 'k-ticket-error' })
+    );
+
+    expect(result).toEqual({
+      kind: 'failed',
+      error: 'Expo rejected 1 push ticket',
+    });
+
+    const stored = await runInDurableObject(stub, async (_inst, state) =>
+      state.storage.get<{ stage: string; ts: number }>('idem:k-ticket-error')
+    );
+    expect(stored).toMatchObject({ stage: 'failed' });
   });
 
   it('accumulates bucket counts across deliveries and exposes total via badge', async () => {

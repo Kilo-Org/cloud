@@ -8,16 +8,16 @@ import {
 } from '@kilocode/notifications';
 import { eq, inArray } from 'drizzle-orm';
 
-import type { ExpoPushMessage, TicketTokenPair } from '../lib/expo-push';
+import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
 // Idempotency record. `pending` means the badge was incremented for this
 // idempotency key but the Expo send did not (yet) succeed; on retry we must
-// skip the increment to avoid double-counting. `delivered` and `suppressed`
-// are terminal stages; further attempts are duplicates.
-type IdemRecord = { stage: 'pending' | 'delivered' | 'suppressed'; ts: number };
+// skip the increment to avoid double-counting. `delivered`, `suppressed`, and
+// `failed` are terminal stages; further attempts are duplicates.
+type IdemRecord = { stage: 'pending' | 'delivered' | 'suppressed' | 'failed'; ts: number };
 
 const IDEM_PREFIX = 'idem:';
 const BUCKET_PREFIX = 'bucket:';
@@ -33,7 +33,11 @@ export class NotificationChannelDO extends DurableObject<Env> {
     //    re-incrementing the badge.
     const idemKey = `${IDEM_PREFIX}${parsedInput.idempotencyKey}`;
     const existing = await this.ctx.storage.get<IdemRecord>(idemKey);
-    if (existing?.stage === 'delivered' || existing?.stage === 'suppressed') {
+    if (
+      existing?.stage === 'delivered' ||
+      existing?.stage === 'suppressed' ||
+      existing?.stage === 'failed'
+    ) {
       return { kind: 'duplicate' };
     }
     const isRetry = existing?.stage === 'pending';
@@ -105,7 +109,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
     }));
 
     const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
-    let result: { ticketTokenPairs: TicketTokenPair[]; staleTokens: string[] };
+    let result: SendResult;
     try {
       result = await sendPushNotifications(messages, accessToken);
     } catch (err) {
@@ -124,6 +128,20 @@ export class NotificationChannelDO extends DurableObject<Env> {
     if (result.ticketTokenPairs.length > 0) {
       const receiptMsg: ReceiptCheckMessage = { ticketTokenPairs: result.ticketTokenPairs };
       await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
+    }
+
+    if (result.ticketErrors.length > 0) {
+      if (result.ticketErrors.every(ticketError => !ticketError.retryable)) {
+        const ts = Date.now();
+        await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'failed', ts });
+        await this.ensureCleanupAlarm(ts);
+      }
+
+      const plural = result.ticketErrors.length === 1 ? '' : 's';
+      return {
+        kind: 'failed',
+        error: `Expo rejected ${result.ticketErrors.length} push ticket${plural}`,
+      };
     }
 
     // 6. Mark `delivered` so future retries short-circuit as duplicate.

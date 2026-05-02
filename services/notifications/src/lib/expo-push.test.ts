@@ -41,6 +41,7 @@ describe('sendPushNotifications', () => {
     expect(result).toEqual({
       ticketTokenPairs: [{ ticketId: 'ticket-1', token: 'ExponentPushToken[token-1]' }],
       staleTokens: [],
+      ticketErrors: [],
     });
   });
 
@@ -59,6 +60,32 @@ describe('sendPushNotifications', () => {
     expect(result).toEqual({
       ticketTokenPairs: [],
       staleTokens: ['ExponentPushToken[token-1]'],
+      ticketErrors: [],
+    });
+  });
+
+  it('surfaces non-stale ticket errors', async () => {
+    sendPushNotificationsAsync.mockResolvedValueOnce([
+      {
+        status: 'error',
+        message: 'Message is too big',
+        details: { error: 'MessageTooBig' },
+      },
+    ]);
+
+    const result = await sendPushNotifications([message], 'access-token');
+
+    expect(result).toEqual({
+      ticketTokenPairs: [],
+      staleTokens: [],
+      ticketErrors: [
+        {
+          token: 'ExponentPushToken[token-1]',
+          errorCode: 'MessageTooBig',
+          message: 'Message is too big',
+          retryable: false,
+        },
+      ],
     });
   });
 });

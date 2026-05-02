@@ -18,12 +18,16 @@
   ],
 
   "durable_objects": {
-    "bindings": [{ "name": "USER_SESSION_DO", "class_name": "UserSessionDO" }],
+    "bindings": [
+      { "name": "USER_SESSION_DO", "class_name": "UserSessionDO" },
+      { "name": "CONNECTION_TICKET_DO", "class_name": "ConnectionTicketDO" },
+    ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["UserSessionDO"] },
     { "tag": "v2", "new_sqlite_classes": ["TicketDO"] },
     { "tag": "v3", "deleted_classes": ["TicketDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["ConnectionTicketDO"] },
   ],
 
   "hyperdrive": [

@@ -60,9 +60,20 @@ class MockWebSocket {
 
 let lastMockWs: MockWebSocket;
 let allMockWs: MockWebSocket[];
+let ticketCounter: number;
 
 beforeEach(() => {
   allMockWs = [];
+  ticketCounter = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      ticketCounter += 1;
+      return new Response(JSON.stringify({ ticket: `ticket-${ticketCounter}` }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    })
+  );
   const WebSocketMock = function (url: string, protocols?: string | string[]) {
     lastMockWs = new MockWebSocket(url, protocols);
     allMockWs.push(lastMockWs);
@@ -87,20 +98,27 @@ function makeClient(url = 'ws://localhost:8080') {
   });
 }
 
-// Mirrors the base64url encoding used inside the client.
-function encodeBase64Url(input: string): string {
-  const base64 = btoa(input);
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function expectNonSecretProtocol(protocols: string | string[] | undefined): void {
+  expect(protocols).toEqual(['kilo.events.v1']);
+  expect(JSON.stringify(protocols)).not.toContain('header.payload.sig');
+  expect(JSON.stringify(protocols)).not.toContain('kilo.jwt.');
+  expect(JSON.stringify(protocols)).not.toMatch(
+    /eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/
+  );
 }
 
 describe('EventServiceClient', () => {
-  it('passes the JWT as a subprotocol and targets /connect', async () => {
+  it('mints a connection ticket and uses a non-secret subprotocol for /connect', async () => {
     const client = makeClient();
     client.subscribe(['room:123', 'user:456']);
     await client.connect();
 
-    expect(lastMockWs.url).toBe('ws://localhost:8080/connect');
-    expect(lastMockWs.protocols).toEqual([`kilo.jwt.${encodeBase64Url('header.payload.sig')}`]);
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8080/connect-ticket', {
+      method: 'POST',
+      headers: { authorization: 'Bearer header.payload.sig' },
+    });
+    expect(lastMockWs.url).toBe('ws://localhost:8080/connect?ticket=ticket-1');
+    expectNonSecretProtocol(lastMockWs.protocols);
     expect(client.isConnected()).toBe(true);
 
     const messages = lastMockWs.sent.map(s => JSON.parse(s) as unknown);
@@ -252,7 +270,12 @@ describe('EventServiceClient', () => {
       await vi.advanceTimersByTimeAsync(2_000);
       expect(allMockWs).toHaveLength(2);
       expect(getToken).toHaveBeenCalledTimes(2);
-      expect(allMockWs[1]?.protocols).toEqual([`kilo.jwt.${encodeBase64Url('fresh.token.sig')}`]);
+      expect(fetch).toHaveBeenLastCalledWith('http://localhost:8080/connect-ticket', {
+        method: 'POST',
+        headers: { authorization: 'Bearer fresh.token.sig' },
+      });
+      expect(allMockWs[1]?.url).toBe('ws://localhost:8080/connect?ticket=ticket-2');
+      expectNonSecretProtocol(allMockWs[1]?.protocols);
       expect(client.isConnected()).toBe(true);
     } finally {
       vi.useRealTimers();

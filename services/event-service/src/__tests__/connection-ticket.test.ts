@@ -1,0 +1,91 @@
+import { env, SELF } from 'cloudflare:test';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { signKiloToken } from '@kilocode/worker-utils';
+
+const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
+const ACCEPTED_PROTOCOL = 'kilo.events.v1';
+
+function ticketNamespace(): DurableObjectNamespace {
+  return (env as unknown as { CONNECTION_TICKET_DO: DurableObjectNamespace }).CONNECTION_TICKET_DO;
+}
+
+async function chatToken(userId: string): Promise<string> {
+  const { token } = await signKiloToken({
+    userId,
+    pepper: null,
+    secret: TEST_JWT_SECRET,
+    expiresInSeconds: 3600,
+    env: 'production',
+    extra: { tokenSource: 'kilo-chat' },
+  });
+  return token;
+}
+
+async function mintTicket(userId: string): Promise<string> {
+  const token = await chatToken(userId);
+  const res = await SELF.fetch('https://events.test/connect-ticket', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` },
+  });
+  expect(res.status).toBe(200);
+  const body = await res.json<{ ticket: string }>();
+  return body.ticket;
+}
+
+async function connect(ticket: string): Promise<Response> {
+  return SELF.fetch(`https://events.test/connect?ticket=${ticket}`, {
+    headers: {
+      Upgrade: 'websocket',
+      'Sec-WebSocket-Protocol': ACCEPTED_PROTOCOL,
+    },
+  });
+}
+
+describe('event-service WebSocket connection tickets', () => {
+  beforeEach(() => {
+    vi.spyOn(env.NEXTAUTH_SECRET, 'get').mockResolvedValue(TEST_JWT_SECRET);
+  });
+
+  it('mints an opaque ticket instead of returning a JWT-shaped credential', async () => {
+    const ticket = await mintTicket('user-ticket-mint');
+
+    expect(ticket).not.toContain('kilo.jwt.');
+    expect(ticket).not.toMatch(/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+  });
+
+  it('accepts a fresh ticket once and echoes only the constant subprotocol', async () => {
+    const ticket = await mintTicket('user-ticket-fresh');
+
+    const first = await connect(ticket);
+    expect(first.status).toBe(101);
+    expect(first.headers.get('Sec-WebSocket-Protocol')).toBe(ACCEPTED_PROTOCOL);
+    expect(first.headers.get('Sec-WebSocket-Protocol')).not.toContain(ticket);
+    first.webSocket?.accept();
+    first.webSocket?.close();
+
+    const replay = await connect(ticket);
+    expect(replay.status).toBe(401);
+  });
+
+  it('rejects invalid tickets', async () => {
+    const res = await connect('not-a-real-ticket');
+
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects stale tickets', async () => {
+    const ticket = crypto.randomUUID();
+    const stub = ticketNamespace().get(ticketNamespace().idFromName(ticket));
+    await stub.fetch('https://ticket.local/mint', {
+      method: 'POST',
+      body: JSON.stringify({
+        userId: 'user-ticket-stale',
+        expiresAt: Date.now() - 1,
+      }),
+    });
+
+    const res = await connect(ticket);
+
+    expect(res.status).toBe(401);
+  });
+});

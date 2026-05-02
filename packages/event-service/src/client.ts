@@ -1,15 +1,7 @@
 import type { ClientMessage, EventServiceConfig } from './types';
 import { serverMessageSchema } from './schemas';
 
-/**
- * Subprotocol format used to carry the JWT on the WebSocket handshake:
- *   "kilo.jwt.<base64url-encoded-jwt>"
- *
- * JWTs contain '.' (which is a valid HTTP token char), but base64 encodings
- * produce '/' and '+' which are not — so we base64url-encode the token before
- * embedding it in a subprotocol identifier.
- */
-const SUBPROTOCOL_PREFIX = 'kilo.jwt.';
+const WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 
 /**
  * Thrown (and surfaced via {@link EventServiceConfig.onUnauthorized}) when the
@@ -35,10 +27,49 @@ export class HandshakeTimeoutError extends Error {
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 const MAX_AUTH_RECOVERY_ATTEMPTS = 1;
 
-function encodeBase64Url(input: string): string {
-  // btoa handles each char as a single byte; JWTs are ASCII so this is safe.
-  const base64 = btoa(input);
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function baseUrlWithPath(base: string, path: string): URL {
+  return new URL(path, base.endsWith('/') ? base : `${base}/`);
+}
+
+function ticketEndpointFor(wsBase: string): string {
+  const url = baseUrlWithPath(wsBase, 'connect-ticket');
+  if (url.protocol === 'ws:') {
+    url.protocol = 'http:';
+  } else if (url.protocol === 'wss:') {
+    url.protocol = 'https:';
+  }
+  return url.toString();
+}
+
+function connectUrlFor(wsBase: string, ticket: string): string {
+  const url = baseUrlWithPath(wsBase, 'connect');
+  url.searchParams.set('ticket', ticket);
+  return url.toString();
+}
+
+async function fetchConnectionTicket(wsBase: string, token: string): Promise<string> {
+  const response = await fetch(ticketEndpointFor(wsBase), {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401 || response.status === 403) {
+    throw new WebSocketAuthError();
+  }
+  if (!response.ok) {
+    throw new Error('Failed to mint WebSocket connection ticket');
+  }
+
+  const body: unknown = await response.json();
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('ticket' in body) ||
+    typeof body.ticket !== 'string' ||
+    body.ticket.length === 0
+  ) {
+    throw new Error('Invalid WebSocket connection ticket response');
+  }
+  return body.ticket;
 }
 
 export class EventServiceClient {
@@ -126,14 +157,15 @@ export class EventServiceClient {
     }
 
     const token = await this.getToken();
+    if (this.destroyed) return;
+    const ticket = await fetchConnectionTicket(this.url, token);
     // disconnect() may have run while we were awaiting the token. Bail before
     // creating the socket so we don't leak a WebSocket + ping timer past
     // provider unmount (e.g. sign-out, navigation, strict-mode remount).
     if (this.destroyed) return;
-    const subprotocol = `${SUBPROTOCOL_PREFIX}${encodeBase64Url(token)}`;
 
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`${this.url}/connect`, [subprotocol]);
+      const ws = new WebSocket(connectUrlFor(this.url, ticket), [WEBSOCKET_PROTOCOL]);
       this.ws = ws;
 
       // Guard against double-resolution: the handshake timeout, the

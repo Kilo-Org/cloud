@@ -28,17 +28,28 @@ for arg in "$@"; do
 done
 
 # Select Dockerfile
+LOCAL_OPENCLAW_TARBALL=""
 if [ "$USE_LOCAL" = true ]; then
   DOCKERFILE="$KILOCLAW_DIR/Dockerfile.local"
-  # Validate that a tarball exists in openclaw-build/
-  if ! ls "$KILOCLAW_DIR"/openclaw-build/openclaw-*.tgz 1>/dev/null 2>&1; then
+  # Validate that exactly one tarball exists in openclaw-build/. Dockerfile.local
+  # copies openclaw-*.tgz to a single file path, so multiple matches are ambiguous.
+  LOCAL_OPENCLAW_TARBALLS=$(find "$KILOCLAW_DIR/openclaw-build" -maxdepth 1 -type f -name 'openclaw-*.tgz' | sort)
+  LOCAL_OPENCLAW_TARBALL_COUNT=$(printf '%s\n' "$LOCAL_OPENCLAW_TARBALLS" | sed '/^$/d' | wc -l | tr -d ' ')
+  if [ "$LOCAL_OPENCLAW_TARBALL_COUNT" -eq 0 ]; then
     echo "Error: No openclaw-*.tgz found in openclaw-build/." >&2
     echo "Build your fork first:" >&2
     echo "  cd /path/to/openclaw && pnpm build && npm pack" >&2
     echo "  cp openclaw-*.tgz $(cd "$KILOCLAW_DIR" && pwd)/openclaw-build/" >&2
     exit 1
   fi
-  echo "Using Dockerfile.local (local OpenClaw tarball)"
+  if [ "$LOCAL_OPENCLAW_TARBALL_COUNT" -gt 1 ]; then
+    echo "Error: Multiple openclaw-*.tgz files found in openclaw-build/." >&2
+    echo "$LOCAL_OPENCLAW_TARBALLS" >&2
+    echo "Keep exactly one tarball so Dockerfile.local and the content hash use the same input." >&2
+    exit 1
+  fi
+  LOCAL_OPENCLAW_TARBALL="$LOCAL_OPENCLAW_TARBALLS"
+  echo "Using Dockerfile.local with $(basename "$LOCAL_OPENCLAW_TARBALL")"
 else
   DOCKERFILE="$KILOCLAW_DIR/Dockerfile"
 fi
@@ -125,7 +136,11 @@ fi
 # ---------- Store content hash of image sources ----------
 # Mirrors the source list used in deploy-kiloclaw.yml and dev-start.sh.
 
-CONTENT_HASH="$("$KILOCLAW_DIR/scripts/image-content-hash.sh" --hash --dockerfile Dockerfile)"
+if [ "$USE_LOCAL" = true ]; then
+  CONTENT_HASH="$("$KILOCLAW_DIR/scripts/image-content-hash.sh" --hash --dockerfile Dockerfile.local --openclaw-tarball "$LOCAL_OPENCLAW_TARBALL")"
+else
+  CONTENT_HASH="$("$KILOCLAW_DIR/scripts/image-content-hash.sh" --hash --dockerfile Dockerfile)"
+fi
 
 if [ -f "$KILOCLAW_DIR/.dev.vars" ] && [ -n "$CONTENT_HASH" ]; then
   if grep -q '^FLY_IMAGE_CONTENT_HASH=' "$KILOCLAW_DIR/.dev.vars"; then

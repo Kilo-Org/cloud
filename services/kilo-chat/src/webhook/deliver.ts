@@ -131,6 +131,9 @@ export async function notifyMessageDeliveryFailed(
   if (!result.ok) {
     return result;
   }
+  if (!result.changed) {
+    return result;
+  }
 
   const ctx = params.convContext ?? (await getConversationContext(env, params.conversationId));
   if (ctx?.sandboxId) {

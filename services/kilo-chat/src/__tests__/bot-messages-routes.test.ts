@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:test';
+import { kiloclawConversationContext } from '@kilocode/event-service';
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { AuthContext } from '../auth';
@@ -72,7 +73,7 @@ async function tokenFor(sandboxId: string): Promise<string> {
 /** Helper to create a conversation + optionally a message as a user.
  *  Registers the message create handler directly with a mock-auth app so we
  *  don't need a real JWT. */
-async function setupData(suffix: string) {
+async function setupData(suffix: string, pushEvent?: ReturnType<typeof vi.fn>) {
   const userId = `user-${suffix}`;
   const sandboxId = `sandbox-${suffix}`;
 
@@ -90,7 +91,7 @@ async function setupData(suffix: string) {
   setupAppBase.delete('/v1/messages/:messageId', handleDeleteMessage);
   const setupApp = withTestExecutionCtx(setupAppBase);
 
-  const testEnv = makeEnv();
+  const testEnv = makeEnv(pushEvent);
 
   const convRes = await setupApp.request(
     '/v1/conversations',
@@ -238,9 +239,14 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
 
 describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-failed', () => {
   it('flips deliveryFailed and returns 202', async () => {
-    const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-msg-df-ok');
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const { sandboxId, conversationId, messageId, testEnv } = await setupData(
+      'bot-msg-df-ok',
+      pushEvent
+    );
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
+    pushEvent.mockClear();
 
     const res = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
@@ -252,8 +258,15 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
       testEnv
     );
     expect(res.status).toBe(202);
+    expect(pushEvent).toHaveBeenCalledOnce();
+    expect(pushEvent).toHaveBeenCalledWith(
+      'user-bot-msg-df-ok',
+      kiloclawConversationContext(sandboxId, conversationId),
+      'message.delivery_failed',
+      { messageId }
+    );
 
-    // second call is idempotent (UPDATE is a no-op)
+    pushEvent.mockClear();
     const second = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
       {
@@ -264,6 +277,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
       testEnv
     );
     expect(second.status).toBe(202);
+    expect(pushEvent).not.toHaveBeenCalled();
   });
 
   it('returns 401 without auth token', async () => {

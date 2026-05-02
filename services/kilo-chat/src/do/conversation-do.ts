@@ -164,7 +164,7 @@ export type RevertActionResolutionResult =
   | { ok: false; code: 'not_found'; error: string };
 
 export type NotifyDeliveryFailedResult =
-  | { ok: true }
+  | { ok: true; changed: boolean }
   | { ok: false; code: 'not_found'; error: string };
 
 export type AddReactionParams = { messageId: string; memberId: string; emoji: string };
@@ -224,11 +224,11 @@ export class ConversationDO extends DurableObject<Env> {
     }
 
     if (row.delivery_failed === 1) {
-      return { ok: true };
+      return { ok: true, changed: false };
     }
 
     this.db.update(messages).set({ delivery_failed: 1 }).where(eq(messages.id, messageId)).run();
-    return { ok: true };
+    return { ok: true, changed: true };
   }
 
   revertActionResolution(params: {

@@ -147,7 +147,7 @@ describe('deliverToBot', () => {
 
   it('retries up to 2 times then notifies failure', async () => {
     const deliverChatWebhook = vi.fn().mockRejectedValue(new Error('boom'));
-    const notifyDeliveryFailed = vi.fn().mockResolvedValue({ ok: true });
+    const notifyDeliveryFailed = vi.fn().mockResolvedValue({ ok: true, changed: true });
     const env = makeEnvWithConvStub(deliverChatWebhook, notifyDeliveryFailed);
 
     await deliverToBot(env, makeMsg());
@@ -227,7 +227,7 @@ describe('deliverToBot', () => {
   it('uses provided convContext on permanent failure instead of re-fetching', async () => {
     const deliverChatWebhook = vi.fn().mockRejectedValue(new Error('boom'));
     const pushEvent = vi.fn().mockResolvedValue(false);
-    const notifyDeliveryFailed = vi.fn().mockResolvedValue({ ok: true });
+    const notifyDeliveryFailed = vi.fn().mockResolvedValue({ ok: true, changed: true });
     const env = {
       KILOCLAW: { deliverChatWebhook },
       EVENT_SERVICE: { pushEvent },
@@ -277,6 +277,32 @@ describe('deliverToBot', () => {
     });
 
     expect(notifyDeliveryFailed).toHaveBeenCalledWith('missing-message');
+    expect(pushEvent).not.toHaveBeenCalled();
+  });
+
+  it('skips message.delivery_failed event when the message was already failed', async () => {
+    const notifyDeliveryFailed = vi.fn().mockResolvedValue({ ok: true, changed: false });
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const env = {
+      EVENT_SERVICE: { pushEvent },
+      CONVERSATION_DO: {
+        idFromName: vi.fn().mockReturnValue('id'),
+        get: vi.fn().mockReturnValue({
+          notifyDeliveryFailed,
+        }),
+      },
+    } as unknown as Env;
+
+    await notifyMessageDeliveryFailed(env, {
+      conversationId: 'conv-1',
+      messageId: 'msg-1',
+      convContext: {
+        humanMemberIds: ['user-1'],
+        sandboxId: 'sandbox-1',
+      },
+    });
+
+    expect(notifyDeliveryFailed).toHaveBeenCalledWith('msg-1');
     expect(pushEvent).not.toHaveBeenCalled();
   });
 });

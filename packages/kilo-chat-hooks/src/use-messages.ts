@@ -57,9 +57,24 @@ export function createReactionOperationTracker(): ReactionOperationTracker {
   return new Map();
 }
 
+const reactionOperationTrackersByConversation = new Map<string, ReactionOperationTracker>();
+
+export function getReactionOperationTracker(conversationId: string): ReactionOperationTracker {
+  const existing = reactionOperationTrackersByConversation.get(conversationId);
+  if (existing) return existing;
+  const tracker = createReactionOperationTracker();
+  reactionOperationTrackersByConversation.set(conversationId, tracker);
+  return tracker;
+}
+
+type ReactionOperation = Pick<
+  ReactionAddedEvent | ReactionRemovedEvent,
+  'messageId' | 'emoji' | 'memberId' | 'operationId'
+>;
+
 function reactionOperationKey(
   conversationId: string,
-  event: Pick<ReactionAddedEvent | ReactionRemovedEvent, 'messageId' | 'emoji' | 'memberId'>
+  event: Pick<ReactionOperation, 'messageId' | 'emoji' | 'memberId'>
 ): string {
   return JSON.stringify([conversationId, event.messageId, event.emoji, event.memberId]);
 }
@@ -67,7 +82,7 @@ function reactionOperationKey(
 function recordFreshReactionOperation(
   latestOperations: ReactionOperationTracker,
   conversationId: string,
-  event: ReactionAddedEvent | ReactionRemovedEvent
+  event: ReactionOperation
 ): boolean {
   const key = reactionOperationKey(conversationId, event);
   const latestOperationId = latestOperations.get(key);
@@ -101,6 +116,32 @@ export function applyReactionRemovedEventToPages<TPageParam>(
   return updateMessageInPages(old, event.messageId, msg => ({
     ...msg,
     reactions: applyReactionRemoved(msg.reactions, event.emoji, event.memberId),
+  }));
+}
+
+export function applyReactionAddedMutationToPages<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  conversationId: string,
+  latestOperations: ReactionOperationTracker,
+  operation: ReactionOperation
+): InfiniteData<Message[], TPageParam> {
+  if (!recordFreshReactionOperation(latestOperations, conversationId, operation)) return old;
+  return updateMessageInPages(old, operation.messageId, msg => ({
+    ...msg,
+    reactions: applyReactionAdded(msg.reactions, operation.emoji, operation.memberId),
+  }));
+}
+
+export function applyReactionRemovedMutationToPages<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  conversationId: string,
+  latestOperations: ReactionOperationTracker,
+  operation: ReactionOperation
+): InfiniteData<Message[], TPageParam> {
+  if (!recordFreshReactionOperation(latestOperations, conversationId, operation)) return old;
+  return updateMessageInPages(old, operation.messageId, msg => ({
+    ...msg,
+    reactions: applyReactionRemoved(msg.reactions, operation.emoji, operation.memberId),
   }));
 }
 
@@ -586,6 +627,20 @@ export function useAddReaction(
       );
       if (!restored) invalidateMessages(queryClient, context.queryKey);
     },
+    onSuccess: (result, variables) => {
+      if (!conversationId || currentUserId === null) return;
+      const queryKey = messagesKey(conversationId);
+      const reactionOperations = getReactionOperationTracker(conversationId);
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return applyReactionAddedMutationToPages(old, conversationId, reactionOperations, {
+          messageId: variables.messageId,
+          emoji: variables.emoji,
+          memberId: currentUserId,
+          operationId: result.id,
+        });
+      });
+    },
   });
 }
 
@@ -627,6 +682,20 @@ export function useRemoveReaction(
         context.optimisticMessage
       );
       if (!restored) invalidateMessages(queryClient, context.queryKey);
+    },
+    onSuccess: (result, variables) => {
+      if (!conversationId || currentUserId === null || !result.removed) return;
+      const queryKey = messagesKey(conversationId);
+      const reactionOperations = getReactionOperationTracker(conversationId);
+      queryClient.setQueryData<InfiniteData<Message[]>>(queryKey, old => {
+        if (!old) return old;
+        return applyReactionRemovedMutationToPages(old, conversationId, reactionOperations, {
+          messageId: variables.messageId,
+          emoji: variables.emoji,
+          memberId: currentUserId,
+          operationId: result.id,
+        });
+      });
     },
   });
 }
@@ -735,7 +804,7 @@ export function useMessageCacheUpdater(
     if (!conversationId || !sandboxId) return;
     const queryKey = messagesKey(conversationId);
     const expectedContext = kiloclawConversationContext(sandboxId, conversationId);
-    const reactionOperations = createReactionOperationTracker();
+    const reactionOperations = getReactionOperationTracker(conversationId);
 
     const onCreated = (ctx: string, e: MessageCreatedEvent) => {
       if (ctx !== expectedContext) return;

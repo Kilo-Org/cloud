@@ -244,9 +244,9 @@ describe('POST /v1/messages/:id/reactions', () => {
 });
 
 describe('DELETE /v1/messages/:id/reactions', () => {
-  it('204 when removing a live reaction via query params', async () => {
+  it('returns the remove operation id when removing a live reaction via query params', async () => {
     const { conversationId, messageId, userApp } = await setup('rx-del-1');
-    await userApp.request(
+    const addRes = await userApp.request(
       `/v1/messages/${messageId}/reactions`,
       {
         method: 'POST',
@@ -255,13 +255,18 @@ describe('DELETE /v1/messages/:id/reactions', () => {
       },
       env
     );
+    const addBody = await addRes.json<{ id: string }>();
     const qs = new URLSearchParams({ conversationId, emoji: '👍' });
     const res = await userApp.request(
       `/v1/messages/${messageId}/reactions?${qs.toString()}`,
       { method: 'DELETE' },
       env
     );
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    const body = await res.json<{ removed: boolean; id: string | null }>();
+    expect(body.removed).toBe(true);
+    expect(body.id).toMatch(/^[0-9A-Z]{26}$/);
+    expect(body.id).not.toBe(addBody.id);
   });
 
   it('pushes reaction.removed events with the remove operation id', async () => {
@@ -292,7 +297,8 @@ describe('DELETE /v1/messages/:id/reactions', () => {
       testEnv
     );
 
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    const body = await res.json<{ removed: boolean; id: string | null }>();
     expect(pushEvent).toHaveBeenCalledOnce();
     expect(pushEvent).toHaveBeenCalledWith(
       userId,
@@ -312,9 +318,10 @@ describe('DELETE /v1/messages/:id/reactions', () => {
     });
     expect(removed[0]?.operationId).toMatch(/^[0-9A-Z]{26}$/);
     expect(removed[0]?.operationId).not.toBe(addBody.id);
+    expect(body).toEqual({ removed: true, id: removed[0]?.operationId });
   });
 
-  it('204 even when reaction never existed (idempotent)', async () => {
+  it('returns an explicit no-op shape when reaction never existed', async () => {
     const { conversationId, messageId, userApp } = await setup('rx-del-2');
     const qs = new URLSearchParams({ conversationId, emoji: '👍' });
     const res = await userApp.request(
@@ -322,7 +329,8 @@ describe('DELETE /v1/messages/:id/reactions', () => {
       { method: 'DELETE' },
       env
     );
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ removed: false, id: null });
   });
 
   it('404 when removing a reaction from a deleted message', async () => {

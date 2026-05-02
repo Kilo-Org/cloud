@@ -1115,13 +1115,13 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members
 // ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions ────────
 
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', () => {
-  it('returns 204 after removing a reaction via query params', async () => {
+  it('returns the remove operation id after removing a reaction via query params', async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-1');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
     // Add first
-    await app.request(
+    const addRes = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}/reactions`,
       {
         method: 'POST',
@@ -1130,6 +1130,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
       },
       testEnv
     );
+    const addBody = await addRes.json<{ id: string }>();
 
     const qs = new URLSearchParams({ conversationId, emoji: '👍' });
     const res = await app.request(
@@ -1141,10 +1142,14 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
       testEnv
     );
 
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    const body = await res.json<{ removed: boolean; id: string | null }>();
+    expect(body.removed).toBe(true);
+    expect(body.id).toMatch(/^[0-9A-Z]{26}$/);
+    expect(body.id).not.toBe(addBody.id);
   });
 
-  it('returns 204 even when reaction never existed (idempotent)', async () => {
+  it('returns an explicit no-op shape when reaction never existed', async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-idem');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -1159,7 +1164,8 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
       testEnv
     );
 
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ removed: false, id: null });
   });
 
   it('returns 403 for non-member bot', async () => {

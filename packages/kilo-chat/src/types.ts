@@ -26,6 +26,7 @@ import type {
   conversationDetailResponseSchema,
   okResponseSchema,
   addReactionResponseSchema,
+  removeReactionResponseSchema,
   executeActionRequestSchema,
   execApprovalDecisionSchema,
   botListConversationsResponseSchema,
@@ -116,6 +117,7 @@ export type MarkConversationReadRequest = z.infer<typeof markConversationReadReq
 export type RenameConversationRequest = z.infer<typeof renameConversationRequestSchema>;
 export type OkResponse = z.infer<typeof okResponseSchema>;
 export type AddReactionResponse = z.infer<typeof addReactionResponseSchema>;
+export type RemoveReactionResponse = z.infer<typeof removeReactionResponseSchema>;
 export type ExecuteActionRequest = z.infer<typeof executeActionRequestSchema>;
 export type ExecApprovalDecision = z.infer<typeof execApprovalDecisionSchema>;
 export type ConversationListResponse = z.infer<typeof conversationListResponseSchema>;

@@ -231,6 +231,11 @@ export const addReactionResponseSchema = z.object({
   id: z.string().min(1),
 });
 
+export const removeReactionResponseSchema = z.discriminatedUnion('removed', [
+  z.object({ removed: z.literal(true), id: z.string().min(1) }),
+  z.object({ removed: z.literal(false), id: z.null() }),
+]);
+
 export const conversationListResponseSchema = z.object({
   conversations: z.array(conversationListItemSchema),
   hasMore: z.boolean(),

@@ -8,6 +8,7 @@ import {
   editMessageResponseSchema,
   messageListResponseSchema,
   addReactionResponseSchema,
+  removeReactionResponseSchema,
   okResponseSchema,
   getBotStatusResponseSchema,
   getConversationStatusResponseSchema,
@@ -43,6 +44,8 @@ import type {
   TypingEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
+  AddReactionResponse,
+  RemoveReactionResponse,
   ConversationCreatedEvent,
   ConversationRenamedEvent,
   ConversationLeftEvent,
@@ -182,7 +185,7 @@ export class KiloChatClient {
   async addReaction(
     messageId: string,
     req: z.input<typeof reactionRequestBodySchema>
-  ): Promise<{ id: string }> {
+  ): Promise<AddReactionResponse> {
     return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'POST',
       body: req,
@@ -193,11 +196,11 @@ export class KiloChatClient {
   async removeReaction(
     messageId: string,
     req: z.input<typeof reactionRequestBodySchema>
-  ): Promise<void> {
-    await this.httpRequest(`/v1/messages/${messageId}/reactions`, {
+  ): Promise<RemoveReactionResponse> {
+    return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'DELETE',
       query: req,
-      schema: voidSchema,
+      schema: removeReactionResponseSchema,
     });
   }
 

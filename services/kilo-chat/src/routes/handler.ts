@@ -29,6 +29,7 @@ import type {
   EditMessageResponse,
   OkResponse,
   AddReactionResponse,
+  RemoveReactionResponse,
   MessageListResponse,
   BotGetMembersResponse,
   BotListConversationsResponse,
@@ -371,7 +372,10 @@ export async function handleRemoveReaction(c: HonoCtx) {
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 500);
   }
-  return new Response(null, { status: 204 });
+  const response = result.removed
+    ? ({ removed: true, id: result.removed_id } satisfies RemoveReactionResponse)
+    : ({ removed: false, id: null } satisfies RemoveReactionResponse);
+  return c.json(response, 200);
 }
 
 // ─── listMessages ────────────────────────────────────────────────────────────

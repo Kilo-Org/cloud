@@ -4,7 +4,6 @@ import type {
   BotStatusRequest,
   ConversationStatusRequest,
 } from '@kilocode/kilo-chat';
-import { getKiloChatEventPayloadSchema } from '@kilocode/kilo-chat';
 import { kiloclawConversationContext, kiloclawInstanceContext } from '@kilocode/event-service';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
@@ -12,29 +11,6 @@ import { lookupSandboxOwnerUserId } from './sandbox-ownership';
 
 function getEventService(env: Env): Env['EVENT_SERVICE'] | null {
   return env.EVENT_SERVICE ?? null;
-}
-
-function compactIssueSummary(issues: Array<{ path: PropertyKey[]; message: string }>): string[] {
-  return issues.slice(0, 5).map(issue => {
-    const path = issue.path.length > 0 ? issue.path.join('.') : '<root>';
-    return `${path}: ${issue.message}`;
-  });
-}
-
-function parseEventPayload(
-  event: KiloChatEventName,
-  payload: unknown,
-  target: Record<string, unknown>
-): KiloChatEventOf<KiloChatEventName> | null {
-  const parsed = getKiloChatEventPayloadSchema(event).safeParse(payload);
-  if (parsed.success) return parsed.data;
-
-  logger.error('event-service pushEvent rejected invalid kilo-chat payload', {
-    event,
-    ...target,
-    issues: compactIssueSummary(parsed.error.issues),
-  });
-  return null;
 }
 
 /**
@@ -52,22 +28,10 @@ export async function pushEventToHumanMembers<N extends KiloChatEventName>(
   const es = getEventService(env);
   if (!es) return new Map();
   const context = kiloclawConversationContext(sandboxId, conversationId);
-  const parsedPayload = parseEventPayload(event, payload, {
-    context,
-    conversationId,
-    sandboxId,
-    target: 'conversation-members',
-  });
-  if (!parsedPayload) return new Map();
 
   const results = await Promise.allSettled(
     humanMemberIds.map(async userId => {
-      const delivered = await es.pushEvent<KiloChatEventName>(
-        userId,
-        context,
-        event,
-        parsedPayload
-      );
+      const delivered = await es.pushEvent<N>(userId, context, event, payload);
       return [userId, delivered] as const;
     })
   );
@@ -103,17 +67,9 @@ export async function pushInstanceEvent<N extends KiloChatEventName>(
   const es = getEventService(env);
   if (!es) return;
   const context = kiloclawInstanceContext(sandboxId);
-  const parsedPayload = parseEventPayload(event, payload, {
-    context,
-    sandboxId,
-    target: 'instance-members',
-  });
-  if (!parsedPayload) return;
 
   const results = await Promise.allSettled(
-    humanMemberIds.map(userId =>
-      es.pushEvent<KiloChatEventName>(userId, context, event, parsedPayload)
-    )
+    humanMemberIds.map(userId => es.pushEvent<N>(userId, context, event, payload))
   );
   for (let i = 0; i < results.length; i++) {
     const r = results[i];
@@ -143,16 +99,9 @@ export async function pushInstanceEventToUser<N extends KiloChatEventName>(
   const es = getEventService(env);
   if (!es) return;
   const context = kiloclawInstanceContext(sandboxId);
-  const parsedPayload = parseEventPayload(event, payload, {
-    context,
-    sandboxId,
-    target: 'instance-user',
-    userId,
-  });
-  if (!parsedPayload) return;
 
   try {
-    await es.pushEvent<KiloChatEventName>(userId, context, event, parsedPayload);
+    await es.pushEvent<N>(userId, context, event, payload);
   } catch (err) {
     logger.error('event-service pushEvent failed for instance user', {
       userId,

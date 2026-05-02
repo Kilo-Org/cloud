@@ -26,24 +26,11 @@ describe('pushInstanceEventToUser', () => {
       lastReadAt: 123,
     });
   });
-
-  it('does not push invalid payloads to a targeted user', async () => {
-    const pushEvent = vi.fn().mockResolvedValue(false);
-    const env = { EVENT_SERVICE: { pushEvent } } as unknown as Env;
-
-    await pushInstanceEventToUser(env, 'sandbox-1', 'reader-1', 'conversation.read', {
-      conversationId,
-      memberId: 'reader-1',
-      lastReadAt: -1,
-    } as never);
-
-    expect(pushEvent).not.toHaveBeenCalled();
-  });
 });
 
 describe('pushEventToHumanMembers', () => {
-  it('does not push invalid payloads to conversation members', async () => {
-    const pushEvent = vi.fn().mockResolvedValue(false);
+  it('pushes typed payloads to conversation members', async () => {
+    const pushEvent = vi.fn().mockResolvedValue(true);
     const env = { EVENT_SERVICE: { pushEvent } } as unknown as Env;
 
     const result = await pushEventToHumanMembers(
@@ -55,26 +42,75 @@ describe('pushEventToHumanMembers', () => {
       {
         conversationId,
         memberId: 'member-1',
-        lastReadAt: -1,
-      } as never
+        lastReadAt: 123,
+      }
     );
 
-    expect(result.size).toBe(0);
-    expect(pushEvent).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      new Map([
+        ['member-1', true],
+        ['member-2', true],
+      ])
+    );
+    expect(pushEvent).toHaveBeenCalledTimes(2);
+    expect(pushEvent).toHaveBeenNthCalledWith(
+      1,
+      'member-1',
+      `/kiloclaw/sandbox-1/${conversationId}`,
+      'conversation.read',
+      {
+        conversationId,
+        memberId: 'member-1',
+        lastReadAt: 123,
+      }
+    );
+    expect(pushEvent).toHaveBeenNthCalledWith(
+      2,
+      'member-2',
+      `/kiloclaw/sandbox-1/${conversationId}`,
+      'conversation.read',
+      {
+        conversationId,
+        memberId: 'member-1',
+        lastReadAt: 123,
+      }
+    );
   });
 });
 
 describe('pushInstanceEvent', () => {
-  it('does not push invalid payloads to instance members', async () => {
+  it('pushes typed payloads to instance members', async () => {
     const pushEvent = vi.fn().mockResolvedValue(false);
     const env = { EVENT_SERVICE: { pushEvent } } as unknown as Env;
 
     await pushInstanceEvent(env, 'sandbox-1', ['member-1', 'member-2'], 'conversation.read', {
       conversationId,
       memberId: 'member-1',
-      lastReadAt: -1,
-    } as never);
+      lastReadAt: 123,
+    });
 
-    expect(pushEvent).not.toHaveBeenCalled();
+    expect(pushEvent).toHaveBeenCalledTimes(2);
+    expect(pushEvent).toHaveBeenNthCalledWith(
+      1,
+      'member-1',
+      '/kiloclaw/sandbox-1',
+      'conversation.read',
+      {
+        conversationId,
+        memberId: 'member-1',
+        lastReadAt: 123,
+      }
+    );
+    expect(pushEvent).toHaveBeenNthCalledWith(
+      2,
+      'member-2',
+      '/kiloclaw/sandbox-1',
+      'conversation.read',
+      {
+        conversationId,
+        memberId: 'member-1',
+        lastReadAt: 123,
+      }
+    );
   });
 });

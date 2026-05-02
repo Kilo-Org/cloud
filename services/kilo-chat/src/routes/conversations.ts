@@ -4,6 +4,7 @@ import type {
   CreateConversationResponse,
   ConversationListResponse,
   ConversationDetailResponse,
+  MarkConversationReadResponse,
   OkResponse,
 } from '@kilocode/kilo-chat';
 import { withDORetry } from '@kilocode/worker-utils';
@@ -199,6 +200,12 @@ export function registerConversationRoutes(
       return c.json({ error: result.error }, result.code === 'invalid' ? 400 : 403);
     }
 
-    return c.json(result);
+    const response = {
+      ok: result.ok,
+      applied: result.applied,
+      lastReadAt: result.lastReadAt,
+      badgeClear: result.badgeClear,
+    } satisfies MarkConversationReadResponse;
+    return c.json(response);
   });
 }

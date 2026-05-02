@@ -15,10 +15,22 @@ export type PushTicketError = {
   retryable: boolean;
 };
 
+export type PushReceiptError = {
+  ticketId: string;
+  errorCode: string | undefined;
+  message: string;
+  retryable: boolean;
+};
+
 export type SendResult = {
   ticketTokenPairs: TicketTokenPair[];
   staleTokens: string[];
   ticketErrors: PushTicketError[];
+};
+
+export type ReceiptCheckResult = {
+  staleTokens: string[];
+  receiptErrors: PushReceiptError[];
 };
 
 type ExpoClient = InstanceType<typeof Expo>;
@@ -57,6 +69,10 @@ function isRetryableTicketError(errorCode: string | undefined): boolean {
   if (RETRYABLE_TICKET_ERROR_CODES.has(errorCode)) return true;
   if (TERMINAL_TICKET_ERROR_CODES.has(errorCode)) return false;
   return true;
+}
+
+function isRetryableReceiptError(errorCode: string | undefined): boolean {
+  return isRetryableTicketError(errorCode);
 }
 
 export async function sendPushNotifications(
@@ -101,8 +117,8 @@ export async function sendPushNotifications(
 export async function checkPushReceipts(
   ticketTokenPairs: TicketTokenPair[],
   accessToken: string
-): Promise<string[]> {
-  if (ticketTokenPairs.length === 0) return [];
+): Promise<ReceiptCheckResult> {
+  if (ticketTokenPairs.length === 0) return { staleTokens: [], receiptErrors: [] };
 
   const expo = new Expo({ accessToken });
   const ticketIds = ticketTokenPairs.map(p => p.ticketId);
@@ -110,6 +126,7 @@ export async function checkPushReceipts(
 
   const ticketToToken = new Map(ticketTokenPairs.map(p => [p.ticketId, p.token]));
   const staleTokens: string[] = [];
+  const receiptErrors: PushReceiptError[] = [];
 
   for (const chunk of chunks) {
     const receipts: { [id: string]: ExpoPushReceipt } =
@@ -119,9 +136,17 @@ export async function checkPushReceipts(
       if (receipt.status === 'error' && receipt.details?.error === 'DeviceNotRegistered') {
         const token = ticketToToken.get(ticketId);
         if (token) staleTokens.push(token);
+      } else if (receipt.status === 'error') {
+        const errorCode = receipt.details?.error;
+        receiptErrors.push({
+          ticketId,
+          errorCode,
+          message: receipt.message,
+          retryable: isRetryableReceiptError(errorCode),
+        });
       }
     }
   }
 
-  return staleTokens;
+  return { staleTokens, receiptErrors };
 }

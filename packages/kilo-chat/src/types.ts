@@ -29,6 +29,7 @@ import type {
   addReactionResponseSchema,
   removeReactionResponseSchema,
   executeActionRequestSchema,
+  executeActionResponseSchema,
   execApprovalDecisionSchema,
   botListConversationsResponseSchema,
   botListMessagesResponseSchema,
@@ -121,6 +122,7 @@ export type OkResponse = z.infer<typeof okResponseSchema>;
 export type AddReactionResponse = z.infer<typeof addReactionResponseSchema>;
 export type RemoveReactionResponse = z.infer<typeof removeReactionResponseSchema>;
 export type ExecuteActionRequest = z.infer<typeof executeActionRequestSchema>;
+export type ExecuteActionResponse = z.infer<typeof executeActionResponseSchema>;
 export type ExecApprovalDecision = z.infer<typeof execApprovalDecisionSchema>;
 export type ConversationListResponse = z.infer<typeof conversationListResponseSchema>;
 export type MessageListResponse = z.infer<typeof messageListResponseSchema>;

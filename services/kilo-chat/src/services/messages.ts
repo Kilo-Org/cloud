@@ -479,7 +479,17 @@ export type ExecuteActionParams = {
 };
 
 export type ExecuteActionResult =
-  | { ok: true }
+  | {
+      ok: true;
+      messageId: string;
+      content: ContentBlock[];
+      resolved: {
+        groupId: string;
+        value: ExecApprovalDecision;
+        resolvedBy: string;
+        resolvedAt: number;
+      };
+    }
   | {
       ok: false;
       code: 'forbidden' | 'not_found' | 'already_resolved' | 'invalid_value' | 'internal';
@@ -550,5 +560,5 @@ export async function executeActionFor(
     ctx.waitUntil(fanOut());
   }
 
-  return { ok: true };
+  return { ok: true, messageId, content: result.content, resolved: result.resolved };
 }

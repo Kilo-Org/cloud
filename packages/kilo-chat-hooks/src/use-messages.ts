@@ -16,6 +16,7 @@ import type {
   ReactionRemovedEvent,
   RemoveReactionResponse,
   MessageListResponse,
+  ExecuteActionResponse,
 } from '@kilocode/kilo-chat';
 import { useEffect } from 'react';
 import { kiloclawConversationContext } from '@kilocode/event-service';
@@ -525,6 +526,16 @@ export function applyMessageUpdatedEventToPages<TPageParam>(
   });
 }
 
+export function applyExecuteActionResponseToPages<TPageParam>(
+  old: InfiniteData<Message[], TPageParam>,
+  response: ExecuteActionResponse
+): InfiniteData<Message[], TPageParam> {
+  return updateMessageInPages(old, response.messageId, msg => ({
+    ...msg,
+    content: response.content,
+  }));
+}
+
 export function useSendMessage(
   client: KiloChatClient,
   conversationId: string | null,
@@ -821,6 +832,13 @@ export function useExecuteAction(
       ) {
         invalidateMessages(queryClient, context.queryKey);
       }
+    },
+    onSuccess: (response, _variables, context) => {
+      if (!context) return;
+      queryClient.setQueryData<InfiniteData<Message[]>>(context.queryKey, old => {
+        if (!old) return old;
+        return applyExecuteActionResponseToPages(old, response);
+      });
     },
   });
 }

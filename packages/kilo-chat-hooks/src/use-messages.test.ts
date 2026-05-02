@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { QueryClient, type InfiniteData } from '@tanstack/react-query';
 import { KiloChatApiError, type Message } from '@kilocode/kilo-chat';
 import {
+  applyExecuteActionResponseToPages,
   applyReactionAddedEventToPages,
   applyReactionRemovedResponseToPages,
   applyReactionRemovedMutationToPages,
@@ -166,5 +167,57 @@ describe('message pagination helpers', () => {
     });
 
     expect(getNextMessagesPageParam(page)).toBeUndefined();
+  });
+});
+
+describe('execute action cache settlement', () => {
+  it('replaces optimistic resolved content with the server response', () => {
+    const messageId = '01KQK8H2222222222222222222';
+    const initial: InfiniteData<Message[]> = {
+      pageParams: [undefined],
+      pages: [
+        [
+          message({
+            id: messageId,
+            content: [
+              {
+                type: 'actions',
+                groupId: 'approval',
+                actions: [{ value: 'deny', label: 'Deny', style: 'danger' }],
+                resolved: { value: 'deny', resolvedBy: 'user-1', resolvedAt: 1 },
+              },
+            ],
+          }),
+        ],
+      ],
+    };
+
+    const result = applyExecuteActionResponseToPages(initial, {
+      ok: true,
+      messageId,
+      content: [
+        {
+          type: 'actions',
+          groupId: 'approval',
+          actions: [{ value: 'deny', label: 'Deny', style: 'danger' }],
+          resolved: { value: 'deny', resolvedBy: 'user-1', resolvedAt: 2 },
+        },
+      ],
+      resolved: {
+        groupId: 'approval',
+        value: 'deny',
+        resolvedBy: 'user-1',
+        resolvedAt: 2,
+      },
+    });
+
+    expect(result.pages[0]?.[0]?.content).toEqual([
+      {
+        type: 'actions',
+        groupId: 'approval',
+        actions: [{ value: 'deny', label: 'Deny', style: 'danger' }],
+        resolved: { value: 'deny', resolvedBy: 'user-1', resolvedAt: 2 },
+      },
+    ]);
   });
 });

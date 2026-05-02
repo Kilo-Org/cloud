@@ -234,6 +234,17 @@ export const executeActionRequestSchema = z.object({
   value: execApprovalDecisionSchema,
 });
 
+export const executeActionResponseSchema = okResponseSchema.extend({
+  messageId: ulidSchema,
+  content: z.array(contentBlockSchema),
+  resolved: z.object({
+    groupId: actionGroupIdSchema,
+    value: execApprovalDecisionSchema,
+    resolvedBy: z.string().min(1),
+    resolvedAt: nonNegativeIntegerSchema,
+  }),
+});
+
 export const reactionRequestBodySchema = z.object({
   conversationId: ulidSchema,
   emoji: emojiSchema,

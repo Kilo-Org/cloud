@@ -167,7 +167,17 @@ export type ExecuteActionParams = {
 };
 
 export type ExecuteActionResult =
-  | { ok: true; content: ContentBlock[]; messageSenderId: string }
+  | {
+      ok: true;
+      content: ContentBlock[];
+      messageSenderId: string;
+      resolved: {
+        groupId: string;
+        value: ExecApprovalDecision;
+        resolvedBy: string;
+        resolvedAt: number;
+      };
+    }
   | {
       ok: false;
       code: 'not_found' | 'forbidden' | 'already_resolved' | 'invalid_value';
@@ -661,11 +671,12 @@ export class ConversationDO extends DurableObject<Env> {
       return { ok: false, code: 'invalid_value', error: 'Value does not match any offered action' };
     }
 
-    actionsBlock.resolved = {
+    const resolved = {
       value: params.value,
       resolvedBy: params.memberId,
       resolvedAt: Date.now(),
     };
+    actionsBlock.resolved = resolved;
 
     const newVersion = row.version + 1;
     this.db
@@ -678,7 +689,12 @@ export class ConversationDO extends DurableObject<Env> {
       .where(eq(messages.id, params.messageId))
       .run();
 
-    return { ok: true, content, messageSenderId: row.sender_id };
+    return {
+      ok: true,
+      content,
+      messageSenderId: row.sender_id,
+      resolved: { groupId: params.groupId, ...resolved },
+    };
   }
 
   addReaction(params: AddReactionParams): AddReactionResult {

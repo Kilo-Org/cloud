@@ -17,6 +17,14 @@ type MutationErrorOptions = {
   onError?: (error: unknown) => void;
 };
 
+function conversationListSandboxIdFromQueryKey(queryKey: QueryKey): string | null | undefined {
+  const sandboxId = queryKey[2];
+  if (typeof sandboxId === 'string' || sandboxId === null) {
+    return sandboxId;
+  }
+  return undefined;
+}
+
 export function useConversations(client: KiloChatClient, sandboxId: string | null) {
   return useInfiniteQuery({
     queryKey: conversationsKey(sandboxId),
@@ -56,7 +64,7 @@ export function useCreateConversation(client: KiloChatClient, options?: Mutation
       });
 
       for (const [entryQueryKey, data] of previousEntries) {
-        const sandboxId = Array.isArray(entryQueryKey) ? entryQueryKey[2] : undefined;
+        const sandboxId = conversationListSandboxIdFromQueryKey(entryQueryKey);
         if (sandboxId !== variables.sandboxId && sandboxId !== null) {
           continue;
         }

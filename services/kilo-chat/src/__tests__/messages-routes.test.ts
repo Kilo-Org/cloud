@@ -1337,6 +1337,61 @@ describe('recipient conversation read state after message delivery', () => {
   });
 });
 
+describe('POST /v1/conversations/:conversationId/messages/:messageId/execute-action', () => {
+  it('returns the canonical resolved action content', async () => {
+    const { conversationId, userApp, botId } = await createConversation('execute-action-result');
+    const convStub = getConvStub(conversationId);
+    const create = await convStub.createMessage({
+      senderId: botId,
+      content: [
+        {
+          type: 'actions',
+          groupId: 'approval',
+          actions: [
+            { value: 'allow-once', label: 'Allow', style: 'primary' },
+            { value: 'deny', label: 'Deny', style: 'danger' },
+          ],
+        },
+      ],
+    });
+    expect(create.ok).toBe(true);
+    if (!create.ok) return;
+
+    const beforeExecute = Date.now();
+    const res = await userApp.request(
+      `/v1/conversations/${conversationId}/messages/${create.messageId}/execute-action`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ groupId: 'approval', value: 'deny' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{
+      ok: true;
+      messageId: string;
+      content: Array<{
+        type: string;
+        groupId?: string;
+        resolved?: { value: string; resolvedBy: string; resolvedAt: number };
+      }>;
+      resolved: { groupId: string; value: string; resolvedBy: string; resolvedAt: number };
+    }>();
+    expect(body.messageId).toBe(create.messageId);
+    expect(body.resolved.groupId).toBe('approval');
+    expect(body.resolved.value).toBe('deny');
+    expect(body.resolved.resolvedBy).toBe('user-execute-action-result');
+    expect(body.resolved.resolvedAt).toBeGreaterThanOrEqual(beforeExecute);
+    expect(body.content.find(block => block.type === 'actions')?.resolved).toEqual({
+      value: 'deny',
+      resolvedBy: 'user-execute-action-result',
+      resolvedAt: body.resolved.resolvedAt,
+    });
+  });
+});
+
 describe('auto-title on first message', () => {
   it('auto-titles an untitled conversation from first message text', async () => {
     const userId = 'user-autotitle';

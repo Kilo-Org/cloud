@@ -11,6 +11,7 @@ import {
   addReactionResponseSchema,
   removeReactionResponseSchema,
   okResponseSchema,
+  executeActionResponseSchema,
   getBotStatusResponseSchema,
   getConversationStatusResponseSchema,
   type listConversationsQuerySchema,
@@ -49,6 +50,7 @@ import type {
   ReactionRemovedEvent,
   AddReactionResponse,
   RemoveReactionResponse,
+  ExecuteActionResponse,
   ConversationCreatedEvent,
   ConversationRenamedEvent,
   ConversationLeftEvent,
@@ -211,10 +213,10 @@ export class KiloChatClient {
     conversationId: string,
     messageId: string,
     req: z.input<typeof executeActionRequestSchema>
-  ): Promise<{ ok: true }> {
+  ): Promise<ExecuteActionResponse> {
     return this.httpRequest(
       `/v1/conversations/${conversationId}/messages/${messageId}/execute-action`,
-      { method: 'POST', body: req, schema: okResponseSchema }
+      { method: 'POST', body: req, schema: executeActionResponseSchema }
     );
   }
 

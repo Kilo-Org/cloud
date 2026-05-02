@@ -176,6 +176,42 @@ describe('KiloChatClient', () => {
     });
   });
 
+  describe('executeAction', () => {
+    it('returns the canonical resolved message content', async () => {
+      const response = {
+        ok: true,
+        messageId: '01HXYZ00000ABCDEFGHJKMNPQS',
+        content: [
+          {
+            type: 'actions',
+            groupId: 'approval',
+            actions: [{ value: 'deny', label: 'Deny', style: 'danger' }],
+            resolved: {
+              value: 'deny',
+              resolvedBy: 'user-1',
+              resolvedAt: 123,
+            },
+          },
+        ],
+        resolved: {
+          groupId: 'approval',
+          value: 'deny',
+          resolvedBy: 'user-1',
+          resolvedAt: 123,
+        },
+      };
+      const fetch = mockFetch(200, response);
+      const client = new KiloChatClient(createMockConfig(fetch));
+
+      await expect(
+        client.executeAction('conv-1', response.messageId, {
+          groupId: 'approval',
+          value: 'deny',
+        })
+      ).resolves.toEqual(response);
+    });
+  });
+
   describe('editMessage', () => {
     it('sends PATCH /v1/messages/:id', async () => {
       const fetch = mockFetch(200, { messageId: 'm1' });

@@ -278,7 +278,11 @@ export class EventServiceClient {
       if (next === 1) newlyActive.push(ctx);
     }
     if (newlyActive.length > 0 && this.isConnected()) {
-      this.send({ type: 'context.subscribe', contexts: newlyActive });
+      const message = {
+        type: 'context.subscribe',
+        contexts: newlyActive,
+      } satisfies ClientMessage;
+      this.send(message);
     }
   }
 
@@ -295,7 +299,11 @@ export class EventServiceClient {
       }
     }
     if (released.length > 0 && this.isConnected()) {
-      this.send({ type: 'context.unsubscribe', contexts: released });
+      const message = {
+        type: 'context.unsubscribe',
+        contexts: released,
+      } satisfies ClientMessage;
+      this.send(message);
     }
   }
 
@@ -376,10 +384,11 @@ export class EventServiceClient {
 
   private resubscribeContexts(): void {
     if (this.activeContexts.size > 0) {
-      this.send({
+      const message = {
         type: 'context.subscribe',
         contexts: Array.from(this.activeContexts.keys()),
-      });
+      } satisfies ClientMessage;
+      this.send(message);
     }
   }
 

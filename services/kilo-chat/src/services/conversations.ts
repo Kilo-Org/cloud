@@ -326,8 +326,12 @@ export type MarkReadParams = {
   lastSeenMessageId: string;
 };
 
+type BadgeClearResult = {
+  badgeCount: number;
+};
+
 export type MarkReadResult =
-  | { ok: true }
+  | { ok: true; badgeClear: BadgeClearResult | null }
   | { ok: false; code: 'forbidden' | 'invalid'; error: string };
 
 export async function markReadFor(
@@ -366,6 +370,7 @@ export async function markReadFor(
   );
 
   const { sandboxId } = extractConversationContext(info.members);
+  let badgeClear: BadgeClearResult | null = null;
   if (sandboxId) {
     const latestMessageId = await withDORetry(
       () => convStub,
@@ -374,15 +379,15 @@ export async function markReadFor(
     );
     if (latestMessageId === null || lastSeenMessageId >= latestMessageId) {
       const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
-      ctx.waitUntil(
-        env.NOTIFICATIONS.clearBadgeBucketForUser({ userId, badgeBucket }).catch(err => {
-          logger.error('clearBadgeBucketForUser failed', {
-            sandboxId,
-            conversationId,
-            ...formatError(err),
-          });
-        })
-      );
+      try {
+        badgeClear = await env.NOTIFICATIONS.clearBadgeBucketForUser({ userId, badgeBucket });
+      } catch (err) {
+        logger.error('clearBadgeBucketForUser failed', {
+          sandboxId,
+          conversationId,
+          ...formatError(err),
+        });
+      }
     }
 
     if (readResult.applied) {
@@ -395,5 +400,5 @@ export async function markReadFor(
     }
   }
 
-  return { ok: true };
+  return { ok: true, badgeClear };
 }

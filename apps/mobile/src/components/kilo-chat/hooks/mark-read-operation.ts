@@ -1,48 +1,63 @@
-import {
-  type MarkBadgeReadInput,
-  type MarkBadgeReadResponse,
-  markBadgeReadResponseSchema,
-} from '@kilocode/notifications';
+import { type MarkConversationReadResponse } from '@kilocode/kilo-chat';
+import { type BadgeCountRow } from '@kilocode/notifications';
 
-type MarkReadConversationAndBadgeInput = {
+type MarkReadConversationInput = {
   conversationId: string;
   lastSeenMessageId: string;
-  badgeBucket: string;
-  notificationsUrl: string;
   markConversationRead: (input: {
     conversationId: string;
     lastSeenMessageId: string;
-  }) => Promise<unknown>;
-  getToken: () => Promise<string>;
-  fetchBadgeRead: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  }) => Promise<MarkConversationReadResponse>;
 };
 
-export async function markReadConversationAndBadge({
+export async function markReadConversation({
   conversationId,
   lastSeenMessageId,
-  badgeBucket,
-  notificationsUrl,
   markConversationRead,
-  getToken,
-  fetchBadgeRead,
-}: MarkReadConversationAndBadgeInput): Promise<MarkBadgeReadResponse | null> {
-  await markConversationRead({ conversationId, lastSeenMessageId });
-  try {
-    const token = await getToken();
-    const input = { badgeBucket } satisfies MarkBadgeReadInput;
-    const response = await fetchBadgeRead(`${notificationsUrl}/v1/badges/mark-read`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(input),
-    });
-    if (!response.ok) {
-      return null;
-    }
-    return markBadgeReadResponseSchema.parse(await response.json());
-  } catch {
-    return null;
+}: MarkReadConversationInput): Promise<MarkConversationReadResponse> {
+  const result = await markConversationRead({ conversationId, lastSeenMessageId });
+  return result;
+}
+
+type ApplyBadgeClearResultInput = {
+  badgeBucket: string;
+  badgeClear: MarkConversationReadResponse['badgeClear'];
+  userId: string | null;
+  updateBadgeRows: (
+    queryKey: readonly ['badges', string],
+    updater: (badges: BadgeCountRow[] | undefined) => BadgeCountRow[] | undefined
+  ) => void;
+  setBadgeCount: (badgeCount: number) => Promise<unknown>;
+};
+
+export function filterClearedBadgeBucket(
+  badges: BadgeCountRow[] | undefined,
+  badgeBucket: string,
+  badgeClear: MarkConversationReadResponse['badgeClear']
+): BadgeCountRow[] | undefined {
+  if (badgeClear === null) {
+    return badges;
   }
+
+  return badges?.filter(row => row.badgeBucket !== badgeBucket);
+}
+
+export function applyBadgeClearResult({
+  badgeBucket,
+  badgeClear,
+  userId,
+  updateBadgeRows,
+  setBadgeCount,
+}: ApplyBadgeClearResultInput): boolean {
+  if (badgeClear === null) {
+    return false;
+  }
+
+  if (userId !== null) {
+    updateBadgeRows(['badges', userId], badges =>
+      filterClearedBadgeBucket(badges, badgeBucket, badgeClear)
+    );
+  }
+  void setBadgeCount(badgeClear.badgeCount);
+  return true;
 }

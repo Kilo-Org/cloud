@@ -196,6 +196,6 @@ export function registerConversationRoutes(
       return c.json({ error: result.error }, result.code === 'invalid' ? 400 : 403);
     }
 
-    return c.body(null, 204);
+    return c.json(result);
   });
 }

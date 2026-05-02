@@ -217,6 +217,14 @@ export const markConversationReadRequestSchema = z.object({
   lastSeenMessageId: ulidSchema,
 });
 
+export const badgeClearResponseSchema = z.object({
+  badgeCount: nonNegativeIntegerSchema,
+});
+
+export const markConversationReadResponseSchema = okResponseSchema.extend({
+  badgeClear: badgeClearResponseSchema.nullable(),
+});
+
 export const executeActionRequestSchema = z.object({
   groupId: actionGroupIdSchema,
   value: execApprovalDecisionSchema,

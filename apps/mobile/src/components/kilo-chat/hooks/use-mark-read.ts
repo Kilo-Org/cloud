@@ -3,24 +3,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import { toast } from 'sonner-native';
 
-import {
-  badgeBucketForConversation,
-  type BadgeCountRow,
-  type MarkBadgeReadResponse,
-} from '@kilocode/notifications';
-import { type KiloChatClient } from '@kilocode/kilo-chat';
+import { type KiloChatClient, type MarkConversationReadResponse } from '@kilocode/kilo-chat';
+import { badgeBucketForConversation, type BadgeCountRow } from '@kilocode/notifications';
 import { useMarkConversationRead } from '@kilocode/kilo-chat-hooks';
 
-import { NOTIFICATIONS_URL } from '@/lib/config';
-
 import { useCurrentUserId } from './use-current-user-id';
-import { useKiloChatTokenGetter } from './use-kilo-chat-token';
-import { markReadConversationAndBadge } from './mark-read-operation';
-
-type MarkReadContext = {
-  previousBadges?: BadgeCountRow[];
-  queryKey?: readonly ['badges', string];
-};
+import { applyBadgeClearResult, markReadConversation } from './mark-read-operation';
 
 type MarkReadInput = {
   sandboxId: string;
@@ -32,51 +20,33 @@ type MarkReadInput = {
 export function useMarkRead(client: KiloChatClient) {
   const queryClient = useQueryClient();
   const userId = useCurrentUserId();
-  const getToken = useKiloChatTokenGetter();
   const markConversationRead = useMarkConversationRead(client);
 
   const mutation = useMutation({
     mutationFn: async ({
       conversationId,
       lastSeenMessageId,
-      badgeBucket,
-    }: MarkReadInput): Promise<MarkBadgeReadResponse | null> => {
-      const result = await markReadConversationAndBadge({
+    }: MarkReadInput): Promise<MarkConversationReadResponse> => {
+      const result = await markReadConversation({
         conversationId,
         lastSeenMessageId,
-        badgeBucket,
-        notificationsUrl: NOTIFICATIONS_URL,
         markConversationRead: markConversationRead.mutateAsync,
-        getToken,
-        fetchBadgeRead: fetch,
       });
       return result;
     },
-    onMutate: async ({ badgeBucket }): Promise<MarkReadContext> => {
-      if (userId === null) {
-        return {};
-      }
-
-      const queryKey = ['badges', userId] as const;
-      await queryClient.cancelQueries({ queryKey });
-      const previousBadges = queryClient.getQueryData<BadgeCountRow[]>(queryKey);
-
-      queryClient.setQueryData<BadgeCountRow[]>(queryKey, badges =>
-        badges?.filter(row => row.badgeBucket !== badgeBucket)
-      );
-
-      return { previousBadges, queryKey };
-    },
-    onError: (error, _badgeBucket, context) => {
-      if (context?.queryKey && context.previousBadges) {
-        queryClient.setQueryData(context.queryKey, context.previousBadges);
-      }
+    onError: error => {
       toast.error(error.message);
     },
-    onSuccess: result => {
-      if (typeof result?.badgeCount === 'number') {
-        void Notifications.setBadgeCountAsync(result.badgeCount);
-      }
+    onSuccess: (result, { badgeBucket }) => {
+      applyBadgeClearResult({
+        badgeBucket,
+        badgeClear: result.badgeClear,
+        userId,
+        updateBadgeRows: (queryKey, updater) => {
+          queryClient.setQueryData<BadgeCountRow[]>(queryKey, updater);
+        },
+        setBadgeCount: Notifications.setBadgeCountAsync,
+      });
     },
     onSettled: () => {
       if (userId !== null) {

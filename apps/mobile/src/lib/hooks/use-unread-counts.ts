@@ -20,7 +20,7 @@ import { NOTIFICATIONS_URL } from '@/lib/config';
  * Freshness is driven by invalidations, not polling:
  *   - Foreground chat push → invalidate (see `use-unread-counts-invalidation`).
  *   - App returns to active → invalidate.
- *   - `useMarkRead` optimistically clears the relevant row.
+ *   - `useMarkRead` clears the relevant row after Kilo Chat confirms the bucket clear.
  */
 export function useUnreadCounts() {
   const userId = useCurrentUserId();

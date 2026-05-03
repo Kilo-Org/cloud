@@ -23,10 +23,15 @@ export default function ChatRootLayout({ children }: { children: React.ReactNode
       instanceErrorMessage={instanceErrorMessage}
       onRetryInstanceStatus={() => void refetch()}
       assistantName={status?.botName ?? null}
+      className="flex-1"
     >
       {children}
     </KiloChatLayout>
   );
 
-  return <BillingWrapper>{content}</BillingWrapper>;
+  return (
+    <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col gap-2 overflow-hidden">
+      <BillingWrapper>{content}</BillingWrapper>
+    </div>
+  );
 }

@@ -196,7 +196,7 @@ export function BillingBanner({
   return (
     <div
       className={cn(
-        'flex w-full items-center gap-4 rounded-xl border p-4',
+        'flex w-full shrink-0 items-center gap-4 rounded-xl border p-4',
         styles.bg,
         styles.border,
         styles.text

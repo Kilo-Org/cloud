@@ -10,6 +10,7 @@ import { ConversationList } from './ConversationList';
 import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import { useEventServiceClient } from '@/contexts/EventServiceContext';
+import { cn } from '@/lib/utils';
 import {
   useConversations,
   useCreateConversation,
@@ -31,6 +32,7 @@ type KiloChatLayoutProps = {
   onRetryInstanceStatus: () => void;
   instanceStatus: string | null;
   assistantName: string | null;
+  className?: string;
   children: React.ReactNode;
 };
 
@@ -45,6 +47,7 @@ export function KiloChatLayout({
   onRetryInstanceStatus,
   instanceStatus,
   assistantName,
+  className,
   children,
 }: KiloChatLayoutProps) {
   const router = useRouter();
@@ -178,7 +181,7 @@ export function KiloChatLayout({
 
   return (
     <KiloChatContext.Provider value={contextValue}>
-      <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+      <div className={cn('flex min-h-0 overflow-hidden', className ?? 'h-[calc(100dvh-3.5rem)]')}>
         {/* Conversation sidebar */}
         <div className="border-border flex w-64 shrink-0 flex-col overflow-hidden border-r">
           <ConversationList

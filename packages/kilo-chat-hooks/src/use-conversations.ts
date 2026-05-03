@@ -211,14 +211,38 @@ export function applyConversationActivityToPages(
     return { data, applied: true };
   }
 
-  const sortedConversations = data.pages
-    .flatMap(page => page.conversations)
-    .map(c =>
-      c.conversationId === activity.conversationId
-        ? { ...c, lastActivityAt: activity.lastActivityAt }
-        : c
-    )
-    .sort(compareConversationsByActivity);
+  const loadedConversations = data.pages.flatMap(page => page.conversations);
+  const updatedConversations = loadedConversations.map(c =>
+    c.conversationId === activity.conversationId
+      ? { ...c, lastActivityAt: activity.lastActivityAt }
+      : c
+  );
+  const sortedConversations = [...updatedConversations].sort(compareConversationsByActivity);
+
+  if (data.pages.some(page => page.hasMore)) {
+    const orderChanged = sortedConversations.some(
+      (conversation, index) =>
+        conversation.conversationId !== loadedConversations[index]?.conversationId
+    );
+    if (orderChanged) {
+      return { data, applied: false };
+    }
+
+    return {
+      data: {
+        ...data,
+        pages: data.pages.map(page => ({
+          ...page,
+          conversations: page.conversations.map(c =>
+            c.conversationId === activity.conversationId
+              ? { ...c, lastActivityAt: activity.lastActivityAt }
+              : c
+          ),
+        })),
+      },
+      applied: true,
+    };
+  }
 
   let nextConversationOffset = 0;
 

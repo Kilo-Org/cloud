@@ -37,6 +37,10 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
       eventService,
       baseUrl: KILO_CHAT_URL,
       getToken,
+      onUnauthorized: () => {
+        clearKiloChatTokenCache();
+        return 'retry';
+      },
     });
     return { eventService, kiloChatClient };
   });

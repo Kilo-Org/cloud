@@ -46,6 +46,10 @@ export function EventServiceProvider({ children }: EventServiceProviderProps) {
         eventService,
         baseUrl: KILO_CHAT_URL,
         getToken: getKiloChatToken,
+        onUnauthorized: () => {
+          clearKiloChatToken();
+          return 'retry';
+        },
       }),
     [eventService]
   );

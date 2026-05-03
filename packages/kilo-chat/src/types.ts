@@ -67,6 +67,7 @@ export type KiloChatClientConfig = {
   eventService: EventServiceClient;
   baseUrl: string;
   getToken: () => Promise<string>;
+  onUnauthorized?: () => Promise<'retry' | 'stop'> | 'retry' | 'stop';
   fetch?: typeof globalThis.fetch;
 };
 

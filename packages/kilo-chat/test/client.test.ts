@@ -52,6 +52,76 @@ describe('KiloChatClient', () => {
       );
       expect(res).toEqual({ conversations: [], hasMore: false, nextCursor: null });
     });
+
+    it('clears stale auth and retries one HTTP request after a 401', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ error: 'stale token' }), { status: 401 })
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              conversations: [],
+              hasMore: false,
+              nextCursor: null,
+            }),
+            { status: 200 }
+          )
+        );
+      const getToken = vi.fn<() => Promise<string>>();
+      getToken.mockResolvedValueOnce('stale-token');
+      getToken.mockResolvedValueOnce('fresh-token');
+      const onUnauthorized = vi.fn<() => 'retry'>(() => 'retry');
+      const client = new KiloChatClient({
+        ...createMockConfig(fetch),
+        getToken,
+        onUnauthorized,
+      });
+
+      await expect(client.listConversations()).resolves.toEqual({
+        conversations: [],
+        hasMore: false,
+        nextCursor: null,
+      });
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(getToken).toHaveBeenCalledTimes(2);
+      expect(fetch).toHaveBeenNthCalledWith(
+        1,
+        'https://chat.example.com/v1/conversations',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer stale-token' }),
+        })
+      );
+      expect(fetch).toHaveBeenNthCalledWith(
+        2,
+        'https://chat.example.com/v1/conversations',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer fresh-token' }),
+        })
+      );
+    });
+
+    it('does not loop when the unauthorized retry also fails', async () => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ error: 'stale token' }), { status: 401 })
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ error: 'still stale' }), { status: 401 })
+        );
+      const onUnauthorized = vi.fn<() => 'retry'>(() => 'retry');
+      const client = new KiloChatClient({
+        ...createMockConfig(fetch),
+        onUnauthorized,
+      });
+
+      await expect(client.listConversations()).rejects.toMatchObject({ status: 401 });
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('getConversation', () => {

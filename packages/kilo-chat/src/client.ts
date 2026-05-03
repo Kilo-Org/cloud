@@ -70,6 +70,7 @@ export class KiloChatClient {
   private readonly es: KiloChatClientConfig['eventService'];
   private readonly baseUrl: string;
   private readonly getToken: () => Promise<string>;
+  private readonly onUnauthorized: KiloChatClientConfig['onUnauthorized'];
   private readonly fetchFn: typeof globalThis.fetch;
   // Per-conversation send queues. Each sendMessage call chains onto the tail
   // of its conversation's queue so concurrent callers cannot race ahead of
@@ -82,6 +83,7 @@ export class KiloChatClient {
     this.es = config.eventService;
     this.baseUrl = config.baseUrl;
     this.getToken = config.getToken;
+    this.onUnauthorized = config.onUnauthorized;
     this.fetchFn = config.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
@@ -388,6 +390,38 @@ export class KiloChatClient {
   // ── Private HTTP helper ───────────────────────────────────────────────────
 
   private async httpRequest<T>(
+    path: string,
+    opts: {
+      method?: string;
+      body?: unknown;
+      query?: Record<string, unknown>;
+      schema: z.ZodType<T>;
+    }
+  ): Promise<T> {
+    try {
+      return await this.httpRequestOnce(path, opts);
+    } catch (err) {
+      const onUnauthorized = this.onUnauthorized;
+      if (!this.shouldRecoverFromUnauthorized(err) || onUnauthorized === undefined) {
+        throw err;
+      }
+      const decision = await onUnauthorized();
+      if (decision !== 'retry') {
+        throw err;
+      }
+      return this.httpRequestOnce(path, opts);
+    }
+  }
+
+  private shouldRecoverFromUnauthorized(err: unknown): err is KiloChatApiError {
+    return (
+      this.onUnauthorized !== undefined &&
+      err instanceof KiloChatApiError &&
+      (err.status === 401 || err.status === 403)
+    );
+  }
+
+  private async httpRequestOnce<T>(
     path: string,
     opts: {
       method?: string;

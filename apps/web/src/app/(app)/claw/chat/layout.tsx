@@ -3,6 +3,7 @@
 import { useUser } from '@/hooks/useUser';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
 import { KiloChatLayout } from '@/app/(app)/claw/kilo-chat/components/KiloChatLayout';
+import { BillingWrapper } from '@/app/(app)/claw/components/billing/BillingWrapper';
 
 export default function ChatRootLayout({ children }: { children: React.ReactNode }) {
   const { data: user } = useUser();
@@ -10,7 +11,7 @@ export default function ChatRootLayout({ children }: { children: React.ReactNode
   const instanceErrorMessage =
     error instanceof Error ? error.message : error ? 'Unknown error' : null;
 
-  return (
+  const content = (
     <KiloChatLayout
       currentUserId={user?.id ?? null}
       sandboxId={status?.sandboxId ?? null}
@@ -26,4 +27,6 @@ export default function ChatRootLayout({ children }: { children: React.ReactNode
       {children}
     </KiloChatLayout>
   );
+
+  return <BillingWrapper>{content}</BillingWrapper>;
 }

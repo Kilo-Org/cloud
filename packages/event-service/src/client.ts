@@ -116,7 +116,8 @@ export class EventServiceClient {
     }
 
     if (this.authRecoveryAttempts >= MAX_AUTH_RECOVERY_ATTEMPTS) {
-      return false;
+      this.stopAfterUnauthorized();
+      return true;
     }
 
     const decision = await this.onUnauthorized();

@@ -311,6 +311,39 @@ describe('EventServiceClient', () => {
     }
   });
 
+  it('stops after the single unauthorized retry is exhausted', async () => {
+    vi.useFakeTimers();
+    try {
+      const retryAuth = (): 'retry' => 'retry';
+      const onUnauthorized = vi.fn(retryAuth);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(null, { status: 401 }))
+      );
+
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken: () => Promise.resolve('h.p.s'),
+        onUnauthorized,
+      });
+
+      await client.connect();
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(allMockWs).toHaveLength(0);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(allMockWs).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps reconnecting after repeated pre-open failures', async () => {
     vi.useFakeTimers();
     const reconnectDelay = vi.spyOn(Math, 'random').mockReturnValue(1);

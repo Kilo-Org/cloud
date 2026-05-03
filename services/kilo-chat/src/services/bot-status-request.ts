@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import type { z } from 'zod';
 import type { AuthContext } from '../auth';
-import { sandboxIdSchema, type chatWebhookRpcSchema } from '@kilocode/kilo-chat';
+import { sandboxIdSchema, type OkResponse, type chatWebhookRpcSchema } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { userOwnsSandbox } from './sandbox-ownership';
@@ -46,11 +46,11 @@ export async function handleRequestBotStatus(c: HonoCtx): Promise<Response> {
     // The fan-out already pushed the event to all of this user's connections;
     // skipping here keeps webhook QPS at ~1 per 15s per sandbox regardless of
     // how many clients are subscribed.
-    return c.body(null, 202);
+    return c.json({ ok: true } satisfies OkResponse);
   }
 
   c.executionCtx.waitUntil(triggerBotStatusWebhook(c.env, sandboxId));
-  return c.body(null, 202);
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 /**

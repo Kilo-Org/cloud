@@ -214,7 +214,8 @@ describe('POST /v1/messages/:id/reactions', () => {
       { method: 'DELETE' },
       env
     );
-    expect(del.status).toBe(204);
+    expect(del.status).toBe(200);
+    await expect(del.json()).resolves.toEqual({ ok: true });
 
     const res = await userApp.request(
       `/v1/messages/${messageId}/reactions`,
@@ -384,7 +385,8 @@ describe('DELETE /v1/messages/:id/reactions', () => {
       { method: 'DELETE' },
       env
     );
-    expect(deleteMessage.status).toBe(204);
+    expect(deleteMessage.status).toBe(200);
+    await expect(deleteMessage.json()).resolves.toEqual({ ok: true });
 
     const qs = new URLSearchParams({ conversationId, emoji: '👍' });
     const res = await userApp.request(

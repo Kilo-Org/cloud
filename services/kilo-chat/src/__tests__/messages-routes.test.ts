@@ -502,7 +502,8 @@ describe('PATCH /v1/messages/:id', () => {
       { method: 'POST' },
       env
     );
-    expect(leaveRes.status).toBe(204);
+    expect(leaveRes.status).toBe(200);
+    await expect(leaveRes.json()).resolves.toEqual({ ok: true });
 
     const editRes = await userApp.request(
       `/v1/messages/${messageId}`,
@@ -523,7 +524,7 @@ describe('PATCH /v1/messages/:id', () => {
 });
 
 describe('DELETE /v1/messages/:id', () => {
-  it('soft-deletes a message and returns 204', async () => {
+  it('soft-deletes a message and returns ok', async () => {
     const { conversationId, userApp } = await createConversation('msg-delete-1');
 
     // Create a message
@@ -549,7 +550,8 @@ describe('DELETE /v1/messages/:id', () => {
       env
     );
 
-    expect(deleteRes.status).toBe(204);
+    expect(deleteRes.status).toBe(200);
+    await expect(deleteRes.json()).resolves.toEqual({ ok: true });
 
     // Verify message is soft-deleted (appears in list but marked deleted)
     const convStub = getConvStub(conversationId);
@@ -613,7 +615,8 @@ describe('DELETE /v1/messages/:id', () => {
       { method: 'POST' },
       env
     );
-    expect(leaveRes.status).toBe(204);
+    expect(leaveRes.status).toBe(200);
+    await expect(leaveRes.json()).resolves.toEqual({ ok: true });
 
     const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await userApp.request(
@@ -1250,7 +1253,8 @@ describe('recipient conversation read state after message delivery', () => {
       },
       deliveredEnv
     );
-    expect(deleteRes.status).toBe(204);
+    expect(deleteRes.status).toBe(200);
+    await expect(deleteRes.json()).resolves.toEqual({ ok: true });
 
     const markReadRes = await recipientApp.request(
       `/v1/conversations/${conversationId}/mark-read`,

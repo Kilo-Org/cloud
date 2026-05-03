@@ -191,7 +191,8 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
       { method: 'POST' },
       testEnv
     );
-    expect(leaveRes.status).toBe(204);
+    expect(leaveRes.status).toBe(200);
+    await expect(leaveRes.json()).resolves.toEqual({ ok: true });
 
     const createAfterLeaveRes = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/messages`,
@@ -238,7 +239,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
 // ─── POST .../messages/:messageId/delivery-failed ──────────────────────────
 
 describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-failed', () => {
-  it('flips deliveryFailed and returns 202', async () => {
+  it('flips deliveryFailed and returns ok', async () => {
     const pushEvent = vi.fn().mockResolvedValue(false);
     const { sandboxId, conversationId, messageId, testEnv } = await setupData(
       'bot-msg-df-ok',
@@ -257,8 +258,8 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
       },
       testEnv
     );
-    expect(res.status).toBe(202);
-    expect(await res.text()).toBe('');
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true });
     expect(pushEvent).toHaveBeenCalledOnce();
     expect(pushEvent).toHaveBeenCalledWith(
       'user-bot-msg-df-ok',
@@ -277,8 +278,8 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
       },
       testEnv
     );
-    expect(second.status).toBe(202);
-    expect(await second.text()).toBe('');
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toEqual({ ok: true });
     expect(pushEvent).not.toHaveBeenCalled();
   });
 
@@ -354,7 +355,8 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
       { method: 'DELETE' },
       testEnv
     );
-    expect(deleteRes.status).toBe(204);
+    expect(deleteRes.status).toBe(200);
+    await expect(deleteRes.json()).resolves.toEqual({ ok: true });
 
     const res = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
@@ -445,7 +447,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
     return { sandboxId, conversationId, messageId, testEnv, token };
   }
 
-  it('reverts resolution and returns 202', async () => {
+  it('reverts resolution and returns ok', async () => {
     const { sandboxId, conversationId, messageId, testEnv, token } =
       await setupWithResolvedAction('bot-act-df-ok');
     const app = makeBotApp();
@@ -459,8 +461,8 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       },
       testEnv
     );
-    expect(res.status).toBe(202);
-    expect(await res.text()).toBe('');
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true });
   });
 
   it('is idempotent when already unresolved', async () => {
@@ -481,8 +483,8 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       },
       testEnv
     );
-    expect(first.status).toBe(202);
-    expect(await first.text()).toBe('');
+    expect(first.status).toBe(200);
+    await expect(first.json()).resolves.toEqual({ ok: true });
     expect(pushEvent).toHaveBeenCalledOnce();
 
     const second = await app.request(
@@ -494,8 +496,8 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       },
       testEnv
     );
-    expect(second.status).toBe(202);
-    expect(await second.text()).toBe('');
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toEqual({ ok: true });
     expect(pushEvent).toHaveBeenCalledOnce();
   });
 
@@ -797,7 +799,7 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
 // ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId ─────────────────
 
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
-  it('soft-deletes a bot-owned message and returns 204', async () => {
+  it('soft-deletes a bot-owned message and returns ok', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-del-1');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -823,7 +825,8 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
       testEnv
     );
 
-    expect(delRes.status).toBe(204);
+    expect(delRes.status).toBe(200);
+    await expect(delRes.json()).resolves.toEqual({ ok: true });
   });
 
   it('returns 404 for non-existent message', async () => {
@@ -901,7 +904,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
 // ─── POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing ───
 
 describe('POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing', () => {
-  it('returns 204 for a member bot', async () => {
+  it('returns ok for a member bot', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-typing-ok');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -915,7 +918,8 @@ describe('POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing
       testEnv
     );
 
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true });
   });
 
   it('returns 403 for non-member bot', async () => {

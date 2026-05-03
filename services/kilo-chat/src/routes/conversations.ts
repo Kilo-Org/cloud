@@ -166,7 +166,7 @@ export function registerConversationRoutes(
       return c.json({ error: result.error }, 403);
     }
 
-    return c.body(null, 204);
+    return c.json({ ok: true } satisfies OkResponse);
   });
 
   // POST /v1/conversations/:id/mark-read — mark conversation as read

@@ -200,7 +200,7 @@ export async function handleDeleteMessage(c: HonoCtx) {
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 500);
   }
-  return new Response(null, { status: 204 });
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 // ─── executeAction ──────────────────────────────────────────────────────────
@@ -273,7 +273,7 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
   if (!result.ok) {
     return c.json({ error: result.error }, 404);
   }
-  return c.body(null, 202);
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 // ─── actionDeliveryFailed (bot-reported) ────────────────────────────────────
@@ -309,7 +309,7 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
     return c.json({ error: result.error }, 404);
   }
   if (!result.reverted) {
-    return c.body(null, 202);
+    return c.json({ ok: true } satisfies OkResponse);
   }
 
   const ctx = await getConversationContext(c.env, convId.data);
@@ -323,7 +323,7 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
       { conversationId: convId.data, messageId, groupId: groupId.data }
     );
   }
-  return c.body(null, 202);
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 // ─── addReaction ─────────────────────────────────────────────────────────────
@@ -467,7 +467,7 @@ export async function handleSetTyping(c: HonoCtx) {
   if (!result.ok) {
     return c.json({ error: result.error }, 403);
   }
-  return new Response(null, { status: 204 });
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 export async function handleStopTyping(c: HonoCtx) {
@@ -479,7 +479,7 @@ export async function handleStopTyping(c: HonoCtx) {
   if (!result.ok) {
     return c.json({ error: result.error }, 403);
   }
-  return new Response(null, { status: 204 });
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 // ─── listBotConversations ────────────────────────────────────────────────────

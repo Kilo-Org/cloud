@@ -40,13 +40,10 @@ async function processReceiptCheck(env: Env, message: ReceiptCheckMessage): Prom
   if (receiptErrors.length > 0) {
     console.warn('Receipt check returned non-stale Expo receipt error(s)', {
       errorCount: receiptErrors.length,
-      retryableCount: receiptErrors.filter(error => error.retryable).length,
-      terminalCount: receiptErrors.filter(error => !error.retryable).length,
       errors: receiptErrors.map(error => ({
         ticketId: error.ticketId,
         errorCode: error.errorCode,
         message: error.message,
-        retryable: error.retryable,
       })),
     });
   }

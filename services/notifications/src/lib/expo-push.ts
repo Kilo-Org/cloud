@@ -18,7 +18,6 @@ export type PushReceiptError = {
   ticketId: string;
   errorCode: string | undefined;
   message: string;
-  retryable: boolean;
 };
 
 export type SendResult = {
@@ -70,10 +69,6 @@ function isRetryableTicketError(errorCode: string | undefined): boolean {
   return true;
 }
 
-function isRetryableReceiptError(errorCode: string | undefined): boolean {
-  return isRetryableTicketError(errorCode);
-}
-
 export async function sendPushNotifications(
   messages: ExpoPushMessage[],
   accessToken: string
@@ -88,24 +83,46 @@ export async function sendPushNotifications(
   const ticketErrors: PushTicketError[] = [];
 
   for (const chunk of chunks) {
-    const tickets = await sendChunkWithTransientRetry(expo, chunk);
+    let pendingChunk = chunk;
 
-    for (let i = 0; i < tickets.length; i++) {
-      const ticket = tickets[i];
-      const to = chunk[i].to;
-      const token = typeof to === 'string' ? to : to[0];
-      if (ticket.status === 'ok') {
-        ticketTokenPairs.push({ ticketId: ticket.id, token });
-      } else if (ticket.details?.error === 'DeviceNotRegistered') {
-        staleTokens.push(token);
-      } else {
-        const errorCode = ticket.details?.error;
-        ticketErrors.push({
-          errorCode,
-          message: ticket.message,
-          retryable: isRetryableTicketError(errorCode),
-        });
+    for (let attempt = 0; ; attempt++) {
+      const tickets = await sendChunkWithTransientRetry(expo, pendingChunk);
+      const retryChunk: ExpoPushMessage[] = [];
+
+      for (let i = 0; i < tickets.length; i++) {
+        const ticket = tickets[i];
+        const message = pendingChunk[i];
+        const to = message.to;
+        const token = typeof to === 'string' ? to : to[0];
+        if (ticket.status === 'ok') {
+          ticketTokenPairs.push({ ticketId: ticket.id, token });
+        } else if (ticket.details?.error === 'DeviceNotRegistered') {
+          staleTokens.push(token);
+        } else {
+          const errorCode = ticket.details?.error;
+          const retryable = isRetryableTicketError(errorCode);
+          const retryDelayMs = TRANSIENT_SEND_RETRY_DELAYS_MS[attempt];
+          if (retryable && retryDelayMs !== undefined) {
+            retryChunk.push(message);
+          } else {
+            ticketErrors.push({
+              errorCode,
+              message: ticket.message,
+              retryable,
+            });
+          }
+        }
       }
+
+      if (retryChunk.length === 0) {
+        break;
+      }
+      const retryDelayMs = TRANSIENT_SEND_RETRY_DELAYS_MS[attempt];
+      if (retryDelayMs === undefined) {
+        break;
+      }
+      await sleep(retryDelayMs);
+      pendingChunk = retryChunk;
     }
   }
 
@@ -140,7 +157,6 @@ export async function checkPushReceipts(
           ticketId,
           errorCode,
           message: receipt.message,
-          retryable: isRetryableReceiptError(errorCode),
         });
       }
     }

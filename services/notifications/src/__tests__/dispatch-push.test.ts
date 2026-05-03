@@ -402,6 +402,46 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(stored).toMatchObject({ stage: 'failed' });
   });
 
+  it('keeps retryable-only ticket failures non-terminal for a later retry', async () => {
+    installDbMock({ tokens: [{ user_id: 'user-retry-ticket-error', token: 'tok-rate-limited' }] });
+    vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
+    vi.mocked(sendPushNotifications).mockResolvedValueOnce({
+      ticketTokenPairs: [],
+      staleTokens: [],
+      ticketErrors: [
+        {
+          errorCode: 'MessageRateExceeded',
+          message: 'Rate limited',
+          retryable: true,
+        },
+      ],
+    });
+    const stub = getDO('user-retry-ticket-error');
+    const input = baseInput({
+      userId: 'user-retry-ticket-error',
+      idempotencyKey: 'k-retry-ticket-error',
+    });
+
+    const first = await stub.dispatchPush(input);
+    const second = await stub.dispatchPush(input);
+
+    expect(first).toEqual({
+      kind: 'failed',
+      error: 'Expo rejected 1 push ticket',
+    });
+    expect(second).toEqual({ kind: 'delivered', tokenCount: 1 });
+    expect(sendPushNotifications).toHaveBeenCalledTimes(2);
+    const [firstMessages] = vi.mocked(sendPushNotifications).mock.calls[0];
+    const [secondMessages] = vi.mocked(sendPushNotifications).mock.calls[1];
+    expect(firstMessages[0].badge).toBe(1);
+    expect(secondMessages[0].badge).toBe(1);
+
+    const stored = await runInDurableObject(stub, async (_inst, state) =>
+      state.storage.get<{ stage: string; ts: number }>('idem:k-retry-ticket-error')
+    );
+    expect(stored).toMatchObject({ stage: 'delivered' });
+  });
+
   it('accumulates bucket counts across deliveries and exposes total via badge', async () => {
     installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);

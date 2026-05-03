@@ -75,6 +75,63 @@ describe('sendPushNotifications', () => {
     });
   });
 
+  it('retries retryable ticket errors without resending accepted tokens', async () => {
+    const rateLimitedMessage: ExpoPushMessage = {
+      to: 'ExponentPushToken[token-2]',
+      title: 'Title',
+      body: 'Body',
+    };
+    sendPushNotificationsAsync
+      .mockResolvedValueOnce([
+        { status: 'ok', id: 'ticket-1' },
+        {
+          status: 'error',
+          message: 'Rate exceeded',
+          details: { error: 'MessageRateExceeded' },
+        },
+      ])
+      .mockResolvedValueOnce([{ status: 'ok', id: 'ticket-2' }]);
+
+    const result = await sendPushNotifications([message, rateLimitedMessage], 'access-token');
+
+    expect(sendPushNotificationsAsync).toHaveBeenCalledTimes(2);
+    expect(sendPushNotificationsAsync).toHaveBeenNthCalledWith(1, [message, rateLimitedMessage]);
+    expect(sendPushNotificationsAsync).toHaveBeenNthCalledWith(2, [rateLimitedMessage]);
+    expect(result).toEqual({
+      ticketTokenPairs: [
+        { ticketId: 'ticket-1', token: 'ExponentPushToken[token-1]' },
+        { ticketId: 'ticket-2', token: 'ExponentPushToken[token-2]' },
+      ],
+      staleTokens: [],
+      ticketErrors: [],
+    });
+  });
+
+  it('surfaces retryable ticket errors after the bounded retry budget', async () => {
+    sendPushNotificationsAsync.mockResolvedValue([
+      {
+        status: 'error',
+        message: 'Rate exceeded',
+        details: { error: 'MessageRateExceeded' },
+      },
+    ]);
+
+    const result = await sendPushNotifications([message], 'access-token');
+
+    expect(sendPushNotificationsAsync).toHaveBeenCalledTimes(3);
+    expect(result).toEqual({
+      ticketTokenPairs: [],
+      staleTokens: [],
+      ticketErrors: [
+        {
+          errorCode: 'MessageRateExceeded',
+          message: 'Rate exceeded',
+          retryable: true,
+        },
+      ],
+    });
+  });
+
   it('surfaces non-stale ticket errors', async () => {
     sendPushNotificationsAsync.mockResolvedValueOnce([
       {
@@ -144,13 +201,11 @@ describe('checkPushReceipts', () => {
           ticketId: 'ticket-terminal',
           errorCode: 'InvalidCredentials',
           message: 'Invalid credentials',
-          retryable: false,
         },
         {
           ticketId: 'ticket-retryable',
           errorCode: 'MessageRateExceeded',
           message: 'Rate exceeded',
-          retryable: true,
         },
       ],
     });

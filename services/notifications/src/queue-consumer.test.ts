@@ -59,20 +59,18 @@ describe('receipt queue consumer', () => {
           ticketId: 'ticket-terminal',
           errorCode: 'InvalidCredentials',
           message: 'Invalid credentials',
-          retryable: false,
         },
         {
-          ticketId: 'ticket-retryable',
+          ticketId: 'ticket-rate-exceeded',
           errorCode: 'MessageRateExceeded',
           message: 'Rate exceeded',
-          retryable: true,
         },
       ],
     });
     const { batch, ack, retry } = fakeBatch({
       ticketTokenPairs: [
         { ticketId: 'ticket-terminal', token: 'ExponentPushToken[terminal]' },
-        { ticketId: 'ticket-retryable', token: 'ExponentPushToken[retryable]' },
+        { ticketId: 'ticket-rate-exceeded', token: 'ExponentPushToken[rate-exceeded]' },
       ],
     });
 
@@ -82,20 +80,16 @@ describe('receipt queue consumer', () => {
     expect(retry).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith('Receipt check returned non-stale Expo receipt error(s)', {
       errorCount: 2,
-      retryableCount: 1,
-      terminalCount: 1,
       errors: [
         {
           ticketId: 'ticket-terminal',
           errorCode: 'InvalidCredentials',
           message: 'Invalid credentials',
-          retryable: false,
         },
         {
-          ticketId: 'ticket-retryable',
+          ticketId: 'ticket-rate-exceeded',
           errorCode: 'MessageRateExceeded',
           message: 'Rate exceeded',
-          retryable: true,
         },
       ],
     });

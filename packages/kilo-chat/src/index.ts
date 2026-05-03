@@ -13,3 +13,4 @@ export type { KiloChatEvent, KiloChatEventName, KiloChatEventOf } from './events
 export * from './schemas';
 export * from './webhook-schemas';
 export * from './events';
+export * from './route-helpers';

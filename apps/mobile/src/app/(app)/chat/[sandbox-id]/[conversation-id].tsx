@@ -4,6 +4,7 @@ import { toast } from 'sonner-native';
 
 import { ConversationScreen } from '@/components/kilo-chat/conversation-screen';
 import {
+  getConversationRouteDecision,
   getConversationRouteErrorMessage,
   shouldRenderConversationScreen,
 } from '@/components/kilo-chat/conversation-route-state';
@@ -18,16 +19,30 @@ export default function ChatConversationRoute() {
   const client = useKiloChatClient();
   const conversationDetail = useConversationDetail(client, conversationId);
   const redirectPath = `/(app)/chat/${sandboxId}` as Href;
+  const routeDecision = getConversationRouteDecision({
+    detail: conversationDetail,
+    routeSandboxId: sandboxId,
+  });
 
   useEffect(() => {
-    if (!conversationDetail.isError) {
+    if (conversationDetail.isError) {
+      toast.error(getConversationRouteErrorMessage(conversationDetail.error));
+      router.replace(redirectPath);
       return;
     }
-    toast.error(getConversationRouteErrorMessage(conversationDetail.error));
-    router.replace(redirectPath);
-  }, [conversationDetail.isError, conversationDetail.error, redirectPath, router]);
+    if (routeDecision === 'not-found') {
+      toast.error('Conversation not found');
+      router.replace(redirectPath);
+    }
+  }, [conversationDetail.error, conversationDetail.isError, redirectPath, routeDecision, router]);
 
-  if (!shouldRenderConversationScreen(conversationDetail)) {
+  if (
+    !shouldRenderConversationScreen({
+      detail: conversationDetail,
+      routeSandboxId: sandboxId,
+    }) ||
+    !conversationDetail.data
+  ) {
     return null;
   }
 

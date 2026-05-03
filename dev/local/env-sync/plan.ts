@@ -265,7 +265,7 @@ function resolveSecretStoreSource(
     return { sourceKey: baseKey, value: envLocalValue };
   }
 
-  return localSecretSources.get(baseKey);
+  return localSecretSources.get(secretName) ?? localSecretSources.get(baseKey);
 }
 
 function collectLocalSecretSources(

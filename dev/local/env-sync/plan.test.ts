@@ -231,6 +231,48 @@ test('auto-creates kilo-chat gateway Secrets Store binding from kiloclaw dev var
   }
 });
 
+test('auto-creates Secrets Store binding from exact suffixed local dev vars before base fallback', () => {
+  const repo = createRepo({
+    '.env.local': '',
+    'services/kiloclaw/.dev.vars.example': [
+      'GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw',
+      'GATEWAY_TOKEN_SECRET_DEV=dev-gateway-secret-kiloclaw-dev',
+      '',
+    ].join('\n'),
+    'services/kilo-chat/package.json': JSON.stringify({ scripts: { dev: 'wrangler dev' } }),
+    'services/kilo-chat/wrangler.jsonc': `{
+      "secrets_store_secrets": [
+        {
+          "binding": "GATEWAY_TOKEN_SECRET",
+          "store_id": "store-id",
+          "secret_name": "GATEWAY_TOKEN_SECRET_DEV"
+        }
+      ]
+    }`,
+  });
+  try {
+    withFakePnpm('', () => {
+      const plan = computePlan(repo.root, new Set(['kilo-chat']));
+      assert.equal(plan.missingEnvLocal, false);
+      assert.deepEqual(plan.secretStoreWarnings, []);
+      assert.deepEqual(plan.secretStoreAutoCreates, [
+        {
+          workerDir: 'services/kilo-chat',
+          binding: {
+            binding: 'GATEWAY_TOKEN_SECRET',
+            store_id: 'store-id',
+            secret_name: 'GATEWAY_TOKEN_SECRET_DEV',
+          },
+          sourceKey: 'services/kiloclaw/.dev.vars.example:GATEWAY_TOKEN_SECRET_DEV',
+          value: 'dev-gateway-secret-kiloclaw-dev',
+        },
+      ]);
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('keeps .env.local values ahead of wrangler vars for local overrides', () => {
   const repo = createCloudAgentNextRepo({
     envLocal: 'R2_ATTACHMENTS_BUCKET=local-attachments\n',

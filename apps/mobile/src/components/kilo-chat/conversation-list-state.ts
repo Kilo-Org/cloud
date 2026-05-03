@@ -1,4 +1,4 @@
-export type ConversationListContentState = 'loading' | 'error' | 'ready';
+type ConversationListContentState = 'loading' | 'error' | 'ready';
 
 export function getConversationListContentState({
   isPending,

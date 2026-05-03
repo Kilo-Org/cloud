@@ -1,4 +1,4 @@
-export type MessageHistoryContentState = 'loading' | 'error' | 'ready';
+type MessageHistoryContentState = 'loading' | 'error' | 'ready';
 
 export function getMessageHistoryContentState({
   isPending,

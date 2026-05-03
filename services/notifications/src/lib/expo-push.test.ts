@@ -91,7 +91,6 @@ describe('sendPushNotifications', () => {
       staleTokens: [],
       ticketErrors: [
         {
-          token: 'ExponentPushToken[token-1]',
           errorCode: 'MessageTooBig',
           message: 'Message is too big',
           retryable: false,

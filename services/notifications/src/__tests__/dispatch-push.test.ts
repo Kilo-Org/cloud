@@ -257,7 +257,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
       staleTokens: [],
       ticketErrors: [
         {
-          token: 'tok1',
           errorCode: 'MessageTooBig',
           message: 'Message is too big',
           retryable: false,
@@ -364,7 +363,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
       staleTokens: [],
       ticketErrors: [
         {
-          token: 'tok-rate-limited',
           errorCode: 'MessageRateExceeded',
           message: 'Rate limited',
           retryable: true,

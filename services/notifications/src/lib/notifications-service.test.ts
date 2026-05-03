@@ -207,13 +207,11 @@ describe('dispatchInstanceLifecyclePush', () => {
         staleTokens: [],
         ticketErrors: [
           {
-            token: 'ExponentPushToken[aaa]',
             errorCode: 'MessageTooBig',
             message: 'Message is too big',
             retryable: false,
           },
           {
-            token: 'ExponentPushToken[bbb]',
             errorCode: 'MessageRateExceeded',
             message: 'Rate exceeded',
             retryable: true,

@@ -9,7 +9,6 @@ export type TicketTokenPair = {
 };
 
 export type PushTicketError = {
-  token: string;
   errorCode: string | undefined;
   message: string;
   retryable: boolean;
@@ -102,7 +101,6 @@ export async function sendPushNotifications(
       } else {
         const errorCode = ticket.details?.error;
         ticketErrors.push({
-          token,
           errorCode,
           message: ticket.message,
           retryable: isRetryableTicketError(errorCode),

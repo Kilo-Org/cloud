@@ -1,4 +1,4 @@
-import { type Message } from '@kilocode/kilo-chat';
+import { type Message } from './types';
 
 export type MessageActionAvailability = {
   canReact: boolean;

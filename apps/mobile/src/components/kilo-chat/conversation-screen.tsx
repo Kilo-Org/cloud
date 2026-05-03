@@ -16,7 +16,12 @@ import {
   useExecuteAction,
   useRemoveReaction,
 } from '@kilocode/kilo-chat-hooks';
-import { type ExecApprovalDecision, formatKiloChatError, type Message } from '@kilocode/kilo-chat';
+import {
+  buildMessageActionAvailability,
+  type ExecApprovalDecision,
+  formatKiloChatError,
+  type Message,
+} from '@kilocode/kilo-chat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -225,16 +230,13 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       if (message.deleted) {
         return;
       }
-      const isPendingMessage = message.id.startsWith('pending-');
       const isOwnMessage = currentUserId !== null && message.senderId === currentUserId;
-      const canUseApiBackedActions = !isPendingMessage;
-      const canMutateFailedMessage = !message.deliveryFailed;
+      const actionAvailability = buildMessageActionAvailability(message, isOwnMessage);
       const actionSheet = buildMessageActionSheetOptions({
-        canReact: currentUserId !== null && canMutateFailedMessage,
-        canReply: canMutateFailedMessage,
-        canEdit: canUseApiBackedActions && isOwnMessage && canMutateFailedMessage,
-        canDelete: canUseApiBackedActions && isOwnMessage,
-        isPendingMessage,
+        canReact: currentUserId !== null && actionAvailability.canReact,
+        canReply: actionAvailability.canReply,
+        canEdit: actionAvailability.canEdit,
+        canDelete: actionAvailability.canDelete,
       });
       showActionSheetWithOptions(
         {

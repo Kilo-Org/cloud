@@ -1,4 +1,7 @@
-import { buildMessageActionAvailability, type Message } from '@kilocode/kilo-chat';
+import { describe, expect, it } from 'vitest';
+
+import { type Message } from '../src';
+import { buildMessageActionAvailability } from '../src/message-action-availability';
 
 const baseMessage = {
   id: '01K8ZB8B3H9BRWZ6KCN39AX09G',
@@ -14,11 +17,21 @@ const baseMessage = {
 } satisfies Message;
 
 describe('buildMessageActionAvailability', () => {
-  it('allows API-backed actions for persisted messages', () => {
+  it('allows API-backed actions for persisted own messages', () => {
     expect(buildMessageActionAvailability(baseMessage, true)).toEqual({
       canReact: true,
       canEdit: true,
       canDelete: true,
+      canReply: true,
+      canExecuteAction: true,
+    });
+  });
+
+  it('blocks owner-only actions for other users messages', () => {
+    expect(buildMessageActionAvailability(baseMessage, false)).toEqual({
+      canReact: true,
+      canEdit: false,
+      canDelete: false,
       canReply: true,
       canExecuteAction: true,
     });
@@ -33,6 +46,18 @@ describe('buildMessageActionAvailability', () => {
       canDelete: false,
       canReply: false,
       canExecuteAction: false,
+    });
+  });
+
+  it('allows deleting but not mutating delivery-failed own messages', () => {
+    const failedMessage = { ...baseMessage, deliveryFailed: true } satisfies Message;
+
+    expect(buildMessageActionAvailability(failedMessage, true)).toEqual({
+      canReact: false,
+      canEdit: false,
+      canDelete: true,
+      canReply: false,
+      canExecuteAction: true,
     });
   });
 });

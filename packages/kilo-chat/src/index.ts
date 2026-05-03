@@ -8,6 +8,10 @@ export {
   decodeConversationCursor,
   type ConversationCursor,
 } from './utils';
+export {
+  buildMessageActionAvailability,
+  type MessageActionAvailability,
+} from './message-action-availability';
 export type * from './types';
 export type { KiloChatEvent, KiloChatEventName, KiloChatEventOf } from './events';
 export * from './schemas';

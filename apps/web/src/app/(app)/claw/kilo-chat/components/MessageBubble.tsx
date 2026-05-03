@@ -13,10 +13,14 @@ import type {
   ExecApprovalDecision,
   ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
-import { MESSAGE_TEXT_MAX_CHARS, ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
+import {
+  buildMessageActionAvailability,
+  MESSAGE_TEXT_MAX_CHARS,
+  ulidToTimestamp,
+  contentBlocksToText,
+} from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
-import { buildMessageActionAvailability } from './message-action-availability';
 import { isMessageEditOverLimit, submitMessageEdit } from './message-edit-state';
 
 const EDIT_COUNTER_SHOW_AT = Math.floor(MESSAGE_TEXT_MAX_CHARS * 0.8);

@@ -2,9 +2,9 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { useWorkersLogger } from 'workers-tagged-logger';
-import { z } from 'zod';
 import type { MiddlewareHandler } from 'hono';
 import type { ConnectTicketResponse } from '@kilocode/event-service';
+import { connectTicketQuerySchema } from '@kilocode/event-service';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { authenticateToken } from './auth';
 import { logger } from './util/logger';
@@ -20,7 +20,6 @@ const app = new Hono<{ Bindings: Env }>();
 const ACCEPTED_WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 const CONNECTION_TICKET_TTL_MS = 30_000;
 const ALLOWED_BROWSER_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
-const connectTicketQuerySchema = z.object({ ticket: z.string().min(1) });
 
 app.use(
   '/connect/*',

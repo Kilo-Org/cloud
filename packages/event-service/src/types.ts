@@ -6,6 +6,7 @@ import type {
   errorMessageSchema,
   eventMessageSchema,
   serverMessageSchema,
+  connectTicketQuerySchema,
   connectTicketResponseSchema,
 } from './schemas';
 
@@ -20,6 +21,10 @@ export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type EventMessage = z.infer<typeof eventMessageSchema>;
 export type ErrorMessage = z.infer<typeof errorMessageSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
+
+// ── HTTP Requests ──────────────────────────────────────────────────
+
+export type ConnectTicketQuery = z.infer<typeof connectTicketQuerySchema>;
 
 // ── HTTP Responses ─────────────────────────────────────────────────
 

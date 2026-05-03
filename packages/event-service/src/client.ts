@@ -1,4 +1,4 @@
-import type { ClientMessage, EventServiceConfig } from './types';
+import type { ClientMessage, ConnectTicketQuery, EventServiceConfig } from './types';
 import { connectTicketResponseSchema, serverMessageSchema } from './schemas';
 
 const WEBSOCKET_PROTOCOL = 'kilo.events.v1';
@@ -43,7 +43,8 @@ function ticketEndpointFor(wsBase: string): string {
 
 function connectUrlFor(wsBase: string, ticket: string): string {
   const url = baseUrlWithPath(wsBase, 'connect');
-  url.searchParams.set('ticket', ticket);
+  const query = { ticket } satisfies ConnectTicketQuery;
+  url.searchParams.set('ticket', query.ticket);
   return url.toString();
 }
 

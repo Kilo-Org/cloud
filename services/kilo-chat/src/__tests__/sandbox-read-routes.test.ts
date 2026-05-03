@@ -178,7 +178,8 @@ describe('POST /v1/sandboxes/:sandboxId/request-bot-status', () => {
       { method: 'POST' },
       makeEnv()
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
+    expect(await res.text()).toBe('');
 
     const calls = await recordingKiloclaw.__recordedWebhookCalls();
     const myCalls = calls.filter(c => c.targetBotId === 'bot:kiloclaw:sandbox-req-fresh');
@@ -206,9 +207,8 @@ describe('POST /v1/sandboxes/:sandboxId/request-bot-status', () => {
       { method: 'POST' },
       testEnv
     );
-    expect(res.status).toBe(200);
-    const body = await res.json<{ ok: boolean; dedupe?: string }>();
-    expect(body.dedupe).toBe('fresh');
+    expect(res.status).toBe(202);
+    expect(await res.text()).toBe('');
 
     const calls = await recordingKiloclaw.__recordedWebhookCalls();
     const myCalls = calls.filter(c => c.targetBotId === 'bot:kiloclaw:sandbox-req-dedupe');

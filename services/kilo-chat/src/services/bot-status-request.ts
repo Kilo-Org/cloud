@@ -46,11 +46,11 @@ export async function handleRequestBotStatus(c: HonoCtx): Promise<Response> {
     // The fan-out already pushed the event to all of this user's connections;
     // skipping here keeps webhook QPS at ~1 per 15s per sandbox regardless of
     // how many clients are subscribed.
-    return c.json({ ok: true, dedupe: 'fresh' });
+    return c.body(null, 202);
   }
 
   c.executionCtx.waitUntil(triggerBotStatusWebhook(c.env, sandboxId));
-  return c.json({ ok: true });
+  return c.body(null, 202);
 }
 
 /**

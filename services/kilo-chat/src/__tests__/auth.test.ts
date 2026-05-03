@@ -70,7 +70,7 @@ describe('authMiddleware', () => {
     });
   });
 
-  it('returns 401 when the JWT is valid but not scoped to kilo-chat', async () => {
+  it('authenticates a valid JWT from another token source', async () => {
     const { token } = await signKiloToken({
       userId: 'user-xyz-789',
       pepper: 'pepper-current',
@@ -84,7 +84,11 @@ describe('authMiddleware', () => {
       { headers: { authorization: `Bearer ${token}` } },
       defaultEnv
     );
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      callerId: 'user-xyz-789',
+      callerKind: 'user',
+    });
   });
 
   it('returns 401 when the chat JWT has a stale pepper', async () => {

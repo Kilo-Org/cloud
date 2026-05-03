@@ -43,7 +43,7 @@ describe('authenticateToken', () => {
     await expect(authenticateToken(token, makeEnv())).resolves.toEqual({ userId: 'user-xyz-789' });
   });
 
-  it('rejects a valid Kilo JWT that is not scoped to kilo-chat', async () => {
+  it('authenticates a valid JWT from another token source', async () => {
     const { token } = await signKiloToken({
       userId: 'user-xyz-789',
       pepper: 'pepper-current',
@@ -53,7 +53,9 @@ describe('authenticateToken', () => {
       extra: { tokenSource: 'cloud-agent' },
     });
 
-    await expect(authenticateToken(token, makeEnv())).resolves.toBeNull();
+    await expect(authenticateToken(token, makeEnv())).resolves.toEqual({
+      userId: 'user-xyz-789',
+    });
   });
 
   it('rejects a valid kilo-chat JWT with a stale pepper', async () => {

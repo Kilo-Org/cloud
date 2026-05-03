@@ -8,10 +8,7 @@ import { connectTicketQuerySchema } from '@kilocode/event-service';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { authenticateToken } from './auth';
 import { logger } from './util/logger';
-import {
-  connectionTicketConsumeResponseSchema,
-  type TicketMintRequest,
-} from './do/connection-ticket-do';
+import { type TicketMintRequest } from './do/connection-ticket-do';
 
 export { UserSessionDO } from './do/user-session-do';
 export { ConnectionTicketDO } from './do/connection-ticket-do';
@@ -54,20 +51,21 @@ async function mintConnectionTicket(env: Env, userId: string): Promise<string | 
     userId,
     expiresAt: Date.now() + CONNECTION_TICKET_TTL_MS,
   } satisfies TicketMintRequest;
-  const res = await stub.fetch('https://ticket.local/mint', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-  return res.ok ? ticket : null;
+  try {
+    await stub.mint(body);
+    return ticket;
+  } catch {
+    return null;
+  }
 }
 
 async function consumeConnectionTicket(env: Env, ticket: string): Promise<string | null> {
   const stub = env.CONNECTION_TICKET_DO.get(env.CONNECTION_TICKET_DO.idFromName(ticket));
-  const res = await stub.fetch('https://ticket.local/consume', { method: 'POST' });
-  if (!res.ok) return null;
-  const body: unknown = await res.json();
-  const parsed = connectionTicketConsumeResponseSchema.safeParse(body);
-  return parsed.success ? parsed.data.userId : null;
+  try {
+    return (await stub.consume())?.userId ?? null;
+  } catch {
+    return null;
+  }
 }
 
 app.post('/connect-ticket', async c => {

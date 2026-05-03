@@ -1,12 +1,18 @@
-import { env, SELF } from 'cloudflare:test';
+import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signKiloToken } from '@kilocode/worker-utils';
+import type { ConnectionTicketDO } from '../do/connection-ticket-do';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 const ACCEPTED_PROTOCOL = 'kilo.events.v1';
 
-function ticketNamespace(): DurableObjectNamespace {
-  return (env as unknown as { CONNECTION_TICKET_DO: DurableObjectNamespace }).CONNECTION_TICKET_DO;
+function ticketNamespace(): DurableObjectNamespace<ConnectionTicketDO> {
+  return (env as unknown as { CONNECTION_TICKET_DO: DurableObjectNamespace<ConnectionTicketDO> })
+    .CONNECTION_TICKET_DO;
+}
+
+function ticketStub(ticket: string): DurableObjectStub<ConnectionTicketDO> {
+  return ticketNamespace().get(ticketNamespace().idFromName(ticket));
 }
 
 function workerEnv(): string {
@@ -94,17 +100,68 @@ describe('event-service WebSocket connection tickets', () => {
 
   it('rejects stale tickets', async () => {
     const ticket = crypto.randomUUID();
-    const stub = ticketNamespace().get(ticketNamespace().idFromName(ticket));
-    await stub.fetch('https://ticket.local/mint', {
-      method: 'POST',
-      body: JSON.stringify({
-        userId: 'user-ticket-stale',
-        expiresAt: Date.now() - 1,
-      }),
+    await ticketStub(ticket).mint({
+      userId: 'user-ticket-stale',
+      expiresAt: Date.now() - 1,
     });
 
     const res = await connect(ticket);
 
     expect(res.status).toBe(401);
+  });
+
+  it('deletes ticket storage and alarm after a successful consume', async () => {
+    const ticket = crypto.randomUUID();
+    const stub = ticketStub(ticket);
+    const expiresAt = Date.now() + 30_000;
+
+    await stub.mint({ userId: 'user-ticket-consume-cleanup', expiresAt });
+    await expect(
+      runInDurableObject(stub, async (_instance: ConnectionTicketDO, state) => ({
+        ticket: await state.storage.get('ticket'),
+        alarm: await state.storage.getAlarm(),
+      }))
+    ).resolves.toEqual({
+      ticket: { userId: 'user-ticket-consume-cleanup', expiresAt },
+      alarm: expiresAt,
+    });
+
+    await expect(stub.consume()).resolves.toEqual({ userId: 'user-ticket-consume-cleanup' });
+
+    await expect(
+      runInDurableObject(stub, async (_instance: ConnectionTicketDO, state) => ({
+        ticket: await state.storage.get('ticket'),
+        alarm: await state.storage.getAlarm(),
+      }))
+    ).resolves.toEqual({
+      ticket: undefined,
+      alarm: null,
+    });
+  });
+
+  it('deletes unconsumed expired ticket storage when the alarm runs', async () => {
+    const ticket = crypto.randomUUID();
+    const stub = ticketStub(ticket);
+    const expiresAt = Date.now() + 30_000;
+
+    await stub.mint({ userId: 'user-ticket-alarm-cleanup', expiresAt });
+    await runInDurableObject(stub, async (_instance: ConnectionTicketDO, state) => {
+      await state.storage.put('ticket', {
+        userId: 'user-ticket-alarm-cleanup',
+        expiresAt: Date.now() - 1,
+      });
+    });
+
+    await expect(runDurableObjectAlarm(stub)).resolves.toBe(true);
+
+    await expect(
+      runInDurableObject(stub, async (_instance: ConnectionTicketDO, state) => ({
+        ticket: await state.storage.get('ticket'),
+        alarm: await state.storage.getAlarm(),
+      }))
+    ).resolves.toEqual({
+      ticket: undefined,
+      alarm: null,
+    });
   });
 });

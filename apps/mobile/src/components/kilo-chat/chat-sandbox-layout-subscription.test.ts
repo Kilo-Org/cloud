@@ -45,6 +45,14 @@ vi.mock('react', async () => {
 
 vi.mock('expo-router', () => ({
   Stack: () => null,
+  useFocusEffect: (effect: ReactModule.EffectCallback) => {
+    const cleanup = effect();
+    if (typeof cleanup === 'function') {
+      testState.cleanups.push(() => {
+        void cleanup();
+      });
+    }
+  },
   useLocalSearchParams: () => ({ 'sandbox-id': testState.sandboxId }),
 }));
 
@@ -77,6 +85,10 @@ vi.mock('@/components/kilo-chat/hooks/use-kilo-chat-client', () => ({
     },
   }),
   useKiloChatClient: () => ({}),
+}));
+
+vi.mock('@/lib/last-active-instance', () => ({
+  setLastActiveInstance: vi.fn(),
 }));
 
 function recordCleanup() {

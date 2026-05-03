@@ -12,3 +12,8 @@ export async function loadLastActiveInstance(): Promise<void> {
 export function getLastActiveInstance(): string | null {
   return cached;
 }
+
+export async function setLastActiveInstance(sandboxId: string): Promise<void> {
+  cached = sandboxId;
+  await SecureStore.setItemAsync(LAST_ACTIVE_INSTANCE_KEY, sandboxId);
+}

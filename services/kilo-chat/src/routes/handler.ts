@@ -273,7 +273,7 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
   if (!result.ok) {
     return c.json({ error: result.error }, 404);
   }
-  return c.json({}, 202);
+  return c.body(null, 202);
 }
 
 // ─── actionDeliveryFailed (bot-reported) ────────────────────────────────────
@@ -323,7 +323,7 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
       { conversationId: convId.data, messageId, groupId: groupId.data }
     );
   }
-  return c.json({}, 202);
+  return c.body(null, 202);
 }
 
 // ─── addReaction ─────────────────────────────────────────────────────────────

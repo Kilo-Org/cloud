@@ -258,6 +258,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
       testEnv
     );
     expect(res.status).toBe(202);
+    expect(await res.text()).toBe('');
     expect(pushEvent).toHaveBeenCalledOnce();
     expect(pushEvent).toHaveBeenCalledWith(
       'user-bot-msg-df-ok',
@@ -277,6 +278,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
       testEnv
     );
     expect(second.status).toBe(202);
+    expect(await second.text()).toBe('');
     expect(pushEvent).not.toHaveBeenCalled();
   });
 
@@ -458,6 +460,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       testEnv
     );
     expect(res.status).toBe(202);
+    expect(await res.text()).toBe('');
   });
 
   it('is idempotent when already unresolved', async () => {
@@ -479,6 +482,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       testEnv
     );
     expect(first.status).toBe(202);
+    expect(await first.text()).toBe('');
     expect(pushEvent).toHaveBeenCalledOnce();
 
     const second = await app.request(

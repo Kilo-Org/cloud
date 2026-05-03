@@ -288,11 +288,25 @@ function collectLocalSecretSources(
   const sources = new Map<string, { sourceKey: string; value: string }>();
 
   for (const workerDir of workerDirs) {
+    const devVarsPath = path.join(repoRoot, workerDir, '.dev.vars');
+    const localVars = readEnvFile(devVarsPath);
+    for (const [key, value] of localVars) {
+      if (value) {
+        sources.set(key, {
+          sourceKey: `${workerDir}/.dev.vars:${key}`,
+          value,
+        });
+      }
+    }
+
     const examplePath = path.join(repoRoot, workerDir, '.dev.vars.example');
     const serviceUsesLanIp = dirUsesLanIp.get(workerDir) ?? false;
     if (fs.existsSync(examplePath)) {
       const entries = parseExampleFile(fs.readFileSync(examplePath, 'utf-8'));
       for (const entry of entries) {
+        if (entry.annotation.type === 'exec') {
+          continue;
+        }
         const { value } = resolveAnnotatedValue(
           entry.key,
           entry,
@@ -306,17 +320,6 @@ function collectLocalSecretSources(
             value,
           });
         }
-      }
-    }
-
-    const devVarsPath = path.join(repoRoot, workerDir, '.dev.vars');
-    const localVars = readEnvFile(devVarsPath);
-    for (const [key, value] of localVars) {
-      if (value) {
-        sources.set(key, {
-          sourceKey: `${workerDir}/.dev.vars:${key}`,
-          value,
-        });
       }
     }
   }

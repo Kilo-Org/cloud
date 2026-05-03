@@ -273,6 +273,50 @@ test('auto-creates Secrets Store binding from exact suffixed local dev vars befo
   }
 });
 
+test('does not execute unrelated @exec annotations while discovering filtered secret sources', () => {
+  const repo = createRepo({
+    '.env.local': '',
+    'services/kiloclaw/.dev.vars.example': [
+      '# @exec node -e console.log("exec-secret")',
+      'DEV_CREATOR=',
+      '',
+    ].join('\n'),
+    'services/kilo-chat/package.json': JSON.stringify({ scripts: { dev: 'wrangler dev' } }),
+    'services/kilo-chat/.dev.vars.example': 'KILO_CHAT_URL=http://localhost:8787\n',
+    'services/kilo-chat/wrangler.jsonc': `{
+      "secrets_store_secrets": [
+        {
+          "binding": "DEV_CREATOR",
+          "store_id": "store-id",
+          "secret_name": "DEV_CREATOR"
+        }
+      ]
+    }`,
+  });
+  try {
+    withFakePnpm('', () => {
+      const plan = computePlan(repo.root, new Set(['kilo-chat']));
+      assert.equal(plan.missingEnvLocal, false);
+      assert.deepEqual(plan.secretStoreAutoCreates, []);
+      assert.deepEqual(plan.secretStoreWarnings, [
+        {
+          workerDir: 'services/kilo-chat',
+          bindings: [
+            {
+              binding: 'DEV_CREATOR',
+              store_id: 'store-id',
+              secret_name: 'DEV_CREATOR',
+            },
+          ],
+        },
+      ]);
+      assert.deepEqual(plan.execWarnings, []);
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('keeps .env.local values ahead of wrangler vars for local overrides', () => {
   const repo = createCloudAgentNextRepo({
     envLocal: 'R2_ATTACHMENTS_BUCKET=local-attachments\n',

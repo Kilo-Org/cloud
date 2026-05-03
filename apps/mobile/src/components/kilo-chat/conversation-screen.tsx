@@ -23,6 +23,8 @@ import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
+import { QueryError } from '@/components/query-error';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ConversationHeader } from './conversation-header';
 import { resolveMobileMessageInputAvailability } from './bot-send-state';
 import { executeActionWithMobileFeedback } from './execute-action-feedback';
@@ -35,6 +37,7 @@ import {
   canToggleReaction,
   createSendMessageClientId,
 } from './message-presentation';
+import { getMessageHistoryContentState } from './message-history-state';
 import { useConversationPresence } from './hooks/use-conversation-presence';
 import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
 import { useMobileTypingState, useTypingSender } from './hooks/use-typing';
@@ -58,6 +61,16 @@ function editableText(message: Message): string {
     .join('\n');
 }
 
+function MessageHistorySkeleton() {
+  return (
+    <View className="flex-1 justify-end gap-3 px-4 py-6">
+      <Skeleton className="h-14 w-3/4 rounded-md" />
+      <Skeleton className="ml-auto h-16 w-2/3 rounded-md" />
+      <Skeleton className="h-20 w-5/6 rounded-md" />
+    </View>
+  );
+}
+
 export function ConversationScreen({ sandboxId, conversationId, conversationTitle }: Props) {
   const client = useKiloChatClient();
   const currentUserId = useCurrentUserId();
@@ -78,7 +91,13 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const now = useNowTicker(10_000);
 
   const messagesQuery = useMessages(client, conversationId);
-  const messages = messagesQuery.data?.messages ?? [];
+  const messageHistoryState = getMessageHistoryContentState({
+    isPending: messagesQuery.isPending,
+    isError: messagesQuery.isError,
+    hasData: messagesQuery.data !== undefined,
+  });
+  const hasInitialMessages = messageHistoryState === 'ready';
+  const messages = hasInitialMessages ? (messagesQuery.data?.messages ?? []) : [];
   const latestMessageId = latestMarkReadMessageId(messages);
   const fetchOlder = useCallback(() => {
     if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) {
@@ -306,7 +325,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   activeAndFocusedRef.current = activeAndFocused;
 
   const markCurrentConversationRead = useCallback(() => {
-    if (latestMessageId === null || currentMarkReadMarker === null) {
+    if (!hasInitialMessages || latestMessageId === null || currentMarkReadMarker === null) {
       return;
     }
     const marker = currentMarkReadMarker;
@@ -323,7 +342,14 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
         markCurrentConversationReadRef.current?.();
       },
     });
-  }, [conversationId, currentMarkReadMarker, latestMessageId, markRead, sandboxId]);
+  }, [
+    conversationId,
+    currentMarkReadMarker,
+    hasInitialMessages,
+    latestMessageId,
+    markRead,
+    sandboxId,
+  ]);
   markCurrentConversationReadRef.current = markCurrentConversationRead;
 
   useEffect(() => {
@@ -361,6 +387,40 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       };
     }, [sandboxId, conversationId])
   );
+
+  if (messageHistoryState === 'loading') {
+    return (
+      <View className="flex-1">
+        <ConversationHeader title={conversationTitle} />
+        <KeyboardAvoidingView
+          className="flex-1"
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <MessageHistorySkeleton />
+        </KeyboardAvoidingView>
+      </View>
+    );
+  }
+
+  if (messageHistoryState === 'error') {
+    return (
+      <View className="flex-1">
+        <ConversationHeader title={conversationTitle} />
+        <KeyboardAvoidingView
+          className="flex-1"
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <QueryError
+            className="flex-1"
+            message="Could not load conversation history"
+            onRetry={() => {
+              void messagesQuery.refetch();
+            }}
+          />
+        </KeyboardAvoidingView>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1">

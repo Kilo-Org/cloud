@@ -37,11 +37,6 @@ export const kiloTokenPayload = z.object({
 export type KiloTokenPayload = z.infer<typeof kiloTokenPayload>;
 const signKiloTokenPayload = kiloTokenPayload.omit({ iat: true, exp: true }).strict();
 
-export type KiloChatTokenPayload = {
-  userId: string;
-  pepper: string | null;
-};
-
 /**
  * Optional claims beyond the core fields (userId, pepper, version, env).
  * Derived from KiloTokenPayload so sign and verify stay in sync.
@@ -107,25 +102,4 @@ export async function verifyKiloToken(token: string, secret: string): Promise<Ki
   });
 
   return kiloTokenPayload.parse(payload);
-}
-
-export async function verifyKiloChatToken(
-  token: string,
-  secret: string,
-  expectedEnv: string
-): Promise<KiloChatTokenPayload> {
-  const payload = await verifyKiloToken(token, secret);
-
-  if (payload.tokenSource !== 'kilo-chat') {
-    throw new Error('Invalid token source');
-  }
-
-  if (payload.env !== expectedEnv) {
-    throw new Error('Invalid token environment');
-  }
-
-  return {
-    userId: payload.kiloUserId,
-    pepper: payload.apiTokenPepper ?? null,
-  };
 }

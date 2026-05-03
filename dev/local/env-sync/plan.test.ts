@@ -233,7 +233,7 @@ test('auto-creates kilo-chat gateway Secrets Store binding from kiloclaw dev var
 
 test('auto-creates Secrets Store binding from exact suffixed local dev vars before base fallback', () => {
   const repo = createRepo({
-    '.env.local': '',
+    '.env.local': 'GATEWAY_TOKEN_SECRET=base-secret\n',
     'services/kiloclaw/.dev.vars.example': [
       'GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw',
       'GATEWAY_TOKEN_SECRET_DEV=dev-gateway-secret-kiloclaw-dev',

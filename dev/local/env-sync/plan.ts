@@ -260,12 +260,22 @@ function resolveSecretStoreSource(
   localSecretSources: Map<string, { sourceKey: string; value: string }>
 ): { sourceKey: string; value: string } | undefined {
   const baseKey = secretName.replace(/_(PROD|DEV)$/, '');
-  const envLocalValue = envLocal.get(baseKey);
-  if (envLocalValue) {
-    return { sourceKey: baseKey, value: envLocalValue };
+  const exactLocalSource = localSecretSources.get(secretName);
+  if (exactLocalSource) {
+    return exactLocalSource;
   }
 
-  return localSecretSources.get(secretName) ?? localSecretSources.get(baseKey);
+  const exactEnvLocalValue = envLocal.get(secretName);
+  if (exactEnvLocalValue) {
+    return { sourceKey: secretName, value: exactEnvLocalValue };
+  }
+
+  const baseEnvLocalValue = envLocal.get(baseKey);
+  if (baseEnvLocalValue) {
+    return { sourceKey: baseKey, value: baseEnvLocalValue };
+  }
+
+  return localSecretSources.get(baseKey);
 }
 
 function collectLocalSecretSources(

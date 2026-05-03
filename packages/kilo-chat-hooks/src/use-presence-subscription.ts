@@ -1,13 +1,11 @@
 import { useEffect } from 'react';
 
-import { useEventServiceClient } from './use-kilo-chat-client';
+import { useEventServiceClient } from './context';
 
 export function usePresenceSubscription(context: string | null, active: boolean) {
   const eventService = useEventServiceClient();
   useEffect(() => {
-    if (!active || !context) {
-      return undefined;
-    }
+    if (!active || context === null) return;
     eventService.subscribe([context]);
     return () => {
       eventService.unsubscribe([context]);

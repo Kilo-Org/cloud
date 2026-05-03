@@ -24,7 +24,6 @@ import {
   kiloclawConversationContext,
   presenceContextForConversation,
 } from '@kilocode/event-service';
-import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
 import { useDocumentVisible } from '@/hooks/useDocumentVisible';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
 import {
@@ -50,6 +49,7 @@ import {
   clearMarkReadRetry,
   createMarkReadRetryState,
   scheduleMarkReadRetry,
+  usePresenceSubscription,
 } from '@kilocode/kilo-chat-hooks';
 import {
   KiloChatApiError,

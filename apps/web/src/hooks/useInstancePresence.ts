@@ -1,9 +1,9 @@
 'use client';
 
 import { presenceContextForInstance } from '@kilocode/event-service';
+import { usePresenceSubscription } from '@kilocode/kilo-chat-hooks';
 
 import { useDocumentVisible } from './useDocumentVisible';
-import { usePresenceSubscription } from './usePresenceSubscription';
 
 export function useInstancePresence(sandboxId: string | undefined, enabled = true) {
   const visible = useDocumentVisible();

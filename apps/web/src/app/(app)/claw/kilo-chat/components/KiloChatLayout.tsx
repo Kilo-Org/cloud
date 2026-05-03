@@ -5,10 +5,10 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatKiloChatError } from '@kilocode/kilo-chat';
+import { usePresenceSubscription } from '@kilocode/kilo-chat-hooks';
 import { ConversationList } from './ConversationList';
 import { KiloChatContext, type KiloChatContextValue } from './kiloChatContext';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
-import { usePresenceSubscription } from '@/hooks/usePresenceSubscription';
 import { useEventServiceClient } from '@/contexts/EventServiceContext';
 import {
   useConversations,

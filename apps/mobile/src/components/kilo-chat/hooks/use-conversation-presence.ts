@@ -1,7 +1,7 @@
 import { presenceContextForConversation } from '@kilocode/event-service';
+import { usePresenceSubscription } from '@kilocode/kilo-chat-hooks';
 
 import { useAppActiveAndFocused } from './use-app-active-and-focused';
-import { usePresenceSubscription } from './use-presence-subscription';
 
 export function useConversationPresence(
   sandboxId: string | undefined,

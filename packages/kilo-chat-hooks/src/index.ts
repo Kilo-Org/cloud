@@ -5,3 +5,4 @@ export * from './query-keys';
 export * from './use-bot-status';
 export * from './use-conversations';
 export * from './use-messages';
+export * from './use-presence-subscription';

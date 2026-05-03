@@ -1335,6 +1335,51 @@ describe('recipient conversation read state after message delivery', () => {
 
     await expect(recordingNotifications.__listNonZeroBuckets(recipientId)).resolves.toEqual([]);
   });
+
+  it('returns retryable failure when required badge clearing fails', async () => {
+    const { conversationId, recipientId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-badge-clear-fails');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      deliveredEnv
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const failingNotifications = {
+      ...deliveredEnv.NOTIFICATIONS,
+      clearBadgeBucketForUser: async () => {
+        throw new Error('notifications unavailable');
+      },
+    } as Env['NOTIFICATIONS'];
+    const failingEnv = { ...deliveredEnv, NOTIFICATIONS: failingNotifications } satisfies Env;
+
+    const markReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: messageId }),
+      },
+      failingEnv
+    );
+
+    expect(markReadRes.status).toBe(503);
+    await expect(markReadRes.json()).resolves.toEqual({
+      error: 'Failed to clear notification badge',
+    });
+
+    const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
+    const after = await recipientMemberStub.listConversations({});
+    const conversation = after.conversations.find(c => c.conversationId === conversationId);
+    expect(conversation?.lastReadAt).toBe(ulidToTimestamp(messageId));
+  });
 });
 
 describe('POST /v1/conversations/:conversationId/messages/:messageId/execute-action', () => {

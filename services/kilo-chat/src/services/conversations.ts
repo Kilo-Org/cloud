@@ -350,7 +350,7 @@ type BadgeClearResult = {
 
 export type MarkReadResult =
   | { ok: true; applied: boolean; lastReadAt: number; badgeClear: BadgeClearResult | null }
-  | { ok: false; code: 'forbidden' | 'invalid'; error: string };
+  | { ok: false; code: 'forbidden' | 'invalid' | 'badge_clear_failed'; error: string };
 
 export async function markReadFor(
   env: Env,
@@ -399,6 +399,11 @@ export async function markReadFor(
           conversationId,
           ...formatError(err),
         });
+        return {
+          ok: false,
+          code: 'badge_clear_failed',
+          error: 'Failed to clear notification badge',
+        };
       }
     }
 

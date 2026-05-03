@@ -197,7 +197,9 @@ export function registerConversationRoutes(
       makeSchedule(c)
     );
     if (!result.ok) {
-      return c.json({ error: result.error }, result.code === 'invalid' ? 400 : 403);
+      if (result.code === 'invalid') return c.json({ error: result.error }, 400);
+      if (result.code === 'badge_clear_failed') return c.json({ error: result.error }, 503);
+      return c.json({ error: result.error }, 403);
     }
 
     const response = {

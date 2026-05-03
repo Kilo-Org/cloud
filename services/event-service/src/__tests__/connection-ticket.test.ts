@@ -9,13 +9,17 @@ function ticketNamespace(): DurableObjectNamespace {
   return (env as unknown as { CONNECTION_TICKET_DO: DurableObjectNamespace }).CONNECTION_TICKET_DO;
 }
 
+function workerEnv(): string {
+  return (env as unknown as { WORKER_ENV: string }).WORKER_ENV;
+}
+
 async function chatToken(userId: string): Promise<string> {
   const { token } = await signKiloToken({
     userId,
     pepper: null,
     secret: TEST_JWT_SECRET,
     expiresInSeconds: 3600,
-    env: 'production',
+    env: workerEnv(),
     extra: { tokenSource: 'kilo-chat' },
   });
   return token;

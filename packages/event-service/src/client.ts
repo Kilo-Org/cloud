@@ -5,10 +5,9 @@ const WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 
 /**
  * Thrown (and surfaced via {@link EventServiceConfig.onUnauthorized}) when the
- * Event Service rejects the WebSocket upgrade with 401/403. Browsers do not
- * expose the HTTP status of a failed WebSocket handshake, so the client
- * treats any pre-open 'error' event as a potential auth failure and relies on
- * the callback to trigger token refresh/sign-out.
+ * Event Service rejects connection-ticket minting with 401/403. Browsers do not
+ * expose the HTTP status of a failed WebSocket handshake, so pre-open socket
+ * errors are treated as generic reconnectable failures.
  */
 export class WebSocketAuthError extends Error {
   constructor(message = 'WebSocket authentication failed') {
@@ -86,7 +85,6 @@ export class EventServiceClient {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private handshakeTimer: ReturnType<typeof setTimeout> | null = null;
   private abortHandshake: ((err: Error) => void) | null = null;
-  private suppressNextCloseReconnect = false;
 
   constructor(config: EventServiceConfig) {
     this.url = config.url;
@@ -216,10 +214,6 @@ export class EventServiceClient {
         this.connected = false;
         this.stopPing();
         this.clearHandshakeTimer();
-        if (this.suppressNextCloseReconnect) {
-          this.suppressNextCloseReconnect = false;
-          return;
-        }
         if (!this.destroyed) {
           this.scheduleReconnect();
         }
@@ -228,13 +222,11 @@ export class EventServiceClient {
       ws.addEventListener('error', () => {
         if (this.ws !== ws) return;
         // error is always followed by close, so we only need to reject the
-        // connect promise here if we never opened. The browser does not
-        // expose the HTTP status of a failed upgrade, so treat pre-open
-        // errors as potential auth failures and surface them via
-        // onUnauthorized. Callers can refresh the token and reconnect.
+        // connect promise here if we never opened. The browser does not expose
+        // the HTTP status of a failed upgrade, so reconnect and reserve auth
+        // recovery for the preceding connection-ticket HTTP request.
         if (!this.connected) {
-          this.suppressNextCloseReconnect = true;
-          settleReject(new WebSocketAuthError());
+          settleReject(new Error('WebSocket connection failed'));
         }
       });
     });

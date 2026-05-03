@@ -228,7 +228,7 @@ describe('EventServiceClient', () => {
     expect(allMockWs).toHaveLength(2);
   });
 
-  it('refreshes a stale token once after a pre-open rejection and reconnects', async () => {
+  it('reconnects after a pre-open error without refreshing auth', async () => {
     vi.useFakeTimers();
     try {
       const tokens = ['stale.token.sig', 'fresh.token.sig'];
@@ -264,7 +264,7 @@ describe('EventServiceClient', () => {
 
       await client.connect();
 
-      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(onUnauthorized).not.toHaveBeenCalled();
       expect(client.isConnected()).toBe(false);
 
       await vi.advanceTimersByTimeAsync(2_000);
@@ -282,25 +282,15 @@ describe('EventServiceClient', () => {
     }
   });
 
-  it('stops after an explicit unauthorized stop decision', async () => {
+  it('stops after an explicit unauthorized stop decision from connect-ticket', async () => {
     vi.useFakeTimers();
     try {
       const stopAuth = (): 'stop' => 'stop';
       const onUnauthorized = vi.fn(stopAuth);
-      const WebSocketMock = function (url: string, protocols?: string | string[]) {
-        lastMockWs = new MockWebSocket(url, protocols);
-        allMockWs.push(lastMockWs);
-        lastMockWs.readyState = 0; // CONNECTING
-        void Promise.resolve().then(() => {
-          lastMockWs.triggerError();
-          lastMockWs.triggerClose();
-        });
-        return lastMockWs;
-      };
-      WebSocketMock.OPEN = 1;
-      WebSocketMock.CLOSING = 2;
-      WebSocketMock.CLOSED = 3;
-      vi.stubGlobal('WebSocket', WebSocketMock);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(null, { status: 401 }))
+      );
 
       const client = new EventServiceClient({
         url: 'ws://localhost:8080',
@@ -311,17 +301,17 @@ describe('EventServiceClient', () => {
       await client.connect();
 
       expect(onUnauthorized).toHaveBeenCalledTimes(1);
-      expect(allMockWs).toHaveLength(1);
+      expect(allMockWs).toHaveLength(0);
       expect(client.isConnected()).toBe(false);
 
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(allMockWs).toHaveLength(1);
+      expect(allMockWs).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('keeps reconnecting after configured auth recovery is consumed by pre-open failures', async () => {
+  it('keeps reconnecting after repeated pre-open failures', async () => {
     vi.useFakeTimers();
     const reconnectDelay = vi.spyOn(Math, 'random').mockReturnValue(1);
     try {
@@ -365,7 +355,7 @@ describe('EventServiceClient', () => {
       await vi.advanceTimersByTimeAsync(4_000);
       expect(allMockWs).toHaveLength(3);
       expect(client.isConnected()).toBe(true);
-      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(onUnauthorized).not.toHaveBeenCalled();
       expect(allMockWs[2]?.sent.map(s => JSON.parse(s) as unknown)).toContainEqual({
         type: 'context.subscribe',
         contexts: ['room:configured'],

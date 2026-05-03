@@ -254,6 +254,66 @@ function listLocalStoreSecrets(repoRoot: string, workerDir: string, storeId: str
   return result.status === 0 ? result.stdout : '';
 }
 
+function resolveSecretStoreSource(
+  secretName: string,
+  envLocal: Map<string, string>,
+  localSecretSources: Map<string, { sourceKey: string; value: string }>
+): { sourceKey: string; value: string } | undefined {
+  const baseKey = secretName.replace(/_(PROD|DEV)$/, '');
+  const envLocalValue = envLocal.get(baseKey);
+  if (envLocalValue) {
+    return { sourceKey: baseKey, value: envLocalValue };
+  }
+
+  return localSecretSources.get(baseKey);
+}
+
+function collectLocalSecretSources(
+  repoRoot: string,
+  workerDirs: string[],
+  envLocal: Map<string, string>,
+  lanIp: string | undefined,
+  dirUsesLanIp: Map<string, boolean>
+): Map<string, { sourceKey: string; value: string }> {
+  const sources = new Map<string, { sourceKey: string; value: string }>();
+
+  for (const workerDir of workerDirs) {
+    const examplePath = path.join(repoRoot, workerDir, '.dev.vars.example');
+    const serviceUsesLanIp = dirUsesLanIp.get(workerDir) ?? false;
+    if (fs.existsSync(examplePath)) {
+      const entries = parseExampleFile(fs.readFileSync(examplePath, 'utf-8'));
+      for (const entry of entries) {
+        const { value } = resolveAnnotatedValue(
+          entry.key,
+          entry,
+          envLocal,
+          lanIp,
+          serviceUsesLanIp
+        );
+        if (value && !sources.has(entry.key)) {
+          sources.set(entry.key, {
+            sourceKey: `${workerDir}/.dev.vars.example:${entry.key}`,
+            value,
+          });
+        }
+      }
+    }
+
+    const devVarsPath = path.join(repoRoot, workerDir, '.dev.vars');
+    const localVars = readEnvFile(devVarsPath);
+    for (const [key, value] of localVars) {
+      if (value) {
+        sources.set(key, {
+          sourceKey: `${workerDir}/.dev.vars:${key}`,
+          value,
+        });
+      }
+    }
+  }
+
+  return sources;
+}
+
 // ---------------------------------------------------------------------------
 // Plan computation
 // ---------------------------------------------------------------------------
@@ -278,6 +338,22 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
   const envLocal = parseEnvFile(fs.readFileSync(envLocalPath, 'utf-8'));
   const allWorkerDirs = findDevVarsExamples(repoRoot);
 
+  // Build dir→useLanIp lookup
+  const dirUsesLanIp = new Map<string, boolean>();
+  for (const [, svc] of services) {
+    if (svc.useLanIp) {
+      dirUsesLanIp.set(svc.dir, true);
+    }
+  }
+
+  const localSecretSources = collectLocalSecretSources(
+    repoRoot,
+    allWorkerDirs,
+    envLocal,
+    lanIp,
+    dirUsesLanIp
+  );
+
   // When filtering by service, only process dirs belonging to targeted services
   let workerDirs: string[];
   if (serviceFilter) {
@@ -289,14 +365,6 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     workerDirs = allWorkerDirs.filter(d => allowedDirs.has(d));
   } else {
     workerDirs = allWorkerDirs;
-  }
-
-  // Build dir→useLanIp lookup
-  const dirUsesLanIp = new Map<string, boolean>();
-  for (const [, svc] of services) {
-    if (svc.useLanIp) {
-      dirUsesLanIp.set(svc.dir, true);
-    }
   }
 
   // --- .dev.vars changes ---
@@ -488,18 +556,15 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
         continue; // Secret exists, nothing to do
       }
 
-      // Try to map secret name to .env.local key via naming convention
-      // Strip _PROD or _DEV suffix to get base key
-      const envLocalKey = b.secret_name.replace(/_(PROD|DEV)$/, '');
-      const value = envLocal.get(envLocalKey);
+      const source = resolveSecretStoreSource(b.secret_name, envLocal, localSecretSources);
 
-      if (value) {
-        // Can auto-create from .env.local
+      if (source) {
+        // Can auto-create from .env.local or another local worker's dev vars.
         secretStoreAutoCreates.push({
           workerDir: svc.dir,
           binding: b,
-          envLocalKey,
-          value,
+          sourceKey: source.sourceKey,
+          value: source.value,
         });
       } else {
         // Missing and no source value - warn

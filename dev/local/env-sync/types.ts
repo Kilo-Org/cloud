@@ -48,7 +48,7 @@ type ConsistencyWarning = {
 type SecretStoreAutoCreate = {
   workerDir: string;
   binding: SecretStoreBinding;
-  envLocalKey: string;
+  sourceKey: string;
   value: string;
 };
 

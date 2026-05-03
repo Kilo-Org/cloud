@@ -98,7 +98,7 @@ function displayPlan(plan: EnvSyncPlan): void {
     // Secrets store auto-creates
     for (const create of group.autoCreates) {
       console.log(
-        `    ${GREEN}⊕${RESET} secret: ${create.binding.secret_name} ${DIM}@from ${create.envLocalKey}${RESET}`
+        `    ${GREEN}⊕${RESET} secret: ${create.binding.secret_name} ${DIM}@from ${create.sourceKey}${RESET}`
       );
     }
 

@@ -57,6 +57,21 @@ function computeCloudAgentNextPlan(root: string) {
   return plan;
 }
 
+function withFakePnpm(output: string, fn: () => void): void {
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'env-sync-bin-'));
+  const oldPath = process.env.PATH;
+  try {
+    const pnpmPath = path.join(binDir, 'pnpm');
+    fs.writeFileSync(pnpmPath, `#!/bin/sh\nprintf '%s' ${JSON.stringify(output)}\n`, 'utf-8');
+    fs.chmodSync(pnpmPath, 0o755);
+    process.env.PATH = `${binDir}${path.delimiter}${oldPath ?? ''}`;
+    fn();
+  } finally {
+    process.env.PATH = oldPath;
+    fs.rmSync(binDir, { recursive: true, force: true });
+  }
+}
+
 test('treats selected wrangler environment vars as satisfied without copying them', () => {
   const repo = createCloudAgentNextRepo({
     wranglerJsonc: `{
@@ -134,6 +149,85 @@ test('writes example defaults to .dev.vars when they override wrangler vars', ()
     assert.ok(change.newFileContent?.includes('FLY_ORG_SLUG=kilo-dev'));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('auto-creates event-service NEXTAUTH Secrets Store binding from .env.local', () => {
+  const repo = createRepo({
+    '.env.local': 'NEXTAUTH_SECRET=local-nextauth-secret\n',
+    'services/event-service/package.json': JSON.stringify({ scripts: { dev: 'wrangler dev' } }),
+    'services/event-service/wrangler.jsonc': `{
+      "secrets_store_secrets": [
+        {
+          "binding": "NEXTAUTH_SECRET",
+          "store_id": "store-id",
+          "secret_name": "NEXTAUTH_SECRET_PROD"
+        }
+      ]
+    }`,
+  });
+  try {
+    withFakePnpm('', () => {
+      const plan = computePlan(repo.root, new Set(['event-service']));
+      assert.equal(plan.missingEnvLocal, false);
+      assert.deepEqual(plan.secretStoreWarnings, []);
+      assert.equal(plan.secretStoreAutoCreates.length, 1);
+      assert.deepEqual(plan.secretStoreAutoCreates[0], {
+        workerDir: 'services/event-service',
+        binding: {
+          binding: 'NEXTAUTH_SECRET',
+          store_id: 'store-id',
+          secret_name: 'NEXTAUTH_SECRET_PROD',
+        },
+        sourceKey: 'NEXTAUTH_SECRET',
+        value: 'local-nextauth-secret',
+      });
+    });
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('auto-creates kilo-chat gateway Secrets Store binding from kiloclaw dev vars', () => {
+  const repo = createRepo({
+    '.env.local': 'NEXTAUTH_SECRET=local-nextauth-secret\n',
+    'services/kiloclaw/.dev.vars.example': 'GATEWAY_TOKEN_SECRET=dev-gateway-secret-kiloclaw\n',
+    'services/kilo-chat/package.json': JSON.stringify({ scripts: { dev: 'wrangler dev' } }),
+    'services/kilo-chat/wrangler.jsonc': `{
+      "secrets_store_secrets": [
+        {
+          "binding": "NEXTAUTH_SECRET",
+          "store_id": "store-id",
+          "secret_name": "NEXTAUTH_SECRET_PROD"
+        },
+        {
+          "binding": "GATEWAY_TOKEN_SECRET",
+          "store_id": "store-id",
+          "secret_name": "GATEWAY_TOKEN_SECRET"
+        }
+      ]
+    }`,
+  });
+  try {
+    withFakePnpm('NEXTAUTH_SECRET_PROD\n', () => {
+      const plan = computePlan(repo.root, new Set(['kilo-chat']));
+      assert.equal(plan.missingEnvLocal, false);
+      assert.deepEqual(plan.secretStoreWarnings, []);
+      assert.deepEqual(plan.secretStoreAutoCreates, [
+        {
+          workerDir: 'services/kilo-chat',
+          binding: {
+            binding: 'GATEWAY_TOKEN_SECRET',
+            store_id: 'store-id',
+            secret_name: 'GATEWAY_TOKEN_SECRET',
+          },
+          sourceKey: 'services/kiloclaw/.dev.vars.example:GATEWAY_TOKEN_SECRET',
+          value: 'dev-gateway-secret-kiloclaw',
+        },
+      ]);
+    });
+  } finally {
+    repo.cleanup();
   }
 });
 

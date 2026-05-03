@@ -5,6 +5,7 @@ import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/ma
 import { NEXTAUTH_URL } from '@/lib/config.server';
 import { sendViaMailgun } from '@/lib/email-mailgun';
 import { verifyEmail } from '@/lib/email-neverbounce';
+import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 // Subject lines for each template — also serves as the canonical list of template names
 export const subjects = {
@@ -247,8 +248,8 @@ export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps): 
 
   const organization_url = `${NEXTAUTH_URL}/organizations/${organizationId}`;
 
-  const sendToRecipient = (email: string) =>
-    send({
+  const sendToRecipient = async (email: string) => {
+    const result = await send({
       to: email,
       templateName: 'balanceAlert',
       templateVars: {
@@ -256,6 +257,17 @@ export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps): 
         organization_url,
       },
     });
+    if (result.sent) {
+      logExceptInTest(
+        `[sendBalanceAlertEmail] Sent to ${email} for org ${organizationId} (threshold: $${minimum_balance})`
+      );
+    } else {
+      warnExceptInTest(
+        `[sendBalanceAlertEmail] Failed to send to ${email} for org ${organizationId}: reason=${result.reason}`
+      );
+    }
+    return result;
+  };
 
   const BATCH_SIZE = 10;
   for (let i = 0; i < to.length; i += BATCH_SIZE) {

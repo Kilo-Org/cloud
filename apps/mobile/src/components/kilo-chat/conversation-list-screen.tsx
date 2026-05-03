@@ -4,12 +4,14 @@ import { useCallback } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { timeAgo } from '@/lib/utils';
 
 import { EmptyConversationList } from './empty-conversation-list';
+import { getConversationListContentState } from './conversation-list-state';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useConversations, useCreateConversation } from './hooks/use-conversations';
 import { useInstancePresence } from './hooks/use-instance-presence';
@@ -31,6 +33,22 @@ type ConversationRowProps = {
   item: ConversationItem;
   onPress: (id: string) => void;
 };
+
+function ConversationListSkeleton() {
+  return (
+    <View className="px-4 py-2">
+      {[0, 1, 2, 3].map(i => (
+        <View key={i} className="flex-row items-center gap-3 py-3">
+          <View className="flex-1 gap-2">
+            <Skeleton className="h-5 w-2/3 rounded-md" />
+            <Skeleton className="h-4 w-24 rounded-md" />
+          </View>
+          <Skeleton className="h-2.5 w-2.5 rounded-full" />
+        </View>
+      ))}
+    </View>
+  );
+}
 
 function ConversationRow({ item, onPress }: ConversationRowProps) {
   const hasUnread =
@@ -70,7 +88,6 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const listQuery = useConversations(client, sandboxId);
   const createConversation = useCreateConversation(client);
 
-  const conversations = listQuery.data?.conversations ?? [];
   const hasNextPage = listQuery.hasNextPage;
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
@@ -97,6 +114,42 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       void fetchNextPage({ cancelRefetch: false });
     }
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const contentState = getConversationListContentState({
+    isPending: listQuery.isPending,
+    isError: listQuery.isError,
+    hasData: listQuery.data !== undefined,
+  });
+
+  if (contentState === 'loading') {
+    return (
+      <View className="flex-1">
+        <ScreenHeader title={sandboxLabel} />
+        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+          <ConversationListSkeleton />
+        </Animated.View>
+      </View>
+    );
+  }
+
+  if (contentState === 'error') {
+    return (
+      <View className="flex-1">
+        <ScreenHeader title={sandboxLabel} />
+        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+          <QueryError
+            className="flex-1"
+            message="Could not load conversations"
+            onRetry={() => {
+              void listQuery.refetch();
+            }}
+          />
+        </Animated.View>
+      </View>
+    );
+  }
+
+  const conversations = listQuery.data?.conversations ?? [];
 
   return (
     <View className="flex-1">

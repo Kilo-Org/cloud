@@ -8,6 +8,7 @@ import { EVENT_SERVICE_URL, KILO_CHAT_URL } from '@/lib/config';
 
 import {
   clearKiloChatTokenCache,
+  subscribeToKiloChatTokenResponses,
   useKiloChatTokenGetter,
   useKiloChatTokenResponseGetter,
 } from './hooks/use-kilo-chat-token';
@@ -49,6 +50,11 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
 
   useEffect(() => {
     let cancelled = false;
+    const unsubscribe = subscribeToKiloChatTokenResponses(response => {
+      if (!cancelled) {
+        setCurrentUserId(response.userId);
+      }
+    });
 
     async function resolveCurrentUserId() {
       try {
@@ -57,9 +63,8 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
           setCurrentUserId(response.userId);
         }
       } catch {
-        if (!cancelled) {
-          setCurrentUserId(null);
-        }
+        // Keep the provider in its loading state. A later successful token fetch
+        // from any Kilo Chat caller will notify the subscription above.
       }
     }
 
@@ -67,6 +72,7 @@ export function KiloChatProvider({ children }: KiloChatProviderProps) {
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [getTokenResponse]);
 

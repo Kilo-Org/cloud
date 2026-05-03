@@ -12,15 +12,25 @@ type TokenCache = {
   expiresAtMs: number;
 };
 
+type TokenResponseListener = (response: KiloChatTokenResponse) => void;
+
 // Module-level cache keyed on the user's auth token, so a sign-out followed by
 // a different sign-in within the JWT window doesn't return the previous user's
 // token. The in-flight ref is keyed the same way for the same reason.
 let cache: TokenCache | null = null;
 let inFlight: { authToken: string; promise: Promise<KiloChatTokenResponse> } | null = null;
+const tokenResponseListeners = new Set<TokenResponseListener>();
 
 export function clearKiloChatTokenCache(): void {
   cache = null;
   inFlight = null;
+}
+
+export function subscribeToKiloChatTokenResponses(listener: TokenResponseListener): () => void {
+  tokenResponseListeners.add(listener);
+  return () => {
+    tokenResponseListeners.delete(listener);
+  };
 }
 
 /**
@@ -72,5 +82,8 @@ export function useKiloChatTokenResponseGetter(): () => Promise<KiloChatTokenRes
 async function fetchAndCacheToken(authToken: string): Promise<KiloChatTokenResponse> {
   const response = await trpcClient.kiloChat.getToken.query();
   cache = { authToken, response, expiresAtMs: new Date(response.expiresAt).getTime() };
+  for (const listener of tokenResponseListeners) {
+    listener(response);
+  }
   return response;
 }

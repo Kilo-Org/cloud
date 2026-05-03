@@ -80,6 +80,7 @@ export function KiloChatLayout({
   const createConversation = useCreateConversation(kiloChatClient);
   const renameConversation = useRenameConversation(kiloChatClient);
   const leaveConversation = useLeaveConversation(kiloChatClient);
+  const [newConversationError, setNewConversationError] = useState<string | null>(null);
 
   const handleRename = useCallback(
     (conversationId: string, title: string) => {
@@ -114,17 +115,33 @@ export function KiloChatLayout({
   );
 
   const handleNewConversation = useCallback(() => {
-    if (!sandboxId) return;
+    if (!sandboxId || createConversation.isPending) return;
+    setNewConversationError(null);
     createConversation.mutate(
       { sandboxId },
       {
         onSuccess: res => {
+          setNewConversationError(null);
           router.push(`${basePath}/${res.conversationId}`);
         },
-        onError: err => toast.error(formatKiloChatError(err, 'Failed to create conversation')),
+        onError: err => {
+          const message = formatKiloChatError(
+            err,
+            "Couldn't create conversation. Check your connection and try again."
+          );
+          setNewConversationError(message);
+          toast.error(message);
+        },
       }
     );
-  }, [sandboxId, basePath, createConversation.mutate, router]);
+  }, [
+    sandboxId,
+    basePath,
+    createConversation.isPending,
+    createConversation.mutate,
+    router,
+    setNewConversationError,
+  ]);
 
   const contextValue = useMemo<KiloChatContextValue>(
     () => ({
@@ -169,6 +186,8 @@ export function KiloChatLayout({
             isLoading={isLoading}
             hasNextPage={!!hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
+            isCreatingConversation={createConversation.isPending}
+            newConversationError={newConversationError}
             onLoadMore={() => void fetchNextPage()}
             onNewConversation={handleNewConversation}
             onRename={handleRename}

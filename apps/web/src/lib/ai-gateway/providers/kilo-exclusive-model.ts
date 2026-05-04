@@ -4,6 +4,7 @@ import {
   type OpenRouterInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 export type KiloExclusiveModelFlag = 'reasoning' | 'vision' | 'stealth' | 'vercel-routing';
 
@@ -37,6 +38,31 @@ export type KiloExclusiveModel = {
   exclusive_to: ReadonlyArray<FeatureValue>;
   inference_provider_restriction: ReadonlyArray<OpenRouterInferenceProviderId>;
 };
+
+/**
+ * Rewrites a gateway request to target a Kilo-exclusive model: swaps the
+ * public model id for its internal id, and narrows the OpenRouter provider
+ * `only` list to the model's `inference_provider_restriction` (intersecting
+ * with any caller-supplied `only`).
+ */
+export function applyKiloExclusiveModelSettings(
+  requestToMutate: GatewayRequest,
+  kiloExclusiveModel: KiloExclusiveModel
+) {
+  requestToMutate.body.model = kiloExclusiveModel.internal_id;
+  const restriction = kiloExclusiveModel.inference_provider_restriction;
+  if (restriction.length === 0) {
+    return;
+  }
+  const provider = requestToMutate.body.provider;
+  if (provider?.only) {
+    provider.only = [...new Set(provider.only).intersection(new Set<string>(restriction))];
+  } else if (provider) {
+    provider.only = [...restriction];
+  } else {
+    requestToMutate.body.provider = { only: [...restriction] };
+  }
+}
 
 export function getInferenceProvider(
   model: KiloExclusiveModel

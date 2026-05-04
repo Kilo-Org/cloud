@@ -12,11 +12,23 @@
  * Auth: X-Internal-Secret header.
  */
 
+import { timingSafeEqual } from 'crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
 import { send as sendEmail, RawHtml, type TemplateName } from '@/lib/email';
+
+// Constant-time comparison so a public attacker can't probe the
+// internal-api secret via response-timing differences. Mirrors the
+// helper in apps/web/src/app/api/internal/kiloclaw/billing-side-effects/route.ts.
+function secretMatches(provided: string | null, expected: string): boolean {
+  if (!provided) return false;
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(expected);
+  if (providedBuffer.length !== expectedBuffer.length) return false;
+  return timingSafeEqual(providedBuffer, expectedBuffer);
+}
 
 // Mirrors the body the sweep sends. Defensive but not exhaustive — we
 // only read the fields we need for the email path. Other channels can
@@ -123,7 +135,7 @@ function versionChangeSection(body: Body): string {
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('X-Internal-Secret');
-  if (!KILOCLAW_INTERNAL_API_SECRET || secret !== KILOCLAW_INTERNAL_API_SECRET) {
+  if (!KILOCLAW_INTERNAL_API_SECRET || !secretMatches(secret, KILOCLAW_INTERNAL_API_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

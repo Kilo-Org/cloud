@@ -21,11 +21,15 @@
  *   - On dispatch error: row goes to status='failed', error_message
  *     stamped. We do not retry — admins can see failures in the
  *     scheduled-action detail view and decide what to do.
- *   - On sweeper crash mid-dispatch: row stays 'pending' and will be
- *     retried on the next tick. The email channel's existing
- *     `kiloclaw_email_log` idempotency filter prevents duplicate
- *     emails; mobile push duplicates are rare and not catastrophic
- *     given the 1-minute cadence.
+ *   - On sweeper crash between successful dispatch and markSent: the
+ *     row stays 'pending' and will be re-dispatched on the next tick.
+ *     The CAS in markSent (WHERE status='pending') is the only barrier
+ *     to a duplicate email — there is no kiloclaw_email_log dedup on
+ *     this path. Acceptable for v1: the crash window is small (single
+ *     DB round-trip after the HTTP call returns) and a duplicate
+ *     "your bot is scheduled to upgrade" email is mildly noisy but
+ *     not harmful. If this turns out to matter, the side-effects route
+ *     can grow a kiloclaw_email_log entry keyed on notificationId.
  */
 
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';

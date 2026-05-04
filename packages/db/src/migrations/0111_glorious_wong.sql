@@ -1,0 +1,2 @@
+DROP INDEX "IDX_kiloclaw_scheduled_action_notifications_pending";--> statement-breakpoint
+CREATE INDEX "IDX_kiloclaw_scheduled_action_notifications_pending" ON "kiloclaw_scheduled_action_notifications" USING btree ("id") WHERE "kiloclaw_scheduled_action_notifications"."status" = 'pending';

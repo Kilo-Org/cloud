@@ -4275,9 +4275,13 @@ export const kiloclaw_scheduled_action_notifications = pgTable(
       table.kind,
       table.channel
     ),
-    // Sweep lookup: notifications still pending dispatch.
+    // Sweep lookup: notifications still pending dispatch. The partial
+    // predicate keeps the index small (only pending rows). The key is
+    // `id` rather than `target_id` because the sweep does a fleet-wide
+    // scan, not a per-target lookup; the per-target cancel queries
+    // already use the unique (target_id, kind, channel) index above.
     index('IDX_kiloclaw_scheduled_action_notifications_pending')
-      .on(table.target_id)
+      .on(table.id)
       .where(sql`${table.status} = 'pending'`),
   ]
 );

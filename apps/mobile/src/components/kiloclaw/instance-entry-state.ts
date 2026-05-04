@@ -2,7 +2,7 @@ type InstanceLike = {
   sandboxId: string;
 };
 
-export type KiloClawEntryDecision =
+type KiloClawEntryDecision =
   | { kind: 'loading' }
   | { kind: 'empty' }
   | { kind: 'redirect'; sandboxId: string }

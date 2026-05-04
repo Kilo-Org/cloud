@@ -1,8 +1,8 @@
 import { type ConversationListItem } from '@kilocode/kilo-chat';
 
-export type ConversationListGroupLabel = 'Today' | 'Yesterday' | 'This Week' | 'Older';
+type ConversationListGroupLabel = 'Today' | 'Yesterday' | 'This Week' | 'Older';
 
-export type ConversationListGroup = {
+type ConversationListGroup = {
   label: ConversationListGroupLabel;
   items: ConversationListItem[];
 };

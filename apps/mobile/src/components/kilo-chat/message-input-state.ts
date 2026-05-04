@@ -6,7 +6,7 @@ export type MessageInputSubmitControls = {
   clearDraft: () => boolean;
 };
 
-export type SubmittedMessageDraft = {
+type SubmittedMessageDraft = {
   text: string;
   replyingToMessageId?: string;
 };

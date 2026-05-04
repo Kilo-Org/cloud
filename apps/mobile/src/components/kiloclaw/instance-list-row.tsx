@@ -6,7 +6,7 @@ import { Text } from '@/components/ui/text';
 import { type ClawInstance } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-export type InstanceListRowProps = {
+type InstanceListRowProps = {
   instance: ClawInstance;
   isCurrent: boolean;
   onPress: (sandboxId: string) => void;

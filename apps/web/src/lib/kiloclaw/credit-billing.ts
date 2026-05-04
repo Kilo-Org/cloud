@@ -619,8 +619,22 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       .from(kiloclaw_subscriptions)
       .where(eq(kiloclaw_subscriptions.id, targetRow.id))
       .limit(1);
+    // Prefer the in-memory `before.status`. When Stripe's
+    // customer.subscription.created handler ran before invoice.paid, it
+    // already transitioned a non-hybrid row to 'active', hiding the
+    // pre-activation state from this snapshot. Fall back to the durable
+    // `kiloclaw_subscription_change_log` entry written by that handler,
+    // which preserves the pre-Stripe `before_state.status` and records the
+    // Stripe-derived plan/period in `after_state`.
     shouldSendSubscriptionStartedEmailForNewSettlement =
-      shouldSendSubscriptionStartedEmailForActivation(before?.status ?? null);
+      shouldSendSubscriptionStartedEmailForActivation(before?.status ?? null) ||
+      (await didStripeSubscriptionCreatedRecordEligibleActivation({
+        tx,
+        subscriptionId: targetRow.id,
+        plan,
+        periodStart,
+        periodEnd,
+      }));
     const [after] = await tx
       .update(kiloclaw_subscriptions)
       .set(updateSet)
@@ -793,6 +807,73 @@ async function didPriorSettlementRecordPaidActivation(params: {
     if (Math.abs(createdAtMs - periodStartMs) > SUBSCRIPTION_STARTED_RECOVERY_WINDOW_MS) continue;
 
     return true;
+  }
+
+  return false;
+}
+
+// Durable pre-settlement activation signal.
+//
+// handleKiloClawSubscriptionCreated can run before invoice.paid and will
+// transition a non-hybrid row to status='active', masking the pre-Stripe
+// status from the in-transaction snapshot used to decide whether this
+// settlement is a first paid activation. The handler writes a
+// `stripe_subscription_created` change-log row that preserves
+// `before_state.status` and records the Stripe-derived plan/period in
+// `after_state`, which is the durable evidence we need.
+//
+// Returns true when a `stripe_subscription_created` entry for this
+// subscription has:
+//   - `before_state.status` that `shouldSendSubscriptionStartedEmailForActivation`
+//     accepts (trialing or canceled), AND
+//   - `after_state.plan` / `after_state.current_period_start` /
+//     `after_state.current_period_end` matching the current settlement.
+//
+// Matching on identity (plan + period boundaries) instead of audit-log
+// ordering avoids relying on `created_at`, which is `now()` and therefore
+// transaction-start scoped rather than a reliable commit/insert chronology
+// under concurrent webhook transactions. A later renewal settlement has a
+// different period than the original activation, so an old
+// `stripe_subscription_created` row from the initial activation cannot match
+// and cannot re-fire the email. The `kiloclaw_email_log` unique index
+// remains the final idempotency guard.
+async function didStripeSubscriptionCreatedRecordEligibleActivation(params: {
+  tx: CreditBillingTx;
+  subscriptionId: string;
+  plan: 'commit' | 'standard';
+  periodStart: string;
+  periodEnd: string;
+}): Promise<boolean> {
+  const { tx, subscriptionId, plan, periodStart, periodEnd } = params;
+  const rows = await tx
+    .select({
+      before_state: kiloclaw_subscription_change_log.before_state,
+      after_state: kiloclaw_subscription_change_log.after_state,
+    })
+    .from(kiloclaw_subscription_change_log)
+    .where(
+      and(
+        eq(kiloclaw_subscription_change_log.subscription_id, subscriptionId),
+        eq(kiloclaw_subscription_change_log.reason, 'stripe_subscription_created')
+      )
+    )
+    .orderBy(desc(kiloclaw_subscription_change_log.created_at))
+    .limit(20);
+
+  for (const row of rows) {
+    if (!isRecord(row.before_state) || !isRecord(row.after_state)) continue;
+    const beforeStatus = stringFieldOrNull(row.before_state, 'status');
+    if (!shouldSendSubscriptionStartedEmailForActivation(beforeStatus)) continue;
+    const afterPlan = stringFieldOrNull(row.after_state, 'plan');
+    const afterPeriodStart = stringFieldOrNull(row.after_state, 'current_period_start');
+    const afterPeriodEnd = stringFieldOrNull(row.after_state, 'current_period_end');
+    if (
+      afterPlan === plan &&
+      timestampsEqual(afterPeriodStart, periodStart) &&
+      timestampsEqual(afterPeriodEnd, periodEnd)
+    ) {
+      return true;
+    }
   }
 
   return false;

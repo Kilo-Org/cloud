@@ -479,6 +479,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1009.0
         version: 3.1009.0
+      '@chat-adapter/github':
+        specifier: 4.27.0
+        version: 4.27.0
       '@chat-adapter/slack':
         specifier: ^4.27.0
         version: 4.27.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -3268,6 +3271,9 @@ packages:
   '@bcoe/v8-coverage@1.0.2':
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
+
+  '@chat-adapter/github@4.27.0':
+    resolution: {integrity: sha512-3/lz5oo/z18H90c89FAXomHnmbXx+E55Nl4jfjtgq4FEUcEI9BU+tbkVANpkQ54tHTEPmhxfg/qJ3mJPctk5hg==}
 
   '@chat-adapter/shared@4.27.0':
     resolution: {integrity: sha512-Wz+YZ8Mp2/qcxxJ+rU0ofZQSEtOF/4toEh7wbA+q+uLlPrLue+7hImWluJpQUZqGjSwsUoXhjSNwgFv3hz20aQ==}
@@ -16858,6 +16864,15 @@ snapshots:
   '@bcoe/v8-coverage@0.2.3': {}
 
   '@bcoe/v8-coverage@1.0.2': {}
+
+  '@chat-adapter/github@4.27.0':
+    dependencies:
+      '@chat-adapter/shared': 4.27.0
+      '@octokit/auth-app': 8.2.0
+      '@octokit/rest': 22.0.1
+      chat: 4.27.0
+    transitivePeerDependencies:
+      - supports-color
 
   '@chat-adapter/shared@4.27.0':
     dependencies:

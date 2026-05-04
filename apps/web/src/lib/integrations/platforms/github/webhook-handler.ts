@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
+import { bot } from '@/lib/bot';
 import { verifyGitHubWebhookSignature } from '@/lib/integrations/platforms/github/adapter';
 import {
   InstallationCreatedPayloadSchema,
@@ -23,7 +24,6 @@ import {
   handlePushEvent,
   handlePullRequest,
   handleIssue,
-  handlePRReviewComment,
 } from '@/lib/integrations/platforms/github/webhook-handlers';
 import { PLATFORM, GITHUB_EVENT, GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
@@ -31,6 +31,83 @@ import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webho
 import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from './app-selector';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
+
+type GitHubWebhookPayloadForChat = {
+  installation?: { id?: number };
+  repository?: {
+    full_name?: string;
+    id?: number;
+    name?: string;
+    owner?: { id?: number; login?: string; type?: string };
+  };
+};
+
+function cloneGitHubRequest(request: Request, body: BodyInit): Request {
+  return new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body,
+  });
+}
+
+function repositoryOwnerFromFullName(fullName: string): string | undefined {
+  const slashIndex = fullName.indexOf('/');
+  if (slashIndex <= 0) return undefined;
+  return fullName.slice(0, slashIndex);
+}
+
+function normalizeGitHubRepositoryForChat<TPayload extends GitHubWebhookPayloadForChat>(
+  payload: TPayload
+): TPayload {
+  const repository = payload.repository;
+  if (!repository) return payload;
+
+  const fullName = repository.full_name;
+  const ownerLogin =
+    repository.owner?.login ?? (fullName ? repositoryOwnerFromFullName(fullName) : undefined);
+  if (!ownerLogin) return payload;
+
+  return {
+    ...payload,
+    repository: {
+      ...repository,
+      id: repository.id ?? 0,
+      name: repository.name ?? fullName?.slice(ownerLogin.length + 1) ?? '',
+      full_name: fullName ?? `${ownerLogin}/${repository.name ?? ''}`,
+      owner: {
+        id: repository.owner?.id ?? 0,
+        login: ownerLogin,
+        type: repository.owner?.type ?? 'Organization',
+      },
+    },
+  };
+}
+
+function clonePayloadWithChatInstallation<TPayload extends GitHubWebhookPayloadForChat>(
+  payload: TPayload
+): TPayload {
+  if (!payload.installation?.id) return normalizeGitHubRepositoryForChat(payload);
+
+  return normalizeGitHubRepositoryForChat({
+    ...payload,
+    installation: {
+      ...payload.installation,
+      account: { id: 0, login: '', type: 'Organization' },
+      repository_selection: 'selected',
+      permissions: {},
+      created_at: '',
+    },
+  });
+}
+
+async function forwardGitHubWebhookToBot(
+  request: Request,
+  payload: GitHubWebhookPayloadForChat,
+  options?: { waitUntil: (task: Promise<unknown>) => void }
+): Promise<Response> {
+  const body = JSON.stringify(clonePayloadWithChatInstallation(payload));
+  return bot.webhooks.github(cloneGitHubRequest(request, body), options);
+}
 
 /**
  * Shared GitHub App Webhook Handler
@@ -453,45 +530,61 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
 
-      // Process asynchronously to return 200 within GitHub's timeout
-      after(async () => {
-        try {
-          await handlePRReviewComment(parseResult.data, integration);
-          if (logResult.webhookEventId) {
-            await updateWebhookEvent(logResult.webhookEventId, {
-              processed: true,
-              processed_at: new Date().toISOString(),
-              handlers_triggered: ['pr_review_comment_fix'],
-              errors: null,
-            });
-          }
-        } catch (error) {
-          logExceptInTest(`Error handling PR review comment${logSuffix}:`, error);
-          captureException(error, {
-            tags: { source: `${sentryPrefix}webhook_pr_review_comment` },
-          });
-          if (logResult.webhookEventId) {
-            try {
-              await updateWebhookEvent(logResult.webhookEventId, {
-                processed: true,
-                processed_at: new Date().toISOString(),
-                handlers_triggered: ['pr_review_comment_fix'],
-                errors: [
-                  {
-                    message: error instanceof Error ? error.message : String(error),
-                    handler: 'pr_review_comment_fix',
-                    stack: error instanceof Error ? error.stack : undefined,
-                  },
-                ],
-              });
-            } catch {
-              // Best-effort logging
-            }
-          }
-        }
+      const result = await forwardGitHubWebhookToBot(request, parseResult.data, {
+        waitUntil: task => after(() => task),
       });
 
-      return NextResponse.json({ message: 'Event received' }, { status: 200 });
+      if (logResult.webhookEventId) {
+        try {
+          await updateWebhookEvent(logResult.webhookEventId, {
+            processed: true,
+            processed_at: new Date().toISOString(),
+            handlers_triggered: ['github_bot'],
+            errors: null,
+          });
+        } catch (error) {
+          logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
+        }
+      }
+
+      return result;
+    }
+
+    // Handle issue_comment events for GitHub Bot mentions in PR and issue conversations.
+    if (eventType === GITHUB_EVENT.ISSUE_COMMENT) {
+      const action = (payload as { action?: string }).action;
+
+      if (action !== GITHUB_ACTION.CREATED) {
+        return NextResponse.json({ message: 'Event received' }, { status: 200 });
+      }
+
+      const logResult = await logWebhook(integration, action);
+      if (logResult.isDuplicate) {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+
+      const result = await forwardGitHubWebhookToBot(
+        request,
+        payload as GitHubWebhookPayloadForChat,
+        {
+          waitUntil: task => after(() => task),
+        }
+      );
+
+      if (logResult.webhookEventId) {
+        try {
+          await updateWebhookEvent(logResult.webhookEventId, {
+            processed: true,
+            processed_at: new Date().toISOString(),
+            handlers_triggered: ['github_bot'],
+            errors: null,
+          });
+        } catch (error) {
+          logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
+        }
+      }
+
+      return result;
     }
 
     // Handle issues events

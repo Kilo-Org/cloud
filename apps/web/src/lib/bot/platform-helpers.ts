@@ -1,27 +1,71 @@
 import type { PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
 import { eq, and, sql } from 'drizzle-orm';
-import { type SlackEvent } from '@chat-adapter/slack';
 import { platform_integrations } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
-export function getSlackTeamId(message: Message<SlackEvent>): string {
-  const teamId = message.raw.team_id ?? message.raw.team;
+type PlatformIdentityMessage = {
+  author: Pick<Message['author'], 'userId'>;
+  raw: unknown;
+};
+
+type PlatformIdentityOptions = {
+  getGitHubInstallationId?: (thread: Pick<Thread, 'id'>) => Promise<number | string | undefined>;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
+}
+
+function readStringProperty(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+export function getSlackTeamId(message: { raw: unknown }): string {
+  if (!isRecord(message.raw)) throw new Error('Expected a teamId in message.raw');
+
+  const teamId =
+    readStringProperty(message.raw, 'team_id') ?? readStringProperty(message.raw, 'team');
   if (!teamId) throw new Error('Expected a teamId in message.raw');
   return teamId;
+}
+
+export function getGitHubInstallationId(message: { raw: unknown }): string {
+  if (!isRecord(message.raw)) throw new Error('Expected an installation.id in message.raw');
+
+  const installation = message.raw.installation;
+  if (!isRecord(installation) || typeof installation.id !== 'number') {
+    throw new Error('Expected an installation.id in message.raw');
+  }
+
+  const installationId = installation.id;
+  return installationId.toString();
 }
 
 /**
  * Extract platform identity coordinates from any adapter's message.
  * Extend the switch for Discord / Teams / Google Chat / etc.
  */
-export function getPlatformIdentity(thread: Thread, message: Message): PlatformIdentity {
+export async function getPlatformIdentity(
+  thread: Pick<Thread, 'id'>,
+  message: PlatformIdentityMessage,
+  options?: PlatformIdentityOptions
+): Promise<PlatformIdentity> {
   const platform = thread.id.split(':')[0]; // "slack", "discord", "gchat", "teams", ...
 
   switch (platform) {
+    case 'github': {
+      const installationId = options?.getGitHubInstallationId
+        ? await options.getGitHubInstallationId(thread)
+        : getGitHubInstallationId(message);
+      if (!installationId) throw new Error('Expected a GitHub installation id');
+      const teamId = installationId.toString();
+      return { platform: PLATFORM.GITHUB, teamId, userId: message.author.userId };
+    }
     case 'slack': {
-      const teamId = getSlackTeamId(message as Message<SlackEvent>);
+      const teamId = getSlackTeamId(message);
       return { platform: PLATFORM.SLACK, teamId, userId: message.author.userId };
     }
     default:
@@ -84,6 +128,8 @@ export async function getPlatformIntegrationByBotUserId(
 
 export function getBotDocumentationUrl(platform: string): string {
   switch (platform) {
+    case PLATFORM.GITHUB:
+      return 'https://kilo.ai/docs/code-with-ai/platforms/github';
     //TODO(remon): Update when we have specific docs pages for other platforms
     default:
       return 'https://kilo.ai/docs/code-with-ai/platforms/slack';

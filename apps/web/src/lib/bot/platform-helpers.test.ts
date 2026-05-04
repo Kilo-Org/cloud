@@ -15,6 +15,8 @@ jest.mock('@/lib/drizzle', () => ({
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   getBotDocumentationUrl,
+  getGitHubInstallationId,
+  getPlatformIdentity,
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
   getPlatformIntegrationById,
@@ -95,9 +97,62 @@ describe('platform helpers', () => {
     expect(mockLimit).not.toHaveBeenCalled();
   });
 
+  it('extracts GitHub identity from chat adapter messages', async () => {
+    const message = {
+      author: { userId: '12345' },
+      raw: {
+        type: 'issue_comment',
+        installation: { id: 98765 },
+      },
+    };
+
+    const identity = await getPlatformIdentity({ id: 'github:acme/widgets:42' }, message);
+
+    expect(identity).toEqual({
+      platform: PLATFORM.GITHUB,
+      teamId: '98765',
+      userId: '12345',
+    });
+  });
+
+  it('can resolve GitHub identity using the adapter installation cache', async () => {
+    const message = {
+      author: { userId: '12345' },
+      raw: {
+        type: 'issue_comment',
+      },
+    };
+
+    const identity = await getPlatformIdentity({ id: 'github:acme/widgets:42' }, message, {
+      getGitHubInstallationId: async thread => {
+        expect(thread.id).toBe('github:acme/widgets:42');
+        return 98765;
+      },
+    });
+
+    expect(identity).toEqual({
+      platform: PLATFORM.GITHUB,
+      teamId: '98765',
+      userId: '12345',
+    });
+  });
+
+  it('throws for GitHub messages without an installation id', () => {
+    expect(() =>
+      getGitHubInstallationId({
+        raw: {
+          type: 'issue_comment',
+        },
+      })
+    ).toThrow('Expected an installation.id in message.raw');
+  });
+
   it('returns platform-specific bot documentation URLs', () => {
     expect(getBotDocumentationUrl(PLATFORM.SLACK)).toBe(
       'https://kilo.ai/docs/code-with-ai/platforms/slack'
+    );
+    expect(getBotDocumentationUrl(PLATFORM.GITHUB)).toBe(
+      'https://kilo.ai/docs/code-with-ai/platforms/github'
     );
     expect(getBotDocumentationUrl(PLATFORM.DISCORD)).toBe(
       'https://kilo.ai/docs/code-with-ai/platforms/slack'

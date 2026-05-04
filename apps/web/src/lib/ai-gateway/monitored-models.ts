@@ -50,12 +50,14 @@ export async function getMonitoredModels() {
 
   for (const model of autoModelIds) {
     for (const { balance, ...params } of VARIATIONS) {
-      const resolved = await resolveAutoModel(
+      const result = await resolveAutoModel(
         { model, ...params },
         Promise.resolve(null),
         Promise.resolve(balance)
       );
-      set.add(resolved.model);
+      if (result.kind === 'ok') {
+        set.add(result.resolved.model);
+      }
     }
   }
 

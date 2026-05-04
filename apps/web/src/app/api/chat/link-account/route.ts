@@ -82,7 +82,8 @@ export async function GET(request: Request) {
     return errorPage('Bad Request', 'Missing token parameter.', 400);
   }
 
-  const linkPayload = verifyLinkToken(token);
+  await bot.initialize();
+  const linkPayload = await verifyLinkToken(bot.getState(), token);
 
   if (!linkPayload) {
     return errorPage(
@@ -108,7 +109,6 @@ export async function GET(request: Request) {
     return errorPage('Access Denied', access.error, 403);
   }
 
-  await bot.initialize();
   await linkKiloUser(bot.getState(), identity, user.id);
 
   after(() => reprocessLinkedMessage(identity, thread, message, user));

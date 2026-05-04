@@ -272,7 +272,7 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
     }
 
     if (!kiloUserId) {
-      await promptLinkAccount(thread, message, identity);
+      await promptLinkAccount(thread, message, identity, chatBot.getState());
       return;
     }
 
@@ -280,7 +280,7 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
 
     if (!user) {
       await unlinkKiloUser(chatBot.getState(), identity);
-      await promptLinkAccount(thread, message, identity);
+      await promptLinkAccount(thread, message, identity, chatBot.getState());
       return;
     }
 

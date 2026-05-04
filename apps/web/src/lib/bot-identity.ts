@@ -13,6 +13,7 @@ import { botIdentityRedisKey } from '@/lib/redis-keys';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 const CHAT_SDK_CACHE_KEY_PREFIX = 'chat-sdk:cache:';
+const LINK_ACCOUNT_CONTEXT_KEY_PREFIX = 'link-account-context:';
 const REDIS_SCAN_BATCH_SIZE = 100;
 const REDIS_DELETE_BATCH_SIZE = 100;
 
@@ -44,6 +45,10 @@ export type PlatformIdentity = {
 
 type LinkTokenPayload = {
   identity: PlatformIdentity;
+  contextKey: string;
+};
+
+type LinkAccountContext = {
   thread: SerializedThread;
   message: SerializedMessage;
 };
@@ -137,12 +142,13 @@ export async function unlinkTeamKiloUsers(
 // plain-text platform/teamId/userId.  The token is HMAC-signed and time-limited
 // so a third party cannot forge a link for a team they don't belong to.
 //
-// Format:  base64url({ identity, thread, message, iat, nonce }) . HMAC-SHA256
+// Format:  base64url({ identity, contextKey, iat, nonce }) . HMAC-SHA256
 //
 // Follows the same pattern as src/lib/integrations/oauth-state.ts.
 
 const HMAC_ALGORITHM = 'sha256';
 const TOKEN_TTL_SECONDS = 30 * 60;
+const LINK_ACCOUNT_CONTEXT_TTL_MS = TOKEN_TTL_SECONDS * 1000;
 const NONCE_BYTES = 16;
 
 const platformIdentitySchema = z.object({
@@ -191,10 +197,14 @@ const serializedMessageSchema = z.custom<SerializedMessage>(
 
 const linkTokenPayloadSchema = z.object({
   identity: platformIdentitySchema,
-  thread: serializedThreadSchema,
-  message: serializedMessageSchema,
+  contextKey: z.string(),
   iat: z.number(),
   nonce: z.string().min(1),
+});
+
+const linkAccountContextSchema = z.object({
+  thread: serializedThreadSchema,
+  message: serializedMessageSchema,
 });
 
 function hmacSign(data: string): string {
@@ -211,8 +221,25 @@ export function createLinkToken(payload: LinkTokenPayload): string {
   return `${encodedPayload}.${hmacSign(encodedPayload)}`;
 }
 
+export async function createLinkAccountToken({
+  identity,
+  thread,
+  message,
+  state,
+}: LinkAccountContext & {
+  identity: PlatformIdentity;
+  state: StateAdapter;
+}): Promise<string> {
+  const contextKey = `${LINK_ACCOUNT_CONTEXT_KEY_PREFIX}${crypto.randomBytes(NONCE_BYTES).toString('base64url')}`;
+  await state.set<LinkAccountContext>(contextKey, { thread, message }, LINK_ACCOUNT_CONTEXT_TTL_MS);
+  return createLinkToken({ identity, contextKey });
+}
+
 /** Verify and decode a link token. Returns the payload or `null` on failure. */
-export function verifyLinkToken(token: string): VerifiedLinkToken | null {
+export async function verifyLinkToken(
+  state: StateAdapter,
+  token: string
+): Promise<VerifiedLinkToken | null> {
   const dotIndex = token.indexOf('.');
   if (dotIndex === -1) return null;
 
@@ -234,10 +261,13 @@ export function verifyLinkToken(token: string): VerifiedLinkToken | null {
     const age = Math.floor(Date.now() / 1000) - data.iat;
     if (age < 0 || age > TOKEN_TTL_SECONDS) return null;
 
+    const context = await state.get<unknown>(data.contextKey);
+    const linkAccountContext = linkAccountContextSchema.parse(context);
+
     return {
       identity: data.identity,
-      thread: ThreadImpl.fromJSON(data.thread),
-      message: Message.fromJSON(data.message),
+      thread: ThreadImpl.fromJSON(linkAccountContext.thread),
+      message: Message.fromJSON(linkAccountContext.message),
     };
   } catch {
     return null;

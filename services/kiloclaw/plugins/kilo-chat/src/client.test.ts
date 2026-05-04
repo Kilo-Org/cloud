@@ -616,12 +616,22 @@ describe('listConversations', () => {
 
 describe('createConversation', () => {
   const TEST_ULID = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+  const createConversationResponse = {
+    conversationId: TEST_ULID,
+    conversation: {
+      conversationId: TEST_ULID,
+      title: 'My Chat',
+      lastActivityAt: null,
+      lastReadAt: null,
+      joinedAt: 123,
+    },
+  };
 
   it('POSTs to /_kilo/kilo-chat/conversations and returns conversationId', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
-      return new Response(JSON.stringify({ conversationId: TEST_ULID }), {
+      return new Response(JSON.stringify(createConversationResponse), {
         status: 201,
         headers: { 'content-type': 'application/json' },
       });
@@ -645,7 +655,7 @@ describe('createConversation', () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
-      return new Response(JSON.stringify({ conversationId: TEST_ULID }), { status: 201 });
+      return new Response(JSON.stringify(createConversationResponse), { status: 201 });
     }) as typeof fetch;
 
     const client = createKiloChatClient({

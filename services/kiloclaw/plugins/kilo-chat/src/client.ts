@@ -388,12 +388,13 @@ export function createKiloChatClient(options: KiloChatClientOptions): KiloChatCl
         `kilo-chat: controller POST conversations responded ${response.status}: ${await response.text()}`
       );
     }
-    return parseOrThrow(
+    const parsed = parseOrThrow(
       createConversationResponseSchema,
       await response.json(),
       'createConversation',
       { conversationId: 'conversationId' }
     );
+    return { conversationId: parsed.conversationId };
   }
 
   async function sendBotStatus(params: BotStatusParams): Promise<void> {

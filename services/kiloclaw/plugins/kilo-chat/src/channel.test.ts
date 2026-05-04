@@ -151,15 +151,51 @@ describe('kilo-chat actions adapter', () => {
     expect(discovery?.actions).toContain('channel-create');
   });
 
-  it('describeMessageTool does not expose additionalMembers until approval authorization supports groups', () => {
+  it('describeMessageTool advertises Kilo Chat action parameters', () => {
     const adapter = kiloChatPlugin.actions;
     const discovery = adapter!.describeMessageTool?.({ cfg: {} as never, accountId: null });
     expect(discovery?.schema).toBeDefined();
     const schema = Array.isArray(discovery?.schema) ? discovery.schema[0] : discovery?.schema;
     expect(schema?.properties).not.toHaveProperty('additionalMembers');
+    expect(schema?.properties).not.toHaveProperty('target');
+    expect(schema?.properties).toHaveProperty('conversationId');
     expect(schema?.properties).toHaveProperty('groupId');
-    expect(schema?.properties).toHaveProperty('target');
+    expect(schema?.properties).toHaveProperty('messageId');
+    expect(schema?.properties).toHaveProperty('message');
+    expect(schema?.properties).toHaveProperty('emoji');
+    expect(schema?.properties).toHaveProperty('remove');
+    expect(schema?.properties).toHaveProperty('name');
+    expect(schema?.properties).toHaveProperty('limit');
+    expect(schema?.properties).toHaveProperty('before');
+    expect(schema?.properties).toHaveProperty('memberId');
+    expect(schema?.properties).toHaveProperty('userId');
+    expect(schema?.properties?.memberId.description).toContain('member-info');
+    expect(schema?.properties?.userId.description).toContain('memberId');
+    expect(schema?.properties?.conversationId.description).toContain('compatibility alias');
     expect(schema?.visibility).toBe('current-channel');
+  });
+
+  it('registers Kilo Chat conversation aliases for destination-bearing actions', () => {
+    const aliases = kiloChatPlugin.actions?.messageActionTargetAliases;
+    const expected = ['conversationId', 'groupId'];
+    expect(aliases?.send?.aliases).toEqual(expected);
+    expect(aliases?.read?.aliases).toEqual(expected);
+    expect(aliases?.react?.aliases).toEqual(expected);
+    expect(aliases?.edit?.aliases).toEqual(expected);
+    expect(aliases?.delete?.aliases).toEqual(expected);
+    expect(aliases?.renameGroup?.aliases).toEqual(expected);
+  });
+
+  it('adds concise Kilo Chat message tool hints', () => {
+    const hints = kiloChatPlugin.agentPrompt?.messageToolHints?.({
+      cfg: {} as never,
+      accountId: null,
+    });
+    expect(hints).toContain(
+      '- `member-info`: use `memberId` or `userId` to inspect one member; omit both to list members. Do not use `target` for the member id.'
+    );
+    expect(hints).toContain('- `renameGroup`: pass `conversationId` or `groupId` plus `name`.');
+    expect(hints?.join('\n')).toContain('conversationId');
   });
 
   it('supportsAction returns true for standard actions and false for unsupported ones', () => {

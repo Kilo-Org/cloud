@@ -4,7 +4,9 @@ type ReactionEmoji = (typeof FIRST_REACTION_EMOJIS)[number];
 
 type MessageAction =
   | { kind: 'reaction'; label: string; emoji: ReactionEmoji }
+  | { kind: 'more-reactions'; label: 'More reactions' }
   | { kind: 'reply'; label: 'Reply' }
+  | { kind: 'copy'; label: 'Copy' }
   | { kind: 'edit'; label: 'Edit' }
   | { kind: 'delete'; label: 'Delete' }
   | { kind: 'cancel'; label: 'Cancel' };
@@ -12,6 +14,7 @@ type MessageAction =
 type BuildMessageActionSheetOptionsInput = {
   canReact: boolean;
   canReply: boolean;
+  canCopy: boolean;
   canEdit: boolean;
   canDelete: boolean;
   isPendingMessage?: boolean;
@@ -20,6 +23,7 @@ type BuildMessageActionSheetOptionsInput = {
 export function buildMessageActionSheetOptions({
   canReact,
   canReply,
+  canCopy,
   canEdit,
   canDelete,
   isPendingMessage = false,
@@ -35,9 +39,13 @@ export function buildMessageActionSheetOptions({
     for (const emoji of FIRST_REACTION_EMOJIS) {
       actions.push({ kind: 'reaction', label: `${emoji} React`, emoji });
     }
+    actions.push({ kind: 'more-reactions', label: 'More reactions' });
   }
   if (canUseApiBackedActions && canReply) {
     actions.push({ kind: 'reply', label: 'Reply' });
+  }
+  if (canCopy) {
+    actions.push({ kind: 'copy', label: 'Copy' });
   }
   if (canUseApiBackedActions && canEdit) {
     actions.push({ kind: 'edit', label: 'Edit' });

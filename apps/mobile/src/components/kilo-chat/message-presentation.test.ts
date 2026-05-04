@@ -8,6 +8,7 @@ import {
   createSendMessageClientId,
   getDeliveryFailureLabel,
   getReplyPreviewText,
+  isMessageEdited,
 } from './message-presentation';
 
 vi.mock('expo-crypto', () => ({
@@ -101,6 +102,16 @@ describe('getReplyPreviewText', () => {
 describe('getDeliveryFailureLabel', () => {
   it('returns a visible failure label for failed delivery messages', () => {
     expect(getDeliveryFailureLabel(message({ deliveryFailed: true }))).toBe('Not delivered');
+  });
+});
+
+describe('isMessageEdited', () => {
+  it('marks updated non-deleted messages as edited', () => {
+    expect(isMessageEdited(message({ clientUpdatedAt: 123 }))).toBe(true);
+  });
+
+  it('hides edited state for deleted messages', () => {
+    expect(isMessageEdited(message({ clientUpdatedAt: 123, deleted: true }))).toBe(false);
   });
 });
 

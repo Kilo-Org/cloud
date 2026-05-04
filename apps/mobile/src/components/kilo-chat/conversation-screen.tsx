@@ -1,5 +1,6 @@
 /* eslint-disable max-lines */
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import {
   attemptMarkCurrentConversationRead,
@@ -19,6 +20,7 @@ import {
 } from '@kilocode/kilo-chat-hooks';
 import {
   buildMessageActionAvailability,
+  contentBlocksToText,
   type ExecApprovalDecision,
   formatKiloChatError,
   type Message,
@@ -38,8 +40,10 @@ import { buildMessageActionSheetOptions, getSelectedMessageAction } from './mess
 import { MessageInput } from './message-input';
 import { type MessageInputSubmitControls } from './message-input-state';
 import { MessageList } from './message-list';
+import { MessageReactionPickerSheet } from './message-reaction-picker-sheet';
 import {
   buildSendMessageVariables,
+  canCopyMessage,
   canToggleReaction,
   createSendMessageClientId,
 } from './message-presentation';
@@ -84,6 +88,8 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const { bottom } = useSafeAreaInsets();
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [reactionPickerMessage, setReactionPickerMessage] = useState<Message | null>(null);
+  const [recentReactions, setRecentReactions] = useState<string[]>([]);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const pendingActionRef = useRef<PendingAction | null>(null);
   const instanceContext = useInstanceContext(sandboxId);
@@ -210,9 +216,19 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           }
         );
       }
+      setRecentReactions(previous => [emoji, ...previous.filter(reaction => reaction !== emoji)]);
+      void Haptics.selectionAsync();
     },
     [addReaction, currentUserId, removeReaction]
   );
+  const handleCopyMessage = useCallback(async (message: Message) => {
+    try {
+      await Clipboard.setStringAsync(contentBlocksToText(message.content));
+      toast.success('Copied');
+    } catch {
+      toast.error('Failed to copy');
+    }
+  }, []);
   const handleExecuteAction = useCallback(
     (message: Message, groupId: string, value: ExecApprovalDecision) => {
       const nextPendingAction = { messageId: message.id, groupId };
@@ -235,16 +251,16 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   );
   const handleLongPressMessage = useCallback(
     (message: Message) => {
-      if (message.deleted) {
-        return;
-      }
       const isOwnMessage = currentUserId !== null && message.senderId === currentUserId;
       const actionAvailability = buildMessageActionAvailability(message, isOwnMessage);
+      const isPendingMessage = message.id.startsWith('pending-');
       const actionSheet = buildMessageActionSheetOptions({
         canReact: currentUserId !== null && actionAvailability.canReact,
         canReply: actionAvailability.canReply,
+        canCopy: canCopyMessage(message),
         canEdit: actionAvailability.canEdit,
         canDelete: actionAvailability.canDelete,
+        isPendingMessage,
       });
       showActionSheetWithOptions(
         {
@@ -261,14 +277,15 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           }
 
           if (selectedAction.kind === 'reaction') {
-            addReaction.mutate(
-              { messageId: message.id, emoji: selectedAction.emoji },
-              {
-                onError: err => {
-                  toast.error(formatKiloChatError(err, 'Failed to add reaction'));
-                },
-              }
-            );
+            handleReactionPress(message, selectedAction.emoji);
+            return;
+          }
+          if (selectedAction.kind === 'more-reactions') {
+            setReactionPickerMessage(message);
+            return;
+          }
+          if (selectedAction.kind === 'copy') {
+            void handleCopyMessage(message);
             return;
           }
           if (selectedAction.kind === 'reply') {
@@ -302,7 +319,15 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
         }
       );
     },
-    [addReaction, bottom, conversationId, currentUserId, deleteMessage, showActionSheetWithOptions]
+    [
+      bottom,
+      conversationId,
+      currentUserId,
+      deleteMessage,
+      handleCopyMessage,
+      handleReactionPress,
+      showActionSheetWithOptions,
+    ]
   );
 
   useConversationPresence(sandboxId, conversationId);
@@ -474,6 +499,20 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           }
         />
       </KeyboardAvoidingView>
+      <MessageReactionPickerSheet
+        visible={reactionPickerMessage !== null}
+        recentReactions={recentReactions}
+        onClose={() => {
+          setReactionPickerMessage(null);
+        }}
+        onSelect={emoji => {
+          const message = reactionPickerMessage;
+          if (message) {
+            handleReactionPress(message, emoji);
+          }
+          setReactionPickerMessage(null);
+        }}
+      />
     </View>
   );
 }

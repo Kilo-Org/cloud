@@ -1,14 +1,18 @@
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
+import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react-native';
 import { memo } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { MessageMarkdown } from './message-markdown';
 import {
   canShowReactionPills,
   getDeliveryFailureLabel,
   getReplyPreviewText,
+  isMessageEdited,
   type ReplyPreviewSource,
 } from './message-presentation';
 
@@ -51,8 +55,11 @@ function MessageBubbleComponent({
   onReactionPress,
   onLongPress,
 }: Props) {
+  const colors = useThemeColors();
   const isPending = message.id.startsWith('pending-');
   const timestamp = message.clientUpdatedAt ?? message.updatedAt;
+  const edited = isMessageEdited(message);
+  const authorLabel = message.senderId.startsWith('bot:') ? 'KiloClaw' : message.senderId;
 
   function handleReactionPress(emoji: string) {
     onReactionPress(message, emoji);
@@ -78,7 +85,7 @@ function MessageBubbleComponent({
     >
       {showAuthor && (
         <View className="mb-0.5 flex-row items-baseline gap-2 px-1">
-          <Text className="text-xs font-medium text-muted-foreground">{message.senderId}</Text>
+          <Text className="text-xs font-medium text-muted-foreground">{authorLabel}</Text>
           {timestamp !== null && (
             <Text className="text-[10px] text-muted-foreground">{formatTimestamp(timestamp)}</Text>
           )}
@@ -109,19 +116,20 @@ function MessageBubbleComponent({
             )}
             {message.content.map((block, index) => {
               if (block.type === 'text') {
-                return (
-                  <Text key={index} selectable className={cn('text-sm leading-5', textColor)}>
-                    {block.text}
-                  </Text>
-                );
+                return <MessageMarkdown key={index} text={block.text} isFromMe={isFromMe} />;
               }
 
               // block.type === 'actions'
               if (block.resolved) {
                 const resolvedAction = block.actions.find(a => a.value === block.resolved?.value);
                 const label = resolvedAction?.label ?? block.resolved.value;
+                const Icon = block.resolved.value.startsWith('allow') ? CheckCircle2 : XCircle;
                 return (
                   <View key={block.groupId} className="mt-2 flex-row items-center gap-1.5">
+                    <Icon
+                      size={14}
+                      color={isFromMe ? colors.primaryForeground : colors.mutedForeground}
+                    />
                     <Text className={cn('text-xs opacity-70', textColor)}>{label}</Text>
                   </View>
                 );
@@ -146,9 +154,12 @@ function MessageBubbleComponent({
               );
             })}
             {deliveryFailureLabel && (
-              <Text className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">
-                {deliveryFailureLabel}
-              </Text>
+              <View className="mt-2 flex-row items-center gap-1.5">
+                <AlertCircle size={14} color={colors.destructive} />
+                <Text className="text-xs font-medium text-red-600 dark:text-red-400">
+                  {deliveryFailureLabel}
+                </Text>
+              </View>
             )}
           </>
         )}
@@ -161,6 +172,7 @@ function MessageBubbleComponent({
             )}
           >
             {formatTimestamp(timestamp)}
+            {edited ? ' (edited)' : ''}
           </Text>
         )}
       </View>
@@ -181,7 +193,7 @@ function MessageBubbleComponent({
                   handleReactionPress(reaction.emoji);
                 }}
                 className={cn(
-                  'flex-row items-center gap-0.5 rounded-full px-2 py-0.5',
+                  'min-h-11 flex-row items-center gap-1 rounded-full px-3 py-1',
                   hasReacted ? 'bg-primary' : 'bg-neutral-200 dark:bg-neutral-700'
                 )}
               >

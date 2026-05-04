@@ -7,6 +7,7 @@ describe('buildMessageActionSheetOptions', () => {
     const options = buildMessageActionSheetOptions({
       canReact: true,
       canReply: true,
+      canCopy: true,
       canEdit: false,
       canDelete: false,
     });
@@ -20,12 +21,14 @@ describe('buildMessageActionSheetOptions', () => {
     const ownOptions = buildMessageActionSheetOptions({
       canReact: true,
       canReply: true,
+      canCopy: true,
       canEdit: true,
       canDelete: true,
     });
     const otherOptions = buildMessageActionSheetOptions({
       canReact: true,
       canReply: true,
+      canCopy: true,
       canEdit: false,
       canDelete: false,
     });
@@ -42,12 +45,14 @@ describe('buildMessageActionSheetOptions', () => {
     const replyableOptions = buildMessageActionSheetOptions({
       canReact: true,
       canReply: true,
+      canCopy: true,
       canEdit: false,
       canDelete: false,
     });
     const failedDeliveryOptions = buildMessageActionSheetOptions({
       canReact: true,
       canReply: false,
+      canCopy: true,
       canEdit: false,
       canDelete: false,
     });
@@ -60,6 +65,7 @@ describe('buildMessageActionSheetOptions', () => {
     const actionSheet = buildMessageActionSheetOptions({
       canReact: false,
       canReply: true,
+      canCopy: false,
       canEdit: false,
       canDelete: false,
     });
@@ -72,6 +78,7 @@ describe('buildMessageActionSheetOptions', () => {
     const actionSheet = buildMessageActionSheetOptions({
       canReact: false,
       canReply: true,
+      canCopy: false,
       canEdit: false,
       canDelete: false,
     });
@@ -86,6 +93,7 @@ describe('buildMessageActionSheetOptions', () => {
     const actionSheet = buildMessageActionSheetOptions({
       canReact: true,
       canReply: true,
+      canCopy: false,
       canEdit: true,
       canDelete: true,
       isPendingMessage: true,
@@ -101,23 +109,48 @@ describe('buildMessageActionSheetOptions', () => {
     const actionSheet = buildMessageActionSheetOptions({
       canReact: false,
       canReply: false,
+      canCopy: true,
       canEdit: false,
       canDelete: true,
     });
 
-    expect(actionSheet.options).toEqual(['Delete', 'Cancel']);
-    expect(actionSheet.destructiveButtonIndex).toBe(0);
+    expect(actionSheet.options).toEqual(['Copy', 'Delete', 'Cancel']);
+    expect(actionSheet.destructiveButtonIndex).toBe(1);
   });
 
   it('offers cancel only for non-own delivery-failed messages', () => {
     const actionSheet = buildMessageActionSheetOptions({
       canReact: false,
       canReply: false,
+      canCopy: false,
       canEdit: false,
       canDelete: false,
     });
 
     expect(actionSheet.options).toEqual(['Cancel']);
     expect(actionSheet.destructiveButtonIndex).toBeUndefined();
+  });
+
+  it('orders reactions, reply, copy, edit, delete, then cancel', () => {
+    const actionSheet = buildMessageActionSheetOptions({
+      canReact: true,
+      canReply: true,
+      canCopy: true,
+      canEdit: true,
+      canDelete: true,
+    });
+
+    expect(actionSheet.options).toEqual([
+      '👍 React',
+      '❤️ React',
+      '😂 React',
+      '🎉 React',
+      'More reactions',
+      'Reply',
+      'Copy',
+      'Edit',
+      'Delete',
+      'Cancel',
+    ]);
   });
 });

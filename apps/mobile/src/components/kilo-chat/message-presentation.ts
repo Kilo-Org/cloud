@@ -74,3 +74,11 @@ export function canShowReactionPills(message: Message): boolean {
 export function canToggleReaction(message: Message, currentUserId: string | null): boolean {
   return currentUserId !== null && !message.deleted && !message.deliveryFailed;
 }
+
+export function canCopyMessage(message: Message): boolean {
+  return !message.deleted && contentBlocksToPreviewText(message.content).trim().length > 0;
+}
+
+export function isMessageEdited(message: Message): boolean {
+  return !message.deleted && message.clientUpdatedAt !== null;
+}

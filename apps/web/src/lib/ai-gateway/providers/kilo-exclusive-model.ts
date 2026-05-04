@@ -35,6 +35,7 @@ export type KiloExclusiveModel = {
   pricing: Pricing | null;
   /** Features allowed to use this model. Empty array means no restriction. */
   exclusive_to: ReadonlyArray<FeatureValue>;
+  inference_provider_restriction: ReadonlyArray<OpenRouterInferenceProviderId>;
 };
 
 export function getInferenceProvider(

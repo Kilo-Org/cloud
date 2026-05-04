@@ -7,7 +7,6 @@ import type {
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
 import { applyXaiModelSettings, isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
-import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
 import { isClaudeModel, isHaikuModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -113,12 +112,15 @@ export function applyProviderSpecificLogic(
   const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   if (kiloExclusiveModel) {
     requestToMutate.body.model = kiloExclusiveModel.internal_id;
-    const inferenceProvider = getInferenceProvider(kiloExclusiveModel);
-    if (inferenceProvider) {
-      if (requestToMutate.body.provider) {
-        requestToMutate.body.provider.only = [inferenceProvider];
+    const restriction = kiloExclusiveModel.inference_provider_restriction;
+    if (restriction.length > 0) {
+      const provider = requestToMutate.body.provider;
+      if (provider?.only) {
+        provider.only = [...new Set(provider.only).intersection(new Set(restriction))];
+      } else if (provider) {
+        provider.only = [...restriction];
       } else {
-        requestToMutate.body.provider = { only: [inferenceProvider] };
+        requestToMutate.body.provider = { only: [...restriction] };
       }
     }
   }

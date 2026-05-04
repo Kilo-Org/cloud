@@ -12,8 +12,9 @@ describe('buildMessageActionSheetOptions', () => {
       canDelete: false,
     });
 
-    expect(options.options).toContain('👍 React');
-    expect(options.options).toContain('❤️ React');
+    expect(options.options).toContain('👍');
+    expect(options.options).toContain('❤️');
+    expect(options.options).not.toContain('👍 React');
     expect(options.cancelButtonIndex).toBe(options.options.length - 1);
   });
 
@@ -141,10 +142,10 @@ describe('buildMessageActionSheetOptions', () => {
     });
 
     expect(actionSheet.options).toEqual([
-      '👍 React',
-      '❤️ React',
-      '😂 React',
-      '🎉 React',
+      '👍',
+      '❤️',
+      '😂',
+      '🎉',
       'More reactions',
       'Reply',
       'Copy',

@@ -37,7 +37,7 @@ export function buildMessageActionSheetOptions({
   const canUseApiBackedActions = !isPendingMessage;
   if (canUseApiBackedActions && canReact) {
     for (const emoji of FIRST_REACTION_EMOJIS) {
-      actions.push({ kind: 'reaction', label: `${emoji} React`, emoji });
+      actions.push({ kind: 'reaction', label: emoji, emoji });
     }
     actions.push({ kind: 'more-reactions', label: 'More reactions' });
   }

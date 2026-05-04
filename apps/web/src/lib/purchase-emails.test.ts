@@ -2,16 +2,20 @@ process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
 
 import { eq, and } from 'drizzle-orm';
 import {
+  credit_transactions,
   kiloclaw_email_log,
   kiloclaw_instances,
   kiloclaw_subscriptions,
+  top_up_email_log,
 } from '@kilocode/db/schema';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { processTopUp } from '@/lib/credits';
 import { KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE } from '@/lib/kiloclaw/credit-billing';
 import type * as creditBillingModule from '@/lib/kiloclaw/credit-billing';
 import {
+  buildCreditsTopUpReceiptSection,
   renderTemplate,
   subjects,
   sendKiloClawSubscriptionStartedEmail,
@@ -95,6 +99,248 @@ function subscriptionStartedSends(): SendViaMailgunParams[] {
     .filter(p => p.subject === KILOCLAW_SUBSCRIPTION_STARTED_SUBJECT);
 }
 
+const CREDITS_TOPUP_AUTO_SUBJECT = 'Kilo auto top-up successful';
+
+function creditsTopUpSends(): SendViaMailgunParams[] {
+  return sendViaMailgunMock.mock.calls
+    .map(([params]) => params)
+    .filter(p => p.subject === subjects.creditsTopUp || p.subject === CREDITS_TOPUP_AUTO_SUBJECT);
+}
+
+describe('creditsTopUp template', () => {
+  test('renders required fields', () => {
+    const html = renderTemplate('creditsTopUp', {
+      heading: 'Thanks for your top-up',
+      intro: 'hello',
+      amount_usd: '15.00',
+      credits_usd: '15.00',
+      purchase_date: 'January 1, 2026',
+      credits_url: 'https://app.kilocode.ai/credits',
+      receipt_section: buildCreditsTopUpReceiptSection('https://stripe.test/receipt'),
+      year: '2026',
+    });
+    expect(html).toContain('Thanks for your top-up');
+    expect(html).toContain('$15.00');
+    expect(html).toContain('January 1, 2026');
+    expect(html).toContain('https://app.kilocode.ai/credits');
+    expect(html).toContain('https://stripe.test/receipt');
+  });
+
+  test('omits receipt section when receipt URL is missing', () => {
+    const html = renderTemplate('creditsTopUp', {
+      heading: 'h',
+      intro: 'i',
+      amount_usd: '5.00',
+      credits_usd: '5.00',
+      purchase_date: 'January 1, 2026',
+      credits_url: 'https://app.kilocode.ai/credits',
+      receipt_section: buildCreditsTopUpReceiptSection(null),
+      year: '2026',
+    });
+    expect(html).not.toContain('View your Stripe receipt');
+  });
+});
+
+describe('processTopUp credit top-up email', () => {
+  beforeEach(() => {
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
+  });
+
+  afterEach(() => {
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
+  });
+
+  test('sends credit top-up email once for a successful manual top-up', async () => {
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const stripePaymentId = `ch_test_${Date.now()}_${Math.random()}`;
+    const first = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(first).toBe(true);
+
+    const topUpSends = creditsTopUpSends();
+    expect(topUpSends).toHaveLength(1);
+    // $15.00 comes from formatUsd(1500) in the real helper — if formatUsd
+    // rounding regresses, this assertion fails.
+    expect(topUpSends[0].html).toContain('$15.00 USD');
+    expect(topUpSends[0].to).toBe(user.google_user_email);
+
+    sendViaMailgunMock.mockClear();
+
+    // Retry / webhook replay with the same stripe_payment_id must not re-send.
+    const second = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(second).toBe(false);
+
+    expect(creditsTopUpSends()).toHaveLength(0);
+  });
+
+  test('uses auto-top-up copy when isAutoTopUp is true', async () => {
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    await processTopUp(
+      user,
+      2000,
+      { type: 'stripe', stripe_payment_id: `ch_auto_${Date.now()}_${Math.random()}` },
+      { isAutoTopUp: true }
+    );
+
+    const autoSend = sendViaMailgunMock.mock.calls
+      .map(([params]) => params)
+      .find(p => p.subject === CREDITS_TOPUP_AUTO_SUBJECT);
+    expect(autoSend).toBeTruthy();
+    // The auto variant also swaps the heading/intro copy — prove both the
+    // subject override and the templateVars wiring land.
+    expect(autoSend?.html).toContain('Your auto top-up was successful');
+  });
+
+  test('does not send an email when skipPostTopUpFreeStuff is true', async () => {
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    await processTopUp(
+      user,
+      1000,
+      { type: 'stripe', stripe_payment_id: `ch_skip_${Date.now()}_${Math.random()}` },
+      { skipPostTopUpFreeStuff: true }
+    );
+
+    expect(creditsTopUpSends()).toHaveLength(0);
+
+    // Sanity: the credit transaction was still recorded.
+    const [txn] = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id))
+      .limit(1);
+    expect(txn).toBeTruthy();
+  });
+
+  test('recovers confirmation email on webhook retry when first attempt did not send', async () => {
+    // Simulate the failure mode: the first processTopUp committed the credit
+    // transaction but exited before firing the email (no top_up_email_log
+    // marker). A webhook retry must observe the missing marker and send.
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const stripePaymentId = `ch_recover_${Date.now()}_${Math.random()}`;
+
+    await db.insert(credit_transactions).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: user.id,
+      is_free: false,
+      amount_microdollars: 1500 * 10_000,
+      description: 'Top-up via stripe',
+      original_baseline_microdollars_used: 0,
+      stripe_payment_id: stripePaymentId,
+    });
+
+    // Retry arrives. processTopUp sees the credit is already committed and
+    // should attempt marker-gated email recovery.
+    const retry = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(retry).toBe(false);
+
+    expect(creditsTopUpSends()).toHaveLength(1);
+
+    // Marker row exists to prevent a third attempt from re-sending.
+    const [marker] = await db
+      .select({ id: top_up_email_log.id })
+      .from(top_up_email_log)
+      .where(eq(top_up_email_log.stripe_payment_id, stripePaymentId))
+      .limit(1);
+    expect(marker).toBeTruthy();
+
+    sendViaMailgunMock.mockClear();
+
+    // A third retry must observe the marker and skip.
+    const thirdAttempt = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(thirdAttempt).toBe(false);
+    expect(creditsTopUpSends()).toHaveLength(0);
+  });
+
+  test('writes a top_up_email_log marker on first-attempt send', async () => {
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const stripePaymentId = `ch_marker_${Date.now()}_${Math.random()}`;
+    const first = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(first).toBe(true);
+
+    const [marker] = await db
+      .select({ stripe_payment_id: top_up_email_log.stripe_payment_id })
+      .from(top_up_email_log)
+      .where(eq(top_up_email_log.stripe_payment_id, stripePaymentId))
+      .limit(1);
+    expect(marker).toEqual({ stripe_payment_id: stripePaymentId });
+  });
+
+  test('recovery path skips email when skipPostTopUpFreeStuff is true on retry', async () => {
+    // Guards against the edge case where a retry caller passes
+    // skipPostTopUpFreeStuff: true (e.g. a Kilo Pass flow re-using
+    // processTopUp as a primitive) — we must not send a user-facing top-up
+    // confirmation email just because a marker was missing.
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const stripePaymentId = `ch_skip_retry_${Date.now()}_${Math.random()}`;
+
+    await db.insert(credit_transactions).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: user.id,
+      is_free: false,
+      amount_microdollars: 1500 * 10_000,
+      description: 'Top-up via stripe',
+      original_baseline_microdollars_used: 0,
+      stripe_payment_id: stripePaymentId,
+    });
+
+    const retry = await processTopUp(
+      user,
+      1500,
+      { type: 'stripe', stripe_payment_id: stripePaymentId },
+      { skipPostTopUpFreeStuff: true }
+    );
+    expect(retry).toBe(false);
+
+    expect(creditsTopUpSends()).toHaveLength(0);
+
+    const [marker] = await db
+      .select({ id: top_up_email_log.id })
+      .from(top_up_email_log)
+      .where(eq(top_up_email_log.stripe_payment_id, stripePaymentId))
+      .limit(1);
+    expect(marker).toBeUndefined();
+  });
+});
 describe('KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE constant', () => {
   test('matches kiloclaw_email_log.email_type', () => {
     expect(KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE).toBe('kiloclaw_subscription_started');

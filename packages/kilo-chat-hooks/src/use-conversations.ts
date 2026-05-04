@@ -51,6 +51,7 @@ type ReconnectEventService = {
 };
 
 type RegisterConversationListCacheHandlersOptions = {
+  activeConversationId?: string | null;
   currentUserId: string | null;
   eventService: ReconnectEventService;
   kiloChatClient: KiloChatConversationEventClient;
@@ -495,6 +496,7 @@ function invalidateConversationListQuery(queryClient: QueryClient, queryKey: Que
 }
 
 export function registerConversationListCacheHandlers({
+  activeConversationId = null,
   currentUserId,
   eventService,
   kiloChatClient,
@@ -521,6 +523,10 @@ export function registerConversationListCacheHandlers({
   }
 
   function patchActivity(event: ConversationActivityEvent): void {
+    if (event.conversationId !== activeConversationId) {
+      void queryClient.invalidateQueries({ queryKey: messagesKey(event.conversationId) });
+    }
+
     const result = applyConversationActivityToPages(
       queryClient.getQueryData<ConversationListInfiniteData>(queryKey),
       event

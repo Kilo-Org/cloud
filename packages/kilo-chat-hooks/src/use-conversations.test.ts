@@ -1,9 +1,14 @@
-import type { ConversationDetail, ConversationListItem } from '@kilocode/kilo-chat';
+import type {
+  ConversationActivityEvent,
+  ConversationDetail,
+  ConversationListItem,
+} from '@kilocode/kilo-chat';
 import { ulidToTimestamp } from '@kilocode/kilo-chat';
+import { kiloclawInstanceContext } from '@kilocode/event-service';
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 
-import { conversationKey, conversationsKey } from './query-keys';
+import { conversationKey, conversationsKey, messagesKey } from './query-keys';
 import {
   applyConversationActivityToPages,
   applyConversationCreatedToPages,
@@ -16,6 +21,7 @@ import {
   settleMarkConversationRead,
   settleCreateConversation,
   settleRenameConversation,
+  registerConversationListCacheHandlers,
   type ConversationListInfiniteData,
   shouldApplyConversationRead,
 } from './use-conversations';
@@ -407,6 +413,109 @@ describe('settleLeaveConversation', () => {
 
     expect(queryClient.getQueryState(activeKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+  });
+});
+
+describe('registerConversationListCacheHandlers', () => {
+  type HandlerOptions = Parameters<typeof registerConversationListCacheHandlers>[0];
+  type EventHandler<T> = (ctx: string, event: T) => void;
+
+  it('invalidates a conversation message cache when instance activity arrives', () => {
+    const queryClient = new QueryClient();
+    const sandboxId = 'sandbox-a';
+    const conversationId = '01KQK8A1111111111111111111';
+    const listKey = conversationsKey(sandboxId);
+    const messageKey = messagesKey(conversationId);
+    let activityHandler: EventHandler<ConversationActivityEvent> | undefined;
+    const off = () => {};
+
+    const kiloChatClient: HandlerOptions['kiloChatClient'] = {
+      onConversationCreated: () => off,
+      onConversationRenamed: () => off,
+      onConversationLeft: () => off,
+      onConversationRead: () => off,
+      onConversationActivity: handler => {
+        activityHandler = handler;
+        return off;
+      },
+    };
+    const eventService: HandlerOptions['eventService'] = {
+      onReconnect: () => off,
+    };
+
+    queryClient.setQueryData(
+      listKey,
+      conversationsData([[conversation(conversationId, { lastActivityAt: 100 })]], [null])
+    );
+    queryClient.setQueryData(messageKey, { stale: 'old-first-page' });
+
+    registerConversationListCacheHandlers({
+      currentUserId: 'user-current',
+      eventService,
+      kiloChatClient,
+      queryClient,
+      queryKey: listKey,
+      sandboxId,
+    });
+
+    expect(queryClient.getQueryState(messageKey)?.isInvalidated).toBe(false);
+    if (!activityHandler) throw new Error('activity handler was not registered');
+
+    activityHandler(kiloclawInstanceContext(sandboxId), {
+      conversationId,
+      lastActivityAt: 200,
+    });
+
+    expect(queryClient.getQueryState(messageKey)?.isInvalidated).toBe(true);
+  });
+
+  it('leaves active conversation messages to the mounted message handler', () => {
+    const queryClient = new QueryClient();
+    const sandboxId = 'sandbox-a';
+    const conversationId = '01KQK8A2222222222222222222';
+    const listKey = conversationsKey(sandboxId);
+    const messageKey = messagesKey(conversationId);
+    let activityHandler: EventHandler<ConversationActivityEvent> | undefined;
+    const off = () => {};
+
+    const kiloChatClient: HandlerOptions['kiloChatClient'] = {
+      onConversationCreated: () => off,
+      onConversationRenamed: () => off,
+      onConversationLeft: () => off,
+      onConversationRead: () => off,
+      onConversationActivity: handler => {
+        activityHandler = handler;
+        return off;
+      },
+    };
+    const eventService: HandlerOptions['eventService'] = {
+      onReconnect: () => off,
+    };
+
+    queryClient.setQueryData(
+      listKey,
+      conversationsData([[conversation(conversationId, { lastActivityAt: 100 })]], [null])
+    );
+    queryClient.setQueryData(messageKey, { current: 'active-first-page' });
+
+    registerConversationListCacheHandlers({
+      activeConversationId: conversationId,
+      currentUserId: 'user-current',
+      eventService,
+      kiloChatClient,
+      queryClient,
+      queryKey: listKey,
+      sandboxId,
+    });
+
+    if (!activityHandler) throw new Error('activity handler was not registered');
+
+    activityHandler(kiloclawInstanceContext(sandboxId), {
+      conversationId,
+      lastActivityAt: 200,
+    });
+
+    expect(queryClient.getQueryState(messageKey)?.isInvalidated).toBe(false);
   });
 });
 

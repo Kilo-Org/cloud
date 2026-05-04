@@ -71,6 +71,7 @@ export function KiloChatLayout({
   // Unknown conversations still invalidate so they can be fetched into the list.
   useEffect(() => {
     return registerConversationListCacheHandlers({
+      activeConversationId: params?.conversationId ?? null,
       currentUserId,
       eventService,
       kiloChatClient,
@@ -78,7 +79,15 @@ export function KiloChatLayout({
       queryKey: conversationsQueryKey,
       sandboxId,
     });
-  }, [currentUserId, eventService, kiloChatClient, queryClient, conversationsQueryKey, sandboxId]);
+  }, [
+    currentUserId,
+    eventService,
+    kiloChatClient,
+    params?.conversationId,
+    queryClient,
+    conversationsQueryKey,
+    sandboxId,
+  ]);
 
   const createConversation = useCreateConversation(kiloChatClient);
   const renameConversation = useRenameConversation(kiloChatClient);

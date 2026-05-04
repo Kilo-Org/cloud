@@ -6,6 +6,7 @@ import {
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
+import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { processTopUp } from '@/lib/credits';
@@ -463,6 +464,65 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
   });
 
+  test('subscription.created before invoice.paid → settlement still sends one subscription-started email', async () => {
+    // Realistic Stripe ordering: customer.subscription.created is processed
+    // before invoice.paid. handleKiloClawSubscriptionCreated flips a non-hybrid
+    // row to status='active', stamps the Stripe-derived period boundaries onto
+    // the row, and writes a durable `stripe_subscription_created` change-log
+    // row preserving the pre-Stripe status. The subsequent settlement's
+    // in-memory `before.status` is already 'active', so the email decision
+    // must fall back to the durable log.
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_created_before_paid_${crypto.randomUUID()}`;
+    const { instance, subscription } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+
+    const periodStart = new Date().toISOString();
+    const periodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
+
+    const trialingSnapshot = subscription;
+    // Simulate handleKiloClawSubscriptionCreated running before invoice.paid
+    // (see apps/web/src/lib/kiloclaw/stripe-handlers.ts): for non-hybrid rows
+    // it stamps the Stripe-derived plan, status, and period boundaries.
+    const [activatedSubscription] = await db
+      .update(kiloclaw_subscriptions)
+      .set({
+        status: 'active',
+        plan: 'standard',
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+      })
+      .where(eq(kiloclaw_subscriptions.id, subscription.id))
+      .returning();
+    await insertKiloClawSubscriptionChangeLog(db, {
+      subscriptionId: subscription.id,
+      actor: { actorType: 'system', actorId: 'stripe-webhook' },
+      action: 'status_changed',
+      reason: 'stripe_subscription_created',
+      before: trialingSnapshot,
+      after: activatedSubscription,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart,
+      periodEnd,
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+  });
+
   test('active renewal → no subscription-started email', async () => {
     const user = await insertTestUser({});
     const stripeSubscriptionId = `sub_renewal_${crypto.randomUUID()}`;
@@ -471,6 +531,59 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       status: 'active',
       plan: 'standard',
       stripeSubscriptionId,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(0);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
+  });
+
+  test('active renewal after a prior activation → eligible subscription.created log for a different period does NOT trigger a second email', async () => {
+    // Defence-in-depth for the durable-signal fallback: the helper matches on
+    // plan + period boundaries of the `stripe_subscription_created.after_state`
+    // against the current settlement period, so an activation log recorded for
+    // the original (earlier) period cannot re-fire the email on subsequent
+    // renewal settlements that cover a different period.
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_renewal_after_prior_${crypto.randomUUID()}`;
+    const { instance, subscription } = await seedSubscription({
+      userId: user.id,
+      status: 'active',
+      plan: 'standard',
+      stripeSubscriptionId,
+    });
+
+    // Original stripe_subscription_created (trialing → active) from activation.
+    // `subscription.current_period_start/end` are seeded to the prior period
+    // (30 days ago → 1 day ago), which is deliberately different from the
+    // renewal settlement period used below.
+    await insertKiloClawSubscriptionChangeLog(db, {
+      subscriptionId: subscription.id,
+      actor: { actorType: 'system', actorId: 'stripe-webhook' },
+      action: 'status_changed',
+      reason: 'stripe_subscription_created',
+      before: { ...subscription, status: 'trialing' },
+      after: subscription,
+    });
+    // Prior settlement that already handled the activation email.
+    await insertKiloClawSubscriptionChangeLog(db, {
+      subscriptionId: subscription.id,
+      actor: { actorType: 'system', actorId: 'kiloclaw-credit-billing' },
+      action: 'period_advanced',
+      reason: 'stripe_invoice_settlement',
+      before: { ...subscription, status: 'trialing' },
+      after: subscription,
     });
 
     const applied = await applyStripeFundedKiloClawPeriod({

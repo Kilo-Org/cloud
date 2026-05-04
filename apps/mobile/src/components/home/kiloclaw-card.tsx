@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
 
 import { isTransitionalStatus, statusLabel, statusTone } from '@/components/kiloclaw/status-badge';
@@ -7,6 +7,7 @@ import { StatusDot } from '@/components/ui/status-dot';
 import { Text } from '@/components/ui/text';
 import { agentColor } from '@/lib/agent-color';
 import { useKiloClawStatus, useKiloClawStatusQueryKey } from '@/lib/hooks/use-kiloclaw-queries';
+import { chatSandboxPath } from '@/lib/kilo-chat-routes';
 
 type KiloClawCardProps = {
   instance: {
@@ -64,7 +65,7 @@ export function KiloClawCard({ instance, unreadCount = 0 }: Readonly<KiloClawCar
     : `Open ${displayName}`;
 
   const handlePress = () => {
-    router.push(`/(app)/chat/${instance.sandboxId}` as Href);
+    router.push(chatSandboxPath(instance.sandboxId));
   };
 
   return (

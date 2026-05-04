@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { Tabs } from 'expo-router';
+import { type Href, Tabs, usePathname, useRouter } from 'expo-router';
 import { Bot, House, MessageSquare } from 'lucide-react-native';
 import { Platform, type TextStyle, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,8 +37,13 @@ function TabBarBackground() {
 }
 
 export default function TabsLayout() {
+  const router = useRouter();
+  const pathname = usePathname();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
+  const pathParts = pathname.split('/').filter(Boolean);
+  const hideTabs =
+    pathParts[0] === 'chat' && pathParts.length === 3 && pathParts[2] !== 'rename-conversation';
 
   return (
     <Tabs
@@ -55,6 +60,7 @@ export default function TabsLayout() {
           backgroundColor: 'transparent',
           borderTopColor: 'transparent',
           borderTopWidth: 0,
+          display: hideTabs ? 'none' : 'flex',
           elevation: 0,
           position: 'absolute',
           ...(Platform.OS === 'android' && {
@@ -73,8 +79,10 @@ export default function TabsLayout() {
           ),
         }}
         listeners={{
-          tabPress: () => {
+          tabPress: event => {
             void Haptics.selectionAsync();
+            event.preventDefault();
+            router.navigate('/(app)/(tabs)/(1_kiloclaw)' as Href);
           },
         }}
       />

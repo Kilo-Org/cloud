@@ -2,7 +2,7 @@ import type * as ReactModule from 'react';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ChatSandboxInstanceEventSubscriptionMount } from '../../app/(app)/chat/[sandbox-id]/_layout';
+import { ChatSandboxInstanceEventSubscriptionMount } from '../../app/(app)/(tabs)/(1_kiloclaw)/chat/[sandbox-id]/_layout';
 
 type TestState = {
   cleanupCalls: number;

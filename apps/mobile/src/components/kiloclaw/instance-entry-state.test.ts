@@ -14,11 +14,8 @@ describe('getKiloClawEntryDecision', () => {
     expect(getKiloClawEntryDecision([])).toEqual({ kind: 'empty' });
   });
 
-  it('redirects directly when exactly one instance exists', () => {
-    expect(getKiloClawEntryDecision([personal])).toEqual({
-      kind: 'redirect',
-      sandboxId: 'personal-1',
-    });
+  it('shows the picker when exactly one instance exists', () => {
+    expect(getKiloClawEntryDecision([personal])).toEqual({ kind: 'list' });
   });
 
   it('shows the picker when multiple instances exist', () => {

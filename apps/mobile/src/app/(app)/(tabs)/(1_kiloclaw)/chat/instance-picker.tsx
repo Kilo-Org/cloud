@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
 import { Pressable, ScrollView, View } from 'react-native';
 
@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { chatSandboxPath } from '@/lib/kilo-chat-routes';
 
 export default function InstancePickerScreen() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function InstancePickerScreen() {
       return;
     }
     router.dismissAll();
-    router.push(`/(app)/chat/${sandboxId}` as Href);
+    router.push(chatSandboxPath(sandboxId));
   };
 
   return (

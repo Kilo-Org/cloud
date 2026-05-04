@@ -1,13 +1,14 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { CONVERSATION_TITLE_MAX_CHARS, type ConversationListItem } from '@kilocode/kilo-chat';
 import * as Haptics from 'expo-haptics';
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { MoreVertical } from 'lucide-react-native';
 import { Alert, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { chatRenameConversationPath } from '@/lib/kilo-chat-routes';
 import { timeAgo } from '@/lib/utils';
 
 type ConversationRowProps = {
@@ -49,7 +50,7 @@ export function ConversationRow({
       conversationId: conversation.conversationId,
       title: title.slice(0, CONVERSATION_TITLE_MAX_CHARS),
     });
-    router.push(`/(app)/chat/${sandboxId}/rename-conversation?${params.toString()}` as Href);
+    router.push(chatRenameConversationPath(sandboxId, params));
   }
 
   function confirmLeave() {

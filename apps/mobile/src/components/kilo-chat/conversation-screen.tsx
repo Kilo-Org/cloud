@@ -27,7 +27,7 @@ import {
 } from '@kilocode/kilo-chat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, View } from 'react-native';
-import { type Href, useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -61,6 +61,11 @@ import { useCurrentUserId } from './hooks/use-current-user-id';
 import { TypingIndicator } from './typing-indicator';
 import { useAllKiloClawInstances, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
+import {
+  chatInstancePickerPath,
+  chatRenameConversationPath,
+  chatSandboxPath,
+} from '@/lib/kilo-chat-routes';
 import { setActiveChatLocation } from '@/lib/notifications';
 
 type Props = { sandboxId: string; conversationId: string; conversationTitle: string };
@@ -151,7 +156,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const instanceLabel = currentInstance?.name ?? currentInstance?.organizationName ?? 'KiloClaw';
 
   const handleSwitchInstance = useCallback(() => {
-    router.push(`/(app)/chat/instance-picker?currentId=${sandboxId}` as Href);
+    router.push(chatInstancePickerPath(sandboxId));
   }, [router, sandboxId]);
 
   const handleOpenConversationOptions = useCallback(() => {
@@ -167,7 +172,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       index => {
         if (index === 0) {
           const params = new URLSearchParams({ conversationId, title: conversationTitle });
-          router.push(`/(app)/chat/${sandboxId}/rename-conversation?${params.toString()}` as Href);
+          router.push(chatRenameConversationPath(sandboxId, params));
           return;
         }
         if (index === 1) {
@@ -182,7 +187,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
                   { conversationId, sandboxId },
                   {
                     onSuccess: () => {
-                      router.replace(`/(app)/chat/${sandboxId}` as Href);
+                      router.replace(chatSandboxPath(sandboxId));
                     },
                   }
                 );

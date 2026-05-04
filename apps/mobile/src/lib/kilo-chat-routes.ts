@@ -1,0 +1,29 @@
+import { type Href } from 'expo-router';
+
+const KILOCLAW_TAB_CHAT_ROOT = '/(app)/(tabs)/(1_kiloclaw)/chat';
+
+export const CHAT_STACK_ROUTE_NAME = 'chat/[sandbox-id]';
+
+export function chatSandboxRoute(sandboxId: string): string {
+  return `${KILOCLAW_TAB_CHAT_ROOT}/${sandboxId}`;
+}
+
+export function chatConversationRoute(sandboxId: string, conversationId: string): string {
+  return `${KILOCLAW_TAB_CHAT_ROOT}/${sandboxId}/${conversationId}`;
+}
+
+export function chatSandboxPath(sandboxId: string): Href {
+  return chatSandboxRoute(sandboxId) as Href;
+}
+
+export function chatConversationPath(sandboxId: string, conversationId: string): Href {
+  return chatConversationRoute(sandboxId, conversationId) as Href;
+}
+
+export function chatRenameConversationPath(sandboxId: string, params: URLSearchParams): Href {
+  return `${KILOCLAW_TAB_CHAT_ROOT}/${sandboxId}/rename-conversation?${params.toString()}` as Href;
+}
+
+export function chatInstancePickerPath(currentId: string): Href {
+  return `${KILOCLAW_TAB_CHAT_ROOT}/instance-picker?currentId=${currentId}` as Href;
+}

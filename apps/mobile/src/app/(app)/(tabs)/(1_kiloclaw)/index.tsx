@@ -14,6 +14,7 @@ import { useForegroundInvalidateKiloclawState } from '@/lib/hooks/use-foreground
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMobileOnboardingState } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { chatSandboxPath } from '@/lib/kilo-chat-routes';
 import { getLastActiveInstance, loadLastActiveInstance } from '@/lib/last-active-instance';
 
 export default function KiloClawTab() {
@@ -33,18 +34,7 @@ export default function KiloClawTab() {
     })();
   }, []);
 
-  const redirectSandboxId = entryDecision.kind === 'redirect' ? entryDecision.sandboxId : null;
-
-  useEffect(() => {
-    if (redirectSandboxId !== null) {
-      router.replace(`/(app)/chat/${redirectSandboxId}` as Href);
-    }
-  }, [redirectSandboxId, router]);
-
-  const showInstanceSkeleton =
-    entryDecision.kind === 'loading' ||
-    entryDecision.kind === 'redirect' ||
-    onboardingQuery.isPending;
+  const showInstanceSkeleton = entryDecision.kind === 'loading' || onboardingQuery.isPending;
 
   if (instancesQuery.isError) {
     return (
@@ -77,7 +67,7 @@ export default function KiloClawTab() {
           void instancesQuery.refetch();
         }}
         onSelect={sandboxId => {
-          router.push(`/(app)/chat/${sandboxId}` as Href);
+          router.push(chatSandboxPath(sandboxId));
         }}
         onCreate={() => {
           router.push('/(app)/onboarding' as Href);

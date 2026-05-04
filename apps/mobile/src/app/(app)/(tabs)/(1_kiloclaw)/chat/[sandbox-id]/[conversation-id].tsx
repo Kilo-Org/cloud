@@ -1,4 +1,4 @@
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { toast } from 'sonner-native';
 
@@ -10,6 +10,7 @@ import {
 } from '@/components/kilo-chat/conversation-route-state';
 import { useConversationDetail } from '@/components/kilo-chat/hooks/use-conversations';
 import { useKiloChatClient } from '@/components/kilo-chat/hooks/use-kilo-chat-client';
+import { chatSandboxPath } from '@/lib/kilo-chat-routes';
 
 export default function ChatConversationRoute() {
   const params = useLocalSearchParams<{ 'sandbox-id': string; 'conversation-id': string }>();
@@ -18,7 +19,7 @@ export default function ChatConversationRoute() {
   const router = useRouter();
   const client = useKiloChatClient();
   const conversationDetail = useConversationDetail(client, conversationId);
-  const redirectPath = `/(app)/chat/${sandboxId}` as Href;
+  const redirectPath = chatSandboxPath(sandboxId);
   const routeDecision = getConversationRouteDecision({
     detail: conversationDetail,
     routeSandboxId: sandboxId,

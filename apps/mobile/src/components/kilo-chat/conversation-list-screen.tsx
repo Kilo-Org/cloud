@@ -1,5 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -9,6 +9,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { chatConversationPath } from '@/lib/kilo-chat-routes';
 import { Plus } from 'lucide-react-native';
 
 import { EmptyConversationList } from './empty-conversation-list';
@@ -88,7 +89,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   useInstancePresence(sandboxId);
 
   function handleRowPress(conversationId: string) {
-    router.push(`/(app)/chat/${sandboxId}/${conversationId}` as Href);
+    router.push(chatConversationPath(sandboxId, conversationId));
   }
 
   function handleCreateAndNavigate() {
@@ -96,7 +97,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       { sandboxId },
       {
         onSuccess: result => {
-          router.push(`/(app)/chat/${sandboxId}/${result.conversationId}` as Href);
+          router.push(chatConversationPath(sandboxId, result.conversationId));
         },
       }
     );

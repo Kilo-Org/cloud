@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { pushDataSchema } from '@kilocode/notifications';
 
-import { CHAT_STACK_ROUTE_NAME } from './app-stack-routes';
+import { CHAT_STACK_ROUTE_NAME } from './kilo-chat-routes';
 import { notificationPathForData } from './notification-path';
 
 describe('notificationPathForData', () => {
@@ -13,7 +13,7 @@ describe('notificationPathForData', () => {
         conversationId: 'conversation-1',
         messageId: 'message-1',
       })
-    ).toBe('/(app)/chat/sandbox-1/conversation-1');
+    ).toBe('/(app)/(tabs)/(1_kiloclaw)/chat/sandbox-1/conversation-1');
   });
 
   it('keeps the registered stack route on the sandbox-id chat segment', () => {
@@ -35,7 +35,7 @@ describe('notificationPathForData', () => {
         event: 'ready',
         sandboxId: 'abcDEF123_-',
       })
-    ).toBe('/(app)/chat/abcDEF123_-');
+    ).toBe('/(app)/(tabs)/(1_kiloclaw)/chat/abcDEF123_-');
   });
 
   it('routes start_failed lifecycle notifications with ki sandbox IDs to the sandbox chat screen', () => {
@@ -45,7 +45,7 @@ describe('notificationPathForData', () => {
         event: 'start_failed',
         sandboxId: 'ki_deadbeef',
       })
-    ).toBe('/(app)/chat/ki_deadbeef');
+    ).toBe('/(app)/(tabs)/(1_kiloclaw)/chat/ki_deadbeef');
   });
 });
 

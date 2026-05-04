@@ -378,7 +378,10 @@ export function checkOrganizationModelRestrictions(params: {
       ?.inference_provider_restriction ?? [];
 
   if (!params.settings) {
-    return { error: null, providerConfig: buildRestrictedProviderConfig(undefined, modelInferenceProviderRestriction) };
+    return {
+      error: null,
+      providerConfig: buildRestrictedProviderConfig(undefined, modelInferenceProviderRestriction),
+    };
   }
 
   // Model/provider access restrictions only apply to Enterprise plans.

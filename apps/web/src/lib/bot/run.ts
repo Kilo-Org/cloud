@@ -16,12 +16,11 @@ export async function processLinkedMessage({
   platformIntegration: PlatformIntegration;
   user: User;
 }) {
-  const platform = thread.id.split(':')[0];
   const botRequestId = await createBotRequest({
     createdBy: user.id,
     organizationId: platformIntegration.owned_by_organization_id ?? null,
     platformIntegrationId: platformIntegration.id,
-    platform,
+    platform: thread.adapter.name,
     platformThreadId: thread.id,
     platformMessageId: message.id,
     userMessage: message.text,

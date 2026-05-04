@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createMessageRequestSchema, type Message } from '@kilocode/kilo-chat';
 
 import {
@@ -9,6 +9,23 @@ import {
   getDeliveryFailureLabel,
   getReplyPreviewText,
 } from './message-presentation';
+
+vi.mock('expo-crypto', () => ({
+  getRandomValues: (typedArray: Uint8Array) => {
+    typedArray[0] = 128;
+    return typedArray;
+  },
+}));
+
+vi.mock('ulid', () => ({
+  ulid: (_seedTime?: number, prng?: () => number) => {
+    if (!prng) {
+      throw new Error('missing explicit PRNG');
+    }
+    prng();
+    return '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+  },
+}));
 
 function message(overrides: Partial<Message> = {}): Message {
   return {
@@ -27,6 +44,10 @@ function message(overrides: Partial<Message> = {}): Message {
 }
 
 describe('buildSendMessageVariables', () => {
+  it('creates client ids without relying on ULID PRNG auto-detection', () => {
+    expect(createSendMessageClientId()).toBe('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+  });
+
   it('builds variables accepted by the create message request schema', () => {
     const variables = buildSendMessageVariables({
       conversationId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',

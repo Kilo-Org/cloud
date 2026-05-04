@@ -3,6 +3,7 @@ import {
   type Message,
   type ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
+import * as Crypto from 'expo-crypto';
 import { ulid } from 'ulid';
 
 type SendMessageVariables = CreateMessageRequest & { clientId: string };
@@ -31,7 +32,16 @@ export function buildSendMessageVariables({
 }
 
 export function createSendMessageClientId(): string {
-  return ulid();
+  return ulid(undefined, expoCryptoPrng);
+}
+
+function expoCryptoPrng(): number {
+  const bytes = Crypto.getRandomValues(new Uint8Array(1));
+  const byte = bytes[0];
+  if (byte === undefined) {
+    throw new Error('Failed to generate a random byte');
+  }
+  return byte / 255;
 }
 
 function contentBlocksToPreviewText(content: Message['content']): string {

@@ -5,6 +5,7 @@ import {
   kiloclaw_instances,
   kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
+  top_up_email_log,
 } from '@kilocode/db/schema';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import { db } from '@/lib/drizzle';
@@ -241,6 +242,117 @@ describe('processTopUp credit top-up email', () => {
       .where(eq(credit_transactions.kilo_user_id, user.id))
       .limit(1);
     expect(txn).toBeTruthy();
+  });
+
+  test('recovers confirmation email on webhook retry when first attempt did not send', async () => {
+    // Simulate the failure mode: the first processTopUp committed the credit
+    // transaction but exited before firing the email (no top_up_email_log
+    // marker). A webhook retry must observe the missing marker and send.
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const stripePaymentId = `ch_recover_${Date.now()}_${Math.random()}`;
+
+    await db.insert(credit_transactions).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: user.id,
+      is_free: false,
+      amount_microdollars: 1500 * 10_000,
+      description: 'Top-up via stripe',
+      original_baseline_microdollars_used: 0,
+      stripe_payment_id: stripePaymentId,
+    });
+
+    // Retry arrives. processTopUp sees the credit is already committed and
+    // should attempt marker-gated email recovery.
+    const retry = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(retry).toBe(false);
+
+    expect(creditsTopUpSends()).toHaveLength(1);
+
+    // Marker row exists to prevent a third attempt from re-sending.
+    const [marker] = await db
+      .select({ id: top_up_email_log.id })
+      .from(top_up_email_log)
+      .where(eq(top_up_email_log.stripe_payment_id, stripePaymentId))
+      .limit(1);
+    expect(marker).toBeTruthy();
+
+    sendViaMailgunMock.mockClear();
+
+    // A third retry must observe the marker and skip.
+    const thirdAttempt = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(thirdAttempt).toBe(false);
+    expect(creditsTopUpSends()).toHaveLength(0);
+  });
+
+  test('writes a top_up_email_log marker on first-attempt send', async () => {
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const stripePaymentId = `ch_marker_${Date.now()}_${Math.random()}`;
+    const first = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(first).toBe(true);
+
+    const [marker] = await db
+      .select({ stripe_payment_id: top_up_email_log.stripe_payment_id })
+      .from(top_up_email_log)
+      .where(eq(top_up_email_log.stripe_payment_id, stripePaymentId))
+      .limit(1);
+    expect(marker).toEqual({ stripe_payment_id: stripePaymentId });
+  });
+
+  test('recovery path skips email when skipPostTopUpFreeStuff is true on retry', async () => {
+    // Guards against the edge case where a retry caller passes
+    // skipPostTopUpFreeStuff: true (e.g. a Kilo Pass flow re-using
+    // processTopUp as a primitive) — we must not send a user-facing top-up
+    // confirmation email just because a marker was missing.
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const stripePaymentId = `ch_skip_retry_${Date.now()}_${Math.random()}`;
+
+    await db.insert(credit_transactions).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: user.id,
+      is_free: false,
+      amount_microdollars: 1500 * 10_000,
+      description: 'Top-up via stripe',
+      original_baseline_microdollars_used: 0,
+      stripe_payment_id: stripePaymentId,
+    });
+
+    const retry = await processTopUp(
+      user,
+      1500,
+      { type: 'stripe', stripe_payment_id: stripePaymentId },
+      { skipPostTopUpFreeStuff: true }
+    );
+    expect(retry).toBe(false);
+
+    expect(creditsTopUpSends()).toHaveLength(0);
+
+    const [marker] = await db
+      .select({ id: top_up_email_log.id })
+      .from(top_up_email_log)
+      .where(eq(top_up_email_log.stripe_payment_id, stripePaymentId))
+      .limit(1);
+    expect(marker).toBeUndefined();
   });
 });
 

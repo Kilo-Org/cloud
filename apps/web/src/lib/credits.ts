@@ -1,4 +1,4 @@
-import { credit_transactions } from '@kilocode/db/schema';
+import { credit_transactions, top_up_email_log } from '@kilocode/db/schema';
 
 import type { User } from '@kilocode/db/schema';
 import { kilocode_users } from '@kilocode/db/schema';
@@ -89,8 +89,24 @@ export async function processTopUp(
     .insert(credit_transactions)
     .values(creditTransactionOptions)
     .onConflictDoNothing();
-  if (attemptToInsert.rowCount === 0) {
-    //violated one of the unique constraints, i.e. this credit is already in the queue.
+  const didInsertCreditTransaction = (attemptToInsert.rowCount ?? 0) > 0;
+
+  if (!didInsertCreditTransaction) {
+    // A prior processTopUp call already committed the credit transaction for
+    // this stripe_payment_id (duplicate webhook / retry). The credit itself
+    // is idempotent, but the confirmation email is not guaranteed to have
+    // been sent — the original process could have exited between the credit
+    // commit and `after(processPostTopUpFreeStuff)`. Attempt to recover the
+    // email via the durable top_up_email_log marker. If a marker already
+    // exists the insert collides and no second email is sent.
+    if (!skipPostTopUpFreeStuff) {
+      await recoverTopUpConfirmationEmailIfMissing({
+        user,
+        amountInCents,
+        stripeChargeOrInvoiceId: config.stripe_payment_id,
+        isAutoTopUp,
+      });
+    }
     return false;
   }
 
@@ -115,7 +131,7 @@ export async function processTopUp(
       });
     }
 
-    await sendTopUpConfirmationEmail({
+    await maybeSendTopUpConfirmationEmail({
       user,
       amountInCents,
       stripeChargeOrInvoiceId: config.stripe_payment_id,
@@ -130,12 +146,15 @@ export async function processTopUp(
   return true;
 }
 
-// Idempotency: this function runs at most once per successful top-up because
-// `processTopUp` is guarded by a unique constraint on
-// `credit_transactions.stripe_payment_id` and only invokes its post-processing
-// block on the row that actually inserted. Any later webhook retry for the
-// same Stripe payment returns early with `false` before reaching here.
-async function sendTopUpConfirmationEmail(params: {
+// Idempotency is enforced by the unique index on
+// `top_up_email_log.stripe_payment_id`. Every send attempt — first-attempt
+// and webhook-retry recovery — first inserts a marker row with
+// `onConflictDoNothing()`. A rowCount of 0 means an earlier attempt already
+// sent the email, so we bail without sending again. If the provider was not
+// configured (e.g. Mailgun env missing in preview/test), the marker is
+// cleared so a future retry can re-attempt. Mirrors
+// `maybeSendKiloClawSubscriptionStartedEmail` in credit-billing.ts.
+async function maybeSendTopUpConfirmationEmail(params: {
   user: User;
   amountInCents: number;
   stripeChargeOrInvoiceId: string;
@@ -143,8 +162,21 @@ async function sendTopUpConfirmationEmail(params: {
 }): Promise<void> {
   const { user, amountInCents, stripeChargeOrInvoiceId, isAutoTopUp } = params;
   try {
+    const insertResult = await db
+      .insert(top_up_email_log)
+      .values({
+        stripe_payment_id: stripeChargeOrInvoiceId,
+        user_id: user.id,
+      })
+      .onConflictDoNothing();
+
+    if ((insertResult.rowCount ?? 0) === 0) {
+      // An earlier attempt already sent this top-up email. Don't re-send.
+      return;
+    }
+
     const receiptUrl = await resolveStripeReceiptUrl(stripeChargeOrInvoiceId);
-    await sendCreditsTopUpEmail({
+    const sendResult = await sendCreditsTopUpEmail({
       to: user.google_user_email,
       variant: isAutoTopUp ? 'auto' : 'manual',
       amountCents: amountInCents,
@@ -152,12 +184,52 @@ async function sendTopUpConfirmationEmail(params: {
       purchaseDate: new Date(),
       receiptUrl,
     });
+
+    // `neverbounce_rejected` is deliberately NOT cleared: NeverBounce's verdict
+    // is terminal for that address, so retrying would loop forever. Keep the
+    // marker so we never try again for this payment.
+    if (!sendResult.sent && sendResult.reason === 'provider_not_configured') {
+      await deleteTopUpEmailLog(stripeChargeOrInvoiceId);
+    }
   } catch (error) {
     captureException(error, {
       tags: { source: 'credits_topup_email' },
       extra: { kilo_user_id: user.id, stripeChargeOrInvoiceId, isAutoTopUp },
     });
+    // Best-effort rollback so a retry can re-attempt — mirrors the pattern in
+    // `maybeSendKiloClawSubscriptionStartedEmail`.
+    try {
+      await deleteTopUpEmailLog(stripeChargeOrInvoiceId);
+    } catch {
+      // Leave the marker in place; we prefer missing one email over duplicate sends.
+    }
   }
+}
+
+// Called from the duplicate-webhook path in `processTopUp`, where the credit
+// transaction is already committed but the first attempt may have exited
+// before sending the email. Runs the same marker-gated send so a successful
+// prior send still dedupes on the unique index.
+async function recoverTopUpConfirmationEmailIfMissing(params: {
+  user: User;
+  amountInCents: number;
+  stripeChargeOrInvoiceId: string;
+  isAutoTopUp: boolean;
+}): Promise<void> {
+  // Reuse the same gated-send path. The marker insert with
+  // onConflictDoNothing() naturally skips when the original attempt already
+  // sent, and fires the email when it didn't.
+  if (IS_IN_AUTOMATED_TEST) {
+    await maybeSendTopUpConfirmationEmail(params);
+  } else {
+    after(() => maybeSendTopUpConfirmationEmail(params));
+  }
+}
+
+async function deleteTopUpEmailLog(stripeChargeOrInvoiceId: string): Promise<void> {
+  await db
+    .delete(top_up_email_log)
+    .where(eq(top_up_email_log.stripe_payment_id, stripeChargeOrInvoiceId));
 }
 
 async function resolveStripeReceiptUrl(stripeChargeOrInvoiceId: string): Promise<string | null> {

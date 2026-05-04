@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { sandboxIdFromUserId } from './sandbox-id.js';
-import { sandboxIdFromInstanceId } from './instance-id.js';
+import { sandboxIdFromUserId } from './sandbox-id';
+import { sandboxIdFromInstanceId } from './instance-id';
 import {
   hostnameLabelFromSandboxId,
   sandboxIdFromHostnameLabel,
   instanceUrl,
   parseInstanceHost,
   MAX_HOSTNAME_LABEL_LENGTH,
-} from './hostname-label.js';
+} from './hostname-label';
 
 describe('hostnameLabelFromSandboxId', () => {
   it('maps an instance-keyed sandboxId to `i-{32hex}`', () => {

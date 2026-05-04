@@ -47,4 +47,4 @@ export function userIdFromSandboxId(sandboxId: string): string {
 // Canonical implementation lives in ./instance-id; re-exported here for
 // convenience so callers get both shapes from one module.
 
-export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
+export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id';

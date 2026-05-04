@@ -23,7 +23,7 @@
  * modern OSes + browsers per RFC 6761, so no `/etc/hosts` edit is required.
  */
 
-import { isInstanceKeyedSandboxId } from './instance-id.js';
+import { isInstanceKeyedSandboxId } from './instance-id';
 
 /** RFC 1035 max label length. */
 export const MAX_HOSTNAME_LABEL_LENGTH = 63;

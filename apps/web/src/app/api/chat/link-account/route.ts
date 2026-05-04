@@ -12,6 +12,7 @@ import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getPlatformIdentity, getPlatformIntegration } from '@/lib/bot/platform-helpers';
 import { processLinkedMessage } from '@/lib/bot/run';
+import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
 import type { Adapter, Message } from 'chat';
 import type { User } from '@kilocode/db';
 
@@ -178,28 +179,29 @@ async function reprocessLinkedMessage(
   user: User
 ): Promise<void> {
   try {
-    const fetched = await fetchMessage(sourceMessage.threadId, sourceMessage.messageId);
-    if (!fetched) return;
-
-    const messageIdentity = getPlatformIdentity(fetched.thread, fetched.message);
-    if (
-      messageIdentity.platform !== identity.platform ||
-      messageIdentity.teamId !== identity.teamId ||
-      messageIdentity.userId !== identity.userId
-    ) {
-      return;
-    }
-
-    const platformIntegration = await getPlatformIntegration(messageIdentity);
+    const platformIntegration = await getPlatformIntegration(identity);
     if (!platformIntegration) return;
 
-    bot.registerSingleton();
-    await fetched.thread.startTyping('Thinking...');
-    await processLinkedMessage({
-      thread: fetched.thread,
-      message: fetched.message,
-      platformIntegration,
-      user,
+    await withBotPlatformAuthContext(platformIntegration, async () => {
+      const fetched = await fetchMessage(sourceMessage.threadId, sourceMessage.messageId);
+      if (!fetched) return;
+
+      const messageIdentity = getPlatformIdentity(fetched.thread, fetched.message);
+      if (
+        messageIdentity.platform !== identity.platform ||
+        messageIdentity.teamId !== identity.teamId ||
+        messageIdentity.userId !== identity.userId
+      ) {
+        return;
+      }
+
+      await fetched.thread.startTyping('Thinking...');
+      await processLinkedMessage({
+        thread: fetched.thread,
+        message: fetched.message,
+        platformIntegration,
+        user,
+      });
     });
   } catch (error) {
     console.error('[Bot] Failed to reprocess linked message:', error);

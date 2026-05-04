@@ -2267,6 +2267,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         // services/kiloclaw/src/db/index.ts maybePromoteScheduledActionsToCompleted
         // (kept inline rather than imported because that helper takes
         // a WorkerDb, not a tx).
+        // NOT EXISTS treats both 'pending' and 'running' as unresolved
+        // — see comment on maybePromoteScheduledActionsToCompleted in
+        // services/kiloclaw/src/db/index.ts for why.
         await tx.execute(sql`
           UPDATE kiloclaw_scheduled_action_stages s
           SET status = CASE
@@ -2278,7 +2281,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             AND s.status IN ('pending', 'running')
             AND NOT EXISTS (
               SELECT 1 FROM kiloclaw_scheduled_action_targets t
-              WHERE t.stage_id = s.id AND t.status = 'pending'
+              WHERE t.stage_id = s.id AND t.status IN ('pending', 'running')
             )
         `);
         await tx.execute(sql`
@@ -2292,7 +2295,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             AND a.status IN ('scheduled', 'running')
             AND NOT EXISTS (
               SELECT 1 FROM kiloclaw_scheduled_action_targets t
-              WHERE t.scheduled_action_id = a.id AND t.status = 'pending'
+              WHERE t.scheduled_action_id = a.id AND t.status IN ('pending', 'running')
             )
         `);
 

@@ -530,6 +530,15 @@ export async function maybePromoteScheduledActionsToCompleted(
   // 'completed' if anything was applied or skipped, otherwise 'failed'.
   // This prevents an action where every target hit a dispatch error
   // from rendering as a green "completed" badge.
+  // The NOT EXISTS clause must treat both 'pending' and 'running' as
+  // unresolved. Targets sit briefly in 'running' between
+  // claimScheduledActionTarget and recordScheduledActionTargetOutcome;
+  // if we only filter 'pending' here, a parallel apply pass on a
+  // different instance under the same parent can promote prematurely
+  // while another target is still mid-dispatch. Premature promotion
+  // also breaks the scheduleAction conflict check (which looks at
+  // parent.status IN ('scheduled', 'running')), letting a new schedule
+  // race in against the still-running target.
   await db.execute(sql`
     UPDATE kiloclaw_scheduled_action_stages s
     SET status = CASE
@@ -541,7 +550,7 @@ export async function maybePromoteScheduledActionsToCompleted(
       AND s.status IN ('pending', 'running')
       AND NOT EXISTS (
         SELECT 1 FROM kiloclaw_scheduled_action_targets t
-        WHERE t.stage_id = s.id AND t.status = 'pending'
+        WHERE t.stage_id = s.id AND t.status IN ('pending', 'running')
       )
   `);
 
@@ -556,7 +565,7 @@ export async function maybePromoteScheduledActionsToCompleted(
       AND a.status IN ('scheduled', 'running')
       AND NOT EXISTS (
         SELECT 1 FROM kiloclaw_scheduled_action_targets t
-        WHERE t.scheduled_action_id = a.id AND t.status = 'pending'
+        WHERE t.scheduled_action_id = a.id AND t.status IN ('pending', 'running')
       )
   `);
 }

@@ -5,7 +5,7 @@ import { after } from 'next/server';
 import { linkKiloUser, verifyLinkToken, type PlatformIdentity } from '@/lib/bot-identity';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
-import { getPlatformIdentity, getPlatformIntegration } from '@/lib/bot/platform-helpers';
+import { getPlatformIntegration } from '@/lib/bot/platform-helpers';
 import { processLinkedMessage } from '@/lib/bot/run';
 import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
 import type { Message, Thread } from 'chat';
@@ -138,15 +138,6 @@ async function reprocessLinkedMessage(
     if (!platformIntegration) return;
 
     await withBotPlatformAuthContext(platformIntegration, async () => {
-      const messageIdentity = getPlatformIdentity(thread, message);
-      if (
-        messageIdentity.platform !== identity.platform ||
-        messageIdentity.teamId !== identity.teamId ||
-        messageIdentity.userId !== identity.userId
-      ) {
-        return;
-      }
-
       await thread.startTyping('Thinking...');
       await processLinkedMessage({
         thread,

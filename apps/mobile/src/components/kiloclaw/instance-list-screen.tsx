@@ -101,17 +101,19 @@ export function InstanceListScreen({
             <Text className="text-[15px] font-medium leading-5 text-muted-foreground">
               Choose an instance to view conversations.
             </Text>
-            <Button
-              className="mt-1 h-11"
-              onPress={() => {
-                void Haptics.selectionAsync();
-                onCreate();
-              }}
-              accessibilityLabel="Create instance"
-            >
-              <Plus size={16} color={colors.primaryForeground} />
-              <Text>Create instance</Text>
-            </Button>
+            {instances.length === 0 ? (
+              <Button
+                className="mt-1 h-11"
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  onCreate();
+                }}
+                accessibilityLabel="Create instance"
+              >
+                <Plus size={16} color={colors.primaryForeground} />
+                <Text>Create instance</Text>
+              </Button>
+            ) : null}
           </View>
 
           <InstanceSection

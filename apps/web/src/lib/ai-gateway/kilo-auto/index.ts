@@ -120,7 +120,7 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Auto Free',
   description:
-    'Rotates through available free models. Limited capability and no credits required. Note: prompts may be logged by the upstream provider and used to improve their services.',
+    'Rotates through available free models. Limited capability and no credits required.\n\n**Warning:** prompts may be logged by the upstream provider and used to improve their services. Not suitable for production or sensitive data workloads.\n\n[Learn more](https://kilo.ai/docs/code-with-ai/agents/auto-model)',
   context_length: 256_000,
   max_completion_tokens: 10_000,
   prompt_price: '0',

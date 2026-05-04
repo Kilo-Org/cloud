@@ -234,6 +234,9 @@ export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Pro
     // Check if balance is crossing the minimum_balance threshold
     if (minimumBalance != null && currentBalance >= minimumBalance && newBalance < minimumBalance) {
       const alertEmails = orgData?.settings?.minimum_balance_alert_email ?? [];
+      logExceptInTest(
+        `[ingestOrganizationTokenUsage] Balance alert triggered for org ${organization_id}: currentBalance=${fromMicrodollars(currentBalance)} newBalance=${fromMicrodollars(newBalance)} threshold=${fromMicrodollars(minimumBalance)} recipients=${alertEmails.length}`
+      );
       // Send email notification about low balance (don't block the transaction, but do make Vercel wait on the Promise before shutting down)
       after(
         sendBalanceAlertEmail({

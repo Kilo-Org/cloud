@@ -82,6 +82,10 @@ export function isKiloExclusiveFreeModel(model: string): boolean {
   );
 }
 
+export function isKiloExclusiveModel(model: string): boolean {
+  return kiloExclusiveModels.some(m => m.public_id === model && m.status !== 'disabled');
+}
+
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
   minimax_m25_free_model,

@@ -97,11 +97,8 @@ export function InstanceListScreen({
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          <View className="gap-2">
-            <Text className="text-[15px] font-medium leading-5 text-muted-foreground">
-              Choose an instance to view conversations.
-            </Text>
-            {instances.length === 0 ? (
+          {instances.length === 0 ? (
+            <View className="gap-2">
               <Button
                 className="mt-1 h-11"
                 onPress={() => {
@@ -113,8 +110,8 @@ export function InstanceListScreen({
                 <Plus size={16} color={colors.primaryForeground} />
                 <Text>Create instance</Text>
               </Button>
-            ) : null}
-          </View>
+            </View>
+          ) : null}
 
           <InstanceSection
             title="Personal"

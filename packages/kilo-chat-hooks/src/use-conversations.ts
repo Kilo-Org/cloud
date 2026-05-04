@@ -104,7 +104,7 @@ type RenameConversationMutationVariables = {
   sandboxId: string | null;
 };
 
-export function useRenameConversation(client: KiloChatClient) {
+export function useRenameConversation(client: KiloChatClient, options?: MutationErrorOptions) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (variables: RenameConversationMutationVariables) =>
@@ -112,6 +112,7 @@ export function useRenameConversation(client: KiloChatClient) {
     onSuccess: (_data, variables) => {
       settleRenameConversation(queryClient, variables);
     },
+    onError: options?.onError,
   });
 }
 
@@ -120,7 +121,7 @@ type LeaveConversationMutationVariables = {
   sandboxId: string | null;
 };
 
-export function useLeaveConversation(client: KiloChatClient) {
+export function useLeaveConversation(client: KiloChatClient, options?: MutationErrorOptions) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (variables: LeaveConversationMutationVariables) =>
@@ -128,6 +129,7 @@ export function useLeaveConversation(client: KiloChatClient) {
     onMutate: variables => applyOptimisticLeaveConversation(queryClient, variables),
     onError: (_err, _variables, context) => {
       rollbackOptimisticLeaveConversation(queryClient, context);
+      options?.onError?.(_err);
     },
     onSuccess: (_data, variables) => {
       settleLeaveConversation(queryClient, variables);

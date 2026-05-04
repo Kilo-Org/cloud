@@ -29,7 +29,19 @@ export default function ChatSandboxLayout() {
     <>
       <ChatSandboxInstanceEventSubscriptionMount />
       <ChatSandboxLastActiveInstanceMount />
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="[conversation-id]" />
+        <Stack.Screen
+          name="rename-conversation"
+          options={{
+            presentation: 'formSheet',
+            sheetAllowedDetents: [0.5],
+            sheetGrabberVisible: true,
+            headerShown: false,
+          }}
+        />
+      </Stack>
     </>
   );
 }

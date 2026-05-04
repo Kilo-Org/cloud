@@ -1,20 +1,28 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { timeAgo } from '@/lib/utils';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { Plus } from 'lucide-react-native';
 
 import { EmptyConversationList } from './empty-conversation-list';
+import { groupConversationsByActivity } from './conversation-list-groups';
 import { getConversationListContentState } from './conversation-list-state';
+import { ConversationRow } from './conversation-row';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
-import { useConversations, useCreateConversation } from './hooks/use-conversations';
+import {
+  useConversations,
+  useCreateConversation,
+  useLeaveConversation,
+} from './hooks/use-conversations';
 import { useInstancePresence } from './hooks/use-instance-presence';
+import { useNowTicker } from './hooks/use-now-ticker';
 
 type Props = {
   sandboxId: string;
@@ -22,21 +30,21 @@ type Props = {
 };
 
 type ConversationItem = {
-  conversationId: string;
-  title: string | null;
-  lastActivityAt: number | null;
-  lastReadAt: number | null;
-  joinedAt: number;
+  kind: 'conversation';
+  conversation: NonNullable<ReturnType<typeof useConversations>['data']>['conversations'][number];
 };
 
-type ConversationRowProps = {
-  item: ConversationItem;
-  onPress: (id: string) => void;
+type ConversationHeaderItem = {
+  kind: 'header';
+  label: string;
 };
 
-function ConversationListSkeleton() {
+type ConversationListEntry = ConversationHeaderItem | ConversationItem;
+
+function ConversationListSkeleton({ showHeader }: Readonly<{ showHeader?: boolean }>) {
   return (
     <View className="px-4 py-2">
+      {showHeader ? <Skeleton className="mb-2 h-4 w-24 rounded-md" /> : null}
       {[0, 1, 2, 3].map(i => (
         <View key={i} className="flex-row items-center gap-3 py-3">
           <View className="flex-1 gap-2">
@@ -50,43 +58,28 @@ function ConversationListSkeleton() {
   );
 }
 
-function ConversationRow({ item, onPress }: ConversationRowProps) {
-  const hasUnread =
-    item.lastActivityAt !== null &&
-    (item.lastReadAt === null || item.lastReadAt < item.lastActivityAt);
-
-  return (
-    <Pressable
-      className="flex-row items-center gap-3 px-4 py-3 active:opacity-80"
-      onPress={() => {
-        onPress(item.conversationId);
-      }}
-    >
-      <View className="flex-1">
-        <Text className="text-base font-medium text-foreground" numberOfLines={1}>
-          {item.title ?? 'Untitled conversation'}
-        </Text>
-        {item.lastActivityAt !== null ? (
-          <Text className="mt-0.5 text-sm text-muted-foreground">
-            {timeAgo(new Date(item.lastActivityAt))}
-          </Text>
-        ) : null}
-      </View>
-      {hasUnread ? (
-        <View className="h-2.5 w-2.5 rounded-full bg-primary" accessibilityLabel="Unread" />
-      ) : (
-        // Reserve space so rows stay the same width whether the dot is shown or not
-        <View className="h-2.5 w-2.5" />
-      )}
-    </Pressable>
-  );
+function flattenConversationGroups(
+  conversations: NonNullable<ReturnType<typeof useConversations>['data']>['conversations'],
+  nowMs: number
+): ConversationListEntry[] {
+  const entries: ConversationListEntry[] = [];
+  for (const group of groupConversationsByActivity(conversations, nowMs)) {
+    entries.push({ kind: 'header', label: group.label });
+    for (const conversation of group.items) {
+      entries.push({ kind: 'conversation', conversation });
+    }
+  }
+  return entries;
 }
 
 export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const router = useRouter();
+  const colors = useThemeColors();
   const client = useKiloChatClient();
   const listQuery = useConversations(client, sandboxId);
   const createConversation = useCreateConversation(client);
+  const leaveConversation = useLeaveConversation(client);
+  const now = useNowTicker(60_000);
 
   const hasNextPage = listQuery.hasNextPage;
   const isFetchingNextPage = listQuery.isFetchingNextPage;
@@ -109,6 +102,10 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
     );
   }
 
+  function handleLeave(conversationId: string) {
+    leaveConversation.mutate({ conversationId, sandboxId });
+  }
+
   const fetchMoreConversations = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       void fetchNextPage({ cancelRefetch: false });
@@ -126,7 +123,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       <View className="flex-1">
         <ScreenHeader title={sandboxLabel} />
         <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-          <ConversationListSkeleton />
+          <ConversationListSkeleton showHeader />
         </Animated.View>
       </View>
     );
@@ -150,15 +147,50 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   }
 
   const conversations = listQuery.data?.conversations ?? [];
+  const entries = flattenConversationGroups(conversations, now);
 
   return (
     <View className="flex-1">
-      <ScreenHeader title={sandboxLabel} />
+      <ScreenHeader
+        title={sandboxLabel}
+        headerRight={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="New conversation"
+            disabled={createConversation.isPending}
+            onPress={handleCreateAndNavigate}
+            className="h-10 w-10 items-center justify-center rounded-full active:bg-muted disabled:opacity-50"
+          >
+            {createConversation.isPending ? (
+              <ActivityIndicator size="small" color={colors.mutedForeground} />
+            ) : (
+              <Plus size={20} color={colors.foreground} />
+            )}
+          </Pressable>
+        }
+      />
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <FlashList
-          data={conversations}
-          keyExtractor={c => c.conversationId}
-          renderItem={({ item }) => <ConversationRow item={item} onPress={handleRowPress} />}
+          data={entries}
+          keyExtractor={entry =>
+            entry.kind === 'header' ? `header:${entry.label}` : entry.conversation.conversationId
+          }
+          renderItem={({ item }) =>
+            item.kind === 'header' ? (
+              <View className="bg-background px-4 pb-1 pt-4">
+                <Text variant="eyebrow">{item.label}</Text>
+              </View>
+            ) : (
+              <View className="px-2">
+                <ConversationRow
+                  conversation={item.conversation}
+                  sandboxId={sandboxId}
+                  onPress={handleRowPress}
+                  onLeave={handleLeave}
+                />
+              </View>
+            )
+          }
           ListEmptyComponent={
             <EmptyConversationList
               onStart={handleCreateAndNavigate}
@@ -168,12 +200,20 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           ListFooterComponent={
             isFetchingNextPage ? (
               <View className="px-4 py-3">
-                <Skeleton className="h-12 w-full rounded-md" />
+                <ConversationListSkeleton />
               </View>
             ) : null
           }
           onEndReached={fetchMoreConversations}
           onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl
+              refreshing={listQuery.isRefetching && !listQuery.isFetchingNextPage}
+              onRefresh={() => {
+                void listQuery.refetch();
+              }}
+            />
+          }
         />
       </Animated.View>
     </View>

@@ -8,6 +8,7 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -16,18 +17,19 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import {
+  resolveLongPressFeedback,
   shouldStartReplyFromSwipe,
   SWIPE_REPLY_DISTANCE,
   SWIPE_REPLY_MAX_TRANSLATE,
 } from './message-gesture-state';
 import { MessageMarkdown } from './message-markdown';
 import {
-  canShowReactionPills,
   getDeliveryFailureLabel,
   getReplyPreviewText,
   isMessageEdited,
   type ReplyPreviewSource,
 } from './message-presentation';
+import { MessageReactionPills } from './message-reaction-pills';
 
 type Props = {
   message: Message;
@@ -78,12 +80,10 @@ function MessageBubbleComponent({
   const edited = isMessageEdited(message);
   const swipeX = useSharedValue(0);
   const replyProgress = useSharedValue(0);
+  const pressScale = useSharedValue(1);
+  const longPressHighlight = useSharedValue(0);
   const canSwipeReply =
     onSwipeReply !== undefined && !isPending && !message.deleted && !message.deliveryFailed;
-
-  function handleReactionPress(emoji: string) {
-    onReactionPress(message, emoji);
-  }
 
   function handleExecuteAction(groupId: string, value: ExecApprovalDecision) {
     onExecuteAction(message, groupId, value);
@@ -91,6 +91,36 @@ function MessageBubbleComponent({
 
   function handleSwipeReply() {
     onSwipeReply?.(message);
+  }
+
+  function handlePressIn() {
+    const feedback = resolveLongPressFeedback({ pressed: true, longPressed: false });
+    pressScale.value = withTiming(feedback.scale, {
+      duration: 120,
+      easing: Easing.out(Easing.cubic),
+    });
+  }
+
+  function handlePressOut() {
+    const feedback = resolveLongPressFeedback({ pressed: false, longPressed: false });
+    pressScale.value = withTiming(feedback.scale, {
+      duration: 160,
+      easing: Easing.out(Easing.cubic),
+    });
+    longPressHighlight.value = withTiming(feedback.highlightOpacity, { duration: 180 });
+  }
+
+  function handleLongPress() {
+    const feedback = resolveLongPressFeedback({ pressed: true, longPressed: true });
+    pressScale.value = withSequence(
+      withTiming(feedback.scale, { duration: 90, easing: Easing.out(Easing.cubic) }),
+      withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) })
+    );
+    longPressHighlight.value = withSequence(
+      withTiming(feedback.highlightOpacity, { duration: 90 }),
+      withTiming(0, { duration: 260 })
+    );
+    onLongPress?.(message);
   }
 
   // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
@@ -122,11 +152,14 @@ function MessageBubbleComponent({
     });
 
   const swipeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: swipeX.value }],
+    transform: [{ translateX: swipeX.value }, { scale: pressScale.value }],
   }));
   const replyHintStyle = useAnimatedStyle(() => ({
     opacity: replyProgress.value,
     transform: [{ scale: 0.85 + replyProgress.value * 0.15 }],
+  }));
+  const longPressHighlightStyle = useAnimatedStyle(() => ({
+    opacity: longPressHighlight.value,
   }));
 
   const textColor = isFromMe ? 'text-white' : 'text-foreground';
@@ -135,13 +168,9 @@ function MessageBubbleComponent({
   return (
     <GestureDetector gesture={swipeGesture}>
       <Pressable
-        onLongPress={
-          onLongPress
-            ? () => {
-                onLongPress(message);
-              }
-            : undefined
-        }
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onLongPress={onLongPress ? handleLongPress : undefined}
         className={cn(
           'px-4 py-1',
           isFromMe ? 'items-end' : 'items-start',
@@ -174,10 +203,15 @@ function MessageBubbleComponent({
 
           <View
             className={cn(
-              'max-w-[80%] rounded-2xl px-3 py-2',
+              'relative max-w-[80%] rounded-2xl px-3 py-2',
               isFromMe ? 'bg-primary' : 'border border-border bg-card dark:bg-secondary'
             )}
           >
+            <Animated.View
+              pointerEvents="none"
+              className="absolute inset-0 rounded-2xl bg-black/5 dark:bg-white/10"
+              style={longPressHighlightStyle}
+            />
             {message.deleted ? (
               <Text className={cn('text-sm italic opacity-50', textColor)}>[deleted message]</Text>
             ) : (
@@ -256,42 +290,12 @@ function MessageBubbleComponent({
             )}
           </View>
 
-          {canShowReactionPills(message) && (
-            <View
-              className={cn(
-                'mt-1 flex-row flex-wrap gap-1 px-1',
-                isFromMe ? 'justify-end' : 'justify-start'
-              )}
-            >
-              {message.reactions.map(reaction => {
-                const hasReacted = currentUserId
-                  ? reaction.memberIds.includes(currentUserId)
-                  : false;
-                return (
-                  <Pressable
-                    key={reaction.emoji}
-                    onPress={() => {
-                      handleReactionPress(reaction.emoji);
-                    }}
-                    className={cn(
-                      'min-h-11 flex-row items-center gap-1 rounded-full px-3 py-1',
-                      hasReacted ? 'bg-primary' : 'bg-neutral-200 dark:bg-neutral-700'
-                    )}
-                  >
-                    <Text className="text-sm">{reaction.emoji}</Text>
-                    <Text
-                      className={cn(
-                        'text-xs font-medium',
-                        hasReacted ? 'text-primary-foreground' : 'text-foreground'
-                      )}
-                    >
-                      {reaction.count}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+          <MessageReactionPills
+            message={message}
+            currentUserId={currentUserId}
+            isFromMe={isFromMe}
+            onReactionPress={onReactionPress}
+          />
         </Animated.View>
       </Pressable>
     </GestureDetector>

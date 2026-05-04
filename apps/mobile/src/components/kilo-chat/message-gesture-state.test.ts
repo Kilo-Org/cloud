@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldStartReplyFromSwipe } from './message-gesture-state';
+import { resolveLongPressFeedback, shouldStartReplyFromSwipe } from './message-gesture-state';
 
 describe('shouldStartReplyFromSwipe', () => {
   it('starts reply on a committed left swipe when reply is available', () => {
@@ -38,5 +38,22 @@ describe('shouldStartReplyFromSwipe', () => {
         velocityX: -700,
       })
     ).toBe(false);
+  });
+});
+
+describe('resolveLongPressFeedback', () => {
+  it('keeps press and long-press feedback subtle', () => {
+    expect(resolveLongPressFeedback({ pressed: false, longPressed: false })).toEqual({
+      scale: 1,
+      highlightOpacity: 0,
+    });
+    expect(resolveLongPressFeedback({ pressed: true, longPressed: false })).toEqual({
+      scale: 0.985,
+      highlightOpacity: 0,
+    });
+    expect(resolveLongPressFeedback({ pressed: true, longPressed: true })).toEqual({
+      scale: 0.97,
+      highlightOpacity: 1,
+    });
   });
 });

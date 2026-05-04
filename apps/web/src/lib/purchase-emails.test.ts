@@ -14,6 +14,7 @@ import {
   KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
   SUBSCRIPTION_STARTED_RECOVERY_WINDOW_MS,
 } from '@/lib/kiloclaw/credit-billing';
+import type * as creditBillingModule from '@/lib/kiloclaw/credit-billing';
 import type * as emailModule from '@/lib/email';
 import {
   renderTemplate,
@@ -378,9 +379,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
   });
 
   async function applyStripeFundedKiloClawPeriod(
-    params: Parameters<
-      typeof import('@/lib/kiloclaw/credit-billing').applyStripeFundedKiloClawPeriod
-    >[0]
+    params: Parameters<typeof creditBillingModule.applyStripeFundedKiloClawPeriod>[0]
   ): Promise<boolean> {
     const mod = await import('@/lib/kiloclaw/credit-billing');
     return mod.applyStripeFundedKiloClawPeriod(params);

@@ -14,7 +14,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type Props = {
   instances: ClawInstance[];
-  currentSandboxId: string | null;
   onSelect: (sandboxId: string) => void;
   onCreate: () => void;
   refreshing: boolean;
@@ -32,13 +31,11 @@ function splitInstances(instances: ClawInstance[]) {
 function InstanceSection({
   title,
   instances,
-  currentSandboxId,
   onSelect,
   showCount,
 }: Readonly<{
   title: string;
   instances: ClawInstance[];
-  currentSandboxId: string | null;
   onSelect: (sandboxId: string) => void;
   showCount: boolean;
 }>) {
@@ -58,12 +55,7 @@ function InstanceSection({
       </View>
       <View className="gap-3">
         {instances.map(instance => (
-          <InstanceListRow
-            key={instance.sandboxId}
-            instance={instance}
-            isCurrent={instance.sandboxId === currentSandboxId}
-            onPress={onSelect}
-          />
+          <InstanceListRow key={instance.sandboxId} instance={instance} onPress={onSelect} />
         ))}
       </View>
     </View>
@@ -72,7 +64,6 @@ function InstanceSection({
 
 export function InstanceListScreen({
   instances,
-  currentSandboxId,
   onSelect,
   onCreate,
   refreshing,
@@ -122,14 +113,12 @@ export function InstanceListScreen({
           <InstanceSection
             title="Personal"
             instances={personal}
-            currentSandboxId={currentSandboxId}
             onSelect={handleSelect}
             showCount={showSectionCounts}
           />
           <InstanceSection
             title="Organizations"
             instances={organizations}
-            currentSandboxId={currentSandboxId}
             onSelect={handleSelect}
             showCount={showSectionCounts}
           />

@@ -1,4 +1,4 @@
-import { Building2, CheckCircle2, ChevronRight, UserRound } from 'lucide-react-native';
+import { Building2, ChevronRight, UserRound } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { StatusBadge } from '@/components/kiloclaw/status-badge';
@@ -8,7 +8,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type InstanceListRowProps = {
   instance: ClawInstance;
-  isCurrent: boolean;
   onPress: (sandboxId: string) => void;
 };
 
@@ -20,7 +19,7 @@ function instanceSubtitle(instance: ClawInstance): string {
   return instance.organizationName ?? 'Personal';
 }
 
-export function InstanceListRow({ instance, isCurrent, onPress }: Readonly<InstanceListRowProps>) {
+export function InstanceListRow({ instance, onPress }: Readonly<InstanceListRowProps>) {
   const colors = useThemeColors();
   const Icon = instance.organizationName ? Building2 : UserRound;
 
@@ -44,7 +43,6 @@ export function InstanceListRow({ instance, isCurrent, onPress }: Readonly<Insta
           >
             {instanceTitle(instance)}
           </Text>
-          {isCurrent ? <CheckCircle2 size={16} color={colors.primary} strokeWidth={2} /> : null}
         </View>
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
           <Text variant="muted" numberOfLines={1} className="max-w-[70%]">

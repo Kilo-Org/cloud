@@ -1,5 +1,4 @@
 import { type Href, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -15,7 +14,6 @@ import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMobileOnboardingState } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
-import { getLastActiveInstance, loadLastActiveInstance } from '@/lib/last-active-instance';
 
 export default function KiloClawTab() {
   const router = useRouter();
@@ -24,15 +22,7 @@ export default function KiloClawTab() {
   const { data: instances } = instancesQuery;
   const entryDecision = getKiloClawEntryDecision(instances);
   const onboardingQuery = useKiloClawMobileOnboardingState(entryDecision.kind === 'empty');
-  const [currentSandboxId, setCurrentSandboxId] = useState<string | null>(null);
   useForegroundInvalidateKiloclawState();
-
-  useEffect(() => {
-    void (async () => {
-      await loadLastActiveInstance();
-      setCurrentSandboxId(getLastActiveInstance());
-    })();
-  }, []);
 
   const showInstanceSkeleton = entryDecision.kind === 'loading' || onboardingQuery.isPending;
 
@@ -63,7 +53,6 @@ export default function KiloClawTab() {
     return (
       <InstanceListScreen
         instances={instances ?? []}
-        currentSandboxId={currentSandboxId}
         refreshing={instancesQuery.isRefetching && !instancesQuery.isPending}
         onRefresh={() => {
           void instancesQuery.refetch();

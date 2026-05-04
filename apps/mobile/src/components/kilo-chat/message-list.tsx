@@ -19,6 +19,7 @@ type Props = {
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
   onReactionPress: (message: Message, emoji: string) => void;
   onLongPressMessage?: (m: Message) => void;
+  onSwipeReplyMessage?: (m: Message) => void;
 };
 
 export function MessageList({
@@ -32,6 +33,7 @@ export function MessageList({
   onExecuteAction,
   onReactionPress,
   onLongPressMessage,
+  onSwipeReplyMessage,
 }: Props) {
   // useMessages returns messages oldest-to-newest.
   // FlashList v2 does not support `inverted`; instead we use maintainVisibleContentPosition
@@ -68,6 +70,7 @@ export function MessageList({
             onExecuteAction={onExecuteAction}
             onReactionPress={onReactionPress}
             onLongPress={onLongPressMessage}
+            onSwipeReply={onSwipeReplyMessage}
           />
         );
       }}

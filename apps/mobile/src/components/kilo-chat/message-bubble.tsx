@@ -1,12 +1,25 @@
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
-import { AlertCircle, CheckCircle2, XCircle } from 'lucide-react-native';
+import { AlertCircle, CheckCircle2, Reply, XCircle } from 'lucide-react-native';
 import { memo } from 'react';
 import { Pressable, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { scheduleOnRN } from 'react-native-worklets';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import {
+  shouldStartReplyFromSwipe,
+  SWIPE_REPLY_DISTANCE,
+  SWIPE_REPLY_MAX_TRANSLATE,
+} from './message-gesture-state';
 import { MessageMarkdown } from './message-markdown';
 import {
   canShowReactionPills,
@@ -27,6 +40,7 @@ type Props = {
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
   onReactionPress: (message: Message, emoji: string) => void;
   onLongPress?: (m: Message) => void;
+  onSwipeReply?: (m: Message) => void;
 };
 
 function formatTimestamp(ms: number): string {
@@ -56,11 +70,16 @@ function MessageBubbleComponent({
   onExecuteAction,
   onReactionPress,
   onLongPress,
+  onSwipeReply,
 }: Props) {
   const colors = useThemeColors();
   const isPending = message.id.startsWith('pending-');
   const timestamp = message.clientUpdatedAt ?? message.updatedAt;
   const edited = isMessageEdited(message);
+  const swipeX = useSharedValue(0);
+  const replyProgress = useSharedValue(0);
+  const canSwipeReply =
+    onSwipeReply !== undefined && !isPending && !message.deleted && !message.deliveryFailed;
 
   function handleReactionPress(emoji: string) {
     onReactionPress(message, emoji);
@@ -70,146 +89,212 @@ function MessageBubbleComponent({
     onExecuteAction(message, groupId, value);
   }
 
+  function handleSwipeReply() {
+    onSwipeReply?.(message);
+  }
+
+  // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-12, 12])
+    .onUpdate(event => {
+      if (!canSwipeReply) {
+        return;
+      }
+      const nextX = Math.max(Math.min(event.translationX, 0), -SWIPE_REPLY_MAX_TRANSLATE);
+      swipeX.value = nextX;
+      replyProgress.value = Math.min(Math.abs(nextX) / SWIPE_REPLY_DISTANCE, 1);
+    })
+    .onEnd(event => {
+      const shouldReply = shouldStartReplyFromSwipe({
+        canReply: canSwipeReply,
+        translationX: event.translationX,
+        velocityX: event.velocityX,
+      });
+      if (shouldReply) {
+        scheduleOnRN(handleSwipeReply);
+      }
+      swipeX.value = withTiming(0, { duration: 180, easing: Easing.out(Easing.cubic) });
+      replyProgress.value = withTiming(0, { duration: 140 });
+    })
+    .onFinalize(() => {
+      swipeX.value = withTiming(0, { duration: 180, easing: Easing.out(Easing.cubic) });
+      replyProgress.value = withTiming(0, { duration: 140 });
+    });
+
+  const swipeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: swipeX.value }],
+  }));
+  const replyHintStyle = useAnimatedStyle(() => ({
+    opacity: replyProgress.value,
+    transform: [{ scale: 0.85 + replyProgress.value * 0.15 }],
+  }));
+
   const textColor = isFromMe ? 'text-white' : 'text-foreground';
   const deliveryFailureLabel = getDeliveryFailureLabel(message);
 
   return (
-    <Pressable
-      onLongPress={
-        onLongPress
-          ? () => {
-              onLongPress(message);
-            }
-          : undefined
-      }
-      className={cn('px-4 py-1', isFromMe ? 'items-end' : 'items-start', isPending && 'opacity-50')}
-    >
-      {showAuthor && (
-        <View className="mb-0.5 flex-row items-baseline gap-2 px-1">
-          <Text className="text-xs font-medium text-muted-foreground">{authorLabel}</Text>
-          {timestamp !== null && (
-            <Text className="text-[10px] text-muted-foreground">{formatTimestamp(timestamp)}</Text>
-          )}
-        </View>
-      )}
-
-      <View
+    <GestureDetector gesture={swipeGesture}>
+      <Pressable
+        onLongPress={
+          onLongPress
+            ? () => {
+                onLongPress(message);
+              }
+            : undefined
+        }
         className={cn(
-          'max-w-[80%] rounded-2xl px-3 py-2',
-          isFromMe ? 'bg-primary' : 'border border-border bg-card dark:bg-secondary'
+          'px-4 py-1',
+          isFromMe ? 'items-end' : 'items-start',
+          isPending && 'opacity-50'
         )}
       >
-        {message.deleted ? (
-          <Text className={cn('text-sm italic opacity-50', textColor)}>[deleted message]</Text>
-        ) : (
-          <>
-            {replyToMessage && (
-              <View
-                className={cn(
-                  'mb-2 border-l-2 py-1 pl-2',
-                  isFromMe ? 'border-white' : 'border-muted-foreground'
-                )}
-              >
-                <Text numberOfLines={2} className={cn('text-xs opacity-80', textColor)}>
-                  {getReplyPreviewText(replyToMessage)}
-                </Text>
-              </View>
-            )}
-            {message.content.map((block, index) => {
-              if (block.type === 'text') {
-                return <MessageMarkdown key={index} text={block.text} isFromMe={isFromMe} />;
-              }
-
-              // block.type === 'actions'
-              if (block.resolved) {
-                const resolvedAction = block.actions.find(a => a.value === block.resolved?.value);
-                const label = resolvedAction?.label ?? block.resolved.value;
-                const Icon = block.resolved.value.startsWith('allow') ? CheckCircle2 : XCircle;
-                return (
-                  <View key={block.groupId} className="mt-2 flex-row items-center gap-1.5">
-                    <Icon size={14} color={isFromMe ? '#FFFFFF' : colors.mutedForeground} />
-                    <Text className={cn('text-xs opacity-70', textColor)}>{label}</Text>
-                  </View>
-                );
-              }
-
-              return (
-                <View key={block.groupId} className="mt-2 flex-row flex-wrap gap-2">
-                  {block.actions.map(action => (
-                    <Button
-                      key={action.value}
-                      variant={actionStyleToVariant(action.style)}
-                      size="sm"
-                      disabled={pendingActionGroupId === block.groupId}
-                      onPress={() => {
-                        handleExecuteAction(block.groupId, action.value);
-                      }}
-                    >
-                      <Text>{action.label}</Text>
-                    </Button>
-                  ))}
-                </View>
-              );
-            })}
-            {deliveryFailureLabel && (
-              <View className="mt-2 flex-row items-center gap-1.5">
-                <AlertCircle size={14} color={colors.destructive} />
-                <Text className="text-xs font-medium text-red-600 dark:text-red-400">
-                  {deliveryFailureLabel}
-                </Text>
-              </View>
-            )}
-          </>
+        {canSwipeReply && (
+          <Animated.View
+            pointerEvents="none"
+            className="absolute bottom-1 right-4 top-1 justify-center"
+            style={replyHintStyle}
+          >
+            <View className="h-9 w-9 items-center justify-center rounded-full bg-neutral-200 dark:bg-neutral-700">
+              <Reply size={17} color={colors.foreground} />
+            </View>
+          </Animated.View>
         )}
 
-        {!showAuthor && timestamp !== null && (
-          <Text
+        <Animated.View style={swipeStyle}>
+          {showAuthor && (
+            <View className="mb-0.5 flex-row items-baseline gap-2 px-1">
+              <Text className="text-xs font-medium text-muted-foreground">{authorLabel}</Text>
+              {timestamp !== null && (
+                <Text className="text-[10px] text-muted-foreground">
+                  {formatTimestamp(timestamp)}
+                </Text>
+              )}
+            </View>
+          )}
+
+          <View
             className={cn(
-              'mt-1 text-right text-[10px]',
-              isFromMe ? 'text-white opacity-70' : 'text-muted-foreground'
+              'max-w-[80%] rounded-2xl px-3 py-2',
+              isFromMe ? 'bg-primary' : 'border border-border bg-card dark:bg-secondary'
             )}
           >
-            {formatTimestamp(timestamp)}
-            {edited ? ' (edited)' : ''}
-          </Text>
-        )}
-      </View>
+            {message.deleted ? (
+              <Text className={cn('text-sm italic opacity-50', textColor)}>[deleted message]</Text>
+            ) : (
+              <>
+                {replyToMessage && (
+                  <View
+                    className={cn(
+                      'mb-2 border-l-2 py-1 pl-2',
+                      isFromMe ? 'border-white' : 'border-muted-foreground'
+                    )}
+                  >
+                    <Text numberOfLines={2} className={cn('text-xs opacity-80', textColor)}>
+                      {getReplyPreviewText(replyToMessage)}
+                    </Text>
+                  </View>
+                )}
+                {message.content.map((block, index) => {
+                  if (block.type === 'text') {
+                    return <MessageMarkdown key={index} text={block.text} isFromMe={isFromMe} />;
+                  }
 
-      {canShowReactionPills(message) && (
-        <View
-          className={cn(
-            'mt-1 flex-row flex-wrap gap-1 px-1',
-            isFromMe ? 'justify-end' : 'justify-start'
-          )}
-        >
-          {message.reactions.map(reaction => {
-            const hasReacted = currentUserId ? reaction.memberIds.includes(currentUserId) : false;
-            return (
-              <Pressable
-                key={reaction.emoji}
-                onPress={() => {
-                  handleReactionPress(reaction.emoji);
-                }}
+                  // block.type === 'actions'
+                  if (block.resolved) {
+                    const resolvedAction = block.actions.find(
+                      action => action.value === block.resolved?.value
+                    );
+                    const label = resolvedAction?.label ?? block.resolved.value;
+                    const Icon = block.resolved.value.startsWith('allow') ? CheckCircle2 : XCircle;
+                    return (
+                      <View key={block.groupId} className="mt-2 flex-row items-center gap-1.5">
+                        <Icon size={14} color={isFromMe ? '#FFFFFF' : colors.mutedForeground} />
+                        <Text className={cn('text-xs opacity-70', textColor)}>{label}</Text>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View key={block.groupId} className="mt-2 flex-row flex-wrap gap-2">
+                      {block.actions.map(action => (
+                        <Button
+                          key={action.value}
+                          variant={actionStyleToVariant(action.style)}
+                          size="sm"
+                          disabled={pendingActionGroupId === block.groupId}
+                          onPress={() => {
+                            handleExecuteAction(block.groupId, action.value);
+                          }}
+                        >
+                          <Text>{action.label}</Text>
+                        </Button>
+                      ))}
+                    </View>
+                  );
+                })}
+                {deliveryFailureLabel && (
+                  <View className="mt-2 flex-row items-center gap-1.5">
+                    <AlertCircle size={14} color={colors.destructive} />
+                    <Text className="text-xs font-medium text-red-600 dark:text-red-400">
+                      {deliveryFailureLabel}
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            {!showAuthor && timestamp !== null && (
+              <Text
                 className={cn(
-                  'min-h-11 flex-row items-center gap-1 rounded-full px-3 py-1',
-                  hasReacted ? 'bg-primary' : 'bg-neutral-200 dark:bg-neutral-700'
+                  'mt-1 text-right text-[10px]',
+                  isFromMe ? 'text-white opacity-70' : 'text-muted-foreground'
                 )}
               >
-                <Text className="text-sm">{reaction.emoji}</Text>
-                <Text
-                  className={cn(
-                    'text-xs font-medium',
-                    hasReacted ? 'text-primary-foreground' : 'text-foreground'
-                  )}
-                >
-                  {reaction.count}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-    </Pressable>
+                {formatTimestamp(timestamp)}
+                {edited ? ' (edited)' : ''}
+              </Text>
+            )}
+          </View>
+
+          {canShowReactionPills(message) && (
+            <View
+              className={cn(
+                'mt-1 flex-row flex-wrap gap-1 px-1',
+                isFromMe ? 'justify-end' : 'justify-start'
+              )}
+            >
+              {message.reactions.map(reaction => {
+                const hasReacted = currentUserId
+                  ? reaction.memberIds.includes(currentUserId)
+                  : false;
+                return (
+                  <Pressable
+                    key={reaction.emoji}
+                    onPress={() => {
+                      handleReactionPress(reaction.emoji);
+                    }}
+                    className={cn(
+                      'min-h-11 flex-row items-center gap-1 rounded-full px-3 py-1',
+                      hasReacted ? 'bg-primary' : 'bg-neutral-200 dark:bg-neutral-700'
+                    )}
+                  >
+                    <Text className="text-sm">{reaction.emoji}</Text>
+                    <Text
+                      className={cn(
+                        'text-xs font-medium',
+                        hasReacted ? 'text-primary-foreground' : 'text-foreground'
+                      )}
+                    >
+                      {reaction.count}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </Animated.View>
+      </Pressable>
+    </GestureDetector>
   );
 }
 

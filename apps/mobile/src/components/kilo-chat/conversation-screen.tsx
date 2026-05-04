@@ -408,6 +408,19 @@ export function ConversationScreen({
       showActionSheetWithOptions,
     ]
   );
+  const handleSwipeReplyMessage = useCallback(
+    (message: Message) => {
+      const isOwnMessage = currentUserId !== null && message.senderId === currentUserId;
+      const actionAvailability = buildMessageActionAvailability(message, isOwnMessage);
+      if (!actionAvailability.canReply) {
+        return;
+      }
+      setEditingMessage(null);
+      setReplyingTo(message);
+      void Haptics.selectionAsync();
+    },
+    [currentUserId]
+  );
 
   useConversationPresence(sandboxId, conversationId);
   useConversationEventSubscription(sandboxId, conversationId);
@@ -559,6 +572,7 @@ export function ConversationScreen({
           pendingAction={pendingAction}
           onExecuteAction={handleExecuteAction}
           onLongPressMessage={handleLongPressMessage}
+          onSwipeReplyMessage={handleSwipeReplyMessage}
           onReactionPress={handleReactionPress}
         />
         <TypingIndicator typingMembers={typingMembers} />

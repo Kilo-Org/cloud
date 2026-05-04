@@ -11,21 +11,13 @@ import {
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
+import {
+  buildSlackRedirectPath,
+  completeSlackMarketplaceInstall,
+} from '@/lib/integrations/slack-callback-helpers';
 
 const SLACK_REDIRECT_URI = `${APP_URL}/api/integrations/slack/callback`;
-
-const buildSlackRedirectPath = (state: string | null, queryParam: string): string => {
-  const verified = state ? verifyOAuthState(state) : null;
-  const owner = verified?.owner;
-
-  if (owner?.startsWith('org_')) {
-    return `/organizations/${owner.replace('org_', '')}/integrations/slack?${queryParam}`;
-  }
-  if (owner?.startsWith('user_')) {
-    return `/integrations/slack?${queryParam}`;
-  }
-  return `/integrations?${queryParam}`;
-};
+const SLACK_MARKETPLACE_SOURCE = 'slack_marketplace_install';
 
 /**
  * Slack OAuth Callback
@@ -51,12 +43,10 @@ export async function GET(request: NextRequest) {
       captureMessage('Slack OAuth error', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
-        extra: { error, state },
+        extra: { error, hasState: !!state },
       });
 
-      return NextResponse.redirect(
-        new URL(buildSlackRedirectPath(state, `error=${error}`), APP_URL)
-      );
+      return NextResponse.redirect(new URL(buildSlackRedirectPath(state, { error }), APP_URL));
     }
 
     // Validate code is present
@@ -64,11 +54,11 @@ export async function GET(request: NextRequest) {
       captureMessage('Slack callback missing code', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
-        extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: { hasState: !!state, hasError: !!error },
       });
 
       return NextResponse.redirect(
-        new URL(buildSlackRedirectPath(state, 'error=missing_code'), APP_URL)
+        new URL(buildSlackRedirectPath(state, { error: 'missing_code' }), APP_URL)
       );
     }
 
@@ -78,7 +68,7 @@ export async function GET(request: NextRequest) {
       captureMessage('Slack callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
-        extra: { code: '***', state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: { hasCode: true, hasState: !!state },
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
@@ -136,11 +126,36 @@ export async function GET(request: NextRequest) {
     } catch (error) {
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {
         return NextResponse.redirect(
-          new URL(buildSlackRedirectPath(state, 'error=workspace_already_connected'), APP_URL)
+          new URL(buildSlackRedirectPath(state, { error: 'workspace_already_connected' }), APP_URL)
         );
       }
 
       throw error;
+    }
+
+    const marketplaceInstall = await completeSlackMarketplaceInstall({
+      verified,
+      teamId,
+      userId: user.id,
+      teamName: installation.teamName,
+      slackAdapter,
+    });
+
+    if (!marketplaceInstall.ok) {
+      return NextResponse.redirect(
+        new URL(buildSlackRedirectPath(state, { error: marketplaceInstall.error }), APP_URL)
+      );
+    }
+
+    if (verified.metadata?.source === SLACK_MARKETPLACE_SOURCE) {
+      return NextResponse.redirect(
+        new URL(
+          buildSlackRedirectPath(state, {
+            success: 'installed',
+          }),
+          APP_URL
+        )
+      );
     }
 
     // 9. Redirect to success page
@@ -163,13 +178,13 @@ export async function GET(request: NextRequest) {
         source: 'slack_oauth',
       },
       extra: {
-        state,
+        hasState: !!state,
         hasCode: !!searchParams.get('code'),
       },
     });
 
     return NextResponse.redirect(
-      new URL(buildSlackRedirectPath(state, 'error=installation_failed'), APP_URL)
+      new URL(buildSlackRedirectPath(state, { error: 'installation_failed' }), APP_URL)
     );
   }
 }

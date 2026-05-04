@@ -12,7 +12,15 @@ import {
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
+import { unlinkTeamKiloUsers, verifyPlatformInstallToken } from '@/lib/bot-identity';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+
+const slackOAuthUrlInput = z
+  .object({
+    organizationId: z.string().uuid().optional(),
+    installToken: z.string().optional(),
+  })
+  .optional();
 
 async function getInitializedBot() {
   const { bot } = await import('@/lib/bot');
@@ -66,14 +74,35 @@ export const slackRouter = createTRPCRouter({
   }),
 
   // Get OAuth URL for initiating Slack OAuth flow
-  getOAuthUrl: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
+  getOAuthUrl: baseProcedure.input(slackOAuthUrlInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
     }
+
+    const installTokenData = input?.installToken
+      ? verifyPlatformInstallToken(input.installToken)
+      : null;
+
+    if (
+      input?.installToken &&
+      (!installTokenData || installTokenData.platform !== PLATFORM.SLACK)
+    ) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Invalid or expired Slack setup link. Please mention Kilo in Slack again.',
+      });
+    }
+
     const statePrefix = input?.organizationId
       ? `org_${input.organizationId}`
       : `user_${ctx.user.id}`;
-    const state = createOAuthState(statePrefix, ctx.user.id);
+    const state = createOAuthState(
+      statePrefix,
+      ctx.user.id,
+      input?.installToken
+        ? { source: 'slack_marketplace_install', installToken: input.installToken }
+        : undefined
+    );
     return {
       url: slackService.getSlackOAuthUrl(state),
     };

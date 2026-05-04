@@ -4,33 +4,50 @@ import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, MessageSquare, CheckCircle2, Building2, User } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  ArrowLeft,
+  MessageSquare,
+  CheckCircle2,
+  Building2,
+  User,
+  TriangleAlert,
+} from 'lucide-react';
 import type { WorkspaceSelection } from './types';
 import { useState } from 'react';
 
 type SlackConnectStepProps = {
   workspace: WorkspaceSelection;
   onBack: () => void;
+  installToken?: string;
 };
 
-export function SlackConnectStep({ workspace, onBack }: SlackConnectStepProps) {
+export function SlackConnectStep({ workspace, onBack, installToken }: SlackConnectStepProps) {
   const trpc = useTRPC();
   const [isStartingSlackConnection, setIsStartingSlackConnection] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const slackOAuthUrlInputValue = {
+    ...(workspace.type === 'org' ? { organizationId: workspace.id } : {}),
+    ...(installToken ? { installToken } : {}),
+  };
+  const slackOAuthUrlInput = Object.keys(slackOAuthUrlInputValue).length
+    ? slackOAuthUrlInputValue
+    : undefined;
 
   // Get OAuth URL only when the user clicks Connect so the signed state is fresh.
   const { refetch: refetchOAuthUrl, isFetching: isFetchingOAuthUrl } = useQuery(
-    trpc.slack.getOAuthUrl.queryOptions(
-      workspace.type === 'org' ? { organizationId: workspace.id } : undefined,
-      { enabled: false }
-    )
+    trpc.slack.getOAuthUrl.queryOptions(slackOAuthUrlInput, { enabled: false })
   );
 
   const handleConnectSlack = async () => {
+    setConnectionError(null);
     setIsStartingSlackConnection(true);
     const result = await refetchOAuthUrl();
     if (result.data?.url) {
       window.location.href = result.data.url;
+    } else if (result.error) {
+      setConnectionError(result.error.message);
+      setIsStartingSlackConnection(false);
     } else {
       setIsStartingSlackConnection(false);
     }
@@ -80,10 +97,19 @@ export function SlackConnectStep({ workspace, onBack }: SlackConnectStepProps) {
         <CardContent className="space-y-4">
           <Alert>
             <AlertDescription>
-              After connecting, you&apos;ll be able to message Kilo directly in Slack to create PRs,
-              debug code, ask questions about your repos, and more.
+              {installToken
+                ? 'After setup, Kilo will post a confirmation back in Slack and you can mention it again right away.'
+                : "After connecting, you'll be able to message Kilo directly in Slack to create PRs, debug code, ask questions about your repos, and more."}
             </AlertDescription>
           </Alert>
+
+          {connectionError && (
+            <Alert variant="destructive">
+              <TriangleAlert className="h-4 w-4" />
+              <AlertTitle>Could not start Slack setup</AlertTitle>
+              <AlertDescription>{connectionError}</AlertDescription>
+            </Alert>
+          )}
 
           <div className="space-y-2 rounded-lg border p-4">
             <h4 className="font-medium">What you&apos;ll get:</h4>

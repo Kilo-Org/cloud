@@ -2,6 +2,13 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 
+export type SlackMarketplaceInstallOAuthMetadata = {
+  source: 'slack_marketplace_install';
+  installToken: string;
+};
+
+export type OAuthStateMetadata = SlackMarketplaceInstallOAuthMetadata;
+
 /**
  * HMAC-signed OAuth state parameter.
  *
@@ -40,18 +47,26 @@ function sign(data: string): string {
   return crypto.createHmac(HMAC_ALGORITHM, NEXTAUTH_SECRET).update(data).digest('base64url');
 }
 
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 /**
  * Build a signed OAuth state parameter.
  *
  * @param owner  – owner string, e.g. `user_abc123` or `org_xyz789`
  * @param userId – the ID of the currently-authenticated user initiating the flow
  */
-export function createOAuthState(owner: string, userId: string): string {
+export function createOAuthState(
+  owner: string,
+  userId: string,
+  metadata?: OAuthStateMetadata
+): string {
   const iat = Math.floor(Date.now() / 1000);
   const nonce = crypto.randomBytes(NONCE_BYTES).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ owner, uid: userId, iat, nonce })).toString(
-    'base64url'
-  );
+  const payload = Buffer.from(
+    JSON.stringify({ owner, uid: userId, iat, nonce, metadata })
+  ).toString('base64url');
   const signature = sign(payload);
   return `${payload}.${signature}`;
 }
@@ -61,7 +76,25 @@ export type VerifiedOAuthState = {
   owner: string;
   /** The user ID that initiated the OAuth flow */
   userId: string;
+  metadata?: OAuthStateMetadata;
 };
+
+function parseOAuthStateMetadata(value: unknown): OAuthStateMetadata | undefined | null {
+  if (value === undefined) return undefined;
+  if (!isUnknownRecord(value)) return null;
+
+  if (
+    'source' in value &&
+    value.source === 'slack_marketplace_install' &&
+    'installToken' in value &&
+    typeof value.installToken === 'string' &&
+    value.installToken.length > 0
+  ) {
+    return { source: value.source, installToken: value.installToken };
+  }
+
+  return null;
+}
 
 /**
  * Verify a signed OAuth state parameter and return the embedded payload.
@@ -88,12 +121,8 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
   }
 
   try {
-    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
-      owner?: string;
-      uid?: string;
-      iat?: number;
-      nonce?: string;
-    };
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!isUnknownRecord(data)) return null;
     if (typeof data.owner !== 'string' || typeof data.uid !== 'string') return null;
 
     // Enforce TTL: reject tokens that are too old or have no timestamp
@@ -104,7 +133,10 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
     // Require nonce to be present (guards against old-format tokens)
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
 
-    return { owner: data.owner, userId: data.uid };
+    const metadata = parseOAuthStateMetadata(data.metadata);
+    if (metadata === null) return null;
+
+    return { owner: data.owner, userId: data.uid, ...(metadata ? { metadata } : {}) };
   } catch {
     return null;
   }

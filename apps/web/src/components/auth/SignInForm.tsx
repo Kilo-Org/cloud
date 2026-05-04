@@ -33,6 +33,13 @@ function signInHrefFromSearchParams(searchParams: Record<string, string>): strin
   return query ? `/users/sign_in?${query}` : '/users/sign_in';
 }
 
+function ssoHrefFromSearchParams(searchParams: Record<string, string>): string {
+  const params = new URLSearchParams(searchParams);
+  params.set('sso', 'true');
+  const query = params.toString();
+  return query ? `/users/sign_in?${query}` : '/users/sign_in?sso=true';
+}
+
 export function SignInForm({
   searchParams,
   error: initialError,
@@ -321,7 +328,7 @@ export function SignInForm({
                   </div>
 
                   <div className="mx-auto max-w-md">
-                    <Link href="/users/sign_in?sso=true" className="block">
+                    <Link href={ssoHrefFromSearchParams(searchParams)} className="block">
                       <SignInButton>
                         <SquareUserRound />
                         Enterprise SSO

@@ -6,21 +6,35 @@ import { SignInForm } from '@/components/auth/SignInForm';
 import { allow_fake_login } from '@/lib/constants';
 import { SlackGetStartedFlow } from './_components/SlackGetStartedFlow';
 
+function buildSlackGetStartedCallbackPath(params: Record<string, string>): string {
+  const callbackParams = new URLSearchParams();
+
+  for (const key of ['installToken', 'source']) {
+    const value = params[key];
+    if (value) callbackParams.set(key, value);
+  }
+
+  const query = callbackParams.toString();
+  return query ? `/get-started/slack?${query}` : '/get-started/slack';
+}
+
 export default async function GetStartedSlackPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
   const { user } = await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true });
+  const params = await searchParams;
+  const callbackPath = buildSlackGetStartedCallbackPath(params);
 
   // If user is not authenticated, show sign-up form
   if (!user) {
-    const { params, error } = await getAuthPageProps(searchParams);
+    const { error } = await getAuthPageProps(Promise.resolve(params));
     return (
       <AuthPageLayout>
         <div className="mt-4 flex flex-col items-center">
           <SignInForm
-            searchParams={{ ...params, callbackPath: '/get-started/slack' }}
+            searchParams={{ ...params, callbackPath }}
             error={error}
             isSignUp={true}
             allowFakeLogin={allow_fake_login}
@@ -33,8 +47,15 @@ export default async function GetStartedSlackPage({
   }
 
   if (user.has_validation_stytch === null) {
-    redirect('/account-verification?callbackPath=/get-started/slack');
+    redirect(`/account-verification?callbackPath=${encodeURIComponent(callbackPath)}`);
   }
 
-  return <SlackGetStartedFlow />;
+  return (
+    <SlackGetStartedFlow
+      installToken={params.installToken}
+      source={params.source}
+      slackSuccess={params.slackSuccess}
+      slackError={params.slackError}
+    />
+  );
 }

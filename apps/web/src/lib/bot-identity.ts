@@ -35,6 +35,11 @@ export type PlatformIdentity = {
   userId: string;
 };
 
+export type PlatformInstallTokenData = PlatformIdentity & {
+  threadId?: string;
+  messageId?: string;
+};
+
 /**
  * Look up the Kilo user ID linked to a chat-platform user.
  * Returns `null` when no mapping exists yet.
@@ -132,16 +137,25 @@ function hmacSign(data: string): string {
   return crypto.createHmac(HMAC_ALGORITHM, NEXTAUTH_SECRET).update(data).digest('base64url');
 }
 
-/** Create a signed, time-limited token encoding a PlatformIdentity. */
-export function createLinkToken(identity: PlatformIdentity): string {
+function createSignedIdentityToken(identity: PlatformInstallTokenData): string {
   const iat = Math.floor(Date.now() / 1000);
   const nonce = crypto.randomBytes(NONCE_BYTES).toString('base64url');
   const payload = Buffer.from(JSON.stringify({ ...identity, iat, nonce })).toString('base64url');
   return `${payload}.${hmacSign(payload)}`;
 }
 
-/** Verify and decode a link token. Returns the identity or `null` on failure. */
-export function verifyLinkToken(token: string): PlatformIdentity | null {
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPlatform(value: unknown): value is PlatformIdentity['platform'] {
+  return (
+    typeof value === 'string' &&
+    Object.values(PLATFORM).includes(value as PlatformIdentity['platform'])
+  );
+}
+
+function verifySignedIdentityToken(token: string): PlatformInstallTokenData | null {
   const dotIndex = token.indexOf('.');
   if (dotIndex === -1) return null;
 
@@ -157,19 +171,13 @@ export function verifyLinkToken(token: string): PlatformIdentity | null {
   }
 
   try {
-    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
-      platform?: PlatformIdentity['platform'];
-      teamId?: string;
-      userId?: string;
-      iat?: number;
-      nonce?: string;
-    };
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!isUnknownRecord(data)) return null;
 
     if (
-      typeof data.platform !== 'string' ||
+      !isPlatform(data.platform) ||
       typeof data.teamId !== 'string' ||
-      typeof data.userId !== 'string' ||
-      !Object.values(PLATFORM).includes(data.platform)
+      typeof data.userId !== 'string'
     ) {
       return null;
     }
@@ -180,8 +188,40 @@ export function verifyLinkToken(token: string): PlatformIdentity | null {
 
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
 
-    return { platform: data.platform, teamId: data.teamId, userId: data.userId };
+    const threadId = data.threadId;
+    const messageId = data.messageId;
+
+    if (threadId !== undefined && typeof threadId !== 'string') return null;
+    if (messageId !== undefined && typeof messageId !== 'string') return null;
+
+    return {
+      platform: data.platform,
+      teamId: data.teamId,
+      userId: data.userId,
+      ...(threadId ? { threadId } : {}),
+      ...(messageId ? { messageId } : {}),
+    };
   } catch {
     return null;
   }
+}
+
+/** Create a signed, time-limited token encoding a PlatformIdentity. */
+export function createLinkToken(identity: PlatformIdentity): string {
+  return createSignedIdentityToken(identity);
+}
+
+/** Verify and decode a link token. Returns the identity or `null` on failure. */
+export function verifyLinkToken(token: string): PlatformIdentity | null {
+  const identity = verifySignedIdentityToken(token);
+  if (!identity) return null;
+  return { platform: identity.platform, teamId: identity.teamId, userId: identity.userId };
+}
+
+export function createPlatformInstallToken(data: PlatformInstallTokenData): string {
+  return createSignedIdentityToken(data);
+}
+
+export function verifyPlatformInstallToken(token: string): PlatformInstallTokenData | null {
+  return verifySignedIdentityToken(token);
 }

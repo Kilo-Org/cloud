@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { Chat, type ActionEvent, type Message, type Thread, type WebhookOptions } from 'chat';
 import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
-import { captureException } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { HomeView } from '@slack/types';
 import { resolveKiloUserId, unlinkKiloUser, unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { isSlackMissingScopeError, postSlackReinstallInstruction } from '@/lib/bot/helpers';
@@ -11,7 +11,12 @@ import {
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
 } from '@/lib/bot/platform-helpers';
-import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-account';
+import {
+  INSTALL_INTEGRATION_ACTION_PREFIX,
+  LINK_ACCOUNT_ACTION_PREFIX,
+  promptInstallIntegration,
+  promptLinkAccount,
+} from '@/lib/bot/link-account';
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
 import { processMessage } from '@/lib/bot/run';
@@ -260,17 +265,19 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
     message: Message
   ): Promise<void> {
     const identity = getPlatformIdentity(thread, message);
-    const [platformIntegration, kiloUserId] = await Promise.all([
-      getPlatformIntegration(identity),
-      resolveKiloUserId(chatBot.getState(), identity),
-    ]);
+    const platformIntegration = await getPlatformIntegration(identity);
 
     if (!platformIntegration) {
-      captureException(new Error('No active platform integration found'), {
+      captureMessage('No active platform integration found for bot mention', {
+        level: 'warning',
+        tags: { component: 'kilo-bot', op: 'missing-platform-integration' },
         extra: { platform: identity.platform, teamId: identity.teamId },
       });
+      await promptInstallIntegration(thread, message, identity);
       return;
     }
+
+    const kiloUserId = await resolveKiloUserId(chatBot.getState(), identity);
 
     if (!kiloUserId) {
       await promptLinkAccount(thread, message, identity);
@@ -321,8 +328,13 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
   // For ephemeral messages the adapter encodes the response_url into the
   // messageId, so deleteMessage sends `{ delete_original: true }` — removing
   // the ephemeral card from the user's view.
-  chatBot.onAction(async function handleLinkAccountClick(event: ActionEvent): Promise<void> {
-    if (!event.actionId.startsWith(LINK_ACCOUNT_ACTION_PREFIX)) return;
+  chatBot.onAction(async function handleSetupLinkClick(event: ActionEvent): Promise<void> {
+    if (
+      !event.actionId.startsWith(LINK_ACCOUNT_ACTION_PREFIX) &&
+      !event.actionId.startsWith(INSTALL_INTEGRATION_ACTION_PREFIX)
+    ) {
+      return;
+    }
 
     try {
       await event.adapter.deleteMessage(event.threadId, event.messageId);

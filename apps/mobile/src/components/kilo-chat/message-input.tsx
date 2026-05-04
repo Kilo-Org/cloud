@@ -1,11 +1,12 @@
 import { Send, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { Pressable, TextInput, type TextStyle, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { type Message, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { messageInputTextStyle } from './message-input-layout';
 import {
   applyMessageInputTextChange,
   isMessageInputOverLimit,
@@ -33,11 +34,6 @@ type Props = {
 };
 
 const COMPOSER_BOTTOM_CLEARANCE = 8;
-
-const messageInputTextStyle = {
-  includeFontPadding: false,
-  textAlignVertical: 'center',
-} satisfies TextStyle;
 
 function resolveSendDisabled({
   canSend,
@@ -134,7 +130,7 @@ export function MessageInput({
             <TextInput
               ref={inputRef}
               className={cn(
-                'max-h-32 min-h-10 rounded-md border bg-card px-3 py-2.5 leading-5 text-foreground',
+                'rounded-md border bg-card px-3 text-foreground',
                 overLimit ? 'border-destructive' : 'border-input'
               )}
               style={messageInputTextStyle}

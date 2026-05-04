@@ -1,8 +1,10 @@
 import { type Href, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { EmptyStateContent } from '@/components/kiloclaw/empty-state-content';
+import { getKiloClawEntryDecision } from '@/components/kiloclaw/instance-entry-state';
 import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,17 +17,33 @@ export default function KiloClawTab() {
   const router = useRouter();
   const colors = useThemeColors();
   const { data: instances } = useAllKiloClawInstances();
-  const isEmpty = instances?.length === 0;
-  const onboardingQuery = useKiloClawMobileOnboardingState(isEmpty);
+  const entryDecision = getKiloClawEntryDecision(instances);
+  const onboardingQuery = useKiloClawMobileOnboardingState(entryDecision.kind === 'empty');
   useForegroundInvalidateKiloclawState();
+
+  const redirectSandboxId = entryDecision.kind === 'redirect' ? entryDecision.sandboxId : null;
+
+  useEffect(() => {
+    if (redirectSandboxId !== null) {
+      router.replace(`/(app)/chat/${redirectSandboxId}` as Href);
+    }
+  }, [redirectSandboxId, router]);
+
+  const showInstanceSkeleton =
+    entryDecision.kind === 'loading' ||
+    entryDecision.kind === 'redirect' ||
+    entryDecision.kind === 'list' ||
+    onboardingQuery.isPending;
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="KiloClaw" showBackButton={false} headerRight={<ProfileAvatarButton />} />
       <Animated.View layout={LinearTransition} className="flex-1 items-center justify-center px-4">
-        {onboardingQuery.isPending ? (
+        {showInstanceSkeleton ? (
           <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 px-4">
-            <Skeleton className="h-48 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-16 w-full rounded-xl" />
           </Animated.View>
         ) : (
           <Animated.View entering={FadeIn.duration(200)}>

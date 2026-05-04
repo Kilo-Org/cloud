@@ -1,14 +1,11 @@
 import * as Haptics from 'expo-haptics';
-import { type Href, Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { Bot, House, MessageSquare } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
 import { Platform, type TextStyle, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BlurBar } from '@/components/ui/blur-bar';
-import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getLastActiveInstance, loadLastActiveInstance } from '@/lib/last-active-instance';
 
 const ANDROID_TAB_BAR_EXTRA_PADDING = 4;
 const TAB_BAR_ITEM_CONTENT_WIDTH = 64;
@@ -42,19 +39,6 @@ function TabBarBackground() {
 export default function TabsLayout() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  const router = useRouter();
-  const { data: instances } = useAllKiloClawInstances();
-  const [lastActiveHydrated, setLastActiveHydrated] = useState(false);
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        await loadLastActiveInstance();
-      } finally {
-        setLastActiveHydrated(true);
-      }
-    })();
-  }, []);
 
   return (
     <Tabs
@@ -104,24 +88,8 @@ export default function TabsLayout() {
           ),
         }}
         listeners={{
-          tabPress: e => {
+          tabPress: () => {
             void Haptics.selectionAsync();
-            // While instances or the persisted last-active id are still loading,
-            // block the tab switch so the user doesn't briefly land on the
-            // (1_kiloclaw) empty state, and so we don't redirect into the wrong
-            // chat before the persisted instance has been hydrated.
-            if (instances === undefined || !lastActiveHydrated) {
-              e.preventDefault();
-              return;
-            }
-            const first = instances[0];
-            if (first) {
-              e.preventDefault();
-              const lastId = getLastActiveInstance();
-              const target =
-                lastId && instances.some(i => i.sandboxId === lastId) ? lastId : first.sandboxId;
-              router.push(`/(app)/chat/${target}` as Href);
-            }
           },
         }}
       />

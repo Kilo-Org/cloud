@@ -101,7 +101,7 @@ export function MessageInput({
   return (
     <View
       style={{ paddingBottom: Math.max(bottomInset, COMPOSER_BOTTOM_CLEARANCE) }}
-      className="px-4 pt-2"
+      className="border-t border-border bg-background px-4 pt-2"
     >
       {replyingTo && (
         <View className="mb-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">

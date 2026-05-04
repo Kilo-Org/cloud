@@ -2194,6 +2194,26 @@ export type WebhookEvent = typeof webhook_events.$inferSelect;
 // Cached model data from OpenRouter and external benchmarks
 
 // Zod schemas for runtime validation of JSONB data
+
+// Kilo's own bench — per-eval aggregate results, keyed by task_source.
+// Written by services/model-eval-ingest when a run is promoted from
+// bench.s1lv.com. One entry per named eval (terminal-bench, swebench-verified,
+// etc.); adding a new eval requires no schema change. Only fields safe to
+// expose on public model pages — internal identifiers (ingest id, bench job
+// url, promoter email) stay on the model_eval_ingest table.
+export const KiloBenchEvalSchema = z.object({
+  taskSource: z.string(),
+  displayName: z.string().optional(),
+  successRate: z.number(),
+  avgCostUsd: z.number(),
+  avgInputTokens: z.number().optional(),
+  avgOutputTokens: z.number().optional(),
+  avgCacheReadTokens: z.number().optional(),
+  avgExecutionMs: z.number().optional(),
+  nTrials: z.number(),
+  lastPromotedAt: z.string(),
+});
+
 export const ModelStatsBenchmarksSchema = z
   .object({
     artificialAnalysis: z
@@ -2207,8 +2227,17 @@ export const ModelStatsBenchmarksSchema = z
         lastUpdated: z.string().optional(),
       })
       .optional(),
+    kiloBench: z
+      .object({
+        overallScore: z.number().optional(),
+        evals: z.record(z.string(), KiloBenchEvalSchema).optional(),
+        lastUpdated: z.string(),
+      })
+      .optional(),
   })
   .optional();
+
+export type KiloBenchEval = z.infer<typeof KiloBenchEvalSchema>;
 
 export const ModelStatsChartDataSchema = z
   .object({
@@ -4636,3 +4665,71 @@ export const channel_badge_counts = pgTable(
 
 export type ChannelBadgeCount = typeof channel_badge_counts.$inferSelect;
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;
+
+// ============ MODEL EVAL INGEST ============
+// Durable, append-only record of eval results promoted from the internal
+// kilo-bench dashboard (bench.s1lv.com) into the public model stats. One
+// row per human-reviewed promotion act. Immutable after insert — a newer
+// row for the same (provider, model, variant, task_source) supersedes by
+// timestamp, but nothing is ever updated or deleted. The table IS the
+// audit log.
+//
+// Cloud reads the latest row per tuple and denormalises into
+// modelStats.benchmarks.kiloBench (a JSONB cache) so public model pages
+// can render without a JOIN. That cache is fully rebuildable from this
+// table at any time.
+//
+// See .plans/dashboard-v2.md in the kilo-bench repo for full design.
+
+export const model_eval_ingest = pgTable(
+  'model_eval_ingest',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+
+    // ---- Identity of what was promoted -----------------------------
+    bench_job_name: text('bench_job_name').notNull(),
+    bench_job_url: text('bench_job_url').notNull(),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    // FK to modelStats — resolved at promotion time. Nullable because a
+    // promotion may land before the model exists in modelStats (e.g. a
+    // stealth model mid-rollout); the admin UI can fix up later.
+    model_stats_id: uuid('model_stats_id').references(() => modelStats.id),
+    variant: text('variant'),
+    task_source: text('task_source').notNull(),
+    task_source_display_name: text('task_source_display_name'),
+
+    // ---- Aggregate summary (what ends up on modelStats.kiloBench) --
+    // Store raw averages; any ratios are computed at display time.
+    n_trials: integer('n_trials').notNull(),
+    success_rate: decimal('success_rate', { precision: 5, scale: 4 }).notNull(),
+    avg_cost_usd: decimal('avg_cost_usd', { precision: 10, scale: 6 }),
+    avg_input_tokens: integer('avg_input_tokens'),
+    avg_output_tokens: integer('avg_output_tokens'),
+    avg_cache_read_tokens: integer('avg_cache_read_tokens'),
+    avg_execution_ms: integer('avg_execution_ms'),
+
+    // ---- Review metadata -------------------------------------------
+    review_note: text('review_note'),
+    promoted_by_email: text('promoted_by_email').notNull(),
+    promoted_at: timestamp('promoted_at', { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+  },
+  t => [
+    index('IDX_model_eval_ingest_model').on(t.model),
+    index('IDX_model_eval_ingest_model_stats').on(t.model_stats_id),
+    // Supports the DISTINCT ON (task_source) ORDER BY promoted_at DESC
+    // recompute query — hits the index directly.
+    index('IDX_model_eval_ingest_lookup').on(
+      t.provider,
+      t.model,
+      t.variant,
+      t.task_source,
+      t.promoted_at
+    ),
+  ]
+);
+
+export type ModelEvalIngest = typeof model_eval_ingest.$inferSelect;
+export type NewModelEvalIngest = typeof model_eval_ingest.$inferInsert;

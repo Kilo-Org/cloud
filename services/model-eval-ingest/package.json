@@ -1,0 +1,37 @@
+{
+  "name": "cloudflare-model-eval-ingest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ingest service for eval results promoted from bench.s1lv.com into modelStats.benchmarks.kiloBench",
+  "type": "module",
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "deploy:prod": "wrangler deploy --env=\"\"",
+    "deploy:dev": "wrangler deploy --env dev",
+    "dev": "wrangler dev --env dev",
+    "start": "wrangler dev --env dev",
+    "types": "wrangler types",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/model-eval-ingest/src",
+    "format": "oxfmt src",
+    "format:check": "oxfmt --list-different src",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@kilocode/db": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": ">=24 <25",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4",
+    "wrangler": "catalog:"
+  }
+}

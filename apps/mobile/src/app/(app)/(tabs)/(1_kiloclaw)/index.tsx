@@ -1,25 +1,37 @@
 import { type Href, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { EmptyStateContent } from '@/components/kiloclaw/empty-state-content';
 import { getKiloClawEntryDecision } from '@/components/kiloclaw/instance-entry-state';
+import { InstanceListScreen } from '@/components/kiloclaw/instance-list-screen';
 import { ProfileAvatarButton } from '@/components/profile-avatar-button';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useForegroundInvalidateKiloclawState } from '@/lib/hooks/use-foreground-invalidate-kiloclaw-state';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMobileOnboardingState } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getLastActiveInstance, loadLastActiveInstance } from '@/lib/last-active-instance';
 
 export default function KiloClawTab() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { data: instances } = useAllKiloClawInstances();
+  const instancesQuery = useAllKiloClawInstances();
+  const { data: instances } = instancesQuery;
   const entryDecision = getKiloClawEntryDecision(instances);
   const onboardingQuery = useKiloClawMobileOnboardingState(entryDecision.kind === 'empty');
+  const [currentSandboxId, setCurrentSandboxId] = useState<string | null>(null);
   useForegroundInvalidateKiloclawState();
+
+  useEffect(() => {
+    void (async () => {
+      await loadLastActiveInstance();
+      setCurrentSandboxId(getLastActiveInstance());
+    })();
+  }, []);
 
   const redirectSandboxId = entryDecision.kind === 'redirect' ? entryDecision.sandboxId : null;
 
@@ -32,8 +44,47 @@ export default function KiloClawTab() {
   const showInstanceSkeleton =
     entryDecision.kind === 'loading' ||
     entryDecision.kind === 'redirect' ||
-    entryDecision.kind === 'list' ||
     onboardingQuery.isPending;
+
+  if (instancesQuery.isError) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title="KiloClaw"
+          showBackButton={false}
+          headerRight={<ProfileAvatarButton />}
+        />
+        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+          <QueryError
+            className="flex-1"
+            message="Could not load KiloClaw instances"
+            onRetry={() => {
+              void instancesQuery.refetch();
+            }}
+          />
+        </Animated.View>
+      </View>
+    );
+  }
+
+  if (entryDecision.kind === 'list') {
+    return (
+      <InstanceListScreen
+        instances={instances ?? []}
+        currentSandboxId={currentSandboxId}
+        refreshing={instancesQuery.isRefetching && !instancesQuery.isPending}
+        onRefresh={() => {
+          void instancesQuery.refetch();
+        }}
+        onSelect={sandboxId => {
+          router.push(`/(app)/chat/${sandboxId}` as Href);
+        }}
+        onCreate={() => {
+          router.push('/(app)/onboarding' as Href);
+        }}
+      />
+    );
+  }
 
   return (
     <View className="flex-1 bg-background">

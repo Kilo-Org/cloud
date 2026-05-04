@@ -16,6 +16,8 @@ export async function processLinkedMessage({
   platformIntegration: PlatformIntegration;
   user: User;
 }) {
+  await thread.startTyping('Thinking...');
+
   const botRequestId = await createBotRequest({
     createdBy: user.id,
     organizationId: platformIntegration.owned_by_organization_id ?? null,

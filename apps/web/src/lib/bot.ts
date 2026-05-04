@@ -286,8 +286,6 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
 
     chatBot.registerSingleton();
 
-    await thread.startTyping('Thinking...');
-
     try {
       await processLinkedMessage({ thread, message, platformIntegration, user });
     } catch (error) {

@@ -138,7 +138,6 @@ async function reprocessLinkedMessage(
     if (!platformIntegration) return;
 
     await withBotPlatformAuthContext(platformIntegration, async () => {
-      await thread.startTyping('Thinking...');
       await processLinkedMessage({
         thread,
         message,

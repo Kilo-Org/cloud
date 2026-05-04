@@ -184,7 +184,6 @@ Respond with ONLY a JSON object (no markdown, no explanation): { "blocking": tru
 
     const startTime = Date.now();
     const response: unknown = await ctx.env.AI.run(
-      // @ts-expect-error Model may not be in the AiModels type map yet — cast to access it.
       '@cf/google/gemma-4-26b-a4b-it',
       {
         messages: [{ role: 'user', content: prompt }],

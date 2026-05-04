@@ -264,9 +264,10 @@ describe('KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE constant', () => {
     expect(KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE).toBe('kiloclaw_subscription_started');
   });
 
-  test('kiloclaw_email_log unique index prevents duplicate inserts for (user, instance, type)', async () => {
-    // Production code writes (user_id, instance_id, email_type) via the
-    // per-instance unique index, so test that exact shape here.
+  test('kiloclaw_email_log unique index dedupes webhook replays of the same activation', async () => {
+    // Production code writes (user_id, instance_id, email_type, period_start)
+    // via the per-instance/period unique index. A second insert with the same
+    // period_start collides (webhook replay).
     const user = await insertTestUser({});
     const [instance] = await db
       .insert(kiloclaw_instances)
@@ -276,12 +277,14 @@ describe('KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE constant', () => {
       })
       .returning();
 
+    const periodStart = new Date().toISOString();
     const first = await db
       .insert(kiloclaw_email_log)
       .values({
         user_id: user.id,
         instance_id: instance.id,
         email_type: KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+        period_start: periodStart,
       })
       .onConflictDoNothing();
     expect(first.rowCount).toBe(1);
@@ -292,6 +295,7 @@ describe('KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE constant', () => {
         user_id: user.id,
         instance_id: instance.id,
         email_type: KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+        period_start: periodStart,
       })
       .onConflictDoNothing();
     expect(second.rowCount).toBe(0);
@@ -307,6 +311,57 @@ describe('KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE constant', () => {
         )
       );
     expect(rows).toHaveLength(1);
+  });
+
+  test('kiloclaw_email_log unique index allows a second row for a new activation period', async () => {
+    // Cancel+resubscribe reuses the same kiloclaw_subscriptions row but
+    // stamps a fresh current_period_start, so the per-activation unique
+    // index admits a second row and a second email goes out.
+    const user = await insertTestUser({});
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: `test-sandbox-${crypto.randomUUID()}`,
+      })
+      .returning();
+
+    const firstPeriodStart = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const secondPeriodStart = new Date().toISOString();
+
+    const first = await db
+      .insert(kiloclaw_email_log)
+      .values({
+        user_id: user.id,
+        instance_id: instance.id,
+        email_type: KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+        period_start: firstPeriodStart,
+      })
+      .onConflictDoNothing();
+    expect(first.rowCount).toBe(1);
+
+    const second = await db
+      .insert(kiloclaw_email_log)
+      .values({
+        user_id: user.id,
+        instance_id: instance.id,
+        email_type: KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+        period_start: secondPeriodStart,
+      })
+      .onConflictDoNothing();
+    expect(second.rowCount).toBe(1);
+
+    const rows = await db
+      .select()
+      .from(kiloclaw_email_log)
+      .where(
+        and(
+          eq(kiloclaw_email_log.user_id, user.id),
+          eq(kiloclaw_email_log.instance_id, instance.id),
+          eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
+        )
+      );
+    expect(rows).toHaveLength(2);
   });
 });
 
@@ -462,6 +517,64 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     expect(applied).toBe(true);
     expect(countSubscriptionStartedSends()).toBe(1);
     expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+  });
+
+  test('activate → cancel → resubscribe on same instance sends a second subscription-started email', async () => {
+    // Real-world flow: user activates, receives the email, cancels, then
+    // resubscribes later. Both paid activations on the same instance should
+    // each send a subscription-started email because each activation covers
+    // a different period. The per-instance lifetime dedupe (pre-fix) would
+    // suppress the second email.
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_resubscribe_${crypto.randomUUID()}`;
+    const { instance, subscription } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+
+    // First activation: trial → paid.
+    const firstPeriodStart = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const firstPeriodEnd = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_first_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: firstPeriodStart,
+      periodEnd: firstPeriodEnd,
+    });
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+
+    sendMock.mockClear();
+
+    // Simulate cancellation: status=canceled on the same row.
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({ status: 'canceled' })
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+
+    // Second activation (resubscribe): same row, fresh period boundaries.
+    const secondPeriodStart = new Date().toISOString();
+    const secondPeriodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_second_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: secondPeriodStart,
+      periodEnd: secondPeriodEnd,
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(2);
   });
 
   test('subscription.created before invoice.paid → settlement still sends one subscription-started email', async () => {

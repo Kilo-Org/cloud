@@ -890,8 +890,13 @@ function planDisplayName(plan: 'commit' | 'standard'): string {
 }
 
 // Idempotency: insert-before-send on `kiloclaw_email_log` guarded by the
-// unique index (user_id, instance_id, email_type). Only the first paid period
-// inserts a row; renewals (which would attempt the same row) are skipped.
+// unique index (user_id, instance_id, email_type, period_start). Each
+// activation event (fresh `periodStart`) gets exactly one row; webhook
+// replays of the same event collide on the index and return early. Because
+// the KiloClaw subscription row is reused across cancel+resubscribe (both
+// Stripe and credit paths UPDATE in place), period_start is what actually
+// distinguishes a resubscribe's activation from the original — hence one
+// email per activation, not one per instance lifetime.
 async function maybeSendKiloClawSubscriptionStartedEmail(params: {
   userId: string;
   instanceId: string;
@@ -908,11 +913,12 @@ async function maybeSendKiloClawSubscriptionStartedEmail(params: {
         user_id: userId,
         instance_id: instanceId,
         email_type: KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+        period_start: periodStart,
       })
       .onConflictDoNothing();
 
     if ((insertResult.rowCount ?? 0) === 0) {
-      // Not the first paid period — renewal, nothing to send.
+      // This activation was already processed — webhook replay, nothing to send.
       return;
     }
 
@@ -944,7 +950,9 @@ async function maybeSendKiloClawSubscriptionStartedEmail(params: {
       extra: { user_id: userId, instance_id: instanceId, plan },
     });
     // Best-effort rollback so a retry can re-attempt — mirrors the pattern in
-    // apps/web/src/app/api/internal/kiloclaw/instance-ready/route.ts.
+    // apps/web/src/app/api/internal/kiloclaw/instance-ready/route.ts. Scope
+    // the delete to this activation's period so we only clear the marker we
+    // just inserted.
     try {
       await db
         .delete(kiloclaw_email_log)
@@ -952,7 +960,8 @@ async function maybeSendKiloClawSubscriptionStartedEmail(params: {
           and(
             eq(kiloclaw_email_log.user_id, userId),
             eq(kiloclaw_email_log.instance_id, instanceId),
-            eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
+            eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE),
+            eq(kiloclaw_email_log.period_start, periodStart)
           )
         );
     } catch {

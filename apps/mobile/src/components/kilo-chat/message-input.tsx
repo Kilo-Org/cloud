@@ -1,6 +1,6 @@
 import { Send, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, TextInput, type TextStyle, View } from 'react-native';
 import { type Message, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 
 import { Text } from '@/components/ui/text';
@@ -30,6 +30,10 @@ type Props = {
   disabledReason?: string | null;
   clearOnSubmit?: boolean;
 };
+
+const messageInputTextStyle = {
+  includeFontPadding: false,
+} satisfies TextStyle;
 
 function resolveSendDisabled({
   canSend,
@@ -116,63 +120,64 @@ export function MessageInput({
           <Text className="text-xs text-muted-foreground">{disabledReason}</Text>
         </View>
       )}
-      <View className="flex-row items-end gap-2">
-        <View className="min-w-0 flex-1">
-          <TextInput
-            ref={inputRef}
-            className={cn(
-              'max-h-32 min-h-10 rounded-md border bg-card px-3 py-2 leading-5 text-foreground',
-              overLimit ? 'border-destructive' : 'border-input'
-            )}
-            placeholder="Message"
-            placeholderTextColor={colors.mutedForeground}
-            defaultValue={initialText}
-            multiline
-            scrollEnabled={draftLength > 160}
-            editable={!disabled}
-            onChangeText={t => {
-              setDraftLength(t.length);
-              applyMessageInputTextChange({
-                text: t,
-                valueRef,
-                setCanSend,
-                onTyping,
-              });
-            }}
-            onSubmitEditing={submit}
-          />
-          <View className="h-5 items-end justify-center">
-            {showCounter ? (
-              <Text
-                className={cn('text-xs text-muted-foreground', overLimit && 'text-destructive')}
-              >
-                {draftLength}/{MESSAGE_TEXT_MAX_CHARS}
-              </Text>
-            ) : null}
+      <View className="gap-1">
+        <View className="flex-row items-end gap-2">
+          <View className="min-w-0 flex-1">
+            <TextInput
+              ref={inputRef}
+              className={cn(
+                'max-h-32 min-h-10 rounded-md border bg-card px-3 py-2.5 leading-5 text-foreground',
+                overLimit ? 'border-destructive' : 'border-input'
+              )}
+              style={messageInputTextStyle}
+              placeholder="Message"
+              placeholderTextColor={colors.mutedForeground}
+              defaultValue={initialText}
+              multiline
+              scrollEnabled={draftLength > 160}
+              editable={!disabled}
+              onChangeText={t => {
+                setDraftLength(t.length);
+                applyMessageInputTextChange({
+                  text: t,
+                  valueRef,
+                  setCanSend,
+                  onTyping,
+                });
+              }}
+              onSubmitEditing={submit}
+            />
           </View>
-        </View>
-        {onCancelEdit && (
+          {onCancelEdit && (
+            <Pressable
+              onPress={onCancelEdit}
+              disabled={disabled}
+              className={cn(
+                'h-10 w-10 items-center justify-center rounded-md bg-secondary',
+                disabled && 'opacity-50'
+              )}
+            >
+              <X size={18} color={colors.foreground} />
+            </Pressable>
+          )}
           <Pressable
-            onPress={onCancelEdit}
-            disabled={disabled}
+            onPress={submit}
+            disabled={sendDisabled}
             className={cn(
-              'h-10 w-10 items-center justify-center rounded-md bg-secondary',
-              disabled && 'opacity-50'
+              'h-10 w-10 items-center justify-center rounded-md bg-primary',
+              sendDisabled && 'opacity-50'
             )}
           >
-            <X size={18} color={colors.foreground} />
+            <Send size={18} color={colors.primaryForeground} />
           </Pressable>
-        )}
-        <Pressable
-          onPress={submit}
-          disabled={sendDisabled}
-          className={cn(
-            'h-10 w-10 items-center justify-center rounded-md bg-primary',
-            sendDisabled && 'opacity-50'
-          )}
-        >
-          <Send size={18} color={colors.primaryForeground} />
-        </Pressable>
+        </View>
+        <View className="h-5 items-end justify-center">
+          {showCounter ? (
+            <Text className={cn('text-xs text-muted-foreground', overLimit && 'text-destructive')}>
+              {draftLength}/{MESSAGE_TEXT_MAX_CHARS}
+            </Text>
+          ) : null}
+        </View>
       </View>
     </View>
   );

@@ -19,6 +19,7 @@ type Props = {
   onCreate: () => void;
   refreshing: boolean;
   onRefresh: () => void;
+  showSectionCounts?: boolean;
 };
 
 function splitInstances(instances: ClawInstance[]) {
@@ -33,11 +34,13 @@ function InstanceSection({
   instances,
   currentSandboxId,
   onSelect,
+  showCount,
 }: Readonly<{
   title: string;
   instances: ClawInstance[];
   currentSandboxId: string | null;
   onSelect: (sandboxId: string) => void;
+  showCount: boolean;
 }>) {
   if (instances.length === 0) {
     return null;
@@ -47,9 +50,11 @@ function InstanceSection({
     <View className="gap-2">
       <View className="flex-row items-center justify-between px-1">
         <Eyebrow>{title}</Eyebrow>
-        <Text variant="mono" className="text-[10px] uppercase tracking-[1.5px] text-muted-soft">
-          {instances.length}
-        </Text>
+        {showCount ? (
+          <Text variant="mono" className="text-[10px] uppercase tracking-[1.5px] text-muted-soft">
+            {instances.length}
+          </Text>
+        ) : null}
       </View>
       <View className="gap-3">
         {instances.map(instance => (
@@ -72,6 +77,7 @@ export function InstanceListScreen({
   onCreate,
   refreshing,
   onRefresh,
+  showSectionCounts = false,
 }: Readonly<Props>) {
   const colors = useThemeColors();
   const { personal, organizations } = splitInstances(instances);
@@ -118,12 +124,14 @@ export function InstanceListScreen({
             instances={personal}
             currentSandboxId={currentSandboxId}
             onSelect={handleSelect}
+            showCount={showSectionCounts}
           />
           <InstanceSection
             title="Organizations"
             instances={organizations}
             currentSandboxId={currentSandboxId}
             onSelect={handleSelect}
+            showCount={showSectionCounts}
           />
         </ScrollView>
       </Animated.View>

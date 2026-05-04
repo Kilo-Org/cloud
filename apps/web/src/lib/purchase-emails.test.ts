@@ -793,6 +793,65 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
   });
 
+  // past_due and unpaid are Stripe's dunning states — the subscription is
+  // already activated on a paid plan and Stripe is retrying a failed renewal
+  // charge. When that retry eventually succeeds, the settlement reaches this
+  // code path with `before.status` still set to the dunning value. Per
+  // shouldSendSubscriptionStartedEmailForActivation these MUST NOT send the
+  // subscription-started email — it would be a duplicate activation
+  // notification for a plan the user was already on.
+  test('past_due recovery settlement → no subscription-started email', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_past_due_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'past_due',
+      plan: 'standard',
+      stripeSubscriptionId,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(0);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
+  });
+
+  test('unpaid recovery settlement → no subscription-started email', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_unpaid_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'unpaid',
+      plan: 'standard',
+      stripeSubscriptionId,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(0);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
+  });
+
   test('active renewal after a prior activation → eligible subscription.created log for a different period does NOT trigger a second email', async () => {
     // Defence-in-depth for the durable-signal fallback: the helper matches on
     // plan + period boundaries of the `stripe_subscription_created.after_state`

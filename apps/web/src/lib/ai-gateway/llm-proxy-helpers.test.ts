@@ -256,6 +256,72 @@ describe('checkOrganizationModelRestrictions', () => {
     });
   });
 
+  describe('model inference provider restriction', () => {
+    it('should set providerConfig.only to the model restriction when no org settings', () => {
+      const result = checkOrganizationModelRestrictions({
+        modelId: 'stepfun/step-3.5-flash:free',
+        settings: undefined,
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.providerConfig).toEqual({ only: ['stepfun'] });
+    });
+
+    it('should intersect model restriction with org provider_allow_list', () => {
+      const result = checkOrganizationModelRestrictions({
+        modelId: 'stepfun/step-3.5-flash:free',
+        settings: {
+          provider_policy_mode: 'allow',
+          provider_allow_list: ['stepfun', 'openai'],
+        },
+        organizationPlan: 'enterprise',
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.providerConfig).toEqual({ only: ['stepfun'] });
+    });
+
+    it('should produce empty only when org allow list excludes the model restriction', () => {
+      const result = checkOrganizationModelRestrictions({
+        modelId: 'stepfun/step-3.5-flash:free',
+        settings: {
+          provider_policy_mode: 'allow',
+          provider_allow_list: ['openai'],
+        },
+        organizationPlan: 'enterprise',
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.providerConfig).toEqual({ only: [] });
+    });
+
+    it('should convert ignore into only when intersecting with model restriction', () => {
+      const result = checkOrganizationModelRestrictions({
+        modelId: 'stepfun/step-3.5-flash:free',
+        settings: {
+          provider_deny_list: ['openai'],
+        },
+        organizationPlan: 'enterprise',
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.providerConfig).toEqual({ only: ['stepfun'] });
+    });
+
+    it('should drop restricted providers that the org has denied', () => {
+      const result = checkOrganizationModelRestrictions({
+        modelId: 'stepfun/step-3.5-flash:free',
+        settings: {
+          provider_deny_list: ['stepfun'],
+        },
+        organizationPlan: 'enterprise',
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.providerConfig).toEqual({ only: [] });
+    });
+  });
+
   describe('no settings', () => {
     it('should return no error and no provider config when settings is undefined', () => {
       const result = checkOrganizationModelRestrictions({

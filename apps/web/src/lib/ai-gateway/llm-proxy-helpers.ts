@@ -372,9 +372,14 @@ export function checkOrganizationModelRestrictions(params: {
   settings?: OrganizationSettings;
   organizationPlan?: OrganizationPlan;
 }): OrganizationRestrictionResult {
-  if (!params.settings) return { error: null };
-
   const normalizedModelId = normalizeModelId(params.modelId);
+  const modelInferenceProviderRestriction =
+    kiloExclusiveModels.find(m => normalizeModelId(m.public_id) === normalizedModelId)
+      ?.inference_provider_restriction ?? [];
+
+  if (!params.settings) {
+    return { error: null, providerConfig: buildRestrictedProviderConfig(undefined, modelInferenceProviderRestriction) };
+  }
 
   // Model/provider access restrictions only apply to Enterprise plans.
   if (params.organizationPlan === 'enterprise') {
@@ -401,6 +406,8 @@ export function checkOrganizationModelRestrictions(params: {
     }
   }
 
+  applyInferenceProviderRestriction(providerConfig, modelInferenceProviderRestriction);
+
   // Setting this only if it's set as an override on the organization settings
   if (dataCollection) {
     providerConfig.data_collection = dataCollection;
@@ -410,6 +417,32 @@ export function checkOrganizationModelRestrictions(params: {
     error: null,
     providerConfig: Object.keys(providerConfig).length > 0 ? providerConfig : undefined,
   };
+}
+
+function buildRestrictedProviderConfig(
+  existing: OpenRouterProviderConfig | undefined,
+  modelInferenceProviderRestriction: ReadonlyArray<string>
+): OpenRouterProviderConfig | undefined {
+  if (modelInferenceProviderRestriction.length === 0) return existing;
+  const providerConfig: OpenRouterProviderConfig = existing ?? {};
+  applyInferenceProviderRestriction(providerConfig, modelInferenceProviderRestriction);
+  return Object.keys(providerConfig).length > 0 ? providerConfig : undefined;
+}
+
+function applyInferenceProviderRestriction(
+  providerConfig: OpenRouterProviderConfig,
+  modelInferenceProviderRestriction: ReadonlyArray<string>
+) {
+  if (modelInferenceProviderRestriction.length === 0) return;
+  if (providerConfig.only !== undefined) {
+    providerConfig.only = providerConfig.only.filter(p =>
+      modelInferenceProviderRestriction.includes(p)
+    );
+    return;
+  }
+  const ignored = providerConfig.ignore ?? [];
+  providerConfig.only = modelInferenceProviderRestriction.filter(p => !ignored.includes(p));
+  delete providerConfig.ignore;
 }
 
 export function extractHeaderAndLimitLength(request: NextRequest, name: string) {

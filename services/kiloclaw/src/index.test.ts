@@ -826,6 +826,50 @@ describe('host-based routing', () => {
     expect(response.status).toBe(404);
   });
 
+  it('skips host-based routing for reserved labels (e.g. claw) and falls through', async () => {
+    // `claw` is reserved for controller check-in + platform traffic that's
+    // registered before the catch-all. A request hitting the catch-all on
+    // `claw.kiloclaw.ai` means no earlier route matched — we want to fall
+    // through to cookie/default routing rather than 404 with "Instance not
+    // found" (the host-branch's response for unparseable labels), which
+    // would be a misleading error for a reserved operational hostname.
+    const instanceStub = {
+      getStatus: vi.fn(),
+    };
+    const registryStub = {
+      // Empty registry → default-personal path resolves no instance,
+      // responds with "Instance not provisioned". Distinct from the
+      // host-branch's "Instance not found".
+      listInstances: vi.fn().mockResolvedValue([]),
+    };
+    const response = await app.fetch(
+      new Request('https://claw.kiloclaw.ai/some-unhandled-path'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+        KILOCLAW_REGISTRY: {
+          idFromName: vi.fn().mockReturnValue('registry-id'),
+          get: vi.fn().mockReturnValue(registryStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(404);
+    // Host branch would have replied `{ error: 'Instance not found' }`;
+    // the default branch replies `{ error: 'Instance not provisioned', ... }`.
+    // The latter body proves the reserved-label short-circuit kicked in.
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Instance not provisioned',
+    });
+    // Host branch would have called the Instance DO's getStatus for the
+    // `claw` label. It must not.
+    expect(instanceStub.getStatus).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when the DO has no userId (instance never provisioned)', async () => {
     const instanceStub = {
       getStatus: vi.fn().mockResolvedValue({

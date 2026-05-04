@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest } from '@jest/globals';
 import { workerUrlForInstance } from './instance-url';
 import { sandboxIdFromUserId, sandboxIdFromInstanceId } from '@kilocode/worker-utils/sandbox-id';
 
@@ -18,16 +18,30 @@ describe('workerUrlForInstance', () => {
     ).toBe(LEGACY);
   });
 
-  it('falls back to the legacy URL when the template has no {label} placeholder', () => {
+  it('falls back to the legacy URL and warns once when the template has no {label} placeholder', () => {
     const sandboxId = sandboxIdFromInstanceId('550e8400-e29b-41d4-a716-446655440000');
-    expect(
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(
+        workerUrlForInstance({
+          sandboxId,
+          controllerCapabilitiesVersion: 2,
+          template: 'https://claw.kiloclaw.ai',
+          fallback: LEGACY,
+        })
+      ).toBe(LEGACY);
+      // Subsequent calls with the same misconfiguration must not spam logs.
       workerUrlForInstance({
         sandboxId,
         controllerCapabilitiesVersion: 2,
         template: 'https://claw.kiloclaw.ai',
         fallback: LEGACY,
-      })
-    ).toBe(LEGACY);
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toMatch(/missing the \{label\} placeholder/);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('falls back to the legacy URL for pre-v2 instances', () => {

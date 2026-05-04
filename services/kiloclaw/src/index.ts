@@ -206,7 +206,14 @@ async function proxyThroughTarget(opts: {
 
     const containerWs = containerResponse.webSocket;
     if (!containerWs) {
-      return containerResponse;
+      // Upstream returned a non-upgrade response to a WebSocket request.
+      // Normalize to 502 JSON rather than leaking the raw upstream body —
+      // this path is only hit when the container is in a bad state
+      // (gateway crash, proxy misconfig) and the raw response may contain
+      // provider/controller error details we don't want to surface to
+      // the Control UI.
+      console.warn(`${logTag} upstream did not upgrade (status ${containerResponse.status})`);
+      return Response.json({ error: 'WebSocket upgrade failed' }, { status: 502 });
     }
 
     const [clientWs, serverWs] = Object.values(new WebSocketPair());
@@ -618,6 +625,20 @@ async function resolveInstance(c: Context<AppEnv>): Promise<{
 }
 
 /**
+ * Reserved hostname labels under the instance-host suffix that are NOT
+ * per-instance virtual hosts. Requests to these land on the worker via
+ * the `*.kiloclaw.ai/*` wildcard route but must be served by
+ * earlier-registered routes (controller check-in, future platform
+ * endpoints) rather than the host-based proxy branch.
+ *
+ * Keeping this set small and explicit prevents accidental routing: a
+ * request to `claw.kiloclaw.ai/someuserpath` will fall through the
+ * host-based branch to cookie/default routing instead of 404ing with an
+ * "instance not found" that's actually a configuration misunderstanding.
+ */
+const RESERVED_INSTANCE_HOST_LABELS = new Set<string>(['claw']);
+
+/**
  * Resolve the DO key that a host-routed request should proxy to.
  *
  *   `i-<32hex>.<suffix>` → key the DO by the decoded instanceId (UUID).
@@ -664,6 +685,15 @@ async function handleHostBasedRoute(c: Context<AppEnv>): Promise<Response | null
   const label = parseInstanceHost(url.host, c.env);
   if (!label) {
     return c.json({ error: 'Instance not found' }, 404);
+  }
+
+  // Reserved labels (e.g. `claw` for controller check-in, platform health
+  // probes) are served by earlier-registered routes. If we've reached the
+  // catch-all on a reserved label the path wasn't a controller/platform
+  // route — return null so the cookie/default branches handle it rather
+  // than 404ing with a misleading "instance not found".
+  if (RESERVED_INSTANCE_HOST_LABELS.has(label)) {
+    return null;
   }
 
   const userId = c.get('userId');

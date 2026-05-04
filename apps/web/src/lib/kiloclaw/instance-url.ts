@@ -30,6 +30,14 @@ const MIN_CAPABILITY_VERSION_FOR_PER_INSTANCE_URL = 2;
 
 const DEFAULT_LEGACY_URL = 'https://claw.kilo.ai';
 
+/**
+ * Process-local guard so the "misconfigured template" warning fires
+ * once per worker/Node process instead of on every getStatus call.
+ * Resets on cold start, which is the right granularity for operator
+ * feedback after a config change.
+ */
+let warnedAboutMissingLabelPlaceholder = false;
+
 export function workerUrlForInstance(params: {
   sandboxId: string | null;
   controllerCapabilitiesVersion: number | null;
@@ -39,7 +47,19 @@ export function workerUrlForInstance(params: {
   const { sandboxId, controllerCapabilitiesVersion, template, fallback } = params;
   const legacyUrl = fallback || DEFAULT_LEGACY_URL;
 
-  if (!template || !template.includes('{label}')) return legacyUrl;
+  if (!template) return legacyUrl;
+  if (!template.includes('{label}')) {
+    // Operator set a template but forgot the placeholder. Silently
+    // falling back to the legacy URL hides the misconfiguration; emit
+    // a one-time warning so it shows up in logs.
+    if (!warnedAboutMissingLabelPlaceholder) {
+      warnedAboutMissingLabelPlaceholder = true;
+      console.warn(
+        '[workerUrlForInstance] KILOCLAW_INSTANCE_URL_TEMPLATE is set but missing the {label} placeholder; falling back to legacy URL'
+      );
+    }
+    return legacyUrl;
+  }
   if (!sandboxId) return legacyUrl;
   if ((controllerCapabilitiesVersion ?? 0) < MIN_CAPABILITY_VERSION_FOR_PER_INSTANCE_URL) {
     return legacyUrl;

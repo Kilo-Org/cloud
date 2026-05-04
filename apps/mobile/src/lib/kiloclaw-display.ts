@@ -19,3 +19,10 @@ export function kiloclawConversationEyebrow(instance: KiloClawDisplayInstance | 
     firstDisplayValue([instance?.botName, instance?.name, instance?.organizationName]) ?? 'KiloClaw'
   );
 }
+
+export function kiloclawInstanceSwitcherTitle(instance: KiloClawDisplayInstance | undefined) {
+  return (
+    firstDisplayValue([instance?.botName, instance?.name, instance?.organizationName]) ??
+    'KiloClaw instance'
+  );
+}

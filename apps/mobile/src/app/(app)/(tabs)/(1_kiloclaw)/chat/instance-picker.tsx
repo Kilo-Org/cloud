@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { kiloclawInstanceSwitcherTitle } from '@/lib/kiloclaw-display';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
 
 export default function InstancePickerScreen() {
@@ -66,7 +67,7 @@ export default function InstancePickerScreen() {
       {!instancesQuery.isPending && !instancesQuery.isError
         ? (instances ?? []).map(instance => {
             const isCurrent = instance.sandboxId === currentId;
-            const title = instance.name ?? instance.organizationName ?? 'KiloClaw instance';
+            const title = kiloclawInstanceSwitcherTitle(instance);
             return (
               <Pressable
                 key={instance.sandboxId}

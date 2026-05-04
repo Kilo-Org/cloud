@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 
-import { applyMessageInputTextChange, submitMessageInputDraft } from './message-input-state';
+import {
+  applyMessageInputTextChange,
+  shouldClearSubmittedDraft,
+  shouldShowMessageInputCounter,
+  submitMessageInputDraft,
+} from './message-input-state';
 
 describe('message input typing behavior', () => {
   it('sends typing notifications on text changes without preventing normal send', () => {
@@ -37,11 +42,11 @@ describe('message input typing behavior', () => {
     });
 
     expect(typingCount).toBe(1);
-    expect(submitted).toBe(true);
+    expect(submitted).toEqual({ text: 'hello', replyingToMessageId: 'reply-1' });
     expect(sentMessages).toEqual([{ text: 'hello', replyTo: 'reply-1' }]);
-    expect(cleared).toBe(true);
-    expect(valueRef.current).toBe('');
-    expect(canSendValues).toEqual([true, false]);
+    expect(cleared).toBe(false);
+    expect(valueRef.current).toBe('  hello  ');
+    expect(canSendValues).toEqual([true]);
   });
 
   it('keeps over-limit drafts intact and does not submit them', () => {
@@ -72,7 +77,7 @@ describe('message input typing behavior', () => {
       },
     });
 
-    expect(submitted).toBe(false);
+    expect(submitted).toBeNull();
     expect(sentMessages).toEqual([]);
     expect(cleared).toBe(false);
     expect(valueRef.current).toBe(overLimitText);
@@ -99,7 +104,7 @@ describe('message input typing behavior', () => {
       clearOnSubmit: false,
     });
 
-    expect(submitted).toBe(true);
+    expect(submitted).toEqual({ text: 'edited draft', replyingToMessageId: undefined });
     expect(sentMessages).toEqual(['edited draft']);
     expect(cleared).toBe(false);
     expect(valueRef.current).toBe('  edited draft  ');
@@ -109,7 +114,7 @@ describe('message input typing behavior', () => {
   it('lets edit callers clear drafts after successful mutation', () => {
     const valueRef = { current: '  edited draft  ' };
     const canSendValues: boolean[] = [];
-    const successControls: { clearDraft?: () => void } = {};
+    const successControls: { clearDraft?: () => boolean } = {};
     let cleared = false;
 
     const submitted = submitMessageInputDraft({
@@ -135,9 +140,42 @@ describe('message input typing behavior', () => {
     }
     clearDraft();
 
-    expect(submitted).toBe(true);
+    expect(submitted).toEqual({ text: 'edited draft', replyingToMessageId: undefined });
     expect(cleared).toBe(true);
     expect(valueRef.current).toBe('');
     expect(canSendValues).toEqual([false]);
+  });
+
+  it('shows the character counter at eighty percent of the text limit', () => {
+    expect(shouldShowMessageInputCounter('x'.repeat(MESSAGE_TEXT_MAX_CHARS * 0.8 - 1))).toBe(false);
+    expect(shouldShowMessageInputCounter('x'.repeat(MESSAGE_TEXT_MAX_CHARS * 0.8))).toBe(true);
+  });
+
+  it('clears a submitted draft only when the visible draft and reply target still match', () => {
+    const submitted = { text: 'hello', replyingToMessageId: 'reply-1' };
+
+    expect(
+      shouldClearSubmittedDraft({
+        currentText: 'hello',
+        currentReplyingToMessageId: 'reply-1',
+        submitted,
+      })
+    ).toBe(true);
+
+    expect(
+      shouldClearSubmittedDraft({
+        currentText: 'hello again',
+        currentReplyingToMessageId: 'reply-1',
+        submitted,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldClearSubmittedDraft({
+        currentText: 'hello',
+        currentReplyingToMessageId: undefined,
+        submitted,
+      })
+    ).toBe(false);
   });
 });

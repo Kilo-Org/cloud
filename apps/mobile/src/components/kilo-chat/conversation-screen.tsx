@@ -1,5 +1,6 @@
 /* eslint-disable max-lines */
 import { useActionSheet } from '@expo/react-native-action-sheet';
+import * as Haptics from 'expo-haptics';
 import {
   attemptMarkCurrentConversationRead,
   clearMarkReadRetry,
@@ -152,6 +153,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
             onSuccess: () => {
               controls?.clearDraft();
               setEditingMessage(null);
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             },
             onError: err => {
               toast.error(formatKiloChatError(err, 'Failed to edit message'));
@@ -169,7 +171,13 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
         }),
         {
           onSuccess: () => {
-            setReplyingTo(null);
+            if (controls?.clearDraft() ?? false) {
+              setReplyingTo(null);
+            }
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+          onError: err => {
+            toast.error(formatKiloChatError(err, 'Failed to send message'));
           },
         }
       );
@@ -449,7 +457,6 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
           disabled={inputAvailability.disabled}
           disabledReason={inputAvailability.disabledReason}
           initialText={editingText}
-          clearOnSubmit={editingMessage === null}
           replyingTo={replyingTo}
           onCancelReply={
             replyingTo

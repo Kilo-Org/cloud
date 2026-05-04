@@ -1,14 +1,16 @@
 import { Send, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import { type Message } from '@kilocode/kilo-chat';
+import { type Message, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   applyMessageInputTextChange,
+  isMessageInputOverLimit,
   type MessageInputSubmitControls,
+  shouldShowMessageInputCounter,
   submitMessageInputDraft,
 } from './message-input-state';
 import { getReplyPreviewText } from './message-presentation';
@@ -29,6 +31,24 @@ type Props = {
   clearOnSubmit?: boolean;
 };
 
+function resolveSendDisabled({
+  canSend,
+  disabled,
+  overLimit,
+}: {
+  canSend: boolean;
+  disabled?: boolean;
+  overLimit: boolean;
+}): boolean {
+  if (!canSend) {
+    return true;
+  }
+  if (disabled === true) {
+    return true;
+  }
+  return overLimit;
+}
+
 export function MessageInput({
   onSend,
   onTyping,
@@ -43,7 +63,13 @@ export function MessageInput({
   const colors = useThemeColors();
   const valueRef = useRef(initialText);
   const [canSend, setCanSend] = useState(initialText.trim().length > 0);
+  const [draftLength, setDraftLength] = useState(initialText.length);
   const inputRef = useRef<TextInput>(null);
+  const currentReplyingToRef = useRef<string | undefined>(replyingTo?.id);
+  currentReplyingToRef.current = replyingTo?.id;
+  const overLimit = isMessageInputOverLimit(valueRef.current);
+  const showCounter = shouldShowMessageInputCounter(valueRef.current);
+  const sendDisabled = resolveSendDisabled({ canSend, disabled, overLimit });
 
   const submit = () => {
     if (disabled) {
@@ -53,8 +79,12 @@ export function MessageInput({
       valueRef,
       replyingToMessageId: replyingTo?.id,
       onSend,
-      clearInput: () => inputRef.current?.clear(),
+      clearInput: () => {
+        inputRef.current?.clear();
+        setDraftLength(0);
+      },
       setCanSend,
+      getCurrentReplyingToMessageId: () => currentReplyingToRef.current,
       clearOnSubmit,
     });
   };
@@ -87,24 +117,40 @@ export function MessageInput({
         </View>
       )}
       <View className="flex-row items-end gap-2">
-        <TextInput
-          ref={inputRef}
-          className="flex-1 rounded-md border border-input bg-card px-3 py-2 leading-5 text-foreground"
-          placeholder="Message"
-          placeholderTextColor={colors.mutedForeground}
-          defaultValue={initialText}
-          multiline
-          editable={!disabled}
-          onChangeText={t => {
-            applyMessageInputTextChange({
-              text: t,
-              valueRef,
-              setCanSend,
-              onTyping,
-            });
-          }}
-          onSubmitEditing={submit}
-        />
+        <View className="min-w-0 flex-1">
+          <TextInput
+            ref={inputRef}
+            className={cn(
+              'max-h-32 min-h-10 rounded-md border bg-card px-3 py-2 leading-5 text-foreground',
+              overLimit ? 'border-destructive' : 'border-input'
+            )}
+            placeholder="Message"
+            placeholderTextColor={colors.mutedForeground}
+            defaultValue={initialText}
+            multiline
+            scrollEnabled={draftLength > 160}
+            editable={!disabled}
+            onChangeText={t => {
+              setDraftLength(t.length);
+              applyMessageInputTextChange({
+                text: t,
+                valueRef,
+                setCanSend,
+                onTyping,
+              });
+            }}
+            onSubmitEditing={submit}
+          />
+          <View className="h-5 items-end justify-center">
+            {showCounter ? (
+              <Text
+                className={cn('text-xs text-muted-foreground', overLimit && 'text-destructive')}
+              >
+                {draftLength}/{MESSAGE_TEXT_MAX_CHARS}
+              </Text>
+            ) : null}
+          </View>
+        </View>
         {onCancelEdit && (
           <Pressable
             onPress={onCancelEdit}
@@ -119,10 +165,10 @@ export function MessageInput({
         )}
         <Pressable
           onPress={submit}
-          disabled={!canSend || disabled}
+          disabled={sendDisabled}
           className={cn(
             'h-10 w-10 items-center justify-center rounded-md bg-primary',
-            (!canSend || disabled) && 'opacity-50'
+            sendDisabled && 'opacity-50'
           )}
         >
           <Send size={18} color={colors.primaryForeground} />

@@ -71,6 +71,7 @@ const fakeStatus = {
   instanceId: 'fake-instance',
   inboundEmailAddress: null,
   inboundEmailEnabled: false,
+  scheduledAction: null,
 } satisfies PopulatedClawStatus;
 
 export function ClawOnboardingFakeWalkthrough({

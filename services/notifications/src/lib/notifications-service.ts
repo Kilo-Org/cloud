@@ -10,12 +10,22 @@ import {
   type SendInstanceLifecycleNotificationParams,
   type SendInstanceLifecycleNotificationResult,
 } from './instance-lifecycle-push';
+import {
+  dispatchScheduledActionPush,
+  type SendScheduledActionNoticeParams,
+  type SendScheduledActionNoticeResult,
+} from './scheduled-action-push';
 
 export type {
   InstanceLifecycleEvent,
   SendInstanceLifecycleNotificationParams,
   SendInstanceLifecycleNotificationResult,
 } from './instance-lifecycle-push';
+export type {
+  ScheduledActionEvent,
+  SendScheduledActionNoticeParams,
+  SendScheduledActionNoticeResult,
+} from './scheduled-action-push';
 
 type ReceiptCheckMessage = {
   ticketTokenPairs: TicketTokenPair[];
@@ -38,6 +48,35 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
     const result = await dispatchInstanceLifecyclePush(params, {
+      getTokens: async userId => {
+        const rows = await db
+          .select({ token: user_push_tokens.token })
+          .from(user_push_tokens)
+          .where(eq(user_push_tokens.user_id, userId));
+        return rows.map(r => r.token);
+      },
+      deleteStaleTokens: async tokens => {
+        await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, tokens));
+      },
+      sendPush: async messages => {
+        const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
+        return sendPushNotifications(messages, accessToken);
+      },
+      enqueueReceipts: async ticketTokenPairs => {
+        const receiptMsg: ReceiptCheckMessage = { ticketTokenPairs };
+        await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
+      },
+    });
+
+    return result;
+  }
+
+  async sendScheduledActionNotice(
+    params: SendScheduledActionNoticeParams
+  ): Promise<SendScheduledActionNoticeResult> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+
+    const result = await dispatchScheduledActionPush(params, {
       getTokens: async userId => {
         const rows = await db
           .select({ token: user_push_tokens.token })

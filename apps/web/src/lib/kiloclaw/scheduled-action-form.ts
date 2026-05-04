@@ -21,3 +21,37 @@ export function defaultScheduledAt(): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/**
+ * v1 channel set — what the schedule dialogs render as checkboxes and
+ * what `scheduleAction` accepts in `noticeChannels`. The 'agent' channel
+ * is intentionally excluded (the v1 dispatcher 501s; surfacing it in
+ * the picker would mislead admins).
+ */
+export const NOTICE_CHANNELS = ['email', 'webapp', 'mobile_push'] as const;
+export type NoticeChannel = (typeof NOTICE_CHANNELS)[number];
+
+export const NOTICE_CHANNEL_LABELS: Record<NoticeChannel, string> = {
+  email: 'Email',
+  webapp: 'In-app banner',
+  mobile_push: 'Mobile push',
+};
+
+/** Default form state for the notification block, matching backend defaults. */
+export type NotifyFormState = {
+  notify: boolean;
+  noticeLeadHours: number;
+  noticeSubject: string;
+  noticeBody: string;
+  noticeChannels: NoticeChannel[];
+};
+
+export function defaultNotifyFormState(): NotifyFormState {
+  return {
+    notify: true,
+    noticeLeadHours: 24,
+    noticeSubject: '',
+    noticeBody: '',
+    noticeChannels: [...NOTICE_CHANNELS],
+  };
+}

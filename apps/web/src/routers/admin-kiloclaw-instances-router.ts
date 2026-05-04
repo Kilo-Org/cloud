@@ -11,9 +11,11 @@ import {
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
+  kiloclaw_scheduled_action_notifications,
   kilocode_users,
 } from '@kilocode/db/schema';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
+import type { NewKiloClawScheduledActionNotification } from '@kilocode/db/schema';
 import {
   cycleInboundEmailAddressForInstance,
   getInboundEmailAddressForInstance,
@@ -1652,12 +1654,25 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           // wall-clock time.
           scheduledAt: z.string().datetime(),
           reason: z.string().max(256).optional(),
-          // Notice fields are collected here but unused until the
-          // notifications PR. Defaults are sensible empty values so
-          // current callers can omit.
+          // Notice config. notify defaults true — admin must explicitly
+          // opt out (uncommon: dev/internal instances with no real user).
+          // When notify=false we skip all notification row inserts and
+          // the action fires silently.
+          notify: z.boolean().default(true),
+          // How far ahead of scheduled_at to dispatch the notice. The
+          // sweep selects pending notifications where now() >= stage.scheduled_at - lead_hours.
+          // Range matches the parent column constraint.
           noticeLeadHours: z.number().int().min(0).max(168).default(24),
           noticeSubject: z.string().max(120).default(''),
           noticeBody: z.string().max(2000).default(''),
+          // Channels default to all available. Admin can narrow at
+          // schedule time. 'agent' is excluded from the v1 enum here —
+          // the dispatcher would 501 anyway and we want admins to know
+          // it's not yet supported.
+          noticeChannels: z
+            .array(z.enum(['email', 'webapp', 'mobile_push']))
+            .min(1)
+            .default(['email', 'webapp', 'mobile_push']),
         }),
         z.object({
           actionType: z.literal('version_change'),
@@ -1676,9 +1691,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           overridePins: z.boolean().default(false),
           scheduledAt: z.string().datetime(),
           reason: z.string().max(256).optional(),
+          notify: z.boolean().default(true),
           noticeLeadHours: z.number().int().min(0).max(168).default(24),
           noticeSubject: z.string().max(120).default(''),
           noticeBody: z.string().max(2000).default(''),
+          noticeChannels: z
+            .array(z.enum(['email', 'webapp', 'mobile_push']))
+            .min(1)
+            .default(['email', 'webapp', 'mobile_push']),
         }),
       ])
     )
@@ -1842,26 +1862,52 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             })
             .returning({ id: kiloclaw_scheduled_action_stages.id });
 
-          await tx.insert(kiloclaw_scheduled_action_targets).values(
-            liveInstanceIds.map(id => {
-              const row = liveResolvedById.get(id);
-              // liveResolvedById is built from liveInstanceRows (filtered
-              // above), so every id resolves.
-              if (!row) throw new Error(`unresolved instance ${id}`);
-              return {
-                scheduled_action_id: parentRow.id,
-                stage_id: stageRow.id,
-                instance_id: row.instance.id,
-                source_image_tag: row.instance.tracked_image_tag,
-                // For version_change targets we stamp the target tag so the
-                // DO apply path can read it from the target row directly
-                // without having to join back to the parent.
-                target_image_tag: parentTargetImageTag,
-                user_id: row.owner_id,
-                status: 'pending' as const,
-              };
-            })
-          );
+          const insertedTargets = await tx
+            .insert(kiloclaw_scheduled_action_targets)
+            .values(
+              liveInstanceIds.map(id => {
+                const row = liveResolvedById.get(id);
+                // liveResolvedById is built from liveInstanceRows (filtered
+                // above), so every id resolves.
+                if (!row) throw new Error(`unresolved instance ${id}`);
+                return {
+                  scheduled_action_id: parentRow.id,
+                  stage_id: stageRow.id,
+                  instance_id: row.instance.id,
+                  source_image_tag: row.instance.tracked_image_tag,
+                  // For version_change targets we stamp the target tag so the
+                  // DO apply path can read it from the target row directly
+                  // without having to join back to the parent.
+                  target_image_tag: parentTargetImageTag,
+                  user_id: row.owner_id,
+                  status: 'pending' as const,
+                };
+              })
+            )
+            .returning({
+              id: kiloclaw_scheduled_action_targets.id,
+              instance_id: kiloclaw_scheduled_action_targets.instance_id,
+            });
+
+          // Fan out one notification row per (target, channel) when
+          // notify=true. The sweep selects pending rows whose stage's
+          // (scheduled_at - notice_lead_hours) is in the past. Channels
+          // dispatch independently; one failed channel doesn't poison
+          // the others.
+          if (input.notify && input.noticeChannels.length > 0) {
+            const notificationRows: NewKiloClawScheduledActionNotification[] = [];
+            for (const target of insertedTargets) {
+              for (const channel of input.noticeChannels) {
+                notificationRows.push({
+                  target_id: target.id,
+                  channel,
+                  kind: 'notice',
+                  status: 'pending',
+                });
+              }
+            }
+            await tx.insert(kiloclaw_scheduled_action_notifications).values(notificationRows);
+          }
 
           return { id: parentRow.id, stageId: stageRow.id };
         },
@@ -2129,6 +2175,19 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
    * filtered to pending targets whose parent is still actionable.
    * Ordered by scheduled_at ascending so the soonest is first.
    */
+  /**
+   * Synchronously runs the scheduled-action notice sweep that the cron
+   * normally drives at 1-minute cadence. Powers the admin Scheduler
+   * tab "Run notice sweep now" button — useful in `wrangler dev` (where
+   * scheduled() does not fire on cadence) and as an on-demand verifier
+   * in production after creating a test notification. The sweep is
+   * idempotent and bounded; calling it on demand is safe.
+   */
+  runNoticeSweepNow: adminProcedure.mutation(async () => {
+    const internalClient = new KiloClawInternalClient();
+    return internalClient.runScheduledActionNoticeSweep();
+  }),
+
   listUpcomingScheduledActionsForInstance: adminProcedure
     .input(z.object({ instanceId: z.string().uuid() }))
     .query(async ({ input }) => {
@@ -2258,6 +2317,23 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             skipped_count: sql`${kiloclaw_scheduled_actions.skipped_count} + 1`,
           })
           .where(eq(kiloclaw_scheduled_actions.id, input.scheduledActionId));
+
+        // Queue cancellation notifications for THIS target only — the
+        // bulk cancel queues for all targets, this path is per-instance
+        // so the scope is just the one target row. Mirrors the
+        // cancelScheduledAction logic: only fire for channels that
+        // already have a 'sent' notice. ON CONFLICT keeps repeat calls
+        // safe.
+        await tx.execute(sql`
+          INSERT INTO kiloclaw_scheduled_action_notifications
+            (target_id, channel, kind, status)
+          SELECT n.target_id, n.channel, 'cancelled', 'pending'
+          FROM kiloclaw_scheduled_action_notifications n
+          WHERE n.target_id = ${updated.id}
+            AND n.kind = 'notice'
+            AND n.status = 'sent'
+          ON CONFLICT (target_id, kind, channel) DO NOTHING
+        `);
 
         // Promote stage + parent if no pending targets remain. Without
         // this, an action whose targets are all individually cancelled
@@ -2392,6 +2468,26 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               eq(kiloclaw_scheduled_action_targets.status, 'pending')
             )
           );
+
+        // Queue cancellation notifications. Only for (target, channel)
+        // pairs that already had a 'notice' row in 'sent' status — if
+        // the user never got a heads-up we don't surface a cancellation
+        // either. Insert one 'cancelled' row per such pair; the sweep
+        // dispatches them like any other notification. Use ON CONFLICT
+        // DO NOTHING so a re-cancel call (idempotency path) doesn't
+        // explode on the unique (target, kind, channel) index.
+        await tx.execute(sql`
+          INSERT INTO kiloclaw_scheduled_action_notifications
+            (target_id, channel, kind, status)
+          SELECT n.target_id, n.channel, 'cancelled', 'pending'
+          FROM kiloclaw_scheduled_action_notifications n
+          INNER JOIN kiloclaw_scheduled_action_targets t
+            ON t.id = n.target_id
+          WHERE t.scheduled_action_id = ${input.id}
+            AND n.kind = 'notice'
+            AND n.status = 'sent'
+          ON CONFLICT (target_id, kind, channel) DO NOTHING
+        `);
 
         return { cancelled: true as const, status: 'cancelled' as const };
       });

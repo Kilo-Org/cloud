@@ -771,6 +771,13 @@
       "when": 1777664842970,
       "tag": "0109_conscious_kingpin",
       "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1777916705045,
+      "tag": "0110_strong_metal_master",
+      "breakpoints": true
     }
   ]
 }

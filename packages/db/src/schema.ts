@@ -56,6 +56,9 @@ import type {
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
   KiloClawScheduledActionTargetStatus,
+  KiloClawScheduledActionNotificationStatus,
+  KiloClawScheduledActionNotificationChannel,
+  KiloClawScheduledActionNotificationKind,
 } from './schema-types';
 import type {
   OrganizationModeConfig,
@@ -4232,6 +4235,57 @@ export const kiloclaw_scheduled_action_targets = pgTable(
 export type KiloClawScheduledActionTarget = typeof kiloclaw_scheduled_action_targets.$inferSelect;
 export type NewKiloClawScheduledActionTarget =
   typeof kiloclaw_scheduled_action_targets.$inferInsert;
+
+// Per-target, per-channel notification rows. Channels dispatch and
+// persist independently — knowing email succeeded but mobile push
+// failed matters for retry and debug. Adding a new channel later is a
+// new value in the enum, not a schema change.
+//
+// kind='notice' is the heads-up dispatched ahead of the scheduled time;
+// kind='cancelled' is the follow-up emitted when an admin cancels the
+// action AFTER a notice was already sent for that (target, channel).
+// We never insert a 'cancelled' row for a (target, channel) that has
+// no prior sent 'notice' — surfacing a cancellation to a user who
+// never got the original heads-up would be confusing.
+export const kiloclaw_scheduled_action_notifications = pgTable(
+  'kiloclaw_scheduled_action_notifications',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    target_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_scheduled_action_targets.id, { onDelete: 'cascade' }),
+
+    channel: text().$type<KiloClawScheduledActionNotificationChannel>().notNull(),
+
+    kind: text().$type<KiloClawScheduledActionNotificationKind>().notNull().default('notice'),
+
+    status: text().$type<KiloClawScheduledActionNotificationStatus>().notNull().default('pending'),
+
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    error_message: text(),
+  },
+  table => [
+    // One notification per (target, kind, channel). A target may have
+    // both kinds (notice sent, then cancellation queued).
+    uniqueIndex('UQ_kiloclaw_scheduled_action_notifications_target_kind_channel').on(
+      table.target_id,
+      table.kind,
+      table.channel
+    ),
+    // Sweep lookup: notifications still pending dispatch.
+    index('IDX_kiloclaw_scheduled_action_notifications_pending')
+      .on(table.target_id)
+      .where(sql`${table.status} = 'pending'`),
+  ]
+);
+
+export type KiloClawScheduledActionNotification =
+  typeof kiloclaw_scheduled_action_notifications.$inferSelect;
+export type NewKiloClawScheduledActionNotification =
+  typeof kiloclaw_scheduled_action_notifications.$inferInsert;
 
 // KiloClaw Early Bird Purchases — records one-time earlybird payments.
 // Unique on user_id enforces at most one purchase per user.

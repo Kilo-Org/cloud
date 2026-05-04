@@ -21,6 +21,7 @@ import type { AppEnv, KiloClawEnv, ChatWebhookPayload } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform, controller } from './routes';
 import { handleSnapshotRestoreQueue } from './queue/snapshot-restore';
+import { runScheduledActionNoticesSweep } from './scheduled/scheduled-action-notices';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { deriveGatewayToken } from './auth/gateway-token';
@@ -1364,6 +1365,26 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
 
   async queue(batch: MessageBatch<SnapshotRestoreMessage>): Promise<void> {
     await handleSnapshotRestoreQueue(batch, this.env);
+  }
+
+  /**
+   * Cron handler. Currently runs the scheduled-action notice sweep
+   * (1-minute cadence per wrangler.jsonc). Wrap each sweep call in
+   * its own try/catch so a failing sweep doesn't poison subsequent
+   * crons or any other handler running on this entrypoint.
+   */
+  async scheduled(_event: ScheduledController): Promise<void> {
+    try {
+      const result = await runScheduledActionNoticesSweep(this.env);
+      if (result.processed > 0) {
+        console.log(
+          `[scheduled] action-notices: processed=${result.processed} sent=${result.sent} failed=${result.failed}`
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[scheduled] action-notices sweep failed:', msg);
+    }
   }
 
   /**

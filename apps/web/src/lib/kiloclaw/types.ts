@@ -602,4 +602,21 @@ export type KiloClawDashboardStatus = PlatformStatusResponse & {
   /** Copyable inbound email address for routing messages into this instance. */
   inboundEmailAddress: string | null;
   inboundEmailEnabled: boolean;
+  /**
+   * Soonest upcoming scheduled action targeting this instance, or null
+   * if none. Drives the in-workspace banner. Cancelled or completed
+   * actions are excluded — a banner that says "your upgrade was
+   * cancelled" comes through email/push, not the live status field.
+   */
+  scheduledAction: KiloClawScheduledActionStatusBlock | null;
+};
+
+export type KiloClawScheduledActionStatusBlock = {
+  scheduledActionId: string;
+  actionType: 'scheduled_restart' | 'version_change';
+  /** When the action will fire (ISO 8601). */
+  scheduledAt: string;
+  /** version_change only — the tag the worker will redeploy on. */
+  targetImageTag: string | null;
+  targetOpenclawVersion: string | null;
 };

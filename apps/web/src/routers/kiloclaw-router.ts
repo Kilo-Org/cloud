@@ -28,12 +28,16 @@ import {
   kiloclaw_instances,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
+  kiloclaw_scheduled_actions,
+  kiloclaw_scheduled_action_stages,
+  kiloclaw_scheduled_action_targets,
   kilocode_users,
   cloud_agent_webhook_triggers,
   credit_transactions,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
+import { and, eq, ne, asc, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
@@ -877,6 +881,57 @@ type KiloCodeConfigPublicResponse = Pick<
   | 'dreamingEnabled'
 >;
 
+/**
+ * Soonest pending scheduled action targeting this instance, or null.
+ * Powers the in-workspace "upcoming X at Y" banner on getStatus. Filter
+ * matches the admin-side conflict check: target.status IN ('pending',
+ * 'running'); parent.status IN ('scheduled', 'running').
+ */
+async function getUpcomingScheduledActionForInstance(
+  instanceId: string
+): Promise<KiloClawDashboardStatus['scheduledAction']> {
+  const targetCatalog = alias(kiloclaw_image_catalog, 'target_catalog');
+  const [row] = await db
+    .select({
+      scheduled_action_id: kiloclaw_scheduled_actions.id,
+      action_type: kiloclaw_scheduled_actions.action_type,
+      scheduled_at: kiloclaw_scheduled_action_stages.scheduled_at,
+      target_image_tag: kiloclaw_scheduled_action_targets.target_image_tag,
+      target_openclaw_version: targetCatalog.openclaw_version,
+    })
+    .from(kiloclaw_scheduled_action_targets)
+    .innerJoin(
+      kiloclaw_scheduled_actions,
+      eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
+    )
+    .innerJoin(
+      kiloclaw_scheduled_action_stages,
+      eq(kiloclaw_scheduled_action_stages.id, kiloclaw_scheduled_action_targets.stage_id)
+    )
+    .leftJoin(
+      targetCatalog,
+      eq(targetCatalog.image_tag, kiloclaw_scheduled_action_targets.target_image_tag)
+    )
+    .where(
+      and(
+        eq(kiloclaw_scheduled_action_targets.instance_id, instanceId),
+        inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running']),
+        inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+      )
+    )
+    .orderBy(asc(kiloclaw_scheduled_action_stages.scheduled_at))
+    .limit(1);
+
+  if (!row) return null;
+  return {
+    scheduledActionId: row.scheduled_action_id,
+    actionType: row.action_type,
+    scheduledAt: row.scheduled_at,
+    targetImageTag: row.target_image_tag ?? null,
+    targetOpenclawVersion: row.target_openclaw_version ?? null,
+  };
+}
+
 function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDashboardStatus {
   return {
     userId,
@@ -918,6 +973,7 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
     instanceId: null,
     inboundEmailAddress: null,
     inboundEmailEnabled: false,
+    scheduledAction: null,
   } satisfies KiloClawDashboardStatus;
 }
 
@@ -2352,9 +2408,10 @@ export const kiloclawRouter = createTRPCRouter({
     }
 
     const client = new KiloClawInternalClient();
-    const [status, inboundEmailAddress] = await Promise.all([
+    const [status, inboundEmailAddress, scheduledAction] = await Promise.all([
       client.getStatus(ctx.user.id, workerInstanceId(instance)),
       getInboundEmailAddressForInstance(instance.id),
+      getUpcomingScheduledActionForInstance(instance.id),
     ]);
 
     return {
@@ -2367,6 +2424,7 @@ export const kiloclawRouter = createTRPCRouter({
       instanceId: workerInstanceId(instance) ? instance.id : null,
       inboundEmailAddress,
       inboundEmailEnabled: instance.inboundEmailEnabled,
+      scheduledAction,
     } satisfies KiloClawDashboardStatus;
   }),
 

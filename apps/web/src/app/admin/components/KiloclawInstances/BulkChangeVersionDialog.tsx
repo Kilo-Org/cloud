@@ -29,7 +29,12 @@ import { toast } from 'sonner';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
 import type { AdminKiloclawInstance } from '@/routers/admin-kiloclaw-instances-router';
-import { defaultScheduledAt } from '@/lib/kiloclaw/scheduled-action-form';
+import {
+  defaultScheduledAt,
+  defaultNotifyFormState,
+  type NotifyFormState,
+} from '@/lib/kiloclaw/scheduled-action-form';
+import { ScheduleNotifyFields } from '../KiloclawScheduler/ScheduleNotifyFields';
 
 type RouterOutputs = inferRouterOutputs<RootRouter>;
 type ListVersionsItem = RouterOutputs['admin']['kiloclawVersions']['listVersions']['items'][number];
@@ -74,6 +79,7 @@ export function BulkChangeVersionDialog({
   const [failedSectionOpen, setFailedSectionOpen] = useState(true);
   const [mode, setMode] = useState<'now' | 'scheduled'>('now');
   const [scheduledAt, setScheduledAt] = useState<string>(defaultScheduledAt);
+  const [notify, setNotify] = useState<NotifyFormState>(defaultNotifyFormState);
 
   // Reset form whenever the dialog reopens. Keeps state from leaking
   // between independent admin actions.
@@ -84,6 +90,7 @@ export function BulkChangeVersionDialog({
       setConfirmInput('');
       setResult(null);
       setMode('now');
+      setNotify(defaultNotifyFormState());
     }
   }, [open]);
 
@@ -220,6 +227,11 @@ export function BulkChangeVersionDialog({
       imageTag: targetTag,
       overridePins,
       scheduledAt: local.toISOString(),
+      notify: notify.notify,
+      noticeLeadHours: notify.noticeLeadHours,
+      noticeSubject: notify.noticeSubject,
+      noticeBody: notify.noticeBody,
+      noticeChannels: notify.noticeChannels,
     });
   };
 
@@ -280,15 +292,7 @@ export function BulkChangeVersionDialog({
                   </AlertDescription>
                 </Alert>
               </TabsContent>
-              <TabsContent value="scheduled" className="mt-3 space-y-2">
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    Notifications aren't implemented yet — end users get no warning before their
-                    session is interrupted at the scheduled time. Use cautiously on customer
-                    instances until the notifications work lands.
-                  </AlertDescription>
-                </Alert>
+              <TabsContent value="scheduled" className="mt-3 space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="bulk-scheduled-at">Scheduled at (local time)</Label>
                   <Input
@@ -308,6 +312,12 @@ export function BulkChangeVersionDialog({
                   Per-instance outcome (applied / skipped / failed) shows up in the Scheduler tab as
                   the action progresses.
                 </p>
+                <ScheduleNotifyFields
+                  idPrefix="bulk"
+                  state={notify}
+                  onChange={setNotify}
+                  disabled={isPending}
+                />
               </TabsContent>
             </Tabs>
 

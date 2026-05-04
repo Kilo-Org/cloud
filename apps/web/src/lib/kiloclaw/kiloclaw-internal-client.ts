@@ -233,6 +233,24 @@ export class KiloClawInternalClient {
     );
   }
 
+  /**
+   * Synchronously runs the notification notice sweep that the cron
+   * normally drives. Used by the admin Scheduler tab "Run notice sweep
+   * now" button so admins can verify notice copy locally (where wrangler
+   * does not fire scheduled() on cadence) and on demand in production.
+   * No userId routing — sweep is fleet-wide.
+   */
+  async runScheduledActionNoticeSweep(): Promise<{
+    processed: number;
+    sent: number;
+    failed: number;
+  }> {
+    return this.request('/api/platform/scheduled-action/run-notice-sweep', {
+      method: 'POST',
+      body: '{}',
+    });
+  }
+
   async setUserKiloclawEarlyAccess(
     userId: string,
     value: boolean

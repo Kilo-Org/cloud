@@ -29,6 +29,7 @@ import {
 } from '../lib/version-rollout';
 import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
+import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
 import {
   KiloclawStartReasonSchema,
@@ -3984,6 +3985,23 @@ platform.post('/scheduled-action/wake', async c => {
     return c.json(woken);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'scheduled-action-wake');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/scheduled-action/run-notice-sweep
+//
+// Synchronously runs the notice sweep that the cron normally drives.
+// Useful for local dev (where wrangler does not fire scheduled() on
+// the cron cadence) and for ad-hoc admin testing in production. The
+// sweep is idempotent and bounded (MAX_NOTIFICATIONS_PER_TICK), so
+// invoking it on demand is safe.
+platform.post('/scheduled-action/run-notice-sweep', async c => {
+  try {
+    const result = await runScheduledActionNoticesSweep(c.env);
+    return c.json(result);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-run-notice-sweep');
     return jsonError(message, status);
   }
 });

@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
@@ -14,6 +14,7 @@ import {
   kilocode_users,
   kiloclaw_email_log,
   kiloclaw_instances,
+  kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
@@ -437,11 +438,18 @@ export async function applyStripeFundedKiloClawPeriod(params: {
 
   let wasSuspended = false;
   let resolvedInstanceId: string | undefined;
+  let resolvedSubscriptionId: string | undefined;
   let applied = false;
-  // True only when the subscription transitions from trialing → first paid period.
-  // Renewals (before.status === 'active') and reactivations must not trigger the
-  // "subscription started" email; existing paid subscribers have no log row yet.
-  let isFirstPaidPeriod = false;
+  // True when this settlement transitions the subscription into a paid active
+  // period from a non-active state (trialing or canceled). Renewals
+  // (before.status === 'active') and recovery states (past_due / unpaid) do
+  // not send the "subscription started" email. See
+  // shouldSendSubscriptionStartedEmailForActivation.
+  let shouldSendSubscriptionStartedEmailForNewSettlement = false;
+  // Set when the primary settlement insert was a duplicate (processTopUp
+  // returned false). In that case the downstream email side effect may not
+  // have run yet and we attempt best-effort recovery after commit.
+  let settlementWasDuplicate = false;
 
   await db.transaction(async tx => {
     const user = await tx.query.kilocode_users.findFirst({
@@ -532,6 +540,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     const targetRow = resolvedTarget.subscription;
     wasSuspended = !!targetRow.suspended_at;
     resolvedInstanceId = targetRow.instance_id ?? undefined;
+    resolvedSubscriptionId = targetRow.id;
 
     const shouldClearSchedule = targetRow.scheduled_plan === plan;
     const commitEndsAt = plan === 'commit' ? periodEnd : null;
@@ -553,6 +562,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
         stripe_payment_id: stripePaymentId,
       });
       applied = true;
+      settlementWasDuplicate = true;
       return;
     }
 
@@ -609,7 +619,8 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       .from(kiloclaw_subscriptions)
       .where(eq(kiloclaw_subscriptions.id, targetRow.id))
       .limit(1);
-    isFirstPaidPeriod = before?.status === 'trialing';
+    shouldSendSubscriptionStartedEmailForNewSettlement =
+      shouldSendSubscriptionStartedEmailForActivation(before?.status ?? null);
     const [after] = await tx
       .update(kiloclaw_subscriptions)
       .set(updateSet)
@@ -650,7 +661,18 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     });
   }
 
-  if (resolvedInstanceId && amountMicrodollars > 0 && isFirstPaidPeriod) {
+  const shouldSendSubscriptionStartedEmail =
+    shouldSendSubscriptionStartedEmailForNewSettlement ||
+    (settlementWasDuplicate &&
+      resolvedSubscriptionId !== undefined &&
+      (await didPriorSettlementRecordPaidActivation({
+        subscriptionId: resolvedSubscriptionId,
+        plan,
+        periodStart,
+        periodEnd,
+      })));
+
+  if (resolvedInstanceId && amountMicrodollars > 0 && shouldSendSubscriptionStartedEmail) {
     await maybeSendKiloClawSubscriptionStartedEmail({
       userId,
       instanceId: resolvedInstanceId,
@@ -673,6 +695,108 @@ export async function applyStripeFundedKiloClawPeriod(params: {
 }
 
 export const KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE = 'kiloclaw_subscription_started';
+
+// Conservative duplicate-recovery window. A change-log row older than this
+// relative to `periodStart` is treated as a stale transition and will not
+// trigger a recovered subscription-started email. The `kiloclaw_email_log`
+// unique index is still the final idempotency guard.
+export const SUBSCRIPTION_STARTED_RECOVERY_WINDOW_MS = 31 * 24 * 60 * 60 * 1000;
+
+// A settlement activates a paid period (and may produce a "subscription
+// started" email) only when the subscription was NOT already active before
+// settlement. Recovery/dunning states (past_due, unpaid) are excluded; those
+// flows are payment-recovery on an active plan, not a new activation.
+// Eligible: trialing, canceled (including canceled paid rows that resubscribe).
+export function shouldSendSubscriptionStartedEmailForActivation(
+  beforeStatus: string | null
+): boolean {
+  return beforeStatus === 'trialing' || beforeStatus === 'canceled';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringFieldOrNull(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === 'string' ? value : null;
+}
+
+// Compare two timestamp strings by parsing them as Dates. Handles the case
+// where a JSONB-serialized timestamp uses Postgres text form
+// ("2026-05-04 16:52:41.287+00") while the input is ISO-8601
+// ("2026-05-04T16:52:41.287Z"). Returns false for either side unparseable.
+function timestampsEqual(a: string | null, b: string | null): boolean {
+  if (a === null || b === null) return false;
+  const aMs = new Date(a).getTime();
+  const bMs = new Date(b).getTime();
+  if (!Number.isFinite(aMs) || !Number.isFinite(bMs)) return false;
+  return aMs === bMs;
+}
+
+// Best-effort check: does `kiloclaw_subscription_change_log` contain a prior
+// `period_advanced` / `stripe_invoice_settlement` entry that transitioned the
+// given subscription into a paid active period for the exact plan and
+// period? Used to recover the subscription-started email when a replay of
+// settlement hits the duplicate-credit path and the original in-transaction
+// email send may have failed. Returns false on missing/malformed rows — the
+// `kiloclaw_email_log` unique index remains the final idempotency guard.
+async function didPriorSettlementRecordPaidActivation(params: {
+  subscriptionId: string;
+  plan: 'commit' | 'standard';
+  periodStart: string;
+  periodEnd: string;
+}): Promise<boolean> {
+  const { subscriptionId, plan, periodStart, periodEnd } = params;
+
+  const rows = await db
+    .select({
+      created_at: kiloclaw_subscription_change_log.created_at,
+      before_state: kiloclaw_subscription_change_log.before_state,
+      after_state: kiloclaw_subscription_change_log.after_state,
+    })
+    .from(kiloclaw_subscription_change_log)
+    .where(
+      and(
+        eq(kiloclaw_subscription_change_log.subscription_id, subscriptionId),
+        eq(kiloclaw_subscription_change_log.action, 'period_advanced'),
+        eq(kiloclaw_subscription_change_log.reason, 'stripe_invoice_settlement')
+      )
+    )
+    .orderBy(desc(kiloclaw_subscription_change_log.created_at))
+    .limit(10);
+
+  const periodStartMs = new Date(periodStart).getTime();
+  if (!Number.isFinite(periodStartMs)) return false;
+
+  for (const row of rows) {
+    if (!isRecord(row.before_state) || !isRecord(row.after_state)) continue;
+
+    const beforeStatus = stringFieldOrNull(row.before_state, 'status');
+    if (!shouldSendSubscriptionStartedEmailForActivation(beforeStatus)) continue;
+
+    const afterStatus = stringFieldOrNull(row.after_state, 'status');
+    const afterPlan = stringFieldOrNull(row.after_state, 'plan');
+    const afterPeriodStart = stringFieldOrNull(row.after_state, 'current_period_start');
+    const afterPeriodEnd = stringFieldOrNull(row.after_state, 'current_period_end');
+    if (
+      afterStatus !== 'active' ||
+      afterPlan !== plan ||
+      !timestampsEqual(afterPeriodStart, periodStart) ||
+      !timestampsEqual(afterPeriodEnd, periodEnd)
+    ) {
+      continue;
+    }
+
+    const createdAtMs = new Date(row.created_at).getTime();
+    if (!Number.isFinite(createdAtMs)) continue;
+    if (Math.abs(createdAtMs - periodStartMs) > SUBSCRIPTION_STARTED_RECOVERY_WINDOW_MS) continue;
+
+    return true;
+  }
+
+  return false;
+}
 
 function formatBillingPeriod(periodStart: string, periodEnd: string): string {
   const start = format(new Date(periodStart), 'MMM d, yyyy');

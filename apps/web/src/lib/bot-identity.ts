@@ -54,6 +54,7 @@ type LinkAccountContext = {
 };
 
 type VerifiedLinkToken = {
+  contextKey: string;
   identity: PlatformIdentity;
   thread: ThreadImpl;
   message: Message;
@@ -235,6 +236,14 @@ export async function createLinkAccountToken({
   return createLinkToken({ identity, contextKey });
 }
 
+export async function consumeLinkAccountContext(
+  state: StateAdapter,
+  contextKey: string
+): Promise<boolean> {
+  const consumedKey = `${contextKey}:consumed`;
+  return await state.setIfNotExists(consumedKey, true, LINK_ACCOUNT_CONTEXT_TTL_MS);
+}
+
 /** Verify and decode a link token. Returns the payload or `null` on failure. */
 export async function verifyLinkToken(
   state: StateAdapter,
@@ -265,6 +274,7 @@ export async function verifyLinkToken(
     const linkAccountContext = linkAccountContextSchema.parse(context);
 
     return {
+      contextKey: data.contextKey,
       identity: data.identity,
       thread: ThreadImpl.fromJSON(linkAccountContext.thread),
       message: Message.fromJSON(linkAccountContext.message),

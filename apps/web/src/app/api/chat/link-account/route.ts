@@ -2,7 +2,12 @@ import { bot } from '@/lib/bot';
 import { APP_URL } from '@/lib/constants';
 import { captureException } from '@sentry/nextjs';
 import { after } from 'next/server';
-import { linkKiloUser, verifyLinkToken, type PlatformIdentity } from '@/lib/bot-identity';
+import {
+  consumeLinkAccountContext,
+  linkKiloUser,
+  verifyLinkToken,
+  type PlatformIdentity,
+} from '@/lib/bot-identity';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getPlatformIntegration } from '@/lib/bot/platform-helpers';
@@ -93,7 +98,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const { identity, thread, message } = linkPayload;
+  const { contextKey, identity, thread, message } = linkPayload;
 
   // Authenticate — redirect to sign-in if no session, then back here
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -111,7 +116,9 @@ export async function GET(request: Request) {
 
   await linkKiloUser(bot.getState(), identity, user.id);
 
-  after(() => reprocessLinkedMessage(identity, thread, message, user));
+  if (await consumeLinkAccountContext(bot.getState(), contextKey)) {
+    after(() => reprocessLinkedMessage(identity, thread, message, user));
+  }
 
   return new Response(
     `<!DOCTYPE html>

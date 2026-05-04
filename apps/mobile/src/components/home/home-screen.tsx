@@ -96,7 +96,7 @@ export function HomeScreen() {
   const hasInstance = (instances?.length ?? 0) > 0;
   const isFirstTime = !hasInstance && !hasAnySession && !instancesError;
 
-  const title = isFirstTime ? 'Welcome to Kilo' : buildTimedGreeting(null);
+  const headerTitle = buildTimedGreeting(null);
 
   const handleRefresh = useCallback(() => {
     void (async () => {
@@ -111,14 +111,20 @@ export function HomeScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Kilo" showBackButton={false} headerRight={<ProfileAvatarButton />} />
+      <ScreenHeader
+        title={headerTitle}
+        size="large"
+        showBackButton={false}
+        className="px-[22px]"
+        headerRight={<ProfileAvatarButton />}
+      />
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-24"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
-        <Greeting title={title} />
+        {isFirstTime ? <Greeting title="Welcome to Kilo" /> : null}
 
         {isLoading ? (
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4">

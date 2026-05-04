@@ -705,7 +705,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
   test('stale duplicate recovery guard → old change-log row outside the window does not trigger a recovered email', async () => {
     const user = await insertTestUser({});
     const stripeSubscriptionId = `sub_stale_${crypto.randomUUID()}`;
-    const { instance } = await seedSubscription({
+    const { instance, subscription } = await seedSubscription({
       userId: user.id,
       status: 'trialing',
       plan: 'trial',
@@ -738,6 +738,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       .set({ created_at: backdated })
       .where(
         and(
+          eq(kiloclaw_subscription_change_log.subscription_id, subscription.id),
           eq(kiloclaw_subscription_change_log.action, 'period_advanced'),
           eq(kiloclaw_subscription_change_log.reason, 'stripe_invoice_settlement')
         )

@@ -79,10 +79,8 @@ export default function TabsLayout() {
           ),
         }}
         listeners={{
-          tabPress: event => {
+          tabPress: () => {
             void Haptics.selectionAsync();
-            event.preventDefault();
-            router.navigate('/(app)/(tabs)/(1_kiloclaw)' as Href);
           },
         }}
       />
@@ -96,8 +94,10 @@ export default function TabsLayout() {
           ),
         }}
         listeners={{
-          tabPress: () => {
+          tabPress: event => {
             void Haptics.selectionAsync();
+            event.preventDefault();
+            router.navigate('/(app)/(tabs)/(1_kiloclaw)' as Href);
           },
         }}
       />

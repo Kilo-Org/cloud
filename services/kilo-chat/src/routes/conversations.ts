@@ -14,6 +14,7 @@ import {
   leaveConversationFor,
   markReadFor,
 } from '../services/conversations';
+import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
 import {
   ulidSchema,
   createConversationRequestSchema,
@@ -107,7 +108,20 @@ export function registerConversationRoutes(
     if (!info || !info.members.some(m => m.id === callerId)) {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    return c.json(info satisfies ConversationDetailResponse);
+    const userIds = info.members.filter(m => m.kind === 'user').map(m => m.id);
+    const displayInfo =
+      userIds.length > 0
+        ? await resolveUserDisplayInfo(c.env.HYPERDRIVE.connectionString, userIds)
+        : new Map<string, UserDisplayInfo>();
+    const enrichedInfo = {
+      ...info,
+      members: info.members.map(member => ({
+        ...member,
+        displayName: displayInfo.get(member.id)?.displayName ?? null,
+        avatarUrl: displayInfo.get(member.id)?.avatarUrl ?? null,
+      })),
+    };
+    return c.json(enrichedInfo satisfies ConversationDetailResponse);
   });
 
   // PATCH /v1/conversations/:id — rename

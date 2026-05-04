@@ -125,7 +125,7 @@ export function MessageInput({
         </View>
       )}
       <View className="gap-1">
-        <View className="flex-row items-end gap-2">
+        <View className="flex-row items-center gap-2">
           <View className="min-w-0 flex-1">
             <TextInput
               ref={inputRef}

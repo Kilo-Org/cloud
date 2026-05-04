@@ -140,6 +140,11 @@ export const conversationMemberSchema = z.object({
   kind: memberKindSchema,
 });
 
+export const conversationDetailMemberSchema = conversationMemberSchema.extend({
+  displayName: z.string().nullish(),
+  avatarUrl: z.string().nullish(),
+});
+
 export const enrichedConversationMemberSchema = z.object({
   id: z.string(),
   kind: z.string(),
@@ -167,7 +172,7 @@ export const conversationDetailSchema = z.object({
   title: z.string().nullable(),
   createdBy: z.string(),
   createdAt: z.number(),
-  members: z.array(conversationMemberSchema),
+  members: z.array(conversationDetailMemberSchema),
 });
 
 // ── Request / response schemas ──────────────────────────────────────

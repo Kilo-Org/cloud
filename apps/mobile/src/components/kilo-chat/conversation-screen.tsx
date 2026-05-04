@@ -21,6 +21,7 @@ import {
 import {
   buildMessageActionAvailability,
   contentBlocksToText,
+  type ConversationDetailResponse,
   type ExecApprovalDecision,
   formatKiloChatError,
   type Message,
@@ -74,6 +75,7 @@ type Props = {
   conversationId: string;
   conversationTitle: string;
   conversationRenameTitle: string;
+  conversationMembers: ConversationDetailResponse['members'];
 };
 
 function editableText(message: Message): string {
@@ -98,6 +100,7 @@ export function ConversationScreen({
   conversationId,
   conversationTitle,
   conversationRenameTitle,
+  conversationMembers,
 }: Props) {
   const client = useKiloChatClient();
   const router = useRouter();
@@ -549,6 +552,8 @@ export function ConversationScreen({
         <MessageList
           messages={messages}
           currentUserId={currentUserId}
+          members={conversationMembers}
+          botName={instanceLabel}
           fetchOlder={fetchOlder}
           isFetchingOlder={messagesQuery.isFetchingNextPage}
           pendingAction={pendingAction}

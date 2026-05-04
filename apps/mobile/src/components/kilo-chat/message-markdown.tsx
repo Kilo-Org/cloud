@@ -16,7 +16,10 @@ export function MessageMarkdown({ text, isFromMe }: Readonly<MessageMarkdownProp
     return <MarkdownText value={text} variant={isFromMe ? 'user' : 'assistant'} />;
   } catch {
     return (
-      <Text selectable className="text-sm leading-5 text-foreground">
+      <Text
+        selectable
+        className={isFromMe ? 'text-sm leading-5 text-white' : 'text-sm leading-5 text-foreground'}
+      >
         {text}
       </Text>
     );

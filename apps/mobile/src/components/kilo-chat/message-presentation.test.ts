@@ -9,6 +9,7 @@ import {
   getDeliveryFailureLabel,
   getReplyPreviewText,
   isMessageEdited,
+  resolveMessageAuthorLabel,
 } from './message-presentation';
 
 vi.mock('expo-crypto', () => ({
@@ -149,5 +150,37 @@ describe('canToggleReaction', () => {
 
   it('allows reaction toggles for loaded users on delivered messages', () => {
     expect(canToggleReaction(message(), 'user-1')).toBe(true);
+  });
+});
+
+describe('resolveMessageAuthorLabel', () => {
+  it('uses resolved display names for user senders', () => {
+    expect(
+      resolveMessageAuthorLabel({
+        senderId: 'user-1',
+        members: [
+          { id: 'user-1', kind: 'user', displayName: 'Igor Minar', avatarUrl: null },
+          { id: 'bot:kiloclaw:sandbox-1', kind: 'bot', displayName: null, avatarUrl: null },
+        ],
+        botName: 'Helper Bot',
+      })
+    ).toBe('Igor Minar');
+  });
+
+  it('uses the bot display name for bot senders', () => {
+    expect(
+      resolveMessageAuthorLabel({
+        senderId: 'bot:kiloclaw:sandbox-1',
+        members: [
+          { id: 'bot:kiloclaw:sandbox-1', kind: 'bot', displayName: null, avatarUrl: null },
+        ],
+        botName: 'Helper Bot',
+      })
+    ).toBe('Helper Bot');
+  });
+
+  it('falls back to stable labels when resolved names are missing', () => {
+    expect(resolveMessageAuthorLabel({ senderId: 'bot:kiloclaw:sandbox-1' })).toBe('KiloClaw');
+    expect(resolveMessageAuthorLabel({ senderId: 'user-1' })).toBe('user-1');
   });
 });

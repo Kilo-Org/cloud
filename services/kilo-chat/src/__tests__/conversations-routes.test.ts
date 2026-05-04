@@ -6,10 +6,19 @@ import { makeApp } from './helpers';
 
 /** Map of userId → set of sandbox IDs they own. */
 const ownershipMap = new Map<string, Set<string>>();
+const userLookupResults = new Map<
+  string,
+  { displayName: string | null; avatarUrl: string | null }
+>();
 
 vi.mock('../services/sandbox-ownership', () => ({
   userOwnsSandbox: async (_env: Env, userId: string, sandboxId: string) =>
     ownershipMap.get(userId)?.has(sandboxId) ?? false,
+}));
+
+vi.mock('../services/user-lookup', () => ({
+  resolveUserDisplayInfo: async (_conn: string, userIds: string[]) =>
+    new Map(userIds.map(userId => [userId, userLookupResults.get(userId) ?? null])),
 }));
 
 function grantSandbox(userId: string, sandboxId: string) {
@@ -279,6 +288,49 @@ describe('GET /v1/conversations/:id', () => {
     expect(body.id).toBe(conversationId);
     expect(body.title).toBe('Frank Chat');
     expect(Array.isArray(body.members)).toBe(true);
+  });
+
+  it('enriches member display info for sender labels', async () => {
+    userLookupResults.set('user-member-display', {
+      displayName: 'Member Display',
+      avatarUrl: 'https://example.com/member.png',
+    });
+    grantSandbox('user-member-display', 'sandbox-member-display');
+    const app = makeApp('user-member-display', 'user');
+    const createRes = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-member-display', title: 'Names Chat' }),
+      },
+      env
+    );
+    const { conversationId } = await createRes.json<{ conversationId: string }>();
+
+    const res = await app.request(`/v1/conversations/${conversationId}`, {}, env);
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{
+      members: Array<{
+        id: string;
+        kind: string;
+        displayName?: string | null;
+        avatarUrl?: string | null;
+      }>;
+    }>();
+    expect(body.members).toContainEqual({
+      id: 'user-member-display',
+      kind: 'user',
+      displayName: 'Member Display',
+      avatarUrl: 'https://example.com/member.png',
+    });
+    expect(body.members).toContainEqual({
+      id: 'bot:kiloclaw:sandbox-member-display',
+      kind: 'bot',
+      displayName: null,
+      avatarUrl: null,
+    });
   });
 
   it('returns 403 for non-member', async () => {

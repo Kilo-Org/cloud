@@ -6,10 +6,13 @@ import { View } from 'react-native';
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
 import { Skeleton } from '@/components/ui/skeleton';
+import { type MessageAuthorMember, resolveMessageAuthorLabel } from './message-presentation';
 
 type Props = {
   messages: Message[];
   currentUserId: string | null;
+  members?: readonly MessageAuthorMember[];
+  botName?: string | null;
   fetchOlder?: () => void;
   isFetchingOlder: boolean;
   pendingAction: PendingAction | null;
@@ -21,6 +24,8 @@ type Props = {
 export function MessageList({
   messages,
   currentUserId,
+  members,
+  botName,
   fetchOlder,
   isFetchingOlder,
   pendingAction,
@@ -53,6 +58,7 @@ export function MessageList({
             currentUserId={currentUserId}
             isFromMe={currentUserId !== null && item.senderId === currentUserId}
             showAuthor={showAuthor}
+            authorLabel={resolveMessageAuthorLabel({ senderId: item.senderId, members, botName })}
             pendingActionGroupId={pendingActionGroupIdForMessage(pendingAction, item.id)}
             replyToMessage={
               item.inReplyToMessageId

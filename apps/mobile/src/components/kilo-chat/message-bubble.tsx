@@ -21,6 +21,7 @@ type Props = {
   currentUserId: string | null;
   isFromMe: boolean;
   showAuthor: boolean;
+  authorLabel: string;
   pendingActionGroupId: string | null;
   replyToMessage?: ReplyPreviewSource | null;
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
@@ -49,6 +50,7 @@ function MessageBubbleComponent({
   currentUserId,
   isFromMe,
   showAuthor,
+  authorLabel,
   pendingActionGroupId,
   replyToMessage,
   onExecuteAction,
@@ -59,7 +61,6 @@ function MessageBubbleComponent({
   const isPending = message.id.startsWith('pending-');
   const timestamp = message.clientUpdatedAt ?? message.updatedAt;
   const edited = isMessageEdited(message);
-  const authorLabel = message.senderId.startsWith('bot:') ? 'KiloClaw' : message.senderId;
 
   function handleReactionPress(emoji: string) {
     onReactionPress(message, emoji);
@@ -69,7 +70,7 @@ function MessageBubbleComponent({
     onExecuteAction(message, groupId, value);
   }
 
-  const textColor = isFromMe ? 'text-primary-foreground' : 'text-foreground';
+  const textColor = isFromMe ? 'text-white' : 'text-foreground';
   const deliveryFailureLabel = getDeliveryFailureLabel(message);
 
   return (
@@ -95,7 +96,7 @@ function MessageBubbleComponent({
       <View
         className={cn(
           'max-w-[80%] rounded-2xl px-3 py-2',
-          isFromMe ? 'bg-primary' : 'bg-neutral-100 dark:bg-neutral-800'
+          isFromMe ? 'bg-primary' : 'border border-border bg-card dark:bg-secondary'
         )}
       >
         {message.deleted ? (
@@ -106,7 +107,7 @@ function MessageBubbleComponent({
               <View
                 className={cn(
                   'mb-2 border-l-2 py-1 pl-2',
-                  isFromMe ? 'border-primary-foreground' : 'border-muted-foreground'
+                  isFromMe ? 'border-white' : 'border-muted-foreground'
                 )}
               >
                 <Text numberOfLines={2} className={cn('text-xs opacity-80', textColor)}>
@@ -126,10 +127,7 @@ function MessageBubbleComponent({
                 const Icon = block.resolved.value.startsWith('allow') ? CheckCircle2 : XCircle;
                 return (
                   <View key={block.groupId} className="mt-2 flex-row items-center gap-1.5">
-                    <Icon
-                      size={14}
-                      color={isFromMe ? colors.primaryForeground : colors.mutedForeground}
-                    />
+                    <Icon size={14} color={isFromMe ? '#FFFFFF' : colors.mutedForeground} />
                     <Text className={cn('text-xs opacity-70', textColor)}>{label}</Text>
                   </View>
                 );
@@ -168,7 +166,7 @@ function MessageBubbleComponent({
           <Text
             className={cn(
               'mt-1 text-right text-[10px]',
-              isFromMe ? 'text-primary-foreground opacity-70' : 'text-muted-foreground'
+              isFromMe ? 'text-white opacity-70' : 'text-muted-foreground'
             )}
           >
             {formatTimestamp(timestamp)}

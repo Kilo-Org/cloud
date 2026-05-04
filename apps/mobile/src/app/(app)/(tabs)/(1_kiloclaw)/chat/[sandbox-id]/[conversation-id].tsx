@@ -56,6 +56,7 @@ export default function ChatConversationRoute() {
         conversationId={conversationId}
         conversationTitle={conversationDetail.data.title ?? 'Untitled'}
         conversationRenameTitle={conversationDetail.data.title ?? ''}
+        conversationMembers={conversationDetail.data.members}
       />
     </>
   );

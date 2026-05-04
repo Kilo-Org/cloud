@@ -1,4 +1,5 @@
 import {
+  type ConversationDetailResponse,
   type CreateMessageRequest,
   type Message,
   type ReplyToMessageSnapshot,
@@ -8,6 +9,7 @@ import { ulid } from 'ulid';
 
 type SendMessageVariables = CreateMessageRequest & { clientId: string };
 export type ReplyPreviewSource = Message | ReplyToMessageSnapshot;
+export type MessageAuthorMember = ConversationDetailResponse['members'][number];
 
 type BuildSendMessageVariablesInput = {
   conversationId: string;
@@ -81,4 +83,30 @@ export function canCopyMessage(message: Message): boolean {
 
 export function isMessageEdited(message: Message): boolean {
   return !message.deleted && message.clientUpdatedAt !== null;
+}
+
+function firstDisplayValue(values: readonly (string | null | undefined)[]): string | null {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+  return null;
+}
+
+export function resolveMessageAuthorLabel({
+  senderId,
+  members = [],
+  botName,
+}: {
+  senderId: string;
+  members?: readonly MessageAuthorMember[];
+  botName?: string | null;
+}): string {
+  const member = members.find(candidate => candidate.id === senderId);
+  if (senderId.startsWith('bot:')) {
+    return firstDisplayValue([botName, member?.displayName]) ?? 'KiloClaw';
+  }
+  return firstDisplayValue([member?.displayName]) ?? senderId;
 }

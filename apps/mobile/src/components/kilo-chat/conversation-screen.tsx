@@ -27,7 +27,7 @@ import {
 } from '@kilocode/kilo-chat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -50,6 +50,7 @@ import {
 import { getMessageHistoryContentState } from './message-history-state';
 import { useConversationPresence } from './hooks/use-conversation-presence';
 import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
+import { useLeaveConversation } from './hooks/use-conversations';
 import { useMobileTypingState, useTypingSender } from './hooks/use-typing';
 import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';
@@ -58,7 +59,7 @@ import { useMessageCacheUpdater, useMessages, useSendMessage } from './hooks/use
 import { useNowTicker } from './hooks/use-now-ticker';
 import { useCurrentUserId } from './hooks/use-current-user-id';
 import { TypingIndicator } from './typing-indicator';
-import { useInstanceContext } from '@/lib/hooks/use-instance-context';
+import { useAllKiloClawInstances, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { setActiveChatLocation } from '@/lib/notifications';
 
@@ -83,6 +84,7 @@ function MessageHistorySkeleton() {
 
 export function ConversationScreen({ sandboxId, conversationId, conversationTitle }: Props) {
   const client = useKiloChatClient();
+  const router = useRouter();
   const currentUserId = useCurrentUserId();
   const { showActionSheetWithOptions } = useActionSheet();
   const { bottom } = useSafeAreaInsets();
@@ -118,6 +120,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   }, [messagesQuery]);
 
   const sendMutation = useSendMessage(client, conversationId, currentUserId);
+  const leaveConversation = useLeaveConversation(client);
   const editMessage = useEditMessage(client, conversationId);
   const deleteMessage = useDeleteMessage(client, conversationId);
   const executeAction = useExecuteAction(client, conversationId, currentUserId);
@@ -142,6 +145,62 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
     pendingMutation: sendMutation.isPending || editMessage.isPending,
     editing: editingMessage !== null,
   });
+  const { data: instances } = useAllKiloClawInstances();
+  const currentInstance = instances?.find(instance => instance.sandboxId === sandboxId);
+  const canSwitchInstance = (instances?.length ?? 0) > 1;
+  const instanceLabel = currentInstance?.name ?? currentInstance?.organizationName ?? 'KiloClaw';
+
+  const handleSwitchInstance = useCallback(() => {
+    router.push(`/(app)/chat/instance-picker?currentId=${sandboxId}` as Href);
+  }, [router, sandboxId]);
+
+  const handleOpenConversationOptions = useCallback(() => {
+    void Haptics.selectionAsync();
+    showActionSheetWithOptions(
+      {
+        title: conversationTitle,
+        options: ['Rename', 'Leave', 'Cancel'],
+        cancelButtonIndex: 2,
+        destructiveButtonIndex: 1,
+        containerStyle: { paddingBottom: bottom },
+      },
+      index => {
+        if (index === 0) {
+          const params = new URLSearchParams({ conversationId, title: conversationTitle });
+          router.push(`/(app)/chat/${sandboxId}/rename-conversation?${params.toString()}` as Href);
+          return;
+        }
+        if (index === 1) {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          Alert.alert('Leave conversation?', 'This removes it from your list.', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Leave',
+              style: 'destructive',
+              onPress: () => {
+                leaveConversation.mutate(
+                  { conversationId, sandboxId },
+                  {
+                    onSuccess: () => {
+                      router.replace(`/(app)/chat/${sandboxId}` as Href);
+                    },
+                  }
+                );
+              },
+            },
+          ]);
+        }
+      }
+    );
+  }, [
+    bottom,
+    conversationId,
+    conversationTitle,
+    leaveConversation,
+    router,
+    sandboxId,
+    showActionSheetWithOptions,
+  ]);
   const handleSend = useCallback(
     (text: string, inReplyToMessageId?: string, controls?: MessageInputSubmitControls) => {
       if (!editingMessage && inputAvailability.disabled) {
@@ -426,7 +485,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   if (messageHistoryState === 'loading') {
     return (
       <View className="flex-1">
-        <ConversationHeader title={conversationTitle} />
+        <ConversationHeader title={conversationTitle} subtitle={instanceLabel} />
         <KeyboardAvoidingView
           className="flex-1"
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -440,7 +499,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   if (messageHistoryState === 'error') {
     return (
       <View className="flex-1">
-        <ConversationHeader title={conversationTitle} />
+        <ConversationHeader title={conversationTitle} subtitle={instanceLabel} />
         <KeyboardAvoidingView
           className="flex-1"
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -459,7 +518,13 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
 
   return (
     <View className="flex-1">
-      <ConversationHeader title={conversationTitle} />
+      <ConversationHeader
+        title={conversationTitle}
+        subtitle={instanceLabel}
+        canSwitchInstance={canSwitchInstance}
+        onSwitchInstance={handleSwitchInstance}
+        onOpenOptions={handleOpenConversationOptions}
+      />
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

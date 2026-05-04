@@ -4,16 +4,18 @@ import { Check } from 'lucide-react-native';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { StatusBadge } from '@/components/kiloclaw/status-badge';
+import { QueryError } from '@/components/query-error';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
-import { type InstanceStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function InstancePickerScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { currentId } = useLocalSearchParams<{ currentId: string }>();
-  const { data: instances } = useAllKiloClawInstances();
+  const instancesQuery = useAllKiloClawInstances();
+  const { data: instances } = instancesQuery;
 
   const handleSelect = (sandboxId: string) => {
     void Haptics.selectionAsync();
@@ -44,28 +46,52 @@ export default function InstancePickerScreen() {
         </View>
       </View>
 
-      {(instances ?? []).map(instance => {
-        const isCurrent = instance.sandboxId === currentId;
-        return (
-          <Pressable
-            key={instance.sandboxId}
-            className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary will-change-pressable"
-            onPress={() => {
-              handleSelect(instance.sandboxId);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`${instance.name ?? instance.sandboxId}${isCurrent ? ', current' : ''}`}
-          >
-            <View className="flex-1 gap-1">
-              <Text className="text-base text-foreground" numberOfLines={1}>
-                {instance.name ?? instance.sandboxId}
-              </Text>
-              <StatusBadge status={instance.status as InstanceStatus} />
-            </View>
-            {isCurrent && <Check size={18} color={colors.primary} />}
-          </Pressable>
-        );
-      })}
+      {instancesQuery.isPending ? (
+        <View className="gap-3 px-4 py-4">
+          <Skeleton className="h-16 rounded-xl" />
+          <Skeleton className="h-16 rounded-xl" />
+          <Skeleton className="h-16 rounded-xl" />
+        </View>
+      ) : null}
+      {instancesQuery.isError ? (
+        <QueryError
+          className="py-12"
+          message="Could not load instances"
+          onRetry={() => {
+            void instancesQuery.refetch();
+          }}
+        />
+      ) : null}
+      {!instancesQuery.isPending && !instancesQuery.isError
+        ? (instances ?? []).map(instance => {
+            const isCurrent = instance.sandboxId === currentId;
+            const title = instance.name ?? instance.organizationName ?? 'KiloClaw instance';
+            return (
+              <Pressable
+                key={instance.sandboxId}
+                className="mx-4 mt-3 min-h-16 flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 active:bg-secondary will-change-pressable"
+                onPress={() => {
+                  handleSelect(instance.sandboxId);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${title}${isCurrent ? ', current' : ''}`}
+              >
+                <View className="min-w-0 flex-1 gap-1">
+                  <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
+                    {title}
+                  </Text>
+                  <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
+                    <Text variant="muted" numberOfLines={1}>
+                      {instance.organizationName ?? 'Personal'}
+                    </Text>
+                    <StatusBadge status={instance.status} />
+                  </View>
+                </View>
+                {isCurrent ? <Check size={18} color={colors.primary} /> : null}
+              </Pressable>
+            );
+          })
+        : null}
     </ScrollView>
   );
 }

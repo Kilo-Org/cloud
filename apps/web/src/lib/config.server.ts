@@ -212,20 +212,30 @@ export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
 /**
  * Per-instance worker URL template.
  *
+ * Per-instance URLs are the default in BOTH production and dev/test so a
+ * merge of the name-based routing feature flips them on automatically,
+ * without forcing anyone to edit env files.
+ *
  * Resolution rules:
  *   1. If `KILOCLAW_INSTANCE_URL_TEMPLATE` is set (to anything, including
- *      empty string), use that value. Explicit empty = kill switch for
- *      rolling back the per-instance URL without redeploying code.
+ *      empty string), use that value verbatim. Explicit empty = kill
+ *      switch / opt-out — operators can roll back without a code deploy,
+ *      devs can disable the per-instance flow locally, and tests can
+ *      force the legacy path.
  *   2. Otherwise in `NODE_ENV=production`, default to the canonical
- *      `https://{label}.kiloclaw.ai` template so merging this feature
- *      flips per-instance URLs on without a Vercel env var edit.
- *   3. Otherwise (dev/test) return empty → legacy path-based behaviour.
- *      Devs opt into dev-parity by setting
- *      `http://{label}.kiloclaw.localhost:8795` explicitly.
+ *      `https://{label}.kiloclaw.ai` template.
+ *   3. Otherwise (dev/test) derive a template from `KILOCLAW_API_URL`:
+ *      if `KILOCLAW_API_URL` looks like a loopback URL (`http://localhost:<port>`
+ *      / `http://127.0.0.1:<port>`), emit
+ *      `http://{label}.kiloclaw.localhost:<port>` so the browser
+ *      auto-resolves `*.kiloclaw.localhost` to `127.0.0.1` per RFC 6761.
+ *      If `KILOCLAW_API_URL` is missing or unparsable, fall back to the
+ *      same template with the wrangler dev port (`8795`) — matches
+ *      `.dev.vars.example`.
  *
- * When the template ends up set and contains `{label}`,
- * `getStatus` emits a `workerUrl` pointing at the instance's own virtual
- * host (derived from its sandboxId) for instances whose
+ * When the template ends up set and contains `{label}`, `getStatus`
+ * emits a `workerUrl` pointing at the instance's own virtual host
+ * (derived from its sandboxId) for instances whose
  * `controllerCapabilitiesVersion >= 2`. Pre-v2 instances keep falling
  * back to `KILOCLAW_API_URL`.
  *
@@ -233,17 +243,40 @@ export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
  * re-import of this entire module (which triggers production-only
  * validation of unrelated secrets).
  */
+const DEFAULT_DEV_WRANGLER_PORT = '8795';
+
+function deriveDevTemplateFromWorkerUrl(workerUrl: string | undefined): string {
+  const fallback = `http://{label}.kiloclaw.localhost:${DEFAULT_DEV_WRANGLER_PORT}`;
+  if (!workerUrl) return fallback;
+  try {
+    const parsed = new URL(workerUrl);
+    // Only derive when we're pointed at a loopback dev worker. Anything
+    // else (remote staging, preview domains, etc.) uses the same
+    // fallback — operators can still override explicitly.
+    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+      return fallback;
+    }
+    const port = parsed.port || DEFAULT_DEV_WRANGLER_PORT;
+    return `${parsed.protocol}//{label}.kiloclaw.localhost:${port}`;
+  } catch {
+    return fallback;
+  }
+}
+
 export function resolveInstanceUrlTemplate(
   envVar: string | undefined,
-  nodeEnv: string | undefined
+  nodeEnv: string | undefined,
+  workerUrl: string | undefined
 ): string {
   if (envVar !== undefined) return envVar;
-  return nodeEnv === 'production' ? 'https://{label}.kiloclaw.ai' : '';
+  if (nodeEnv === 'production') return 'https://{label}.kiloclaw.ai';
+  return deriveDevTemplateFromWorkerUrl(workerUrl);
 }
 
 export const KILOCLAW_INSTANCE_URL_TEMPLATE = resolveInstanceUrlTemplate(
   process.env.KILOCLAW_INSTANCE_URL_TEMPLATE,
-  process.env.NODE_ENV
+  process.env.NODE_ENV,
+  KILOCLAW_API_URL
 );
 
 // KiloClaw Early Bird Checkout

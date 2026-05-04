@@ -32,7 +32,9 @@ jest.mock('@/lib/firstTopupBonus', () => ({
 // The helpers are replaced with jest.fns that forward the call via
 // sendMock using a synthetic `templateName` so existing tests that filter
 // by templateName continue to work.
-const sendMock = jest.fn(async (_params: unknown) => ({ sent: true as const }));
+const sendMock = jest.fn<Promise<emailModule.SendResult>, [unknown]>(async () => ({
+  sent: true,
+}));
 
 jest.mock('@/lib/email', () => {
   const actual = jest.requireActual<typeof emailModule>('@/lib/email');
@@ -519,6 +521,42 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
   });
 
+  test('$0 Stripe settlement (full coupon / promo) still sends one subscription-started email', async () => {
+    // Per KiloClaw billing spec Stripe-Funded Credit Settlement rule 10,
+    // `$0` KiloClaw invoices must still run settlement so Stripe-created
+    // subscriptions transition into the activated hybrid state. The
+    // subscription-started email is an activation notification, not a
+    // revenue side effect, so it must fire even when amount_paid is 0.
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_zero_amount_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `in_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 0,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+
+    const zeroAmountSend = sendMock.mock.calls
+      .map(([params]) => params as { templateName: string; templateVars: Record<string, unknown> })
+      .find(p => p.templateName === 'kiloClawSubscriptionStarted');
+    expect(zeroAmountSend?.templateVars.price_usd).toBe('0.00');
+  });
+
   test('activate → cancel → resubscribe on same instance sends a second subscription-started email', async () => {
     // Real-world flow: user activates, receives the email, cancels, then
     // resubscribes later. Both paid activations on the same instance should
@@ -811,6 +849,86 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       periodEnd,
     });
 
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+  });
+
+  test('provider_not_configured → email log row is cleared so a retry can re-attempt', async () => {
+    // Regression: maybeSendKiloClawSubscriptionStartedEmail used to insert the
+    // kiloclaw_email_log marker before calling the provider, and only delete
+    // it if the send threw. When the provider returned {sent: false,
+    // reason: 'provider_not_configured'} without throwing, the marker
+    // remained and permanently suppressed the email on future retries.
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_provider_unconfigured_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+
+    sendMock.mockImplementationOnce(async () => ({
+      sent: false,
+      reason: 'provider_not_configured' as const,
+    }));
+
+    const periodStart = new Date().toISOString();
+    const periodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart,
+      periodEnd,
+    });
+
+    expect(applied).toBe(true);
+    // We did attempt to send exactly once, but the provider wasn't configured.
+    expect(countSubscriptionStartedSends()).toBe(1);
+    // The marker row must be gone so a later retry can re-attempt — the
+    // unique index would otherwise permanently suppress this activation.
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
+  });
+
+  test('neverbounce_rejected → email log row is retained so we do not retry a terminally invalid address', async () => {
+    // NeverBounce's "invalid" / "disposable" verdict is terminal for that
+    // address; retrying would loop forever. Leaving the kiloclaw_email_log
+    // row in place makes the outcome idempotent: we tried once, the address
+    // was rejected, we don't try again.
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_neverbounce_rejected_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+
+    sendMock.mockImplementationOnce(async () => ({
+      sent: false,
+      reason: 'neverbounce_rejected' as const,
+    }));
+
+    const periodStart = new Date().toISOString();
+    const periodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart,
+      periodEnd,
+    });
+
+    expect(applied).toBe(true);
     expect(countSubscriptionStartedSends()).toBe(1);
     expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
   });

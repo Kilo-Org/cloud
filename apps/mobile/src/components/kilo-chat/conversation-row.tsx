@@ -2,7 +2,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { CONVERSATION_TITLE_MAX_CHARS, type ConversationListItem } from '@kilocode/kilo-chat';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { MoreVertical } from 'lucide-react-native';
+import { MessageSquare, MoreVertical } from 'lucide-react-native';
 import { Alert, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -91,12 +91,16 @@ export function ConversationRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      className="min-h-16 flex-row items-center gap-3 rounded-xl px-3 py-3 active:bg-muted"
+      accessibilityHint="Opens the conversation"
+      className="min-h-16 flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 active:opacity-80"
       onPress={() => {
         onPress(conversation.conversationId);
       }}
     >
-      <View className="min-w-0 flex-1">
+      <View className="h-10 w-10 items-center justify-center rounded-xl border border-border bg-secondary">
+        <MessageSquare size={18} color={colors.mutedForeground} strokeWidth={1.75} />
+      </View>
+      <View className="min-w-0 flex-1 gap-1">
         <View className="flex-row items-center gap-2">
           <Text
             className="min-w-0 flex-1 text-base font-semibold text-foreground"
@@ -104,13 +108,15 @@ export function ConversationRow({
           >
             {title}
           </Text>
+        </View>
+        <View className="flex-row items-center gap-2">
           {hasUnread(conversation) ? (
             <View className="h-2.5 w-2.5 rounded-full bg-primary" accessibilityLabel="Unread" />
           ) : null}
+          <Text variant="muted" numberOfLines={1}>
+            {timeAgo(new Date(conversationTimestamp(conversation)))}
+          </Text>
         </View>
-        <Text className="mt-0.5 text-sm text-muted-foreground">
-          {timeAgo(new Date(conversationTimestamp(conversation)))}
-        </Text>
       </View>
       <Pressable
         accessibilityRole="button"

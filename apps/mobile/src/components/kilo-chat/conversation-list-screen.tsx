@@ -1,4 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, View } from 'react-native';
@@ -44,15 +45,19 @@ type ConversationListEntry = ConversationHeaderItem | ConversationItem;
 
 function ConversationListSkeleton({ showHeader }: Readonly<{ showHeader?: boolean }>) {
   return (
-    <View className="px-4 py-2">
-      {showHeader ? <Skeleton className="mb-2 h-4 w-24 rounded-md" /> : null}
+    <View className="gap-3 px-4 pt-2">
+      {showHeader ? <Skeleton className="mx-1 mb-1 h-4 w-24 rounded-md" /> : null}
       {[0, 1, 2, 3].map(i => (
-        <View key={i} className="flex-row items-center gap-3 py-3">
-          <View className="flex-1 gap-2">
+        <View
+          key={i}
+          className="min-h-16 flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 py-3"
+        >
+          <Skeleton className="h-10 w-10 rounded-xl" />
+          <View className="min-w-0 flex-1 gap-2">
             <Skeleton className="h-5 w-2/3 rounded-md" />
             <Skeleton className="h-4 w-24 rounded-md" />
           </View>
-          <Skeleton className="h-2.5 w-2.5 rounded-full" />
+          <Skeleton className="h-10 w-10 rounded-full" />
         </View>
       ))}
     </View>
@@ -89,10 +94,12 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   useInstancePresence(sandboxId);
 
   function handleRowPress(conversationId: string) {
+    void Haptics.selectionAsync();
     router.push(chatConversationPath(sandboxId, conversationId));
   }
 
   function handleCreateAndNavigate() {
+    void Haptics.selectionAsync();
     createConversation.mutate(
       { sandboxId },
       {
@@ -121,8 +128,8 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
 
   if (contentState === 'loading') {
     return (
-      <View className="flex-1">
-        <ScreenHeader title={sandboxLabel} />
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={sandboxLabel} size="large" className="px-[22px]" />
         <Animated.View entering={FadeIn.duration(200)} className="flex-1">
           <ConversationListSkeleton showHeader />
         </Animated.View>
@@ -132,8 +139,8 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
 
   if (contentState === 'error') {
     return (
-      <View className="flex-1">
-        <ScreenHeader title={sandboxLabel} />
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={sandboxLabel} size="large" className="px-[22px]" />
         <Animated.View entering={FadeIn.duration(200)} className="flex-1">
           <QueryError
             className="flex-1"
@@ -151,9 +158,11 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const entries = flattenConversationGroups(conversations, now);
 
   return (
-    <View className="flex-1">
+    <View className="flex-1 bg-background">
       <ScreenHeader
         title={sandboxLabel}
+        size="large"
+        className="px-[22px]"
         headerRight={
           <Pressable
             accessibilityRole="button"
@@ -178,11 +187,11 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           }
           renderItem={({ item }) =>
             item.kind === 'header' ? (
-              <View className="bg-background px-4 pb-1 pt-4">
+              <View className="bg-background px-5 pb-2 pt-4">
                 <Text variant="eyebrow">{item.label}</Text>
               </View>
             ) : (
-              <View className="px-2">
+              <View className="px-4 pb-3">
                 <ConversationRow
                   conversation={item.conversation}
                   sandboxId={sandboxId}
@@ -200,7 +209,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           }
           ListFooterComponent={
             isFetchingNextPage ? (
-              <View className="px-4 py-3">
+              <View className="pb-6 pt-1">
                 <ConversationListSkeleton />
               </View>
             ) : null

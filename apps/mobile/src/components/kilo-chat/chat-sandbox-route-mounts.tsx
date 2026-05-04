@@ -10,7 +10,7 @@ export function ChatSandboxInstanceEventSubscriptionMount() {
   return null;
 }
 
-export function ChatSandboxLastActiveInstanceMount() {
+function ChatSandboxLastActiveInstanceMount() {
   const { 'sandbox-id': sandboxId } = useLocalSearchParams<{ 'sandbox-id': string }>();
 
   useFocusEffect(

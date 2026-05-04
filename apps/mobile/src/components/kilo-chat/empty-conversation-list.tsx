@@ -12,14 +12,14 @@ type Props = {
 
 export function EmptyConversationList({ onStart, isStarting }: Props) {
   return (
-    <View className="flex-1 items-center justify-center px-6">
+    <View className="min-h-[420px] flex-1 items-center justify-center px-6">
       <EmptyState
         icon={MessageSquarePlus}
         title="No conversations yet"
-        description="Start your first conversation with the agent."
+        description="Create a conversation to start chatting with your KiloClaw instance."
         action={
-          <Button onPress={onStart} disabled={isStarting}>
-            <Text>{isStarting ? 'Starting…' : 'Start a conversation'}</Text>
+          <Button className="h-11 px-5" onPress={onStart} disabled={isStarting}>
+            <Text>{isStarting ? 'Starting…' : 'Create conversation'}</Text>
           </Button>
         }
       />

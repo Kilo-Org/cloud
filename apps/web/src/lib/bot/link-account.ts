@@ -7,9 +7,12 @@ const LINK_ACCOUNT_PATH = '/api/chat/link-account';
 
 export const LINK_ACCOUNT_ACTION_PREFIX = `link-${APP_URL}${LINK_ACCOUNT_PATH}`;
 
-function buildLinkAccountUrl(identity: PlatformIdentity): string {
+function buildLinkAccountUrl(identity: PlatformIdentity, thread: Thread, message: Message): string {
   const url = new URL(LINK_ACCOUNT_PATH, APP_URL);
-  url.searchParams.set('token', createLinkToken(identity));
+  url.searchParams.set(
+    'token',
+    createLinkToken({ identity, sourceMessage: { threadId: thread.id, messageId: message.id } })
+  );
   return url.toString();
 }
 
@@ -36,7 +39,11 @@ export async function promptLinkAccount(
   // Post to the channel when the @mention is top-level, otherwise into the thread.
   const target = isChannelLevelMessage(thread, message) ? thread.channel : thread;
 
-  await target.postEphemeral(message.author, linkAccountCard(buildLinkAccountUrl(identity)), {
-    fallbackToDM: true,
-  });
+  await target.postEphemeral(
+    message.author,
+    linkAccountCard(buildLinkAccountUrl(identity, thread, message)),
+    {
+      fallbackToDM: true,
+    }
+  );
 }

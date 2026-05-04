@@ -1,9 +1,35 @@
-import { updateBotRequest } from '@/lib/bot/request-logging';
+import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
 import { extractAndUploadImages } from '@/lib/bot/images';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
+
+export async function processLinkedMessage({
+  thread,
+  message,
+  platformIntegration,
+  user,
+}: {
+  thread: Thread;
+  message: Message;
+  platformIntegration: PlatformIntegration;
+  user: User;
+}) {
+  const platform = thread.id.split(':')[0];
+  const botRequestId = await createBotRequest({
+    createdBy: user.id,
+    organizationId: platformIntegration.owned_by_organization_id ?? null,
+    platformIntegrationId: platformIntegration.id,
+    platform,
+    platformThreadId: thread.id,
+    platformMessageId: message.id,
+    userMessage: message.text,
+    modelUsed: undefined,
+  });
+
+  await processMessage({ thread, message, platformIntegration, user, botRequestId });
+}
 
 export async function processMessage({
   thread,

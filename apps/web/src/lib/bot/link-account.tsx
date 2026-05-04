@@ -1,5 +1,3 @@
-/** @jsxImportSource chat */
-
 import { Actions, Card, LinkButton, CardText, type Message, type Thread } from 'chat';
 import { createLinkAccountToken, type PlatformIdentity } from '@/lib/bot-identity';
 import { APP_URL } from '@/lib/constants';
@@ -30,17 +28,16 @@ async function buildLinkAccountUrl(
 }
 
 function linkAccountCard(linkUrl: string) {
-  return (
-    <Card title="Link your Kilo account">
-      <CardText>
-        To use Kilo from this workspace you first need to link your chat account. Click the button
-        below to sign in and link your account.
-      </CardText>
-      <Actions>
-        <LinkButton label="Link Account" url={linkUrl} style="primary" />
-      </Actions>
-    </Card>
-  );
+  return Card({
+    title: 'Link your Kilo account',
+    children: [
+      CardText(
+        'To use Kilo from this workspace you first need to link your chat account. ' +
+          'Click the button below to sign in and link your account.'
+      ),
+      Actions([LinkButton({ label: 'Link Account', url: linkUrl, style: 'primary' })]),
+    ],
+  });
 }
 
 export async function promptLinkAccount(

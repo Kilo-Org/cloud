@@ -13,7 +13,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { getPlatformIntegration } from '@/lib/bot/platform-helpers';
 import { processLinkedMessage } from '@/lib/bot/run';
 import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
-import type { Message, Thread } from 'chat';
+import { Message, ThreadImpl, type Thread } from 'chat';
 import type { User } from '@kilocode/db';
 
 function errorPage(title: string, message: string, status: number): Response {
@@ -117,7 +117,9 @@ export async function GET(request: Request) {
   await linkKiloUser(bot.getState(), identity, user.id);
 
   if (await consumeLinkAccountContext(bot.getState(), contextKey)) {
-    after(() => reprocessLinkedMessage(identity, thread, message, user));
+    after(() =>
+      reprocessLinkedMessage(identity, ThreadImpl.fromJSON(thread), Message.fromJSON(message), user)
+    );
   }
 
   return new Response(

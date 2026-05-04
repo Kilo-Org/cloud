@@ -1,12 +1,6 @@
 import 'server-only';
 import crypto from 'node:crypto';
-import {
-  Message,
-  ThreadImpl,
-  type SerializedMessage,
-  type SerializedThread,
-  type StateAdapter,
-} from 'chat';
+import type { SerializedMessage, SerializedThread, StateAdapter } from 'chat';
 import * as z from 'zod';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { botIdentityRedisKey } from '@/lib/redis-keys';
@@ -56,8 +50,8 @@ type LinkAccountContext = {
 type VerifiedLinkToken = {
   contextKey: string;
   identity: PlatformIdentity;
-  thread: ThreadImpl;
-  message: Message;
+  thread: SerializedThread;
+  message: SerializedMessage;
 };
 
 /**
@@ -276,8 +270,8 @@ export async function verifyLinkToken(
     return {
       contextKey: data.contextKey,
       identity: data.identity,
-      thread: ThreadImpl.fromJSON(linkAccountContext.thread),
-      message: Message.fromJSON(linkAccountContext.message),
+      thread: linkAccountContext.thread,
+      message: linkAccountContext.message,
     };
   } catch {
     return null;

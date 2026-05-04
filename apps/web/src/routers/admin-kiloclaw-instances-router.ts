@@ -2338,6 +2338,30 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           ON CONFLICT (target_id, kind, channel) DO NOTHING
         `);
 
+        // Void any pending notice rows for this target so the sweep
+        // doesn't deliver a "your bot will restart soon" message after
+        // the action has been cancelled. Without this, an admin who
+        // cancels before the notice lead-time window opens (e.g.
+        // notice_lead_hours=24, cancel at hour 18) still sees the
+        // notice fire after hour 24 — selectDueNotifications filters
+        // only on notification.status, not on parent action/target
+        // status. We deliberately leave 'sending' rows alone: the
+        // sweep already committed to dispatching them, and overwriting
+        // mid-flight would race with markSent.
+        await tx
+          .update(kiloclaw_scheduled_action_notifications)
+          .set({
+            status: 'failed',
+            error_message: 'action cancelled before notice was dispatched',
+          })
+          .where(
+            and(
+              eq(kiloclaw_scheduled_action_notifications.target_id, updated.id),
+              eq(kiloclaw_scheduled_action_notifications.kind, 'notice'),
+              eq(kiloclaw_scheduled_action_notifications.status, 'pending')
+            )
+          );
+
         // Promote stage + parent if no pending targets remain. Without
         // this, an action whose targets are all individually cancelled
         // via this path stays in 'scheduled' forever — the DO alarm
@@ -2503,6 +2527,25 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             AND n.kind = 'notice'
             AND n.status = 'sent'
           ON CONFLICT (target_id, kind, channel) DO NOTHING
+        `);
+
+        // Void any pending notice rows so the sweep doesn't deliver a
+        // notice for a now-cancelled action. The sweep's selectDue
+        // query filters only on notification.status, not on parent
+        // status, so without this an admin who cancels before the
+        // notice lead-time window opens still sees the original
+        // notice fire on a later tick. Leave 'sending' rows alone —
+        // see the per-target version of this for the same reasoning.
+        await tx.execute(sql`
+          UPDATE kiloclaw_scheduled_action_notifications
+          SET status = 'failed',
+              error_message = 'action cancelled before notice was dispatched'
+          WHERE target_id IN (
+            SELECT id FROM kiloclaw_scheduled_action_targets
+            WHERE scheduled_action_id = ${input.id}
+          )
+            AND kind = 'notice'
+            AND status = 'pending'
         `);
 
         return { cancelled: true as const, status: 'cancelled' as const };

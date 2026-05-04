@@ -257,9 +257,9 @@ export function KiloclawSchedulerTab() {
             hibernated). Treat the chosen time as a "no earlier than" bound, not an exact fire time.
           </div>
           <div className="mt-2">
-            <strong>Notifications:</strong> not implemented yet. End users get no warning before
-            their session is interrupted at the scheduled time. Use cautiously on customer instances
-            until the notifications work lands.
+            <strong>Notifications:</strong> email, in-app banner, and mobile push are dispatched by
+            the notice sweep at a 1-minute cadence. Configure or disable per schedule using the
+            "Notify users" controls below.
           </div>
         </AlertDescription>
       </Alert>

@@ -42,6 +42,7 @@ import {
   makeErrorReadable,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
+  noFreeModelsAvailableResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
@@ -81,7 +82,10 @@ import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
-import { applyResolvedAutoModel } from '@/lib/ai-gateway/kilo-auto/resolution';
+import {
+  applyResolvedAutoModel,
+  NoFreeModelsAvailableError,
+} from '@/lib/ai-gateway/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
 import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
 import { extractResponsesPromptInfo } from '@/lib/ai-gateway/processUsage.responses';
@@ -237,19 +241,26 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
-    await applyResolvedAutoModel(
-      {
-        model: requestedModelLowerCased,
-        modeHeader,
-        featureHeader: feature,
-        sessionId: taskId ?? null,
-        apiKind: requestBodyParsed.kind,
-        clientIp: ipAddress ?? null,
-      },
-      requestBodyParsed,
-      authPromise.then(res => res.user),
-      balanceAndSettingsPromise.then(res => res.balance)
-    );
+    try {
+      await applyResolvedAutoModel(
+        {
+          model: requestedModelLowerCased,
+          modeHeader,
+          featureHeader: feature,
+          sessionId: taskId ?? null,
+          apiKind: requestBodyParsed.kind,
+          clientIp: ipAddress ?? null,
+        },
+        requestBodyParsed,
+        authPromise.then(res => res.user),
+        balanceAndSettingsPromise.then(res => res.balance)
+      );
+    } catch (e) {
+      if (e instanceof NoFreeModelsAvailableError) {
+        return noFreeModelsAvailableResponse();
+      }
+      throw e;
+    }
   }
 
   const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();

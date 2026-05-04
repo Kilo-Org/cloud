@@ -85,6 +85,16 @@ function gatewaySupportsApiKind(
   return provider?.supportedChatApis.some(k => k === apiKind) ?? false;
 }
 
+export class NoFreeModelsAvailableError extends Error {
+  constructor() {
+    super(
+      `No free models are currently available for ${KILO_AUTO_FREE_MODEL.id}. ` +
+        `Please try again later, or switch to ${KILO_AUTO_BALANCED_MODEL.id} for affordable paid inference.`
+    );
+    this.name = 'NoFreeModelsAvailableError';
+  }
+}
+
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
@@ -95,7 +105,7 @@ export async function resolveAutoModel(
     const openRouterModels = await getOpenRouterModels();
     const candidates = getAutoFreeCandidates(openRouterModels, apiKind);
     if (candidates.length === 0) {
-      throw new Error('No free model candidates available');
+      throw new NoFreeModelsAvailableError();
     }
     const randomNumber = getRandomNumber(
       'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp),

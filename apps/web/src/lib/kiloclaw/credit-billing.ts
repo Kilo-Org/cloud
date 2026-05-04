@@ -717,12 +717,6 @@ export async function applyStripeFundedKiloClawPeriod(params: {
 
 export const KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE = 'kiloclaw_subscription_started';
 
-// Conservative duplicate-recovery window. A change-log row older than this
-// relative to `periodStart` is treated as a stale transition and will not
-// trigger a recovered subscription-started email. The `kiloclaw_email_log`
-// unique index is still the final idempotency guard.
-export const SUBSCRIPTION_STARTED_RECOVERY_WINDOW_MS = 31 * 24 * 60 * 60 * 1000;
-
 // A settlement activates a paid period (and may produce a "subscription
 // started" email) only when the subscription was NOT already active before
 // settlement. Recovery/dunning states (past_due, unpaid) are excluded; those
@@ -762,6 +756,15 @@ function timestampsEqual(a: string | null, b: string | null): boolean {
 // settlement hits the duplicate-credit path and the original in-transaction
 // email send may have failed. Returns false on missing/malformed rows — the
 // `kiloclaw_email_log` unique index remains the final idempotency guard.
+//
+// Identity is established by subscription_id + action/reason scope + exact
+// plan/period-boundary match on `after_state`. `stripe_invoice_settlement`
+// rows are written only by `applyStripeFundedKiloClawPeriod` (once per
+// successful settlement), and KiloClaw never uses Stripe proration, so
+// renewals move period boundaries forward and two settlements on the same
+// subscription cannot share plan+period. No time-window guard is needed: a
+// legitimately delayed webhook replay (e.g., manual Stripe-dashboard
+// resend well after the period started) should still recover the email.
 async function didPriorSettlementRecordPaidActivation(params: {
   subscriptionId: string;
   plan: 'commit' | 'standard';
@@ -772,7 +775,6 @@ async function didPriorSettlementRecordPaidActivation(params: {
 
   const rows = await db
     .select({
-      created_at: kiloclaw_subscription_change_log.created_at,
       before_state: kiloclaw_subscription_change_log.before_state,
       after_state: kiloclaw_subscription_change_log.after_state,
     })
@@ -786,9 +788,6 @@ async function didPriorSettlementRecordPaidActivation(params: {
     )
     .orderBy(desc(kiloclaw_subscription_change_log.created_at))
     .limit(10);
-
-  const periodStartMs = new Date(periodStart).getTime();
-  if (!Number.isFinite(periodStartMs)) return false;
 
   for (const row of rows) {
     if (!isRecord(row.before_state) || !isRecord(row.after_state)) continue;
@@ -808,10 +807,6 @@ async function didPriorSettlementRecordPaidActivation(params: {
     ) {
       continue;
     }
-
-    const createdAtMs = new Date(row.created_at).getTime();
-    if (!Number.isFinite(createdAtMs)) continue;
-    if (Math.abs(createdAtMs - periodStartMs) > SUBSCRIPTION_STARTED_RECOVERY_WINDOW_MS) continue;
 
     return true;
   }

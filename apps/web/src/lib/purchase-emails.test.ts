@@ -3,7 +3,6 @@ import {
   credit_transactions,
   kiloclaw_email_log,
   kiloclaw_instances,
-  kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   top_up_email_log,
 } from '@kilocode/db/schema';
@@ -11,10 +10,7 @@ import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { processTopUp } from '@/lib/credits';
-import {
-  KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
-  SUBSCRIPTION_STARTED_RECOVERY_WINDOW_MS,
-} from '@/lib/kiloclaw/credit-billing';
+import { KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE } from '@/lib/kiloclaw/credit-billing';
 import type * as creditBillingModule from '@/lib/kiloclaw/credit-billing';
 import {
   renderTemplate,
@@ -1087,74 +1083,6 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     expect(verifyEmailMock).toHaveBeenCalledWith(user.google_user_email);
     expect(countSubscriptionStartedSends()).toBe(0);
     expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
-  });
-
-  test('stale duplicate recovery guard → old change-log row outside the window does not trigger a recovered email', async () => {
-    const user = await insertTestUser({});
-    const stripeSubscriptionId = `sub_stale_${crypto.randomUUID()}`;
-    const { instance, subscription } = await seedSubscription({
-      userId: user.id,
-      status: 'trialing',
-      plan: 'trial',
-      stripeSubscriptionId,
-    });
-
-    const periodStart = new Date().toISOString();
-    const periodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
-    const stripePaymentId = `ch_${crypto.randomUUID()}`;
-
-    await applyStripeFundedKiloClawPeriod({
-      userId: user.id,
-      metadataInstanceId: instance.id,
-      stripeSubscriptionId,
-      stripePaymentId,
-      plan: 'standard',
-      amountMicrodollars: 9_000_000,
-      periodStart,
-      periodEnd,
-    });
-    expect(countSubscriptionStartedSends()).toBe(1);
-
-    // Backdate the change-log row well outside the recovery window relative
-    // to periodStart, and clear the email-log row. A replay must NOT send.
-    const backdated = new Date(
-      new Date(periodStart).getTime() - SUBSCRIPTION_STARTED_RECOVERY_WINDOW_MS - 86_400_000
-    ).toISOString();
-    await db
-      .update(kiloclaw_subscription_change_log)
-      .set({ created_at: backdated })
-      .where(
-        and(
-          eq(kiloclaw_subscription_change_log.subscription_id, subscription.id),
-          eq(kiloclaw_subscription_change_log.action, 'period_advanced'),
-          eq(kiloclaw_subscription_change_log.reason, 'stripe_invoice_settlement')
-        )
-      );
-    await db
-      .delete(kiloclaw_email_log)
-      .where(
-        and(
-          eq(kiloclaw_email_log.user_id, user.id),
-          eq(kiloclaw_email_log.instance_id, instance.id),
-          eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
-        )
-      );
-    sendViaMailgunMock.mockClear();
-    verifyEmailMock.mockClear();
-
-    await applyStripeFundedKiloClawPeriod({
-      userId: user.id,
-      metadataInstanceId: instance.id,
-      stripeSubscriptionId,
-      stripePaymentId,
-      plan: 'standard',
-      amountMicrodollars: 9_000_000,
-      periodStart,
-      periodEnd,
-    });
-
-    expect(countSubscriptionStartedSends()).toBe(0);
-    expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
   });
 });
 

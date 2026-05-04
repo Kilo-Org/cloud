@@ -579,9 +579,9 @@ export function ConversationScreen({
                 }
               : undefined
           }
+          bottomInset={bottom}
         />
       </KeyboardAvoidingView>
-      <View style={{ height: bottom }} className="bg-background" />
       <MessageReactionPickerSheet
         visible={reactionPickerMessage !== null}
         recentReactions={recentReactions}

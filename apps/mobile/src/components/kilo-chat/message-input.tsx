@@ -29,7 +29,10 @@ type Props = {
   onCancelReply?: () => void;
   disabledReason?: string | null;
   clearOnSubmit?: boolean;
+  bottomInset?: number;
 };
+
+const COMPOSER_BOTTOM_CLEARANCE = 8;
 
 const messageInputTextStyle = {
   includeFontPadding: false,
@@ -64,6 +67,7 @@ export function MessageInput({
   onCancelReply,
   disabledReason,
   clearOnSubmit,
+  bottomInset = 0,
 }: Props) {
   const colors = useThemeColors();
   const valueRef = useRef(initialText);
@@ -95,7 +99,10 @@ export function MessageInput({
   };
 
   return (
-    <View className="border-t border-border bg-background px-3 py-2">
+    <View
+      style={{ paddingBottom: Math.max(bottomInset, COMPOSER_BOTTOM_CLEARANCE) }}
+      className="px-4 pt-2"
+    >
       {replyingTo && (
         <View className="mb-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
           <View className="min-w-0 flex-1">
@@ -122,12 +129,12 @@ export function MessageInput({
         </View>
       )}
       <View className="gap-1">
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row items-end gap-2">
           <View className="min-w-0 flex-1">
             <TextInput
               ref={inputRef}
               className={cn(
-                'max-h-32 min-h-12 rounded-full border bg-card px-5 py-2 leading-5 text-foreground',
+                'max-h-32 min-h-10 rounded-md border bg-card px-3 py-2.5 leading-5 text-foreground',
                 overLimit ? 'border-destructive' : 'border-input'
               )}
               style={messageInputTextStyle}
@@ -154,7 +161,7 @@ export function MessageInput({
               onPress={onCancelEdit}
               disabled={disabled}
               className={cn(
-                'h-12 w-12 items-center justify-center rounded-full bg-secondary',
+                'h-10 w-10 items-center justify-center rounded-md bg-secondary',
                 disabled && 'opacity-50'
               )}
             >
@@ -165,7 +172,7 @@ export function MessageInput({
             onPress={submit}
             disabled={sendDisabled}
             className={cn(
-              'h-12 w-12 items-center justify-center rounded-full bg-primary',
+              'h-10 w-10 items-center justify-center rounded-md bg-primary',
               sendDisabled && 'opacity-50'
             )}
           >

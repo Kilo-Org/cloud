@@ -63,29 +63,28 @@ export default function DashboardScreen() {
   const isLoading = statusQuery.isPending || (isPersonal && billingQuery.isPending);
 
   const [renameVisible, setRenameVisible] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const refetchStatus = statusQuery.refetch;
   const refetchBilling = billingQuery.refetch;
   const refetchServiceDegraded = serviceDegradedQuery.refetch;
   const refetchGateway = gatewayQuery.refetch;
   const refetchConfig = configQuery.refetch;
 
-  const refreshing =
-    statusQuery.isRefetching ||
-    configQuery.isRefetching ||
-    serviceDegradedQuery.isRefetching ||
-    (isRunning && gatewayQuery.isRefetching) ||
-    (isPersonal && billingQuery.isRefetching);
-
   const handleRefresh = useCallback(() => {
     void (async () => {
-      const refreshes = [
-        refetchStatus(),
-        refetchConfig(),
-        refetchServiceDegraded(),
-        ...(isRunning ? [refetchGateway()] : []),
-        ...(isPersonal ? [refetchBilling()] : []),
-      ];
-      await Promise.all(refreshes);
+      setManualRefreshing(true);
+      try {
+        const refreshes = [
+          refetchStatus(),
+          refetchConfig(),
+          refetchServiceDegraded(),
+          ...(isRunning ? [refetchGateway()] : []),
+          ...(isPersonal ? [refetchBilling()] : []),
+        ];
+        await Promise.all(refreshes);
+      } finally {
+        setManualRefreshing(false);
+      }
     })();
   }, [
     refetchBilling,
@@ -173,7 +172,7 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={manualRefreshing}
             onRefresh={handleRefresh}
             colors={[colors.mutedForeground]}
             tintColor={colors.mutedForeground}

@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -89,6 +89,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const createConversation = useCreateConversation(client);
   const leaveConversation = useLeaveConversation(client);
   const now = useNowTicker(60_000);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const hasNextPage = listQuery.hasNextPage;
   const isFetchingNextPage = listQuery.isFetchingNextPage;
@@ -125,7 +126,14 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const handleRefresh = useCallback(() => {
-    void refetchConversations();
+    void (async () => {
+      setManualRefreshing(true);
+      try {
+        await refetchConversations();
+      } finally {
+        setManualRefreshing(false);
+      }
+    })();
   }, [refetchConversations]);
 
   const contentState = getConversationListContentState({
@@ -164,7 +172,6 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
 
   const conversations = listQuery.data?.conversations ?? [];
   const entries = flattenConversationGroups(conversations, now);
-  const refreshing = listQuery.isRefetching && !listQuery.isFetchingNextPage;
 
   return (
     <View className="flex-1 bg-background">
@@ -229,7 +236,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           onEndReachedThreshold={0.5}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
+              refreshing={manualRefreshing}
               onRefresh={handleRefresh}
               colors={[colors.mutedForeground]}
               tintColor={colors.mutedForeground}

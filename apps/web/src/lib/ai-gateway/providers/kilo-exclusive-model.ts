@@ -36,15 +36,14 @@ export type KiloExclusiveModel = {
   pricing: Pricing | null;
   /** Features allowed to use this model. Empty array means no restriction. */
   exclusive_to: ReadonlyArray<FeatureValue>;
+  /**
+   * Upstream inference providers this model may be routed to; empty means no
+   * restriction. Only honored by the OpenRouter and Vercel AI Gateway upstreams.
+   */
   inference_provider_restriction: ReadonlyArray<OpenRouterInferenceProviderId>;
 };
 
-/**
- * Rewrites a gateway request to target a Kilo-exclusive model: swaps the
- * public model id for its internal id, and narrows the OpenRouter provider
- * `only` list to the model's `inference_provider_restriction` (intersecting
- * with any caller-supplied `only`).
- */
+/** Rewrites a gateway request to target a Kilo-exclusive model. */
 export function applyKiloExclusiveModelSettings(
   requestToMutate: GatewayRequest,
   kiloExclusiveModel: KiloExclusiveModel

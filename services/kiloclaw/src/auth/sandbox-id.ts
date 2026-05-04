@@ -1,50 +1,16 @@
 /**
- * Reversible base64url encoding of userId into sandboxId.
+ * SandboxId encoding helpers.
  *
- * NOT the cloud-agent-next SHA-256 pattern -- we need to recover userId
- * from sandboxId in lifecycle hooks without a DB lookup.
- *
- * Uses TextEncoder/TextDecoder so non-Latin1 userIds (e.g. Unicode from
- * some IdPs) don't throw at runtime. ASCII userIds encode identically
- * to the old btoa() approach.
- *
- * No prefix -- the full 63-char sandboxId limit is available.
+ * Canonical implementation lives in `@kilocode/worker-utils/sandbox-id`
+ * so it can be shared with `apps/web` (per-instance URL minting) without
+ * duplicating the base64url encoding. This module is a thin re-export
+ * shim kept in place so the many existing `./auth/sandbox-id` imports in
+ * the worker don't have to migrate all at once.
  */
 
-const MAX_SANDBOX_ID_LENGTH = 63;
-
-function bytesToBase64url(bytes: Uint8Array): string {
-  const binString = Array.from(bytes, b => String.fromCodePoint(b)).join('');
-  return btoa(binString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64urlToBytes(encoded: string): Uint8Array {
-  let b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
-  while (b64.length % 4 !== 0) {
-    b64 += '=';
-  }
-  const binString = atob(b64);
-  return Uint8Array.from(binString, c => c.codePointAt(0) ?? 0);
-}
-
-export function sandboxIdFromUserId(userId: string): string {
-  const bytes = new TextEncoder().encode(userId);
-  const encoded = bytesToBase64url(bytes);
-  if (encoded.length > MAX_SANDBOX_ID_LENGTH) {
-    throw new Error(
-      `userId too long: encoded sandboxId would be ${encoded.length} chars (max ${MAX_SANDBOX_ID_LENGTH})`
-    );
-  }
-  return encoded;
-}
-
-export function userIdFromSandboxId(sandboxId: string): string {
-  const bytes = base64urlToBytes(sandboxId);
-  return new TextDecoder('utf-8', { fatal: false, ignoreBOM: true }).decode(bytes);
-}
-
-// ─── Instance-scoped identity ───────────────────────────────────────
-// Canonical implementation lives in @kilocode/worker-utils/instance-id;
-// re-exported here so existing imports within the worker package continue to work.
-
-export { isValidInstanceId, sandboxIdFromInstanceId } from '@kilocode/worker-utils/instance-id';
+export {
+  sandboxIdFromUserId,
+  userIdFromSandboxId,
+  isValidInstanceId,
+  sandboxIdFromInstanceId,
+} from '@kilocode/worker-utils/sandbox-id';

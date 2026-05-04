@@ -955,6 +955,7 @@ describe('generateBaseConfig', () => {
     expect(config.hooks.enabled).toBe(true);
     expect(config.hooks.token).toBe('test-hooks-token');
     expect(config.hooks.path).toBe('/hooks');
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
     expect(config.hooks.presets).toBeUndefined();
     expect(config.hooks.mappings).toContainEqual({
       id: 'cloudflare-email-inbound',
@@ -1018,6 +1019,18 @@ describe('generateBaseConfig', () => {
     expect(config.hooks.mappings).toContainEqual(
       expect.objectContaining({ id: 'cloudflare-email-inbound', wakeMode: 'now' })
     );
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
+  });
+
+  it('preserves existing hook session key prefixes without duplicating inbound email', () => {
+    const existing = JSON.stringify({
+      hooks: { allowedSessionKeyPrefixes: ['custom:', 'hook:', 'inbound-email:'] },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'test-hooks-token' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['custom:', 'hook:', 'inbound-email:']);
   });
 
   it('adds gmail preset when Gog credentials are configured', () => {

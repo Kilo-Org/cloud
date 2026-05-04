@@ -28,7 +28,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "openclaw": "2026.4.15"
+    "openclaw": "2026.4.23"
   },
   "devDependencies": {
     "esbuild": "^0.25.2",

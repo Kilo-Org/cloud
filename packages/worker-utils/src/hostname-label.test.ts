@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { sandboxIdFromUserId } from './sandbox-id';
-import { sandboxIdFromInstanceId } from '@kilocode/worker-utils/instance-id';
+import { sandboxIdFromInstanceId } from './instance-id';
 import {
   hostnameLabelFromSandboxId,
   sandboxIdFromHostnameLabel,

@@ -18,6 +18,10 @@ import {
   getBotRequestCloudAgentSessionGroupReadiness,
 } from '@/lib/bot/cloud-agent-session-groups';
 import {
+  buildCallbackThreadPostChunks,
+  formatCallbackContinuationFailureMessage,
+} from '@/lib/bot/callback-hardening';
+import {
   markBotRequestCloudAgentSessionTerminalStrict,
   recordBotRequestCloudAgentSessionResultErrorStrict,
   recordBotRequestCloudAgentSessionResultStrict,
@@ -176,20 +180,29 @@ async function postBotThreadMessage(params: {
   markdown: string;
   platformIntegration: PlatformIntegration;
 }): Promise<void> {
+  const chunks = buildCallbackThreadPostChunks(params.markdown);
   logCallback('Posting callback thread message', {
     threadId: params.thread.id,
     markdownLength: params.markdown.length,
+    messageCount: chunks.length,
     platform: params.platformIntegration.platform,
     platformIntegrationId: params.platformIntegration.id,
   });
 
-  const posted = await withBotPlatformAuthContext(
+  const postedMessageIds = await withBotPlatformAuthContext(
     params.platformIntegration,
-    async () => await params.thread.post({ markdown: params.markdown })
+    async () => {
+      const messageIds: string[] = [];
+      for (const chunk of chunks) {
+        const posted = await params.thread.post(chunk);
+        messageIds.push(posted.id);
+      }
+      return messageIds;
+    }
   );
   logCallback('Callback thread message posted', {
     threadId: params.thread.id,
-    messageId: posted.id,
+    messageIds: postedMessageIds,
     platform: params.platformIntegration.platform,
   });
 }
@@ -662,14 +675,51 @@ ${cloudAgentResultsForPrompt}`;
     botRequestId,
   });
 
-  const continuation = await continueBotAgentAfterCallback({
-    botRequestId,
-    requestRow,
-    platformIntegration,
-    thread,
-    continuationPrompt,
-    completedStepCount,
-  });
+  let continuation: Awaited<ReturnType<typeof continueBotAgentAfterCallback>>;
+  try {
+    continuation = await continueBotAgentAfterCallback({
+      botRequestId,
+      requestRow,
+      platformIntegration,
+      thread,
+      continuationPrompt,
+      completedStepCount,
+    });
+  } catch (error) {
+    const errorMessage = formatCallbackContinuationFailureMessage(error);
+    captureException(error, {
+      tags: {
+        source: 'bot-session-callback-api',
+        op: 'continue-bot-agent-after-callback',
+      },
+      extra: {
+        botRequestId,
+      },
+    });
+
+    const updated = await failBotRequest({
+      botRequestId,
+      expectedCloudAgentSessionId,
+      errorMessage,
+      responseTimeMs: Date.now() - startedAt,
+    });
+
+    logCallback('Completed callback failed while continuing ToolLoopAgent', {
+      botRequestId,
+      updated: Boolean(updated),
+      errorMessage,
+    });
+
+    if (updated) {
+      await postBotThreadMessage({
+        thread,
+        markdown: errorMessage,
+        platformIntegration,
+      });
+    }
+
+    return;
+  }
 
   logCallback('Completed callback continued ToolLoopAgent', {
     botRequestId,

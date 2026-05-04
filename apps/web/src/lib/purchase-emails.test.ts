@@ -111,14 +111,14 @@ describe('kiloClawSubscriptionStarted template', () => {
       price_usd: '9.00',
       billing_period: 'Jan 1, 2026 – Feb 1, 2026',
       next_billing_date: 'February 1, 2026',
-      manage_url: 'https://app.kilocode.ai/claw',
+      manage_url: 'https://app.kilocode.ai/claw/subscription',
       year: '2026',
     });
     expect(html).toContain('KiloClaw Standard');
     expect(html).toContain('$9.00');
     expect(html).toContain('Jan 1, 2026 – Feb 1, 2026');
     expect(html).toContain('February 1, 2026');
-    expect(html).toContain('https://app.kilocode.ai/claw');
+    expect(html).toContain('https://app.kilocode.ai/claw/subscription');
   });
 });
 
@@ -1216,8 +1216,8 @@ describe('sendKiloClawSubscriptionStartedEmail payload', () => {
     expect(params.html).toContain('Jan 15, 2026 – Feb 15, 2026');
     // formatDate(next billing).
     expect(params.html).toContain('February 15, 2026');
-    // manage_url construction (NEXTAUTH_URL + '/claw').
-    expect(params.html).toContain('/claw');
+    // manage_url construction (NEXTAUTH_URL + '/claw/subscription').
+    expect(params.html).toContain('/claw/subscription');
   });
 
   test('zero-cent price still renders "$0.00 USD" (formatUsd rounding)', async () => {

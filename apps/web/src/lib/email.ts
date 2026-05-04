@@ -468,7 +468,7 @@ type SendKiloClawSubscriptionStartedEmailProps = {
 export async function sendKiloClawSubscriptionStartedEmail(
   props: SendKiloClawSubscriptionStartedEmailProps
 ): Promise<SendResult> {
-  const manage_url = `${NEXTAUTH_URL}/claw`;
+  const manage_url = `${NEXTAUTH_URL}/claw/subscription`;
   return send({
     to: props.to,
     templateName: 'kiloClawSubscriptionStarted',

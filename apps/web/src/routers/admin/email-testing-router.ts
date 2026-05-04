@@ -132,7 +132,7 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         price_usd: '29.00',
         billing_period: 'Monthly',
         next_billing_date: formatDate(new Date(Date.now() + 30 * 86_400_000)),
-        manage_url: `${NEXTAUTH_URL}/claw`,
+        manage_url: `${NEXTAUTH_URL}/claw/subscription`,
       };
   }
 }

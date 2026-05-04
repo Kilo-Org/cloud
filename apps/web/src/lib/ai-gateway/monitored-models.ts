@@ -44,7 +44,7 @@ const VARIATIONS: AutoModelVariation[] = [
 export async function getMonitoredModels() {
   const set = new Set<string>();
 
-  // kilo-auto/free rotates through free models that may transiently be unavailable;
+  // kilo-auto/free rotates through free models that may be removed at any moment;
   // monitoring it would create noisy alerts, so exclude it.
   const autoModelIds = AUTO_MODELS.filter(m => m.id !== KILO_AUTO_FREE_MODEL.id).map(m => m.id);
 

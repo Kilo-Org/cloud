@@ -48,7 +48,7 @@ export function ConversationRow({
   function openRenameSheet() {
     const params = new URLSearchParams({
       conversationId: conversation.conversationId,
-      title: title.slice(0, CONVERSATION_TITLE_MAX_CHARS),
+      title: (conversation.title ?? '').slice(0, CONVERSATION_TITLE_MAX_CHARS),
     });
     router.push(chatRenameConversationPath(sandboxId, params));
   }
@@ -91,11 +91,12 @@ export function ConversationRow({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      accessibilityHint="Opens the conversation"
+      accessibilityHint="Opens the conversation. Long press for rename and leave options."
       className="min-h-16 flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 active:opacity-80"
       onPress={() => {
         onPress(conversation.conversationId);
       }}
+      onLongPress={openActions}
     >
       <View className="h-10 w-10 items-center justify-center rounded-xl border border-border bg-secondary">
         <MessageSquare size={18} color={colors.mutedForeground} strokeWidth={1.75} />

@@ -1,11 +1,13 @@
 import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
+import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -44,7 +46,9 @@ type ConversationHeaderItem = {
 type ConversationListEntry = ConversationHeaderItem | ConversationItem;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
-const listContentContainerStyle = { flexGrow: 1 } satisfies ViewStyle;
+const TAB_BAR_FAB_CLEARANCE = 72;
+const FAB_SIZE = 56;
+const FAB_MARGIN = 16;
 
 function ConversationListSkeleton({ showHeader }: Readonly<{ showHeader?: boolean }>) {
   return (
@@ -84,6 +88,7 @@ function flattenConversationGroups(
 export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const router = useRouter();
   const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
   const client = useKiloChatClient();
   const listQuery = useConversations(client, sandboxId);
   const createConversation = useCreateConversation(client);
@@ -95,6 +100,22 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
   const refetchConversations = listQuery.refetch;
+  const listContentContainerStyle = useMemo(
+    () =>
+      ({
+        flexGrow: 1,
+        paddingBottom: Math.max(bottom, 16) + TAB_BAR_FAB_CLEARANCE + FAB_SIZE + FAB_MARGIN,
+      }) satisfies ViewStyle,
+    [bottom]
+  );
+  const createButtonStyle = useMemo(
+    () =>
+      ({
+        bottom: Math.max(bottom, 16) + TAB_BAR_FAB_CLEARANCE,
+        right: 20,
+      }) satisfies ViewStyle,
+    [bottom]
+  );
 
   useInstancePresence(sandboxId);
 
@@ -179,21 +200,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
         title={sandboxLabel}
         size="large"
         className="px-[22px]"
-        headerRight={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="New conversation"
-            disabled={createConversation.isPending}
-            onPress={handleCreateAndNavigate}
-            className="h-10 w-10 items-center justify-center rounded-full active:bg-muted disabled:opacity-50"
-          >
-            {createConversation.isPending ? (
-              <ActivityIndicator size="small" color={colors.mutedForeground} />
-            ) : (
-              <Plus size={20} color={colors.foreground} />
-            )}
-          </Pressable>
-        }
+        headerRight={<ProfileAvatarButton />}
       />
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <FlashList
@@ -244,6 +251,20 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           }
         />
       </Animated.View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="New conversation"
+        disabled={createConversation.isPending}
+        onPress={handleCreateAndNavigate}
+        className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg shadow-black/25 active:opacity-80 disabled:opacity-60"
+        style={createButtonStyle}
+      >
+        {createConversation.isPending ? (
+          <ActivityIndicator size="small" color={colors.primaryForeground} />
+        ) : (
+          <Plus size={24} color={colors.primaryForeground} />
+        )}
+      </Pressable>
     </View>
   );
 }

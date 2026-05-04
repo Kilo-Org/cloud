@@ -4264,6 +4264,10 @@ export const kiloclaw_scheduled_action_notifications = pgTable(
 
     status: text().$type<KiloClawScheduledActionNotificationStatus>().notNull().default('pending'),
 
+    // Set when the sweep CAS-claims the row (pending → sending). Used
+    // by the next tick to detect and recover stuck claims left behind
+    // by a sweep that crashed mid-dispatch.
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }),
     error_message: text(),
   },
@@ -4276,12 +4280,12 @@ export const kiloclaw_scheduled_action_notifications = pgTable(
       table.channel
     ),
     // Sweep lookup: notifications still pending dispatch. The partial
-    // predicate keeps the index small (only pending rows). The key is
-    // `id` rather than `target_id` because the sweep does a fleet-wide
-    // scan, not a per-target lookup; the per-target cancel queries
-    // already use the unique (target_id, kind, channel) index above.
+    // predicate keeps the index small (only pending rows). Keyed on
+    // target_id so the sweep's join into kiloclaw_scheduled_action_targets
+    // can use it for the inner-join lookup. Point lookups by id (markSent,
+    // markFailed) hit the primary key index directly.
     index('IDX_kiloclaw_scheduled_action_notifications_pending')
-      .on(table.id)
+      .on(table.target_id)
       .where(sql`${table.status} = 'pending'`),
   ]
 );

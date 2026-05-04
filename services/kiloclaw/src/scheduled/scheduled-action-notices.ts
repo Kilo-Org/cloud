@@ -59,6 +59,13 @@ const MAX_NOTIFICATIONS_PER_TICK = 100;
 // in the same batch.
 const DISPATCH_CONCURRENCY = 10;
 
+// How long a 'sending' row must sit before recovery considers it
+// stuck. Must be longer than the longest realistic tick duration so
+// in-flight claims from the current tick aren't reset by a parallel
+// recovery on the next tick. With concurrency 10 and 100 rows/tick at
+// ~200ms each, typical tick is ~2s. 5 minutes is comfortably above.
+const STUCK_CLAIM_RECOVERY_MINUTES = 5;
+
 type DueNotificationRow = {
   notification_id: string;
   notification_kind: 'notice' | 'cancelled';
@@ -84,47 +91,75 @@ type DueNotificationRow = {
   reason: string | null;
 };
 
-export async function runScheduledActionNoticesSweep(env: KiloClawEnv): Promise<{
+export type SweepResult = {
   processed: number;
   sent: number;
   failed: number;
-}> {
-  const connectionString = env.HYPERDRIVE?.connectionString;
-  if (!connectionString) {
-    console.warn('[notices-sweep] HYPERDRIVE not bound; skipping');
-    return { processed: 0, sent: 0, failed: 0 };
-  }
-  if (!env.BACKEND_API_URL || !env.KILOCLAW_INTERNAL_API_SECRET) {
-    console.warn('[notices-sweep] BACKEND_API_URL or internal secret missing; skipping');
-    return { processed: 0, sent: 0, failed: 0 };
-  }
+  recovered: number;
+};
 
-  const db = getWorkerDb(connectionString);
+/**
+ * Pure orchestration interface for the sweep. The DB-backed and
+ * worker-binding-backed implementations live in the entry point below;
+ * tests inject their own implementations via runSweepWithIO to verify
+ * the orchestration logic without a real Postgres or NOTIFICATIONS
+ * service binding.
+ */
+export type SweepIO = {
+  /** Reset stuck 'sending' rows from prior crashed sweeps to 'pending'. */
+  recoverStuckClaims(): Promise<number>;
+  /** Select pending rows whose notice window has opened. */
+  selectDue(): Promise<DueNotificationRow[]>;
+  /** Atomic CAS pending → sending. Returns true iff this call won the claim. */
+  claim(notificationId: string): Promise<boolean>;
+  markSent(notificationId: string): Promise<void>;
+  markFailed(notificationId: string, error: string): Promise<void>;
+  /** Channel-specific dispatch (HTTP/RPC). Returns ok/fail per row. */
+  dispatchOne(row: DueNotificationRow): Promise<{ ok: true } | { ok: false; error: string }>;
+};
 
-  const due = await selectDueNotifications(db);
-  if (due.length === 0) return { processed: 0, sent: 0, failed: 0 };
+/**
+ * Testable orchestrator. Concurrent batches via Promise.allSettled.
+ *
+ * Per-row flow inside a batch:
+ *   1. claim() — CAS pending → sending. If 0 rows updated (another
+ *      sweep already claimed), skip silently. This is what prevents
+ *      duplicate dispatch when two cron ticks overlap.
+ *   2. dispatchOne() — fire the channel-specific side effect.
+ *   3. markSent() / markFailed() — final transition. CAS WHERE
+ *      status='sending' inside; ignored if recovery already reset
+ *      this row to pending (extremely unlikely given the recovery
+ *      threshold).
+ *   4. The mark step is wrapped in try/catch so a transient DB error
+ *      doesn't abort the rest of the batch. The dispatched side
+ *      effect is durable; on a mark failure the row stays in
+ *      'sending' until recovery resets it on a future tick.
+ */
+export async function runSweepWithIO(io: SweepIO): Promise<SweepResult> {
+  const recovered = await io.recoverStuckClaims();
+  const due = await io.selectDue();
+  if (due.length === 0) return { processed: 0, sent: 0, failed: 0, recovered };
 
   let sent = 0;
   let failed = 0;
-  // Process in concurrent batches. Promise.allSettled isolates failures
-  // — one slow or throwing row never blocks siblings in the same batch.
-  // Per-row try/catch on the mark step prevents a transient DB error on
-  // one row from aborting the whole tick (without it, the throw would
-  // propagate up through the scheduled() handler — every remaining
-  // unprocessed row in `due` would silently drop from this tick AND
-  // any already-dispatched-but-not-yet-marked rows could re-dispatch
-  // on the next tick → duplicate email/push).
   for (let i = 0; i < due.length; i += DISPATCH_CONCURRENCY) {
     const batch = due.slice(i, i + DISPATCH_CONCURRENCY);
     const results = await Promise.allSettled(
       batch.map(async row => {
-        const dispatchResult = await dispatchOne(env, row);
+        const claimed = await io.claim(row.notification_id);
+        if (!claimed) {
+          // Another concurrent sweep tick won the claim. Don't
+          // dispatch and don't count — the winning sweep is responsible
+          // for the final outcome.
+          return { kind: 'skipped' as const };
+        }
+        const dispatchResult = await io.dispatchOne(row);
         try {
           if (dispatchResult.ok) {
-            await markSent(db, row.notification_id);
+            await io.markSent(row.notification_id);
             return { kind: 'sent' as const };
           }
-          await markFailed(db, row.notification_id, dispatchResult.error);
+          await io.markFailed(row.notification_id, dispatchResult.error);
           return { kind: 'failed' as const };
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -139,11 +174,15 @@ export async function runScheduledActionNoticesSweep(env: KiloClawEnv): Promise<
     for (const r of results) {
       if (r.status === 'fulfilled') {
         if (r.value.kind === 'sent') sent += 1;
-        else failed += 1;
+        else if (r.value.kind === 'failed') failed += 1;
+        // 'skipped' rows neither sent nor failed; they belong to the
+        // sweep that won the claim.
       } else {
-        // Promise rejection from dispatchOne itself (we already catch
-        // inside, but be defensive). Counts as failed; row stays pending
-        // for next-tick retry since neither markSent nor markFailed ran.
+        // Defensive: the inner branches all return rather than throw,
+        // but if claim() or dispatchOne() throws synchronously the
+        // rejection lands here. Count as failed; the row stays in
+        // whatever state it was in (pending if claim threw, sending if
+        // dispatch threw and recovery will reset).
         const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
         console.error('[notices-sweep] dispatch settle rejected', { error: reason });
         failed += 1;
@@ -151,7 +190,31 @@ export async function runScheduledActionNoticesSweep(env: KiloClawEnv): Promise<
     }
   }
 
-  return { processed: due.length, sent, failed };
+  return { processed: due.length, sent, failed, recovered };
+}
+
+export async function runScheduledActionNoticesSweep(env: KiloClawEnv): Promise<SweepResult> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) {
+    console.warn('[notices-sweep] HYPERDRIVE not bound; skipping');
+    return { processed: 0, sent: 0, failed: 0, recovered: 0 };
+  }
+  if (!env.BACKEND_API_URL || !env.KILOCLAW_INTERNAL_API_SECRET) {
+    console.warn('[notices-sweep] BACKEND_API_URL or internal secret missing; skipping');
+    return { processed: 0, sent: 0, failed: 0, recovered: 0 };
+  }
+
+  const db = getWorkerDb(connectionString);
+
+  const io: SweepIO = {
+    recoverStuckClaims: () => recoverStuckClaims(db),
+    selectDue: () => selectDueNotifications(db),
+    claim: id => claimNotification(db, id),
+    markSent: id => markSent(db, id),
+    markFailed: (id, error) => markFailed(db, id, error),
+    dispatchOne: row => dispatchOne(env, row),
+  };
+  return runSweepWithIO(io);
 }
 
 async function selectDueNotifications(db: WorkerDb): Promise<DueNotificationRow[]> {
@@ -346,16 +409,57 @@ function mobilePushEventFor(
     : 'scheduled_version_change_cancelled';
 }
 
+/**
+ * CAS pending → sending. Returns true iff this call won the claim, i.e.
+ * the row was 'pending' at execution time and is now 'sending'. Returning
+ * false means another concurrent sweep already claimed it (or recovery
+ * already reset it back to pending after a previous crash) — caller must
+ * skip dispatch in that case.
+ */
+async function claimNotification(db: WorkerDb, notificationId: string): Promise<boolean> {
+  const updated = await db
+    .update(kiloclaw_scheduled_action_notifications)
+    .set({ status: 'sending', claimed_at: sql`now()` })
+    .where(
+      and(
+        eq(kiloclaw_scheduled_action_notifications.id, notificationId),
+        eq(kiloclaw_scheduled_action_notifications.status, 'pending')
+      )
+    )
+    .returning({ id: kiloclaw_scheduled_action_notifications.id });
+  return updated.length > 0;
+}
+
+/**
+ * Reset rows that have been 'sending' longer than the recovery threshold
+ * back to 'pending'. Without this, a sweep that crashed after CAS-claiming
+ * a row but before markSent/markFailed would leave the row stranded in
+ * 'sending' forever. Returns the number of rows reset for sweep telemetry.
+ */
+async function recoverStuckClaims(db: WorkerDb): Promise<number> {
+  const reset = await db
+    .update(kiloclaw_scheduled_action_notifications)
+    .set({ status: 'pending', claimed_at: null })
+    .where(
+      and(
+        eq(kiloclaw_scheduled_action_notifications.status, 'sending'),
+        sql`${kiloclaw_scheduled_action_notifications.claimed_at} < now() - (${STUCK_CLAIM_RECOVERY_MINUTES} * interval '1 minute')`
+      )
+    )
+    .returning({ id: kiloclaw_scheduled_action_notifications.id });
+  return reset.length;
+}
+
 async function markSent(db: WorkerDb, notificationId: string): Promise<void> {
-  // CAS WHERE status='pending' so an overlapping sweeper can't move
-  // a 'failed' or already-'sent' row.
+  // CAS WHERE status='sending' — only the sweep that claimed this row
+  // (and hasn't been recovered as stuck) can finalize it as sent.
   await db
     .update(kiloclaw_scheduled_action_notifications)
     .set({ status: 'sent', sent_at: sql`now()` })
     .where(
       and(
         eq(kiloclaw_scheduled_action_notifications.id, notificationId),
-        eq(kiloclaw_scheduled_action_notifications.status, 'pending')
+        eq(kiloclaw_scheduled_action_notifications.status, 'sending')
       )
     );
 }
@@ -371,7 +475,7 @@ async function markFailed(
     .where(
       and(
         eq(kiloclaw_scheduled_action_notifications.id, notificationId),
-        eq(kiloclaw_scheduled_action_notifications.status, 'pending')
+        eq(kiloclaw_scheduled_action_notifications.status, 'sending')
       )
     );
 }

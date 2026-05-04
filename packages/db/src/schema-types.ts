@@ -295,11 +295,19 @@ export type KiloClawScheduledActionTargetStatus = z.infer<
   typeof KiloClawScheduledActionTargetStatus
 >;
 
-// Notification dispatch lifecycle. 'pending' until the sweep dispatches
-// it; 'sent' on successful dispatch; 'failed' if the channel returned
-// an error (we do not retry in v1 — admins can see the failure in the
-// detail view and decide).
-export const KiloClawScheduledActionNotificationStatus = z.enum(['pending', 'sent', 'failed']);
+// Notification dispatch lifecycle. 'pending' until the sweep claims
+// it via the CAS pending → sending; 'sending' is a transient state
+// while the sweep is mid-dispatch (set when claimed, cleared by markSent
+// or markFailed); 'sent' on successful dispatch; 'failed' if the channel
+// returned an error. Recovery: stuck 'sending' rows whose claimed_at is
+// older than the recovery threshold get reset to 'pending' at the top
+// of each tick.
+export const KiloClawScheduledActionNotificationStatus = z.enum([
+  'pending',
+  'sending',
+  'sent',
+  'failed',
+]);
 export type KiloClawScheduledActionNotificationStatus = z.infer<
   typeof KiloClawScheduledActionNotificationStatus
 >;

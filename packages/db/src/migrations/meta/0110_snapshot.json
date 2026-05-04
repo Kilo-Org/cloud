@@ -1,5 +1,5 @@
 {
-  "id": "8a2b2154-9ea0-4938-a27a-45d731ce8405",
+  "id": "b5dec53e-5f7f-46a2-9620-afadcf3f6acc",
   "prevId": "4c1ec3c4-df75-4028-a0ab-68a0ad3c1c4d",
   "version": "7",
   "dialect": "postgresql",
@@ -9858,6 +9858,12 @@
           "notNull": true,
           "default": "'pending'"
         },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "sent_at": {
           "name": "sent_at",
           "type": "timestamp with time zone",
@@ -9903,7 +9909,7 @@
           "name": "IDX_kiloclaw_scheduled_action_notifications_pending",
           "columns": [
             {
-              "expression": "id",
+              "expression": "target_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

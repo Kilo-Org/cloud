@@ -28,7 +28,7 @@ function createJsonKV(): KVNamespace & { _store: Map<string, string> } {
 
 function entry(imageTag: string, rolloutPercent: number, isLatest = false): ImageVersionEntry {
   return {
-    openclawVersion: '2026.4.15',
+    openclawVersion: '2026.4.23',
     variant: 'default',
     imageTag,
     imageDigest: null,

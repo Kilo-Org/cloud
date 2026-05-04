@@ -7306,9 +7306,9 @@ describe('applyPinnedVersion', () => {
     });
 
     (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
-      openclawVersion: '2026.4.15',
+      openclawVersion: '2026.4.23',
       variant: 'default',
-      imageTag: '2026-04-15',
+      imageTag: '2026-04-23',
       imageDigest: 'sha256:latest',
       publishedAt: new Date().toISOString(),
       rolloutPercent: 100,
@@ -7317,11 +7317,11 @@ describe('applyPinnedVersion', () => {
 
     const applied = await instance.applyPinnedVersion(null);
 
-    expect(applied.imageTag).toBe('2026-04-15');
-    expect(applied.openclawVersion).toBe('2026.4.15');
+    expect(applied.imageTag).toBe('2026-04-23');
+    expect(applied.openclawVersion).toBe('2026.4.23');
     expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
     expect(resolveVersionByTag).not.toHaveBeenCalled();
-    expect(storage._store.get('trackedImageTag')).toBe('2026-04-15');
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-23');
   });
 
   it('when cleared, passes currentImageTag=null to the selector so non-cohort users can fall off the pinned candidate', async () => {
@@ -7338,7 +7338,7 @@ describe('applyPinnedVersion', () => {
     // ignoreCurrentImageTag, it should instead be invoked with
     // currentImageTag=null and return :latest.
     (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
-      openclawVersion: '2026.4.15',
+      openclawVersion: '2026.4.23',
       variant: 'default',
       imageTag: 'latest-tag',
       imageDigest: 'sha256:latest',

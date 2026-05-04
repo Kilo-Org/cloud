@@ -269,12 +269,34 @@ user-provided encrypted secrets and channel tokens are silently skipped.
 
 ### Optional
 
-| Variable                   | Description                                        |
-| -------------------------- | -------------------------------------------------- |
-| `KILOCODE_API_BASE_URL`    | Override KiloCode API base URL (dev only)          |
-| `CDP_SECRET`               | Shared secret for CDP browser automation endpoints |
-| `WORKER_URL`               | Public URL of the worker (required for CDP)        |
-| `OPENCLAW_ALLOWED_ORIGINS` | Comma-separated origins for WebSocket connections  |
+| Variable                        | Description                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------------- |
+| `KILOCODE_API_BASE_URL`         | Override KiloCode API base URL (dev only)                                     |
+| `CDP_SECRET`                    | Shared secret for CDP browser automation endpoints                            |
+| `WORKER_URL`                    | Public URL of the worker (required for CDP)                                   |
+| `OPENCLAW_ALLOWED_ORIGINS`      | Comma-separated origins for WebSocket connections                             |
+| `KILOCLAW_INSTANCE_HOST_SUFFIX` | Per-instance host suffix. Prod: `.kiloclaw.ai`. Required (no silent default). |
+| `KILOCLAW_INSTANCE_URL_SCHEME`  | URL scheme paired with the suffix. Prod: `https`. Required.                   |
+
+### Per-instance host routing (`*.kiloclaw.ai`)
+
+The worker proxies `<label>.kiloclaw.ai` requests by `Host` header to the
+owning instance DO. `<label>` is derived deterministically from the
+sandboxId (`i-{hex}` for instance-keyed, `u-{base32hex}` for legacy). The
+two env vars above feed three call sites: the catch-all host parser, the
+per-instance origin injector in `buildEnvVars` (machines' OpenClaw
+origin allowlist), and the Next.js link generator (in progress).
+
+**Dev parity (optional).** Setting `KILOCLAW_INSTANCE_HOST_SUFFIX=.kiloclaw.localhost:8795`
+and `KILOCLAW_INSTANCE_URL_SCHEME=http` in `.dev.vars` emulates the
+production routing locally. `.kiloclaw.localhost` auto-resolves to
+`127.0.0.1` per RFC 6761 on all modern OSes/browsers — no `/etc/hosts`
+entry, no TLS cert, no reverse proxy needed. Then open
+`http://i-<hex>.kiloclaw.localhost:8795/` to route through the host
+branch. Leaving the default prod values is also fine: the
+localhost-hosted dev worker never sees a Host header matching
+`.kiloclaw.ai`, so host-based routing stays inert and traffic falls
+through to the path-based flow.
 
 ### `.env.local` (Next.js, monorepo root)
 

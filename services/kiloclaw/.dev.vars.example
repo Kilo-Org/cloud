@@ -131,6 +131,25 @@ FLY_APP_NAME=kiloclaw-dev
 # (claw.kilosessions.ai), so that origin must be included for local dev.
 OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795,http://claw.kilosessions.ai
 
+# Per-instance host suffix + scheme. The worker uses these for (1) injecting
+# `<scheme>://<label><suffix>` into each machine's OPENCLAW_ALLOWED_ORIGINS
+# and (2) recognising `<label><suffix>` as an instance selector in the
+# catch-all proxy. Both are required — the worker refuses to start without
+# them, and there is no silent fallback.
+#
+# Dev default mirrors production routing on loopback:
+# `.kiloclaw.localhost` auto-resolves to 127.0.0.1 on modern browsers/OSes
+# per RFC 6761, so no /etc/hosts edit is needed. Open e.g.
+# http://i-<32hex>.kiloclaw.localhost:8795/ to route through the host
+# branch in dev. Hitting http://localhost:8795 directly still works —
+# that host doesn't match the suffix, so traffic falls through to the
+# existing path-based flow and the cookie-based catch-all.
+#
+# If wrangler dev is running on a port other than 8795, update the port
+# here to match.
+KILOCLAW_INSTANCE_HOST_SUFFIX=.kiloclaw.localhost:8795
+KILOCLAW_INSTANCE_URL_SCHEME=http
+
 # PostHog product telemetry (public project token, same as .env).
 NEXT_PUBLIC_POSTHOG_KEY=phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z
 

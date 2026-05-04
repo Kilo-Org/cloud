@@ -702,7 +702,16 @@ export class SessionService {
     // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
     const effectivePlatform = platform ?? (gitUrl?.includes('gitlab') ? 'gitlab' : undefined);
 
-    // Set GITLAB_TOKEN for GitLab repos, respecting user overrides
+    // Set GITLAB_TOKEN for GitLab repos, respecting user overrides.
+    //
+    // We also set GLAB_IS_OAUTH2=true unconditionally so that `glab` (>=1.82.0)
+    // sends `Authorization: Bearer $token` instead of `PRIVATE-TOKEN: $token`.
+    // This is required for OAuth access tokens (which GitLab rejects with 401
+    // when sent via PRIVATE-TOKEN) and is also valid for PATs — per GitLab
+    // REST API docs, personal/project/group access tokens accept OAuth-compliant
+    // headers (https://docs.gitlab.com/api/rest/authentication/). Treating both
+    // token types uniformly avoids threading the auth type through the session
+    // request/DO/metadata stack.
     if (gitToken && effectivePlatform === 'gitlab' && !baseEnvVars.GITLAB_TOKEN) {
       envVars.GITLAB_TOKEN = gitToken;
       if (!baseEnvVars.GITLAB_HOST) {
@@ -717,13 +726,16 @@ export class SessionService {
           envVars.GITLAB_HOST = 'gitlab.com';
         }
       }
+      if (!baseEnvVars.GLAB_IS_OAUTH2) {
+        envVars.GLAB_IS_OAUTH2 = 'true';
+      }
       logger
         .withFields({
           gitUrl,
           gitlabHost: envVars.GITLAB_HOST,
           gitTokenLength: gitToken.length,
         })
-        .info('[GITLAB] Setting GITLAB_TOKEN and GITLAB_HOST for GitLab session');
+        .info('[GITLAB] Setting GITLAB_TOKEN, GITLAB_HOST, and GLAB_IS_OAUTH2 for GitLab session');
     }
 
     // Only add KILOCODE_ORG_ID if we have an org (personal accounts don't have one)

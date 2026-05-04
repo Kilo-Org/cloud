@@ -36,6 +36,12 @@ import { registerVersionIfNeeded } from './lib/image-version';
 import { resolveDoKeyForUser } from './lib/instance-routing';
 import { startingUpPage } from './pages/starting-up';
 import { buildForwardHeaders } from './utils/proxy-headers';
+import {
+  hostMatchesInstanceSuffix,
+  parseInstanceHost,
+  sandboxIdFromHostnameLabel,
+} from './auth/hostname-label';
+import { WORKER_CONTROLLER_CAPABILITIES_VERSION } from './config';
 import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 import { timingMiddleware } from './middleware/analytics';
 import type { RegistryEntry } from './durable-objects/kiloclaw-registry';
@@ -124,6 +130,11 @@ function validateRequiredEnv(env: KiloClawEnv): string[] {
   const missing: string[] = [];
   if (!env.NEXTAUTH_SECRET) missing.push('NEXTAUTH_SECRET');
   if (!env.GATEWAY_TOKEN_SECRET) missing.push('GATEWAY_TOKEN_SECRET');
+  // Per-instance virtual-hosting config. Canonical values live in
+  // wrangler.jsonc `vars`; when unset (e.g. a misconfigured preview),
+  // reject requests rather than silently fall back to prod defaults.
+  if (!env.KILOCLAW_INSTANCE_HOST_SUFFIX) missing.push('KILOCLAW_INSTANCE_HOST_SUFFIX');
+  if (!env.KILOCLAW_INSTANCE_URL_SCHEME) missing.push('KILOCLAW_INSTANCE_URL_SCHEME');
   return missing;
 }
 
@@ -143,6 +154,136 @@ function missingGoogleBrokerEnv(env: KiloClawEnv): string[] {
 
 function routingTargetUrl(target: ProviderRoutingTarget, pathname: string, search = ''): string {
   return `${target.origin}${pathname}${search}`;
+}
+
+/**
+ * Forward an HTTP or WebSocket request through to a provider-routed target.
+ *
+ * Shared by the host-based branch of the catch-all proxy. The existing
+ * cookie-based branch and the `/i/:instanceId/*` route predate this helper
+ * and inline the same logic — they can be consolidated in a follow-up.
+ *
+ * `logTag` is prepended to console logs so failing requests can be traced
+ * back to their originating branch.
+ */
+async function proxyThroughTarget(opts: {
+  request: Request;
+  targetUrl: string;
+  forwardHeaders: Headers;
+  logTag: string;
+}): Promise<Response> {
+  const { request, targetUrl, forwardHeaders, logTag } = opts;
+  const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
+
+  if (isWebSocketRequest) {
+    let containerResponse: Response;
+    try {
+      containerResponse = await fetch(targetUrl, { headers: forwardHeaders });
+    } catch (err) {
+      console.error(`${logTag} WS fetch failed:`, err);
+      return Response.json(
+        { error: 'Instance not reachable' },
+        { status: 503, headers: { 'Retry-After': '5' } }
+      );
+    }
+
+    if (containerResponse.status === 502) {
+      return Response.json(
+        { error: 'Instance is starting up' },
+        { status: 503, headers: { 'Retry-After': '5' } }
+      );
+    }
+
+    const containerWs = containerResponse.webSocket;
+    if (!containerWs) {
+      return containerResponse;
+    }
+
+    const [clientWs, serverWs] = Object.values(new WebSocketPair());
+    serverWs.accept();
+    containerWs.accept();
+
+    let droppedToContainer = 0;
+    let droppedToClient = 0;
+
+    serverWs.addEventListener('message', event => {
+      if (containerWs.readyState === WebSocket.OPEN) {
+        containerWs.send(event.data as string | ArrayBuffer);
+      } else {
+        droppedToContainer++;
+        if (droppedToContainer === 1) {
+          console.warn(
+            `${logTag} First dropped client->container message (readyState:`,
+            containerWs.readyState,
+            ')'
+          );
+        }
+      }
+    });
+    containerWs.addEventListener('message', event => {
+      const data = transformWsMessage(event.data as string | ArrayBuffer);
+      if (serverWs.readyState === WebSocket.OPEN) {
+        serverWs.send(data);
+      } else {
+        droppedToClient++;
+        if (droppedToClient === 1) {
+          console.warn(
+            `${logTag} First dropped container->client message (readyState:`,
+            serverWs.readyState,
+            ')'
+          );
+        }
+      }
+    });
+
+    const logDropSummary = () => {
+      const totalDropped = droppedToClient + droppedToContainer;
+      if (totalDropped > 0) {
+        console.warn(
+          `${logTag} Connection closed with`,
+          totalDropped,
+          'dropped messages (toClient:',
+          droppedToClient,
+          'toContainer:',
+          droppedToContainer,
+          ')'
+        );
+      }
+    };
+
+    serverWs.addEventListener('close', event => {
+      logDropSummary();
+      safeClose(containerWs, event.code, event.reason);
+    });
+    containerWs.addEventListener('close', event => {
+      logDropSummary();
+      safeClose(serverWs, event.code, sanitizeCloseReason(event.reason));
+    });
+    serverWs.addEventListener('error', () => safeClose(containerWs, 1011, 'Client error'));
+    containerWs.addEventListener('error', () => safeClose(serverWs, 1011, 'Container error'));
+
+    return new Response(null, { status: 101, webSocket: clientWs });
+  }
+
+  // HTTP proxy. Buffer body upfront so streams aren't consumed mid-retry.
+  const requestBody = request.body ? await request.arrayBuffer() : null;
+  try {
+    const httpResponse = await fetch(targetUrl, {
+      method: request.method,
+      headers: forwardHeaders,
+      body: requestBody,
+    });
+    if (httpResponse.status === 502) {
+      return startingUpPage();
+    }
+    return httpResponse;
+  } catch (err) {
+    console.error(`${logTag} HTTP fetch failed:`, err);
+    return Response.json(
+      { error: 'Instance not reachable' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
 }
 
 // =============================================================================
@@ -571,6 +712,162 @@ async function resolveInstance(c: Context<AppEnv>): Promise<{
   };
 }
 
+/**
+ * Resolve the DO key that a host-routed request should proxy to.
+ *
+ *   `i-<32hex>.<suffix>` → key the DO by the decoded instanceId (UUID).
+ *   `u-<base32hex>.<suffix>` → key the DO by the decoded userId (legacy).
+ *
+ * Returns null when the label can't be parsed — caller returns 404 so we
+ * don't accidentally proxy to something like `marketing.kiloclaw.ai`.
+ */
+function resolveHostRouteDoKey(label: string): { doKey: string; sandboxId: string } | null {
+  const sandboxId = sandboxIdFromHostnameLabel(label);
+  if (!sandboxId) return null;
+  if (isInstanceKeyedSandboxId(sandboxId)) {
+    return { doKey: instanceIdFromSandboxId(sandboxId), sandboxId };
+  }
+  return { doKey: userIdFromSandboxId(sandboxId), sandboxId };
+}
+
+/**
+ * Host-based proxy branch. Runs before the cookie check. Returns the final
+ * response when the request host matches the configured instance suffix, or
+ * `null` to let subsequent routing (cookie/default) handle it.
+ *
+ * Behaviour:
+ *   - host doesn't match suffix → null (fall through to cookie branch)
+ *   - label unparseable → 404
+ *   - DO resolves to an instance owned by another user → 403
+ *   - instance destroyed / restoring / recovering → 409
+ *   - instance not provisioned / no runtime → 404
+ *   - capability version < current (v1 machines lack the per-instance origin
+ *     in their openclaw allowlist, so WS upgrades would fail origin check)
+ *     → 404 with a restart hint so the user knows the per-instance host
+ *     needs a machine restart; the legacy host keeps working meanwhile
+ *   - otherwise → proxy via `proxyThroughTarget`
+ */
+async function handleHostBasedRoute(c: Context<AppEnv>): Promise<Response | null> {
+  const request = c.req.raw;
+  const url = new URL(request.url);
+  if (!hostMatchesInstanceSuffix(url.host, c.env)) return null;
+
+  // Within the instance-host space. Anything the label parser rejects
+  // (bare suffix, multi-label, unparseable label) 404s here rather than
+  // falling through to default-personal routing — users on `*.kiloclaw.ai`
+  // are bound to a specific instance by the URL.
+  const label = parseInstanceHost(url.host, c.env);
+  if (!label) {
+    return c.json({ error: 'Instance not found' }, 404);
+  }
+
+  const userId = c.get('userId');
+  if (!userId) {
+    return c.json({ error: 'Authentication required' }, 401);
+  }
+
+  const resolved = resolveHostRouteDoKey(label);
+  if (!resolved) {
+    return c.json({ error: 'Instance not found' }, 404);
+  }
+
+  if (!c.env.GATEWAY_TOKEN_SECRET) {
+    return c.json(
+      { error: 'Configuration error' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
+
+  const getHostStub = () =>
+    c.env.KILOCLAW_INSTANCE.get(c.env.KILOCLAW_INSTANCE.idFromName(resolved.doKey));
+  const status = await withDORetry(
+    getHostStub,
+    stub => stub.getStatus(),
+    'KiloClawInstance.getStatus'
+  );
+
+  // Non-existent instance (DO was never populated) — 404 to avoid leaking
+  // existence via 403/404 distinction.
+  if (!status.userId) {
+    return c.json({ error: 'Instance not found' }, 404);
+  }
+
+  if (status.userId !== userId) {
+    return c.json({ error: 'Access denied' }, 403);
+  }
+
+  // Capability gate. v1 machines don't have `<label>.<suffix>` in their
+  // OPENCLAW_ALLOWED_ORIGINS, so WebSocket upgrades from this host would be
+  // rejected by openclaw's exact-match origin check. Refuse the request on
+  // the per-instance host so broken-at-runtime traffic never reaches the
+  // machine; the user can continue via the legacy host
+  // (`claw.kilosessions.ai`) and the instance rolls onto v2 on its next
+  // restart.
+  const version = status.controllerCapabilitiesVersion ?? 1;
+  if (version < WORKER_CONTROLLER_CAPABILITIES_VERSION) {
+    return c.json(
+      {
+        error: 'Instance not available on this host',
+        hint: 'This instance needs a restart before it can be reached at its per-instance hostname. Use the legacy URL for now.',
+      },
+      404
+    );
+  }
+
+  if (status.status === 'destroying') {
+    return c.json({ error: 'Instance is being destroyed' }, 409);
+  }
+  if (status.status === 'restoring') {
+    return c.json({ error: 'Instance is restoring from a snapshot' }, 409);
+  }
+  if (status.status === 'recovering') {
+    return c.json({ error: 'Instance is recovering from an unexpected stop' }, 409);
+  }
+  if (!status.runtimeId) {
+    return c.json({ error: 'Instance not provisioned' }, 404);
+  }
+  if (!status.sandboxId) {
+    return c.json({ error: 'Instance has no sandboxId' }, 500);
+  }
+
+  const routingTarget = await withDORetry(
+    getHostStub,
+    stub => stub.getRoutingTarget(),
+    'KiloClawInstance.getRoutingTarget'
+  );
+  if (!routingTarget) {
+    return c.json(
+      { error: 'Instance not routable' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
+
+  const targetUrl = routingTargetUrl(routingTarget, url.pathname, url.search);
+  const forwardHeaders = await buildForwardHeaders({
+    requestHeaders: request.headers,
+    sandboxId: status.sandboxId,
+    gatewayTokenSecret: c.env.GATEWAY_TOKEN_SECRET,
+    providerHeaders: routingTarget.headers,
+  });
+
+  console.log(
+    '[PROXY host]',
+    'Handling request:',
+    url.pathname,
+    'label:',
+    label,
+    'runtime:',
+    status.runtimeId
+  );
+
+  return proxyThroughTarget({
+    request,
+    targetUrl,
+    forwardHeaders,
+    logTag: '[PROXY host]',
+  });
+}
+
 app.all('*', async c => {
   // Auth gate: middleware-derived sandboxId proves the user is authenticated.
   if (!c.get('sandboxId')) {
@@ -579,6 +876,14 @@ app.all('*', async c => {
       401
     );
   }
+
+  // Host-based routing: when the request arrives on a configured per-instance
+  // virtual host (e.g. `i-<hex>.kiloclaw.ai`), resolve the owning DO from the
+  // label rather than from the active-instance cookie. Takes precedence over
+  // the cookie-based branch — users on `<label>.kiloclaw.ai` are bound to
+  // that instance by the URL, not by cookie state.
+  const hostRouteResponse = await handleHostBasedRoute(c);
+  if (hostRouteResponse) return hostRouteResponse;
 
   // Cookie-based instance routing: when the user opened an instance-keyed
   // instance via the access gateway, the active-instance cookie is set.

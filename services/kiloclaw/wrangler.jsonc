@@ -143,6 +143,17 @@
     // `https://<instanceId>.kiloclaw.ai` per-instance at machine build time.
     "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
     "KILOCLAW_CHECKIN_URL": "https://claw.kilosessions.ai/api/controller/checkin",
+    // Per-instance virtual hosting. Three call sites share this suffix:
+    //   1. `parseInstanceHost` (catch-all proxy, PR2) routes `<label>.kiloclaw.ai`
+    //      requests by `Host` header.
+    //   2. `instanceUrl` injects `https://<label>.kiloclaw.ai` into each
+    //      machine's `OPENCLAW_ALLOWED_ORIGINS` (see `gateway/env.ts`).
+    //   3. (PR3) Next.js dashboard link generator builds "Open instance" URLs
+    //      using the same template.
+    // Dev parity: override in `.dev.vars` to `.kiloclaw.localhost:8795` +
+    // scheme `http` to emulate per-instance hosts locally.
+    "KILOCLAW_INSTANCE_HOST_SUFFIX": ".kiloclaw.ai",
+    "KILOCLAW_INSTANCE_URL_SCHEME": "https",
     "KILOCHAT_BASE_URL": "https://chat.kiloapps.io",
     "REQUIRE_PROXY_TOKEN": "true",
     // Proactive API key refresh: trigger when key expires within this many hours. Default: 72 (3 days).

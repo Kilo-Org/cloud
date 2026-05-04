@@ -2,16 +2,30 @@ import * as Haptics from 'expo-haptics';
 import { type Href, Tabs, useRouter } from 'expo-router';
 import { Bot, House, MessageSquare } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, type TextStyle, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BlurBar } from '@/components/ui/blur-bar';
-import { Text } from '@/components/ui/text';
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getLastActiveInstance, loadLastActiveInstance } from '@/lib/last-active-instance';
 
 const ANDROID_TAB_BAR_EXTRA_PADDING = 4;
+const TAB_BAR_ITEM_CONTENT_WIDTH = 64;
+const TAB_BAR_ICON_STYLE = {
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: TAB_BAR_ITEM_CONTENT_WIDTH,
+} satisfies ViewStyle;
+const TAB_BAR_LABEL_STYLE = {
+  fontFamily: 'JetBrainsMono_500Medium',
+  fontSize: 10,
+  letterSpacing: 0,
+  marginTop: 2,
+  minWidth: TAB_BAR_ITEM_CONTENT_WIDTH,
+  textAlign: 'center',
+  textTransform: 'uppercase',
+} satisfies TextStyle;
 
 export const unstable_settings = {
   initialRouteName: '(0_home)',
@@ -22,18 +36,6 @@ function TabBarBackground() {
     <BlurBar className="absolute inset-0">
       <View className="flex-1" />
     </BlurBar>
-  );
-}
-
-function renderTabBarLabel(label: string) {
-  // Mirrors the "eyebrow" variant (mono/uppercase/10px/muted) without the
-  // letter-spacing, which would otherwise push the visible glyphs off-center
-  // beneath the icon since iOS and Android disagree on whether trailing
-  // letter-spacing is included in the measured text width.
-  return (
-    <Text className="mt-0.5 font-mono-medium text-[10px] uppercase text-muted-foreground">
-      {label}
-    </Text>
   );
 }
 
@@ -62,6 +64,9 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.foreground,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarBackground: TabBarBackground,
+        tabBarIconStyle: TAB_BAR_ICON_STYLE,
+        tabBarLabelPosition: 'below-icon',
+        tabBarLabelStyle: TAB_BAR_LABEL_STYLE,
         tabBarStyle: {
           backgroundColor: 'transparent',
           borderTopColor: 'transparent',
@@ -78,10 +83,10 @@ export default function TabsLayout() {
         name="(0_home)"
         options={{
           title: 'Home',
+          tabBarLabel: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <House size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
-          tabBarLabel: () => renderTabBarLabel('Home'),
         }}
         listeners={{
           tabPress: () => {
@@ -93,10 +98,10 @@ export default function TabsLayout() {
         name="(1_kiloclaw)"
         options={{
           title: 'KiloClaw',
+          tabBarLabel: 'KiloClaw',
           tabBarIcon: ({ color, focused }) => (
             <MessageSquare size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
-          tabBarLabel: () => renderTabBarLabel('KiloClaw'),
         }}
         listeners={{
           tabPress: e => {
@@ -124,10 +129,10 @@ export default function TabsLayout() {
         name="(2_agents)"
         options={{
           title: 'Agents',
+          tabBarLabel: 'Agents',
           tabBarIcon: ({ color, focused }) => (
             <Bot size={22} color={color} strokeWidth={focused ? 2 : 1.5} />
           ),
-          tabBarLabel: () => renderTabBarLabel('Agents'),
         }}
         listeners={{
           tabPress: () => {

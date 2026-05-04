@@ -492,6 +492,47 @@ describe('message pagination helpers', () => {
 });
 
 describe('send message cache settlement', () => {
+  it('orders settled messages without Array.prototype.toSorted for Hermes clients', () => {
+    const originalToSorted = Array.prototype.toSorted;
+    Object.defineProperty(Array.prototype, 'toSorted', {
+      configurable: true,
+      value: undefined,
+    });
+
+    try {
+      const pendingMessage = message({
+        id: 'pending-01KQK8Y1111111111111111111',
+        senderId: 'user-current',
+        content: textContent('still sending'),
+      });
+      const olderServerMessage = message({ id: '01KQK8Y2222222222222222222' });
+      const middleServerMessage = message({ id: '01KQK8Y3333333333333333333' });
+      const newestServerMessage = message({ id: '01KQK8Y4444444444444444444' });
+      const initial: MessageInfiniteData = {
+        pageParams: [undefined],
+        pages: [messagePage([pendingMessage, olderServerMessage, middleServerMessage])],
+      };
+
+      const result = applyCreateMessageResponseToPages(initial, 'pending-missing', {
+        messageId: newestServerMessage.id,
+        clientId: '01KQK8Y5555555555555555555',
+        message: newestServerMessage,
+      });
+
+      expect(result.pages[0]?.messages.map(({ id }) => id)).toEqual([
+        newestServerMessage.id,
+        pendingMessage.id,
+        middleServerMessage.id,
+        olderServerMessage.id,
+      ]);
+    } finally {
+      Object.defineProperty(Array.prototype, 'toSorted', {
+        configurable: true,
+        value: originalToSorted,
+      });
+    }
+  });
+
   it('creates the first page for an optimistic send when the messages cache is cold', () => {
     const queryClient = new QueryClient();
     const queryKey = messagesKey('01KQK8Y0000000000000000000');

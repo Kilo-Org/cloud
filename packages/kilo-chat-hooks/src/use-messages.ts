@@ -403,9 +403,11 @@ function errorCode(error: unknown): string | null {
 }
 
 function orderNewestLoadedPageByServerId(page: MessagePage): MessagePage {
-  const orderedServerMessages = page.messages
-    .filter(message => !message.id.startsWith('pending-'))
-    .toSorted((left, right) => right.id.localeCompare(left.id));
+  const serverMessages = page.messages.filter(message => !message.id.startsWith('pending-'));
+  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; spread keeps the filtered array immutable.
+  const orderedServerMessages = [...serverMessages].sort((left, right) =>
+    right.id.localeCompare(left.id)
+  );
   let orderedServerMessageIndex = 0;
 
   return withPageMessages(

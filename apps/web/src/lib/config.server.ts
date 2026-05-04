@@ -210,17 +210,41 @@ export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
   getEnvVariable('KILOCLAW_INBOUND_EMAIL_DOMAIN') || 'kiloclaw.ai';
 
 /**
- * Per-instance worker URL template. When set to e.g.
- * `https://{label}.kiloclaw.ai`, `getStatus` emits a `workerUrl` pointing
- * at the instance's own virtual host (derived from its sandboxId) for
- * instances whose `controllerCapabilitiesVersion >= 2`. Pre-v2 instances
- * keep falling back to `KILOCLAW_API_URL`.
+ * Per-instance worker URL template.
  *
- * Leave unset to keep the path-based / legacy behaviour everywhere —
- * dev defaults to localhost and doesn't need the template.
+ * Resolution rules:
+ *   1. If `KILOCLAW_INSTANCE_URL_TEMPLATE` is set (to anything, including
+ *      empty string), use that value. Explicit empty = kill switch for
+ *      rolling back the per-instance URL without redeploying code.
+ *   2. Otherwise in `NODE_ENV=production`, default to the canonical
+ *      `https://{label}.kiloclaw.ai` template so merging this feature
+ *      flips per-instance URLs on without a Vercel env var edit.
+ *   3. Otherwise (dev/test) return empty → legacy path-based behaviour.
+ *      Devs opt into dev-parity by setting
+ *      `http://{label}.kiloclaw.localhost:8795` explicitly.
+ *
+ * When the template ends up set and contains `{label}`,
+ * `getStatus` emits a `workerUrl` pointing at the instance's own virtual
+ * host (derived from its sandboxId) for instances whose
+ * `controllerCapabilitiesVersion >= 2`. Pre-v2 instances keep falling
+ * back to `KILOCLAW_API_URL`.
+ *
+ * Exported as a plain function so it's testable without forcing a
+ * re-import of this entire module (which triggers production-only
+ * validation of unrelated secrets).
  */
-export const KILOCLAW_INSTANCE_URL_TEMPLATE =
-  getEnvVariable('KILOCLAW_INSTANCE_URL_TEMPLATE') || '';
+export function resolveInstanceUrlTemplate(
+  envVar: string | undefined,
+  nodeEnv: string | undefined
+): string {
+  if (envVar !== undefined) return envVar;
+  return nodeEnv === 'production' ? 'https://{label}.kiloclaw.ai' : '';
+}
+
+export const KILOCLAW_INSTANCE_URL_TEMPLATE = resolveInstanceUrlTemplate(
+  process.env.KILOCLAW_INSTANCE_URL_TEMPLATE,
+  process.env.NODE_ENV
+);
 
 // KiloClaw Early Bird Checkout
 export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(

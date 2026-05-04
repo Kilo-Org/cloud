@@ -225,6 +225,15 @@ export type PlatformStatusResponse = {
   botNature: string | null;
   botVibe: string | null;
   botEmoji: string | null;
+  /**
+   * Version of the controller-configuration contract the running machine
+   * was started with. Bumped by the worker whenever the set of env vars /
+   * config it writes into a machine changes in a way callers care about.
+   * `null` means the instance has never been started under a versioned
+   * contract (treat as pre-v1 / legacy). See
+   * `services/kiloclaw/src/config.ts` (`WORKER_CONTROLLER_CAPABILITIES_VERSION`).
+   */
+  controllerCapabilitiesVersion: number | null;
 };
 
 /** A single registry DO's entries + migration status. */
@@ -594,7 +603,14 @@ export type ChatCredentials = {
 
 /** Combined status returned by tRPC getStatus */
 export type KiloClawDashboardStatus = PlatformStatusResponse & {
-  /** Worker base URL for constructing the "Open" link. Falls back to claw.kilo.ai. */
+  /**
+   * Worker base URL for constructing the "Open" link.
+   *
+   * When `KILOCLAW_INSTANCE_URL_TEMPLATE` is configured and the instance
+   * is on `controllerCapabilitiesVersion >= 2`, this is the per-instance
+   * virtual host (e.g. `https://i-<hex>.kiloclaw.ai`). Otherwise it falls
+   * back to `KILOCLAW_API_URL` (production: `https://claw.kilo.ai`).
+   */
   workerUrl: string;
   name: string | null;
   /** Postgres row ID. Used to construct /i/{instanceId} proxy paths for instance-keyed instances. */

@@ -17,7 +17,8 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { KILOCLAW_API_URL, KILOCLAW_INSTANCE_URL_TEMPLATE } from '@/lib/config.server';
+import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
@@ -914,6 +915,7 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
     botVibe: null,
     botEmoji: null,
     workerUrl,
+    controllerCapabilitiesVersion: null,
     name: null,
     instanceId: null,
     inboundEmailAddress: null,
@@ -2345,10 +2347,13 @@ export const kiloclawRouter = createTRPCRouter({
 
   getStatus: baseProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);
-    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
+    const legacyWorkerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
 
     if (!instance) {
-      return createNoInstanceStatus(ctx.user.id, workerUrl);
+      // No instance yet → no sandboxId yet → per-instance URL can't be
+      // minted. Serve the legacy host; the real host kicks in once the
+      // dashboard provisions and re-fetches status.
+      return createNoInstanceStatus(ctx.user.id, legacyWorkerUrl);
     }
 
     const client = new KiloClawInternalClient();
@@ -2356,6 +2361,13 @@ export const kiloclawRouter = createTRPCRouter({
       client.getStatus(ctx.user.id, workerInstanceId(instance)),
       getInboundEmailAddressForInstance(instance.id),
     ]);
+
+    const workerUrl = workerUrlForInstance({
+      sandboxId: status.sandboxId,
+      controllerCapabilitiesVersion: status.controllerCapabilitiesVersion,
+      template: KILOCLAW_INSTANCE_URL_TEMPLATE,
+      fallback: legacyWorkerUrl,
+    });
 
     return {
       ...status,

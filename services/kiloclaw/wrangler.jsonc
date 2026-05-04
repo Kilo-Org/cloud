@@ -142,7 +142,15 @@
     // `buildEnvVars` in src/gateway/env.ts appends
     // `https://<instanceId>.kiloclaw.ai` per-instance at machine build time.
     "OPENCLAW_ALLOWED_ORIGINS": "https://claw.kilosessions.ai,https://kilo.ai,https://www.kilo.ai",
-    "KILOCLAW_CHECKIN_URL": "https://claw.kilosessions.ai/api/controller/checkin",
+    // Controller check-in URL baked into newly-provisioned / restarted
+    // machines. Points at a single canonical hostname under
+    // `kiloclaw.ai` so the legacy `claw.kilosessions.ai` custom domain
+    // can be retired once the fleet rolls over. Both hostnames resolve
+    // to the same worker, so in-flight machines on the old URL keep
+    // working through the transition. Apex is not routed, so we use a
+    // dedicated `claw` subdomain (covered by the `*.kiloclaw.ai/*`
+    // wildcard route).
+    "KILOCLAW_CHECKIN_URL": "https://claw.kiloclaw.ai/api/controller/checkin",
     // Per-instance virtual hosting. Three call sites share this suffix:
     //   1. `parseInstanceHost` (catch-all proxy, PR2) routes `<label>.kiloclaw.ai`
     //      requests by `Host` header.

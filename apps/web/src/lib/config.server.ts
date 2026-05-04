@@ -209,6 +209,19 @@ export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_AP
 export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
   getEnvVariable('KILOCLAW_INBOUND_EMAIL_DOMAIN') || 'kiloclaw.ai';
 
+/**
+ * Per-instance worker URL template. When set to e.g.
+ * `https://{label}.kiloclaw.ai`, `getStatus` emits a `workerUrl` pointing
+ * at the instance's own virtual host (derived from its sandboxId) for
+ * instances whose `controllerCapabilitiesVersion >= 2`. Pre-v2 instances
+ * keep falling back to `KILOCLAW_API_URL`.
+ *
+ * Leave unset to keep the path-based / legacy behaviour everywhere —
+ * dev defaults to localhost and doesn't need the template.
+ */
+export const KILOCLAW_INSTANCE_URL_TEMPLATE =
+  getEnvVariable('KILOCLAW_INSTANCE_URL_TEMPLATE') || '';
+
 // KiloClaw Early Bird Checkout
 export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(
   'STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID'

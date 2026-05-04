@@ -33,6 +33,7 @@ type Props = {
 
 const messageInputTextStyle = {
   includeFontPadding: false,
+  textAlignVertical: 'center',
 } satisfies TextStyle;
 
 function resolveSendDisabled({
@@ -94,7 +95,7 @@ export function MessageInput({
   };
 
   return (
-    <View className="border-t border-border bg-background px-4 py-2">
+    <View className="border-t border-border bg-background px-3 py-2">
       {replyingTo && (
         <View className="mb-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
           <View className="min-w-0 flex-1">
@@ -121,12 +122,12 @@ export function MessageInput({
         </View>
       )}
       <View className="gap-1">
-        <View className="flex-row items-end gap-2">
+        <View className="flex-row items-center gap-2">
           <View className="min-w-0 flex-1">
             <TextInput
               ref={inputRef}
               className={cn(
-                'max-h-32 min-h-10 rounded-md border bg-card px-3 py-2.5 leading-5 text-foreground',
+                'max-h-32 min-h-12 rounded-full border bg-card px-5 py-2 leading-5 text-foreground',
                 overLimit ? 'border-destructive' : 'border-input'
               )}
               style={messageInputTextStyle}
@@ -153,7 +154,7 @@ export function MessageInput({
               onPress={onCancelEdit}
               disabled={disabled}
               className={cn(
-                'h-10 w-10 items-center justify-center rounded-md bg-secondary',
+                'h-12 w-12 items-center justify-center rounded-full bg-secondary',
                 disabled && 'opacity-50'
               )}
             >
@@ -164,20 +165,20 @@ export function MessageInput({
             onPress={submit}
             disabled={sendDisabled}
             className={cn(
-              'h-10 w-10 items-center justify-center rounded-md bg-primary',
+              'h-12 w-12 items-center justify-center rounded-full bg-primary',
               sendDisabled && 'opacity-50'
             )}
           >
             <Send size={18} color={colors.primaryForeground} />
           </Pressable>
         </View>
-        <View className="h-5 items-end justify-center">
-          {showCounter ? (
+        {showCounter ? (
+          <View className="items-end justify-center">
             <Text className={cn('text-xs text-muted-foreground', overLimit && 'text-destructive')}>
               {draftLength}/{MESSAGE_TEXT_MAX_CHARS}
             </Text>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
       </View>
     </View>
   );

@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { toast } from 'sonner-native';
 
+import { ChatSandboxRouteMounts } from '@/components/kilo-chat/chat-sandbox-route-mounts';
 import { ConversationScreen } from '@/components/kilo-chat/conversation-screen';
 import {
   getConversationRouteDecision,
@@ -48,10 +49,13 @@ export default function ChatConversationRoute() {
   }
 
   return (
-    <ConversationScreen
-      sandboxId={sandboxId}
-      conversationId={conversationId}
-      conversationTitle={conversationDetail.data.title ?? 'Untitled'}
-    />
+    <>
+      <ChatSandboxRouteMounts />
+      <ConversationScreen
+        sandboxId={sandboxId}
+        conversationId={conversationId}
+        conversationTitle={conversationDetail.data.title ?? 'Untitled'}
+      />
+    </>
   );
 }

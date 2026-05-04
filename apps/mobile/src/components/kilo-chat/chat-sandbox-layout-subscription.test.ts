@@ -2,7 +2,7 @@ import type * as ReactModule from 'react';
 import { kiloclawInstanceContext } from '@kilocode/event-service';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ChatSandboxInstanceEventSubscriptionMount } from '../../app/(app)/(tabs)/(1_kiloclaw)/chat/[sandbox-id]/_layout';
+import { ChatSandboxInstanceEventSubscriptionMount } from './chat-sandbox-route-mounts';
 
 type TestState = {
   cleanupCalls: number;
@@ -44,7 +44,6 @@ vi.mock('react', async () => {
 });
 
 vi.mock('expo-router', () => ({
-  Stack: () => null,
   useFocusEffect: (effect: ReactModule.EffectCallback) => {
     const cleanup = effect();
     if (typeof cleanup === 'function') {

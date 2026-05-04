@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveLongPressFeedback, shouldStartReplyFromSwipe } from './message-gesture-state';
+import {
+  getSwipeReplyActiveOffsetX,
+  resolveLongPressFeedback,
+  shouldStartReplyFromSwipe,
+} from './message-gesture-state';
+
+describe('getSwipeReplyActiveOffsetX', () => {
+  it('activates the message gesture only for left swipes', () => {
+    expect(getSwipeReplyActiveOffsetX()).toEqual([-12, Number.MAX_SAFE_INTEGER]);
+  });
+});
 
 describe('shouldStartReplyFromSwipe', () => {
   it('starts reply on a committed left swipe when reply is available', () => {

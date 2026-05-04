@@ -2,6 +2,7 @@ export const SWIPE_REPLY_DISTANCE = 56;
 export const SWIPE_REPLY_FAST_DISTANCE = 24;
 export const SWIPE_REPLY_FAST_VELOCITY = -650;
 export const SWIPE_REPLY_MAX_TRANSLATE = 72;
+export const SWIPE_REPLY_ACTIVATION_DISTANCE = 12;
 export const LONG_PRESS_FEEDBACK_PRESS_SCALE = 0.985;
 export const LONG_PRESS_FEEDBACK_ACTIVE_SCALE = 0.97;
 export const LONG_PRESS_FEEDBACK_HIGHLIGHT_OPACITY = 1;
@@ -21,6 +22,10 @@ type LongPressFeedback = {
   scale: number;
   highlightOpacity: number;
 };
+
+export function getSwipeReplyActiveOffsetX(): [number, number] {
+  return [-SWIPE_REPLY_ACTIVATION_DISTANCE, Number.MAX_SAFE_INTEGER];
+}
 
 export function shouldStartReplyFromSwipe({
   canReply,

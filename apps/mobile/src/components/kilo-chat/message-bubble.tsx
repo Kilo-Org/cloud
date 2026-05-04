@@ -17,6 +17,7 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import {
+  getSwipeReplyActiveOffsetX,
   resolveLongPressFeedback,
   shouldStartReplyFromSwipe,
   SWIPE_REPLY_DISTANCE,
@@ -125,7 +126,7 @@ function MessageBubbleComponent({
 
   // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
   const swipeGesture = Gesture.Pan()
-    .activeOffsetX([-12, 12])
+    .activeOffsetX(getSwipeReplyActiveOffsetX())
     .onUpdate(event => {
       if (!canSwipeReply) {
         return;

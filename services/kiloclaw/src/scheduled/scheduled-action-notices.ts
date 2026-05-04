@@ -43,6 +43,7 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import type { KiloClawEnv } from '../types';
 
 // Cap how many notifications we dispatch per tick. Bounds the worst
@@ -62,8 +63,14 @@ const DISPATCH_CONCURRENCY = 10;
 // How long a 'sending' row must sit before recovery considers it
 // stuck. Must be longer than the longest realistic tick duration so
 // in-flight claims from the current tick aren't reset by a parallel
-// recovery on the next tick. With concurrency 10 and 100 rows/tick at
-// ~200ms each, typical tick is ~2s. 5 minutes is comfortably above.
+// recovery on the next tick.
+//
+// Worst-case tick budget: MAX_NOTIFICATIONS_PER_TICK / DISPATCH_CONCURRENCY
+// = 10 batches; each batch dispatches up to 10 rows in parallel and
+// each dispatch is bounded by DISPATCH_TIMEOUT_MS = 10s. So the
+// theoretical max tick is ~100s (10 batches × 10s each). 5 minutes
+// is comfortably above that, with headroom for the cron's 1-minute
+// cadence + a slow upstream blocking past the timeout deadline.
 const STUCK_CLAIM_RECOVERY_MINUTES = 5;
 
 // Per-dispatch timeout. Cloudflare allows subrequests to hold open up to
@@ -73,35 +80,42 @@ const STUCK_CLAIM_RECOVERY_MINUTES = 5;
 // only renders + sends an email.
 const DISPATCH_TIMEOUT_MS = 10_000;
 
-type DueNotificationRow = {
-  notification_id: string;
-  notification_kind: 'notice' | 'cancelled';
-  notification_channel: 'email' | 'webapp' | 'mobile_push' | 'agent';
-  target_id: string;
-  scheduled_action_id: string;
-  action_type: 'scheduled_restart' | 'version_change';
+// Zod-validated at the dispatch boundary so a Drizzle type widening
+// (or a schema-shape drift in selectDueNotifications) is caught
+// loudly with a parse error rather than silently passing a malformed
+// row into channel-specific dispatchers. Per-tick rows are bounded
+// by MAX_NOTIFICATIONS_PER_TICK so the parse cost is negligible.
+const DueNotificationRowSchema = z.object({
+  notification_id: z.string(),
+  notification_kind: z.enum(['notice', 'cancelled']),
+  notification_channel: z.enum(['email', 'webapp', 'mobile_push', 'agent']),
+  target_id: z.string(),
+  scheduled_action_id: z.string(),
+  action_type: z.enum(['scheduled_restart', 'version_change']),
   // From the target row (always present; FK NOT NULL).
-  user_id: string;
+  user_id: z.string(),
   // Null when the joined kilocode_users row is missing (e.g. a hard-
   // delete bypassed the GDPR anonymize-only flow). Used as a sentinel
   // to fail the dispatch instead of looping the orphan row forever.
-  user_record_id: string | null;
-  user_email: string | null;
-  user_name: string | null;
-  instance_id: string;
-  instance_sandbox_id: string;
-  instance_name: string | null;
-  source_image_tag: string | null;
-  source_openclaw_version: string | null;
-  target_image_tag: string | null;
-  target_openclaw_version: string | null;
-  override_pins: boolean;
-  scheduled_at: string;
-  notice_lead_hours: number;
-  notice_subject: string;
-  notice_body: string;
-  reason: string | null;
-};
+  user_record_id: z.string().nullable(),
+  user_email: z.string().nullable(),
+  user_name: z.string().nullable(),
+  instance_id: z.string(),
+  instance_sandbox_id: z.string(),
+  instance_name: z.string().nullable(),
+  source_image_tag: z.string().nullable(),
+  source_openclaw_version: z.string().nullable(),
+  target_image_tag: z.string().nullable(),
+  target_openclaw_version: z.string().nullable(),
+  override_pins: z.boolean(),
+  scheduled_at: z.string(),
+  notice_lead_hours: z.number(),
+  notice_subject: z.string(),
+  notice_body: z.string(),
+  reason: z.string().nullable(),
+});
+
+type DueNotificationRow = z.infer<typeof DueNotificationRowSchema>;
 
 export type SweepResult = {
   processed: number;
@@ -305,7 +319,13 @@ async function selectDueNotifications(db: WorkerDb): Promise<DueNotificationRow[
     .orderBy(kiloclaw_scheduled_action_stages.scheduled_at)
     .limit(MAX_NOTIFICATIONS_PER_TICK);
 
-  return rows as DueNotificationRow[];
+  // Validate at the boundary instead of casting. If a Drizzle upgrade
+  // ever widens a column type, or a schema migration changes a shape
+  // out from under us, parse errors here are loud and traceable. A
+  // single malformed row drops the whole tick — better than silently
+  // routing bad data into dispatch where it would corrupt downstream
+  // state. The parse runs on at most MAX_NOTIFICATIONS_PER_TICK rows.
+  return rows.map(row => DueNotificationRowSchema.parse(row));
 }
 
 export async function dispatchOne(
@@ -349,6 +369,17 @@ async function dispatchEmail(
   env: KiloClawEnv,
   row: DueNotificationRow
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Narrow the optional bindings explicitly. The entry-point
+  // runScheduledActionNoticesSweep already returns early when either
+  // is missing, so in production this guard is dead code — but
+  // dispatchOne is exported for unit tests that pass {} as KiloClawEnv,
+  // and a future refactor of the entry-point shouldn't be able to
+  // silently send an empty 'X-Internal-Secret' header (which the
+  // backend would 401, marking every row failed with an opaque
+  // 'dispatcher 401' instead of skipping the sweep loudly).
+  if (!env.BACKEND_API_URL || !env.KILOCLAW_INTERNAL_API_SECRET) {
+    return { ok: false, error: 'BACKEND_API_URL or internal secret not bound' };
+  }
   try {
     const res = await fetch(
       `${env.BACKEND_API_URL}/api/internal/kiloclaw/scheduled-action-side-effects`,
@@ -357,7 +388,7 @@ async function dispatchEmail(
         signal: AbortSignal.timeout(DISPATCH_TIMEOUT_MS),
         headers: {
           'Content-Type': 'application/json',
-          'X-Internal-Secret': env.KILOCLAW_INTERNAL_API_SECRET ?? '',
+          'X-Internal-Secret': env.KILOCLAW_INTERNAL_API_SECRET,
         },
         body: JSON.stringify({
           notificationId: row.notification_id,

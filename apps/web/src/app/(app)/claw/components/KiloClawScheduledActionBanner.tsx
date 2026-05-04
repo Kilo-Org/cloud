@@ -28,15 +28,24 @@ type Props = {
 };
 
 function formatScheduledAt(iso: string): string {
+  // INTENTIONAL: this banner renders LOCAL time + the user's timezone
+  // abbreviation (e.g., "5/4/2026, 6:55 PM PDT"). The email and push
+  // surfaces render the same instant in UTC ("May 4, 2026, 6:55 PM
+  // UTC") — see apps/web/src/app/api/internal/kiloclaw/
+  // scheduled-action-side-effects/route.ts and
+  // services/notifications/src/lib/scheduled-action-push.ts. The two
+  // strings will not match character-for-character, but each labels
+  // its zone explicitly, so a user comparing the banner to the email
+  // knows they're seeing the same instant in two zones — the banner
+  // is local-friendly, the email is portable across recipients in
+  // different zones.
+  //
+  // This is a 'use client' component, so toLocaleString runs in the
+  // user's browser, not on the server, and the runtime locale/zone
+  // are stable per user.
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    // Append the user's timezone abbreviation (e.g., "PDT") so the
-    // banner's local-rendered time is internally unambiguous. The
-    // email server-renders the same instant in UTC and labels it
-    // "UTC"; both surfaces are clear about which zone they're showing,
-    // so a user comparing them knows they're not the same string and
-    // doesn't second-guess.
     const dateStr = d.toLocaleString();
     const tzPart = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
       .formatToParts(d)

@@ -12,7 +12,7 @@
  * Auth: X-Internal-Secret header.
  */
 
-import { timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -20,27 +20,19 @@ import { KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
 import { send as sendEmail, RawHtml, type TemplateName } from '@/lib/email';
 
 // Constant-time comparison so a public attacker can't probe the
-// internal-api secret via response-timing differences. Pad both
-// buffers to the same length before timingSafeEqual so an early
-// length-mismatch return doesn't leak the expected secret's length
-// (a length-only oracle would let an attacker binary-search the
-// secret length before brute-forcing the bytes).
+// internal-api secret via response-timing differences. HMAC both
+// inputs with a fixed key so timingSafeEqual always sees fixed-length
+// (sha256 = 32 bytes) buffers — this avoids any branch on length and
+// any padding-prefix corner case. The HMAC key doesn't need to be
+// secret; it just normalizes both sides to a uniform-distribution
+// 32-byte digest so the byte-by-byte compare is meaningful.
+const SECRET_COMPARE_HMAC_KEY = Buffer.from('kiloclaw-internal-secret-compare');
+
 function secretMatches(provided: string | null, expected: string): boolean {
   if (!provided) return false;
-  const providedBuffer = Buffer.from(provided);
-  const expectedBuffer = Buffer.from(expected);
-  const maxLen = Math.max(providedBuffer.length, expectedBuffer.length);
-  const a = Buffer.alloc(maxLen);
-  const b = Buffer.alloc(maxLen);
-  providedBuffer.copy(a);
-  expectedBuffer.copy(b);
-  // timingSafeEqual runs to completion on maxLen bytes regardless of
-  // input contents; the trailing length check guards against the
-  // edge case where a shorter provided value is a prefix of expected
-  // (padded zeros would only collide if the secret itself contains
-  // trailing zero bytes, which Buffer.from(string) won't emit, but
-  // belt-and-braces).
-  return timingSafeEqual(a, b) && providedBuffer.length === expectedBuffer.length;
+  const a = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(provided).digest();
+  const b = createHmac('sha256', SECRET_COMPARE_HMAC_KEY).update(expected).digest();
+  return timingSafeEqual(a, b);
 }
 
 // Mirrors the body the sweep sends. Defensive but not exhaustive — we
@@ -159,12 +151,17 @@ export async function POST(req: NextRequest) {
   }
   const body = parsed.data;
 
-  // Only handle the email channel here. The sweep handles mobile_push
-  // via the NOTIFICATIONS service binding and webapp as a no-op.
+  // Only the email channel is dispatched through this endpoint. The
+  // sweep routes mobile_push to the NOTIFICATIONS service binding
+  // directly and treats webapp as a no-op, so any non-email request
+  // is a routing bug. Return 400 (not 200 'skipped') so the sweep
+  // marks the row failed with a legible error_message instead of
+  // recording a phantom 'sent' for a notification that never went
+  // out.
   if (body.channel !== 'email') {
     return NextResponse.json(
-      { skipped: true, reason: `channel ${body.channel} not handled by web endpoint` },
-      { status: 200 }
+      { error: `channel ${body.channel} not handled by web endpoint` },
+      { status: 400 }
     );
   }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { runSweepWithIO, type SweepIO } from './scheduled-action-notices';
+import { dispatchOne, runSweepWithIO, type SweepIO } from './scheduled-action-notices';
+import type { KiloClawEnv } from '../types';
 
 type DueRow = Awaited<ReturnType<SweepIO['selectDue']>>[number];
 
@@ -12,6 +13,7 @@ function makeRow(overrides: Partial<DueRow> = {}): DueRow {
     scheduled_action_id: '00000000-0000-0000-0000-0000000000bb',
     action_type: 'scheduled_restart',
     user_id: 'user_123',
+    user_record_id: 'user_123',
     user_email: 'u@example.com',
     user_name: 'User',
     instance_id: '00000000-0000-0000-0000-0000000000cc',
@@ -181,5 +183,81 @@ describe('runSweepWithIO', () => {
     const io = fakeIO({ due, recovered: 2 });
     const result = await runSweepWithIO(io);
     expect(result).toEqual({ processed: 1, sent: 1, failed: 0, recovered: 2 });
+  });
+});
+
+describe('dispatchOne orphan-user guard', () => {
+  // The leftJoin on kilocode_users is what surfaces these rows; without
+  // the dispatchOne pre-check they would loop forever in 'pending'
+  // because no channel can succeed. env is not accessed when the guard
+  // trips, so a minimal cast is enough.
+  const fakeEnv = {} as KiloClawEnv;
+
+  it('returns ok:false for every channel when user_record_id is null', async () => {
+    const channels = ['email', 'webapp', 'mobile_push', 'agent'] as const;
+    for (const channel of channels) {
+      const row = {
+        notification_id: 'n-1',
+        notification_kind: 'notice' as const,
+        notification_channel: channel,
+        target_id: '00000000-0000-0000-0000-0000000000aa',
+        scheduled_action_id: '00000000-0000-0000-0000-0000000000bb',
+        action_type: 'scheduled_restart' as const,
+        user_id: 'orphan_user',
+        user_record_id: null,
+        user_email: null,
+        user_name: null,
+        instance_id: '00000000-0000-0000-0000-0000000000cc',
+        instance_sandbox_id: 'ki_abc',
+        instance_name: 'My Bot',
+        source_image_tag: null,
+        source_openclaw_version: null,
+        target_image_tag: null,
+        target_openclaw_version: null,
+        override_pins: false,
+        scheduled_at: '2026-05-04T18:55:00Z',
+        notice_lead_hours: 24,
+        notice_subject: 'Heads up',
+        notice_body: 'Body',
+        reason: null,
+      } satisfies DueRow;
+
+      const result = await dispatchOne(fakeEnv, row);
+      expect(result).toEqual({
+        ok: false,
+        error: 'kilocode_users row missing for user_id=orphan_user',
+      });
+    }
+  });
+
+  it('webapp channel still no-ops when user_record_id is present', async () => {
+    const row = {
+      notification_id: 'n-2',
+      notification_kind: 'notice' as const,
+      notification_channel: 'webapp' as const,
+      target_id: '00000000-0000-0000-0000-0000000000aa',
+      scheduled_action_id: '00000000-0000-0000-0000-0000000000bb',
+      action_type: 'scheduled_restart' as const,
+      user_id: 'user_present',
+      user_record_id: 'user_present',
+      user_email: null,
+      user_name: null,
+      instance_id: '00000000-0000-0000-0000-0000000000cc',
+      instance_sandbox_id: 'ki_abc',
+      instance_name: 'My Bot',
+      source_image_tag: null,
+      source_openclaw_version: null,
+      target_image_tag: null,
+      target_openclaw_version: null,
+      override_pins: false,
+      scheduled_at: '2026-05-04T18:55:00Z',
+      notice_lead_hours: 24,
+      notice_subject: 'Heads up',
+      notice_body: 'Body',
+      reason: null,
+    } satisfies DueRow;
+
+    const result = await dispatchOne(fakeEnv, row);
+    expect(result).toEqual({ ok: true });
   });
 });

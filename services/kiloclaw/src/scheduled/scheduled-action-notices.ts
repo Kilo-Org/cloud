@@ -80,7 +80,12 @@ type DueNotificationRow = {
   target_id: string;
   scheduled_action_id: string;
   action_type: 'scheduled_restart' | 'version_change';
+  // From the target row (always present; FK NOT NULL).
   user_id: string;
+  // Null when the joined kilocode_users row is missing (e.g. a hard-
+  // delete bypassed the GDPR anonymize-only flow). Used as a sentinel
+  // to fail the dispatch instead of looping the orphan row forever.
+  user_record_id: string | null;
   user_email: string | null;
   user_name: string | null;
   instance_id: string;
@@ -239,7 +244,8 @@ async function selectDueNotifications(db: WorkerDb): Promise<DueNotificationRow[
       target_id: kiloclaw_scheduled_action_targets.id,
       scheduled_action_id: kiloclaw_scheduled_actions.id,
       action_type: kiloclaw_scheduled_actions.action_type,
-      user_id: kilocode_users.id,
+      user_id: kiloclaw_scheduled_action_targets.user_id,
+      user_record_id: kilocode_users.id,
       user_email: kilocode_users.google_user_email,
       user_name: kilocode_users.google_user_name,
       instance_id: kiloclaw_instances.id,
@@ -269,7 +275,12 @@ async function selectDueNotifications(db: WorkerDb): Promise<DueNotificationRow[
       kiloclaw_scheduled_actions,
       eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
     )
-    .innerJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_scheduled_action_targets.user_id))
+    // leftJoin (not inner) so an orphaned target — e.g. user record
+    // hard-deleted out from under us, bypassing the GDPR
+    // anonymize-only flow — still surfaces and can be marked failed
+    // by dispatchOne. An inner join would silently drop it and the
+    // row would loop forever in 'pending'.
+    .leftJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_scheduled_action_targets.user_id))
     .innerJoin(
       kiloclaw_instances,
       eq(kiloclaw_instances.id, kiloclaw_scheduled_action_targets.instance_id)
@@ -297,10 +308,19 @@ async function selectDueNotifications(db: WorkerDb): Promise<DueNotificationRow[
   return rows as DueNotificationRow[];
 }
 
-async function dispatchOne(
+export async function dispatchOne(
   env: KiloClawEnv,
   row: DueNotificationRow
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Orphaned target — kilocode_users row missing for the FK. Fail
+  // every channel uniformly so the row exits the pending pool with
+  // a legible error_message instead of looping forever. Webapp/agent
+  // also fail here even though they don't strictly need a user record:
+  // the banner queries getStatus by instance, but if the user is gone
+  // the parent surface is gone too, so there's nothing to render.
+  if (row.user_record_id === null) {
+    return { ok: false, error: `kilocode_users row missing for user_id=${row.user_id}` };
+  }
   switch (row.notification_channel) {
     case 'email':
       // Email goes through the web internal endpoint because the email

@@ -20,14 +20,27 @@ import { KILOCLAW_INTERNAL_API_SECRET } from '@/lib/config.server';
 import { send as sendEmail, RawHtml, type TemplateName } from '@/lib/email';
 
 // Constant-time comparison so a public attacker can't probe the
-// internal-api secret via response-timing differences. Mirrors the
-// helper in apps/web/src/app/api/internal/kiloclaw/billing-side-effects/route.ts.
+// internal-api secret via response-timing differences. Pad both
+// buffers to the same length before timingSafeEqual so an early
+// length-mismatch return doesn't leak the expected secret's length
+// (a length-only oracle would let an attacker binary-search the
+// secret length before brute-forcing the bytes).
 function secretMatches(provided: string | null, expected: string): boolean {
   if (!provided) return false;
   const providedBuffer = Buffer.from(provided);
   const expectedBuffer = Buffer.from(expected);
-  if (providedBuffer.length !== expectedBuffer.length) return false;
-  return timingSafeEqual(providedBuffer, expectedBuffer);
+  const maxLen = Math.max(providedBuffer.length, expectedBuffer.length);
+  const a = Buffer.alloc(maxLen);
+  const b = Buffer.alloc(maxLen);
+  providedBuffer.copy(a);
+  expectedBuffer.copy(b);
+  // timingSafeEqual runs to completion on maxLen bytes regardless of
+  // input contents; the trailing length check guards against the
+  // edge case where a shorter provided value is a prefix of expected
+  // (padded zeros would only collide if the secret itself contains
+  // trailing zero bytes, which Buffer.from(string) won't emit, but
+  // belt-and-braces).
+  return timingSafeEqual(a, b) && providedBuffer.length === expectedBuffer.length;
 }
 
 // Mirrors the body the sweep sends. Defensive but not exhaustive — we

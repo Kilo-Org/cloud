@@ -3439,6 +3439,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             if (!open) {
               setChangeVersionSelectedTag('');
               setChangeVersionMode('now');
+              setChangeVersionNotify(defaultNotifyFormState());
             }
           }}
         >

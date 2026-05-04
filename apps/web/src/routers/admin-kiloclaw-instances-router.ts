@@ -1669,6 +1669,15 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           // schedule time. 'agent' is excluded from the v1 enum here —
           // the dispatcher would 501 anyway and we want admins to know
           // it's not yet supported.
+          //
+          // min(1) is enforced even when notify=false: callers that
+          // want "no notifications" should set notify:false and let
+          // the default fill the array, rather than passing []. The
+          // backend ignores channels entirely when notify=false (the
+          // notification-row insert is gated on notify), so the
+          // constraint never affects runtime behavior — it just keeps
+          // the validator simple and rejects accidentally-empty
+          // arrays from API callers who DID intend notify:true.
           noticeChannels: z
             .array(z.enum(['email', 'webapp', 'mobile_push']))
             .min(1)

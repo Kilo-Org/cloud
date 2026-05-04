@@ -2,8 +2,6 @@ import { type Href } from 'expo-router';
 
 const KILOCLAW_TAB_CHAT_ROOT = '/(app)/(tabs)/(1_kiloclaw)/chat';
 
-export const CHAT_STACK_ROUTE_NAME = 'chat/[sandbox-id]';
-
 export function chatSandboxRoute(sandboxId: string): string {
   return `${KILOCLAW_TAB_CHAT_ROOT}/${sandboxId}`;
 }

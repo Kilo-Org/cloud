@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pushDataSchema } from '@kilocode/notifications';
 
-import { CHAT_STACK_ROUTE_NAME } from './kilo-chat-routes';
 import { notificationPathForData } from './notification-path';
 
 describe('notificationPathForData', () => {
@@ -16,8 +15,7 @@ describe('notificationPathForData', () => {
     ).toBe('/(app)/(tabs)/(1_kiloclaw)/chat/sandbox-1/conversation-1');
   });
 
-  it('keeps the registered stack route on the sandbox-id chat segment', () => {
-    expect(CHAT_STACK_ROUTE_NAME).toBe('chat/[sandbox-id]');
+  it('keeps notifications on the tab-owned KiloClaw chat route', () => {
     expect(
       notificationPathForData({
         type: 'chat.message',
@@ -25,7 +23,7 @@ describe('notificationPathForData', () => {
         conversationId: 'conversation-1',
         messageId: 'message-1',
       })
-    ).toContain('/chat/sandbox-1/');
+    ).toContain('/(app)/(tabs)/(1_kiloclaw)/chat/sandbox-1/');
   });
 
   it('routes ready lifecycle notifications with legacy sandbox IDs to the sandbox chat screen', () => {

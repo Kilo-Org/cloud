@@ -156,7 +156,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (!body.userEmail) {
-    return NextResponse.json({ sent: false, reason: 'no user email' }, { status: 200 });
+    // 422 (not 200) so the sweep marks the row as failed with a clear
+    // error_message. Returning 200 here would record the row as 'sent'
+    // even though no email was actually delivered, which is misleading
+    // when an admin is investigating why a user didn't receive a notice.
+    return NextResponse.json({ error: 'no user email' }, { status: 422 });
   }
 
   const templateName = pickTemplate(body.actionType, body.kind);

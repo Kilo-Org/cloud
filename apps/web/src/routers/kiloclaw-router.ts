@@ -915,7 +915,14 @@ async function getUpcomingScheduledActionForInstance(
     .where(
       and(
         eq(kiloclaw_scheduled_action_targets.instance_id, instanceId),
-        inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running']),
+        // Just 'pending' here — not 'pending' OR 'running' — so this
+        // hits the partial index IDX_kiloclaw_scheduled_action_targets_pending_by_instance
+        // (predicate WHERE status='pending'). The 'running' state is a
+        // transient ~seconds-long claim window between the DO's CAS
+        // and the recordOutcome write; the banner being null during
+        // that window is fine because the action is about to fire
+        // (or just did) regardless.
+        eq(kiloclaw_scheduled_action_targets.status, 'pending'),
         inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
       )
     )

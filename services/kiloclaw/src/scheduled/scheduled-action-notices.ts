@@ -100,11 +100,27 @@ export async function runScheduledActionNoticesSweep(env: KiloClawEnv): Promise<
   let failed = 0;
   for (const row of due) {
     const result = await dispatchOne(env, row);
-    if (result.ok) {
-      await markSent(db, row.notification_id);
-      sent += 1;
-    } else {
-      await markFailed(db, row.notification_id, result.error);
+    // Per-row try/catch on the mark step so a transient DB error on
+    // one row doesn't abort the whole tick. Without this, a
+    // markSent/markFailed throw propagates up through the scheduled()
+    // handler — every remaining unprocessed row in `due` is silently
+    // dropped from this tick (next tick re-selects them) AND any
+    // already-dispatched-but-not-yet-marked rows can re-dispatch on
+    // the next tick (duplicate email/push).
+    try {
+      if (result.ok) {
+        await markSent(db, row.notification_id);
+        sent += 1;
+      } else {
+        await markFailed(db, row.notification_id, result.error);
+        failed += 1;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[notices-sweep] failed to mark notification status', {
+        notificationId: row.notification_id,
+        error: msg,
+      });
       failed += 1;
     }
   }

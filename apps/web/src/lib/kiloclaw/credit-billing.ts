@@ -943,13 +943,27 @@ async function maybeSendKiloClawSubscriptionStartedEmail(params: {
       return;
     }
 
-    await sendKiloClawSubscriptionStartedEmail({
+    const sendResult = await sendKiloClawSubscriptionStartedEmail({
       to: user.email,
       planName: planDisplayName(plan),
       priceCents: amountCents,
       billingPeriod: formatBillingPeriod(periodStart, periodEnd),
       nextBillingDate: new Date(periodEnd),
     });
+
+    // If the provider is not configured (e.g. Mailgun env missing in a test or
+    // preview environment), the send never reached a real provider and a later
+    // webhook retry should be free to re-attempt. Clear the marker we just
+    // inserted so the unique-index guard does not permanently suppress the
+    // email. Mirrors services/kiloclaw-billing/src/lifecycle.ts:879-884.
+    //
+    // `neverbounce_rejected` is deliberately NOT cleared: NeverBounce's verdict
+    // is terminal for that address (invalid / disposable), so retrying would
+    // loop forever. Leaving the row keeps the behavior idempotent — we tried
+    // once, the address was rejected, we don't try again.
+    if (!sendResult.sent && sendResult.reason === 'provider_not_configured') {
+      await deleteSubscriptionStartedEmailLog({ userId, instanceId, periodStart });
+    }
   } catch (error) {
     // Never fail the settlement flow because of an email error.
     captureException(error, {
@@ -961,20 +975,29 @@ async function maybeSendKiloClawSubscriptionStartedEmail(params: {
     // the delete to this activation's period so we only clear the marker we
     // just inserted.
     try {
-      await db
-        .delete(kiloclaw_email_log)
-        .where(
-          and(
-            eq(kiloclaw_email_log.user_id, userId),
-            eq(kiloclaw_email_log.instance_id, instanceId),
-            eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE),
-            eq(kiloclaw_email_log.period_start, periodStart)
-          )
-        );
+      await deleteSubscriptionStartedEmailLog({ userId, instanceId, periodStart });
     } catch {
       // Leave the marker in place; we prefer missing one email over duplicate sends.
     }
   }
+}
+
+async function deleteSubscriptionStartedEmailLog(params: {
+  userId: string;
+  instanceId: string;
+  periodStart: string;
+}): Promise<void> {
+  const { userId, instanceId, periodStart } = params;
+  await db
+    .delete(kiloclaw_email_log)
+    .where(
+      and(
+        eq(kiloclaw_email_log.user_id, userId),
+        eq(kiloclaw_email_log.instance_id, instanceId),
+        eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE),
+        eq(kiloclaw_email_log.period_start, periodStart)
+      )
+    );
 }
 
 /**

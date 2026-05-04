@@ -59,12 +59,22 @@ function truncate(text: string, max = BODY_MAX_LENGTH): string {
 }
 
 function formatScheduledAt(iso: string): string {
-  // Expo push body is small; pick a compact local-time representation
-  // server-side. Device renders this as plain text in the system tray.
+  // Expo push body is small; pick a compact server-rendered string.
+  // Pin to UTC so the output is deterministic across runtimes (CF
+  // Workers happen to be UTC, but Vitest/Jest runners on dev laptops
+  // are not — without this, body assertions in unit tests would be
+  // flaky depending on the host timezone, and the email and push
+  // bodies would disagree about the rendered time).
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString();
+    return (
+      d.toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: 'UTC',
+      }) + ' UTC'
+    );
   } catch {
     return iso;
   }

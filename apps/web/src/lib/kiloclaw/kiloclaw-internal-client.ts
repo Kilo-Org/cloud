@@ -244,6 +244,7 @@ export class KiloClawInternalClient {
     processed: number;
     sent: number;
     failed: number;
+    recovered: number;
   }> {
     return this.request('/api/platform/scheduled-action/run-notice-sweep', {
       method: 'POST',

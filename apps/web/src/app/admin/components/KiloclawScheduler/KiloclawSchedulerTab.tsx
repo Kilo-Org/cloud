@@ -438,7 +438,8 @@ export function KiloclawSchedulerTab() {
           {runNoticeSweep.data && (
             <p className="text-muted-foreground mt-2 font-mono text-xs">
               Last run: processed={runNoticeSweep.data.processed}, sent=
-              {runNoticeSweep.data.sent}, failed={runNoticeSweep.data.failed}
+              {runNoticeSweep.data.sent}, failed={runNoticeSweep.data.failed}, recovered=
+              {runNoticeSweep.data.recovered}
             </p>
           )}
           {runNoticeSweep.error && (

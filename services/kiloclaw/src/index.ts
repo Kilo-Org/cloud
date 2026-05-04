@@ -1376,9 +1376,9 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
   async scheduled(_event: ScheduledController): Promise<void> {
     try {
       const result = await runScheduledActionNoticesSweep(this.env);
-      if (result.processed > 0) {
+      if (result.processed > 0 || result.recovered > 0) {
         console.log(
-          `[scheduled] action-notices: processed=${result.processed} sent=${result.sent} failed=${result.failed}`
+          `[scheduled] action-notices: processed=${result.processed} sent=${result.sent} failed=${result.failed} recovered=${result.recovered}`
         );
       }
     } catch (err) {

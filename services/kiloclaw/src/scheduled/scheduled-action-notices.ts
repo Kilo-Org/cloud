@@ -66,6 +66,13 @@ const DISPATCH_CONCURRENCY = 10;
 // ~200ms each, typical tick is ~2s. 5 minutes is comfortably above.
 const STUCK_CLAIM_RECOVERY_MINUTES = 5;
 
+// Per-dispatch timeout. Cloudflare allows subrequests to hold open up to
+// 900s; without this, a hung BACKEND_API_URL or upstream Mailgun would
+// block all DISPATCH_CONCURRENCY workers in a batch and stall subsequent
+// batches in the same tick. 10s is generous for an internal POST that
+// only renders + sends an email.
+const DISPATCH_TIMEOUT_MS = 10_000;
+
 type DueNotificationRow = {
   notification_id: string;
   notification_kind: 'notice' | 'cancelled';
@@ -327,6 +334,7 @@ async function dispatchEmail(
       `${env.BACKEND_API_URL}/api/internal/kiloclaw/scheduled-action-side-effects`,
       {
         method: 'POST',
+        signal: AbortSignal.timeout(DISPATCH_TIMEOUT_MS),
         headers: {
           'Content-Type': 'application/json',
           'X-Internal-Secret': env.KILOCLAW_INTERNAL_API_SECRET ?? '',

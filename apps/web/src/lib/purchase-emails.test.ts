@@ -15,11 +15,12 @@ import {
   SUBSCRIPTION_STARTED_RECOVERY_WINDOW_MS,
 } from '@/lib/kiloclaw/credit-billing';
 import type * as creditBillingModule from '@/lib/kiloclaw/credit-billing';
-import type * as emailModule from '@/lib/email';
 import {
   renderTemplate,
   buildCreditsTopUpReceiptSection,
   subjects,
+  sendCreditsTopUpEmail,
+  sendKiloClawSubscriptionStartedEmail,
   type TemplateName,
 } from '@/lib/email';
 
@@ -28,62 +29,23 @@ jest.mock('@/lib/firstTopupBonus', () => ({
   processFirstTopupBonus: jest.fn(),
 }));
 
-// Count email sends via the shared `send` export as well as the
-// `sendKiloClawSubscriptionStartedEmail` / `sendCreditsTopUpEmail` helpers.
-// The helpers are replaced with jest.fns that forward the call via
-// sendMock using a synthetic `templateName` so existing tests that filter
-// by templateName continue to work.
-const sendMock = jest.fn<Promise<emailModule.SendResult>, [unknown]>(async () => ({
-  sent: true,
+// Mock the outbound transport (Mailgun) and the upstream address-validity
+// check (NeverBounce) rather than the helper exports. This way the real
+// `send()`, `sendCreditsTopUpEmail`, and `sendKiloClawSubscriptionStartedEmail`
+// wiring — formatUsd rounding, formatDate formatting, subjectOverride,
+// credits_url / manage_url construction, receipt_section rendering — is
+// exercised on every test, so a regression in any of that wiring fails here.
+type SendViaMailgunParams = { to: string; subject: string; html: string; replyTo?: string };
+const sendViaMailgunMock = jest.fn<Promise<boolean>, [SendViaMailgunParams]>(async () => true);
+const verifyEmailMock = jest.fn<Promise<boolean>, [string]>(async () => true);
+
+jest.mock('@/lib/email-mailgun', () => ({
+  sendViaMailgun: (params: SendViaMailgunParams) => sendViaMailgunMock(params),
 }));
 
-jest.mock('@/lib/email', () => {
-  const actual = jest.requireActual<typeof emailModule>('@/lib/email');
-  return {
-    ...actual,
-    send: jest.fn((params: unknown) => sendMock(params)),
-    sendCreditsTopUpEmail: jest.fn(
-      async (props: {
-        to: string;
-        variant: 'auto' | 'manual';
-        amountCents: number;
-        creditsCents: number;
-        purchaseDate: Date;
-        receiptUrl: string | null;
-      }) =>
-        sendMock({
-          to: props.to,
-          templateName: 'creditsTopUp',
-          templateVars: {
-            amount_usd: (props.amountCents / 100).toFixed(2),
-            credits_usd: (props.creditsCents / 100).toFixed(2),
-            receipt_url: props.receiptUrl,
-            variant: props.variant,
-          },
-          subjectOverride: props.variant === 'auto' ? 'Kilo auto top-up successful' : undefined,
-        })
-    ),
-    sendKiloClawSubscriptionStartedEmail: jest.fn(
-      async (props: {
-        to: string;
-        planName: string;
-        priceCents: number;
-        billingPeriod: string;
-        nextBillingDate: Date;
-      }) =>
-        sendMock({
-          to: props.to,
-          templateName: 'kiloClawSubscriptionStarted',
-          templateVars: {
-            plan_name: props.planName,
-            price_usd: (props.priceCents / 100).toFixed(2),
-            billing_period: props.billingPeriod,
-            next_billing_date: props.nextBillingDate.toISOString(),
-          },
-        })
-    ),
-  };
-});
+jest.mock('@/lib/email-neverbounce', () => ({
+  verifyEmail: (email: string) => verifyEmailMock(email),
+}));
 
 // Receipt URL lookups during unit tests must not touch Stripe.
 jest.mock('@/lib/stripe-client', () => ({
@@ -172,13 +134,35 @@ describe('subjects map', () => {
   });
 });
 
+// Each template has a unique subject line (or a documented subjectOverride),
+// so we discriminate Mailgun calls by subject rather than by templateName.
+const CREDITS_TOPUP_MANUAL_SUBJECT = subjects.creditsTopUp;
+const CREDITS_TOPUP_AUTO_SUBJECT = 'Kilo auto top-up successful';
+const KILOCLAW_SUBSCRIPTION_STARTED_SUBJECT = subjects.kiloClawSubscriptionStarted;
+
+function creditsTopUpSends(): SendViaMailgunParams[] {
+  return sendViaMailgunMock.mock.calls
+    .map(([params]) => params)
+    .filter(
+      p => p.subject === CREDITS_TOPUP_MANUAL_SUBJECT || p.subject === CREDITS_TOPUP_AUTO_SUBJECT
+    );
+}
+
+function subscriptionStartedSends(): SendViaMailgunParams[] {
+  return sendViaMailgunMock.mock.calls
+    .map(([params]) => params)
+    .filter(p => p.subject === KILOCLAW_SUBSCRIPTION_STARTED_SUBJECT);
+}
+
 describe('processTopUp credit top-up email', () => {
   beforeEach(() => {
-    sendMock.mockClear();
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
   });
 
   afterEach(() => {
-    sendMock.mockClear();
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
   });
 
   test('sends credit top-up email once for a successful manual top-up', async () => {
@@ -194,13 +178,14 @@ describe('processTopUp credit top-up email', () => {
     });
     expect(first).toBe(true);
 
-    const topUpSends = sendMock.mock.calls
-      .map(([params]) => params as { templateName: string; templateVars: Record<string, unknown> })
-      .filter(p => p.templateName === 'creditsTopUp');
+    const topUpSends = creditsTopUpSends();
     expect(topUpSends).toHaveLength(1);
-    expect(topUpSends[0].templateVars.amount_usd).toBe('15.00');
+    // $15.00 comes from formatUsd(1500) in the real helper — if formatUsd
+    // rounding regresses, this assertion fails.
+    expect(topUpSends[0].html).toContain('$15.00 USD');
+    expect(topUpSends[0].to).toBe(user.google_user_email);
 
-    sendMock.mockClear();
+    sendViaMailgunMock.mockClear();
 
     // Retry / webhook replay with the same stripe_payment_id must not re-send.
     const second = await processTopUp(user, 1500, {
@@ -209,10 +194,7 @@ describe('processTopUp credit top-up email', () => {
     });
     expect(second).toBe(false);
 
-    const replayTopUpSends = sendMock.mock.calls
-      .map(([params]) => params as { templateName: string })
-      .filter(p => p.templateName === 'creditsTopUp');
-    expect(replayTopUpSends).toHaveLength(0);
+    expect(creditsTopUpSends()).toHaveLength(0);
   });
 
   test('uses auto-top-up copy when isAutoTopUp is true', async () => {
@@ -228,10 +210,13 @@ describe('processTopUp credit top-up email', () => {
       { isAutoTopUp: true }
     );
 
-    const call = sendMock.mock.calls
-      .map(([params]) => params as { templateName: string; subjectOverride?: string })
-      .find(p => p.templateName === 'creditsTopUp');
-    expect(call?.subjectOverride).toBe('Kilo auto top-up successful');
+    const autoSend = sendViaMailgunMock.mock.calls
+      .map(([params]) => params)
+      .find(p => p.subject === CREDITS_TOPUP_AUTO_SUBJECT);
+    expect(autoSend).toBeTruthy();
+    // The auto variant also swaps the heading/intro copy — prove both the
+    // subject override and the templateVars wiring land.
+    expect(autoSend?.html).toContain('Your auto top-up was successful');
   });
 
   test('does not send an email when skipPostTopUpFreeStuff is true', async () => {
@@ -247,10 +232,7 @@ describe('processTopUp credit top-up email', () => {
       { skipPostTopUpFreeStuff: true }
     );
 
-    const topUpSends = sendMock.mock.calls
-      .map(([params]) => params as { templateName: string })
-      .filter(p => p.templateName === 'creditsTopUp');
-    expect(topUpSends).toHaveLength(0);
+    expect(creditsTopUpSends()).toHaveLength(0);
 
     // Sanity: the credit transaction was still recorded.
     const [txn] = await db
@@ -372,10 +354,12 @@ describe('KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE constant', () => {
 
 describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
   beforeEach(() => {
-    sendMock.mockClear();
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
   });
   afterEach(() => {
-    sendMock.mockClear();
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
   });
 
   async function applyStripeFundedKiloClawPeriod(
@@ -422,10 +406,7 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
   }
 
   function countSubscriptionStartedSends(): number {
-    return sendMock.mock.calls.filter(
-      ([params]) =>
-        (params as { templateName: string }).templateName === 'kiloClawSubscriptionStarted'
-    ).length;
+    return subscriptionStartedSends().length;
   }
 
   async function countEmailLogRows(userId: string, instanceId: string): Promise<number> {
@@ -550,10 +531,10 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     expect(countSubscriptionStartedSends()).toBe(1);
     expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
 
-    const zeroAmountSend = sendMock.mock.calls
-      .map(([params]) => params as { templateName: string; templateVars: Record<string, unknown> })
-      .find(p => p.templateName === 'kiloClawSubscriptionStarted');
-    expect(zeroAmountSend?.templateVars.price_usd).toBe('0.00');
+    const zeroAmountSend = subscriptionStartedSends()[0];
+    expect(zeroAmountSend).toBeTruthy();
+    // formatUsd(0) must render "0.00", not "0" or "NaN" — real helper wiring.
+    expect(zeroAmountSend.html).toContain('$0.00 USD');
   });
 
   test('activate → cancel → resubscribe on same instance sends a second subscription-started email', async () => {
@@ -587,7 +568,8 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     expect(countSubscriptionStartedSends()).toBe(1);
     expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
 
-    sendMock.mockClear();
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
 
     // Simulate cancellation: status=canceled on the same row.
     await db
@@ -778,7 +760,8 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     });
     expect(countSubscriptionStartedSends()).toBe(1);
 
-    sendMock.mockClear();
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
 
     // Same stripe_payment_id → processTopUp returns false (duplicate credit),
     // so we take the duplicate-recovery path. The kiloclaw_email_log row from
@@ -835,7 +818,8 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
           eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
         )
       );
-    sendMock.mockClear();
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
 
     await applyStripeFundedKiloClawPeriod({
       userId: user.id,
@@ -867,10 +851,9 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
     });
 
-    sendMock.mockImplementationOnce(async () => ({
-      sent: false,
-      reason: 'provider_not_configured' as const,
-    }));
+    // Mailgun returns false when MAILGUN_API_KEY/MAILGUN_DOMAIN are missing,
+    // which `send()` translates into { sent: false, reason: 'provider_not_configured' }.
+    sendViaMailgunMock.mockImplementationOnce(async () => false);
 
     const periodStart = new Date().toISOString();
     const periodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
@@ -908,10 +891,9 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
       stripeSubscriptionId,
     });
 
-    sendMock.mockImplementationOnce(async () => ({
-      sent: false,
-      reason: 'neverbounce_rejected' as const,
-    }));
+    // NeverBounce returns false for invalid/disposable addresses, which
+    // `send()` translates into { sent: false, reason: 'neverbounce_rejected' }.
+    verifyEmailMock.mockImplementationOnce(async () => false);
 
     const periodStart = new Date().toISOString();
     const periodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
@@ -928,7 +910,11 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     });
 
     expect(applied).toBe(true);
-    expect(countSubscriptionStartedSends()).toBe(1);
+    // verifyEmail was called once for this user (the send attempt),
+    // so we did try. sendViaMailgun was not reached because verification
+    // rejected the address — which is the whole point of this branch.
+    expect(verifyEmailMock).toHaveBeenCalledWith(user.google_user_email);
+    expect(countSubscriptionStartedSends()).toBe(0);
     expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
   });
 
@@ -982,7 +968,8 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
           eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
         )
       );
-    sendMock.mockClear();
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
 
     await applyStripeFundedKiloClawPeriod({
       userId: user.id,
@@ -997,5 +984,153 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
 
     expect(countSubscriptionStartedSends()).toBe(0);
     expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
+  });
+});
+
+// ── Direct helper payload tests ────────────────────────────────────────────
+// The surrounding describe blocks mock @/lib/email-mailgun and exercise the
+// real helpers through production call sites. These tests assert the exact
+// Mailgun payload the helpers emit, protecting:
+//   - formatUsd rounding
+//   - formatDate formatting
+//   - purchase_date / credits_url / receipt_section / manage_url mapping
+//   - subjectOverride selection
+
+describe('sendCreditsTopUpEmail payload', () => {
+  beforeEach(() => {
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
+  });
+
+  test('manual variant emits the canonical subject, formatted amounts, and a receipt link', async () => {
+    const result = await sendCreditsTopUpEmail({
+      to: 'recipient@example.com',
+      variant: 'manual',
+      amountCents: 1500,
+      creditsCents: 1500,
+      purchaseDate: new Date('2026-01-15T12:00:00Z'),
+      receiptUrl: 'https://pay.stripe.com/receipts/abc',
+    });
+
+    expect(result).toEqual({ sent: true });
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.to).toBe('recipient@example.com');
+    expect(params.subject).toBe(subjects.creditsTopUp);
+    // formatUsd(1500) rounding.
+    expect(params.html).toContain('$15.00 USD');
+    // formatDate en-US UTC formatting.
+    expect(params.html).toContain('January 15, 2026');
+    // credits_url construction (NEXTAUTH_URL + '/credits' — http://localhost:3000 in tests).
+    expect(params.html).toContain('/credits');
+    // receipt_section rendering (RawHtml, escaped href).
+    expect(params.html).toContain('https://pay.stripe.com/receipts/abc');
+    expect(params.html).toContain('View your Stripe receipt');
+  });
+
+  test('auto variant overrides the subject and swaps the heading copy', async () => {
+    await sendCreditsTopUpEmail({
+      to: 'recipient@example.com',
+      variant: 'auto',
+      amountCents: 2000,
+      creditsCents: 2000,
+      purchaseDate: new Date('2026-02-01T00:00:00Z'),
+      receiptUrl: null,
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.subject).toBe('Kilo auto top-up successful');
+    expect(params.html).toContain('Your auto top-up was successful');
+    // No receipt URL → receipt section empty, "View your Stripe receipt" absent.
+    expect(params.html).not.toContain('View your Stripe receipt');
+  });
+
+  test('null receipt URL renders an empty receipt section without breaking the template', async () => {
+    await sendCreditsTopUpEmail({
+      to: 'recipient@example.com',
+      variant: 'manual',
+      amountCents: 500,
+      creditsCents: 500,
+      purchaseDate: new Date('2026-03-01T00:00:00Z'),
+      receiptUrl: null,
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.html).toContain('$5.00 USD');
+    expect(params.html).not.toContain('View your Stripe receipt');
+  });
+
+  test('neverbounce rejection short-circuits before Mailgun is called', async () => {
+    verifyEmailMock.mockImplementationOnce(async () => false);
+
+    const result = await sendCreditsTopUpEmail({
+      to: 'bad@example.com',
+      variant: 'manual',
+      amountCents: 1000,
+      creditsCents: 1000,
+      purchaseDate: new Date(),
+      receiptUrl: null,
+    });
+
+    expect(result).toEqual({ sent: false, reason: 'neverbounce_rejected' });
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
+  });
+
+  test('mailgun misconfiguration surfaces as provider_not_configured', async () => {
+    sendViaMailgunMock.mockImplementationOnce(async () => false);
+
+    const result = await sendCreditsTopUpEmail({
+      to: 'recipient@example.com',
+      variant: 'manual',
+      amountCents: 1000,
+      creditsCents: 1000,
+      purchaseDate: new Date(),
+      receiptUrl: null,
+    });
+
+    expect(result).toEqual({ sent: false, reason: 'provider_not_configured' });
+  });
+});
+
+describe('sendKiloClawSubscriptionStartedEmail payload', () => {
+  beforeEach(() => {
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
+  });
+
+  test('emits the canonical subject, formatted price/next-billing-date, and the manage link', async () => {
+    const result = await sendKiloClawSubscriptionStartedEmail({
+      to: 'recipient@example.com',
+      planName: 'KiloClaw Standard',
+      priceCents: 900,
+      billingPeriod: 'Jan 15, 2026 – Feb 15, 2026',
+      nextBillingDate: new Date('2026-02-15T00:00:00Z'),
+    });
+
+    expect(result).toEqual({ sent: true });
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.to).toBe('recipient@example.com');
+    expect(params.subject).toBe(subjects.kiloClawSubscriptionStarted);
+    expect(params.html).toContain('KiloClaw Standard');
+    // formatUsd(900).
+    expect(params.html).toContain('$9.00 USD');
+    expect(params.html).toContain('Jan 15, 2026 – Feb 15, 2026');
+    // formatDate(next billing).
+    expect(params.html).toContain('February 15, 2026');
+    // manage_url construction (NEXTAUTH_URL + '/claw').
+    expect(params.html).toContain('/claw');
+  });
+
+  test('zero-cent price still renders "$0.00 USD" (formatUsd rounding)', async () => {
+    await sendKiloClawSubscriptionStartedEmail({
+      to: 'recipient@example.com',
+      planName: 'KiloClaw Standard',
+      priceCents: 0,
+      billingPeriod: 'Jan 1, 2026 – Feb 1, 2026',
+      nextBillingDate: new Date('2026-02-01T00:00:00Z'),
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.html).toContain('$0.00 USD');
   });
 });

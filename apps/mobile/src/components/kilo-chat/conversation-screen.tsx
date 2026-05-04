@@ -61,6 +61,7 @@ import { useCurrentUserId } from './hooks/use-current-user-id';
 import { TypingIndicator } from './typing-indicator';
 import { useAllKiloClawInstances, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
+import { kiloclawConversationEyebrow } from '@/lib/kiloclaw-display';
 import {
   chatInstancePickerPath,
   chatRenameConversationPath,
@@ -153,7 +154,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   const { data: instances } = useAllKiloClawInstances();
   const currentInstance = instances?.find(instance => instance.sandboxId === sandboxId);
   const canSwitchInstance = (instances?.length ?? 0) > 1;
-  const instanceLabel = currentInstance?.name ?? currentInstance?.organizationName ?? 'KiloClaw';
+  const instanceLabel = kiloclawConversationEyebrow(currentInstance);
 
   const handleSwitchInstance = useCallback(() => {
     router.push(chatInstancePickerPath(sandboxId));

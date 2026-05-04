@@ -579,9 +579,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             <strong>{directProvider.name}</strong> to use this key
                           </p>
                           <p className="mt-1">
-                            In your client, select a model entry from the list above. After saving,
-                            you may need to wait a few minutes and restart your client for this
-                            entry to appear.
+                            In your client, select a model entry from the list above with{' '}
+                            <code>{directProvider.id}/</code> prefix. After saving, you may need to
+                            wait a few minutes and restart your client for this entry to appear.
                           </p>
                         </AlertDescription>
                       </Alert>

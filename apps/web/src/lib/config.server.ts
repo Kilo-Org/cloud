@@ -216,15 +216,20 @@ export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
  * merge of the name-based routing feature flips them on automatically,
  * without forcing anyone to edit env files.
  *
- * Resolution rules:
- *   1. If `KILOCLAW_INSTANCE_URL_TEMPLATE` is set (to anything, including
- *      empty string), use that value verbatim. Explicit empty = kill
- *      switch / opt-out — operators can roll back without a code deploy,
- *      devs can disable the per-instance flow locally, and tests can
- *      force the legacy path.
- *   2. Otherwise in `NODE_ENV=production`, default to the canonical
+ * Resolution rules (checked in order):
+ *   1. `KILOCLAW_INSTANCE_URL_TEMPLATE=legacy` (case-insensitive) is the
+ *      explicit **kill switch** — disables per-instance URLs entirely and
+ *      falls back to the single-host `KILOCLAW_API_URL`. Operators can
+ *      roll prod back without a code deploy; devs can disable locally.
+ *      A non-empty sentinel is used (rather than empty string) because
+ *      Vercel / Node env pipelines often coerce empty env entries into
+ *      "unset", making an empty-string rollback unreliable.
+ *   2. A non-empty `KILOCLAW_INSTANCE_URL_TEMPLATE` is used verbatim.
+ *      Must contain `{label}`; missing placeholder is a misconfiguration
+ *      warned about at render time (see `workerUrlForInstance`).
+ *   3. Otherwise in `NODE_ENV=production`, default to the canonical
  *      `https://{label}.kiloclaw.ai` template.
- *   3. Otherwise (dev/test) derive a template from `KILOCLAW_API_URL`:
+ *   4. Otherwise (dev/test) derive a template from `KILOCLAW_API_URL`:
  *      if `KILOCLAW_API_URL` looks like a loopback URL (`http://localhost:<port>`
  *      / `http://127.0.0.1:<port>`), emit
  *      `http://{label}.kiloclaw.localhost:<port>` so the browser
@@ -244,6 +249,15 @@ export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
  * validation of unrelated secrets).
  */
 const DEFAULT_DEV_WRANGLER_PORT = '8795';
+
+/**
+ * Sentinel value for `KILOCLAW_INSTANCE_URL_TEMPLATE` that disables the
+ * per-instance URL pattern entirely. Case-insensitive match. Picked as
+ * a non-empty word because empty env values are unreliable across
+ * Vercel / Node / dotenv pipelines (often dropped or indistinguishable
+ * from "unset"), which would mean the kill switch silently fails open.
+ */
+const KILL_SWITCH_SENTINEL = 'legacy';
 
 function deriveDevTemplateFromWorkerUrl(workerUrl: string | undefined): string {
   const fallback = `http://{label}.kiloclaw.localhost:${DEFAULT_DEV_WRANGLER_PORT}`;
@@ -268,7 +282,13 @@ export function resolveInstanceUrlTemplate(
   nodeEnv: string | undefined,
   workerUrl: string | undefined
 ): string {
-  if (envVar !== undefined) return envVar;
+  // Explicit kill switch. Empty string falls through to the production
+  // / dev defaults — operators must set `legacy` to disable, not "".
+  if (envVar !== undefined && envVar.toLowerCase() === KILL_SWITCH_SENTINEL) {
+    return '';
+  }
+  // Non-empty explicit override wins.
+  if (envVar !== undefined && envVar !== '') return envVar;
   if (nodeEnv === 'production') return 'https://{label}.kiloclaw.ai';
   return deriveDevTemplateFromWorkerUrl(workerUrl);
 }

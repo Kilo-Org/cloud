@@ -639,34 +639,6 @@ async function resolveInstance(c: Context<AppEnv>): Promise<{
 const RESERVED_INSTANCE_HOST_LABELS = new Set<string>(['claw']);
 
 /**
- * Labels that should permanently 301 to the apex host (suffix with the
- * leading dot stripped). The wildcard route on `*.kiloclaw.ai/*` catches
- * these before they can surface as "instance not found" 404s, and the
- * redirect target inherits the configured scheme + suffix so dev parity
- * works without hardcoding `kiloclaw.ai`.
- *
- * Example (prod): `www.kiloclaw.ai/foo?q=1` → `https://kiloclaw.ai/foo?q=1`
- */
-const CANONICAL_APEX_REDIRECT_LABELS = new Set<string>(['www']);
-
-/**
- * Build the apex redirect target for a canonical-redirect label.
- * Strips the leading dot from the suffix and pairs it with the configured
- * scheme. Preserves path + search verbatim via the URL setters (not via
- * string construction) to avoid scheme-relative (`//`) open-redirect
- * footguns.
- */
-function buildApexRedirectUrl(requestUrl: URL, env: KiloClawEnv): string {
-  const suffix = env.KILOCLAW_INSTANCE_HOST_SUFFIX ?? '';
-  const apexHost = suffix.startsWith('.') ? suffix.slice(1) : suffix;
-  const scheme = env.KILOCLAW_INSTANCE_URL_SCHEME ?? 'https';
-  const target = new URL(`${scheme}://${apexHost}`);
-  target.pathname = requestUrl.pathname;
-  target.search = requestUrl.search;
-  return target.toString();
-}
-
-/**
  * Resolve the DO key that a host-routed request should proxy to.
  *
  *   `i-<32hex>.<suffix>` → key the DO by the decoded instanceId (UUID).
@@ -713,13 +685,6 @@ async function handleHostBasedRoute(c: Context<AppEnv>): Promise<Response | null
   const label = parseInstanceHost(url.host, c.env);
   if (!label) {
     return c.json({ error: 'Instance not found' }, 404);
-  }
-
-  // Canonical-host redirects (e.g. `www.kiloclaw.ai` → `kiloclaw.ai`).
-  // 301 happens before auth / ownership checks so the redirect target
-  // doesn't depend on request state.
-  if (CANONICAL_APEX_REDIRECT_LABELS.has(label)) {
-    return c.redirect(buildApexRedirectUrl(url, c.env), 301);
   }
 
   // Reserved labels (e.g. `claw` for controller check-in, platform health

@@ -2,7 +2,33 @@ import { describe, it, expect } from '@jest/globals';
 import { resolveInstanceUrlTemplate } from './config.server';
 
 describe('resolveInstanceUrlTemplate', () => {
-  describe('production', () => {
+  describe('kill switch (KILOCLAW_INSTANCE_URL_TEMPLATE=legacy)', () => {
+    it('returns empty (legacy routing) when set to the kill-switch sentinel in production', () => {
+      expect(resolveInstanceUrlTemplate('legacy', 'production', 'https://claw.kilo.ai')).toBe('');
+    });
+
+    it('matches the sentinel case-insensitively', () => {
+      expect(resolveInstanceUrlTemplate('Legacy', 'production', 'https://claw.kilo.ai')).toBe('');
+      expect(resolveInstanceUrlTemplate('LEGACY', 'production', 'https://claw.kilo.ai')).toBe('');
+    });
+
+    it('also disables per-instance URLs in dev when set', () => {
+      expect(resolveInstanceUrlTemplate('legacy', 'development', 'http://localhost:8795')).toBe('');
+    });
+
+    it('treats an explicit empty string as "unset" (falls through to defaults), not as a kill switch', () => {
+      // Platform env pipelines often coerce empty values to "unset", so
+      // empty string must not be the rollback signal.
+      expect(resolveInstanceUrlTemplate('', 'production', 'https://claw.kilo.ai')).toBe(
+        'https://{label}.kiloclaw.ai'
+      );
+      expect(resolveInstanceUrlTemplate('', 'development', 'http://localhost:8795')).toBe(
+        'http://{label}.kiloclaw.localhost:8795'
+      );
+    });
+  });
+
+  describe('production defaults', () => {
     it('defaults to the canonical prod template when no override is set', () => {
       expect(resolveInstanceUrlTemplate(undefined, 'production', 'https://claw.kilo.ai')).toBe(
         'https://{label}.kiloclaw.ai'
@@ -17,12 +43,6 @@ describe('resolveInstanceUrlTemplate', () => {
           'https://claw.kilo.ai'
         )
       ).toBe('https://{label}.preview.kiloclaw.ai');
-    });
-
-    it('treats an explicit empty string as a kill switch in production', () => {
-      // Operators can roll back without a code deploy by setting
-      // KILOCLAW_INSTANCE_URL_TEMPLATE= (empty) in Vercel.
-      expect(resolveInstanceUrlTemplate('', 'production', 'https://claw.kilo.ai')).toBe('');
     });
   });
 
@@ -87,12 +107,6 @@ describe('resolveInstanceUrlTemplate', () => {
           'http://localhost:8795'
         )
       ).toBe('http://{label}.kiloclaw.localhost:8795');
-    });
-
-    it('treats an explicit empty string as an opt-out in dev', () => {
-      // Devs who want the legacy path-based flow can set
-      // KILOCLAW_INSTANCE_URL_TEMPLATE= (empty) in .env.local.
-      expect(resolveInstanceUrlTemplate('', 'development', 'http://localhost:8795')).toBe('');
     });
   });
 });

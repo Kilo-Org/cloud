@@ -826,6 +826,32 @@ describe('host-based routing', () => {
     expect(response.status).toBe(404);
   });
 
+  it('permanently redirects www.kiloclaw.ai to the apex preserving path and query', async () => {
+    const response = await app.fetch(
+      new Request('https://www.kiloclaw.ai/foo/bar?x=1&y=2', { redirect: 'manual' }),
+      baseEnv(),
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(301);
+    expect(response.headers.get('Location')).toBe('https://kiloclaw.ai/foo/bar?x=1&y=2');
+  });
+
+  it('preserves scheme + port from the suffix when redirecting www in dev parity', async () => {
+    const response = await app.fetch(
+      new Request('http://www.kiloclaw.localhost:8795/', { redirect: 'manual' }),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.localhost:8795',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'http',
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(301);
+    expect(response.headers.get('Location')).toBe('http://kiloclaw.localhost:8795/');
+  });
+
   it('skips host-based routing for reserved labels (e.g. claw) and falls through', async () => {
     // `claw` is reserved for controller check-in + platform traffic that's
     // registered before the catch-all. A request hitting the catch-all on

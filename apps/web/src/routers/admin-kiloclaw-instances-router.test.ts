@@ -2108,7 +2108,7 @@ describe('admin.kiloclawInstances scheduled actions', () => {
         })
       ).rejects.toMatchObject({
         code: 'CONFLICT',
-        message: expect.stringContaining('pending scheduled action'),
+        message: expect.stringMatching(/pending(?:.*in-flight)? scheduled action/),
       });
     });
 

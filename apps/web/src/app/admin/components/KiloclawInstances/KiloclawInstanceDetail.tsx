@@ -78,6 +78,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
+import { defaultScheduledAt } from '@/lib/kiloclaw/scheduled-action-form';
 import { AdminFileEditor } from './AdminFileEditor';
 import { KiloCliRunCard } from './KiloCliRunCard';
 import { BumpVolumeTo15GbButton } from './BumpVolumeTo15GbDialog';
@@ -1258,12 +1259,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [changeVersionDialogOpen, setChangeVersionDialogOpen] = useState(false);
   const [changeVersionSelectedTag, setChangeVersionSelectedTag] = useState<string>('');
   const [changeVersionMode, setChangeVersionMode] = useState<'now' | 'scheduled'>('now');
-  const [changeVersionScheduledAt, setChangeVersionScheduledAt] = useState<string>(() => {
-    // Default = now + 5 minutes (local time, datetime-local format).
-    const d = new Date(Date.now() + 5 * 60_000);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  });
+  const [changeVersionScheduledAt, setChangeVersionScheduledAt] =
+    useState<string>(defaultScheduledAt);
   const [upgradeLatestConfirmOpen, setUpgradeLatestConfirmOpen] = useState(false);
   const [resizePhase, setResizePhase] = useState<
     'idle' | 'stopping' | 'resizing' | 'starting' | 'waiting' | 'done' | 'error'

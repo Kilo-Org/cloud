@@ -50,7 +50,13 @@ import {
   AffiliateEventType,
   AffiliateEventDeliveryState,
 } from './schema-types';
-import type { CustomLlmDefinition, KiloClawAdminAuditAction } from './schema-types';
+import type {
+  CustomLlmDefinition,
+  KiloClawAdminAuditAction,
+  KiloClawScheduledActionStatus,
+  KiloClawScheduledActionStageStatus,
+  KiloClawScheduledActionTargetStatus,
+} from './schema-types';
 import type {
   OrganizationModeConfig,
   OrganizationPlan,
@@ -4105,10 +4111,7 @@ export const kiloclaw_scheduled_actions = pgTable(
 
     reason: text(), // optional admin-facing label
 
-    status: text()
-      .$type<'scheduled' | 'running' | 'completed' | 'cancelled' | 'failed'>()
-      .notNull()
-      .default('scheduled'),
+    status: text().$type<KiloClawScheduledActionStatus>().notNull().default('scheduled'),
 
     created_by: text()
       .notNull()
@@ -4147,10 +4150,7 @@ export const kiloclaw_scheduled_action_stages = pgTable(
     stage_index: integer().notNull(), // 0-based per parent
     scheduled_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
 
-    status: text()
-      .$type<'pending' | 'running' | 'completed' | 'cancelled' | 'failed'>()
-      .notNull()
-      .default('pending'),
+    status: text().$type<KiloClawScheduledActionStageStatus>().notNull().default('pending'),
 
     notice_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -4211,10 +4211,7 @@ export const kiloclaw_scheduled_action_targets = pgTable(
     // the final CAS but both restarts have already been kicked off.
     // The claim CAS (pending → running) makes the dispatch
     // single-writer without needing a row lock.
-    status: text()
-      .$type<'pending' | 'running' | 'applied' | 'skipped' | 'failed'>()
-      .notNull()
-      .default('pending'),
+    status: text().$type<KiloClawScheduledActionTargetStatus>().notNull().default('pending'),
     skip_reason: text(),
     error_message: text(),
   },

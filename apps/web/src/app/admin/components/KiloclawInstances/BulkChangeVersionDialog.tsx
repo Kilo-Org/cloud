@@ -29,6 +29,7 @@ import { toast } from 'sonner';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
 import type { AdminKiloclawInstance } from '@/routers/admin-kiloclaw-instances-router';
+import { defaultScheduledAt } from '@/lib/kiloclaw/scheduled-action-form';
 
 type RouterOutputs = inferRouterOutputs<RootRouter>;
 type ListVersionsItem = RouterOutputs['admin']['kiloclawVersions']['listVersions']['items'][number];
@@ -72,12 +73,7 @@ export function BulkChangeVersionDialog({
   const [skippedSectionOpen, setSkippedSectionOpen] = useState(true);
   const [failedSectionOpen, setFailedSectionOpen] = useState(true);
   const [mode, setMode] = useState<'now' | 'scheduled'>('now');
-  const [scheduledAt, setScheduledAt] = useState<string>(() => {
-    // Default = now + 5 minutes (local time, datetime-local format).
-    const d = new Date(Date.now() + 5 * 60_000);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  });
+  const [scheduledAt, setScheduledAt] = useState<string>(defaultScheduledAt);
 
   // Reset form whenever the dialog reopens. Keeps state from leaking
   // between independent admin actions.

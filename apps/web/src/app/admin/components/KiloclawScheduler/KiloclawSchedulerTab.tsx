@@ -49,6 +49,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { formatRelativeTime } from '../KiloclawInstances/shared';
+import { defaultScheduledAt } from '@/lib/kiloclaw/scheduled-action-form';
 
 // Per design.md: every status badge is `bg-{color}-500/20 text-{color}-400
 // ring-1 ring-{color}-500/20`. Color assignments are fixed by domain —
@@ -62,14 +63,8 @@ const statusBadgeClass: Record<string, string> = {
   failed: 'border-transparent bg-red-500/20 text-red-400 ring-1 ring-red-500/20',
 };
 
-function defaultScheduledAt(): string {
-  // Default = now + 5 minutes (UTC ISO truncated to minutes for the
-  // datetime-local input).
-  const d = new Date(Date.now() + 5 * 60_000);
-  // datetime-local needs YYYY-MM-DDTHH:mm (no seconds, no zone).
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+// defaultScheduledAt is shared with the Change Version dialogs (bulk
+// + per instance) — see `@/lib/kiloclaw/scheduled-action-form`.
 
 export function KiloclawSchedulerTab() {
   const trpc = useTRPC();

@@ -257,6 +257,44 @@ export const KiloClawAdminAuditAction = z.enum([
 
 export type KiloClawAdminAuditAction = z.infer<typeof KiloClawAdminAuditAction>;
 
+// --- KiloClaw scheduled action status enums ---
+
+// Parent action status. Lifecycle:
+//   scheduled → running → completed (or failed if every target failed)
+//   scheduled or running → cancelled (by admin)
+export const KiloClawScheduledActionStatus = z.enum([
+  'scheduled',
+  'running',
+  'completed',
+  'cancelled',
+  'failed',
+]);
+export type KiloClawScheduledActionStatus = z.infer<typeof KiloClawScheduledActionStatus>;
+
+// Stage status. Same lifecycle as the parent action.
+export const KiloClawScheduledActionStageStatus = z.enum([
+  'pending',
+  'running',
+  'completed',
+  'cancelled',
+  'failed',
+]);
+export type KiloClawScheduledActionStageStatus = z.infer<typeof KiloClawScheduledActionStageStatus>;
+
+// Target status. 'running' is a transient claim state set by the DO
+// apply path immediately before it dispatches the side effect; final
+// states are 'applied', 'skipped', or 'failed'.
+export const KiloClawScheduledActionTargetStatus = z.enum([
+  'pending',
+  'running',
+  'applied',
+  'skipped',
+  'failed',
+]);
+export type KiloClawScheduledActionTargetStatus = z.infer<
+  typeof KiloClawScheduledActionTargetStatus
+>;
+
 // --- ContributorChampion enums ---
 
 export const ContributorChampionTier = {

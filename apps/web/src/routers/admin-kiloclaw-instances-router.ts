@@ -1778,6 +1778,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       // clicking is fine.
       const result = await db.transaction(
         async tx => {
+          // Filter must include 'running' as well as 'pending'. The DO
+          // apply path flips the target to 'running' via
+          // claimScheduledActionTarget right before invoking the side
+          // effect; if a second schedule request lands during that
+          // window and we filter on 'pending' alone, we'd miss the
+          // in-flight target and create a duplicate parent action.
           const existingPending = await tx
             .select({
               instance_id: kiloclaw_scheduled_action_targets.instance_id,
@@ -1794,7 +1800,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             .where(
               and(
                 inArray(kiloclaw_scheduled_action_targets.instance_id, liveInstanceIds),
-                eq(kiloclaw_scheduled_action_targets.status, 'pending'),
+                inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running']),
                 inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
               )
             );
@@ -1805,8 +1811,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               code: 'CONFLICT',
               message:
                 conflictIds.length === 1
-                  ? `Instance ${conflictIds[0]} already has a pending scheduled action; cancel it first`
-                  : `${conflictIds.length} instances already have pending scheduled actions; cancel those first: ${conflictIds.join(', ')}`,
+                  ? `Instance ${conflictIds[0]} already has a pending or in-flight scheduled action; cancel it first`
+                  : `${conflictIds.length} instances already have pending or in-flight scheduled actions; cancel those first: ${conflictIds.join(', ')}`,
             });
           }
 

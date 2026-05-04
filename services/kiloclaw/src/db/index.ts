@@ -13,6 +13,7 @@ import {
   kiloclaw_scheduled_action_targets,
   kiloclaw_version_pins,
 } from '@kilocode/db/schema';
+import type { KiloClawScheduledActionStatus } from '@kilocode/db/schema-types';
 import { eq, and, isNull, gt, lte, inArray, sql } from 'drizzle-orm';
 
 export { getWorkerDb, type WorkerDb };
@@ -310,7 +311,7 @@ export type DueScheduledActionTarget = {
   action_type: 'scheduled_restart' | 'version_change';
   target_image_tag: string | null;
   override_pins: boolean;
-  parent_status: 'scheduled' | 'running' | 'completed' | 'cancelled' | 'failed';
+  parent_status: KiloClawScheduledActionStatus;
 };
 
 /**
@@ -392,6 +393,12 @@ export async function findDueScheduledActionTargetsForInstance(
  * before-dispatch, both passes can find the same due target and both
  * fire restartMachine — only one wins the final CAS, but both side
  * effects have already started.
+ *
+ * Important for callers that look up "is there an in-flight action on
+ * this instance?" (e.g. the conflict check in scheduleAction): you
+ * must filter on `status IN ('pending', 'running')`, not just
+ * 'pending'. A target in the brief window between this CAS and the
+ * recordOutcome call sits in 'running' and would otherwise be missed.
  */
 export async function claimScheduledActionTarget(
   db: WorkerDb,

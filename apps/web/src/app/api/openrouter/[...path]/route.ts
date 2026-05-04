@@ -17,7 +17,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { openRouterRequest } from '@/lib/ai-gateway/providers/openrouter-request';
+import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -42,6 +42,7 @@ import {
   makeErrorReadable,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
+  noFreeModelsAvailableResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
@@ -237,7 +238,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
-    await applyResolvedAutoModel(
+    const autoResult = await applyResolvedAutoModel(
       {
         model: requestedModelLowerCased,
         modeHeader,
@@ -250,6 +251,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       authPromise.then(res => res.user),
       balanceAndSettingsPromise.then(res => res.balance)
     );
+    if (autoResult.kind === 'no_free_models_available') {
+      return noFreeModelsAvailableResponse();
+    }
   }
 
   const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
@@ -486,7 +490,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   const openrouterRequestSpan = startInactiveSpan({
-    name: 'openrouter-request-start',
+    name: 'upstream-request-start',
     op: 'http.client',
   });
 
@@ -530,7 +534,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     fraudHeaders
   );
 
-  const response = await openRouterRequest({
+  const response = await upstreamRequest({
     path,
     search: url.search,
     method: request.method,

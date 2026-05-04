@@ -9,7 +9,7 @@ import type {
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
 } from './providers/openrouter/types';
-import { fetchGeneration } from './providers/openrouter-request';
+import { fetchGeneration } from './providers/upstream-request';
 import PROVIDERS from './providers/provider-definitions';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
@@ -195,7 +195,7 @@ export function toInsertableDbUsageRecord(
     message_id: usageStats.messageId ?? '<missing>',
     upstream_id: usageStats.upstream_id,
     finish_reason: usageStats.finish_reason,
-    latency: ttfb_ms,
+    latency: usageStats.latency ?? ttfb_ms,
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
     is_byok: usageStats.is_byok,

@@ -24,6 +24,10 @@ export function isGrok4Model(model: string) {
   return model.includes('grok-4');
 }
 
+export function isGrokToggleableReasoningModel(model: string) {
+  return model.includes('grok-4.1') || model.includes('grok-4.2');
+}
+
 export function applyXaiModelSettings(
   requestToMutate: GatewayRequest,
   extraHeaders: Record<string, string>

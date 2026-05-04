@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import { stripModelTilde } from '@/lib/ai-gateway/providers/model-prefix';
 import { isGptOssModel } from '@/lib/ai-gateway/providers/openai';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
@@ -85,6 +84,7 @@ export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'moonshotai',
   'novita',
   'xai',
+  'xiaomi',
   'zai',
 ]);
 
@@ -98,6 +98,7 @@ export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'codestral',
   'kimi-coding',
   'neuralwatt',
+  'ollama-cloud',
   'zai-coding',
 ]);
 
@@ -123,12 +124,14 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.mistral]: 'mistral/devstral-2',
   [VercelUserByokInferenceProviderIdSchema.enum.openai]: 'openai/gpt-5-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
+  [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum['chutes-byok']]: 'Qwen/Qwen3-30B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
   [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
+  [DirectUserByokInferenceProviderIdSchema.enum['ollama-cloud']]: 'kimi-k2.6:cloud',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
 } satisfies Record<UserByokProviderId, string>;
 
@@ -160,7 +163,6 @@ export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'vertex',
   'vertexAnthropic',
   'voyage',
-  'xiaomi',
 ]);
 
 export const VercelInferenceProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
@@ -210,7 +212,7 @@ export function inferVercelFirstPartyInferenceProviderForModel(
 ): VercelInferenceProviderId | null {
   return isGptOssModel(model)
     ? null
-    : (modelPrefixToVercelInferenceProviderMapping[stripModelTilde(model).split('/')[0]] ?? null);
+    : (modelPrefixToVercelInferenceProviderMapping[model.split('/')[0]] ?? null);
 }
 
 export const AwsCredentialsSchema = z.object({

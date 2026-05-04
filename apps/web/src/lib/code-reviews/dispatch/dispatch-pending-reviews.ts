@@ -140,7 +140,11 @@ export async function tryDispatchPendingReviews(owner: Owner): Promise<DispatchR
           )
         )
       )
-      .orderBy(cloud_agent_code_reviews.created_at)
+      .orderBy(
+        // Stale queued rows are recovery work and must not starve fresh pending reviews.
+        sql`CASE WHEN ${cloud_agent_code_reviews.status} = 'pending' THEN 0 ELSE 1 END`,
+        cloud_agent_code_reviews.created_at
+      )
       .limit(availableSlots);
 
     logExceptInTest('[tryDispatchPendingReviews] Found pending reviews', {

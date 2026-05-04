@@ -1,9 +1,36 @@
-import { updateBotRequest } from '@/lib/bot/request-logging';
+import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
 import { extractAndUploadImages } from '@/lib/bot/images';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
+
+export async function processLinkedMessage({
+  thread,
+  message,
+  platformIntegration,
+  user,
+}: {
+  thread: Thread;
+  message: Message;
+  platformIntegration: PlatformIntegration;
+  user: User;
+}) {
+  await thread.startTyping('Thinking...');
+
+  const botRequestId = await createBotRequest({
+    createdBy: user.id,
+    organizationId: platformIntegration.owned_by_organization_id ?? null,
+    platformIntegrationId: platformIntegration.id,
+    platform: thread.adapter.name,
+    platformThreadId: thread.id,
+    platformMessageId: message.id,
+    userMessage: message.text,
+    modelUsed: undefined,
+  });
+
+  await processMessage({ thread, message, platformIntegration, user, botRequestId });
+}
 
 export async function processMessage({
   thread,
@@ -20,7 +47,7 @@ export async function processMessage({
 }) {
   const startedAt = Date.now();
 
-  // Extract and upload any image attachments from the Slack message to R2.
+  // Extract and upload any image attachments from the chat message to R2.
   // This runs before the agent loop so the images are ready when a Cloud Agent
   // session is spawned. Failures are non-fatal — we log and continue without images.
   let images: Awaited<ReturnType<typeof extractAndUploadImages>>;

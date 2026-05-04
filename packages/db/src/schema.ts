@@ -1712,6 +1712,9 @@ export const platform_integrations = pgTable(
     uniqueIndex('UQ_platform_integrations_owned_by_user_platform_inst')
       .on(table.owned_by_user_id, table.platform, table.platform_installation_id)
       .where(isNotNull(table.owned_by_user_id)),
+    uniqueIndex('UQ_platform_integrations_slack_platform_inst')
+      .on(table.platform, table.platform_installation_id)
+      .where(sql`${table.platform} = 'slack' AND ${table.platform_installation_id} IS NOT NULL`),
     index('IDX_platform_integrations_owned_by_org_id').on(table.owned_by_organization_id),
     index('IDX_platform_integrations_owned_by_user_id').on(table.owned_by_user_id),
     index('IDX_platform_integrations_platform_inst_id').on(table.platform_installation_id),

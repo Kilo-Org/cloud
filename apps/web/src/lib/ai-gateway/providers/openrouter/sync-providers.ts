@@ -22,16 +22,12 @@ import { captureException } from '@sentry/nextjs';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
-import type { StoredModel } from '@/lib/ai-gateway/providers/vercel/types';
-import { EndpointsSchema, ModelsSchema } from '@/lib/ai-gateway/providers/vercel/types';
+import type { StoredModel } from '@kilocode/db/schema-types';
+import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
 import { redisSet } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
-
-const ATTRIBUTION_HEADERS = {
-  'HTTP-Referer': 'https://kilocode.ai',
-  'X-Title': 'Kilo Code',
-} as const;
+import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent

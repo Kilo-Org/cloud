@@ -408,4 +408,58 @@ describe('tryDispatchPendingReviews', () => {
     });
     expect(mockDispatchReview).not.toHaveBeenCalled();
   });
+
+  it('prioritizes fresh pending reviews over older stale queued recovery reviews', async () => {
+    const staleQueuedCreatedAt = minutesAgo(30);
+    const staleQueuedUpdatedAt = minutesAgo(6);
+    const pendingCreatedAt = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const insertedReviews = await db
+      .insert(cloud_agent_code_reviews)
+      .values([
+        reviewValues({
+          owner,
+          status: 'queued',
+          createdAt: staleQueuedCreatedAt,
+          updatedAt: staleQueuedUpdatedAt,
+        }),
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: pendingCreatedAt,
+          updatedAt: pendingCreatedAt,
+        }),
+      ])
+      .returning({ id: cloud_agent_code_reviews.id });
+    const staleQueuedReview = insertedReviews[0];
+    const pendingReview = insertedReviews[1];
+
+    if (!staleQueuedReview || !pendingReview) {
+      throw new Error('Expected stale queued and pending reviews to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    expect(result).toEqual({
+      dispatched: 1,
+      pending: 0,
+      activeCount: 1,
+    });
+    expect(mockDispatchReview).toHaveBeenCalledTimes(1);
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
+      reviewId: pendingReview.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { id: 'test-agent-config', config: {} },
+      platform: 'github',
+    });
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: staleQueuedReview.id })
+    );
+  });
 });

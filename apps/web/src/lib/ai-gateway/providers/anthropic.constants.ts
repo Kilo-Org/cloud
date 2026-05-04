@@ -1,12 +1,12 @@
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
-
-export const CLAUDE_SONNET_CURRENT_MODEL_NAME = 'Claude Sonnet 4.6';
-
 export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.7';
+export const CLAUDE_HAIKU_CURRENT_MODEL_ID = 'anthropic/claude-haiku-4.5';
 
-export const CLAUDE_OPUS_CURRENT_MODEL_NAME = 'Claude Opus 4.7';
+export const CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID = CLAUDE_SONNET_CURRENT_MODEL_ID;
+export const CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID = CLAUDE_OPUS_CURRENT_MODEL_ID;
+export const CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID = CLAUDE_HAIKU_CURRENT_MODEL_ID;
 
 export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
   public_id: CLAUDE_SONNET_CURRENT_MODEL_ID + ':clawsetup',

@@ -95,5 +95,10 @@
     "typescript": "catalog:",
     "vitest": "^4.1.0"
   },
+  "dependenciesMeta": {
+    "@kilocode/kilo-chat-hooks": {
+      "injected": true
+    }
+  },
   "private": true
 }

@@ -145,7 +145,7 @@ importers:
         version: link:../../packages/kilo-chat
       '@kilocode/kilo-chat-hooks':
         specifier: workspace:*
-        version: link:../../packages/kilo-chat-hooks
+        version: file:packages/kilo-chat-hooks(@tanstack/react-query@5.90.21(react@19.2.0))(react@19.2.0)
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
@@ -323,6 +323,9 @@ importers:
       ulid:
         specifier: 3.0.1
         version: 3.0.1
+    dependenciesMeta:
+      '@kilocode/kilo-chat-hooks':
+        injected: true
     devDependencies:
       '@sentry/cli':
         specifier: ^3.3.4
@@ -4530,6 +4533,12 @@ packages:
       '@jsamr/counter-style': ^1.0.0 || ^2.0.0
       react: '*'
       react-native: '*'
+
+  '@kilocode/kilo-chat-hooks@file:packages/kilo-chat-hooks':
+    resolution: {directory: packages/kilo-chat-hooks, type: directory}
+    peerDependencies:
+      '@tanstack/react-query': '*'
+      react: '*'
 
   '@kilocode/plugin@7.2.14':
     resolution: {integrity: sha512-mS+WA9HZIBH2qQ9ARA+v0q4MdQTSdfOvKbe4AOSkjP+P5hVA70OM/UVM9DVcvmjSOxU+wuUxmOy+j/EQIrgFmw==}
@@ -18524,6 +18533,13 @@ snapshots:
       '@jsamr/counter-style': 2.0.2
       react: 19.2.0
       react-native: 0.83.4(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
+
+  '@kilocode/kilo-chat-hooks@file:packages/kilo-chat-hooks(@tanstack/react-query@5.90.21(react@19.2.0))(react@19.2.0)':
+    dependencies:
+      '@kilocode/event-service': link:packages/event-service
+      '@kilocode/kilo-chat': link:packages/kilo-chat
+      '@tanstack/react-query': 5.90.21(react@19.2.0)
+      react: 19.2.0
 
   '@kilocode/plugin@7.2.14':
     dependencies:

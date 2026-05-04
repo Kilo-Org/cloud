@@ -1,6 +1,13 @@
 import 'server-only';
 import crypto from 'node:crypto';
-import type { StateAdapter } from 'chat';
+import {
+  Message,
+  ThreadImpl,
+  type SerializedMessage,
+  type SerializedThread,
+  type StateAdapter,
+} from 'chat';
+import * as z from 'zod';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { botIdentityRedisKey } from '@/lib/redis-keys';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -35,14 +42,16 @@ export type PlatformIdentity = {
   userId: string;
 };
 
-export type LinkSourceMessage = {
-  threadId: string;
-  messageId: string;
-};
-
 type LinkTokenPayload = {
   identity: PlatformIdentity;
-  sourceMessage?: LinkSourceMessage;
+  thread: SerializedThread;
+  message: SerializedMessage;
+};
+
+type VerifiedLinkToken = {
+  identity: PlatformIdentity;
+  thread: ThreadImpl;
+  message: Message;
 };
 
 /**
@@ -128,15 +137,65 @@ export async function unlinkTeamKiloUsers(
 // plain-text platform/teamId/userId.  The token is HMAC-signed and time-limited
 // so a third party cannot forge a link for a team they don't belong to.
 //
-// Format:  base64url({ identity, sourceMessage, iat, nonce }) . HMAC-SHA256
+// Format:  base64url({ identity, thread, message, iat, nonce }) . HMAC-SHA256
 //
 // Follows the same pattern as src/lib/integrations/oauth-state.ts.
 
 const HMAC_ALGORITHM = 'sha256';
-
 const TOKEN_TTL_SECONDS = 30 * 60;
-
 const NONCE_BYTES = 16;
+
+const platformIdentitySchema = z.object({
+  platform: z.enum(PLATFORM),
+  teamId: z.string(),
+  userId: z.string(),
+});
+
+const serializedThreadShape = z.looseObject({
+  _type: z.literal('chat:Thread'),
+  adapterName: z.string(),
+  channelId: z.string(),
+  id: z.string(),
+  isDM: z.boolean(),
+});
+
+const serializedThreadSchema = z.custom<SerializedThread>(
+  value => serializedThreadShape.safeParse(value).success
+);
+
+const serializedMessageShape = z.looseObject({
+  _type: z.literal('chat:Message'),
+  attachments: z.array(z.unknown()),
+  author: z.object({
+    userId: z.string(),
+    userName: z.string(),
+    fullName: z.string(),
+    isBot: z.union([z.boolean(), z.literal('unknown')]),
+    isMe: z.boolean(),
+  }),
+  formatted: z.unknown(),
+  id: z.string(),
+  metadata: z.object({
+    dateSent: z.iso.datetime(),
+    edited: z.boolean(),
+    editedAt: z.iso.datetime().optional(),
+  }),
+  raw: z.unknown(),
+  text: z.string(),
+  threadId: z.string(),
+});
+
+const serializedMessageSchema = z.custom<SerializedMessage>(
+  value => serializedMessageShape.safeParse(value).success
+);
+
+const linkTokenPayloadSchema = z.object({
+  identity: platformIdentitySchema,
+  thread: serializedThreadSchema,
+  message: serializedMessageSchema,
+  iat: z.number(),
+  nonce: z.string().min(1),
+});
 
 function hmacSign(data: string): string {
   return crypto.createHmac(HMAC_ALGORITHM, NEXTAUTH_SECRET).update(data).digest('base64url');
@@ -152,8 +211,8 @@ export function createLinkToken(payload: LinkTokenPayload): string {
   return `${encodedPayload}.${hmacSign(encodedPayload)}`;
 }
 
-/** Verify and decode a link token. Returns the identity or `null` on failure. */
-export function verifyLinkToken(token: string): LinkTokenPayload | null {
+/** Verify and decode a link token. Returns the payload or `null` on failure. */
+export function verifyLinkToken(token: string): VerifiedLinkToken | null {
   const dotIndex = token.indexOf('.');
   if (dotIndex === -1) return null;
 
@@ -169,65 +228,16 @@ export function verifyLinkToken(token: string): LinkTokenPayload | null {
   }
 
   try {
-    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
-      identity?: {
-        platform?: PlatformIdentity['platform'];
-        teamId?: string;
-        userId?: string;
-      };
-      platform?: PlatformIdentity['platform'];
-      teamId?: string;
-      userId?: string;
-      sourceMessage?: {
-        threadId?: string;
-        messageId?: string;
-      };
-      iat?: number;
-      nonce?: string;
-    };
-    const identity = data.identity ?? {
-      platform: data.platform,
-      teamId: data.teamId,
-      userId: data.userId,
-    };
-
-    if (
-      typeof identity.platform !== 'string' ||
-      typeof identity.teamId !== 'string' ||
-      typeof identity.userId !== 'string' ||
-      !Object.values(PLATFORM).includes(identity.platform)
-    ) {
-      return null;
-    }
-
-    let sourceMessage: LinkSourceMessage | undefined;
-    if (data.sourceMessage !== undefined) {
-      if (
-        typeof data.sourceMessage.threadId !== 'string' ||
-        typeof data.sourceMessage.messageId !== 'string'
-      ) {
-        return null;
-      }
-
-      sourceMessage = {
-        threadId: data.sourceMessage.threadId,
-        messageId: data.sourceMessage.messageId,
-      };
-    }
-
-    if (typeof data.iat !== 'number') return null;
+    const data = linkTokenPayloadSchema.parse(
+      JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    );
     const age = Math.floor(Date.now() / 1000) - data.iat;
     if (age < 0 || age > TOKEN_TTL_SECONDS) return null;
 
-    if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
-
     return {
-      identity: {
-        platform: identity.platform,
-        teamId: identity.teamId,
-        userId: identity.userId,
-      },
-      sourceMessage,
+      identity: data.identity,
+      thread: ThreadImpl.fromJSON(data.thread),
+      message: Message.fromJSON(data.message),
     };
   } catch {
     return null;

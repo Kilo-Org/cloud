@@ -11,7 +11,7 @@ function buildLinkAccountUrl(identity: PlatformIdentity, thread: Thread, message
   const url = new URL(LINK_ACCOUNT_PATH, APP_URL);
   url.searchParams.set(
     'token',
-    createLinkToken({ identity, sourceMessage: { threadId: thread.id, messageId: message.id } })
+    createLinkToken({ identity, thread: thread.toJSON(), message: message.toJSON() })
   );
   return url.toString();
 }

@@ -2,54 +2,14 @@ import { bot } from '@/lib/bot';
 import { APP_URL } from '@/lib/constants';
 import { captureException } from '@sentry/nextjs';
 import { after } from 'next/server';
-import {
-  linkKiloUser,
-  verifyLinkToken,
-  type LinkSourceMessage,
-  type PlatformIdentity,
-} from '@/lib/bot-identity';
+import { linkKiloUser, verifyLinkToken, type PlatformIdentity } from '@/lib/bot-identity';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getPlatformIdentity, getPlatformIntegration } from '@/lib/bot/platform-helpers';
 import { processLinkedMessage } from '@/lib/bot/run';
 import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
-import type { Adapter, Message } from 'chat';
+import type { Message, Thread } from 'chat';
 import type { User } from '@kilocode/db';
-
-const CHANNEL_MESSAGE_FALLBACK_LIMIT = 50;
-
-function isMessageFetchCapable(adapter: Adapter): adapter is Adapter & {
-  fetchMessage(threadId: string, messageId: string): Promise<Message | null>;
-} {
-  return typeof adapter.fetchMessage === 'function';
-}
-
-async function fetchMessage(threadId: string, messageId: string) {
-  await bot.initialize();
-  const thread = bot.thread(threadId);
-  let fetchedMessage: Message | null = null;
-
-  if (isMessageFetchCapable(thread.adapter)) {
-    fetchedMessage = await thread.adapter.fetchMessage(threadId, messageId).catch(() => null);
-  }
-
-  if (!fetchedMessage) {
-    let checkedMessages = 0;
-    for await (const message of thread.channel.messages) {
-      if (message.id === messageId) {
-        fetchedMessage = message;
-        break;
-      }
-
-      checkedMessages += 1;
-      if (checkedMessages >= CHANNEL_MESSAGE_FALLBACK_LIMIT) {
-        break;
-      }
-    }
-  }
-
-  return fetchedMessage ? { thread, message: fetchedMessage } : null;
-}
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -132,7 +92,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const { identity, sourceMessage } = linkPayload;
+  const { identity, thread, message } = linkPayload;
 
   // Authenticate — redirect to sign-in if no session, then back here
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -151,9 +111,7 @@ export async function GET(request: Request) {
   await bot.initialize();
   await linkKiloUser(bot.getState(), identity, user.id);
 
-  if (sourceMessage) {
-    after(() => reprocessLinkedMessage(identity, sourceMessage, user));
-  }
+  after(() => reprocessLinkedMessage(identity, thread, message, user));
 
   return new Response(
     `<!DOCTYPE html>
@@ -162,11 +120,7 @@ export async function GET(request: Request) {
 <div style="text-align:center">
   <h1>Account linked</h1>
   <p>Your ${identity.platform} account has been linked to your Kilo account.<br>
-     ${
-       sourceMessage
-         ? 'You can close this tab and return to your chat. Kilo is processing your message.'
-         : 'You can close this tab and @mention Kilo again in your chat.'
-     }</p>
+     You can close this tab and return to your chat. Kilo is processing your message.</p>
 </div>
 </body></html>`,
     { headers: { 'content-type': 'text/html; charset=utf-8' } }
@@ -175,7 +129,8 @@ export async function GET(request: Request) {
 
 async function reprocessLinkedMessage(
   identity: PlatformIdentity,
-  sourceMessage: LinkSourceMessage,
+  thread: Thread,
+  message: Message,
   user: User
 ): Promise<void> {
   try {
@@ -183,10 +138,7 @@ async function reprocessLinkedMessage(
     if (!platformIntegration) return;
 
     await withBotPlatformAuthContext(platformIntegration, async () => {
-      const fetched = await fetchMessage(sourceMessage.threadId, sourceMessage.messageId);
-      if (!fetched) return;
-
-      const messageIdentity = getPlatformIdentity(fetched.thread, fetched.message);
+      const messageIdentity = getPlatformIdentity(thread, message);
       if (
         messageIdentity.platform !== identity.platform ||
         messageIdentity.teamId !== identity.teamId ||
@@ -195,10 +147,10 @@ async function reprocessLinkedMessage(
         return;
       }
 
-      await fetched.thread.startTyping('Thinking...');
+      await thread.startTyping('Thinking...');
       await processLinkedMessage({
-        thread: fetched.thread,
-        message: fetched.message,
+        thread,
+        message,
         platformIntegration,
         user,
       });
@@ -208,8 +160,8 @@ async function reprocessLinkedMessage(
     captureException(error, {
       tags: { component: 'kilo-bot', op: 'link-account-reprocess-message' },
       extra: {
-        threadId: sourceMessage.threadId,
-        messageId: sourceMessage.messageId,
+        threadId: thread.id,
+        messageId: message.id,
         userId: user.id,
       },
     });

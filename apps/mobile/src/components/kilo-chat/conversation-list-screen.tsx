@@ -2,7 +2,7 @@ import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { QueryError } from '@/components/query-error';
@@ -42,6 +42,9 @@ type ConversationHeaderItem = {
 };
 
 type ConversationListEntry = ConversationHeaderItem | ConversationItem;
+
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = { flexGrow: 1 } satisfies ViewStyle;
 
 function ConversationListSkeleton({ showHeader }: Readonly<{ showHeader?: boolean }>) {
   return (
@@ -90,6 +93,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const hasNextPage = listQuery.hasNextPage;
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
+  const refetchConversations = listQuery.refetch;
 
   useInstancePresence(sandboxId);
 
@@ -119,6 +123,10 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       void fetchNextPage({ cancelRefetch: false });
     }
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const handleRefresh = useCallback(() => {
+    void refetchConversations();
+  }, [refetchConversations]);
 
   const contentState = getConversationListContentState({
     isPending: listQuery.isPending,
@@ -156,6 +164,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
 
   const conversations = listQuery.data?.conversations ?? [];
   const entries = flattenConversationGroups(conversations, now);
+  const refreshing = listQuery.isRefetching && !listQuery.isFetchingNextPage;
 
   return (
     <View className="flex-1 bg-background">
@@ -181,6 +190,8 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
       />
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <FlashList
+          style={listStyle}
+          contentContainerStyle={listContentContainerStyle}
           data={entries}
           keyExtractor={entry =>
             entry.kind === 'header' ? `header:${entry.label}` : entry.conversation.conversationId
@@ -218,10 +229,10 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
           onEndReachedThreshold={0.5}
           refreshControl={
             <RefreshControl
-              refreshing={listQuery.isRefetching && !listQuery.isFetchingNextPage}
-              onRefresh={() => {
-                void listQuery.refetch();
-              }}
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[colors.mutedForeground]}
+              tintColor={colors.mutedForeground}
             />
           }
         />

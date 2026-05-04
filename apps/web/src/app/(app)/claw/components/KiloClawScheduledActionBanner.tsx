@@ -31,7 +31,17 @@ function formatScheduledAt(iso: string): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString();
+    // Append the user's timezone abbreviation (e.g., "PDT") so the
+    // banner's local-rendered time is internally unambiguous. The
+    // email server-renders the same instant in UTC and labels it
+    // "UTC"; both surfaces are clear about which zone they're showing,
+    // so a user comparing them knows they're not the same string and
+    // doesn't second-guess.
+    const dateStr = d.toLocaleString();
+    const tzPart = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
+      .formatToParts(d)
+      .find(p => p.type === 'timeZoneName')?.value;
+    return tzPart ? `${dateStr} ${tzPart}` : dateStr;
   } catch {
     return iso;
   }

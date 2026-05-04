@@ -184,7 +184,11 @@ export async function POST(req: NextRequest) {
       subjectOverride,
     });
     if (!result.sent) {
-      return NextResponse.json({ sent: false, reason: result.reason }, { status: 200 });
+      // 422 (not 200) so the sweep marks the row failed with a legible
+      // error_message instead of recording it as 'sent' when the email
+      // didn't actually go out (provider misconfigured, NeverBounce
+      // rejected, etc.). Same treatment as the missing-email case above.
+      return NextResponse.json({ error: `email not sent: ${result.reason}` }, { status: 422 });
     }
     return NextResponse.json({ sent: true });
   } catch (err) {

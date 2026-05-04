@@ -2324,6 +2324,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         // cancelScheduledAction logic: only fire for channels that
         // already have a 'sent' notice. ON CONFLICT keeps repeat calls
         // safe.
+        //
+        // Same in-flight race as the bulk cancel: see the comment in
+        // cancelScheduledAction's INSERT...SELECT for the v1 trade-off.
         await tx.execute(sql`
           INSERT INTO kiloclaw_scheduled_action_notifications
             (target_id, channel, kind, status)
@@ -2476,6 +2479,19 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         // dispatches them like any other notification. Use ON CONFLICT
         // DO NOTHING so a re-cancel call (idempotency path) doesn't
         // explode on the unique (target, kind, channel) index.
+        //
+        // Known v1 race: there is a ~1 DB round-trip window between
+        // the sweep's successful dispatch (ok=true returned from the
+        // channel) and its markSent UPDATE. A cancel that lands inside
+        // that window sees status='pending' for the notice row, this
+        // SELECT misses it, and the user receives the original notice
+        // with no cancellation follow-up. Acceptable given the narrow
+        // window (single-digit ms) and v1 scope. If we later need to
+        // close it, options are: (a) widen this predicate to status
+        // IN ('pending', 'sent') — but then we'd cancel notices that
+        // never actually went out, (b) add a per-row in-flight flag
+        // the sweep CAS-flips before dispatch, (c) wrap dispatch +
+        // markSent in a single tx (long-running; bad).
         await tx.execute(sql`
           INSERT INTO kiloclaw_scheduled_action_notifications
             (target_id, channel, kind, status)

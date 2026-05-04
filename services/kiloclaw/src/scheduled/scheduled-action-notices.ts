@@ -51,6 +51,14 @@ import type { KiloClawEnv } from '../types';
 // next tick picks up whatever's left.
 const MAX_NOTIFICATIONS_PER_TICK = 100;
 
+// Concurrent dispatches inside a single tick. Each dispatch is its
+// own HTTP/RPC round-trip, so serial processing of 100 rows at ~200ms
+// each would push tick duration to ~20s and crowd the next 1-minute
+// cron. Batched concurrency drops it to ~2s for 100 rows. Per-row
+// try/catch in the loop keeps one slow dispatch from blocking siblings
+// in the same batch.
+const DISPATCH_CONCURRENCY = 10;
+
 type DueNotificationRow = {
   notification_id: string;
   notification_kind: 'notice' | 'cancelled';
@@ -98,30 +106,48 @@ export async function runScheduledActionNoticesSweep(env: KiloClawEnv): Promise<
 
   let sent = 0;
   let failed = 0;
-  for (const row of due) {
-    const result = await dispatchOne(env, row);
-    // Per-row try/catch on the mark step so a transient DB error on
-    // one row doesn't abort the whole tick. Without this, a
-    // markSent/markFailed throw propagates up through the scheduled()
-    // handler — every remaining unprocessed row in `due` is silently
-    // dropped from this tick (next tick re-selects them) AND any
-    // already-dispatched-but-not-yet-marked rows can re-dispatch on
-    // the next tick (duplicate email/push).
-    try {
-      if (result.ok) {
-        await markSent(db, row.notification_id);
-        sent += 1;
+  // Process in concurrent batches. Promise.allSettled isolates failures
+  // — one slow or throwing row never blocks siblings in the same batch.
+  // Per-row try/catch on the mark step prevents a transient DB error on
+  // one row from aborting the whole tick (without it, the throw would
+  // propagate up through the scheduled() handler — every remaining
+  // unprocessed row in `due` would silently drop from this tick AND
+  // any already-dispatched-but-not-yet-marked rows could re-dispatch
+  // on the next tick → duplicate email/push).
+  for (let i = 0; i < due.length; i += DISPATCH_CONCURRENCY) {
+    const batch = due.slice(i, i + DISPATCH_CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map(async row => {
+        const dispatchResult = await dispatchOne(env, row);
+        try {
+          if (dispatchResult.ok) {
+            await markSent(db, row.notification_id);
+            return { kind: 'sent' as const };
+          }
+          await markFailed(db, row.notification_id, dispatchResult.error);
+          return { kind: 'failed' as const };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error('[notices-sweep] failed to mark notification status', {
+            notificationId: row.notification_id,
+            error: msg,
+          });
+          return { kind: 'failed' as const };
+        }
+      })
+    );
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        if (r.value.kind === 'sent') sent += 1;
+        else failed += 1;
       } else {
-        await markFailed(db, row.notification_id, result.error);
+        // Promise rejection from dispatchOne itself (we already catch
+        // inside, but be defensive). Counts as failed; row stays pending
+        // for next-tick retry since neither markSent nor markFailed ran.
+        const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        console.error('[notices-sweep] dispatch settle rejected', { error: reason });
         failed += 1;
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[notices-sweep] failed to mark notification status', {
-        notificationId: row.notification_id,
-        error: msg,
-      });
-      failed += 1;
     }
   }
 

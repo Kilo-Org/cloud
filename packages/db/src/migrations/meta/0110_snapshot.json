@@ -1,5 +1,5 @@
 {
-  "id": "78fdf815-ec02-4c84-9a50-29fa5164fa69",
+  "id": "8a2b2154-9ea0-4938-a27a-45d731ce8405",
   "prevId": "4c1ec3c4-df75-4028-a0ab-68a0ad3c1c4d",
   "version": "7",
   "dialect": "postgresql",
@@ -9903,7 +9903,7 @@
           "name": "IDX_kiloclaw_scheduled_action_notifications_pending",
           "columns": [
             {
-              "expression": "target_id",
+              "expression": "id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

@@ -69,6 +69,10 @@ export function getDeliveryFailureLabel(message: Message): string | null {
   return message.deliveryFailed ? 'Not delivered' : null;
 }
 
+export function isMessageTextSelectionEnabled(): boolean {
+  return false;
+}
+
 export function canShowReactionPills(message: Message): boolean {
   return !message.deleted && message.reactions.length > 0;
 }

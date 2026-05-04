@@ -1,6 +1,7 @@
 import { Text } from '@/components/ui/text';
 
 import { MarkdownText } from '../agents/markdown-text';
+import { isMessageTextSelectionEnabled } from './message-presentation';
 
 type MessageMarkdownProps = {
   text: string;
@@ -13,11 +14,17 @@ export function MessageMarkdown({ text, isFromMe }: Readonly<MessageMarkdownProp
   }
 
   try {
-    return <MarkdownText value={text} variant={isFromMe ? 'user' : 'assistant'} />;
+    return (
+      <MarkdownText
+        value={text}
+        variant={isFromMe ? 'user' : 'assistant'}
+        selectable={isMessageTextSelectionEnabled()}
+      />
+    );
   } catch {
     return (
       <Text
-        selectable
+        selectable={isMessageTextSelectionEnabled()}
         className={isFromMe ? 'text-sm leading-5 text-white' : 'text-sm leading-5 text-foreground'}
       >
         {text}

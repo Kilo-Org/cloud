@@ -7,12 +7,8 @@ import { useRenameConversation } from '@/components/kilo-chat/hooks/use-conversa
 export default function RenameConversationRoute() {
   const router = useRouter();
   const client = useKiloChatClient();
-  const {
-    'sandbox-id': sandboxId,
-    conversationId,
-    title,
-  } = useLocalSearchParams<{
-    'sandbox-id': string;
+  const { sandboxId, conversationId, title } = useLocalSearchParams<{
+    sandboxId: string;
     conversationId?: string;
     title?: string;
   }>();

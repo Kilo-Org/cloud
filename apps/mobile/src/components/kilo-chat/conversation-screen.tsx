@@ -69,7 +69,12 @@ import {
 } from '@/lib/kilo-chat-routes';
 import { setActiveChatLocation } from '@/lib/notifications';
 
-type Props = { sandboxId: string; conversationId: string; conversationTitle: string };
+type Props = {
+  sandboxId: string;
+  conversationId: string;
+  conversationTitle: string;
+  conversationRenameTitle: string;
+};
 
 function editableText(message: Message): string {
   return message.content
@@ -88,7 +93,12 @@ function MessageHistorySkeleton() {
   );
 }
 
-export function ConversationScreen({ sandboxId, conversationId, conversationTitle }: Props) {
+export function ConversationScreen({
+  sandboxId,
+  conversationId,
+  conversationTitle,
+  conversationRenameTitle,
+}: Props) {
   const client = useKiloChatClient();
   const router = useRouter();
   const currentUserId = useCurrentUserId();
@@ -172,7 +182,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
       },
       index => {
         if (index === 0) {
-          const params = new URLSearchParams({ conversationId, title: conversationTitle });
+          const params = new URLSearchParams({ conversationId, title: conversationRenameTitle });
           router.push(chatRenameConversationPath(sandboxId, params));
           return;
         }
@@ -201,6 +211,7 @@ export function ConversationScreen({ sandboxId, conversationId, conversationTitl
   }, [
     bottom,
     conversationId,
+    conversationRenameTitle,
     conversationTitle,
     leaveConversation,
     router,

@@ -55,6 +55,7 @@ export default function ChatConversationRoute() {
         sandboxId={sandboxId}
         conversationId={conversationId}
         conversationTitle={conversationDetail.data.title ?? 'Untitled'}
+        conversationRenameTitle={conversationDetail.data.title ?? ''}
       />
     </>
   );

@@ -12,7 +12,7 @@ ARG KILOCODE_CLI_VERSION="7.1.23"
 # This builds kilo-cli from source and copies the linux-x64 binary here.
 
 # Install CLI tools and generate locales to suppress setlocale warnings
-RUN apt-get update && apt-get install -y --no-install-recommends git-lfs jq locales ripgrep && \
+RUN apt-get update && apt-get install -y --no-install-recommends git-lfs jq locales ripgrep openssh-client && \
 	   sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
 	   locale-gen && \
 	   apt-get clean && \
@@ -21,8 +21,9 @@ ENV LC_ALL=en_US.UTF-8
 ENV LANG=en_US.UTF-8
 
 
-# Install GitLab CLI (glab) - download official .deb from GitLab releases
-RUN GLAB_VERSION="1.80.4" \
+# Install GitLab CLI (glab) - download official .deb from GitLab releases.
+# Version 1.82.0+ is required for OAuth2 access token support (GLAB_IS_OAUTH2).
+RUN GLAB_VERSION="1.93.0" \
 	&& wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
 	&& dpkg -i /tmp/glab.deb \
 	&& rm /tmp/glab.deb

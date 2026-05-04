@@ -12,10 +12,13 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
 	&& mkdir -p -m 755 /etc/apt/sources.list.d \
 	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
 	&& apt update \
-	&& apt install gh git-lfs jq -y
+	&& apt install gh git-lfs jq openssh-client -y
 
-# Install GitLab CLI (glab) - download official .deb from GitLab releases
-RUN GLAB_VERSION="1.80.4" \
+# Install GitLab CLI (glab) - download official .deb from GitLab releases.
+# Version 1.82.0+ is required so OAuth2 access tokens sent via GITLAB_TOKEN are
+# authenticated with `Authorization: Bearer` instead of `PRIVATE-TOKEN` (which
+# GitLab rejects for OAuth tokens). Enabled via `GLAB_IS_OAUTH2=true` at runtime.
+RUN GLAB_VERSION="1.93.0" \
 	&& wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
 	&& dpkg -i /tmp/glab.deb \
 	&& rm /tmp/glab.deb

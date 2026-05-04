@@ -1796,6 +1796,102 @@ describe('SessionService', () => {
     });
   });
 
+  describe('GITLAB_TOKEN / GLAB_IS_OAUTH2 Auto-Setting', () => {
+    function setupSandbox(sessionId: SessionId) {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+      return { sandbox, sandboxCreateSession };
+    }
+
+    // glab >=1.82.0 sends GITLAB_TOKEN as `Authorization: Bearer $token` when
+    // GLAB_IS_OAUTH2=true, otherwise as `PRIVATE-TOKEN: $token`. GitLab rejects
+    // OAuth tokens sent via PRIVATE-TOKEN with 401; PATs accept both. Setting
+    // GLAB_IS_OAUTH2=true unconditionally works for every token type we inject.
+    it('sets GITLAB_TOKEN, GITLAB_HOST, and GLAB_IS_OAUTH2 for GitLab sessions', async () => {
+      const sessionId: SessionId = 'agent_gitlab_token';
+      const { sandbox, sandboxCreateSession } = setupSandbox(sessionId);
+
+      await new SessionService().initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        gitToken: 'access-token',
+        platform: 'gitlab',
+        env: mockEnv,
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      expect(callArgs.env.GITLAB_TOKEN).toBe('access-token');
+      expect(callArgs.env.GITLAB_HOST).toBe('gitlab.com');
+      expect(callArgs.env.GLAB_IS_OAUTH2).toBe('true');
+    });
+
+    it('does not overwrite user-provided GLAB_IS_OAUTH2 env var', async () => {
+      const sessionId: SessionId = 'agent_gitlab_user_override';
+      const { sandbox, sandboxCreateSession } = setupSandbox(sessionId);
+
+      await new SessionService().initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        gitUrl: 'https://gitlab.com/acme/repo.git',
+        gitToken: 'access-token',
+        platform: 'gitlab',
+        envVars: { GLAB_IS_OAUTH2: 'false' },
+        env: mockEnv,
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      expect(callArgs.env.GLAB_IS_OAUTH2).toBe('false');
+    });
+
+    it('picks up self-managed GitLab host from the gitUrl', async () => {
+      const sessionId: SessionId = 'agent_gitlab_selfhosted';
+      const { sandbox, sandboxCreateSession } = setupSandbox(sessionId);
+
+      await new SessionService().initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        gitUrl: 'https://gitlab.acme.internal/team/repo.git',
+        gitToken: 'access-token',
+        platform: 'gitlab',
+        env: mockEnv,
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      expect(callArgs.env.GITLAB_HOST).toBe('gitlab.acme.internal');
+    });
+  });
+
   describe('Setup Commands Execution', () => {
     it('should continue executing commands when one fails during resume (lenient)', async () => {
       const metadata = {

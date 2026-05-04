@@ -1,8 +1,9 @@
-import { Building2, ChevronRight, UserRound } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { StatusBadge } from '@/components/kiloclaw/status-badge';
 import { Text } from '@/components/ui/text';
+import { agentColor } from '@/lib/agent-color';
 import { type ClawInstance } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -12,7 +13,7 @@ type InstanceListRowProps = {
 };
 
 function instanceTitle(instance: ClawInstance): string {
-  return instance.name ?? 'KiloClaw instance';
+  return instance.botName ?? instance.name ?? 'KiloClaw';
 }
 
 function instanceSubtitle(instance: ClawInstance): string {
@@ -21,7 +22,8 @@ function instanceSubtitle(instance: ClawInstance): string {
 
 export function InstanceListRow({ instance, onPress }: Readonly<InstanceListRowProps>) {
   const colors = useThemeColors();
-  const Icon = instance.organizationName ? Building2 : UserRound;
+  const title = instanceTitle(instance);
+  const hue = agentColor(title);
 
   return (
     <Pressable
@@ -32,8 +34,16 @@ export function InstanceListRow({ instance, onPress }: Readonly<InstanceListRowP
       }}
       className="min-h-16 flex-row items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 active:opacity-80"
     >
-      <View className="h-10 w-10 items-center justify-center rounded-xl bg-muted">
-        <Icon size={18} color={colors.mutedForeground} strokeWidth={1.75} />
+      <View
+        className={`h-10 w-10 items-center justify-center rounded-xl border ${hue.tileBgClass} ${hue.tileBorderClass}`}
+      >
+        {instance.botEmoji ? (
+          <Text className="text-lg">{instance.botEmoji}</Text>
+        ) : (
+          <Text className={`text-[15px] font-bold ${hue.hueTextClass}`}>
+            {title.trim()[0]?.toUpperCase() ?? 'K'}
+          </Text>
+        )}
       </View>
       <View className="min-w-0 flex-1 gap-1">
         <View className="flex-row items-center gap-2">
@@ -41,7 +51,7 @@ export function InstanceListRow({ instance, onPress }: Readonly<InstanceListRowP
             className="min-w-0 flex-1 text-base font-semibold text-foreground"
             numberOfLines={1}
           >
-            {instanceTitle(instance)}
+            {title}
           </Text>
         </View>
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">

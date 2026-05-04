@@ -2321,9 +2321,13 @@ export const kiloclawRouter = createTRPCRouter({
     const results = await Promise.all(
       instances.map(async instance => {
         let status: string | null = null;
+        let botName: string | null = null;
+        let botEmoji: string | null = null;
         try {
           const workerStatus = await client.getStatus(ctx.user.id, workerInstanceId(instance));
           status = workerStatus.status;
+          botName = workerStatus.botName;
+          botEmoji = workerStatus.botEmoji;
         } catch {
           // Worker unreachable — show as null (unknown)
         }
@@ -2335,6 +2339,8 @@ export const kiloclawRouter = createTRPCRouter({
           organizationName: instance.organizationId
             ? (orgNameMap.get(instance.organizationId) ?? null)
             : null,
+          botName,
+          botEmoji,
           status,
         };
       })

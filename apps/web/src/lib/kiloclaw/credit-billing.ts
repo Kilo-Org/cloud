@@ -686,7 +686,14 @@ export async function applyStripeFundedKiloClawPeriod(params: {
         periodEnd,
       })));
 
-  if (resolvedInstanceId && amountMicrodollars > 0 && shouldSendSubscriptionStartedEmail) {
+  // Per KiloClaw billing spec (Stripe-Funded Credit Settlement rule 10),
+  // $0 KiloClaw invoices must still run settlement and transition the row
+  // into the activated hybrid state. The subscription-started email is an
+  // activation notification, not a revenue side effect, so it must fire
+  // regardless of invoice amount. Revenue side effects (analytics,
+  // affiliate sale events) apply their own `amount_paid > 0` guard in
+  // stripe-handlers.ts.
+  if (resolvedInstanceId && shouldSendSubscriptionStartedEmail) {
     await maybeSendKiloClawSubscriptionStartedEmail({
       userId,
       instanceId: resolvedInstanceId,

@@ -83,7 +83,13 @@ export function InstanceListScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="KiloClaw" showBackButton={false} headerRight={<ProfileAvatarButton />} />
+      <ScreenHeader
+        title="KiloClaw"
+        size="large"
+        showBackButton={false}
+        className="px-[22px]"
+        headerRight={<ProfileAvatarButton />}
+      />
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <ScrollView
           className="flex-1"

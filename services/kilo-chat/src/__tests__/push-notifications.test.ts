@@ -1,4 +1,4 @@
-import { env } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ConversationDO } from '../do/conversation-do';
 import { makeApp } from './helpers';
@@ -18,6 +18,19 @@ async function waitForCalls(spy: { mock: { calls: unknown[][] } }, timeoutMs = 2
     if (spy.mock.calls.length > 0) return;
     await new Promise(r => setTimeout(r, 10));
   }
+}
+
+async function waitForAlarm(
+  stub: DurableObjectStub<ConversationDO>,
+  timeoutMs = 1000
+): Promise<number | null> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const alarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    if (alarm !== null) return alarm;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  return null;
 }
 
 describe('kilo-chat publishes push on message.created', () => {
@@ -218,7 +231,299 @@ describe('kilo-chat publishes push on message.created', () => {
       conversationId,
       sandboxId,
       messageId,
+      trigger: 'message.created',
       failedRecipients: [{ userId: otherId, outcome: 'failed' }],
     });
+  });
+
+  it('notifies all human members when a bot message reaches the length threshold', async () => {
+    const sendSpy = vi
+      .spyOn(env.NOTIFICATIONS, 'sendPushForConversation')
+      .mockResolvedValue({ perRecipient: [] });
+
+    const userId = 'user-bot-length';
+    const sandboxId = 'sandbox-bot-length';
+    const botId = `bot:kiloclaw:${sandboxId}`;
+    const userApp = makeApp(userId, 'user');
+    const botApp = makeApp(botId, 'bot');
+
+    const createConversationRes = await userApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, title: 'Bot length' }),
+      },
+      env
+    );
+    expect(createConversationRes.status).toBe(201);
+    const { conversationId } = await createConversationRes.json<{ conversationId: string }>();
+
+    const createMessageRes = await botApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: [{ type: 'text', text: 'short' }] }),
+      },
+      env
+    );
+    expect(createMessageRes.status).toBe(201);
+    const { messageId } = await createMessageRes.json<{ messageId: string }>();
+    expect(sendSpy).not.toHaveBeenCalled();
+
+    const longText =
+      'This bot response is now long enough to notify the human member after streaming crosses the eighty character threshold.';
+    const editRes = await botApp.request(
+      `/v1/messages/${messageId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: longText }],
+          timestamp: Date.now(),
+        }),
+      },
+      env
+    );
+    expect(editRes.status).toBe(200);
+
+    await waitForCalls(sendSpy);
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    expect(sendSpy.mock.calls[0][0]).toMatchObject({
+      conversationId,
+      sandboxId,
+      senderUserId: null,
+      recipientUserIds: [userId],
+      bodyPreview: longText.slice(0, 200),
+      messageId,
+    });
+
+    const secondEditRes = await botApp.request(
+      `/v1/messages/${messageId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: `${longText} More streamed text.` }],
+          timestamp: Date.now() + 1,
+        }),
+      },
+      env
+    );
+    expect(secondEditRes.status).toBe(200);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifies the latest unnotified bot message when bot typing stops', async () => {
+    const sendSpy = vi
+      .spyOn(env.NOTIFICATIONS, 'sendPushForConversation')
+      .mockResolvedValue({ perRecipient: [] });
+
+    const userId = 'user-bot-typing-stop';
+    const sandboxId = 'sandbox-bot-typing-stop';
+    const botId = `bot:kiloclaw:${sandboxId}`;
+    const userApp = makeApp(userId, 'user');
+    const botApp = makeApp(botId, 'bot');
+
+    const createConversationRes = await userApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, title: 'Bot typing stop' }),
+      },
+      env
+    );
+    expect(createConversationRes.status).toBe(201);
+    const { conversationId } = await createConversationRes.json<{ conversationId: string }>();
+
+    const createMessageRes = await botApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Short final answer.' }],
+        }),
+      },
+      env
+    );
+    expect(createMessageRes.status).toBe(201);
+    const { messageId } = await createMessageRes.json<{ messageId: string }>();
+    expect(sendSpy).not.toHaveBeenCalled();
+
+    const stopRes = await botApp.request(
+      `/v1/conversations/${conversationId}/typing/stop`,
+      { method: 'POST' },
+      env
+    );
+    expect(stopRes.status).toBe(200);
+
+    await waitForCalls(sendSpy);
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    expect(sendSpy.mock.calls[0][0]).toMatchObject({
+      conversationId,
+      sandboxId,
+      senderUserId: null,
+      recipientUserIds: [userId],
+      bodyPreview: 'Short final answer.',
+      messageId,
+    });
+
+    const duplicateStopRes = await botApp.request(
+      `/v1/conversations/${conversationId}/typing/stop`,
+      { method: 'POST' },
+      env
+    );
+    expect(duplicateStopRes.status).toBe(200);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifies an unnotified bot message when the timeout alarm fires', async () => {
+    const sendSpy = vi
+      .spyOn(env.NOTIFICATIONS, 'sendPushForConversation')
+      .mockResolvedValue({ perRecipient: [] });
+
+    const userId = 'user-bot-timeout';
+    const sandboxId = 'sandbox-bot-timeout';
+    const botId = `bot:kiloclaw:${sandboxId}`;
+    const userApp = makeApp(userId, 'user');
+    const botApp = makeApp(botId, 'bot');
+
+    const createConversationRes = await userApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, title: 'Bot timeout' }),
+      },
+      env
+    );
+    expect(createConversationRes.status).toBe(201);
+    const { conversationId } = await createConversationRes.json<{ conversationId: string }>();
+
+    const createMessageRes = await botApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Still thinking.' }],
+        }),
+      },
+      env
+    );
+    expect(createMessageRes.status).toBe(201);
+    const { messageId } = await createMessageRes.json<{ messageId: string }>();
+    expect(sendSpy).not.toHaveBeenCalled();
+
+    const stub: DurableObjectStub<ConversationDO> = env.CONVERSATION_DO.get(
+      env.CONVERSATION_DO.idFromName(conversationId)
+    );
+    const alarmAt = await waitForAlarm(stub);
+    expect(alarmAt).not.toBeNull();
+
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Number(alarmAt));
+    try {
+      await runInDurableObject(stub, async inst => {
+        await (inst as unknown as { alarm: () => Promise<void> }).alarm();
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    await waitForCalls(sendSpy);
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    expect(sendSpy.mock.calls[0][0]).toMatchObject({
+      conversationId,
+      sandboxId,
+      senderUserId: null,
+      recipientUserIds: [userId],
+      bodyPreview: 'Still thinking.',
+      messageId,
+    });
+
+    await runInDurableObject(stub, async inst => {
+      await (inst as unknown as { alarm: () => Promise<void> }).alarm();
+    });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reschedules the bot notification alarm for the next pending bot message', async () => {
+    const sendSpy = vi
+      .spyOn(env.NOTIFICATIONS, 'sendPushForConversation')
+      .mockResolvedValue({ perRecipient: [] });
+
+    const userId = 'user-bot-timeout-reschedule';
+    const sandboxId = 'sandbox-bot-timeout-reschedule';
+    const botId = `bot:kiloclaw:${sandboxId}`;
+    const userApp = makeApp(userId, 'user');
+    const botApp = makeApp(botId, 'bot');
+
+    const createConversationRes = await userApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, title: 'Bot timeout reschedule' }),
+      },
+      env
+    );
+    expect(createConversationRes.status).toBe(201);
+    const { conversationId } = await createConversationRes.json<{ conversationId: string }>();
+
+    const firstRes = await botApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: [{ type: 'text', text: 'first' }] }),
+      },
+      env
+    );
+    expect(firstRes.status).toBe(201);
+
+    await new Promise(resolve => setTimeout(resolve, 5));
+
+    const secondRes = await botApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: [{ type: 'text', text: 'second' }] }),
+      },
+      env
+    );
+    expect(secondRes.status).toBe(201);
+
+    const stub: DurableObjectStub<ConversationDO> = env.CONVERSATION_DO.get(
+      env.CONVERSATION_DO.idFromName(conversationId)
+    );
+    const firstAlarm = await waitForAlarm(stub);
+    expect(firstAlarm).not.toBeNull();
+
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Number(firstAlarm));
+    try {
+      await runInDurableObject(stub, async inst => {
+        await (inst as unknown as { alarm: () => Promise<void> }).alarm();
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    await waitForCalls(sendSpy);
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+
+    const secondAlarm = await waitForAlarm(stub);
+    expect(secondAlarm).not.toBeNull();
+    expect(Number(secondAlarm)).toBeGreaterThan(Number(firstAlarm));
   });
 });

@@ -15,17 +15,15 @@ import {
   type Message,
   type ReplyToMessageSnapshot,
 } from '@kilocode/kilo-chat';
-import type { SendPushForConversationInput } from '@kilocode/notifications';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
-import { contentBlocksToText } from '../util/content';
 import {
   extractConversationContext,
   pushEventToHumanMembers,
   pushInstanceEvent,
   pushInstanceEventToUser,
 } from './event-push';
-import { fetchSandboxLabel } from './sandbox-lookup';
+import { sendConversationMessagePush } from './push-notifications';
 import type { ConversationInfo, GetMessageResult } from '../do/conversation-do';
 
 export type DeferCtx = { waitUntil: (p: Promise<unknown>) => void };
@@ -333,41 +331,22 @@ export async function postCommitFanOut(
   }
 
   // ── Block E: Push notification fanout ─────────────────────────────────
-  // Runs after realtime/event-service delivery has been attempted. Sender is
-  // excluded; bot members are not push recipients (kind=bot, never in
-  // humanMemberIds). Failures are logged but never propagate — the send has
-  // already succeeded and any other post-commit work must complete.
-  const pushRecipients = humanMemberIds.filter(id => id !== callerId);
-  if (sandboxId !== null && pushRecipients.length > 0) {
-    try {
-      const senderUserId = isSenderHuman ? callerId : null;
-      const bodyPreview = contentBlocksToText(content).slice(0, 200);
-      const sandboxLabel = await fetchSandboxLabel(env.HYPERDRIVE.connectionString, sandboxId);
-      const conversationTitle = info.title ?? appliedAutoTitle ?? 'Untitled';
-      const payload = {
-        conversationId,
-        sandboxId,
-        senderUserId,
-        recipientUserIds: pushRecipients,
-        title: `${sandboxLabel} · ${conversationTitle}`,
-        bodyPreview,
-        messageId,
-      } satisfies SendPushForConversationInput;
-      const pushResult = await env.NOTIFICATIONS.sendPushForConversation(payload);
-      const failedRecipients = pushResult.perRecipient.filter(
-        result => result.outcome === 'failed'
-      );
-      if (failedRecipients.length > 0) {
-        logger.error('sendPushForConversation returned failed outcomes', {
-          conversationId,
-          sandboxId,
-          messageId,
-          failedRecipients,
-        });
-      }
-    } catch (err) {
-      logger.error('sendPushForConversation failed', formatError(err));
-    }
+  // User-authored messages notify other human members. Bot-authored message
+  // notifications are gated by ConversationDO state because bot messages
+  // stream through create + edit operations.
+  if (sandboxId !== null && isSenderHuman) {
+    await sendConversationMessagePush(env, {
+      conversationId,
+      sandboxId,
+      title: info.title ?? appliedAutoTitle,
+      humanMemberIds,
+      senderId: callerId,
+      senderIsHuman: true,
+      messageId,
+      content,
+      recipientMode: 'exclude-sender-human',
+      logContext: 'message.created',
+    });
   }
 }
 

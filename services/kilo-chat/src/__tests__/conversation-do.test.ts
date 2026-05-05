@@ -1,10 +1,20 @@
-import { env } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import type { ConversationDO } from '../do/conversation-do';
 
 function getStub(convId: string): DurableObjectStub<ConversationDO> {
   const id = env.CONVERSATION_DO.idFromName(convId);
   return env.CONVERSATION_DO.get(id);
+}
+
+async function waitForAlarm(stub: DurableObjectStub<ConversationDO>): Promise<number | null> {
+  const deadline = Date.now() + 1000;
+  for (;;) {
+    const alarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    if (alarm !== null) return alarm;
+    if (Date.now() > deadline) return null;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
 }
 
 const BASE_PARAMS = {
@@ -76,6 +86,39 @@ describe('ConversationDO', () => {
       expect(result.info).not.toBeNull();
       expect(result.info.members).toHaveLength(2);
     }
+  });
+
+  it('sets an alarm when a bot message is created below the notification threshold', async () => {
+    const stub = getStub('conv-bot-notification-alarm');
+    await stub.initialize({
+      ...BASE_PARAMS,
+      id: 'conv-bot-notification-alarm',
+    });
+
+    const result = await stub.createMessage({
+      senderId: 'bot-1',
+      content: [{ type: 'text', text: 'short bot placeholder' }],
+    });
+
+    expect(result.ok).toBe(true);
+    await expect(waitForAlarm(stub)).resolves.not.toBeNull();
+  });
+
+  it('does not create a bot notification alarm for human messages', async () => {
+    const stub = getStub('conv-human-no-notification-alarm');
+    await stub.initialize({
+      ...BASE_PARAMS,
+      id: 'conv-human-no-notification-alarm',
+    });
+
+    const result = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'human message' }],
+    });
+
+    expect(result.ok).toBe(true);
+    const alarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    expect(alarm).toBeNull();
   });
 
   it('createMessage - rejects non-member', async () => {

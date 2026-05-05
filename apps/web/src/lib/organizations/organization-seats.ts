@@ -19,11 +19,7 @@ import PostHogClient from '@/lib/posthog';
 import { findUserById } from '@/lib/user';
 import { after } from 'next/server';
 import { sendOrgCancelledEmail, sendOrgRenewedEmail, sendOrgSubscriptionEmail } from '@/lib/email';
-import {
-  IS_IN_AUTOMATED_TEST,
-  STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
-  STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID,
-} from '@/lib/config.server';
+import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
 import {
   OrganizationPlanSchema,
@@ -31,18 +27,9 @@ import {
   billingCycleToDb,
 } from '@/lib/organizations/organization-types';
 import { client as stripeClient } from '@/lib/stripe-client';
+import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 
 const sentryError = sentryLogger('organization_seats', 'error');
-
-const SEAT_PRODUCT_IDS = new Set(
-  [STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID, STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID].filter(Boolean)
-);
-
-function isSeatLineItem(item: Stripe.SubscriptionItem): boolean {
-  const productId = item.price?.product;
-  if (typeof productId !== 'string') return false;
-  return SEAT_PRODUCT_IDS.has(productId);
-}
 
 const SubscriptionMetadataSchema = z.object({
   type: z.string(),

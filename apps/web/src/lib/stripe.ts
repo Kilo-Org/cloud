@@ -61,10 +61,9 @@ import {
   STRIPE_TEAMS_ANNUAL_PRICE_ID,
   STRIPE_ENTERPRISE_MONTHLY_PRICE_ID,
   STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
-  STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
-  STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID,
 } from '@/lib/config.server';
 import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organization-types';
+import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 import { successResult } from '@/lib/maybe-result';
 
 async function isKiloClawCharge(chargeId: string): Promise<boolean> {
@@ -1189,17 +1188,6 @@ export const KNOWN_SEAT_PRICE_IDS = new Set([
   STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
 ]);
 
-const SEAT_PRODUCT_IDS = new Set(
-  [STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID, STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID].filter(
-    (productId): productId is string => productId != null && productId.trim() !== ''
-  )
-);
-
-function isSeatProductLineItem(item: Stripe.SubscriptionItem): boolean {
-  const productId = item.price.product;
-  return typeof productId === 'string' && SEAT_PRODUCT_IDS.has(productId);
-}
-
 /** Derive the plan tier from a Stripe price ID. Returns null for unknown prices. */
 export function getPlanForPriceId(priceId: string): OrganizationPlan | null {
   if (priceId === STRIPE_TEAMS_MONTHLY_PRICE_ID || priceId === STRIPE_TEAMS_ANNUAL_PRICE_ID) {
@@ -1398,7 +1386,7 @@ export async function handleUpdateSeatCount(
     // Calculate the free seat count from non-paid seat-product items to preserve them.
     // Non-seat add-ons can share the subscription but must not reduce the paid seat quantity.
     const freeSeatCount = subscription.items.data
-      .filter(item => isSeatProductLineItem(item) && !KNOWN_SEAT_PRICE_IDS.has(item.price.id))
+      .filter(item => isSeatLineItem(item) && !KNOWN_SEAT_PRICE_IDS.has(item.price.id))
       .reduce((total, item) => total + (item.quantity ?? 0), 0);
 
     // The requested newSeatCount is the desired total. Deduct free seats to get paid quantity.

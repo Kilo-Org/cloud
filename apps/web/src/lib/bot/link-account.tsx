@@ -59,7 +59,7 @@ export async function promptLinkAccount(
       });
       return;
     }
-    case PLATFORM.GITHUB:
+    case PLATFORM.GITHUB: {
       const linkUrl = new URL(GITHUB_LINK_PATH, APP_URL);
       linkUrl.searchParams.set('installation_id', identity.teamId);
 
@@ -70,6 +70,7 @@ export async function promptLinkAccount(
           'After linking, mention me again in this issue or pull request.',
       });
       return;
+    }
     default:
       throw new Error(`Unsupported platform: ${identity.platform}`);
   }

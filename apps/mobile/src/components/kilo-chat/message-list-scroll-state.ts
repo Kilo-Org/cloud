@@ -15,15 +15,21 @@ export function isMessageListAtBottom({
 }
 
 export function shouldScrollToNewestAfterMessagesChange({
+  isAutoFollowingNewest = false,
   newestMessageKey,
   previousNewestMessageKey,
   wasAtBottom,
 }: {
+  isAutoFollowingNewest?: boolean;
   newestMessageKey: string | null;
   previousNewestMessageKey: string | null;
   wasAtBottom: boolean;
 }): boolean {
-  return newestMessageKey !== null && newestMessageKey !== previousNewestMessageKey && wasAtBottom;
+  return (
+    newestMessageKey !== null &&
+    newestMessageKey !== previousNewestMessageKey &&
+    (wasAtBottom || isAutoFollowingNewest)
+  );
 }
 
 export function messageListNewestScrollKey(message: Message | undefined): string | null {

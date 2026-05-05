@@ -48,9 +48,11 @@ export function MessageList({
 }: Props) {
   const listRef = useRef<FlashListRef<Message>>(null);
   const scrollOffsetRef = useRef(0);
+  const contentHeightRef = useRef(0);
   const initialNewestMessage = messages.at(-1);
   const newestMessageKeyRef = useRef(messageListNewestScrollKey(initialNewestMessage));
   const isAtBottomRef = useRef(true);
+  const isAutoFollowingNewestRef = useRef(true);
   const scrollToNewestRequestRef = useRef(scrollToNewestRequest);
   const keyboardScrollScheduler = useMemo(
     () =>
@@ -81,6 +83,7 @@ export function MessageList({
     [chronological]
   );
   const scrollToNewest = useCallback(() => {
+    isAutoFollowingNewestRef.current = true;
     isAtBottomRef.current = true;
     newestScrollScheduler.schedule();
   }, [newestScrollScheduler]);
@@ -88,12 +91,32 @@ export function MessageList({
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     scrollOffsetRef.current = contentOffset.y;
-    isAtBottomRef.current = isMessageListAtBottom({
+    contentHeightRef.current = contentSize.height;
+    const nextIsAtBottom = isMessageListAtBottom({
       contentHeight: contentSize.height,
       viewportHeight: layoutMeasurement.height,
       offsetY: contentOffset.y,
     });
+    isAtBottomRef.current = nextIsAtBottom;
+    if (nextIsAtBottom) {
+      isAutoFollowingNewestRef.current = true;
+    }
   }, []);
+
+  const handleScrollBeginDrag = useCallback(() => {
+    isAutoFollowingNewestRef.current = false;
+  }, []);
+
+  const handleContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      const previousContentHeight = contentHeightRef.current;
+      contentHeightRef.current = height;
+      if (height > previousContentHeight && isAutoFollowingNewestRef.current) {
+        scrollToNewest();
+      }
+    },
+    [scrollToNewest]
+  );
 
   useEffect(() => {
     const subscription = Keyboard.addListener('keyboardDidShow', event => {
@@ -110,6 +133,7 @@ export function MessageList({
   useEffect(() => {
     const newestMessageKey = messageListNewestScrollKey(newestMessage);
     const shouldScroll = shouldScrollToNewestAfterMessagesChange({
+      isAutoFollowingNewest: isAutoFollowingNewestRef.current,
       newestMessageKey,
       previousNewestMessageKey: newestMessageKeyRef.current,
       wasAtBottom: isAtBottomRef.current,
@@ -161,6 +185,8 @@ export function MessageList({
       }}
       keyExtractor={item => item.id}
       onScroll={handleScroll}
+      onScrollBeginDrag={handleScrollBeginDrag}
+      onContentSizeChange={handleContentSizeChange}
       scrollEventThrottle={16}
       onStartReached={fetchOlder}
       onStartReachedThreshold={0.5}

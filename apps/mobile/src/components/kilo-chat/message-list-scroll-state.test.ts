@@ -65,6 +65,17 @@ describe('message list scroll state', () => {
     ).toBe(false);
   });
 
+  it('keeps scrolling while newest-message auto-follow is active', () => {
+    const params = {
+      newestMessageKey: 'message-2-edit',
+      previousNewestMessageKey: 'message-2',
+      wasAtBottom: false,
+      isAutoFollowingNewest: true,
+    };
+
+    expect(shouldScrollToNewestAfterMessagesChange(params)).toBe(true);
+  });
+
   it('changes the newest scroll key when the newest message is edited', () => {
     expect(messageListNewestScrollKey(newestMessage)).not.toBe(
       messageListNewestScrollKey({

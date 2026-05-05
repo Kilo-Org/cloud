@@ -1363,6 +1363,69 @@ describe('Non-seat product filtering', () => {
     expect(org.seat_count).toBe(5);
   });
 
+  test('should derive billing period from seat line item when non-seat product appears first', async () => {
+    const base = createMockSubscription();
+    const baseItem = base.items.data[0];
+    const nonSeatStart = 1_800_000_000;
+    const nonSeatEnd = nonSeatStart + 2_592_000;
+    const seatStart = 1_700_000_000;
+    const seatEnd = seatStart + 2_592_000;
+
+    const subscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: testUser.id,
+        organizationId: testOrganization.id,
+        seats: '5',
+      },
+      items: {
+        object: 'list',
+        data: [
+          {
+            ...baseItem,
+            id: 'si_non_seat_first',
+            quantity: 27,
+            current_period_start: nonSeatStart,
+            current_period_end: nonSeatEnd,
+            price: {
+              ...baseItem.price,
+              id: 'price_kilopass_first',
+              product: 'prod_kilopass_not_seats',
+              unit_amount: 1900,
+            },
+          },
+          {
+            ...baseItem,
+            id: 'si_seat_second',
+            quantity: 5,
+            current_period_start: seatStart,
+            current_period_end: seatEnd,
+            price: {
+              ...baseItem.price,
+              product: STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
+              unit_amount: 1000,
+            },
+          },
+        ],
+        has_more: false,
+        url: '/v1/subscription_items',
+      },
+    });
+
+    await handleSubscriptionEvent(subscription, 'test-seat-period-from-filtered-item');
+
+    const purchases = await db
+      .select()
+      .from(organization_seats_purchases)
+      .where(
+        eq(organization_seats_purchases.idempotency_key, 'test-seat-period-from-filtered-item')
+      );
+
+    expect(purchases).toHaveLength(1);
+    expect(new Date(purchases[0].starts_at).getTime()).toBe(seatStart * 1000);
+    expect(new Date(purchases[0].expires_at).getTime()).toBe(seatEnd * 1000);
+  });
+
   test('should sum quantities across multiple seat product line items at different prices', async () => {
     const base = createMockSubscription();
     const baseItem = base.items.data[0];

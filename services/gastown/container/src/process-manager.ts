@@ -90,15 +90,23 @@ const startAgentLocks = new Map<string, Promise<unknown>>();
 // `startAgent` (which wraps `startAgentImpl` with this lock).
 export async function withStartAgentLock<T>(agentId: string, fn: () => Promise<T>): Promise<T> {
   const previous = startAgentLocks.get(agentId) ?? Promise.resolve();
-  const deferred = Promise.withResolvers<void>();
-  startAgentLocks.set(agentId, deferred.promise);
+  // Use the same explicit `new Promise` pattern as `sdkServerLock` above
+  // instead of `Promise.withResolvers`, which is not available on older
+  // Bun runtimes. This module is imported during container startup, so a
+  // missing global here would throw before the crash handlers are
+  // registered and prevent the control server from starting.
+  let releaseLock!: () => void;
+  const lockPromise = new Promise<void>(resolve => {
+    releaseLock = resolve;
+  });
+  startAgentLocks.set(agentId, lockPromise);
   try {
     await previous.catch(() => {});
     return await fn();
   } finally {
-    deferred.resolve();
+    releaseLock();
     // Only clear the slot if no newer caller has queued behind us.
-    if (startAgentLocks.get(agentId) === deferred.promise) {
+    if (startAgentLocks.get(agentId) === lockPromise) {
       startAgentLocks.delete(agentId);
     }
   }

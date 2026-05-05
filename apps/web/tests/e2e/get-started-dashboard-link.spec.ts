@@ -9,7 +9,7 @@ test.describe('/get-started dashboard escape hatch', () => {
 
     const skipLink = page.getByRole('link', { name: /skip to dashboard/i });
     await expect(skipLink).toBeVisible();
-    await expect(skipLink).toHaveAttribute('href', /callbackPath=%2Fprofile/);
+    await expect(skipLink).toHaveAttribute('href', '/profile');
   });
 
   test('shows the dashboard link after fake login and survey skip', async ({ page }) => {
@@ -36,6 +36,6 @@ test.describe('/get-started dashboard escape hatch', () => {
     await page.goto('/get-started');
     const skipLink = page.getByRole('link', { name: /skip to dashboard/i });
     await expect(skipLink).toBeVisible();
-    await expect(skipLink).toHaveAttribute('href', /\/profile|\/organizations\//);
+    await expect(skipLink).toHaveAttribute('href', '/profile');
   });
 });

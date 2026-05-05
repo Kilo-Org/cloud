@@ -4,14 +4,12 @@ import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { cn } from '@/lib/utils';
 import { ArrowRight, Briefcase, Check, Cloud, Download } from 'lucide-react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 import type { ReactNode } from 'react';
 
 import './ProductOptionsContent.css';
 
 type WelcomeContentProps = {
   isAuthenticated: boolean;
-  dashboardHref: string;
 };
 
 type RowCard = {
@@ -28,10 +26,6 @@ type RowCard = {
 
 function getAuthenticatedHref(isAuthenticated: boolean, path: string) {
   return isAuthenticated ? path : `/users/sign_in?callbackPath=${path}`;
-}
-
-function getSignInHref(path: string) {
-  return `/users/sign_in?callbackPath=${encodeURIComponent(path)}`;
 }
 
 function CardRow({ card, entranceDelayMs }: { card: RowCard; entranceDelayMs: number }) {
@@ -100,14 +94,11 @@ function CardRow({ card, entranceDelayMs }: { card: RowCard; entranceDelayMs: nu
   );
 }
 
-export default function WelcomeContent({ isAuthenticated, dashboardHref }: WelcomeContentProps) {
-  const session = useSession();
-  const isSignedIn = isAuthenticated || session.status === 'authenticated';
-  const cloudHref = getAuthenticatedHref(isSignedIn, '/cloud');
-  const kiloclawHref = getAuthenticatedHref(isSignedIn, '/claw');
-  const teamHref = getAuthenticatedHref(isSignedIn, '/organizations/new');
+export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps) {
+  const cloudHref = getAuthenticatedHref(isAuthenticated, '/cloud');
+  const kiloclawHref = getAuthenticatedHref(isAuthenticated, '/claw');
+  const teamHref = getAuthenticatedHref(isAuthenticated, '/organizations/new');
   const signInHref = `/users/sign_in?callbackPath=/get-started`;
-  const skipDashboardHref = isSignedIn ? dashboardHref : getSignInHref(dashboardHref);
 
   const cards: RowCard[] = [
     {
@@ -230,20 +221,21 @@ export default function WelcomeContent({ isAuthenticated, dashboardHref }: Welco
           />
         </div>
 
-        <div
+        <p
           style={{ animationDelay: '540ms' }}
-          className="kilo-fade-up flex flex-col items-center gap-3 pt-1 text-center"
+          className="text-muted-foreground kilo-fade-up pt-1 text-center text-xs"
         >
+          Not ready to choose?{' '}
           <Link
-            href={skipDashboardHref}
-            className="border-border bg-card/60 hover:border-brand-primary/60 hover:bg-card/80 inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-bold text-white outline-none transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
+            href="/profile"
+            className="inline-flex items-center gap-1 rounded font-semibold text-white outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
           >
             Skip to dashboard
-            <ArrowRight className="h-3.5 w-3.5" />
+            <ArrowRight className="h-3 w-3" />
           </Link>
-
-          {!isSignedIn ? (
-            <p className="text-muted-foreground text-xs">
+          {!isAuthenticated ? (
+            <>
+              <span className="mx-2 text-muted-foreground/60">·</span>
               Already have an account?{' '}
               <Link
                 href={signInHref}
@@ -251,9 +243,9 @@ export default function WelcomeContent({ isAuthenticated, dashboardHref }: Welco
               >
                 Sign in
               </Link>
-            </p>
+            </>
           ) : null}
-        </div>
+        </p>
       </section>
     </div>
   );

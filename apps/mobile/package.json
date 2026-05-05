@@ -16,7 +16,7 @@
     "lint": "pnpm -w exec oxlint --config apps/mobile/.oxlintrc.json apps/mobile/src",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
-    "check:unused": "knip",
+    "check:unused": "node --env-file=.env node_modules/knip/bin/knip.js --no-config-hints",
     "test": "vitest run",
     "test:watch": "vitest"
   },

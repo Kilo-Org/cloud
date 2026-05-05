@@ -14,8 +14,8 @@ import { InstanceTierSpecSchema } from '../types';
 
 describe('instance tier catalog', () => {
   it('defines the default and offered tiers', () => {
-    expect(DEFAULT_INSTANCE_TIER).toBe('perf-1');
-    expect(OFFERED_TIERS).toEqual(['perf-1', 'perf-4-8', 'perf-4-16']);
+    expect(DEFAULT_INSTANCE_TIER).toBe('perf-1-3');
+    expect(OFFERED_TIERS).toEqual(['perf-1-3', 'perf-4-8', 'perf-4-16']);
     expect(getTier('perf-4-16')).toMatchObject({
       volumeSizeGb: 40,
       machineSize: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
@@ -24,7 +24,7 @@ describe('instance tier catalog', () => {
 
   it('matches tiers by exact compute and volume shape', () => {
     expect(tierFromMachineSize({ cpus: 1, memory_mb: 3072, cpu_kind: 'performance' }, 10)).toBe(
-      'perf-1'
+      'perf-1-3'
     );
     expect(tierFromMachineSize({ cpus: 2, memory_mb: 3072, cpu_kind: 'shared' }, 10)).toBe(
       'shared-2-3'
@@ -45,9 +45,9 @@ describe('instance tier catalog', () => {
   });
 
   it('ranks only offered tiers', () => {
-    expect(compareTierRank('perf-4-8', 'perf-1')).toBeGreaterThan(0);
+    expect(compareTierRank('perf-4-8', 'perf-1-3')).toBeGreaterThan(0);
     expect(compareTierRank('perf-4-16', 'perf-4-8')).toBeGreaterThan(0);
-    expect(() => compareTierRank('shared-2-3', 'perf-1')).toThrow(/offered tiers/);
+    expect(() => compareTierRank('shared-2-3', 'perf-1-3')).toThrow(/offered tiers/);
   });
 
   it('keeps legacy tiers label-only', () => {
@@ -58,7 +58,7 @@ describe('instance tier catalog', () => {
   it('applies tier upgrade policy', () => {
     expect(
       canUpgradeTo({
-        currentType: 'perf-1',
+        currentType: 'perf-1-3',
         currentSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
         currentVolumeSizeGb: 10,
         targetTier: 'perf-4-8',
@@ -69,7 +69,7 @@ describe('instance tier catalog', () => {
         currentType: 'perf-4-8',
         currentSize: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
         currentVolumeSizeGb: 20,
-        targetTier: 'perf-1',
+        targetTier: 'perf-1-3',
       })
     ).toBe(false);
     expect(
@@ -77,7 +77,7 @@ describe('instance tier catalog', () => {
         currentType: 'shared-2-4',
         currentSize: { cpus: 2, memory_mb: 4096, cpu_kind: 'shared' },
         currentVolumeSizeGb: 10,
-        targetTier: 'perf-1',
+        targetTier: 'perf-1-3',
       })
     ).toBe(false);
     expect(
@@ -85,7 +85,7 @@ describe('instance tier catalog', () => {
         currentType: 'custom',
         currentSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
         currentVolumeSizeGb: 10,
-        targetTier: 'perf-1',
+        targetTier: 'perf-1-3',
       })
     ).toBe(true);
     expect(
@@ -93,7 +93,7 @@ describe('instance tier catalog', () => {
         currentType: 'custom',
         currentSize: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
         currentVolumeSizeGb: 40,
-        targetTier: 'perf-1',
+        targetTier: 'perf-1-3',
       })
     ).toBe(false);
     expect(

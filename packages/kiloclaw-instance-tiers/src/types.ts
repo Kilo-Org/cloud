@@ -11,7 +11,7 @@ export const MachineSizeSchema = z
   .readonly();
 
 export const InstanceTierKeySchema = z.enum([
-  'perf-1',
+  'perf-1-3',
   'perf-4-8',
   'perf-4-16',
   'shared-2-3',
@@ -27,7 +27,6 @@ export const InstanceTierSpecSchema = z
     machineSize: MachineSizeSchema,
     volumeSizeGb: z.number().int().positive(),
     status: InstanceTierStatusSchema,
-    displayPriceUsd: z.number().positive().optional(),
   })
   .readonly();
 

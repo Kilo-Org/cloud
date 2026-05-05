@@ -4,13 +4,12 @@ import type { InstanceTierKey, InstanceTierSpec } from './types';
 // deprecated selectable tiers become `legacy`, and retired keys are removed only
 // after no active Postgres rows reference them.
 const INSTANCE_TIERS_RAW = {
-  'perf-1': {
-    key: 'perf-1',
-    label: 'perf-1',
+  'perf-1-3': {
+    key: 'perf-1-3',
+    label: 'perf-1-3',
     machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
     volumeSizeGb: 10,
     status: 'offered',
-    displayPriceUsd: 47,
   },
   'perf-4-8': {
     key: 'perf-4-8',
@@ -18,7 +17,6 @@ const INSTANCE_TIERS_RAW = {
     machineSize: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
     volumeSizeGb: 20,
     status: 'offered',
-    displayPriceUsd: 180,
   },
   'perf-4-16': {
     key: 'perf-4-16',
@@ -26,7 +24,6 @@ const INSTANCE_TIERS_RAW = {
     machineSize: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
     volumeSizeGb: 40,
     status: 'offered',
-    displayPriceUsd: 300,
   },
   'shared-2-3': {
     key: 'shared-2-3',
@@ -47,7 +44,7 @@ const INSTANCE_TIERS_RAW = {
 export const INSTANCE_TIERS: Readonly<Record<InstanceTierKey, InstanceTierSpec>> =
   INSTANCE_TIERS_RAW;
 
-export const DEFAULT_INSTANCE_TIER: InstanceTierKey = 'perf-1';
+export const DEFAULT_INSTANCE_TIER: InstanceTierKey = 'perf-1-3';
 
 export const DEFAULT_VOLUME_SIZE_GB = 10;
 

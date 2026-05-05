@@ -2,7 +2,7 @@ import { DEFAULT_VOLUME_SIZE_GB, INSTANCE_TIERS } from './catalog';
 import type { InstanceTierKey, InstanceTierSpec, InstanceType, MachineSize } from './types';
 
 const OFFERED_RANKS: Partial<Record<InstanceTierKey, number>> = {
-  'perf-1': 0,
+  'perf-1-3': 0,
   'perf-4-8': 1,
   'perf-4-16': 2,
 };
@@ -79,7 +79,7 @@ export function canUpgradeTo(args: {
     return compareTierRank(args.targetTier, args.currentType) > 0;
   }
 
-  const baseline = getTier('perf-1');
+  const baseline = getTier('perf-1-3');
   const currentCpus = args.currentSize?.cpus ?? baseline.machineSize.cpus;
   const currentMemoryMb = args.currentSize?.memory_mb ?? baseline.machineSize.memory_mb;
   const currentVolumeSizeGb = args.currentVolumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB;

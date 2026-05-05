@@ -58,8 +58,8 @@ export function getNorthflankConfig(env: KiloClawEnv): NorthflankConfig {
     region: requiredEnv(env, 'NF_REGION'),
     deploymentPlan: requiredEnv(env, 'NF_DEPLOYMENT_PLAN'),
     deploymentPlans: {
-      'perf-1':
-        optionalEnv(env, 'NF_DEPLOYMENT_PLAN_PERF_1') ?? requiredEnv(env, 'NF_DEPLOYMENT_PLAN'),
+      'perf-1-3':
+        optionalEnv(env, 'NF_DEPLOYMENT_PLAN_PERF_1_3') ?? requiredEnv(env, 'NF_DEPLOYMENT_PLAN'),
       'perf-4-8':
         optionalEnv(env, 'NF_DEPLOYMENT_PLAN_PERF_4_8') ?? requiredEnv(env, 'NF_DEPLOYMENT_PLAN'),
       'perf-4-16':

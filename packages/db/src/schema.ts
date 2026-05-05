@@ -3818,7 +3818,7 @@ export const kiloclaw_instances = pgTable(
     check(
       'CHK_kiloclaw_instances_instance_type',
       sql`${table.instance_type} IS NULL OR ${table.instance_type} IN (${sql.join(
-        INSTANCE_TYPE_VALUES.map(value => sql`${value}`),
+        INSTANCE_TYPE_VALUES.map(value => sql.raw(`'${value}'`)),
         sql.raw(', ')
       )})`
     ),

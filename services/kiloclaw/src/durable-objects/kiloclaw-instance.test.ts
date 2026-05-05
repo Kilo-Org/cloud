@@ -7696,7 +7696,7 @@ describe("provision: async start sets status to 'starting'", () => {
     expect(storage._store.get('volumeSizeGb')).toBe(15);
   });
 
-  it('preserves unknown legacy machine size on re-provision instead of defaulting to perf-1', async () => {
+  it('preserves unknown legacy machine size on re-provision instead of defaulting to perf-1-3', async () => {
     const { instance, storage } = createInstance();
     const legacyMachineSize = { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' };
     await seedProvisioned(storage, {
@@ -8839,7 +8839,7 @@ describe('resizeMachine', () => {
   it('rejects resize when instance is running', async () => {
     const { instance, storage } = createInstance();
     await seedRunning(storage, {
-      instanceType: 'perf-1',
+      instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
     });
 
@@ -8852,7 +8852,7 @@ describe('resizeMachine', () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       status: 'stopped',
-      instanceType: 'perf-1',
+      instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
       volumeSizeGb: 10,
     });
@@ -8872,7 +8872,7 @@ describe('resizeMachine', () => {
       volumeSizeGb: 20,
     });
 
-    await expect(instance.resizeMachine('perf-1')).rejects.toThrow(
+    await expect(instance.resizeMachine('perf-1-3')).rejects.toThrow(
       'downgrades and sidegrades are not allowed'
     );
   });
@@ -8881,12 +8881,12 @@ describe('resizeMachine', () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       status: 'stopped',
-      instanceType: 'perf-1',
+      instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
       volumeSizeGb: 10,
     });
 
-    await expect(instance.resizeMachine('perf-1')).rejects.toThrow(
+    await expect(instance.resizeMachine('perf-1-3')).rejects.toThrow(
       'downgrades and sidegrades are not allowed'
     );
   });
@@ -8904,7 +8904,7 @@ describe('resizeMachine', () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       status: 'stopped',
-      instanceType: 'perf-1',
+      instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
       volumeSizeGb: 10,
       flyVolumeId: 'vol-1',
@@ -8926,7 +8926,7 @@ describe('resizeMachine', () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       status: 'stopped',
-      instanceType: 'perf-1',
+      instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
       volumeSizeGb: 10,
       flyVolumeId: 'vol-1',
@@ -8936,7 +8936,7 @@ describe('resizeMachine', () => {
     await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow('extend failed');
 
     expect(storage._store.get('volumeSizeGb')).toBe(10);
-    expect(storage._store.get('instanceType')).toBe('perf-1');
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
     expect(storage._store.get('machineSize')).toEqual({
       cpus: 1,
       memory_mb: 3072,
@@ -8948,7 +8948,7 @@ describe('resizeMachine', () => {
     const { instance, storage, waitUntilPromises } = createInstance();
     await seedProvisioned(storage, {
       status: 'stopped',
-      instanceType: 'perf-1',
+      instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
       volumeSizeGb: 10,
       flyVolumeId: 'vol-1',
@@ -8973,7 +8973,7 @@ describe('resizeMachine', () => {
         hostPort: 45001,
       },
       status: 'stopped',
-      instanceType: 'perf-1',
+      instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
       volumeSizeGb: 10,
       flyVolumeId: null,
@@ -8993,7 +8993,7 @@ describe('resizeMachine', () => {
       provider: 'northflank',
       providerState: { provider: 'northflank' },
       status: 'stopped',
-      instanceType: 'perf-1',
+      instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
       volumeSizeGb: 10,
     });
@@ -9001,7 +9001,7 @@ describe('resizeMachine', () => {
     await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
       'Instance tier resize is not yet supported on Northflank instances'
     );
-    expect(storage._store.get('instanceType')).toBe('perf-1');
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
   });
 });
 

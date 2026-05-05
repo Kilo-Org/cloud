@@ -1,3 +1,3 @@
 ALTER TABLE "kiloclaw_instances" ADD COLUMN "instance_type" text;--> statement-breakpoint
 CREATE INDEX "IDX_kiloclaw_instances_instance_type" ON "kiloclaw_instances" USING btree ("instance_type") WHERE "kiloclaw_instances"."destroyed_at" is null;--> statement-breakpoint
-ALTER TABLE "kiloclaw_instances" ADD CONSTRAINT "CHK_kiloclaw_instances_instance_type" CHECK ("kiloclaw_instances"."instance_type" IS NULL OR "kiloclaw_instances"."instance_type" IN ('perf-1', 'perf-4-8', 'perf-4-16', 'shared-2-3', 'shared-2-4', 'custom'));
+ALTER TABLE "kiloclaw_instances" ADD CONSTRAINT "CHK_kiloclaw_instances_instance_type" CHECK ("kiloclaw_instances"."instance_type" IS NULL OR "kiloclaw_instances"."instance_type" IN ('perf-1-3', 'perf-4-8', 'perf-4-16', 'shared-2-3', 'shared-2-4', 'custom'));

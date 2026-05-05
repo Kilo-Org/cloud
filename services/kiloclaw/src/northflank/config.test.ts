@@ -18,7 +18,7 @@ describe('getNorthflankConfig', () => {
       region: 'us-central',
       deploymentPlan: 'nf-compute-200',
       deploymentPlans: {
-        'perf-1': 'nf-compute-200',
+        'perf-1-3': 'nf-compute-200',
         'perf-4-8': 'nf-compute-200',
         'perf-4-16': 'nf-compute-200',
       },
@@ -53,7 +53,7 @@ describe('getNorthflankConfig', () => {
       region: 'us-central',
       deploymentPlan: 'nf-compute-200',
       deploymentPlans: {
-        'perf-1': 'nf-compute-200',
+        'perf-1-3': 'nf-compute-200',
         'perf-4-8': 'nf-compute-200',
         'perf-4-16': 'nf-compute-200',
       },

@@ -37,7 +37,7 @@ import { northflankResourceNames } from './names';
 const NORTHFLANK_PORT_NAME = 'p01';
 const NORTHFLANK_STARTUP_TIMEOUT_SECONDS = 240;
 const NORTHFLANK_TERMINATION_GRACE_PERIOD_SECONDS = 60;
-const NORTHFLANK_OFFERED_TIER_KEYS = ['perf-1', 'perf-4-8', 'perf-4-16'] as const;
+const NORTHFLANK_OFFERED_TIER_KEYS = ['perf-1-3', 'perf-4-8', 'perf-4-16'] as const;
 
 function isNorthflankOfferedTier(
   tier: InstanceMutableState['instanceType']

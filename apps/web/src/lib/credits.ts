@@ -272,8 +272,23 @@ async function resolveStripeReceiptUrl(stripeChargeOrInvoiceId: string): Promise
     }
     return null;
   } catch (error) {
-    // Receipt URLs are a nice-to-have — never fail the email flow.
-    if (error instanceof Stripe.errors.StripeError) return null;
+    // Receipt URLs are a nice-to-have — never fail the email flow. Narrow
+    // the silenced set to the one expected subclass and surface everything
+    // else, matching the autoTopUp.ts / admin-router.ts pattern of
+    // swallowing specific known-benign Stripe errors and reporting the rest.
+    //
+    // `StripeInvalidRequestError` is the expected outcome when the charge /
+    // invoice / payment-intent was refunded or voided between payment and
+    // this lookup, or when the ID is otherwise unrecognizable to Stripe.
+    // Everything else — rate-limit / API 5xx / auth failure after key
+    // rotation / non-Stripe programmer error — is engineer-actionable.
+    if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+      return null;
+    }
+    captureException(error, {
+      tags: { source: 'credits_topup_receipt_lookup' },
+      extra: { stripeChargeOrInvoiceId },
+    });
     return null;
   }
 }

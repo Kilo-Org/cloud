@@ -108,6 +108,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     mockedFindIntegrationByInstallationId.mockResolvedValue({
       owned_by_organization_id: 'org_1',
       owned_by_user_id: null,
+      github_app_type: 'standard',
     } as never);
     mockedIsOrganizationMember.mockResolvedValue(true);
   });
@@ -195,5 +196,18 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       { platform: 'github', teamId: 'user', userId: GITHUB_USER_ID },
       USER_ID
     );
+  });
+
+  test("exchanges the OAuth code against the integration's github_app_type", async () => {
+    mockedFindIntegrationByInstallationId.mockResolvedValue({
+      owned_by_organization_id: 'org_1',
+      owned_by_user_id: null,
+      github_app_type: 'lite',
+    } as never);
+
+    const { GET } = await import('./route');
+    await GET(makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never);
+
+    expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'lite');
   });
 });

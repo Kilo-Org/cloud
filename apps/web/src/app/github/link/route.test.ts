@@ -3,15 +3,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { createGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
+import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
 import { failureResult } from '@/lib/maybe-result';
 
 jest.mock('@/lib/user.server');
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/integrations/platforms/github/app-selector');
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  findIntegrationByInstallationId: jest.fn(),
+}));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedCreateGitHubBotLinkState = jest.mocked(createGitHubBotLinkState);
 const mockedGetGitHubAppCredentials = jest.mocked(getGitHubAppCredentials);
+const mockedFindIntegrationByInstallationId = jest.mocked(findIntegrationByInstallationId);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 
@@ -43,6 +48,9 @@ describe('GET /github/link', () => {
       appName: 'KiloConnect',
       webhookSecret: 'webhook-secret',
     });
+    mockedFindIntegrationByInstallationId.mockResolvedValue({
+      github_app_type: 'standard',
+    } as never);
   });
 
   test('redirects unauthenticated users to sign-in with callbackPath', async () => {
@@ -80,6 +88,29 @@ describe('GET /github/link', () => {
     expect(redirectUrl.searchParams.get('state')).toBe('signed-state');
     expect(redirectUrl.searchParams.get('scope')).toBe('read:user');
     expect(mockedCreateGitHubBotLinkState).toHaveBeenCalledWith(USER_ID, '98765');
+    expect(mockedGetGitHubAppCredentials).toHaveBeenCalledWith('standard');
+  });
+
+  test("picks credentials matching the integration's github_app_type", async () => {
+    mockedFindIntegrationByInstallationId.mockResolvedValue({
+      github_app_type: 'lite',
+    } as never);
+
+    const { GET } = await import('./route');
+    await GET(makeRequest('/github/link?installation_id=98765') as never);
+
+    expect(mockedGetGitHubAppCredentials).toHaveBeenCalledWith('lite');
+  });
+
+  test('returns 404 when the installation is not known to Kilo', async () => {
+    mockedFindIntegrationByInstallationId.mockResolvedValue(null);
+
+    const { GET } = await import('./route');
+    const response = await GET(makeRequest('/github/link?installation_id=98765') as never);
+
+    expect(response.status).toBe(404);
+    expect(mockedCreateGitHubBotLinkState).not.toHaveBeenCalled();
+    expect(mockedGetGitHubAppCredentials).not.toHaveBeenCalled();
   });
 
   test('rejects requests without installation context', async () => {

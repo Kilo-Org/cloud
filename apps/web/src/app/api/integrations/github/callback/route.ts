@@ -81,7 +81,8 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
     return htmlPage('Link Failed', 'You are not the owner of this GitHub integration.', 403);
   }
 
-  const githubUser = await exchangeGitHubOAuthCode(code, 'standard');
+  const appType = integration.github_app_type ?? 'standard';
+  const githubUser = await exchangeGitHubOAuthCode(code, appType);
 
   await bot.initialize();
   await linkKiloUser(bot.getState(), githubUserIdentity(githubUser.id), user.id);

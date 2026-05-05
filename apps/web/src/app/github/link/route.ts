@@ -4,6 +4,8 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { APP_URL } from '@/lib/constants';
 import { createGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
+import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_CALLBACK_PATH = '/api/integrations/github/callback';
@@ -41,7 +43,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  const credentials = getGitHubAppCredentials('standard');
+  const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, installationId);
+
+  if (!integration) {
+    return errorPage('Link Failed', 'No matching GitHub integration was found.', 404);
+  }
+
+  const appType = integration.github_app_type ?? 'standard';
+  const credentials = getGitHubAppCredentials(appType);
   const authorizeUrl = new URL(GITHUB_AUTHORIZE_URL);
   authorizeUrl.searchParams.set('client_id', credentials.clientId);
   authorizeUrl.searchParams.set('redirect_uri', new URL(GITHUB_CALLBACK_PATH, APP_URL).toString());

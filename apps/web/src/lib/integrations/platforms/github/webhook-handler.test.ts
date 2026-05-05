@@ -7,7 +7,7 @@ const mockFindIntegrationByInstallationId = jest.fn();
 const mockLogWebhookEvent = jest.fn();
 const mockUpdateWebhookEvent = jest.fn();
 const mockHandlePullRequest = jest.fn();
-const mockGithubWebhook = jest.fn();
+const mockHandlePRReviewComment = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -32,17 +32,11 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handleInstallationSuspend: jest.fn(),
   handleInstallationUnsuspend: jest.fn(),
   handleIssue: jest.fn(),
+  handlePRReviewComment: (payload: unknown, platformIntegration: unknown) =>
+    mockHandlePRReviewComment(payload, platformIntegration),
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePullRequest(payload, platformIntegration),
   handlePushEvent: jest.fn(),
-}));
-
-jest.mock('@/lib/bot', () => ({
-  bot: {
-    webhooks: {
-      github: (request: Request, options: unknown) => mockGithubWebhook(request, options),
-    },
-  },
 }));
 
 jest.mock('next/server', () => {
@@ -168,7 +162,7 @@ describe('handleGitHubWebhook', () => {
     mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
-    mockGithubWebhook.mockResolvedValue(new Response('ok'));
+    mockHandlePRReviewComment.mockResolvedValue(undefined);
   });
 
   it('keeps pull_request webhooks on the code review path', async () => {
@@ -183,14 +177,14 @@ describe('handleGitHubWebhook', () => {
       expect.objectContaining(payload),
       integration
     );
-    expect(mockGithubWebhook).not.toHaveBeenCalled();
+    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
       expect.objectContaining({ handlers_triggered: ['code_review'] })
     );
   });
 
-  it('forwards pull_request_review_comment created events to the GitHub chat adapter', async () => {
+  it('keeps pull_request_review_comment created events on the legacy auto-fix path', async () => {
     const response = await handleGitHubWebhook(
       signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
       'standard'
@@ -198,38 +192,26 @@ describe('handleGitHubWebhook', () => {
 
     expect(response.status).toBe(200);
     expect(mockHandlePullRequest).not.toHaveBeenCalled();
-    expect(mockGithubWebhook).toHaveBeenCalledTimes(1);
-
-    const forwardedRequest = mockGithubWebhook.mock.calls[0][0] as Request;
-    expect(forwardedRequest.headers.get('x-github-event')).toBe('pull_request_review_comment');
-    expect(await forwardedRequest.json()).toEqual(
-      expect.objectContaining({
-        installation: expect.objectContaining({
-          id: 98765,
-          account: expect.any(Object),
-        }),
-      })
+    expect(mockHandlePRReviewComment).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'created' }),
+      integration
     );
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
-      expect.objectContaining({ handlers_triggered: ['github_bot'] })
+      expect.objectContaining({ handlers_triggered: ['pr_review_comment_fix'] })
     );
   });
 
-  it('forwards issue_comment created events to the GitHub chat adapter', async () => {
+  it('acknowledges issue_comment events without invoking legacy handlers', async () => {
     const response = await handleGitHubWebhook(
       signedGitHubRequest('issue_comment', issueCommentPayload()),
       'standard'
     );
 
     expect(response.status).toBe(200);
-    expect(mockGithubWebhook).toHaveBeenCalledTimes(1);
-    const forwardedRequest = mockGithubWebhook.mock.calls[0][0] as Request;
-    expect(forwardedRequest.headers.get('x-github-event')).toBe('issue_comment');
-    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
-      'we_1',
-      expect.objectContaining({ handlers_triggered: ['github_bot'] })
-    );
+    expect(await response.json()).toEqual({ message: 'Event received' });
+    expect(mockHandlePullRequest).not.toHaveBeenCalled();
+    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 
   it('acknowledges non-created issue_comment events without invoking the bot', async () => {
@@ -240,7 +222,7 @@ describe('handleGitHubWebhook', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ message: 'Event received' });
-    expect(mockGithubWebhook).not.toHaveBeenCalled();
-    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockHandlePullRequest).not.toHaveBeenCalled();
+    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 });

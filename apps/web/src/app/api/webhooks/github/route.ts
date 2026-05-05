@@ -1,5 +1,5 @@
-import { NextRequest } from 'next/server';
-import { after } from 'next/server';
+import { NextRequest, after } from 'next/server';
+import { captureException } from '@sentry/nextjs';
 import { bot } from '@/lib/bot';
 import { handleGitHubWebhook } from '@/lib/integrations/platforms/github/webhook-handler';
 
@@ -23,14 +23,21 @@ export async function POST(request: NextRequest) {
   const botRequest = cloneGitHubRequest(request, rawBody);
 
   after(async () => {
-    const response = await bot.webhooks.github(botRequest, {
-      waitUntil: task => after(() => task),
-    });
+    try {
+      const response = await bot.webhooks.github(botRequest, {
+        waitUntil: task => after(() => task),
+      });
 
-    if (!response.ok) {
-      console.warn('[GitHub Webhook] Chat adapter returned non-ok response:', {
-        status: response.status,
-        statusText: response.statusText,
+      if (!response.ok) {
+        console.warn('[GitHub Webhook] Chat adapter returned non-ok response:', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+      }
+    } catch (error) {
+      console.error('[GitHub Webhook] Chat adapter threw:', error);
+      captureException(error, {
+        tags: { endpoint: 'webhooks/github', source: 'chat_adapter' },
       });
     }
   });

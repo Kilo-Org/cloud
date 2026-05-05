@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import {
   kiloclaw_email_log,
   kiloclaw_instances,
@@ -86,20 +86,6 @@ describe('subjects map', () => {
 // Each template has a unique subject line (or a documented subjectOverride),
 // so we discriminate Mailgun calls by subject rather than by templateName.
 const KILOCLAW_SUBSCRIPTION_STARTED_SUBJECT = subjects.kiloClawSubscriptionStarted;
-
-beforeAll(async () => {
-  await db.execute(sql`DROP INDEX IF EXISTS "UQ_kiloclaw_email_log_user_instance_type"`);
-  await db.execute(sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS "UQ_kiloclaw_email_log_user_instance_type_period"
-    ON "kiloclaw_email_log" USING btree (
-      "user_id",
-      "instance_id",
-      "email_type",
-      "period_start"
-    )
-    WHERE "kiloclaw_email_log"."instance_id" is not null
-  `);
-});
 
 function subscriptionStartedSends(): SendViaMailgunParams[] {
   return sendViaMailgunMock.mock.calls

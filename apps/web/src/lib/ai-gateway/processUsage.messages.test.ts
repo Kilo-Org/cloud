@@ -106,9 +106,7 @@ describe('processMessagesApiUsage', () => {
           modelAttempts: [
             {
               success: true,
-              providerAttempts: [
-                { provider: 'bedrock', credentialType: 'byok', success: true },
-              ],
+              providerAttempts: [{ provider: 'bedrock', credentialType: 'byok', success: true }],
             },
           ],
         },
@@ -138,9 +136,7 @@ describe('processMessagesApiUsage', () => {
           modelAttempts: [
             {
               success: true,
-              providerAttempts: [
-                { provider: 'bedrock', credentialType: 'system', success: true },
-              ],
+              providerAttempts: [{ provider: 'bedrock', credentialType: 'system', success: true }],
             },
           ],
         },

@@ -113,9 +113,7 @@ describe('processResponsesApiUsage', () => {
           modelAttempts: [
             {
               success: true,
-              providerAttempts: [
-                { provider: 'openai', credentialType: 'byok', success: true },
-              ],
+              providerAttempts: [{ provider: 'openai', credentialType: 'byok', success: true }],
             },
           ],
         },

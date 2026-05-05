@@ -7,6 +7,8 @@
 
 import { z } from 'zod';
 
+import type { PushData } from '@kilocode/notifications';
+
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from './expo-push';
 
 export type ScheduledActionEvent =
@@ -120,19 +122,22 @@ export function buildScheduledActionMessages(
   const title = buildTitle(params.event, params.instanceName);
   const body = buildBody(params);
 
-  return tokens.map(token => ({
-    to: token,
-    title,
-    body,
-    // Keep in sync with pushDataSchema in @kilocode/notifications.
-    data: {
+  return tokens.map(token => {
+    const data = {
       type: 'scheduled-action',
       event: params.event,
       sandboxId: params.sandboxId,
-    },
-    sound: 'default' as const,
-    priority: 'high' as const,
-  }));
+    } satisfies PushData;
+
+    return {
+      to: token,
+      title,
+      body,
+      data,
+      sound: 'default' as const,
+      priority: 'high' as const,
+    };
+  });
 }
 
 export type ScheduledActionDispatchDeps = {

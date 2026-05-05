@@ -1,0 +1,3 @@
+DROP INDEX "UQ_kiloclaw_email_log_user_instance_type";--> statement-breakpoint
+ALTER TABLE "kiloclaw_email_log" ADD COLUMN "period_start" timestamp with time zone DEFAULT 'epoch' NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_kiloclaw_email_log_user_instance_type_period" ON "kiloclaw_email_log" USING btree ("user_id","instance_id","email_type","period_start") WHERE "kiloclaw_email_log"."instance_id" is not null;

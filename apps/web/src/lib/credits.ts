@@ -149,9 +149,8 @@ export async function processTopUp(
  * sending again. If the provider was not configured (e.g. Mailgun env missing
  * in preview/test), the marker is cleared so a future retry can re-attempt.
  *
- * Known gaps shared with every other insert-before-send email path in this
- * codebase (`maybeSendKiloClawSubscriptionStartedEmail` below,
- * `services/kiloclaw-billing/src/lifecycle.ts` ~L850, and the
+ * Known gaps shared with the other insert-before-send email paths in this
+ * codebase (`services/kiloclaw-billing/src/lifecycle.ts` ~L850 and the
  * `kiloclaw_email_log`-gated sends in `apps/web/src/app/api/internal/kiloclaw/`):
  * 1. A crash between the marker insert and the provider send permanently
  *    suppresses the email on retry; the marker looks "already sent".
@@ -209,8 +208,7 @@ async function maybeSendTopUpConfirmationEmail(params: {
       tags: { source: 'credits_topup_email' },
       extra: { kilo_user_id: user.id, stripeChargeOrInvoiceId, isAutoTopUp },
     });
-    // Best-effort rollback so a retry can re-attempt — mirrors the pattern in
-    // `maybeSendKiloClawSubscriptionStartedEmail`.
+    // Best-effort rollback so a retry can re-attempt.
     try {
       await deleteTopUpEmailMarker(stripeChargeOrInvoiceId);
     } catch {

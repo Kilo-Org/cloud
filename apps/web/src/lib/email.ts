@@ -42,7 +42,6 @@ export const subjects = {
   clawComplementaryInferenceEnded: 'Your Free AI Inference Period Has Ended',
   accountDeletionRequest: 'Kilo: Account Deletion Request Received',
   creditsTopUp: 'Your Kilo credit top-up',
-  kiloClawSubscriptionStarted: 'Your KiloClaw subscription is active',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -460,31 +459,6 @@ export async function sendCreditsTopUpEmail(
       purchase_date: formatDate(props.purchaseDate),
       credits_url,
       receipt_section: buildCreditsTopUpReceiptSection(props.receiptUrl),
-    },
-  });
-}
-
-type SendKiloClawSubscriptionStartedEmailProps = {
-  to: string;
-  planName: string;
-  priceCents: number;
-  billingPeriod: string;
-  nextBillingDate: Date;
-};
-
-export async function sendKiloClawSubscriptionStartedEmail(
-  props: SendKiloClawSubscriptionStartedEmailProps
-): Promise<SendResult> {
-  const manage_url = `${NEXTAUTH_URL}/claw/subscription`;
-  return send({
-    to: props.to,
-    templateName: 'kiloClawSubscriptionStarted',
-    templateVars: {
-      plan_name: props.planName,
-      price_usd: formatUsd(props.priceCents),
-      billing_period: props.billingPeriod,
-      next_billing_date: formatDate(props.nextBillingDate),
-      manage_url,
     },
   });
 }

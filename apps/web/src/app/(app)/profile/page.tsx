@@ -22,7 +22,6 @@ import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations
 import { PageLayout } from '@/components/PageLayout';
 import { ProfileOrganizationsSection } from '@/components/profile/ProfileOrganizationsSection';
 import { ProfileKiloPassSection } from '@/components/profile/ProfileKiloPassSection';
-import { ImpactAdvocateReferralCard } from '@/components/profile/ImpactAdvocateReferralCard';
 import { CreateKilocodeOrgButton } from '@/components/dev/CreateKilocodeOrgButton';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { UserProfileCard } from '@/components/profile/UserProfileCard';
@@ -82,8 +81,6 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
       </div>
 
       {isKiloPassUiEnabled && <ProfileKiloPassSection />}
-
-      <ImpactAdvocateReferralCard />
 
       <ProfileOrganizationsSection orgs={orgs} />
 

@@ -1,16 +1,35 @@
 'use client';
 
 import { createElement, useEffect, useState } from 'react';
-import { Gift } from 'lucide-react';
-
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 type WidgetState =
   | { status: 'loading' }
   | { status: 'ready'; token: string; widgetId: string }
   | { status: 'unavailable'; message: string };
 
-export function ImpactAdvocateReferralCard() {
+function renderWidgetContent(state: WidgetState) {
+  switch (state.status) {
+    case 'loading':
+      return <div className="text-muted-foreground text-sm">Loading referral sharing…</div>;
+    case 'unavailable':
+      return <div className="text-muted-foreground text-sm">{state.message}</div>;
+    case 'ready':
+      return (
+        <div data-impact-token={state.token ? 'loaded' : 'missing'}>
+          {createElement(
+            'impact-embed',
+            {
+              widget: state.widgetId,
+              className: 'block min-h-52 w-full',
+            },
+            <div className="text-muted-foreground text-sm">Loading referral widget…</div>
+          )}
+        </div>
+      );
+  }
+}
+
+export function ImpactAdvocateReferralWidget() {
   const [state, setState] = useState<WidgetState>({ status: 'loading' });
 
   useEffect(() => {
@@ -77,36 +96,5 @@ export function ImpactAdvocateReferralCard() {
     };
   }, []);
 
-  return (
-    <Card className="w-full text-left">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Gift className="h-5 w-5" />
-          Referral Program
-        </CardTitle>
-        <CardDescription>
-          Invite a friend to KiloClaw. When they become an eligible paid personal subscriber, you
-          both get a free month.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {state.status === 'loading' ? (
-          <div className="text-muted-foreground text-sm">Loading referral sharing…</div>
-        ) : state.status === 'unavailable' ? (
-          <div className="text-muted-foreground text-sm">{state.message}</div>
-        ) : (
-          <div data-impact-token={state.token ? 'loaded' : 'missing'}>
-            {createElement(
-              'impact-embed',
-              {
-                widget: state.widgetId,
-                className: 'block min-h-52 w-full',
-              },
-              <div className="text-muted-foreground text-sm">Loading referral widget…</div>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+  return <div className="w-full">{renderWidgetContent(state)}</div>;
 }

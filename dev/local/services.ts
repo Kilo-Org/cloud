@@ -41,6 +41,7 @@ const groups: ServiceGroup[] = [
   { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
+  { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
 ];
 
@@ -178,6 +179,8 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/ai-attribution',
   },
   grafana: { group: 'observability', dependsOn: [] },
+  // mobile
+  mobile: { group: 'mobile', dependsOn: [], dir: 'apps/mobile' },
   // storybook
   storybook: { group: 'storybook', dependsOn: [] },
   // gastown
@@ -319,6 +322,20 @@ function buildServiceDefs(): ServiceDef[] {
         port: 6006 + portOffset,
         dependsOn: meta.dependsOn,
         command: ['pnpm', 'run', 'storybook', '--', '-p', String(6006 + portOffset)],
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'mobile') {
+      const port = 8081 + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: 'apps/mobile',
+        port,
+        dependsOn: meta.dependsOn,
+        command: ['pnpm', 'run', 'start', '--', '--port', String(port)],
         group: meta.group,
       });
       continue;

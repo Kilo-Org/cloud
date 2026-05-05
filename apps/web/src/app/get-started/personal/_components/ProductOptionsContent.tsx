@@ -4,12 +4,14 @@ import KiloCrabIcon from '@/components/KiloCrabIcon';
 import { cn } from '@/lib/utils';
 import { ArrowRight, Briefcase, Check, Cloud, Download } from 'lucide-react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import type { ReactNode } from 'react';
 
 import './ProductOptionsContent.css';
 
 type WelcomeContentProps = {
   isAuthenticated: boolean;
+  dashboardHref: string;
 };
 
 type RowCard = {
@@ -94,10 +96,12 @@ function CardRow({ card, entranceDelayMs }: { card: RowCard; entranceDelayMs: nu
   );
 }
 
-export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps) {
-  const cloudHref = getAuthenticatedHref(isAuthenticated, '/cloud');
-  const kiloclawHref = getAuthenticatedHref(isAuthenticated, '/claw');
-  const teamHref = getAuthenticatedHref(isAuthenticated, '/organizations/new');
+export default function WelcomeContent({ isAuthenticated, dashboardHref }: WelcomeContentProps) {
+  const session = useSession();
+  const isSignedIn = isAuthenticated || session.status === 'authenticated';
+  const cloudHref = getAuthenticatedHref(isSignedIn, '/cloud');
+  const kiloclawHref = getAuthenticatedHref(isSignedIn, '/claw');
+  const teamHref = getAuthenticatedHref(isSignedIn, '/organizations/new');
   const signInHref = `/users/sign_in?callbackPath=/get-started`;
 
   const cards: RowCard[] = [
@@ -221,14 +225,14 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
           />
         </div>
 
-        {isAuthenticated ? (
+        {isSignedIn ? (
           <p
             style={{ animationDelay: '540ms' }}
             className="text-muted-foreground kilo-fade-up pt-1 text-center text-xs"
           >
             Not ready to choose?{' '}
             <Link
-              href="/profile"
+              href={dashboardHref}
               className="inline-flex items-center gap-1 rounded font-semibold text-white outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
             >
               Skip to dashboard

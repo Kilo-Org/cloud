@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { getUserFromAuth } from '@/lib/user.server';
+import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user.server';
 import { redirect } from 'next/navigation';
 import ProductOptionsContent from './personal/_components/ProductOptionsContent';
 import { PageContainer } from '@/components/layouts/PageContainer';
@@ -36,11 +36,12 @@ export default async function GetStartedPage() {
   }
 
   const isAuthenticated = !!user;
+  const dashboardHref = user ? await getProfileRedirectPath(user) : '/profile';
 
   return (
     <PageContainer className="min-h-screen max-w-7xl justify-center py-8 md:py-12">
       <main className="mx-auto w-full max-w-6xl">
-        <ProductOptionsContent isAuthenticated={isAuthenticated} />
+        <ProductOptionsContent isAuthenticated={isAuthenticated} dashboardHref={dashboardHref} />
       </main>
     </PageContainer>
   );

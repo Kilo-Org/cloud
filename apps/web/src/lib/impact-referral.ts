@@ -352,6 +352,126 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
     .where(eq(impact_advocate_participants.id, participant.id));
 }
 
+/**
+ * Queue an Upsert User attempt for an advocate-only Kilo user — someone who
+ * has not arrived through a referral cookie themselves but is now actively
+ * trying to share a referral link (e.g. the user has loaded /claw/refer).
+ *
+ * Without this, the only Kilo users with `impact_advocate_participants` rows
+ * are referees; advocate-only users would have either no row or a row whose
+ * `opaque_referral_identifier` was a Kilo-side UUID with no relationship to
+ * the SaaSquatch-issued referral code. That UUID can never match an inbound
+ * referee touch's `rs_code`, so the conversion lifecycle would resolve
+ * `referrerUserId = null` and silently undercount attribution on the Kilo
+ * side. See spec rules 11 and 51.
+ *
+ * Idempotent: deduped by user id, so repeated `/claw/refer` visits don't
+ * stack attempts. The dispatcher (dispatchImpactAdvocateRegistrationAttemptById)
+ * extracts the SaaSquatch code from the response and writes it to
+ * `participants.opaque_referral_identifier` exactly the same way as for
+ * referee registrations.
+ */
+export async function queueImpactAdvocateSelfRegistration(params: {
+  database?: DatabaseClient;
+  user: Pick<User, 'id' | 'google_user_email'>;
+  locale?: string | null;
+  countryCode?: string | null;
+}): Promise<void> {
+  const database = getDatabaseClient(params.database);
+  const isConfigured = isImpactAdvocateConfigured();
+  const nowIso = new Date().toISOString();
+
+  // Empty cookie envelope — advocate-only users have no inbound attribution.
+  // SaaSquatch's Verified Access widget creates such users on the fly when
+  // the JWT identifies them; this server-side mirror produces the same
+  // outcome and lets us read the referralCodes back from the response.
+  const payload = buildImpactAdvocateRegisterParticipantPayload({
+    user: params.user,
+    referralCookieValue: '',
+    locale: params.locale,
+    countryCode: params.countryCode,
+  });
+
+  const participant = await ensureImpactAdvocateParticipantProfile({
+    database,
+    user: params.user,
+    locale: params.locale,
+    countryCode: params.countryCode,
+  });
+
+  const existing = await database.query.impact_advocate_participants.findFirst({
+    where: eq(impact_advocate_participants.id, participant.id),
+    columns: { registration_state: true, opaque_referral_identifier: true },
+  });
+  if (
+    existing?.registration_state === ImpactAdvocateRegistrationState.Registered &&
+    existing.opaque_referral_identifier?.trim()
+  ) {
+    logImpactReferralDebug(
+      'Skipped Impact Advocate self-registration; participant already registered with code',
+      {
+        userId: params.user.id,
+        participantId: participant.id,
+      }
+    );
+    return;
+  }
+
+  const attemptDedupeKey = buildHashedDedupeKey([
+    'impact-advocate-self-registration',
+    params.user.id,
+  ]);
+
+  const [insertedAttempt] = await database
+    .insert(impact_advocate_registration_attempts)
+    .values({
+      participant_id: participant.id,
+      dedupe_key: attemptDedupeKey,
+      opaque_cookie_value: null,
+      cookie_value_length: 0,
+      delivery_state: isConfigured
+        ? ImpactAdvocateAttemptDeliveryState.Queued
+        : ImpactAdvocateAttemptDeliveryState.Failed,
+      request_payload: payload satisfies Record<string, unknown>,
+      response_payload: isConfigured
+        ? null
+        : ({ error: 'missing_configuration' } satisfies Record<string, unknown>),
+      response_status_code: isConfigured ? null : 503,
+    })
+    .onConflictDoNothing({ target: [impact_advocate_registration_attempts.dedupe_key] })
+    .returning({ id: impact_advocate_registration_attempts.id });
+
+  logImpactReferralDebug(
+    insertedAttempt
+      ? 'Queued Impact Advocate self-registration attempt'
+      : 'Impact Advocate self-registration attempt already existed',
+    {
+      userId: params.user.id,
+      participantId: participant.id,
+      attemptId: insertedAttempt?.id ?? null,
+      impactAdvocateConfigured: isConfigured,
+      localePresent: Boolean(params.locale?.trim()),
+      countryCode: params.countryCode ?? null,
+    }
+  );
+
+  if (!insertedAttempt) {
+    return;
+  }
+
+  await database
+    .update(impact_advocate_participants)
+    .set({
+      registration_state: isConfigured
+        ? ImpactAdvocateRegistrationState.Pending
+        : ImpactAdvocateRegistrationState.Failed,
+      last_error_code: isConfigured ? null : 'missing_configuration',
+      last_error_message: isConfigured ? null : 'Impact Advocate configuration is incomplete',
+      last_registration_attempt_at: nowIso,
+    })
+    .where(eq(impact_advocate_participants.id, participant.id));
+}
+
 export async function createDeletedUserEmailTombstone(params: {
   database?: DatabaseClient;
   normalizedEmail: string | null;

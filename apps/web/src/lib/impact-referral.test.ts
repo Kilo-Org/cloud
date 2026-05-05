@@ -423,4 +423,120 @@ describe('impact referral participant registration dispatch', () => {
       expect(incumbentParticipant?.opaque_referral_identifier).toBe('COLLIDING_CODE');
     }
   );
+
+  describe('queueImpactAdvocateSelfRegistration', () => {
+    it('queues an Upsert User attempt with empty cookies and persists the SaaSquatch code on dispatch', async () => {
+      const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            id: 'sq-self-id',
+            email: 'advocate@example.com',
+            referralCodes: { '51699': 'ADVOCATE7777' },
+            referable: true,
+          }),
+          { status: 200 }
+        )
+      );
+      global.fetch = fetchMock;
+
+      const user = await insertTestUser({
+        google_user_email: 'advocate@example.com',
+        normalized_email: 'advocate@example.com',
+      });
+
+      const {
+        dispatchQueuedImpactAdvocateRegistrationAttempts,
+        queueImpactAdvocateSelfRegistration,
+      } = await import('@/lib/impact-referral');
+
+      await queueImpactAdvocateSelfRegistration({
+        user,
+        locale: 'en-US',
+        countryCode: 'US',
+      });
+
+      // Attempt was queued without a cookie value.
+      const [queued] = await db.select().from(impact_advocate_registration_attempts);
+      expect(queued.delivery_state).toBe('queued');
+      expect(queued.opaque_cookie_value).toBeNull();
+      expect(queued.cookie_value_length).toBe(0);
+
+      const summary = await dispatchQueuedImpactAdvocateRegistrationAttempts();
+      expect(summary).toEqual({ claimed: 1, delivered: 1, retried: 0, failed: 0 });
+
+      // Body sent over the wire has empty cookies and locale normalised.
+      const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+      expect(requestBody).toEqual({
+        id: 'advocate@example.com',
+        accountId: 'advocate@example.com',
+        email: 'advocate@example.com',
+        cookies: '',
+        locale: 'en_US',
+        countryCode: 'US',
+      });
+
+      // Participant now carries the SaaSquatch code so future referee touches
+      // resolve back to this user.
+      const participant = await db.query.impact_advocate_participants.findFirst({
+        where: eq(impact_advocate_participants.user_id, user.id),
+      });
+      expect(participant?.registration_state).toBe('registered');
+      expect(participant?.opaque_referral_identifier).toBe('ADVOCATE7777');
+    });
+
+    it('is idempotent across repeat calls (deduped by user id)', async () => {
+      const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            id: 'sq-id',
+            email: 'advocate@example.com',
+            referralCodes: { '51699': 'ADVOCATE7777' },
+            referable: true,
+          }),
+          { status: 200 }
+        )
+      );
+      global.fetch = fetchMock;
+
+      const user = await insertTestUser({
+        google_user_email: 'advocate@example.com',
+        normalized_email: 'advocate@example.com',
+      });
+
+      const { queueImpactAdvocateSelfRegistration } = await import('@/lib/impact-referral');
+
+      await queueImpactAdvocateSelfRegistration({ user });
+      await queueImpactAdvocateSelfRegistration({ user });
+      await queueImpactAdvocateSelfRegistration({ user });
+
+      const attempts = await db.select().from(impact_advocate_registration_attempts);
+      expect(attempts).toHaveLength(1);
+    });
+
+    it('skips queueing once the participant is already registered with a code', async () => {
+      const fetchMock = jest.fn<typeof fetch>();
+      global.fetch = fetchMock;
+
+      const user = await insertTestUser({
+        google_user_email: 'advocate@example.com',
+        normalized_email: 'advocate@example.com',
+      });
+      // Pretend SaaSquatch has already registered them and we have the code.
+      await db.insert(impact_advocate_participants).values({
+        user_id: user.id,
+        advocate_id: user.google_user_email,
+        advocate_account_id: user.google_user_email,
+        opaque_referral_identifier: 'ADVOCATE7777',
+        registration_state: 'registered',
+        registered_at: new Date('2026-04-01T00:00:00.000Z').toISOString(),
+      });
+
+      const { queueImpactAdvocateSelfRegistration } = await import('@/lib/impact-referral');
+      await queueImpactAdvocateSelfRegistration({ user });
+
+      const attempts = await db.select().from(impact_advocate_registration_attempts);
+      expect(attempts).toHaveLength(0);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });

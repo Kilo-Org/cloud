@@ -1359,12 +1359,12 @@ async function processCreditRenewalRow(
         itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
         itemName: getKiloClawAffiliateItemName(effectivePlan),
         itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
-      }).catch(error => {
-        log('warn', 'Affiliate sale enqueue recovery failed during duplicate credit renewal', {
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
       });
+
+      await database
+        .update(kiloclaw_subscriptions)
+        .set({ credit_renewal_at: newPeriodEnd })
+        .where(eq(kiloclaw_subscriptions.id, row.id));
 
       summary.credit_renewals_skipped_duplicate++;
       return;
@@ -1402,22 +1402,25 @@ async function processCreditRenewalRow(
       });
     }
 
-    await processPaidConversion(env, context, {
-      userId,
-      dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
-      eventDateIso: renewalAt,
-      orderId: deductionCategory,
-      amount: costMicrodollars / 1_000_000,
-      currencyCode: 'usd',
-      itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
-      itemName: getKiloClawAffiliateItemName(effectivePlan),
-      itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
-    }).catch(error => {
-      log('warn', 'Affiliate sale enqueue failed during credit renewal', {
+    try {
+      await processPaidConversion(env, context, {
         userId,
-        error: error instanceof Error ? error.message : String(error),
+        dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
+        eventDateIso: renewalAt,
+        orderId: deductionCategory,
+        amount: costMicrodollars / 1_000_000,
+        currencyCode: 'usd',
+        itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
+        itemName: getKiloClawAffiliateItemName(effectivePlan),
+        itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
       });
-    });
+    } catch (error) {
+      await database
+        .update(kiloclaw_subscriptions)
+        .set({ credit_renewal_at: renewalAt })
+        .where(eq(kiloclaw_subscriptions.id, row.id));
+      throw error;
+    }
 
     summary.credit_renewals++;
     return;

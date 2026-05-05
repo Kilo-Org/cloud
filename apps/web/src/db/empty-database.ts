@@ -2,6 +2,10 @@ import '../lib/load-env';
 import { sql } from 'drizzle-orm';
 import { db } from '../lib/drizzle';
 
+function quotePostgresIdentifier(identifier: string): string {
+  return `"${identifier.replaceAll('"', '""')}"`;
+}
+
 async function main() {
   console.log('Resetting database (drop and recreate app schemas)...');
 
@@ -18,7 +22,9 @@ async function main() {
     }
 
     console.log(`Dropping schema ${row.nspname}...`);
-    await db.execute(sql.raw(`DROP SCHEMA IF EXISTS "${row.nspname}" CASCADE`));
+    await db.execute(
+      sql.raw(`DROP SCHEMA IF EXISTS ${quotePostgresIdentifier(row.nspname)} CASCADE`)
+    );
   }
 
   await db.execute(sql.raw('CREATE SCHEMA "public"'));

@@ -15,6 +15,7 @@ import { ensureAutoIntroSchedule } from '@/lib/kiloclaw/stripe-handlers';
 import { isIntroPriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
 import { client as stripe } from '@/lib/stripe-client';
 import { enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
 import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
 import { projectPendingKiloPassBonusMicrodollars } from '@/lib/kiloclaw/credit-billing';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
@@ -272,6 +273,16 @@ export async function POST(request: NextRequest) {
       }
 
       case 'enqueue_affiliate_event':
+        logImpactReferralDebug('KiloClaw billing side effect enqueueing affiliate event', {
+          userId: parsed.data.input.userId,
+          provider: parsed.data.input.provider,
+          eventType: parsed.data.input.eventType,
+          dedupeKey: parsed.data.input.dedupeKey,
+          orderId: parsed.data.input.orderId,
+          amount: parsed.data.input.amount,
+          currencyCode: parsed.data.input.currencyCode,
+          itemCategory: parsed.data.input.itemCategory,
+        });
         await enqueueAffiliateEventForUser({
           userId: parsed.data.input.userId,
           provider: parsed.data.input.provider,
@@ -290,6 +301,14 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'process_paid_conversion': {
+        logImpactReferralDebug('KiloClaw billing side effect processing paid conversion', {
+          userId: parsed.data.input.userId,
+          dedupeKey: parsed.data.input.dedupeKey,
+          orderId: parsed.data.input.orderId,
+          amount: parsed.data.input.amount,
+          currencyCode: parsed.data.input.currencyCode,
+          itemCategory: parsed.data.input.itemCategory,
+        });
         const disposition = await processPersonalKiloClawPaidConversion({
           userId: parsed.data.input.userId,
           sourcePaymentId: parsed.data.input.orderId,
@@ -300,6 +319,15 @@ export async function POST(request: NextRequest) {
           itemName: parsed.data.input.itemName,
           itemSku: parsed.data.input.itemSku,
           convertedAt: new Date(parsed.data.input.eventDateIso),
+        });
+
+        logImpactReferralDebug('KiloClaw billing side effect paid conversion disposition', {
+          userId: parsed.data.input.userId,
+          orderId: parsed.data.input.orderId,
+          shouldEnqueueAffiliateSale: disposition.shouldEnqueueAffiliateSale,
+          winningTouchType: disposition.winningTouchType,
+          conversionId: disposition.conversionId,
+          disqualificationReason: disposition.disqualificationReason,
         });
 
         if (disposition.shouldEnqueueAffiliateSale) {

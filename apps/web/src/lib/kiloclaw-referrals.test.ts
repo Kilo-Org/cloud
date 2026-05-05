@@ -440,6 +440,125 @@ describe('kiloclaw referrals', () => {
       expect(mockSendImpactConversionPayload).toHaveBeenCalledTimes(1);
     });
 
+    it('resolves referrers through referral_codes when no participant mapping exists', async () => {
+      const referrer = await insertTestUser({
+        google_user_email: 'referral-code-referrer@example.com',
+        normalized_email: 'referral-code-referrer@example.com',
+      });
+      const referee = await insertTestUser({
+        google_user_email: 'referral-code-referee@example.com',
+        normalized_email: 'referral-code-referee@example.com',
+      });
+      const impactReferralId = 'REFERRER5616';
+      const sourcePaymentId = 'kiloclaw-subscription:instance-referral-code:2026-04';
+
+      await db.insert(referral_codes).values({
+        kilo_user_id: referrer.id,
+        code: impactReferralId,
+      });
+      await insertActivePersonalSubscription(referrer.id);
+      await insertActivePersonalSubscription(referee.id);
+      await db.insert(credit_transactions).values({
+        kilo_user_id: referee.id,
+        amount_microdollars: -9_000_000,
+        is_free: false,
+        description: 'KiloClaw standard enrollment',
+        credit_category: sourcePaymentId,
+      });
+      await db.insert(kiloclaw_attribution_touches).values({
+        id: 'abababab-abab-4bab-8bab-abababababab',
+        dedupe_key: 'referral-code-touch',
+        user_id: referee.id,
+        touch_type: 'referral',
+        provider: 'impact_advocate',
+        opaque_tracking_value: 'sq-cookie',
+        tracking_value_length: 9,
+        is_tracking_value_accepted: true,
+        rs_code: impactReferralId,
+        touched_at: '2026-03-31T00:00:00.000Z',
+        expires_at: '2026-04-30T00:00:00.000Z',
+      });
+
+      const disposition = await processPersonalKiloClawPaidConversion({
+        userId: referee.id,
+        sourcePaymentId,
+        orderId: sourcePaymentId,
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+        convertedAt: new Date('2026-04-09T00:00:00.000Z'),
+      });
+
+      expect(disposition).toMatchObject({
+        shouldEnqueueAffiliateSale: false,
+        winningTouchType: 'referral',
+        disqualificationReason: null,
+      });
+
+      const [conversion] = await db.select().from(kiloclaw_referral_conversions);
+      expect(conversion.referrer_user_id).toBe(referrer.id);
+      expect(conversion.qualified).toBe(true);
+    });
+
+    it('allows signup referral touches captured shortly after user creation', async () => {
+      const referrer = await insertTestUser({
+        google_user_email: 'signup-race-referrer@example.com',
+        normalized_email: 'signup-race-referrer@example.com',
+      });
+      const referee = await insertTestUser({
+        google_user_email: 'signup-race-referee@example.com',
+        normalized_email: 'signup-race-referee@example.com',
+        created_at: '2026-04-01T00:00:00.000Z',
+        updated_at: '2026-04-01T00:00:00.000Z',
+      });
+      const opaqueReferralIdentifier = await insertImpactAdvocateParticipant(referrer.id);
+      const sourcePaymentId = 'kiloclaw-subscription:instance-signup-race:2026-04';
+
+      await insertActivePersonalSubscription(referrer.id);
+      await insertActivePersonalSubscription(referee.id);
+      await db.insert(credit_transactions).values({
+        kilo_user_id: referee.id,
+        amount_microdollars: -9_000_000,
+        is_free: false,
+        description: 'KiloClaw standard enrollment',
+        credit_category: sourcePaymentId,
+      });
+      await db.insert(kiloclaw_attribution_touches).values({
+        id: 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
+        dedupe_key: 'signup-race-referral-touch',
+        user_id: referee.id,
+        touch_type: 'referral',
+        provider: 'impact_advocate',
+        opaque_tracking_value: 'sq-cookie',
+        tracking_value_length: 9,
+        is_tracking_value_accepted: true,
+        rs_code: opaqueReferralIdentifier,
+        landing_path: '/users/after-sign-in?signup=true&callbackPath=%2Fclaw%2Fnew',
+        touched_at: '2026-04-01T00:00:02.000Z',
+        expires_at: '2026-05-01T00:00:02.000Z',
+      });
+
+      const disposition = await processPersonalKiloClawPaidConversion({
+        userId: referee.id,
+        sourcePaymentId,
+        orderId: sourcePaymentId,
+        amount: 9,
+        currencyCode: 'usd',
+        itemCategory: 'kiloclaw-standard',
+        itemName: 'KiloClaw Standard Plan',
+        itemSku: 'price_standard',
+        convertedAt: new Date('2026-04-09T00:00:00.000Z'),
+      });
+
+      expect(disposition).toMatchObject({
+        shouldEnqueueAffiliateSale: false,
+        winningTouchType: 'referral',
+        disqualificationReason: null,
+      });
+    });
+
     it('logs terminal 4xx Impact conversion report failures and stops retrying unchanged payloads', async () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       mockSendImpactConversionPayload.mockResolvedValueOnce({

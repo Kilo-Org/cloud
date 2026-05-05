@@ -173,6 +173,40 @@ export function getImpactAdvocateWidgetId(): string {
   return getImpactAdvocateConfig()?.widgetId ?? IMPACT_ADVOCATE_DEFAULT_WIDGET_ID;
 }
 
+export function getImpactAdvocateProgramId(): string {
+  return getImpactAdvocateConfig()?.programId ?? IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID;
+}
+
+/**
+ * Pull the program-scoped referral code out of a SaaSquatch Upsert User
+ * response body. The response shape is:
+ *
+ *   { ..., "referralCodes": { "<programId>": "<code>" }, ... }
+ *
+ * Returns null when the body is missing, malformed, or does not contain a
+ * code for the requested programId. Never throws — callers treat null as
+ * "no code, leave participants.opaque_referral_identifier alone".
+ */
+export function extractAdvocateReferralCodeFromUpsertResponse(
+  responseBody: string | null | undefined,
+  programId: string
+): string | null {
+  if (!responseBody) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(responseBody);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const referralCodes = (parsed as Record<string, unknown>).referralCodes;
+  if (typeof referralCodes !== 'object' || referralCodes === null) return null;
+  const code = (referralCodes as Record<string, unknown>)[programId];
+  if (typeof code !== 'string') return null;
+  const trimmed = code.trim();
+  return trimmed ? trimmed : null;
+}
+
 export function buildImpactAdvocateIdentityPayload(
   user: Pick<User, 'google_user_email'>
 ): ImpactAdvocateIdentityPayload {

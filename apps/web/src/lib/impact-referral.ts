@@ -4,6 +4,8 @@ import { createHash } from 'crypto';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   buildImpactAdvocateRegisterParticipantPayload,
+  extractAdvocateReferralCodeFromUpsertResponse,
+  getImpactAdvocateProgramId,
   isImpactAdvocateConfigured,
   sendImpactAdvocateRegisterParticipantPayload,
   type ImpactAdvocateRegisterParticipantPayload,
@@ -26,7 +28,7 @@ import {
   KiloClawAttributionTouchProvider,
   KiloClawAttributionTouchType,
 } from '@kilocode/db/schema-types';
-import { and, asc, eq, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, lte, ne, or, sql } from 'drizzle-orm';
 
 type DatabaseClient = typeof db | DrizzleTransaction;
 
@@ -465,6 +467,54 @@ async function dispatchImpactAdvocateRegistrationAttemptById(
   });
 
   if (result.ok) {
+    // Pull the SaaSquatch-generated referral code out of the response so the
+    // participant becomes discoverable as an Advocate. Without this, every
+    // future referee touch carrying this user's rsCode would resolve
+    // referrerUserId=null and the rewards lifecycle would silently undercount
+    // attribution on the Kilo side. The unique constraint on
+    // opaque_referral_identifier means we have to pre-check for a collision
+    // (vanishingly unlikely — SaaSquatch issues unique codes per tenant — but
+    // a violation here would otherwise roll back the whole success transaction
+    // and put us in a retry loop).
+    const programId = getImpactAdvocateProgramId();
+    const advocateCode = extractAdvocateReferralCodeFromUpsertResponse(
+      result.responseBody,
+      programId
+    );
+
+    let advocateCodeToPersist: string | null = null;
+    if (advocateCode) {
+      const conflicting = await db.query.impact_advocate_participants.findFirst({
+        where: and(
+          eq(impact_advocate_participants.opaque_referral_identifier, advocateCode),
+          ne(impact_advocate_participants.id, participant.id)
+        ),
+        columns: { id: true, user_id: true },
+      });
+      if (conflicting) {
+        logImpactReferralDebug(
+          'Skipped persisting Impact Advocate referral code due to existing holder',
+          {
+            participantId: participant.id,
+            conflictingParticipantId: conflicting.id,
+            conflictingUserId: conflicting.user_id,
+            programId,
+          }
+        );
+      } else {
+        advocateCodeToPersist = advocateCode;
+      }
+    }
+
+    logImpactReferralDebug('Parsed Impact Advocate referral code from upsert response', {
+      attemptId: attempt.id,
+      participantId: participant.id,
+      userId: participant.user_id,
+      programId,
+      advocateCodePresent: Boolean(advocateCode),
+      advocateCodePersisted: Boolean(advocateCodeToPersist),
+    });
+
     await db.transaction(async tx => {
       await tx
         .update(impact_advocate_registration_attempts)
@@ -488,6 +538,7 @@ async function dispatchImpactAdvocateRegistrationAttemptById(
           last_registration_attempt_at: completedAt,
           last_error_code: null,
           last_error_message: null,
+          ...(advocateCodeToPersist ? { opaque_referral_identifier: advocateCodeToPersist } : {}),
         })
         .where(eq(impact_advocate_participants.id, participant.id));
     });

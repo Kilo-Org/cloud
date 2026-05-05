@@ -156,4 +156,50 @@ describe('impact advocate', () => {
       countryCode: 'US',
     });
   });
+
+  describe('extractAdvocateReferralCodeFromUpsertResponse', () => {
+    it('returns the program-scoped code from a SaaSquatch upsert response', async () => {
+      const { extractAdvocateReferralCodeFromUpsertResponse } =
+        await import('@/lib/impact-advocate');
+
+      const body = JSON.stringify({
+        id: 'hash',
+        email: 'referee@example.com',
+        referralCodes: { '51699': 'REFEREE15914', '99999': 'OTHER42' },
+        referable: true,
+      });
+
+      expect(extractAdvocateReferralCodeFromUpsertResponse(body, '51699')).toBe('REFEREE15914');
+      expect(extractAdvocateReferralCodeFromUpsertResponse(body, '99999')).toBe('OTHER42');
+    });
+
+    it('returns null for missing program, malformed JSON, empty bodies, or non-string codes', async () => {
+      const { extractAdvocateReferralCodeFromUpsertResponse } =
+        await import('@/lib/impact-advocate');
+
+      expect(extractAdvocateReferralCodeFromUpsertResponse(null, '51699')).toBeNull();
+      expect(extractAdvocateReferralCodeFromUpsertResponse('', '51699')).toBeNull();
+      expect(extractAdvocateReferralCodeFromUpsertResponse('not json', '51699')).toBeNull();
+      expect(extractAdvocateReferralCodeFromUpsertResponse('null', '51699')).toBeNull();
+      expect(extractAdvocateReferralCodeFromUpsertResponse('{}', '51699')).toBeNull();
+      expect(
+        extractAdvocateReferralCodeFromUpsertResponse(
+          JSON.stringify({ referralCodes: { '51699': '   ' } }),
+          '51699'
+        )
+      ).toBeNull();
+      expect(
+        extractAdvocateReferralCodeFromUpsertResponse(
+          JSON.stringify({ referralCodes: { '51699': 12345 } }),
+          '51699'
+        )
+      ).toBeNull();
+      expect(
+        extractAdvocateReferralCodeFromUpsertResponse(
+          JSON.stringify({ referralCodes: { '99999': 'OTHER42' } }),
+          '51699'
+        )
+      ).toBeNull();
+    });
+  });
 });

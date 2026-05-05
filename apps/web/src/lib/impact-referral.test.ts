@@ -31,11 +31,22 @@ describe('impact referral participant registration dispatch', () => {
   });
 
   it('delivers queued participant registrations and marks the participant registered', async () => {
-    const fetchMock = jest
-      .fn<typeof fetch>()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ participantId: 'impact-participant-1' }), { status: 200 })
-      );
+    // Realistic SaaSquatch upsert response shape — the dispatcher must parse
+    // referralCodes[programId] and persist it as the participant's
+    // opaque_referral_identifier so future referee touches can resolve back
+    // to this user as their advocate.
+    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'sq-hash-id',
+          accountId: 'sq-hash-id',
+          email: 'participant@example.com',
+          referralCodes: { '51699': 'PARTICIPANT9001' },
+          referable: true,
+        }),
+        { status: 200 }
+      )
+    );
     global.fetch = fetchMock;
 
     const user = await insertTestUser({
@@ -82,6 +93,9 @@ describe('impact referral participant registration dispatch', () => {
     expect(participant.registration_state).toBe('registered');
     expect(participant.registered_at).toBeTruthy();
     expect(participant.last_error_code).toBeNull();
+    // The advocate's program-scoped SaaSquatch code is now persisted so the
+    // attribution lookup in kiloclaw-referrals.ts can resolve referrerUserId.
+    expect(participant.opaque_referral_identifier).toBe('PARTICIPANT9001');
 
     const [attempt] = await db.select().from(impact_advocate_registration_attempts);
     expect(attempt.delivery_state).toBe('succeeded');
@@ -321,4 +335,92 @@ describe('impact referral participant registration dispatch', () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it(
+    'leaves opaque_referral_identifier untouched when another participant ' +
+      'already holds the SaaSquatch code',
+    async () => {
+      // Existing participant on a *different* user already holds the code.
+      // The unique constraint on opaque_referral_identifier means we must not
+      // try to write the same code on a second participant — doing so would
+      // roll back the success transaction and the cron would loop forever.
+      const incumbent = await insertTestUser({
+        google_user_email: 'incumbent@example.com',
+        normalized_email: 'incumbent@example.com',
+      });
+      await db.insert(impact_advocate_participants).values({
+        user_id: incumbent.id,
+        advocate_id: incumbent.google_user_email,
+        advocate_account_id: incumbent.google_user_email,
+        opaque_referral_identifier: 'COLLIDING_CODE',
+        registration_state: 'registered',
+      });
+
+      const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            id: 'sq-hash-id-other',
+            email: 'other@example.com',
+            referralCodes: { '51699': 'COLLIDING_CODE' },
+            referable: true,
+          }),
+          { status: 200 }
+        )
+      );
+      global.fetch = fetchMock;
+
+      const newUser = await insertTestUser({
+        google_user_email: 'other@example.com',
+        normalized_email: 'other@example.com',
+      });
+
+      const {
+        dispatchQueuedImpactAdvocateRegistrationAttempts,
+        queueImpactAdvocateParticipantRegistration,
+      } = await import('@/lib/impact-referral');
+
+      await queueImpactAdvocateParticipantRegistration({
+        user: newUser,
+        referralTouch: {
+          opaqueTrackingValue: 'sq-cookie-other',
+          trackingValueLength: 15,
+          isTrackingValueAccepted: true,
+          rsCode: 'ref-other',
+          rsShareMedium: 'email',
+          rsEngagementMedium: 'link',
+          landingPath: '/get-started?_saasquatch=sq-cookie-other',
+          utmSource: null,
+          utmMedium: null,
+          utmCampaign: null,
+          utmTerm: null,
+          utmContent: null,
+          touchedAt: new Date('2026-04-23T00:00:00.000Z'),
+          expiresAt: new Date('2026-05-23T00:00:00.000Z'),
+        },
+        locale: 'en-US',
+        countryCode: 'US',
+      });
+
+      const summary = await dispatchQueuedImpactAdvocateRegistrationAttempts();
+      expect(summary).toEqual({
+        claimed: 1,
+        delivered: 1,
+        retried: 0,
+        failed: 0,
+      });
+
+      // The new participant is registered but does NOT receive the colliding
+      // code; the incumbent keeps it.
+      const newParticipant = await db.query.impact_advocate_participants.findFirst({
+        where: eq(impact_advocate_participants.user_id, newUser.id),
+      });
+      expect(newParticipant?.registration_state).toBe('registered');
+      expect(newParticipant?.opaque_referral_identifier).toBeNull();
+
+      const incumbentParticipant = await db.query.impact_advocate_participants.findFirst({
+        where: eq(impact_advocate_participants.user_id, incumbent.id),
+      });
+      expect(incumbentParticipant?.opaque_referral_identifier).toBe('COLLIDING_CODE');
+    }
+  );
 });

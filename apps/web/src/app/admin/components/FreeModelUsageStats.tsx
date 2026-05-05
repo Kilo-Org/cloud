@@ -57,8 +57,8 @@ export function FreeModelUsageStats() {
         <CardHeader>
           <CardTitle>Rate Limit Configuration</CardTitle>
           <CardDescription>
-            Current free model rate limit settings (per user for authenticated requests, per IP for
-            anonymous requests)
+            Current free model rate limit settings (per user for authenticated requests, per IP
+            for anonymous requests)
           </CardDescription>
         </CardHeader>
         <CardContent>

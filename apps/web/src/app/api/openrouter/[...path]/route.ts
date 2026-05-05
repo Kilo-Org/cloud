@@ -37,7 +37,6 @@ import {
   makeErrorReadable,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
-  noFreeModelsAvailableResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
@@ -219,7 +218,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
-    const autoResult = await applyResolvedAutoModel(
+    await applyResolvedAutoModel(
       {
         model: requestedModelLowerCased,
         modeHeader,
@@ -232,9 +231,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       authPromise.then(res => res.user),
       balanceAndSettingsPromise.then(res => res.balance)
     );
-    if (autoResult.kind === 'no_free_models_available') {
-      return noFreeModelsAvailableResponse();
-    }
   }
 
   const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();

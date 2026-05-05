@@ -46,7 +46,9 @@ export function RateLimitTesting() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {usageQuery.isLoading && <p className="text-muted-foreground text-sm">Loading usage...</p>}
+        {usageQuery.isLoading && (
+          <p className="text-muted-foreground text-sm">Loading usage...</p>
+        )}
 
         {usageQuery.error && (
           <p className="text-sm text-red-500">

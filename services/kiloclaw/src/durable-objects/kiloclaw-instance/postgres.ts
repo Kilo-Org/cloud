@@ -4,6 +4,7 @@ import type {
   FlyProviderState,
   NorthflankProviderState,
 } from '../../schemas/instance-config';
+import { InstanceTypeSchema } from '@kilocode/kiloclaw-instance-tiers';
 import {
   getWorkerDb,
   getActivePersonalInstance,
@@ -31,8 +32,7 @@ import {
   findVolumeByName,
 } from '../../northflank/client';
 import { northflankResourceNames } from '../../providers/northflank/names';
-import { tierFromMachineSize } from '@kilocode/kiloclaw-instance-tiers';
-import { DEFAULT_VOLUME_SIZE_GB } from '../../config';
+import { resolveInstanceTypeLabel } from '@kilocode/kiloclaw-instance-tiers';
 
 type RestoreOpts = {
   /** If the DO has a stored sandboxId, use it for precise lookup. */
@@ -170,6 +170,7 @@ export async function restoreFromPostgres(
         ? await recoverNorthflankProviderState(env, instance.sandboxId)
         : await recoverFlyProviderState(env, restoredUserId, instance.sandboxId);
     const recoveredAppName = providerState.provider === 'fly' ? providerState.appName : null;
+    const restoredInstanceType = InstanceTypeSchema.nullable().parse(instance.instanceType ?? null);
 
     await ctx.storage.put(
       storageUpdate({
@@ -191,6 +192,8 @@ export async function restoreFromPostgres(
         flyVolumeId: null,
         flyRegion: null,
         machineSize: null,
+        instanceType: restoredInstanceType,
+        volumeSizeGb: null,
         healthCheckFailCount: 0,
         pendingDestroyMachineId: null,
         pendingDestroyVolumeId: null,
@@ -215,6 +218,8 @@ export async function restoreFromPostgres(
     state.lastStartedAt = null;
     state.lastStoppedAt = null;
     state.machineSize = null;
+    state.instanceType = restoredInstanceType;
+    state.volumeSizeGb = null;
     state.healthCheckFailCount = 0;
     state.pendingDestroyMachineId = null;
     state.pendingDestroyVolumeId = null;
@@ -296,9 +301,7 @@ export async function syncInstanceTypeToPostgresHelper(
     let instanceType = state.instanceType;
     if (instanceType === null) {
       if (state.machineSize === null) return;
-      instanceType =
-        tierFromMachineSize(state.machineSize, state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB) ??
-        'custom';
+      instanceType = resolveInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
       state.instanceType = instanceType;
       await persist?.({ instanceType });
     }

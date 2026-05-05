@@ -49,6 +49,8 @@ export const INSTANCE_TIERS: Readonly<Record<InstanceTierKey, InstanceTierSpec>>
 
 export const DEFAULT_INSTANCE_TIER: InstanceTierKey = 'perf-1';
 
+export const DEFAULT_VOLUME_SIZE_GB = 10;
+
 export const OFFERED_TIERS: readonly InstanceTierKey[] = Object.values(INSTANCE_TIERS)
   .filter(tier => tier.status === 'offered')
   .map(tier => tier.key);

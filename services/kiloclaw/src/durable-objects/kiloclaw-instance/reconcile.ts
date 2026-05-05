@@ -11,10 +11,9 @@ import {
   RESTARTING_MAX_TIMEOUT_MS,
   RECOVERING_TIMEOUT_MS,
   WORKER_CONTROLLER_CAPABILITIES_VERSION,
-  DEFAULT_VOLUME_SIZE_GB,
   getProactiveRefreshThresholdMs,
 } from '../../config';
-import { tierFromMachineSize } from '@kilocode/kiloclaw-instance-tiers';
+import { resolveInstanceTypeLabel } from '@kilocode/kiloclaw-instance-tiers';
 import { ENCRYPTED_ENV_PREFIX, encryptEnvValue } from '../../utils/env-encryption';
 import {
   METADATA_RECOVERY_COOLDOWN_MS,
@@ -1164,9 +1163,7 @@ export async function syncStatusFromLiveCheck(
     if (state.machineSize === null && machine.config?.guest) {
       const { cpus, memory_mb, cpu_kind } = machine.config.guest;
       state.machineSize = { cpus, memory_mb, cpu_kind };
-      state.instanceType =
-        tierFromMachineSize(state.machineSize, state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB) ??
-        'custom';
+      state.instanceType = resolveInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
       await ctx.storage.put(
         storageUpdate({ machineSize: state.machineSize, instanceType: state.instanceType })
       );

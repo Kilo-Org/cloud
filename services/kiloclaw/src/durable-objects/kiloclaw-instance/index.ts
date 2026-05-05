@@ -48,7 +48,6 @@ import type { ImageVariant } from '../../schemas/image-version';
 import {
   LIVE_CHECK_THROTTLE_MS,
   OPENCLAW_BUILTIN_DEFAULT_MODEL,
-  DEFAULT_VOLUME_SIZE_GB,
   RESTARTING_TIMEOUT_MS,
   STARTING_TIMEOUT_MS,
   WORKER_CONTROLLER_CAPABILITIES_VERSION,
@@ -62,11 +61,12 @@ import {
   type SecretFieldKey,
 } from '@kilocode/kiloclaw-secret-catalog';
 import {
-  compareTierRank,
+  canUpgradeTo,
   DEFAULT_INSTANCE_TIER,
   getTier,
-  isOfferedTier,
-  tierFromMachineSize,
+  resolveInstanceTypeLabel,
+  tryInstanceTypeLabel,
+  DEFAULT_VOLUME_SIZE_GB,
   type InstanceTierKey,
   type InstanceType,
 } from '@kilocode/kiloclaw-instance-tiers';
@@ -140,36 +140,6 @@ import type {
   ProviderResult,
   ProviderRoutingTarget,
 } from '../../providers/types';
-
-function resolvePersistedInstanceType(
-  instanceType: InstanceType | null,
-  machineSize: MachineSize | null,
-  volumeSizeGb: number | null
-): InstanceType | null {
-  return instanceType ?? tierFromMachineSize(machineSize, volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB);
-}
-
-function isDowngradeOrSidegrade(
-  currentType: InstanceType | null,
-  currentSize: MachineSize | null,
-  currentVolumeSizeGb: number,
-  targetTier: ReturnType<typeof getTier>
-): boolean {
-  if (currentType && currentType !== 'custom' && isOfferedTier(currentType)) {
-    return compareTierRank(targetTier.key, currentType) <= 0;
-  }
-  if (currentType && currentType !== 'custom' && !isOfferedTier(currentType)) {
-    return false;
-  }
-  const currentCpus = currentSize?.cpus ?? getTier(DEFAULT_INSTANCE_TIER).machineSize.cpus;
-  const currentMemoryMb =
-    currentSize?.memory_mb ?? getTier(DEFAULT_INSTANCE_TIER).machineSize.memory_mb;
-  return (
-    targetTier.machineSize.cpus < currentCpus ||
-    targetTier.machineSize.memory_mb < currentMemoryMb ||
-    targetTier.volumeSizeGb < currentVolumeSizeGb
-  );
-}
 
 // Re-export extracted helpers so existing consumers don't break.
 export {
@@ -758,8 +728,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       opts?.provider ?? (isNew ? resolveDefaultProvider(this.env) : this.s.provider);
     const orgId = opts?.orgId ?? null;
     const inferredInstanceType =
-      this.s.instanceType ??
-      tierFromMachineSize(this.s.machineSize, this.s.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB);
+      this.s.instanceType ?? tryInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
     const instanceType =
       config.instanceType ?? inferredInstanceType ?? (isNew ? DEFAULT_INSTANCE_TIER : null);
     const tier = instanceType && instanceType !== 'custom' ? getTier(instanceType) : null;
@@ -2647,11 +2616,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyVolumeId: this.s.flyVolumeId,
       flyRegion: this.s.flyRegion,
       machineSize: this.s.machineSize,
-      instanceType: resolvePersistedInstanceType(
-        this.s.instanceType,
-        this.s.machineSize,
-        this.s.volumeSizeGb
-      ),
+      instanceType:
+        this.s.instanceType ?? tryInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb),
       volumeSizeGb: this.s.volumeSizeGb,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
@@ -2818,11 +2784,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyVolumeId: this.s.flyVolumeId,
       flyRegion: this.s.flyRegion,
       machineSize: this.s.machineSize,
-      instanceType: resolvePersistedInstanceType(
-        this.s.instanceType,
-        this.s.machineSize,
-        this.s.volumeSizeGb
-      ),
+      instanceType:
+        this.s.instanceType ?? tryInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb),
       volumeSizeGb: this.s.volumeSizeGb,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
@@ -3077,28 +3040,27 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error(`Instance tier ${targetTierKey} is not an offerable resize target`);
     }
 
-    const previousTier = resolvePersistedInstanceType(
-      this.s.instanceType,
-      this.s.machineSize,
-      this.s.volumeSizeGb
-    );
+    const previousTier =
+      this.s.instanceType ?? tryInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
     const previousVolumeSizeGb = this.s.volumeSizeGb;
-    const effectiveCurrentVolumeSizeGb = previousVolumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB;
 
     if (
-      isDowngradeOrSidegrade(
-        previousTier,
-        this.s.machineSize,
-        effectiveCurrentVolumeSizeGb,
-        targetTier
-      )
+      !canUpgradeTo({
+        currentType: previousTier,
+        currentSize: this.s.machineSize,
+        currentVolumeSizeGb: previousVolumeSizeGb,
+        targetTier: targetTier.key,
+      })
     ) {
       throw new Error(
         `Cannot resize from ${previousTier ?? 'custom'} to ${targetTierKey}: downgrades and sidegrades are not allowed`
       );
     }
 
-    if (this.s.provider === 'fly' && targetTier.volumeSizeGb > effectiveCurrentVolumeSizeGb) {
+    if (
+      this.s.provider === 'fly' &&
+      targetTier.volumeSizeGb > (previousVolumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB)
+    ) {
       if (!this.s.flyVolumeId) {
         throw new Error('Cannot resize: no Fly volume is associated with this instance');
       }
@@ -3551,11 +3513,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         if (machine.config?.guest) {
           const { cpus, memory_mb, cpu_kind } = machine.config.guest;
           this.s.machineSize = { cpus, memory_mb, cpu_kind };
-          this.s.instanceType =
-            tierFromMachineSize(
-              this.s.machineSize,
-              this.s.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB
-            ) ?? 'custom';
+          this.s.instanceType = resolveInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
           await this.persist({
             machineSize: this.s.machineSize,
             instanceType: this.s.instanceType,

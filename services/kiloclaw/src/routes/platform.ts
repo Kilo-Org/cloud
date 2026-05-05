@@ -18,7 +18,11 @@ import {
   SecretsPatchSchema,
   InstanceIdParam,
 } from '../schemas/instance-config';
-import { DEFAULT_INSTANCE_TIER, InstanceTierKeySchema } from '@kilocode/kiloclaw-instance-tiers';
+import {
+  DEFAULT_INSTANCE_TIER,
+  InstanceTierKeySchema,
+  isOfferedTier,
+} from '@kilocode/kiloclaw-instance-tiers';
 import { ImageVersionEntrySchema, imageVersionKey } from '../schemas/image-version';
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
 import {
@@ -877,6 +881,9 @@ platform.post('/provision', async c => {
     region,
     pinnedImageTag,
   } = result.data;
+  if (requestedInstanceType && !isOfferedTier(requestedInstanceType)) {
+    return c.json({ error: 'instanceType must be an offered tier' }, 400);
+  }
   const instanceType = requestedInstanceType ?? DEFAULT_INSTANCE_TIER;
   const provisionedInstanceId = instanceId ?? crypto.randomUUID();
   const shouldInsertInstanceRecord = !instanceId;

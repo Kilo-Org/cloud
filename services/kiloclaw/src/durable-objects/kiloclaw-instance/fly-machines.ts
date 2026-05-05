@@ -19,7 +19,7 @@ import {
 import { guestFromSize, volumeNameFromSandboxId, METADATA_KEY_SANDBOX_ID } from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { reconcileLog, doError, doWarn, toLoggable } from './log';
-import { tierFromMachineSize } from '@kilocode/kiloclaw-instance-tiers';
+import { resolveInstanceTypeLabel } from '@kilocode/kiloclaw-instance-tiers';
 
 type FlyRuntimeState = Pick<
   InstanceMutableState,
@@ -315,9 +315,7 @@ export async function startExistingMachine(
     if (state.machineSize === null && machine.config?.guest) {
       const { cpus, memory_mb, cpu_kind } = machine.config.guest;
       machineSizePatch = { cpus, memory_mb, cpu_kind };
-      const instanceTypePatch =
-        tierFromMachineSize(machineSizePatch, state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB) ??
-        'custom';
+      const instanceTypePatch = resolveInstanceTypeLabel(machineSizePatch, state.volumeSizeGb);
       machineConfig = { ...machineConfig, guest: guestFromSize(machineSizePatch) };
       await persistProviderResult({
         providerState,

@@ -79,12 +79,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { toast } from 'sonner';
 import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
 import {
-  compareTierRank,
+  canUpgradeTo,
   DEFAULT_INSTANCE_TIER,
   formatTierHardware,
   getTier,
   InstanceTierKeySchema,
-  isOfferedTier,
   OFFERED_TIERS,
   type InstanceTierKey,
   type InstanceType,
@@ -127,12 +126,18 @@ function InstanceTypeBadge({ instanceType }: { instanceType: InstanceType | null
   );
 }
 
-function canResizeToTier(current: InstanceType | null, target: InstanceTierKey): boolean {
-  if (!isOfferedTier(target)) return false;
-  if (current && current !== 'custom' && isOfferedTier(current)) {
-    return compareTierRank(target, current) > 0;
-  }
-  return true;
+function canResizeToTier(
+  current: InstanceType | null,
+  machineSize: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' } | null,
+  volumeSizeGb: number | null,
+  target: InstanceTierKey
+): boolean {
+  return canUpgradeTo({
+    currentType: current,
+    currentSize: machineSize,
+    currentVolumeSizeGb: volumeSizeGb,
+    targetTier: target,
+  });
 }
 
 function useControllerTelemetryDiskUsage(sandboxId: string) {
@@ -1536,7 +1541,14 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     data?.workerStatus?.status !== 'restoring' &&
     data?.workerStatus?.status !== 'recovering';
   const nextResizeTier = data?.workerStatus
-    ? OFFERED_TIERS.find(tier => canResizeToTier(data.workerStatus?.instanceType ?? null, tier))
+    ? OFFERED_TIERS.find(tier =>
+        canResizeToTier(
+          data.workerStatus?.instanceType ?? null,
+          data.workerStatus?.machineSize ?? null,
+          data.workerStatus?.volumeSizeGb ?? null,
+          tier
+        )
+      )
     : undefined;
   const hasRuntime = !!runtimeId;
   const hasFlyMachine = isFlyProvider && !!flyMachineId;
@@ -3265,7 +3277,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         key={tierKey}
                         value={tierKey}
                         disabled={
-                          !canResizeToTier(data?.workerStatus?.instanceType ?? null, tierKey)
+                          !canResizeToTier(
+                            data?.workerStatus?.instanceType ?? null,
+                            data?.workerStatus?.machineSize ?? null,
+                            data?.workerStatus?.volumeSizeGb ?? null,
+                            tierKey
+                          )
                         }
                       >
                         {tierKey} — {formatTierHardware(tier)}

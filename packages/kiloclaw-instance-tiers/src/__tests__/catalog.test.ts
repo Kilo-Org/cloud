@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   compareTierRank,
+  canUpgradeTo,
   DEFAULT_INSTANCE_TIER,
   getTier,
   INSTANCE_TIERS,
   OFFERED_TIERS,
+  resolveInstanceTypeLabel,
   tierFromMachineSize,
+  tryInstanceTypeLabel,
 } from '..';
 import { InstanceTierSpecSchema } from '../types';
 
@@ -34,6 +37,13 @@ describe('instance tier catalog', () => {
     ).toBeNull();
   });
 
+  it('resolves labels with explicit custom and unknown semantics', () => {
+    const customSize = { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' } as const;
+    expect(tryInstanceTypeLabel(customSize, 10)).toBeNull();
+    expect(resolveInstanceTypeLabel(customSize, 10)).toBe('custom');
+    expect(resolveInstanceTypeLabel(null, 10)).toBeNull();
+  });
+
   it('ranks only offered tiers', () => {
     expect(compareTierRank('perf-4-8', 'perf-1')).toBeGreaterThan(0);
     expect(compareTierRank('perf-4-16', 'perf-4-8')).toBeGreaterThan(0);
@@ -43,6 +53,57 @@ describe('instance tier catalog', () => {
   it('keeps legacy tiers label-only', () => {
     expect(INSTANCE_TIERS['shared-2-3'].status).toBe('legacy');
     expect(INSTANCE_TIERS['shared-2-4'].status).toBe('legacy');
+  });
+
+  it('applies tier upgrade policy', () => {
+    expect(
+      canUpgradeTo({
+        currentType: 'perf-1',
+        currentSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+        currentVolumeSizeGb: 10,
+        targetTier: 'perf-4-8',
+      })
+    ).toBe(true);
+    expect(
+      canUpgradeTo({
+        currentType: 'perf-4-8',
+        currentSize: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+        currentVolumeSizeGb: 20,
+        targetTier: 'perf-1',
+      })
+    ).toBe(false);
+    expect(
+      canUpgradeTo({
+        currentType: 'shared-2-4',
+        currentSize: { cpus: 2, memory_mb: 4096, cpu_kind: 'shared' },
+        currentVolumeSizeGb: 10,
+        targetTier: 'perf-1',
+      })
+    ).toBe(false);
+    expect(
+      canUpgradeTo({
+        currentType: 'custom',
+        currentSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+        currentVolumeSizeGb: 10,
+        targetTier: 'perf-1',
+      })
+    ).toBe(true);
+    expect(
+      canUpgradeTo({
+        currentType: 'custom',
+        currentSize: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+        currentVolumeSizeGb: 40,
+        targetTier: 'perf-1',
+      })
+    ).toBe(false);
+    expect(
+      canUpgradeTo({
+        currentType: 'custom',
+        currentSize: null,
+        currentVolumeSizeGb: 10,
+        targetTier: 'shared-2-3',
+      })
+    ).toBe(false);
   });
 
   it('validates every catalog entry against the runtime schema', () => {

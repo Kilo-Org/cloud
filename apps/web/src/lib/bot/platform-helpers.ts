@@ -23,7 +23,7 @@ export async function getPlatformIdentity(
   thread: Thread,
   message: Message
 ): Promise<PlatformIdentity> {
-  const platform = thread.id.split(':')[0]; // "slack", "discord", "gchat", "teams", ...
+  const platform = thread.adapter.name;
 
   switch (platform) {
     case PLATFORM.GITHUB: {

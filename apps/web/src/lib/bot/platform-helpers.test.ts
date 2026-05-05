@@ -12,20 +12,40 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
+jest.mock('@/lib/bot', () => ({
+  bot: {
+    getAdapter: jest.fn(),
+  },
+}));
+
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   getBotDocumentationUrl,
-  getGitHubInstallationId,
   getPlatformIdentity,
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
   getPlatformIntegrationById,
   getPlatformUserIdentity,
 } from './platform-helpers';
+import type { Thread, Message } from 'chat';
+
+type MockBotModule = {
+  bot: {
+    getAdapter: jest.Mock;
+  };
+};
+
+const mockBotModule: MockBotModule = jest.requireMock('@/lib/bot');
+const mockGetInstallationId = jest.fn();
 
 describe('platform helpers', () => {
   beforeEach(() => {
     mockLimit.mockReset();
+    mockGetInstallationId.mockReset();
+    mockBotModule.bot.getAdapter.mockReset();
+    mockBotModule.bot.getAdapter.mockReturnValue({
+      getInstallationId: mockGetInstallationId,
+    });
   });
 
   it('returns the platform integration for a given identity', async () => {
@@ -103,12 +123,17 @@ describe('platform helpers', () => {
       author: { userId: '12345' },
       raw: {
         type: 'issue_comment',
-        installation: { id: 98765 },
       },
     };
+    mockGetInstallationId.mockResolvedValue(98765);
 
-    const identity = await getPlatformIdentity({ id: 'github:acme/widgets:42' }, message);
+    const identity = await getPlatformIdentity(
+      { id: 'github:acme/widgets:42' } as Thread,
+      message as Message
+    );
 
+    expect(mockBotModule.bot.getAdapter).toHaveBeenCalledWith(PLATFORM.GITHUB);
+    expect(mockGetInstallationId).toHaveBeenCalledWith({ id: 'github:acme/widgets:42' });
     expect(identity).toEqual({
       platform: PLATFORM.GITHUB,
       teamId: '98765',
@@ -116,26 +141,18 @@ describe('platform helpers', () => {
     });
   });
 
-  it('can resolve GitHub identity using the adapter installation cache', async () => {
+  it('throws when the GitHub adapter cannot resolve the installation id', async () => {
     const message = {
       author: { userId: '12345' },
       raw: {
         type: 'issue_comment',
       },
-    };
+    } as Message;
+    mockGetInstallationId.mockResolvedValue(null);
 
-    const identity = await getPlatformIdentity({ id: 'github:acme/widgets:42' }, message, {
-      getGitHubInstallationId: async thread => {
-        expect(thread.id).toBe('github:acme/widgets:42');
-        return 98765;
-      },
-    });
-
-    expect(identity).toEqual({
-      platform: PLATFORM.GITHUB,
-      teamId: '98765',
-      userId: '12345',
-    });
+    await expect(
+      getPlatformIdentity({ id: 'github:acme/widgets:42' } as Thread, message)
+    ).rejects.toThrow('Could not find GitHub installation ID for thread github:acme/widgets:42');
   });
 
   it('converts GitHub installation identities to user-level identities for user lookup', () => {
@@ -152,16 +169,6 @@ describe('platform helpers', () => {
     const identity = { platform: PLATFORM.SLACK, teamId: 'T123', userId: 'U123' };
 
     expect(getPlatformUserIdentity(identity)).toBe(identity);
-  });
-
-  it('throws for GitHub messages without an installation id', () => {
-    expect(() =>
-      getGitHubInstallationId({
-        raw: {
-          type: 'issue_comment',
-        },
-      })
-    ).toThrow('Expected an installation.id in message.raw');
   });
 
   it('returns platform-specific bot documentation URLs', () => {

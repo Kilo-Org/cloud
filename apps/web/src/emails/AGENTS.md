@@ -86,3 +86,4 @@ Every template must include this branding footer below the content table:
 | `clawEarlybirdExpiresTomorrow.html`    | `expiry_date`, `claw_url`, `year`                                                                                          | `30`                       |
 | `clawComplementaryInferenceEnded.html` | `claw_url`, `year`                                                                                                         | —                          |
 | `accountDeletionRequest.html`          | `email`, `year`                                                                                                            | —                          |
+| `kiloClawSubscriptionStarted.html`     | `plan_name`, `price_usd`, `billing_period`, `next_billing_date`, `manage_url`, `year`                                      | —                          |

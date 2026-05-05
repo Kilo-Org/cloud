@@ -4436,6 +4436,13 @@ export const kiloclaw_subscription_change_log = pgTable(
 export type KiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferSelect;
 export type NewKiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferInsert;
 
+// KiloClaw subscription-started emails are per paid activation, not per
+// instance lifetime. Cancel+resubscribe reuses the same subscription row (we
+// UPDATE the existing row in place), so only `period_start` — which advances
+// on every fresh activation — distinguishes activation events. `period_start`
+// defaults to the Unix epoch so the unique-index math works for any future
+// per-instance email type that has no natural per-activation boundary: those
+// callers pass no value and collapse to one row per (user, instance, type).
 export const kiloclaw_email_log = pgTable(
   'kiloclaw_email_log',
   {
@@ -4448,14 +4455,17 @@ export const kiloclaw_email_log = pgTable(
       .references(() => kilocode_users.id),
     instance_id: uuid().references(() => kiloclaw_instances.id),
     email_type: text().notNull(),
+    period_start: timestamp({ withTimezone: true, mode: 'string' })
+      .notNull()
+      .default(sql`'epoch'`),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
     uniqueIndex('UQ_kiloclaw_email_log_user_type_global')
       .on(table.user_id, table.email_type)
       .where(isNull(table.instance_id)),
-    uniqueIndex('UQ_kiloclaw_email_log_user_instance_type')
-      .on(table.user_id, table.instance_id, table.email_type)
+    uniqueIndex('UQ_kiloclaw_email_log_user_instance_type_period')
+      .on(table.user_id, table.instance_id, table.email_type, table.period_start)
       .where(isNotNull(table.instance_id)),
     index('IDX_kiloclaw_email_log_type_sent_instance')
       .on(table.email_type, table.sent_at, table.instance_id, table.user_id)

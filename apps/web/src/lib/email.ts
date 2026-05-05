@@ -41,6 +41,7 @@ export const subjects = {
   clawCreditRenewalFailed: 'Action Required: KiloClaw Hosting Renewal Failed',
   clawComplementaryInferenceEnded: 'Your Free AI Inference Period Has Ended',
   accountDeletionRequest: 'Kilo: Account Deletion Request Received',
+  kiloClawSubscriptionStarted: 'Your KiloClaw subscription is active',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -389,5 +390,45 @@ export async function sendAccountDeletionSupportNotification(
     subject: `Account Deletion Request — ${userEmail}`,
     html: `<p>User <strong>${userEmail}</strong> (ID: <code>${userId}</code>) has requested account deletion from the mobile app.</p>`,
     replyTo: userEmail,
+  });
+}
+
+function formatUsd(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+function formatDate(date: Date): string {
+  // Dates surfaced to end-users; the server locale is stable (UTC in prod) so
+  // explicit en-US formatting avoids surprise month-name changes in tests.
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+type SendKiloClawSubscriptionStartedEmailProps = {
+  to: string;
+  planName: string;
+  priceCents: number;
+  billingPeriod: string;
+  nextBillingDate: Date;
+};
+
+export async function sendKiloClawSubscriptionStartedEmail(
+  props: SendKiloClawSubscriptionStartedEmailProps
+): Promise<SendResult> {
+  const manage_url = `${NEXTAUTH_URL}/claw/subscription`;
+  return send({
+    to: props.to,
+    templateName: 'kiloClawSubscriptionStarted',
+    templateVars: {
+      plan_name: props.planName,
+      price_usd: formatUsd(props.priceCents),
+      billing_period: props.billingPeriod,
+      next_billing_date: formatDate(props.nextBillingDate),
+      manage_url,
+    },
   });
 }

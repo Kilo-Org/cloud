@@ -114,6 +114,14 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'accountDeletionRequest':
       return { email: 'user@example.com' };
+    case 'kiloClawSubscriptionStarted':
+      return {
+        plan_name: 'KiloClaw Standard',
+        price_usd: '29.00',
+        billing_period: 'Monthly',
+        next_billing_date: formatDate(new Date(Date.now() + 30 * 86_400_000)),
+        manage_url: `${NEXTAUTH_URL}/claw/subscription`,
+      };
   }
   throw new Error(`Unknown template: ${template}`);
 }

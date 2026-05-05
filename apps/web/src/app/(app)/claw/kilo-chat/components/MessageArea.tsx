@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ulid } from 'ulid';
-import type { Message, ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
+import type {
+  Message,
+  ContentBlock,
+  EditMessageRequest,
+  ExecApprovalDecision,
+} from '@kilocode/kilo-chat';
 import {
   useMessages,
   useSendMessage,
@@ -13,13 +18,23 @@ import {
   useAddReaction,
   useRemoveReaction,
   useExecuteAction,
+  latestMarkReadMessageId,
 } from '../hooks/useMessages';
-import { useConversationContext } from '../hooks/useEventService';
+import {
+  kiloclawConversationContext,
+  presenceContextForConversation,
+} from '@kilocode/event-service';
+import { useDocumentVisible } from '@/hooks/useDocumentVisible';
 import { useTypingSender, useTypingState } from '../hooks/useTyping';
 import {
+  createMarkReadState,
+  finishMarkReadAttempt,
   useConversationDetail,
   useRenameConversation,
   useMarkConversationRead,
+  shouldStartMarkReadAttempt,
+  startMarkReadAttempt,
+  succeedMarkReadAttempt,
 } from '../hooks/useConversations';
 import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
@@ -31,15 +46,45 @@ import { ContextUsageRing } from './ContextUsageRing';
 import { useBotStatus } from '../hooks/useBotStatus';
 import { useConversationStatus } from '../hooks/useConversationStatus';
 import {
+  clearMarkReadRetry,
+  createMarkReadRetryState,
+  scheduleMarkReadRetry,
+  usePresenceSubscription,
+} from '@kilocode/kilo-chat-hooks';
+import {
   KiloChatApiError,
   formatKiloChatError,
   CONVERSATION_TITLE_MAX_CHARS,
 } from '@kilocode/kilo-chat';
+import {
+  clearPendingAction,
+  pendingActionGroupIdForMessage,
+  tryStartPendingAction,
+  type PendingAction,
+} from '@kilocode/kilo-chat-hooks';
+import {
+  applyPrependScrollAnchor,
+  capturePrependScrollAnchor,
+  type PrependScrollAnchorSnapshot,
+} from './message-scroll-anchor';
 import { MessageCircle, ArrowDown } from 'lucide-react';
 
 type MessageAreaProps = {
   conversationId: string;
 };
+
+function toEditableContent(content: ContentBlock[]): EditMessageRequest['content'] {
+  return content.map(block => {
+    if (block.type === 'actions') {
+      return {
+        type: 'actions',
+        groupId: block.groupId,
+        actions: block.actions,
+      };
+    }
+    return block;
+  });
+}
 
 export function MessageArea({ conversationId }: MessageAreaProps) {
   const { currentUserId, instanceStatus, assistantName, sandboxId, eventService, kiloChatClient } =
@@ -59,35 +104,57 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   // which is a normal steady state. Only block sends once the bot is clearly
   // `offline` (>90 s stale, explicitly offline, or instance not running) or
   // `unknown` (no presence data at all).
-  const canSend = botDisplay.state === 'online' || botDisplay.state === 'idle';
+  const botCanSend = botDisplay.state === 'online' || botDisplay.state === 'idle';
+  const canSend = currentUserId !== null && botCanSend;
   const sendDisabledReason = canSend
     ? null
-    : botDisplay.state === 'unknown'
-      ? 'Waiting for bot status…'
-      : 'Bot is offline — messages will resume when it reconnects';
+    : currentUserId === null
+      ? 'Loading user...'
+      : botDisplay.state === 'unknown'
+        ? 'Waiting for bot status…'
+        : 'Bot is offline — messages will resume when it reconnects';
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
+  const pendingPrependScrollAnchorRef = useRef<PrependScrollAnchorSnapshot | null>(null);
+  const wasFetchingNextPageRef = useRef(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isRenamingTitle, setIsRenamingTitle] = useState(false);
   const [renameText, setRenameText] = useState('');
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const pendingActionRef = useRef<PendingAction | null>(null);
 
-  // Subscribe to this conversation's events via the event-service WebSocket
-  useConversationContext(eventService, sandboxId, conversationId);
+  const visible = useDocumentVisible();
+
+  // Subscribe to this conversation's chat-event stream while the conversation
+  // is open. Not gated on visibility — we want incoming messages to land in
+  // the cache even when the tab is hidden.
+  usePresenceSubscription(
+    sandboxId && conversationId ? kiloclawConversationContext(sandboxId, conversationId) : null,
+    Boolean(sandboxId && conversationId)
+  );
+
+  // Signal our own presence on this conversation. Gated on visibility so we
+  // only appear "viewing" while the tab is actually in the foreground.
+  usePresenceSubscription(
+    sandboxId && conversationId ? presenceContextForConversation(sandboxId, conversationId) : null,
+    Boolean(sandboxId && conversationId) && visible
+  );
 
   // Event Service delivers subscribed contexts to every handler, so each
   // handler must validate the incoming `ctx` against this string before
   // applying changes to the active conversation's state.
-  const expectedContext = sandboxId ? `/kiloclaw/${sandboxId}/${conversationId}` : null;
+  const expectedContext = sandboxId ? kiloclawConversationContext(sandboxId, conversationId) : null;
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useMessages(
     kiloChatClient,
     conversationId
   );
   const messages = data?.messages ?? [];
+  const latestMessageId = latestMarkReadMessageId(messages);
 
   const conversationDetail = useConversationDetail(kiloChatClient, conversationId);
   const renameConversation = useRenameConversation(kiloChatClient);
@@ -108,27 +175,95 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   // Bots are excluded inside the hook because their streaming uses
   // message.created for every token chunk and relies on typing.stopped to
   // signal stream completion.
-  useMessageCacheUpdater(kiloChatClient, sandboxId, conversationId, clearTypingForMember);
+  const handleActionFailed = useCallback(() => {
+    toast.error("Couldn't reach the bot — please try again");
+  }, []);
+  const handleMessageDeliveryFailed = useCallback(() => {
+    toast.error('Message could not be delivered to the bot');
+  }, []);
+  useMessageCacheUpdater(
+    kiloChatClient,
+    sandboxId,
+    conversationId,
+    clearTypingForMember,
+    handleActionFailed,
+    handleMessageDeliveryFailed
+  );
   const sendTyping = useTypingSender(kiloChatClient, conversationId);
 
   const markRead = useMarkConversationRead(kiloChatClient);
-  const lastMarkedRef = useRef<string | null>(null);
+  const markReadStateRef = useRef(createMarkReadState());
+  const markReadRetryStateRef = useRef(createMarkReadRetryState());
+  const currentMarkReadMarker =
+    latestMessageId === null ? null : `${conversationId}:${latestMessageId}`;
+  const currentMarkReadMarkerRef = useRef<string | null>(currentMarkReadMarker);
+  const visibleRef = useRef(visible);
+  const markCurrentConversationReadRef = useRef<() => void>(() => {});
+  currentMarkReadMarkerRef.current = currentMarkReadMarker;
+  visibleRef.current = visible;
 
-  // Mark conversation as read when opened. react-query's mutate is stable
-  // across renders, so including it in deps is safe.
+  const markCurrentConversationRead = useCallback(() => {
+    if (latestMessageId === null || currentMarkReadMarker === null) {
+      return;
+    }
+    const marker = currentMarkReadMarker;
+    const state = markReadStateRef.current;
+    if (!shouldStartMarkReadAttempt(state, marker)) {
+      return;
+    }
+    startMarkReadAttempt(state, marker);
+    markRead.mutate(
+      { sandboxId, conversationId, lastSeenMessageId: latestMessageId },
+      {
+        onSuccess: () => {
+          succeedMarkReadAttempt(state, marker);
+          clearMarkReadRetry(markReadRetryStateRef.current);
+        },
+        onSettled: () => {
+          finishMarkReadAttempt(state, marker);
+          if (state.lastSucceededMarker !== marker) {
+            scheduleMarkReadRetry(markReadRetryStateRef.current, {
+              marker,
+              currentMarker: () => currentMarkReadMarkerRef.current,
+              isActive: () => visibleRef.current,
+              lastSucceededMarker: () => markReadStateRef.current.lastSucceededMarker,
+              retry: () => markCurrentConversationReadRef.current(),
+            });
+          }
+        },
+      }
+    );
+  }, [conversationId, currentMarkReadMarker, latestMessageId, markRead.mutate, sandboxId]);
+  markCurrentConversationReadRef.current = markCurrentConversationRead;
+
   useEffect(() => {
-    if (lastMarkedRef.current === conversationId) return;
-    lastMarkedRef.current = conversationId;
-    markRead.mutate(conversationId);
-  }, [conversationId, markRead.mutate]);
+    if (!visible || currentMarkReadMarker === null) {
+      clearMarkReadRetry(markReadRetryStateRef.current);
+      return;
+    }
+    if (
+      markReadRetryStateRef.current.marker !== null &&
+      markReadRetryStateRef.current.marker !== currentMarkReadMarker
+    ) {
+      clearMarkReadRetry(markReadRetryStateRef.current);
+    }
+  }, [currentMarkReadMarker, visible]);
+
+  useEffect(() => {
+    return () => clearMarkReadRetry(markReadRetryStateRef.current);
+  }, []);
+
+  // Mark conversation as read when opened and whenever visible hydration or
+  // realtime receipt advances the newest message.
+  useEffect(() => {
+    if (!visible) return;
+    markCurrentConversationRead();
+  }, [markCurrentConversationRead, visible]);
 
   // Register side-effect handlers that don't mutate the message cache
   // (cache updates are handled by useMessageCacheUpdater).
   useEffect(() => {
     const offs = [
-      kiloChatClient.onMessageDeliveryFailed(() => {
-        toast.error('Message could not be delivered to the bot');
-      }),
       kiloChatClient.onTyping((ctx, data) => {
         handleTypingEvent(ctx, data);
       }),
@@ -143,8 +278,11 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   useEffect(() => {
     return eventService.onReconnect(() => {
       void queryClient.invalidateQueries({ queryKey: ['kilo-chat', 'messages', conversationId] });
+      if (visible) {
+        markCurrentConversationRead();
+      }
     });
-  }, [eventService, queryClient, conversationId]);
+  }, [conversationId, eventService, markCurrentConversationRead, queryClient, visible]);
 
   // Auto-scroll whenever content height changes (new messages, streaming
   // updates, image loads). A ResizeObserver on the inner content fires only
@@ -163,6 +301,29 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const wasFetchingNextPage = wasFetchingNextPageRef.current;
+    wasFetchingNextPageRef.current = isFetchingNextPage;
+
+    if (!wasFetchingNextPage || isFetchingNextPage) {
+      return;
+    }
+
+    const snapshot = pendingPrependScrollAnchorRef.current;
+    pendingPrependScrollAnchorRef.current = null;
+    if (!snapshot) {
+      return;
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      applyPrependScrollAnchor(el, snapshot);
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [isFetchingNextPage]);
+
   // Track scroll position to detect user scrolling away from bottom
   function handleScroll() {
     const el = scrollRef.current;
@@ -170,6 +331,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
 
     // Load more on scroll to top
     if (el.scrollTop < 50 && hasNextPage && !isFetchingNextPage) {
+      pendingPrependScrollAnchorRef.current = capturePrependScrollAnchor(el);
       void fetchNextPage();
     }
 
@@ -192,38 +354,45 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
   }
 
   const handleSend = useCallback(
-    (text: string, inReplyToMessageId?: string) => {
+    async (text: string, inReplyToMessageId?: string): Promise<boolean> => {
       autoScrollRef.current = true;
       setShowScrollButton(false);
-      sendMessage.mutate(
-        {
+      try {
+        await sendMessage.mutateAsync({
           conversationId,
           content: [{ type: 'text', text }],
           inReplyToMessageId,
           clientId: ulid(),
-        },
-        { onError: err => toast.error(formatKiloChatError(err, 'Failed to send message')) }
-      );
+        });
+        return true;
+      } catch (err) {
+        toast.error(formatKiloChatError(err, 'Failed to send message'));
+        return false;
+      }
     },
-    [sendMessage.mutate, conversationId]
+    [sendMessage.mutateAsync, conversationId]
   );
 
   const handleEdit = useCallback(
-    (messageId: string, content: ContentBlock[]) => {
-      editMessage.mutate(
-        { messageId, conversationId, content, timestamp: Date.now() },
-        {
-          onError: err => {
-            if (err instanceof KiloChatApiError && err.status === 409) {
-              toast.error('Message was edited by someone else — please try again');
-              return;
-            }
-            toast.error(formatKiloChatError(err, 'Failed to edit message'));
-          },
+    async (messageId: string, content: ContentBlock[]): Promise<boolean> => {
+      try {
+        await editMessage.mutateAsync({
+          messageId,
+          conversationId,
+          content: toEditableContent(content),
+          timestamp: Date.now(),
+        });
+        return true;
+      } catch (err) {
+        if (err instanceof KiloChatApiError && err.status === 409) {
+          toast.error('Message was edited by someone else — please try again');
+          return false;
         }
-      );
+        toast.error(formatKiloChatError(err, 'Failed to edit message'));
+        return false;
+      }
     },
-    [editMessage.mutate, conversationId]
+    [editMessage.mutateAsync, conversationId]
   );
 
   const handleDelete = useCallback((messageId: string) => {
@@ -269,9 +438,20 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
 
   const handleExecuteAction = useCallback(
     (messageId: string, groupId: string, value: ExecApprovalDecision) => {
+      const nextPendingAction = { messageId, groupId };
+      if (!tryStartPendingAction(pendingActionRef, nextPendingAction)) {
+        return;
+      }
+      setPendingAction(pendingActionRef.current);
       executeAction.mutate(
         { messageId, groupId, value },
-        { onError: err => toast.error(formatKiloChatError(err, 'Failed to execute action')) }
+        {
+          onError: err => toast.error(formatKiloChatError(err, 'Failed to execute action')),
+          onSettled: () => {
+            clearPendingAction(pendingActionRef, nextPendingAction);
+            setPendingAction(pendingActionRef.current);
+          },
+        }
       );
     },
     [executeAction.mutate]
@@ -291,7 +471,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
       const trimmed = renameText.trim();
       if (trimmed) {
         renameConversation.mutate(
-          { conversationId, title: trimmed },
+          { sandboxId, conversationId, title: trimmed },
           { onError: err => toast.error(formatKiloChatError(err, 'Failed to rename conversation')) }
         );
       }
@@ -306,7 +486,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
     const trimmed = renameText.trim();
     if (trimmed && trimmed !== title) {
       renameConversation.mutate(
-        { conversationId, title: trimmed },
+        { sandboxId, conversationId, title: trimmed },
         { onError: err => toast.error(formatKiloChatError(err, 'Failed to rename conversation')) }
       );
     }
@@ -382,9 +562,11 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
               <MessageBubble
                 key={msg.id}
                 message={msg}
-                isOwn={msg.senderId === currentUserId}
+                isOwn={currentUserId !== null && msg.senderId === currentUserId}
                 replyToMessage={
-                  msg.inReplyToMessageId ? (messageMap.get(msg.inReplyToMessageId) ?? null) : null
+                  msg.inReplyToMessageId
+                    ? (messageMap.get(msg.inReplyToMessageId) ?? msg.replyTo)
+                    : null
                 }
                 pendingDeleteId={pendingDeleteId}
                 onEdit={handleEdit}
@@ -395,7 +577,7 @@ export function MessageArea({ conversationId }: MessageAreaProps) {
                 onAddReaction={handleAddReaction}
                 onRemoveReaction={handleRemoveReaction}
                 onExecuteAction={handleExecuteAction}
-                actionPending={executeAction.isPending}
+                pendingActionGroupId={pendingActionGroupIdForMessage(pendingAction, msg.id)}
                 currentUserId={currentUserId}
               />
             ))}

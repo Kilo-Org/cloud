@@ -295,6 +295,46 @@ export type KiloClawScheduledActionTargetStatus = z.infer<
   typeof KiloClawScheduledActionTargetStatus
 >;
 
+// Notification dispatch lifecycle. 'pending' until the sweep claims
+// it via the CAS pending → sending; 'sending' is a transient state
+// while the sweep is mid-dispatch (set when claimed, cleared by markSent
+// or markFailed); 'sent' on successful dispatch; 'failed' if the channel
+// returned an error. Recovery: stuck 'sending' rows whose claimed_at is
+// older than the recovery threshold get reset to 'pending' at the top
+// of each tick.
+export const KiloClawScheduledActionNotificationStatus = z.enum([
+  'pending',
+  'sending',
+  'sent',
+  'failed',
+]);
+export type KiloClawScheduledActionNotificationStatus = z.infer<
+  typeof KiloClawScheduledActionNotificationStatus
+>;
+
+// Notification dispatch channel. 'agent' is reserved for a future PR
+// that adds a kilo-chat sendSystemNotice RPC; the v1 dispatcher returns
+// 501 for that channel so the schema enum can stabilize without the
+// dispatcher implementation.
+export const KiloClawScheduledActionNotificationChannel = z.enum([
+  'email',
+  'webapp',
+  'mobile_push',
+  'agent',
+]);
+export type KiloClawScheduledActionNotificationChannel = z.infer<
+  typeof KiloClawScheduledActionNotificationChannel
+>;
+
+// Why this notification exists. 'notice' is the upcoming-action heads-up
+// dispatched ahead of the scheduled time. 'cancelled' is the follow-up
+// when an admin cancels an action whose notice has already been sent
+// for the same (target, channel) pair.
+export const KiloClawScheduledActionNotificationKind = z.enum(['notice', 'cancelled']);
+export type KiloClawScheduledActionNotificationKind = z.infer<
+  typeof KiloClawScheduledActionNotificationKind
+>;
+
 // --- ContributorChampion enums ---
 
 export const ContributorChampionTier = {

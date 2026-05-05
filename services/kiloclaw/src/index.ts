@@ -15,12 +15,14 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { getCookie, deleteCookie } from 'hono/cookie';
+import type { z } from 'zod';
+import { sandboxIdSchema, type chatWebhookSchema } from '@kilocode/kilo-chat';
 
-import { chatWebhookRpcSchema } from '@kilocode/kilo-chat';
 import type { AppEnv, KiloClawEnv, ChatWebhookPayload } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
 import { accessGatewayRoutes, publicRoutes, api, kiloclaw, platform, controller } from './routes';
 import { handleSnapshotRestoreQueue } from './queue/snapshot-restore';
+import { runScheduledActionNoticesSweep } from './scheduled/scheduled-action-notices';
 import { redactSensitiveParams } from './utils/logging';
 import { authMiddleware, internalApiMiddleware } from './auth';
 import { deriveGatewayToken } from './auth/gateway-token';
@@ -1052,6 +1054,26 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
   }
 
   /**
+   * Cron handler. Currently runs the scheduled-action notice sweep
+   * (1-minute cadence per wrangler.jsonc). Wrap each sweep call in
+   * its own try/catch so a failing sweep doesn't poison subsequent
+   * crons or any other handler running on this entrypoint.
+   */
+  async scheduled(_event: ScheduledController): Promise<void> {
+    try {
+      const result = await runScheduledActionNoticesSweep(this.env);
+      if (result.processed > 0 || result.recovered > 0 || result.voidedStale > 0) {
+        console.log(
+          `[scheduled] action-notices: processed=${result.processed} sent=${result.sent} failed=${result.failed} recovered=${result.recovered} voidedStale=${result.voidedStale}`
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[scheduled] action-notices sweep failed:', msg);
+    }
+  }
+
+  /**
    * RPC method called by kilo-chat service via service binding.
    * Routes the webhook payload to the correct kiloclaw Fly machine
    * based on the targetBotId (bot:kiloclaw:{sandboxId}).
@@ -1068,12 +1090,16 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
    * stale-online until staleness inference catches up, ~poll interval).
    */
   async deliverChatWebhook(payload: ChatWebhookPayload): Promise<void> {
-    const parsed = chatWebhookRpcSchema.parse(payload);
+    const { targetBotId, ...rpcPayload } = payload;
+    const webhookPayload = rpcPayload satisfies z.infer<typeof chatWebhookSchema>;
     const botPrefix = 'bot:kiloclaw:';
-    if (!parsed.targetBotId.startsWith(botPrefix)) {
-      throw new Error(`Invalid targetBotId: ${parsed.targetBotId}`);
+    if (!targetBotId.startsWith(botPrefix)) {
+      throw new Error(`Invalid targetBotId: ${targetBotId}`);
     }
-    const sandboxId = parsed.targetBotId.slice(botPrefix.length);
+    const sandboxId = targetBotId.slice(botPrefix.length);
+    if (!sandboxIdSchema.safeParse(sandboxId).success) {
+      throw new Error(`Invalid sandboxId derived from targetBotId: ${targetBotId}`);
+    }
 
     const { doKey, label } = await this.resolveChatWebhookDoKey(sandboxId);
     const getWebhookStub = () =>
@@ -1114,7 +1140,6 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
     );
 
     // Forward the webhook payload (without targetBotId) to the controller
-    const { targetBotId: _, ...webhookPayload } = parsed;
     const body = JSON.stringify(webhookPayload);
 
     const controller = new AbortController();

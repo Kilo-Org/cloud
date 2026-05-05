@@ -43,6 +43,7 @@ import {
   useKiloClawStatus,
 } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { chatSandboxPath } from '@/lib/kilo-chat-routes';
 import { useTRPC } from '@/lib/trpc';
 
 function categorizeProvisionError(error: {
@@ -309,12 +310,12 @@ export function OnboardingFlow() {
   ]);
 
   const onOpenInstance = useCallback(() => {
-    // Dismiss the onboarding modal, then open the chat. `chat/[instance-id]`
+    // Dismiss the onboarding modal, then open the chat. `chat/[sandbox-id]`
     // is at the (app) layer, so it renders above the tab bar once the modal
     // closes.
     router.back();
     if (state.sandboxId) {
-      router.push(`/(app)/chat/${state.sandboxId}` as Href);
+      router.push(chatSandboxPath(state.sandboxId));
     }
   }, [router, state.sandboxId]);
 

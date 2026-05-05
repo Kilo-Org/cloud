@@ -1,5 +1,6 @@
 import { createMiddleware } from 'hono/factory';
-import { extractBearerToken, getCachedSecret, verifyKiloToken } from '@kilocode/worker-utils';
+import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
+import { extractBearerToken } from '@kilocode/worker-utils';
 import { logger } from './util/logger';
 
 export type AuthContext = {
@@ -25,11 +26,19 @@ export const authMiddleware = createMiddleware<{
   }
 
   try {
-    const jwtSecret = await getCachedSecret(c.env.NEXTAUTH_SECRET, 'NEXTAUTH_SECRET');
-    const payload = await verifyKiloToken(token, jwtSecret);
-    c.set('callerId', payload.kiloUserId);
+    const auth = await verifyKiloBearerAgainstCurrentPepper({
+      token,
+      nextAuthSecret: c.env.NEXTAUTH_SECRET,
+      workerEnv: c.env.WORKER_ENV,
+      connectionString: c.env.HYPERDRIVE.connectionString,
+    });
+    if (!auth) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    c.set('callerId', auth.userId);
     c.set('callerKind', 'user');
-    logger.setTags({ callerId: payload.kiloUserId, callerKind: 'user' });
+    logger.setTags({ callerId: auth.userId, callerKind: 'user' });
     return next();
   } catch {
     return c.json({ error: 'Unauthorized' }, 401);

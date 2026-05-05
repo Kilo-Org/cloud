@@ -13,7 +13,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync as nodeExecFileSync } from 'node:child_process';
-import { generateBaseConfig, writeBaseConfig, writeMcporterConfig } from './config-writer';
+import {
+  generateBaseConfig,
+  sanitizeLegacyStreamChatConfig,
+  writeBaseConfig,
+  writeMcporterConfig,
+} from './config-writer';
 import type { ConfigWriterDeps } from './config-writer';
 import { atomicWrite } from './atomic-write';
 import { migrateKilocodeAuthProfilesToKeyRef } from './auth-profiles-migration';
@@ -705,6 +710,44 @@ function toAuthProfilesMigrationDeps(deps: BootstrapDeps): AuthProfilesMigration
   };
 }
 
+function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(deps.readFileSync(CONFIG_PATH, 'utf8'));
+  } catch (error) {
+    console.warn(
+      `[controller] Skipping pre-doctor config sanitization: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return;
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return;
+  }
+
+  const before = JSON.stringify(parsed);
+  sanitizeLegacyStreamChatConfig(parsed);
+  const serialized = JSON.stringify(parsed, null, 2);
+  if (JSON.stringify(parsed) === before) {
+    return;
+  }
+
+  atomicWrite(
+    CONFIG_PATH,
+    serialized,
+    {
+      writeFileSync: deps.writeFileSync,
+      renameSync: deps.renameSync,
+      unlinkSync: deps.unlinkSync,
+      chmodSync: deps.chmodSync,
+    },
+    { mode: 0o600 }
+  );
+  console.log('Removed legacy Stream Chat config before doctor');
+}
+
 export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
   const configExists = deps.existsSync(CONFIG_PATH);
   const cwDeps = toConfigWriterDeps(deps);
@@ -724,6 +767,7 @@ export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDe
     }
   } else {
     console.log('Using existing config, running doctor...');
+    sanitizeExistingConfigBeforeDoctor(deps);
     deps.execFileSync('openclaw', ['doctor', '--fix', '--non-interactive'], {
       stdio: 'inherit',
     });

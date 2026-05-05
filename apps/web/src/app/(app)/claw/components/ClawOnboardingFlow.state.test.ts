@@ -52,6 +52,7 @@ function createStatus(status: KiloClawDashboardStatus['status']): KiloClawDashbo
     instanceId: null,
     inboundEmailAddress: null,
     inboundEmailEnabled: false,
+    scheduledAction: null,
   };
 }
 

@@ -78,10 +78,6 @@ export type KiloClawEnv = {
   // Developer identity (development only, auto-populated by dev-start from `fly auth whoami`)
   DEV_CREATOR?: string;
 
-  // Stream Chat (default channel for new instances)
-  STREAM_CHAT_API_KEY?: string;
-  STREAM_CHAT_API_SECRET?: string;
-
   // OpenClaw gateway configuration
   OPENCLAW_ALLOWED_ORIGINS?: string;
   KILOCLAW_CHECKIN_URL?: string;

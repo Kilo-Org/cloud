@@ -43,6 +43,7 @@ const baseStatus: KiloClawDashboardStatus = {
   instanceId: 'instance-1',
   inboundEmailAddress: 'amber-river-quiet-maple@kiloclaw.ai',
   inboundEmailEnabled: true,
+  scheduledAction: null,
 };
 
 function createStatus(instanceId: string | null = 'instance-1'): KiloClawDashboardStatus {

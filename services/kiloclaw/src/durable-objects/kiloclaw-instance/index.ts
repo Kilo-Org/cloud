@@ -116,11 +116,6 @@ import {
   runUnexpectedStopRecoveryInBackground,
   type RecoveryRuntime,
 } from './recovery';
-import {
-  setupDefaultStreamChatChannel,
-  createShortLivedUserToken,
-  deactivateStreamChatUsers,
-} from '../../stream-chat/client';
 import { writeEvent, safeInstanceIdFromSandboxId } from '../../utils/analytics';
 import type { KiloClawEventData, KiloClawEventName } from '../../utils/analytics';
 import { getProviderAdapter, resolveDefaultProvider } from '../../providers';
@@ -848,47 +843,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         userTimezone,
         userLocation,
       });
-    }
-
-    // Set up the default Stream Chat channel on first provision (best-effort).
-    // The bot and channel are created server-side here so the API secret never
-    // reaches the Fly Machine. Failure is non-fatal: the instance will start
-    // without the Stream Chat channel rather than blocking provisioning.
-    // Set up or backfill the default Stream Chat channel (best-effort).
-    // On first provision (isNew) this creates the channel from scratch.
-    // On re-provision (!isNew) this backfills instances created before the
-    // feature was added. setupDefaultStreamChatChannel is idempotent
-    // (upsert users, getOrCreate channel). Failure is non-fatal.
-    if (
-      !this.s.streamChatApiKey &&
-      this.env.STREAM_CHAT_API_KEY &&
-      this.env.STREAM_CHAT_API_SECRET
-    ) {
-      try {
-        const streamChat = await setupDefaultStreamChatChannel(
-          this.env.STREAM_CHAT_API_KEY,
-          this.env.STREAM_CHAT_API_SECRET,
-          sandboxId
-        );
-        this.s.streamChatApiKey = streamChat.apiKey;
-        this.s.streamChatBotUserId = streamChat.botUserId;
-        this.s.streamChatBotUserToken = streamChat.botUserToken;
-        this.s.streamChatChannelId = streamChat.channelId;
-        await this.persist({
-          streamChatApiKey: streamChat.apiKey,
-          streamChatBotUserId: streamChat.botUserId,
-          streamChatBotUserToken: streamChat.botUserToken,
-          streamChatChannelId: streamChat.channelId,
-        });
-        console.log(
-          `[DO] Stream Chat channel ${isNew ? 'provisioned' : 'backfilled'}:`,
-          streamChat.channelId
-        );
-      } catch (err) {
-        doWarn(this.s, 'Stream Chat channel setup failed (non-fatal)', {
-          error: toLoggable(err),
-        });
-      }
     }
 
     if (isNew) {
@@ -2387,22 +2341,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       value: machineUptimeMs,
     });
 
-    // Best-effort: deactivate Stream Chat users so any captured tokens become useless.
-    // Failure is non-fatal — worst case is the same as pre-deactivation behavior.
-    if (this.env.STREAM_CHAT_API_KEY && this.env.STREAM_CHAT_API_SECRET && this.s.sandboxId) {
-      try {
-        await deactivateStreamChatUsers(
-          this.env.STREAM_CHAT_API_KEY,
-          this.env.STREAM_CHAT_API_SECRET,
-          [this.s.sandboxId, `bot-${this.s.sandboxId}`]
-        );
-      } catch (err) {
-        doWarn(this.s, 'Stream Chat user deactivation failed (non-fatal)', {
-          error: toLoggable(err),
-        });
-      }
-    }
-
     // Best-effort: clean up kilo-chat data (conversations, messages, memberships)
     // for this sandbox. Failure is non-fatal — orphaned data is unreachable.
     if (this.env.KILO_CHAT && this.s.sandboxId) {
@@ -2608,38 +2546,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       botVibe: this.s.botVibe,
       botEmoji: this.s.botEmoji,
       controllerCapabilitiesVersion: this.s.controllerCapabilitiesVersion,
-    };
-  }
-
-  async getStreamChatCredentials(): Promise<{
-    apiKey: string;
-    userId: string;
-    userToken: string;
-    channelId: string;
-  } | null> {
-    await this.loadState();
-
-    if (
-      !this.s.streamChatApiKey ||
-      !this.env.STREAM_CHAT_API_SECRET ||
-      !this.s.streamChatChannelId ||
-      !this.s.sandboxId
-    ) {
-      return null;
-    }
-
-    // Mint a short-lived token on every request so that revoked users lose
-    // access when the token expires, without requiring an app-secret rotation.
-    const userToken = await createShortLivedUserToken(
-      this.env.STREAM_CHAT_API_SECRET,
-      this.s.sandboxId
-    );
-
-    return {
-      apiKey: this.s.streamChatApiKey,
-      userId: this.s.sandboxId,
-      userToken,
-      channelId: this.s.streamChatChannelId,
     };
   }
 
@@ -3478,40 +3384,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
       if (!getRuntimeId(this.s)) {
         throw new Error('No machine exists');
-      }
-
-      // Backfill Stream Chat for instances created before the feature was added.
-      // setupDefaultStreamChatChannel is idempotent (upsert users, getOrCreate channel).
-      if (
-        !this.s.streamChatApiKey &&
-        this.env.STREAM_CHAT_API_KEY &&
-        this.env.STREAM_CHAT_API_SECRET &&
-        this.s.sandboxId
-      ) {
-        try {
-          const streamChat = await setupDefaultStreamChatChannel(
-            this.env.STREAM_CHAT_API_KEY,
-            this.env.STREAM_CHAT_API_SECRET,
-            this.s.sandboxId
-          );
-          this.s.streamChatApiKey = streamChat.apiKey;
-          this.s.streamChatBotUserId = streamChat.botUserId;
-          this.s.streamChatBotUserToken = streamChat.botUserToken;
-          this.s.streamChatChannelId = streamChat.channelId;
-          await this.persist({
-            streamChatApiKey: streamChat.apiKey,
-            streamChatBotUserId: streamChat.botUserId,
-            streamChatBotUserToken: streamChat.botUserToken,
-            streamChatChannelId: streamChat.channelId,
-          });
-          doLog(this.s, 'Stream Chat backfilled on restart', {
-            channelId: streamChat.channelId,
-          });
-        } catch (err) {
-          doWarn(this.s, 'Stream Chat backfill failed on restart (non-fatal)', {
-            error: toLoggable(err),
-          });
-        }
       }
 
       const { envVars, bootstrapEnv, minSecretsVersion } = await buildUserEnvVars(

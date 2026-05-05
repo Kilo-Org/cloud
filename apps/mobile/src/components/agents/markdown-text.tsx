@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo } from 'react';
 import {
+  Linking,
   ScrollView,
   Text,
   type TextStyle,
@@ -21,6 +22,7 @@ import {
 type MarkdownTextProps = {
   value: string;
   variant?: MarkdownVariant;
+  selectable?: boolean;
 };
 
 // The library's default `Renderer` renders code blocks with the `em` text
@@ -37,10 +39,24 @@ type MarkdownTextProps = {
 // instead — readable in chat, and it avoids the Fabric measurement bug.
 class MarkdownRenderer extends Renderer {
   private readonly palette: MarkdownPalette;
+  private readonly selectable: boolean;
 
-  constructor(palette: MarkdownPalette) {
+  constructor(palette: MarkdownPalette, selectable = true) {
     super();
     this.palette = palette;
+    this.selectable = selectable;
+  }
+
+  private textNode(children: string | ReactNode[], styles?: TextStyle): ReactNode {
+    return (
+      <Text selectable={this.selectable} key={this.getKey()} style={styles}>
+        {children}
+      </Text>
+    );
+  }
+
+  override heading(text: string | ReactNode[], styles?: TextStyle): ReactNode {
+    return this.textNode(text, styles);
   }
 
   // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
@@ -53,7 +69,7 @@ class MarkdownRenderer extends Renderer {
     return (
       <View key={this.getKey()} style={containerStyle}>
         <Text
-          selectable
+          selectable={this.selectable}
           className="font-mono text-sm leading-5"
           // eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color
           style={{ color: this.palette.textColor }}
@@ -62,6 +78,62 @@ class MarkdownRenderer extends Renderer {
         </Text>
       </View>
     );
+  }
+
+  override escape(text: string, styles?: TextStyle): ReactNode {
+    return this.textNode(text, styles);
+  }
+
+  // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
+  override link(
+    children: string | ReactNode[],
+    href: string,
+    styles?: TextStyle,
+    title?: string
+  ): ReactNode {
+    return (
+      <Text
+        selectable={this.selectable}
+        accessibilityRole="link"
+        accessibilityHint="Opens in a new window"
+        accessibilityLabel={title ?? 'Link'}
+        key={this.getKey()}
+        onPress={() => {
+          void Linking.openURL(href);
+        }}
+        style={styles}
+      >
+        {children}
+      </Text>
+    );
+  }
+
+  override strong(children: string | ReactNode[], styles?: TextStyle): ReactNode {
+    return this.textNode(children, styles);
+  }
+
+  override em(children: string | ReactNode[], styles?: TextStyle): ReactNode {
+    return this.textNode(children, styles);
+  }
+
+  override codespan(text: string, styles?: TextStyle): ReactNode {
+    return this.textNode(text, styles);
+  }
+
+  override br(): ReactNode {
+    return this.textNode('\n', {});
+  }
+
+  override del(children: string | ReactNode[], styles?: TextStyle): ReactNode {
+    return this.textNode(children, styles);
+  }
+
+  override text(text: string | ReactNode[], styles?: TextStyle): ReactNode {
+    return this.textNode(text, styles);
+  }
+
+  override html(text: string | ReactNode[], styles?: TextStyle): ReactNode {
+    return this.textNode(text, styles);
   }
 
   // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
@@ -170,7 +242,11 @@ function TableCell({ palette, width, hasRightBorder, hasBottomBorder, children }
   );
 }
 
-export function MarkdownText({ value, variant = 'assistant' }: Readonly<MarkdownTextProps>) {
+export function MarkdownText({
+  value,
+  variant = 'assistant',
+  selectable = true,
+}: Readonly<MarkdownTextProps>) {
   const colorScheme = useColorScheme();
   const colors = useThemeColors();
 
@@ -178,7 +254,7 @@ export function MarkdownText({ value, variant = 'assistant' }: Readonly<Markdown
     const palette = getPalette(variant, colors);
     return {
       styles: getMarkdownStyles(palette),
-      renderer: new MarkdownRenderer(palette),
+      renderer: new MarkdownRenderer(palette, selectable),
       theme: {
         colors: {
           text: palette.textColor,
@@ -188,7 +264,7 @@ export function MarkdownText({ value, variant = 'assistant' }: Readonly<Markdown
         },
       },
     };
-  }, [variant, colors]);
+  }, [variant, colors, selectable]);
 
   const elements = useMarkdown(value, {
     colorScheme,

@@ -6,10 +6,19 @@ import { makeApp } from './helpers';
 
 /** Map of userId → set of sandbox IDs they own. */
 const ownershipMap = new Map<string, Set<string>>();
+const userLookupResults = new Map<
+  string,
+  { displayName: string | null; avatarUrl: string | null }
+>();
 
 vi.mock('../services/sandbox-ownership', () => ({
   userOwnsSandbox: async (_env: Env, userId: string, sandboxId: string) =>
     ownershipMap.get(userId)?.has(sandboxId) ?? false,
+}));
+
+vi.mock('../services/user-lookup', () => ({
+  resolveUserDisplayInfo: async (_conn: string, userIds: string[]) =>
+    new Map(userIds.map(userId => [userId, userLookupResults.get(userId) ?? null])),
 }));
 
 function grantSandbox(userId: string, sandboxId: string) {
@@ -26,9 +35,21 @@ function getMemberStub(memberId: string): DurableObjectStub<MembershipDO> {
 }
 
 describe('POST /v1/conversations', () => {
-  it('creates a conversation and returns conversationId', async () => {
+  it('creates a conversation and returns the list row contract', async () => {
     grantSandbox('user-alice', 'sandbox-123');
     const app = makeApp('user-alice', 'user');
+    const pushedEvents: Array<{ event: string; payload: unknown }> = [];
+    const eventEnv = {
+      ...env,
+      EVENT_SERVICE: {
+        fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+        connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+        pushEvent: async (_userId: string, _context: string, event: string, payload: unknown) => {
+          pushedEvents.push({ event, payload });
+          return true;
+        },
+      },
+    } satisfies Env;
     const res = await app.request(
       '/v1/conversations',
       {
@@ -36,14 +57,37 @@ describe('POST /v1/conversations', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sandboxId: 'sandbox-123', title: 'My Chat' }),
       },
-      env
+      eventEnv
     );
 
     expect(res.status).toBe(201);
-    const body = await res.json<{ conversationId: string }>();
+    const body = await res.json<{
+      conversationId: string;
+      conversation: {
+        conversationId: string;
+        title: string | null;
+        lastActivityAt: number | null;
+        lastReadAt: number | null;
+        joinedAt: number;
+      };
+    }>();
     expect(body.conversationId).toBeTruthy();
     expect(typeof body.conversationId).toBe('string');
     expect(body.conversationId).toHaveLength(26);
+    expect(body.conversation).toMatchObject({
+      conversationId: body.conversationId,
+      title: 'My Chat',
+      lastActivityAt: null,
+      lastReadAt: null,
+    });
+    expect(typeof body.conversation.joinedAt).toBe('number');
+    expect(pushedEvents).toContainEqual({
+      event: 'conversation.created',
+      payload: {
+        conversationId: body.conversationId,
+        conversation: body.conversation,
+      },
+    });
   });
 
   it('initializes ConversationDO and MembershipDOs on creation', async () => {
@@ -244,6 +288,49 @@ describe('GET /v1/conversations/:id', () => {
     expect(body.id).toBe(conversationId);
     expect(body.title).toBe('Frank Chat');
     expect(Array.isArray(body.members)).toBe(true);
+  });
+
+  it('enriches member display info for sender labels', async () => {
+    userLookupResults.set('user-member-display', {
+      displayName: 'Member Display',
+      avatarUrl: 'https://example.com/member.png',
+    });
+    grantSandbox('user-member-display', 'sandbox-member-display');
+    const app = makeApp('user-member-display', 'user');
+    const createRes = await app.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId: 'sandbox-member-display', title: 'Names Chat' }),
+      },
+      env
+    );
+    const { conversationId } = await createRes.json<{ conversationId: string }>();
+
+    const res = await app.request(`/v1/conversations/${conversationId}`, {}, env);
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{
+      members: Array<{
+        id: string;
+        kind: string;
+        displayName?: string | null;
+        avatarUrl?: string | null;
+      }>;
+    }>();
+    expect(body.members).toContainEqual({
+      id: 'user-member-display',
+      kind: 'user',
+      displayName: 'Member Display',
+      avatarUrl: 'https://example.com/member.png',
+    });
+    expect(body.members).toContainEqual({
+      id: 'bot:kiloclaw:sandbox-member-display',
+      kind: 'bot',
+      displayName: null,
+      avatarUrl: null,
+    });
   });
 
   it('returns 403 for non-member', async () => {

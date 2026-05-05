@@ -9,6 +9,7 @@
   "logpush": true,
   "placement": { "mode": "smart" },
   "dev": { "port": 8808 },
+  "vars": { "WORKER_ENV": "production" },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "routes": [
     {
@@ -42,6 +43,11 @@
   "services": [
     { "binding": "KILOCLAW", "service": "kiloclaw" },
     { "binding": "EVENT_SERVICE", "service": "event-service" },
+    {
+      "binding": "NOTIFICATIONS",
+      "service": "notifications",
+      "entrypoint": "NotificationsService",
+    },
   ],
 
   "secrets_store_secrets": [

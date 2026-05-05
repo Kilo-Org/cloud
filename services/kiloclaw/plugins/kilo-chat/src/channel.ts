@@ -23,6 +23,7 @@ import { stripPrefix } from './action-schemas';
 const CHANNEL_ID = 'kilo-chat';
 export const DEFAULT_ACCOUNT_ID = 'default';
 const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
+const CONVERSATION_TARGET_ALIASES = ['conversationId', 'groupId'];
 
 function isValidUlid(raw: string): boolean {
   return ULID_RE.test(raw);
@@ -77,6 +78,18 @@ const pluginBase = createChannelPluginBase({
   },
   setup: {
     applyAccountConfig: ({ cfg }) => cfg,
+  },
+  agentPrompt: {
+    messageToolHints: () => [
+      '- Kilo Chat uses the shared `message` tool. Prefer `target` for explicit conversation destinations; omit it to act in the current conversation when supported.',
+      '- `send`: pass `message` plus `target`; `conversationId` and `groupId` are accepted compatibility aliases for the target conversation.',
+      '- Kilo Chat actions: `channel-list` lists conversations with optional `limit`; `channel-create` creates a conversation with optional `name`.',
+      '- `read`: omit `target` for the current conversation, or pass `target`/`conversationId`; use `limit` and `before` for pagination.',
+      '- `react`: pass `messageId` and the actual emoji in `emoji`; set `remove=true` to remove that emoji. If `messageId` is omitted, the current inbound message is used when available.',
+      '- `edit` and `delete`: pass `messageId`; `edit` also requires replacement `message` text.',
+      '- `member-info`: use `memberId` or `userId` to inspect one member; omit both to list members. Do not use `target` for the member id.',
+      '- `renameGroup`: pass `conversationId` or `groupId` plus `name`.',
+    ],
   },
   config: {
     listAccountIds: () => ['default'],
@@ -173,20 +186,65 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         ] as const,
         schema: {
           properties: {
-            additionalMembers: Type.Optional(
+            conversationId: Type.Optional(
               Type.String({
-                description: 'Comma-separated member IDs to add when creating a conversation.',
+                description:
+                  'Kilo Chat conversation id. Prefer `target` for OpenClaw-native sends, but this is accepted as a compatibility alias for `send`, `read`, `react`, `edit`, `delete`, and `renameGroup` when not acting on the current conversation.',
               })
             ),
             groupId: Type.Optional(
               Type.String({
                 description:
-                  'Conversation/group id. Required for `renameGroup` (must be the target conversation, not the current one). Optional elsewhere — falls back to the current conversation.',
+                  'Alias for `conversationId`. Accepted for `send`, `read`, `react`, `edit`, `delete`, and `renameGroup`; required for `renameGroup` if `conversationId` is omitted.',
               })
             ),
-            target: Type.Optional(
+            messageId: Type.Optional(
               Type.String({
-                description: 'Member id to inspect with `member-info`. Omit to list all members.',
+                description:
+                  'Target Kilo Chat message id for `react`, `edit`, and `delete`. Defaults to the current inbound message when available.',
+              })
+            ),
+            message: Type.Optional(
+              Type.String({
+                description: 'Message body for `send` and replacement text for `edit`.',
+              })
+            ),
+            emoji: Type.Optional(
+              Type.String({
+                description: 'Actual emoji for `react`, for example 👍.',
+              })
+            ),
+            remove: Type.Optional(
+              Type.Boolean({
+                description: 'For `react`, remove the given emoji reaction instead of adding it.',
+              })
+            ),
+            name: Type.Optional(
+              Type.String({
+                description: 'Conversation title for `channel-create` or `renameGroup`.',
+              })
+            ),
+            limit: Type.Optional(
+              Type.Number({
+                description:
+                  'Maximum conversations or messages to return for `channel-list` or `read`.',
+              })
+            ),
+            before: Type.Optional(
+              Type.String({
+                description:
+                  'Pagination cursor for `read`; use the `nextCursor` returned by a previous read.',
+              })
+            ),
+            memberId: Type.Optional(
+              Type.String({
+                description:
+                  'Member/user id to inspect with `member-info`. Omit to list all members.',
+              })
+            ),
+            userId: Type.Optional(
+              Type.String({
+                description: 'Alias for `memberId` for `member-info`.',
               })
             ),
           },
@@ -194,12 +252,15 @@ export const kiloChatPlugin = createChatChannelPlugin<ResolvedKiloChatAccount>({
         },
       }),
       // Tell the OpenClaw message-tool runtime that `groupId`/`conversationId`
-      // count as a target for `renameGroup`. Without this, the runtime treats
-      // the action as targetless and injects `toolContext.currentChannelId`
-      // as `to`, which would silently rename the active conversation instead
-      // of the one the caller specified.
+      // count as destination fields so explicit Kilo Chat conversations are not
+      // overwritten by the current conversation during tool normalization.
       messageActionTargetAliases: {
-        renameGroup: { aliases: ['groupId', 'conversationId'] },
+        send: { aliases: CONVERSATION_TARGET_ALIASES },
+        read: { aliases: CONVERSATION_TARGET_ALIASES },
+        react: { aliases: CONVERSATION_TARGET_ALIASES },
+        edit: { aliases: CONVERSATION_TARGET_ALIASES },
+        delete: { aliases: CONVERSATION_TARGET_ALIASES },
+        renameGroup: { aliases: CONVERSATION_TARGET_ALIASES },
       },
       supportsAction: ({ action }: { action: string }) =>
         action === 'react' ||

@@ -56,6 +56,9 @@ import type {
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
   KiloClawScheduledActionTargetStatus,
+  KiloClawScheduledActionNotificationStatus,
+  KiloClawScheduledActionNotificationChannel,
+  KiloClawScheduledActionNotificationKind,
 } from './schema-types';
 import type {
   OrganizationModeConfig,
@@ -4233,6 +4236,65 @@ export type KiloClawScheduledActionTarget = typeof kiloclaw_scheduled_action_tar
 export type NewKiloClawScheduledActionTarget =
   typeof kiloclaw_scheduled_action_targets.$inferInsert;
 
+// Per-target, per-channel notification rows. Channels dispatch and
+// persist independently — knowing email succeeded but mobile push
+// failed matters for retry and debug. Adding a new channel later is a
+// new value in the enum, not a schema change.
+//
+// kind='notice' is the heads-up dispatched ahead of the scheduled time;
+// kind='cancelled' is the follow-up emitted when an admin cancels the
+// action AFTER a notice was already sent for that (target, channel).
+// We never insert a 'cancelled' row for a (target, channel) that has
+// no prior sent 'notice' — surfacing a cancellation to a user who
+// never got the original heads-up would be confusing.
+export const kiloclaw_scheduled_action_notifications = pgTable(
+  'kiloclaw_scheduled_action_notifications',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    target_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_scheduled_action_targets.id, { onDelete: 'cascade' }),
+
+    channel: text().$type<KiloClawScheduledActionNotificationChannel>().notNull(),
+
+    kind: text().$type<KiloClawScheduledActionNotificationKind>().notNull().default('notice'),
+
+    status: text().$type<KiloClawScheduledActionNotificationStatus>().notNull().default('pending'),
+
+    // Set when the sweep CAS-claims the row (pending → sending). Used
+    // by the next tick to detect and recover stuck claims left behind
+    // by a sweep that crashed mid-dispatch.
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    error_message: text(),
+  },
+  table => [
+    // One notification per (target, kind, channel). A target may have
+    // both kinds (notice sent, then cancellation queued).
+    uniqueIndex('UQ_kiloclaw_scheduled_action_notifications_target_kind_channel').on(
+      table.target_id,
+      table.kind,
+      table.channel
+    ),
+    // Sweep lookup: notifications still pending dispatch. The partial
+    // predicate keeps the index small (only pending rows). Keyed on
+    // target_id so the sweep's join into kiloclaw_scheduled_action_targets
+    // can use it for the inner-join lookup. Point lookups by id (markSent,
+    // markFailed) hit the primary key index directly.
+    index('IDX_kiloclaw_scheduled_action_notifications_pending')
+      .on(table.target_id)
+      .where(sql`${table.status} = 'pending'`),
+  ]
+);
+
+export type KiloClawScheduledActionNotification =
+  typeof kiloclaw_scheduled_action_notifications.$inferSelect;
+export type NewKiloClawScheduledActionNotification =
+  typeof kiloclaw_scheduled_action_notifications.$inferInsert;
+
 // KiloClaw Early Bird Purchases — records one-time earlybird payments.
 // Unique on user_id enforces at most one purchase per user.
 // Unique on stripe_charge_id provides webhook idempotency.
@@ -4780,29 +4842,4 @@ export const security_advisor_content = pgTable('security_advisor_content', {
 export type SecurityAdvisorContent = typeof security_advisor_content.$inferSelect;
 export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferInsert;
 
-// ============ CHANNEL BADGE COUNTS ============
-// Per-user per-channel unread notification counts for mobile app badge display.
-// (user_id, channel_id) is the composite PK — one row per user per chat channel.
-// Keyed by channel rather than instance to support multiple channels per instance
-// in future. The notification service increments badge_count on each push and sums
-// across all channels to get the total badge count to include in the push payload.
-// The mobile client resets a channel's count (to 0) when the user views that chat.
-
-export const channel_badge_counts = pgTable(
-  'channel_badge_counts',
-  {
-    user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    channel_id: text().notNull(),
-    badge_count: integer().notNull().default(0),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [primaryKey({ columns: [table.user_id, table.channel_id] })]
-);
-
-export type ChannelBadgeCount = typeof channel_badge_counts.$inferSelect;
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

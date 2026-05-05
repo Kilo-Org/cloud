@@ -4,12 +4,21 @@
  */
 
 import { ulid } from 'ulid';
-import { withDORetry } from '@kilocode/worker-utils';
-import { extractConversationContext, extractSandboxId, pushInstanceEvent } from './event-push';
+import { ulidToTimestamp } from '@kilocode/kilo-chat';
+import type { ConversationListItem } from '@kilocode/kilo-chat';
+import { badgeBucketForConversation } from '@kilocode/notifications';
+import type { ClearBadgeBucketForUserInput } from '@kilocode/notifications';
+import { formatError, withDORetry } from '@kilocode/worker-utils';
+import {
+  extractConversationContext,
+  extractSandboxId,
+  pushInstanceEvent,
+  pushInstanceEventToUser,
+} from './event-push';
 import { lookupSandboxOwnerUserId, userOwnsSandbox } from './sandbox-ownership';
-import { validateUserIds } from './user-lookup';
 import type { DeferCtx } from './messages';
 import type { ConversationDO, UpdateTitleIfMemberResult } from '../do/conversation-do';
+import { logger } from '../util/logger';
 
 // ─── partial-failure rollback helpers ──────────────────────────────────────
 
@@ -19,6 +28,16 @@ type MemberAddParams = {
   sandboxId: string;
   joinedAt: number;
 };
+
+function conversationListItemFromMemberParams(params: MemberAddParams): ConversationListItem {
+  return {
+    conversationId: params.conversationId,
+    title: params.title,
+    lastActivityAt: null,
+    lastReadAt: null,
+    joinedAt: params.joinedAt,
+  };
+}
 
 /**
  * Fan out `addConversation` to each member's MembershipDO. Accumulates the
@@ -71,7 +90,7 @@ export type CreateConversationParams = {
 };
 
 export type CreateConversationResult =
-  | { ok: true; conversationId: string }
+  | { ok: true; conversationId: string; conversation: ConversationListItem }
   | { ok: false; code: 'forbidden' | 'internal'; error: string };
 
 export async function createConversationFor(
@@ -119,12 +138,15 @@ export async function createConversationFor(
     throw err;
   }
 
+  const conversation = conversationListItemFromMemberParams(memberParams);
+
   // Notify all human members on the instance context so their conversation list updates.
   await pushInstanceEvent(env, params.sandboxId, [userId], 'conversation.created', {
     conversationId,
+    conversation,
   });
 
-  return { ok: true, conversationId };
+  return { ok: true, conversationId, conversation };
 }
 
 // ─── createBotConversation ─────────────────────────────────────────────────
@@ -136,7 +158,7 @@ export type CreateBotConversationParams = {
 };
 
 export type CreateBotConversationResult =
-  | { ok: true; conversationId: string }
+  | { ok: true; conversationId: string; conversation: ConversationListItem }
   | {
       ok: false;
       code: 'not_found' | 'invalid_members' | 'internal';
@@ -155,15 +177,12 @@ export async function createBotConversationFor(
 
   const additionalMembers = params.additionalMembers ?? [];
   if (additionalMembers.length > 0) {
-    const { invalid } = await validateUserIds(env.HYPERDRIVE.connectionString, additionalMembers);
-    if (invalid.length > 0) {
-      return {
-        ok: false,
-        code: 'invalid_members',
-        error: `Invalid member IDs: ${invalid.join(', ')}`,
-        invalidMembers: invalid,
-      };
-    }
+    return {
+      ok: false,
+      code: 'invalid_members',
+      error: 'Bot-created conversations do not support additionalMembers',
+      invalidMembers: additionalMembers,
+    };
   }
 
   const conversationId = ulid();
@@ -173,9 +192,6 @@ export async function createBotConversationFor(
   const members: Array<{ id: string; kind: 'user' | 'bot' }> = [
     { id: ownerId, kind: 'user' },
     { id: botId, kind: 'bot' },
-    ...additionalMembers
-      .filter(id => id !== ownerId) // Dedupe owner if passed in additionalMembers
-      .map(id => ({ id, kind: 'user' as const })),
   ];
 
   const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
@@ -208,11 +224,13 @@ export async function createBotConversationFor(
   }
 
   const humanMemberIds = members.filter(m => m.kind === 'user').map(m => m.id);
+  const conversation = conversationListItemFromMemberParams(memberParams);
   await pushInstanceEvent(env, params.sandboxId, humanMemberIds, 'conversation.created', {
     conversationId,
+    conversation,
   });
 
-  return { ok: true, conversationId };
+  return { ok: true, conversationId, conversation };
 }
 
 // ─── renameConversation ────────────────────────────────────────────────────
@@ -322,9 +340,17 @@ export async function leaveConversationFor(
 
 export type MarkReadParams = {
   conversationId: string;
+  lastSeenMessageId: string;
 };
 
-export type MarkReadResult = { ok: true } | { ok: false; code: 'forbidden'; error: string };
+type BadgeClearResult = {
+  badgeBucket: string;
+  badgeCount: number;
+};
+
+export type MarkReadResult =
+  | { ok: true; applied: boolean; lastReadAt: number; badgeClear: BadgeClearResult | null }
+  | { ok: false; code: 'forbidden' | 'invalid' | 'badge_clear_failed'; error: string };
 
 export async function markReadFor(
   env: Env,
@@ -332,34 +358,64 @@ export async function markReadFor(
   params: MarkReadParams,
   ctx: DeferCtx
 ): Promise<MarkReadResult> {
-  const { conversationId } = params;
+  const { conversationId, lastSeenMessageId } = params;
 
-  // Single getInfo() call for both membership check and context extraction.
-  const info = await withDORetry(
-    () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-    stub => stub.getInfo(),
-    'ConversationDO.getInfo'
+  const convStub = env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId));
+  const resolved = await withDORetry(
+    () => convStub,
+    async stub => stub.resolveMarkRead(userId, lastSeenMessageId),
+    'ConversationDO.resolveMarkRead'
   );
-  if (!info || !info.members.some(m => m.id === userId)) {
-    return { ok: false, code: 'forbidden', error: 'Forbidden' };
+  if (!resolved.ok) {
+    return { ok: false, code: resolved.code, error: resolved.error };
   }
 
-  const now = Date.now();
-  await withDORetry(
+  const requestedLastReadAt = ulidToTimestamp(lastSeenMessageId);
+  const readResult = await withDORetry(
     () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(userId)),
-    stub => stub.markRead(conversationId, now),
+    stub => stub.markReadAtLeast(conversationId, requestedLastReadAt),
     'MembershipDO.markRead'
   );
+  const lastReadAt = readResult.lastReadAt ?? requestedLastReadAt;
 
-  const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
+  const { sandboxId } = resolved;
+  let badgeClear: BadgeClearResult | null = null;
   if (sandboxId) {
-    const pushPromise = pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
-      conversationId,
-      memberId: userId,
-      lastReadAt: now,
-    });
-    ctx.waitUntil(pushPromise);
+    if (
+      resolved.latestNonDeletedMessageId === null ||
+      lastSeenMessageId >= resolved.latestNonDeletedMessageId
+    ) {
+      const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
+      try {
+        const payload = {
+          userId,
+          badgeBucket,
+        } satisfies ClearBadgeBucketForUserInput;
+        const clearResult = await env.NOTIFICATIONS.clearBadgeBucketForUser(payload);
+        badgeClear = { ...clearResult, badgeBucket };
+      } catch (err) {
+        logger.error('clearBadgeBucketForUser failed', {
+          sandboxId,
+          conversationId,
+          ...formatError(err),
+        });
+        return {
+          ok: false,
+          code: 'badge_clear_failed',
+          error: 'Failed to clear notification badge',
+        };
+      }
+    }
+
+    if (readResult.applied) {
+      const pushPromise = pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
+        conversationId,
+        memberId: userId,
+        lastReadAt,
+      });
+      ctx.waitUntil(pushPromise);
+    }
   }
 
-  return { ok: true };
+  return { ok: true, applied: readResult.applied, lastReadAt, badgeClear };
 }

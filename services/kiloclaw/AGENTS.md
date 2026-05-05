@@ -261,31 +261,27 @@ User config is transported to the machine via environment variables set in the F
 
 **Encrypted (stored as `KILOCLAW_ENC_{name}`, decrypted to `{name}` at boot):**
 
-| Env var (after decrypt)      | Source                            | Purpose                        |
-| ---------------------------- | --------------------------------- | ------------------------------ |
-| `KILOCODE_API_KEY`           | User config (DO)                  | KiloCode API authentication    |
-| `OPENCLAW_GATEWAY_TOKEN`     | Derived from sandboxId            | Per-user gateway auth          |
-| `TELEGRAM_BOT_TOKEN`         | Decrypted channel token           | Telegram channel               |
-| `DISCORD_BOT_TOKEN`          | Decrypted channel token           | Discord channel                |
-| `SLACK_BOT_TOKEN`            | Decrypted channel token           | Slack channel                  |
-| `SLACK_APP_TOKEN`            | Decrypted channel token           | Slack channel                  |
-| `STREAM_CHAT_BOT_USER_TOKEN` | Auto-provisioned (Stream Chat DO) | Stream Chat bot authentication |
-| User encrypted secrets       | Decrypted from RSA envelopes      | User-provided credentials      |
+| Env var (after decrypt)  | Source                       | Purpose                     |
+| ------------------------ | ---------------------------- | --------------------------- |
+| `KILOCODE_API_KEY`       | User config (DO)             | KiloCode API authentication |
+| `OPENCLAW_GATEWAY_TOKEN` | Derived from sandboxId       | Per-user gateway auth       |
+| `TELEGRAM_BOT_TOKEN`     | Decrypted channel token      | Telegram channel            |
+| `DISCORD_BOT_TOKEN`      | Decrypted channel token      | Discord channel             |
+| `SLACK_BOT_TOKEN`        | Decrypted channel token      | Slack channel               |
+| `SLACK_APP_TOKEN`        | Decrypted channel token      | Slack channel               |
+| User encrypted secrets   | Decrypted from RSA envelopes | User-provided credentials   |
 
 **Plaintext (stored as-is in config.env):**
 
-| Env var                          | Source                            | Purpose                              |
-| -------------------------------- | --------------------------------- | ------------------------------------ |
-| `KILOCODE_DEFAULT_MODEL`         | User config (DO)                  | Default model for agents             |
-| `KILOCODE_MODELS_JSON`           | User config (DO), JSON-serialized | Available model list                 |
-| `KILOCODE_API_BASE_URL`          | Worker env                        | API base URL override                |
-| `AUTO_APPROVE_DEVICES`           | Hardcoded `true`                  | Skip device pairing                  |
-| `TELEGRAM_DM_POLICY`             | Worker env                        | Telegram DM policy                   |
-| `DISCORD_DM_POLICY`              | Worker env                        | Discord DM policy                    |
-| `OPENCLAW_ALLOWED_ORIGINS`       | Worker env                        | Control UI WebSocket allowed origins |
-| `STREAM_CHAT_API_KEY`            | Auto-provisioned (Stream Chat DO) | Stream Chat app key                  |
-| `STREAM_CHAT_BOT_USER_ID`        | Auto-provisioned (Stream Chat DO) | Per-user bot identifier              |
-| `STREAM_CHAT_DEFAULT_CHANNEL_ID` | Auto-provisioned (Stream Chat DO) | Default channel ID for the user      |
+| Env var                    | Source                            | Purpose                              |
+| -------------------------- | --------------------------------- | ------------------------------------ |
+| `KILOCODE_DEFAULT_MODEL`   | User config (DO)                  | Default model for agents             |
+| `KILOCODE_MODELS_JSON`     | User config (DO), JSON-serialized | Available model list                 |
+| `KILOCODE_API_BASE_URL`    | Worker env                        | API base URL override                |
+| `AUTO_APPROVE_DEVICES`     | Hardcoded `true`                  | Skip device pairing                  |
+| `TELEGRAM_DM_POLICY`       | Worker env                        | Telegram DM policy                   |
+| `DISCORD_DM_POLICY`        | Worker env                        | Discord DM policy                    |
+| `OPENCLAW_ALLOWED_ORIGINS` | Worker env                        | Control UI WebSocket allowed origins |
 
 ### AI Provider Selection
 
@@ -321,15 +317,17 @@ These files are COPYed by the Dockerfile and hashed by CI (`deploy-kiloclaw.yml`
 produce the content-hash image tag. If you add or remove a COPY in the Dockerfile,
 update the `find` command in the workflow's "Compute source content hash" step to match.
 
-| Path                              | Purpose                                                 |
-| --------------------------------- | ------------------------------------------------------- |
-| `Dockerfile`                      | Base image, apt packages, npm versions                  |
-| `controller/`                     | Compiled to `kiloclaw-controller.js` (entrypoint)       |
-| `container/`                      | Runtime assets (e.g. `TOOLS.md`) staged outside `/root` |
-| `plugins/kiloclaw-customizer/`    | KiloClaw customizer plugin package installed in image   |
-| `openclaw-pairing-list.js`        | Helper script used at runtime by controller             |
-| `openclaw-device-pairing-list.js` | Helper script used at runtime by controller             |
-| `skills/`                         | Custom skills copied to `/root/clawd/skills/`           |
+| Path                                 | Purpose                                                 |
+| ------------------------------------ | ------------------------------------------------------- |
+| `Dockerfile`                         | Base image, apt packages, npm versions                  |
+| `controller/`                        | Compiled to `kiloclaw-controller.js` (entrypoint)       |
+| `container/`                         | Runtime assets (e.g. `TOOLS.md`) staged outside `/root` |
+| `plugins/kiloclaw-customizer/`       | KiloClaw customizer plugin package installed in image   |
+| `plugins/kilo-chat/`                 | Kilo Chat channel plugin package installed in image     |
+| `plugins/kiloclaw-morning-briefing/` | Morning briefing plugin package installed in image      |
+| `openclaw-pairing-list.js`           | Helper script used at runtime by controller             |
+| `openclaw-device-pairing-list.js`    | Helper script used at runtime by controller             |
+| `skills/`                            | Custom skills copied to `/root/clawd/skills/`           |
 
 ## Fly Machine Lifecycle
 

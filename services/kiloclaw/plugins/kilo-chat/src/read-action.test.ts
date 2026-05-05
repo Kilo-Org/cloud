@@ -76,6 +76,23 @@ describe('handleKiloChatReadAction', () => {
     });
   });
 
+  it('includes the next cursor when more messages are available', async () => {
+    const client = mockClient({
+      listMessages: vi.fn().mockResolvedValue({
+        messages: [{ id: 'M1', senderId: 'alice', content: [{ type: 'text', text: 'Hi' }] }],
+        hasMore: true,
+        nextCursor: 'NEXT_CURSOR',
+      }),
+    });
+
+    const result = await handleKiloChatReadAction({
+      params: { to: 'CONV' },
+      client,
+    });
+
+    expect(result.content[0].text).toContain('More messages available. nextCursor: NEXT_CURSOR');
+  });
+
   it('joins multiple content blocks', async () => {
     const client = mockClient({
       listMessages: vi.fn().mockResolvedValue({

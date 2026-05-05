@@ -340,10 +340,6 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.startFailurePushSentForAttempt =
       'startFailurePushSentForAttempt' in raw ? d.startFailurePushSentForAttempt : true;
     s.customSecretMeta = d.customSecretMeta;
-    s.streamChatApiKey = d.streamChatApiKey;
-    s.streamChatBotUserId = d.streamChatBotUserId;
-    s.streamChatBotUserToken = d.streamChatBotUserToken;
-    s.streamChatChannelId = d.streamChatChannelId;
     s.vectorMemoryEnabled = d.vectorMemoryEnabled;
     s.vectorMemoryModel = d.vectorMemoryModel;
     s.dreamingEnabled = d.dreamingEnabled;
@@ -440,10 +436,6 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
   Object.assign(s, LIFECYCLE_NOTIFICATION_RESET);
-  s.streamChatApiKey = null;
-  s.streamChatBotUserId = null;
-  s.streamChatBotUserToken = null;
-  s.streamChatChannelId = null;
   s.vectorMemoryEnabled = false;
   s.vectorMemoryModel = null;
   s.dreamingEnabled = false;
@@ -535,10 +527,6 @@ export function createMutableState(): InstanceMutableState {
     pendingRestoreVolumeId: null,
     ...LIFECYCLE_NOTIFICATION_RESET,
     customSecretMeta: null,
-    streamChatApiKey: null,
-    streamChatBotUserId: null,
-    streamChatBotUserToken: null,
-    streamChatChannelId: null,
     vectorMemoryEnabled: false,
     vectorMemoryModel: null,
     dreamingEnabled: false,

@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./instance-id": "./src/instance-id.ts",
+    "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./redact-headers": "./src/redact-headers.ts",
@@ -18,7 +19,9 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src"
   },
   "dependencies": {
+    "@kilocode/db": "workspace:*",
     "aws4fetch": "catalog:",
+    "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
     "zod": "catalog:"

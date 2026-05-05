@@ -138,18 +138,6 @@ vi.mock('../utils/encryption', async () => {
   };
 });
 
-// -- Mock stream-chat client --
-vi.mock('../stream-chat/client', () => ({
-  setupDefaultStreamChatChannel: vi.fn().mockResolvedValue({
-    apiKey: 'sc-api-key',
-    botUserId: 'bot-sandbox-1',
-    botUserToken: 'sc-bot-token',
-    channelId: 'default-sandbox-1',
-  }),
-  createShortLivedUserToken: vi.fn().mockResolvedValue('short-lived-token'),
-  deactivateStreamChatUsers: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { KiloClawInstance } from './kiloclaw-instance';
 import { buildChannelConfigPatch } from './kiloclaw-instance/channel-config';
 import * as flyClient from '../fly/client';
@@ -160,7 +148,6 @@ import * as regions from './regions';
 import { resolveLatestVersion, resolveVersionByTag } from '../lib/image-version';
 import { lookupCatalogVersion } from '../lib/catalog-registration';
 import { selectImageVersionForInstance } from '../lib/version-rollout';
-import { setupDefaultStreamChatChannel } from '../stream-chat/client';
 import { verifyKiloToken } from '@kilocode/worker-utils';
 import {
   ALARM_INTERVAL_RUNNING_MS,
@@ -9408,236 +9395,40 @@ describe('tryMarkInstanceReady', () => {
 });
 
 // ============================================================================
-// Stream Chat backfill
-// ============================================================================
-
-describe('Stream Chat backfill on provision', () => {
-  beforeEach(() => {
-    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
-      id: 'vol-1',
-      region: 'iad',
-    });
-    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
-    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'iad' });
-    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
-    (setupDefaultStreamChatChannel as Mock).mockClear();
-  });
-
-  it('provisions Stream Chat on first provision when env vars are present', async () => {
-    const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
-
-    await instance.provision('user-1', {});
-    await Promise.all(waitUntilPromises);
-
-    expect(setupDefaultStreamChatChannel).toHaveBeenCalledOnce();
-    expect(storage._store.get('streamChatApiKey')).toBe('sc-api-key');
-    expect(storage._store.get('streamChatBotUserId')).toBe('bot-sandbox-1');
-    expect(storage._store.get('streamChatBotUserToken')).toBe('sc-bot-token');
-    expect(storage._store.get('streamChatChannelId')).toBe('default-sandbox-1');
-  });
-
-  it('backfills Stream Chat on re-provision when DO state has no credentials', async () => {
-    const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage } = createInstance(undefined, env);
-    await seedRunning(storage);
-
-    (setupDefaultStreamChatChannel as Mock).mockClear();
-    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
-
-    expect(setupDefaultStreamChatChannel).toHaveBeenCalledOnce();
-    expect(storage._store.get('streamChatApiKey')).toBe('sc-api-key');
-    expect(storage._store.get('streamChatBotUserId')).toBe('bot-sandbox-1');
-    expect(storage._store.get('streamChatBotUserToken')).toBe('sc-bot-token');
-    expect(storage._store.get('streamChatChannelId')).toBe('default-sandbox-1');
-  });
-
-  it('skips Stream Chat setup on re-provision when credentials already exist', async () => {
-    const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage } = createInstance(undefined, env);
-    await seedRunning(storage, {
-      streamChatApiKey: 'existing-key',
-      streamChatBotUserId: 'existing-bot',
-      streamChatBotUserToken: 'existing-token',
-      streamChatChannelId: 'existing-channel',
-    });
-
-    (setupDefaultStreamChatChannel as Mock).mockClear();
-    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
-
-    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
-    expect(storage._store.get('streamChatApiKey')).toBe('existing-key');
-  });
-
-  it('skips Stream Chat when worker env vars are missing', async () => {
-    const { instance, storage, waitUntilPromises } = createInstance();
-    // Default env does not have STREAM_CHAT_API_KEY / STREAM_CHAT_API_SECRET
-
-    await instance.provision('user-1', {});
-    await Promise.all(waitUntilPromises);
-
-    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
-    expect(storage._store.get('streamChatApiKey')).toBeUndefined();
-  });
-
-  it('continues provisioning when Stream Chat setup fails (non-fatal)', async () => {
-    const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
-
-    (setupDefaultStreamChatChannel as Mock).mockRejectedValueOnce(
-      new Error('Stream Chat API down')
-    );
-
-    await instance.provision('user-1', {});
-    await Promise.all(waitUntilPromises);
-
-    // Provision succeeded despite Stream Chat failure
-    expect(storage._store.get('status')).toBeTruthy();
-    expect(storage._store.get('streamChatApiKey')).toBeUndefined();
-  });
-});
-
-describe('Stream Chat backfill on restartMachine', () => {
-  beforeEach(() => {
-    (flyClient.updateMachine as Mock).mockResolvedValue({ instance_id: 'inst-1' });
-    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
-    (flyClient.getMachine as Mock).mockResolvedValue({
-      id: 'machine-1',
-      state: 'started',
-      config: { guest: { cpus: 1, memory_mb: 256, cpu_kind: 'shared' } },
-    });
-    (setupDefaultStreamChatChannel as Mock).mockClear();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockImplementation((url: string) => {
-        if (typeof url === 'string' && url.includes('/_kilo/gateway/status')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: () => Promise.resolve({ state: 'running' }),
-          });
-        }
-        return Promise.resolve({ ok: true, status: 200 });
-      })
-    );
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('backfills Stream Chat on restart when DO state has no credentials', async () => {
-    const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
-    await seedRunning(storage);
-
-    const result = await instance.restartMachine();
-    expect(result.success).toBe(true);
-    await Promise.all(waitUntilPromises);
-
-    expect(setupDefaultStreamChatChannel).toHaveBeenCalledOnce();
-    expect(storage._store.get('streamChatApiKey')).toBe('sc-api-key');
-    expect(storage._store.get('streamChatBotUserId')).toBe('bot-sandbox-1');
-    expect(storage._store.get('streamChatBotUserToken')).toBe('sc-bot-token');
-    expect(storage._store.get('streamChatChannelId')).toBe('default-sandbox-1');
-  });
-
-  it('skips Stream Chat backfill on restart when credentials already exist', async () => {
-    const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
-    await seedRunning(storage, {
-      streamChatApiKey: 'existing-key',
-      streamChatBotUserId: 'existing-bot',
-      streamChatBotUserToken: 'existing-token',
-      streamChatChannelId: 'existing-channel',
-    });
-
-    const result = await instance.restartMachine();
-    expect(result.success).toBe(true);
-    await Promise.all(waitUntilPromises);
-
-    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
-    expect(storage._store.get('streamChatApiKey')).toBe('existing-key');
-  });
-
-  it('continues restart when Stream Chat backfill fails (non-fatal)', async () => {
-    const env = createFakeEnv();
-    Object.assign(env, {
-      STREAM_CHAT_API_KEY: 'sc-key',
-      STREAM_CHAT_API_SECRET: 'sc-secret',
-    });
-    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
-    await seedRunning(storage);
-
-    (setupDefaultStreamChatChannel as Mock).mockRejectedValueOnce(
-      new Error('Stream Chat API down')
-    );
-
-    const result = await instance.restartMachine();
-    expect(result.success).toBe(true);
-    await Promise.all(waitUntilPromises);
-
-    // Restart still completes — Stream Chat failure is non-fatal
-    expect(storage._store.get('streamChatApiKey')).toBeUndefined();
-    // Machine was still updated
-    expect(flyClient.updateMachine).toHaveBeenCalled();
-  });
-
-  it('skips Stream Chat backfill when worker env vars are missing', async () => {
-    const { instance, storage, waitUntilPromises } = createInstance();
-    await seedRunning(storage);
-
-    const result = await instance.restartMachine();
-    expect(result.success).toBe(true);
-    await Promise.all(waitUntilPromises);
-
-    expect(setupDefaultStreamChatChannel).not.toHaveBeenCalled();
-  });
-});
-
-// ============================================================================
 // Lifecycle push notifications
 // ============================================================================
 
 type LifecyclePushCall = {
   userId: string;
-  instanceId: string;
   sandboxId: string;
   event: 'ready' | 'start_failed';
   instanceName: string | null;
   errorMessage?: string;
 };
 
-function createFakeNotificationsBinding(): {
+type LifecyclePushResult = {
+  tokenCount: number;
+  sent: number;
+  staleTokens: number;
+  receiptCount: number;
+  ticketErrors: {
+    total: number;
+    retryable: number;
+    terminal: number;
+  };
+};
+
+const cleanLifecyclePushResult = {
+  tokenCount: 1,
+  sent: 1,
+  staleTokens: 0,
+  receiptCount: 1,
+  ticketErrors: { total: 0, retryable: 0, terminal: 0 },
+} satisfies LifecyclePushResult;
+
+function createFakeNotificationsBinding(result: LifecyclePushResult = cleanLifecyclePushResult): {
   binding: {
-    sendInstanceLifecycleNotification: (params: LifecyclePushCall) => Promise<{
-      sent: number;
-      staleTokens: number;
-    }>;
+    sendInstanceLifecycleNotification: (params: LifecyclePushCall) => Promise<LifecyclePushResult>;
   };
   calls: LifecyclePushCall[];
 } {
@@ -9646,7 +9437,7 @@ function createFakeNotificationsBinding(): {
     binding: {
       sendInstanceLifecycleNotification: async (params: LifecyclePushCall) => {
         calls.push(params);
-        return { tokenCount: 1, sent: 1, staleTokens: 0, receiptCount: 1 };
+        return result;
       },
     },
     calls,
@@ -9669,7 +9460,7 @@ describe('instance ready push', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].event).toBe('ready');
     expect(calls[0].userId).toBe('user-1');
-    expect(calls[0].instanceId).toBe('sandbox-1');
+    expect(calls[0].sandboxId).toBe('sandbox-1');
     expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
   });
 
@@ -9685,6 +9476,43 @@ describe('instance ready push', () => {
     await Promise.all(waitUntilPromises);
 
     expect(calls).toHaveLength(0);
+  });
+
+  it('logs ticket-error ready dispatches as warnings instead of clean completions', async () => {
+    const env = createFakeEnv();
+    const { binding } = createFakeNotificationsBinding({
+      tokenCount: 2,
+      sent: 1,
+      staleTokens: 0,
+      receiptCount: 1,
+      ticketErrors: { total: 1, retryable: 0, terminal: 1 },
+    });
+    Object.assign(env, { NOTIFICATIONS: binding });
+
+    const { instance, storage, waitUntilPromises } = createInstance(undefined, env);
+    await seedProvisioned(storage, { instanceReadyEmailSent: false });
+
+    await instance.tryMarkInstanceReady();
+    await Promise.all(waitUntilPromises);
+
+    const warningCall = (console.warn as Mock).mock.calls.find(
+      (c: unknown[]) =>
+        typeof c[0] === 'string' &&
+        c[0].includes('ready push dispatch completed with ticket errors')
+    );
+    if (!warningCall) throw new Error('Expected ready push ticket-error warning');
+    const payload = JSON.parse(warningCall[0] as string) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      level: 'warn',
+      message: 'ready push dispatch completed with ticket errors',
+      tokenCount: 2,
+      sent: 1,
+      staleTokens: 0,
+      receiptCount: 1,
+      ticketErrors: 1,
+      retryableTicketErrors: 0,
+      terminalTicketErrors: 1,
+    });
   });
 
   it('does not dispatch when provisioned > 6h ago', async () => {
@@ -9759,7 +9587,7 @@ describe('instance start-failed push', () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0].event).toBe('start_failed');
-    expect(calls[0].instanceId).toBe('sandbox-1');
+    expect(calls[0].sandboxId).toBe('sandbox-1');
     expect(storage._store.get('startFailurePushSentForAttempt')).toBe(true);
   });
 

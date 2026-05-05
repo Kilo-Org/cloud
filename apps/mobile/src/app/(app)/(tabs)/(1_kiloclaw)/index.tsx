@@ -14,6 +14,7 @@ import { useForegroundInvalidateKiloclawState } from '@/lib/hooks/use-foreground
 import { useAllKiloClawInstances } from '@/lib/hooks/use-instance-context';
 import { useKiloClawMobileOnboardingState } from '@/lib/hooks/use-kiloclaw-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useUnreadCounts } from '@/lib/hooks/use-unread-counts';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
 
 export default function KiloClawTab() {
@@ -22,6 +23,7 @@ export default function KiloClawTab() {
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const instancesQuery = useAllKiloClawInstances();
   const { data: instances } = instancesQuery;
+  const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
   const refetchInstances = instancesQuery.refetch;
   const entryDecision = getKiloClawEntryDecision(instances);
   const onboardingQuery = useKiloClawMobileOnboardingState(entryDecision.kind === 'empty');
@@ -72,6 +74,10 @@ export default function KiloClawTab() {
         onSelect={sandboxId => {
           router.push(chatSandboxPath(sandboxId));
         }}
+        onSettingsPress={sandboxId => {
+          router.push(`/(app)/kiloclaw/${sandboxId}/dashboard` as Href);
+        }}
+        unreadByBadgeBucket={unreadByBadgeBucket}
         onCreate={() => {
           router.push('/(app)/onboarding' as Href);
         }}

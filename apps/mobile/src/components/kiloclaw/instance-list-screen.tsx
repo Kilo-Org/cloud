@@ -3,7 +3,9 @@ import { Plus } from 'lucide-react-native';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { InstanceListRow } from '@/components/kiloclaw/instance-list-row';
+import { badgeBucketForInstance } from '@kilocode/notifications';
+
+import { KiloClawCard } from '@/components/kiloclaw/instance-card';
 import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -15,9 +17,11 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 type Props = {
   instances: ClawInstance[];
   onSelect: (sandboxId: string) => void;
+  onSettingsPress: (sandboxId: string) => void;
   onCreate: () => void;
   refreshing: boolean;
   onRefresh: () => void;
+  unreadByBadgeBucket?: Map<string, number>;
   showSectionCounts?: boolean;
 };
 
@@ -32,11 +36,15 @@ function InstanceSection({
   title,
   instances,
   onSelect,
+  onSettingsPress,
+  unreadByBadgeBucket,
   showCount,
 }: Readonly<{
   title: string;
   instances: ClawInstance[];
   onSelect: (sandboxId: string) => void;
+  onSettingsPress: (sandboxId: string) => void;
+  unreadByBadgeBucket?: Map<string, number>;
   showCount: boolean;
 }>) {
   if (instances.length === 0) {
@@ -45,7 +53,7 @@ function InstanceSection({
 
   return (
     <View className="gap-2">
-      <View className="flex-row items-center justify-between px-1">
+      <View className="flex-row items-center justify-between px-4">
         <Eyebrow>{title}</Eyebrow>
         {showCount ? (
           <Text variant="mono" className="text-[10px] uppercase tracking-[1.5px] text-muted-soft">
@@ -55,7 +63,13 @@ function InstanceSection({
       </View>
       <View className="gap-3">
         {instances.map(instance => (
-          <InstanceListRow key={instance.sandboxId} instance={instance} onPress={onSelect} />
+          <KiloClawCard
+            key={instance.sandboxId}
+            instance={instance}
+            onPress={onSelect}
+            onSettingsPress={onSettingsPress}
+            unreadCount={unreadByBadgeBucket?.get(badgeBucketForInstance(instance.sandboxId)) ?? 0}
+          />
         ))}
       </View>
     </View>
@@ -65,9 +79,11 @@ function InstanceSection({
 export function InstanceListScreen({
   instances,
   onSelect,
+  onSettingsPress,
   onCreate,
   refreshing,
   onRefresh,
+  unreadByBadgeBucket,
   showSectionCounts = false,
 }: Readonly<Props>) {
   const colors = useThemeColors();
@@ -76,6 +92,11 @@ export function InstanceListScreen({
   function handleSelect(sandboxId: string) {
     void Haptics.selectionAsync();
     onSelect(sandboxId);
+  }
+
+  function handleSettingsPress(sandboxId: string) {
+    void Haptics.selectionAsync();
+    onSettingsPress(sandboxId);
   }
 
   return (
@@ -90,12 +111,12 @@ export function InstanceListScreen({
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <ScrollView
           className="flex-1"
-          contentContainerClassName="flex-grow gap-6 px-4 pb-24 pt-5"
+          contentContainerClassName="flex-grow gap-6 pb-24 pt-5"
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {instances.length === 0 ? (
-            <View className="gap-2">
+            <View className="mx-4 gap-2">
               <Button
                 className="mt-1 h-11"
                 onPress={() => {
@@ -114,12 +135,16 @@ export function InstanceListScreen({
             title="Personal"
             instances={personal}
             onSelect={handleSelect}
+            onSettingsPress={handleSettingsPress}
+            unreadByBadgeBucket={unreadByBadgeBucket}
             showCount={showSectionCounts}
           />
           <InstanceSection
             title="Organizations"
             instances={organizations}
             onSelect={handleSelect}
+            onSettingsPress={handleSettingsPress}
+            unreadByBadgeBucket={unreadByBadgeBucket}
             showCount={showSectionCounts}
           />
         </ScrollView>

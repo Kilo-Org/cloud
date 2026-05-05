@@ -1,11 +1,12 @@
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
 import { type PendingAction, pendingActionGroupIdForMessage } from '@kilocode/kilo-chat-hooks';
-import { useMemo } from 'react';
-import { View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { Keyboard, type NativeScrollEvent, type NativeSyntheticEvent, View } from 'react-native';
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
 import { Skeleton } from '@/components/ui/skeleton';
+import { createMessageListKeyboardScrollScheduler } from './message-list-keyboard-scroll';
 import { type MessageAuthorMember, resolveMessageAuthorLabel } from './message-presentation';
 
 type Props = {
@@ -35,6 +36,18 @@ export function MessageList({
   onLongPressMessage,
   onSwipeReplyMessage,
 }: Props) {
+  const listRef = useRef<FlashListRef<Message>>(null);
+  const scrollOffsetRef = useRef(0);
+  const keyboardScrollScheduler = useMemo(
+    () =>
+      createMessageListKeyboardScrollScheduler({
+        getScrollOffset: () => scrollOffsetRef.current,
+        scrollToOffset: params => {
+          listRef.current?.scrollToOffset(params);
+        },
+      }),
+    []
+  );
   // useMessages returns messages oldest-to-newest.
   // FlashList v2 does not support `inverted`; instead we use maintainVisibleContentPosition
   // with startRenderingFromBottom, which expects chronological order.
@@ -44,8 +57,24 @@ export function MessageList({
     [chronological]
   );
 
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+  }, []);
+
+  useEffect(() => {
+    const subscription = Keyboard.addListener('keyboardDidShow', event => {
+      keyboardScrollScheduler.schedule(event.endCoordinates.height);
+    });
+
+    return () => {
+      subscription.remove();
+      keyboardScrollScheduler.cancel();
+    };
+  }, [keyboardScrollScheduler]);
+
   return (
     <FlashList
+      ref={listRef}
       data={chronological}
       renderItem={({ item, index }) => {
         // In chronological order, the previous message in time is data[index - 1].
@@ -75,6 +104,8 @@ export function MessageList({
         );
       }}
       keyExtractor={item => item.id}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
       onStartReached={fetchOlder}
       onStartReachedThreshold={0.5}
       maintainVisibleContentPosition={{

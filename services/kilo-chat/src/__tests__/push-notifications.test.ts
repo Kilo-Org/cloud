@@ -385,6 +385,63 @@ describe('kilo-chat publishes push on message.created', () => {
     expect(sendSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('does not notify a deleted bot message when bot typing stops', async () => {
+    const sendSpy = vi
+      .spyOn(env.NOTIFICATIONS, 'sendPushForConversation')
+      .mockResolvedValue({ perRecipient: [] });
+
+    const userId = 'user-bot-typing-stop-deleted';
+    const sandboxId = 'sandbox-bot-typing-stop-deleted';
+    const botId = `bot:kiloclaw:${sandboxId}`;
+    const userApp = makeApp(userId, 'user');
+    const botApp = makeApp(botId, 'bot');
+
+    const createConversationRes = await userApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, title: 'Bot typing stop deleted' }),
+      },
+      env
+    );
+    expect(createConversationRes.status).toBe(201);
+    const { conversationId } = await createConversationRes.json<{ conversationId: string }>();
+
+    const createMessageRes = await botApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Short answer to delete.' }],
+        }),
+      },
+      env
+    );
+    expect(createMessageRes.status).toBe(201);
+    const { messageId } = await createMessageRes.json<{ messageId: string }>();
+
+    const deleteQs = new URLSearchParams({ conversationId });
+    const deleteRes = await botApp.request(
+      `/v1/messages/${messageId}?${deleteQs.toString()}`,
+      { method: 'DELETE' },
+      env
+    );
+    expect(deleteRes.status).toBe(200);
+
+    const stopRes = await botApp.request(
+      `/v1/conversations/${conversationId}/typing/stop`,
+      { method: 'POST' },
+      env
+    );
+    expect(stopRes.status).toBe(200);
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
   it('notifies an unnotified bot message when the timeout alarm fires', async () => {
     const sendSpy = vi
       .spyOn(env.NOTIFICATIONS, 'sendPushForConversation')
@@ -455,6 +512,71 @@ describe('kilo-chat publishes push on message.created', () => {
     });
     await new Promise(resolve => setTimeout(resolve, 50));
     expect(sendSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not notify a deleted bot message when the timeout alarm fires', async () => {
+    const sendSpy = vi
+      .spyOn(env.NOTIFICATIONS, 'sendPushForConversation')
+      .mockResolvedValue({ perRecipient: [] });
+
+    const userId = 'user-bot-timeout-deleted';
+    const sandboxId = 'sandbox-bot-timeout-deleted';
+    const botId = `bot:kiloclaw:${sandboxId}`;
+    const userApp = makeApp(userId, 'user');
+    const botApp = makeApp(botId, 'bot');
+
+    const createConversationRes = await userApp.request(
+      '/v1/conversations',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sandboxId, title: 'Bot timeout deleted' }),
+      },
+      env
+    );
+    expect(createConversationRes.status).toBe(201);
+    const { conversationId } = await createConversationRes.json<{ conversationId: string }>();
+
+    const createMessageRes = await botApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Still thinking, then deleted.' }],
+        }),
+      },
+      env
+    );
+    expect(createMessageRes.status).toBe(201);
+    const { messageId } = await createMessageRes.json<{ messageId: string }>();
+
+    const stub: DurableObjectStub<ConversationDO> = env.CONVERSATION_DO.get(
+      env.CONVERSATION_DO.idFromName(conversationId)
+    );
+    const alarmAt = await waitForAlarm(stub);
+    expect(alarmAt).not.toBeNull();
+
+    const deleteQs = new URLSearchParams({ conversationId });
+    const deleteRes = await botApp.request(
+      `/v1/messages/${messageId}?${deleteQs.toString()}`,
+      { method: 'DELETE' },
+      env
+    );
+    expect(deleteRes.status).toBe(200);
+
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Number(alarmAt));
+    try {
+      await runInDurableObject(stub, async inst => {
+        await (inst as unknown as { alarm: () => Promise<void> }).alarm();
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(sendSpy).not.toHaveBeenCalled();
   });
 
   it('reschedules the bot notification alarm for the next pending bot message', async () => {

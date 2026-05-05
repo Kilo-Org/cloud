@@ -885,11 +885,24 @@ export class ConversationDO extends DurableObject<Env> {
       return { ok: true, memberContext };
     }
 
-    this.db
-      .update(messages)
-      .set({ deleted: 1, updated_at: Date.now() })
-      .where(eq(messages.id, params.messageId))
-      .run();
+    const clearPendingBotNotification = this.isBotMember(params.senderId);
+    this.db.transaction(tx => {
+      tx.update(messages)
+        .set({ deleted: 1, updated_at: Date.now() })
+        .where(eq(messages.id, params.messageId))
+        .run();
+
+      if (clearPendingBotNotification) {
+        tx.delete(botMessageNotifications)
+          .where(
+            and(
+              eq(botMessageNotifications.message_id, params.messageId),
+              sql`${botMessageNotifications.notified_at} IS NULL`
+            )
+          )
+          .run();
+      }
+    });
 
     return { ok: true, memberContext };
   }

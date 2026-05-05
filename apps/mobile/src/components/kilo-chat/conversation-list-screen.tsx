@@ -1,4 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
+import { useBotStatus } from '@kilocode/kilo-chat-hooks';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Plus, Settings2 } from 'lucide-react-native';
@@ -118,6 +119,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   );
 
   useInstancePresence(sandboxId);
+  useBotStatus(client, sandboxId);
 
   function handleRowPress(conversationId: string) {
     void Haptics.selectionAsync();

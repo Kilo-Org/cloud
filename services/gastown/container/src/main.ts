@@ -2,7 +2,17 @@ import { startControlServer } from './control-server';
 import { log } from './logger';
 import { activeAgentCount, bootHydration, getUptime, listAgents } from './process-manager';
 
-log.info('container.cold_start', { uptime: getUptime(), ts: new Date().toISOString() });
+// Container-scoped identifiers for crash/diagnostic logs. The container is
+// pinned to a single town for its lifetime (see GASTOWN_TOWN_ID injection in
+// the deployer), so reading these once at module init is safe and lets us
+// emit them even when no agents are registered yet.
+const TOWN_ID = process.env.GASTOWN_TOWN_ID ?? null;
+
+log.info('container.cold_start', {
+  uptime: getUptime(),
+  ts: new Date().toISOString(),
+  townId: TOWN_ID,
+});
 
 // Bun (like Node) will ignore unhandled promise rejections unless a handler
 // is registered. Without this handler a rejection in a fire-and-forget path
@@ -20,6 +30,7 @@ process.on('unhandledRejection', (reason, promise) => {
       : { message: String(reason) };
   log.error('container.unhandled_rejection', {
     ...err,
+    townId: TOWN_ID,
     uptimeMs: getUptime(),
     activeAgents: activeAgentCount(),
     promise: String(promise),
@@ -31,6 +42,7 @@ process.on('uncaughtException', err => {
     message: err.message,
     stack: err.stack,
     name: err.name,
+    townId: TOWN_ID,
     uptimeMs: getUptime(),
     activeAgents: activeAgentCount(),
   });
@@ -57,6 +69,7 @@ setInterval(() => {
       heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
       heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
       externalMB: Math.round(mem.external / 1024 / 1024),
+      townId: TOWN_ID,
       uptimeMs: getUptime(),
       agents: listAgents().length,
       activeAgents: activeAgentCount(),
@@ -81,6 +94,7 @@ void (async () => {
     log.error('container.boot_hydration_failed', {
       message: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack : undefined,
+      townId: TOWN_ID,
     });
   }
 })();

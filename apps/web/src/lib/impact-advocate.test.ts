@@ -68,7 +68,7 @@ describe('impact advocate', () => {
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
     process.env.IMPACT_ADVOCATE_DEBUG_LOGGING = 'true';
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
 
     const {
       buildImpactAdvocateRegisterParticipantPayload,
@@ -84,7 +84,7 @@ describe('impact advocate', () => {
       new Date('2026-04-23T12:00:00.000Z')
     );
 
-    const loggedData = JSON.stringify(warnSpy.mock.calls);
+    const loggedData = JSON.stringify(logSpy.mock.calls);
     expect(loggedData).toContain('[impact-advocate] built register participant payload');
     expect(loggedData).toContain('[impact-advocate] issued verified access token');
     expect(loggedData).toContain('referee@example.com');

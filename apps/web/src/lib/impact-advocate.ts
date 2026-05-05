@@ -11,6 +11,7 @@ import {
   IMPACT_ADVOCATE_TENANT_ALIAS,
   IMPACT_ADVOCATE_WIDGET_ID,
 } from '@/lib/config.server';
+import { logImpactReferralDebug, truncateForLog } from '@/lib/impact-debug';
 
 export const IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID = '51699';
 export const IMPACT_ADVOCATE_DEFAULT_WIDGET_ID = 'p/51699/w/referrerWidget';
@@ -67,14 +68,12 @@ function getDebuggableRegisterParticipantPayload(
   };
 }
 
-function isImpactAdvocateDebugLoggingEnabled(): boolean {
-  const value = process.env.IMPACT_ADVOCATE_DEBUG_LOGGING?.trim().toLowerCase();
-  return value === 'true' || value === '1' || value === 'yes';
-}
-
 function logImpactAdvocateDebug(message: string, details: Record<string, unknown>): void {
-  if (!isImpactAdvocateDebugLoggingEnabled()) return;
-  console.warn(`${message} ${JSON.stringify(details)}`);
+  // Delegates to the unified Impact debug logger so a single env
+  // (IMPACT_REFERRAL_DEBUG=true, or NODE_ENV=development) lights up every
+  // outbound Impact call site. IMPACT_ADVOCATE_DEBUG_LOGGING is still
+  // honored as a legacy alias inside the unified gate.
+  logImpactReferralDebug(message, details);
 }
 
 function getImpactAdvocateWidgetPath(widgetId: string, programId: string): string {
@@ -195,6 +194,13 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
     });
 
     const responseBody = await response.text();
+    logImpactAdvocateDebug('[impact-advocate] register participant response', {
+      url,
+      ok: response.ok,
+      statusCode: response.status,
+      responseBody: truncateForLog(responseBody),
+    });
+
     if (response.ok) {
       return {
         ok: true,
@@ -210,6 +216,9 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
       responseBody,
     };
   } catch (error) {
+    logImpactAdvocateDebug('[impact-advocate] register participant network error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return {
       ok: false,
       failureKind: 'network',

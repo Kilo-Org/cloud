@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createHash } from 'crypto';
 import { IMPACT_ACCOUNT_SID, IMPACT_AUTH_TOKEN, IMPACT_CAMPAIGN_ID } from '@/lib/config.server';
-import { logImpactReferralDebug } from '@/lib/impact-debug';
+import { logImpactReferralDebug, truncateForLog } from '@/lib/impact-debug';
 
 const IMPACT_REVERSAL_DISPOSITION_CODE = 'REJECTED';
 
@@ -547,9 +547,11 @@ function getNormalizedStatus(value: unknown): string | null {
 export async function sendImpactConversionPayload(
   payload: ImpactConversionPayload
 ): Promise<ImpactDispatchResult> {
+  const conversionPath = `/Advertisers/${IMPACT_ACCOUNT_SID}/Conversions`;
   logImpactReferralDebug('Sending Impact conversion payload', {
     actionTrackerId: payload.ActionTrackerId,
     orderId: payload.OrderId,
+    url: buildImpactUrl(conversionPath),
     clickIdPresent: Boolean(payload.ClickId?.trim()),
     customerIdPresent: Boolean(payload.CustomerId?.trim()),
     customerEmailHashPresent: Boolean(payload.CustomerEmail?.trim()),
@@ -561,7 +563,7 @@ export async function sendImpactConversionPayload(
 
   const result = await sendImpactRequest({
     method: 'POST',
-    path: `/Advertisers/${IMPACT_ACCOUNT_SID}/Conversions`,
+    path: conversionPath,
     body: JSON.stringify(payload),
     contentType: 'application/json',
   });
@@ -573,6 +575,8 @@ export async function sendImpactConversionPayload(
     delivery: result.ok ? (result.skipped ?? result.delivery ?? null) : null,
     failureKind: result.ok ? null : result.failureKind,
     statusCode: result.ok ? null : (result.statusCode ?? null),
+    responseBody: result.ok ? null : truncateForLog(result.responseBody ?? null),
+    error: result.ok ? null : (result.error ?? null),
   });
 
   if (
@@ -602,9 +606,22 @@ export async function sendImpactConversionPayload(
 export async function resolveImpactSubmissionUri(
   submissionUri: string
 ): Promise<ImpactSubmissionResolutionResult> {
+  logImpactReferralDebug('Resolving Impact submission URI', {
+    submissionUri,
+    url: buildImpactUrl(submissionUri),
+    impactConfigured: isImpactConfigured(),
+  });
   const result = await sendImpactRequest({
     method: 'GET',
     path: submissionUri,
+  });
+  logImpactReferralDebug('Impact submission URI resolution raw result', {
+    submissionUri,
+    ok: result.ok,
+    delivery: result.ok ? (result.skipped ?? result.delivery ?? null) : null,
+    failureKind: result.ok ? null : result.failureKind,
+    statusCode: result.ok ? null : (result.statusCode ?? null),
+    responseBody: truncateForLog(result.ok ? result.responseBody : result.responseBody),
   });
 
   if (!result.ok) {

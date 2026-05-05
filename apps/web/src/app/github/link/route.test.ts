@@ -52,15 +52,18 @@ describe('GET /github/link', () => {
     } as never);
 
     const { GET } = await import('./route');
-    const response = await GET(makeRequest('/github/link') as never);
+    const response = await GET(makeRequest('/github/link?installation_id=98765') as never);
 
     expect(response.status).toBe(307);
-    expectRedirectLocation(response, '/users/sign_in?callbackPath=%2Fgithub%2Flink');
+    expectRedirectLocation(
+      response,
+      '/users/sign_in?callbackPath=%2Fgithub%2Flink%3Finstallation_id%3D98765'
+    );
   });
 
   test('redirects authenticated users to GitHub OAuth with signed state', async () => {
     const { GET } = await import('./route');
-    const response = await GET(makeRequest('/github/link') as never);
+    const response = await GET(makeRequest('/github/link?installation_id=98765') as never);
 
     expect(response.status).toBe(307);
     const location = response.headers.get('location');
@@ -76,6 +79,15 @@ describe('GET /github/link', () => {
     );
     expect(redirectUrl.searchParams.get('state')).toBe('signed-state');
     expect(redirectUrl.searchParams.get('scope')).toBe('read:user');
-    expect(mockedCreateGitHubBotLinkState).toHaveBeenCalledWith(USER_ID);
+    expect(mockedCreateGitHubBotLinkState).toHaveBeenCalledWith(USER_ID, '98765');
+  });
+
+  test('rejects requests without installation context', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(makeRequest('/github/link') as never);
+
+    expect(response.status).toBe(400);
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedCreateGitHubBotLinkState).not.toHaveBeenCalled();
   });
 });

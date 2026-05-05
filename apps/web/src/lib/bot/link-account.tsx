@@ -60,10 +60,13 @@ export async function promptLinkAccount(
       return;
     }
     case PLATFORM.GITHUB:
+      const linkUrl = new URL(GITHUB_LINK_PATH, APP_URL);
+      linkUrl.searchParams.set('installation_id', identity.teamId);
+
       await target.post({
         markdown:
           'To use Kilo from GitHub you first need to link your GitHub account to Kilo. ' +
-          `[Link your Kilo account](${new URL(GITHUB_LINK_PATH, APP_URL).toString()}) to continue. ` +
+          `[Link your Kilo account](${linkUrl.toString()}) to continue. ` +
           'After linking, mention me again in this issue or pull request.',
       });
       return;

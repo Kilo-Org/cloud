@@ -11,6 +11,7 @@ import {
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   createPendingIntegration,
+  findIntegrationByInstallationId,
   findPendingInstallationByRequesterId,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
@@ -23,6 +24,8 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { githubUserIdentity, linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
+import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 function htmlPage(title: string, message: string, status = 200): Response {
   return new Response(
@@ -57,6 +60,25 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
       'This GitHub link request was started by another Kilo user.',
       403
     );
+  }
+
+  const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, state.installationId);
+
+  if (!integration) {
+    return htmlPage('Link Failed', 'No matching GitHub integration was found.', 404);
+  }
+
+  if (integration.owned_by_organization_id) {
+    const isMember = await isOrganizationMember(integration.owned_by_organization_id, user.id);
+    if (!isMember) {
+      return htmlPage(
+        'Link Failed',
+        'You are not a member of the organization that owns this GitHub integration.',
+        403
+      );
+    }
+  } else if (integration.owned_by_user_id !== user.id) {
+    return htmlPage('Link Failed', 'You are not the owner of this GitHub integration.', 403);
   }
 
   const githubUser = await exchangeGitHubOAuthCode(code, 'standard');

@@ -6,6 +6,8 @@ import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/ada
 import { githubUserIdentity, linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
 import { failureResult } from '@/lib/maybe-result';
+import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
+import { isOrganizationMember } from '@/lib/organizations/organizations';
 import type { StateAdapter } from 'chat';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
@@ -47,8 +49,12 @@ jest.mock('@/routers/organizations/utils', () => ({
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   createPendingIntegration: jest.fn(),
+  findIntegrationByInstallationId: jest.fn(),
   findPendingInstallationByRequesterId: jest.fn(),
   upsertPlatformIntegrationForOwner: jest.fn(),
+}));
+jest.mock('@/lib/organizations/organizations', () => ({
+  isOrganizationMember: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -61,10 +67,13 @@ const mockedExchangeGitHubOAuthCode = jest.mocked(exchangeGitHubOAuthCode);
 const mockedGithubUserIdentity = jest.mocked(githubUserIdentity);
 const mockedLinkKiloUser = jest.mocked(linkKiloUser);
 const mockedBot = jest.mocked(bot);
+const mockedFindIntegrationByInstallationId = jest.mocked(findIntegrationByInstallationId);
+const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
 const OTHER_USER_ID = 'c00b91a1-6959-4b04-9ef8-e8d37b340f4a';
 const GITHUB_USER_ID = '12345';
+const INSTALLATION_ID = '98765';
 
 function makeRequest(pathWithQuery: string) {
   return new NextRequest(`http://localhost:3000${pathWithQuery}`);
@@ -87,6 +96,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     } as never);
     mockedVerifyGitHubBotLinkState.mockReturnValue({
       userId: USER_ID,
+      installationId: INSTALLATION_ID,
       callbackPath: '/github/link',
     });
     mockedExchangeGitHubOAuthCode.mockResolvedValue({ id: GITHUB_USER_ID, login: 'octocat' });
@@ -95,6 +105,11 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       teamId: 'user',
       userId: GITHUB_USER_ID,
     });
+    mockedFindIntegrationByInstallationId.mockResolvedValue({
+      owned_by_organization_id: 'org_1',
+      owned_by_user_id: null,
+    } as never);
+    mockedIsOrganizationMember.mockResolvedValue(true);
   });
 
   test('redirects unauthenticated bot-link callbacks to existing callback auth fallback', async () => {
@@ -130,6 +145,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
   test('rejects bot-link state user mismatches', async () => {
     mockedVerifyGitHubBotLinkState.mockReturnValue({
       userId: OTHER_USER_ID,
+      installationId: INSTALLATION_ID,
       callbackPath: '/github/link',
     });
 
@@ -144,6 +160,23 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
 
+  test('rejects bot-link callbacks when the Kilo user cannot access the integration owner', async () => {
+    mockedIsOrganizationMember.mockResolvedValue(false);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toContain(
+      'not a member of the organization that owns this GitHub integration'
+    );
+    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith('github', INSTALLATION_ID);
+    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
+    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
+  });
+
   test('links the OAuth-verified GitHub user through the existing app callback URL', async () => {
     const { GET } = await import('./route');
     const response = await GET(
@@ -153,6 +186,8 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toContain('GitHub account octocat has been linked');
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'standard');
+    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith('github', INSTALLATION_ID);
+    expect(mockedIsOrganizationMember).toHaveBeenCalledWith('org_1', USER_ID);
     expect(mockedGithubUserIdentity).toHaveBeenCalledWith(GITHUB_USER_ID);
     expect(mockedBot.initialize).toHaveBeenCalled();
     expect(mockedLinkKiloUser).toHaveBeenCalledWith(

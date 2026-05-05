@@ -8,6 +8,7 @@ const NONCE_BYTES = 16;
 
 type GitHubBotLinkStatePayload = {
   userId: string;
+  installationId: string;
   callbackPath: string;
   iat: number;
   nonce: string;
@@ -15,6 +16,7 @@ type GitHubBotLinkStatePayload = {
 
 export type VerifiedGitHubBotLinkState = {
   userId: string;
+  installationId: string;
   callbackPath: string;
 };
 
@@ -22,9 +24,14 @@ function sign(data: string): string {
   return crypto.createHmac(HMAC_ALGORITHM, NEXTAUTH_SECRET).update(data).digest('base64url');
 }
 
-export function createGitHubBotLinkState(userId: string, callbackPath = '/github/link'): string {
+export function createGitHubBotLinkState(
+  userId: string,
+  installationId: string,
+  callbackPath = '/github/link'
+): string {
   const payload: GitHubBotLinkStatePayload = {
     userId,
+    installationId,
     callbackPath,
     iat: Math.floor(Date.now() / 1000),
     nonce: crypto.randomBytes(NONCE_BYTES).toString('base64url'),
@@ -56,6 +63,7 @@ export function verifyGitHubBotLinkState(state: string | null): VerifiedGitHubBo
     ) as Partial<GitHubBotLinkStatePayload>;
 
     if (typeof data.userId !== 'string') return null;
+    if (typeof data.installationId !== 'string' || data.installationId.length === 0) return null;
     if (typeof data.callbackPath !== 'string' || !data.callbackPath.startsWith('/')) return null;
     if (typeof data.iat !== 'number') return null;
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
@@ -63,7 +71,11 @@ export function verifyGitHubBotLinkState(state: string | null): VerifiedGitHubBo
     const ageSeconds = Math.floor(Date.now() / 1000) - data.iat;
     if (ageSeconds < 0 || ageSeconds > STATE_TTL_SECONDS) return null;
 
-    return { userId: data.userId, callbackPath: data.callbackPath };
+    return {
+      userId: data.userId,
+      installationId: data.installationId,
+      callbackPath: data.callbackPath,
+    };
   } catch {
     return null;
   }

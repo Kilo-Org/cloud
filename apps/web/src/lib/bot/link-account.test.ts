@@ -107,6 +107,9 @@ describe('promptLinkAccount', () => {
       markdown: expect.stringContaining('/github/link'),
     });
     expect(post).toHaveBeenCalledWith({
+      markdown: expect.stringContaining('installation_id=98765'),
+    });
+    expect(post).toHaveBeenCalledWith({
       markdown: expect.not.stringContaining('/api/chat/link-account'),
     });
     expect(mockCreateLinkAccountTokenFn).not.toHaveBeenCalled();

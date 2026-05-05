@@ -13,6 +13,7 @@ import {
 } from '@kilocode/db/schema-types';
 
 import { getSeedDb } from '../lib/db';
+import type { SeedResult } from '../index';
 import {
   addDays,
   assertUserCount,
@@ -43,7 +44,7 @@ function buildHistoricalReferee(i: number) {
   };
 }
 
-export async function run(): Promise<void> {
+export async function run(): Promise<SeedResult> {
   const db = getSeedDb();
   const historicalReferees = Array.from({ length: 12 }, (_, index) =>
     buildHistoricalReferee(index + 1)
@@ -258,20 +259,20 @@ export async function run(): Promise<void> {
     );
 
   console.log('');
-  console.log(`[${SEED_SCOPE}] Seed complete`);
-  console.log('');
-  console.log(`referrerUserId: ${referrerUserId}`);
-  console.log(`currentRefereeUserId: ${currentRefereeUserId}`);
-  console.log(`currentReferralId: ${currentReferral.id}`);
-  console.log(`currentConversionId: ${currentConversion.id}`);
-  console.log(`currentCapLimitedDecisionId: ${currentCapLimitedDecisionId}`);
-  console.log(`referrerSubscriptionId: ${referrerSubscription.id}`);
-  console.log(`grantedReferrerMonthsBeforeCapDecision: ${referrerGrantedMonths.length}`);
-  console.log('');
   console.log('This fixture represents:');
   console.log('- 12 previously granted referrer reward months already recorded');
   console.log('- a 13th qualified referral where the referee still gets a reward');
   console.log(
     '- the referrer decision is recorded as cap-limited with no extra referrer reward row'
   );
+
+  return {
+    referrerUserId,
+    currentRefereeUserId,
+    currentReferralId: currentReferral.id,
+    currentConversionId: currentConversion.id,
+    currentCapLimitedDecisionId,
+    referrerSubscriptionId: referrerSubscription.id,
+    grantedReferrerMonthsBeforeCapDecision: referrerGrantedMonths.length,
+  };
 }

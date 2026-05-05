@@ -19,6 +19,7 @@ import {
 } from '@kilocode/db/schema-types';
 
 import { getSeedDb } from '../lib/db';
+import type { SeedResult } from '../index';
 import {
   assertUserCount,
   cleanupKiloClawReferralSeedScenario,
@@ -51,7 +52,7 @@ const convertedAt = '2026-04-15T16:30:00.000Z';
 const previousRenewalBoundary = '2026-05-01T00:00:00.000Z';
 const newRenewalBoundary = '2026-06-01T00:00:00.000Z';
 
-export async function run(): Promise<void> {
+export async function run(): Promise<SeedResult> {
   const db = getSeedDb();
 
   console.log(`[${SEED_SCOPE}] Resetting existing seed data`);
@@ -295,23 +296,23 @@ export async function run(): Promise<void> {
   });
 
   console.log('');
-  console.log(`[${SEED_SCOPE}] Seed complete`);
-  console.log('');
-  console.log(`referrerUserId: ${referrerUserId}`);
-  console.log(`refereeUserId: ${refereeUserId}`);
-  console.log(`referralId: ${referral.id}`);
-  console.log(`conversionId: ${conversion.id}`);
-  console.log(`affiliateTouchId: ${affiliateTouch.id}`);
-  console.log(`referralTouchId: ${referralTouch.id}`);
-  console.log(`sourcePaymentId: ${sourcePaymentId}`);
-  console.log(`orderId: ${orderId}`);
-  console.log(`referrerSubscriptionId: ${referrerSubscription.id}`);
-  console.log(`refereeSubscriptionId: ${refereeSubscription.id}`);
-  console.log('');
   console.log('This fixture represents:');
   console.log('- affiliate touch first, referral touch second');
   console.log('- no prior affiliate SALE attribution');
   console.log('- referral wins at first paid conversion');
   console.log('- both rewards already applied to personal credits subscriptions');
   console.log('- Impact sale report already delivered');
+
+  return {
+    referrerUserId,
+    refereeUserId,
+    referralId: referral.id,
+    conversionId: conversion.id,
+    affiliateTouchId: affiliateTouch.id,
+    referralTouchId: referralTouch.id,
+    sourcePaymentId,
+    orderId,
+    referrerSubscriptionId: referrerSubscription.id,
+    refereeSubscriptionId: refereeSubscription.id,
+  };
 }

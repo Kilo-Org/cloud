@@ -5,6 +5,7 @@ import {
 } from '@kilocode/db/schema-types';
 
 import { getSeedDb } from '../lib/db';
+import type { SeedResult } from '../index';
 import {
   assertUserCount,
   cleanupKiloClawReferralSeedScenario,
@@ -31,7 +32,7 @@ const sourcePaymentId = seedSourcePaymentId(SCENARIO, 'manual-adjustment');
 const orderId = seedOrderId(SCENARIO, 'manual-adjustment');
 const convertedAt = '2026-04-15T16:30:00.000Z';
 
-export async function run(): Promise<void> {
+export async function run(): Promise<SeedResult> {
   const db = getSeedDb();
 
   console.log(`[${SEED_SCOPE}] Resetting existing seed data`);
@@ -138,17 +139,6 @@ export async function run(): Promise<void> {
   });
 
   console.log('');
-  console.log(`[${SEED_SCOPE}] Seed complete`);
-  console.log('');
-  console.log(`referrerUserId: ${referrerUserId}`);
-  console.log(`refereeUserId: ${refereeUserId}`);
-  console.log(`referrerSubscriptionId: ${referrerSubscription.id}`);
-  console.log(`refereeSubscriptionId: ${refereeSubscription.id}`);
-  console.log(`affiliateTouchId: ${affiliateTouch.id}`);
-  console.log(`referralTouchId: ${referralTouch.id}`);
-  console.log(`sourcePaymentId: ${sourcePaymentId}`);
-  console.log(`orderId: ${orderId}`);
-  console.log('');
   console.log('This fixture represents:');
   console.log('- a valid referral touch that would normally win over the affiliate touch');
   console.log('- a source payment that heuristically looks like a manual adjustment');
@@ -169,4 +159,15 @@ export async function run(): Promise<void> {
       }
     )}'`
   );
+
+  return {
+    referrerUserId,
+    refereeUserId,
+    referrerSubscriptionId: referrerSubscription.id,
+    refereeSubscriptionId: refereeSubscription.id,
+    affiliateTouchId: affiliateTouch.id,
+    referralTouchId: referralTouch.id,
+    sourcePaymentId,
+    orderId,
+  };
 }

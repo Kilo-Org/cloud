@@ -19,6 +19,7 @@ import {
 } from '@kilocode/db/schema-types';
 
 import { getSeedDb } from '../lib/db';
+import type { SeedResult } from '../index';
 import {
   addMonthsUtc,
   assertUserCount,
@@ -50,7 +51,7 @@ const convertedAt = '2026-04-15T16:30:00.000Z';
 const previousRenewalBoundary = '2026-05-01T00:00:00.000Z';
 const newRenewalBoundary = '2026-06-01T00:00:00.000Z';
 
-export async function run(): Promise<void> {
+export async function run(): Promise<SeedResult> {
   const db = getSeedDb();
 
   console.log(`[${SEED_SCOPE}] Resetting existing seed data`);
@@ -261,21 +262,21 @@ export async function run(): Promise<void> {
   });
 
   console.log('');
-  console.log(`[${SEED_SCOPE}] Seed complete`);
-  console.log('');
-  console.log(`referrerUserId: ${referrerUserId}`);
-  console.log(`refereeUserId: ${refereeUserId}`);
-  console.log(`referralId: ${referral.id}`);
-  console.log(`conversionId: ${conversion.id}`);
-  console.log(`sourcePaymentId: ${sourcePaymentId}`);
-  console.log(`orderId: ${orderId}`);
-  console.log(`referrerTrialSubscriptionId: ${referrerTrialSubscription.id}`);
-  console.log(`refereeSubscriptionId: ${refereeSubscription.id}`);
-  console.log(`pendingReferrerRewardId: ${referrerRewardId}`);
-  console.log('');
   console.log('This fixture represents:');
   console.log('- a qualified referral conversion');
   console.log('- the referee reward already applied');
   console.log('- the referrer still on a trial, so their reward remains pending');
   console.log('- the pending reward already has a 12-month expiration timestamp');
+
+  return {
+    referrerUserId,
+    refereeUserId,
+    referralId: referral.id,
+    conversionId: conversion.id,
+    sourcePaymentId,
+    orderId,
+    referrerTrialSubscriptionId: referrerTrialSubscription.id,
+    refereeSubscriptionId: refereeSubscription.id,
+    pendingReferrerRewardId: referrerRewardId,
+  };
 }

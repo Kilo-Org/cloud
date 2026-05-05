@@ -122,6 +122,7 @@ export type SweepResult = {
   sent: number;
   failed: number;
   recovered: number;
+  voidedStale: number;
 };
 
 /**
@@ -134,6 +135,15 @@ export type SweepResult = {
 export type SweepIO = {
   /** Reset stuck 'sending' rows from prior crashed sweeps to 'pending'. */
   recoverStuckClaims(): Promise<number>;
+  /**
+   * Finalize pending notice rows whose parent target/action/stage left
+   * valid pre-apply states. The claim CAS already prevents stale
+   * dispatch, but a row that lost the claim race because the parent
+   * moved would otherwise sit 'pending' forever (selectDue filters
+   * them out, claim refuses them). This step gives those rows a
+   * terminal status so the lifecycle stays clean.
+   */
+  voidStaleParents(): Promise<number>;
   /** Select pending rows whose notice window has opened. */
   selectDue(): Promise<DueNotificationRow[]>;
   /**
@@ -170,8 +180,9 @@ export type SweepIO = {
  */
 export async function runSweepWithIO(io: SweepIO): Promise<SweepResult> {
   const recovered = await io.recoverStuckClaims();
+  const voidedStale = await io.voidStaleParents();
   const due = await io.selectDue();
-  if (due.length === 0) return { processed: 0, sent: 0, failed: 0, recovered };
+  if (due.length === 0) return { processed: 0, sent: 0, failed: 0, recovered, voidedStale };
 
   let sent = 0;
   let failed = 0;
@@ -226,24 +237,25 @@ export async function runSweepWithIO(io: SweepIO): Promise<SweepResult> {
     }
   }
 
-  return { processed: due.length, sent, failed, recovered };
+  return { processed: due.length, sent, failed, recovered, voidedStale };
 }
 
 export async function runScheduledActionNoticesSweep(env: KiloClawEnv): Promise<SweepResult> {
   const connectionString = env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
     console.warn('[notices-sweep] HYPERDRIVE not bound; skipping');
-    return { processed: 0, sent: 0, failed: 0, recovered: 0 };
+    return { processed: 0, sent: 0, failed: 0, recovered: 0, voidedStale: 0 };
   }
   if (!env.BACKEND_API_URL || !env.KILOCLAW_INTERNAL_API_SECRET) {
     console.warn('[notices-sweep] BACKEND_API_URL or internal secret missing; skipping');
-    return { processed: 0, sent: 0, failed: 0, recovered: 0 };
+    return { processed: 0, sent: 0, failed: 0, recovered: 0, voidedStale: 0 };
   }
 
   const db = getWorkerDb(connectionString);
 
   const io: SweepIO = {
     recoverStuckClaims: () => recoverStuckClaims(db),
+    voidStaleParents: () => voidStaleParents(db),
     selectDue: () => selectDueNotifications(db),
     claim: row => claimNotification(db, row),
     markSent: id => markSent(db, id),
@@ -546,6 +558,42 @@ async function claimNotification(db: WorkerDb, row: DueNotificationRow): Promise
     )
     .returning({ id: kiloclaw_scheduled_action_notifications.id });
   return updated.length > 0;
+}
+
+/**
+ * Mark pending 'notice' rows whose parent target/action/stage left
+ * pre-apply states as 'failed'. The claim CAS already prevents stale
+ * dispatch when the parent moved between selectDue and claim, but the
+ * row would otherwise stay 'pending' forever since selectDue and claim
+ * both refuse it. This step gives stale rows a terminal status so the
+ * lifecycle stays clean. Idempotent. 'cancelled' rows are skipped —
+ * they fire regardless of parent state.
+ */
+async function voidStaleParents(db: WorkerDb): Promise<number> {
+  const reset = await db
+    .update(kiloclaw_scheduled_action_notifications)
+    .set({
+      status: 'failed',
+      error_message: 'parent state changed before notice was dispatched',
+    })
+    .where(
+      and(
+        eq(kiloclaw_scheduled_action_notifications.status, 'pending'),
+        eq(kiloclaw_scheduled_action_notifications.kind, 'notice'),
+        sql`NOT EXISTS (
+          SELECT 1
+          FROM ${kiloclaw_scheduled_action_targets} t
+          INNER JOIN ${kiloclaw_scheduled_actions} a ON a.id = t.scheduled_action_id
+          INNER JOIN ${kiloclaw_scheduled_action_stages} s ON s.id = t.stage_id
+          WHERE t.id = ${kiloclaw_scheduled_action_notifications.target_id}
+            AND t.status = 'pending'
+            AND a.status IN ('scheduled', 'running')
+            AND s.status IN ('pending', 'running')
+        )`
+      )
+    )
+    .returning({ id: kiloclaw_scheduled_action_notifications.id });
+  return reset.length;
 }
 
 /**

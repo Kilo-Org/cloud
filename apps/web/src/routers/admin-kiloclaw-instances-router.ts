@@ -2330,12 +2330,18 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         // Queue cancellation notifications for THIS target only — the
         // bulk cancel queues for all targets, this path is per-instance
         // so the scope is just the one target row. Mirrors the
-        // cancelScheduledAction logic: only fire for channels that
-        // already have a 'sent' notice. ON CONFLICT keeps repeat calls
+        // cancelScheduledAction logic. ON CONFLICT keeps repeat calls
         // safe.
         //
-        // Same in-flight race as the bulk cancel: see the comment in
-        // cancelScheduledAction's INSERT...SELECT for the v1 trade-off.
+        // We include 'sending' along with 'sent': a sending row is
+        // mid-dispatch and will become 'sent' moments later, so the
+        // user IS getting the original notice and needs the
+        // cancellation follow-up. Without this, a cancel that lands
+        // between the sweep's claim and its markSent leaves the user
+        // with a stale "your bot will restart" message and no
+        // cancellation. The cancellation row sits 'pending' until the
+        // next sweep tick picks it up; ON CONFLICT means a markSent
+        // that races a second cancel is harmless.
         await tx.execute(sql`
           INSERT INTO kiloclaw_scheduled_action_notifications
             (target_id, channel, kind, status)
@@ -2343,7 +2349,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           FROM kiloclaw_scheduled_action_notifications n
           WHERE n.target_id = ${updated.id}
             AND n.kind = 'notice'
-            AND n.status = 'sent'
+            AND n.status IN ('sent', 'sending')
           ON CONFLICT (target_id, kind, channel) DO NOTHING
         `);
 
@@ -2505,26 +2511,22 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             )
           );
 
-        // Queue cancellation notifications. Only for (target, channel)
-        // pairs that already had a 'notice' row in 'sent' status — if
-        // the user never got a heads-up we don't surface a cancellation
-        // either. Insert one 'cancelled' row per such pair; the sweep
-        // dispatches them like any other notification. Use ON CONFLICT
-        // DO NOTHING so a re-cancel call (idempotency path) doesn't
-        // explode on the unique (target, kind, channel) index.
+        // Queue cancellation notifications. For (target, channel) pairs
+        // that already had a 'notice' row in 'sent' OR 'sending' status:
+        // 'sent' means the original notice already went out; 'sending'
+        // means it's mid-dispatch and will become 'sent' moments later
+        // (the user IS getting the notice and needs the cancellation).
+        // We do NOT queue a cancellation for pending notices because
+        // those are voided below before they ever dispatch.
         //
-        // Known v1 race: there is a ~1 DB round-trip window between
-        // the sweep's successful dispatch (ok=true returned from the
-        // channel) and its markSent UPDATE. A cancel that lands inside
-        // that window sees status='pending' for the notice row, this
-        // SELECT misses it, and the user receives the original notice
-        // with no cancellation follow-up. Acceptable given the narrow
-        // window (single-digit ms) and v1 scope. If we later need to
-        // close it, options are: (a) widen this predicate to status
-        // IN ('pending', 'sent') — but then we'd cancel notices that
-        // never actually went out, (b) add a per-row in-flight flag
-        // the sweep CAS-flips before dispatch, (c) wrap dispatch +
-        // markSent in a single tx (long-running; bad).
+        // 'sending' coverage closes the race the per-target cancel
+        // comment describes: a cancel landing between the sweep's claim
+        // and its markSent used to leave the user with the original
+        // notice and no follow-up. Including 'sending' here means the
+        // cancellation row is queued during the cancel transaction; it
+        // sits 'pending' until the next sweep tick picks it up, which
+        // will be after the in-flight notice's markSent commits. ON
+        // CONFLICT DO NOTHING keeps repeat cancel calls idempotent.
         await tx.execute(sql`
           INSERT INTO kiloclaw_scheduled_action_notifications
             (target_id, channel, kind, status)
@@ -2534,7 +2536,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             ON t.id = n.target_id
           WHERE t.scheduled_action_id = ${input.id}
             AND n.kind = 'notice'
-            AND n.status = 'sent'
+            AND n.status IN ('sent', 'sending')
           ON CONFLICT (target_id, kind, channel) DO NOTHING
         `);
 

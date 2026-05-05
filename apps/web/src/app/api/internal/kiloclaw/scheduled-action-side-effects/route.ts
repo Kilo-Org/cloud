@@ -184,7 +184,14 @@ export async function POST(req: NextRequest) {
       : {}),
   };
 
-  const subjectOverride = body.noticeSubject.trim() || undefined;
+  // Only the heads-up notice borrows the admin-authored subject. The
+  // cancellation email is a follow-up announcing the schedule is off,
+  // so reusing the original notice subject (e.g. "Restart tonight") in
+  // an inbox row that actually says "the previously scheduled restart
+  // has been cancelled" is misleading. Falling through to undefined
+  // here lets the cancellation template's default subject render.
+  const subjectOverride =
+    body.kind === 'notice' ? body.noticeSubject.trim() || undefined : undefined;
 
   try {
     const result = await sendEmail({

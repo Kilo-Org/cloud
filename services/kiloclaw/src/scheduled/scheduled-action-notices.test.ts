@@ -36,6 +36,7 @@ function makeRow(overrides: Partial<DueRow> = {}): DueRow {
 type FakeIO = SweepIO & {
   calls: {
     recover: number;
+    voidStale: number;
     select: number;
     claim: string[];
     sent: string[];
@@ -47,6 +48,7 @@ type FakeIO = SweepIO & {
 function fakeIO(opts: {
   due: DueRow[];
   recovered?: number;
+  voidedStale?: number;
   claim?: (row: DueRow) => Promise<boolean>;
   dispatch?: (row: DueRow) => Promise<{ ok: true } | { ok: false; error: string }>;
   markSent?: (id: string) => Promise<void>;
@@ -54,6 +56,7 @@ function fakeIO(opts: {
 }): FakeIO {
   const calls = {
     recover: 0,
+    voidStale: 0,
     select: 0,
     claim: [] as string[],
     sent: [] as string[],
@@ -65,6 +68,10 @@ function fakeIO(opts: {
     recoverStuckClaims: async () => {
       calls.recover += 1;
       return opts.recovered ?? 0;
+    },
+    voidStaleParents: async () => {
+      calls.voidStale += 1;
+      return opts.voidedStale ?? 0;
     },
     selectDue: async () => {
       calls.select += 1;
@@ -94,11 +101,12 @@ function fakeIO(opts: {
 }
 
 describe('runSweepWithIO', () => {
-  it('returns zeros and skips dispatch when no rows are due, but still runs recovery', async () => {
-    const io = fakeIO({ due: [], recovered: 3 });
+  it('returns zeros and skips dispatch when no rows are due, but still runs recovery + voidStale', async () => {
+    const io = fakeIO({ due: [], recovered: 3, voidedStale: 2 });
     const result = await runSweepWithIO(io);
-    expect(result).toEqual({ processed: 0, sent: 0, failed: 0, recovered: 3 });
+    expect(result).toEqual({ processed: 0, sent: 0, failed: 0, recovered: 3, voidedStale: 2 });
     expect(io.calls.recover).toBe(1);
+    expect(io.calls.voidStale).toBe(1);
     expect(io.calls.select).toBe(1);
     expect(io.calls.claim).toEqual([]);
     expect(io.calls.dispatched).toEqual([]);
@@ -108,7 +116,7 @@ describe('runSweepWithIO', () => {
     const due = [makeRow({ notification_id: 'n-1' }), makeRow({ notification_id: 'n-2' })];
     const io = fakeIO({ due });
     const result = await runSweepWithIO(io);
-    expect(result).toEqual({ processed: 2, sent: 2, failed: 0, recovered: 0 });
+    expect(result).toEqual({ processed: 2, sent: 2, failed: 0, recovered: 0, voidedStale: 0 });
     expect(io.calls.claim).toEqual(['n-1', 'n-2']);
     expect(io.calls.dispatched).toEqual(['n-1', 'n-2']);
     expect(io.calls.sent).toEqual(['n-1', 'n-2']);
@@ -122,7 +130,7 @@ describe('runSweepWithIO', () => {
       claim: async () => false,
     });
     const result = await runSweepWithIO(io);
-    expect(result).toEqual({ processed: 1, sent: 0, failed: 0, recovered: 0 });
+    expect(result).toEqual({ processed: 1, sent: 0, failed: 0, recovered: 0, voidedStale: 0 });
     expect(io.calls.dispatched).toEqual([]); // never dispatched
     expect(io.calls.sent).toEqual([]);
     expect(io.calls.failed).toEqual([]);
@@ -142,7 +150,7 @@ describe('runSweepWithIO', () => {
       },
     });
     const result = await runSweepWithIO(io);
-    expect(result).toEqual({ processed: 1, sent: 0, failed: 0, recovered: 0 });
+    expect(result).toEqual({ processed: 1, sent: 0, failed: 0, recovered: 0, voidedStale: 0 });
     expect(io.calls.dispatched).toEqual([]);
     expect(io.calls.sent).toEqual([]);
     expect(io.calls.failed).toEqual([]);
@@ -163,7 +171,7 @@ describe('runSweepWithIO', () => {
       claim: async row => row.notification_kind === 'cancelled',
     });
     const result = await runSweepWithIO(io);
-    expect(result).toEqual({ processed: 2, sent: 1, failed: 0, recovered: 0 });
+    expect(result).toEqual({ processed: 2, sent: 1, failed: 0, recovered: 0, voidedStale: 0 });
     expect(io.calls.dispatched).toEqual(['cancel-fires']);
     expect(io.calls.sent).toEqual(['cancel-fires']);
   });
@@ -175,7 +183,7 @@ describe('runSweepWithIO', () => {
       dispatch: async () => ({ ok: false, error: 'agent channel not implemented' }),
     });
     const result = await runSweepWithIO(io);
-    expect(result).toEqual({ processed: 1, sent: 0, failed: 1, recovered: 0 });
+    expect(result).toEqual({ processed: 1, sent: 0, failed: 1, recovered: 0, voidedStale: 0 });
     expect(io.calls.failed).toEqual([{ id: 'bad', err: 'agent channel not implemented' }]);
     expect(io.calls.sent).toEqual([]);
   });
@@ -213,16 +221,16 @@ describe('runSweepWithIO', () => {
       },
     });
     const result = await runSweepWithIO(io);
-    expect(result).toEqual({ processed: 3, sent: 2, failed: 1, recovered: 0 });
+    expect(result).toEqual({ processed: 3, sent: 2, failed: 1, recovered: 0, voidedStale: 0 });
     expect(io.calls.sent).toEqual(['good-1', 'good-2']);
     expect(io.calls.failed.map(f => f.id)).toEqual(['bad']);
   });
 
-  it('reports recovered count from recoverStuckClaims even when due rows process normally', async () => {
+  it('reports recovered + voidedStale counts even when due rows process normally', async () => {
     const due = [makeRow({ notification_id: 'n-1' })];
-    const io = fakeIO({ due, recovered: 2 });
+    const io = fakeIO({ due, recovered: 2, voidedStale: 1 });
     const result = await runSweepWithIO(io);
-    expect(result).toEqual({ processed: 1, sent: 1, failed: 0, recovered: 2 });
+    expect(result).toEqual({ processed: 1, sent: 1, failed: 0, recovered: 2, voidedStale: 1 });
   });
 });
 

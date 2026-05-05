@@ -6,12 +6,24 @@ import type { User } from '@kilocode/db/schema';
 import {
   IMPACT_ACCOUNT_SID,
   IMPACT_ADVOCATE_ACCOUNT_SID,
+  IMPACT_ADVOCATE_API_BASE_URL,
   IMPACT_ADVOCATE_AUTH_TOKEN,
   IMPACT_ADVOCATE_PROGRAM_ID,
   IMPACT_ADVOCATE_TENANT_ALIAS,
   IMPACT_ADVOCATE_WIDGET_ID,
 } from '@/lib/config.server';
 import { logImpactReferralDebug, truncateForLog } from '@/lib/impact-debug';
+
+/**
+ * SaaSquatch / Impact Advocate expects locale tags formatted as `en_US`,
+ * not the BCP 47 `en-US` we get from Accept-Language. Normalize once here
+ * so the value is consistent both on the wire and in the persisted payload.
+ */
+function normalizeAdvocateLocale(locale: string | null | undefined): string | null {
+  const trimmed = locale?.trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/-/g, '_');
+}
 
 export const IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID = '51699';
 export const IMPACT_ADVOCATE_DEFAULT_WIDGET_ID = 'p/51699/w/referrerWidget';
@@ -129,13 +141,14 @@ export function buildImpactAdvocateRegisterParticipantPayload(params: {
   countryCode?: string | null;
 }): ImpactAdvocateRegisterParticipantPayload {
   const config = getImpactAdvocateConfig();
+  const normalizedLocale = normalizeAdvocateLocale(params.locale);
   const payload: ImpactAdvocateRegisterParticipantPayload = {
     id: params.user.google_user_email,
     accountId: params.user.google_user_email,
     programId: config?.programId ?? IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID,
     email: params.user.google_user_email,
     cookies: params.referralCookieValue,
-    ...(params.locale ? { locale: params.locale } : {}),
+    ...(normalizedLocale ? { locale: normalizedLocale } : {}),
     ...(params.countryCode ? { countryCode: params.countryCode } : {}),
   };
 
@@ -152,10 +165,27 @@ function getImpactAdvocateAuthorizationHeader(
   return `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString('base64')}`;
 }
 
+function trimTrailingSlashes(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+
+/**
+ * SaaSquatch (Impact Advocate) Upsert User REST endpoint.
+ *
+ *   PUT {base}/api/v1/{tenantAlias}/open/account/{accountId}/user/{userId}
+ *
+ * accountId and userId are both the user's plain email per the program's
+ * integration spec; we URL-encode them because the path segment contains '@'.
+ */
 function getImpactAdvocateRegisterParticipantUrl(
-  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>
+  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>,
+  payload: ImpactAdvocateRegisterParticipantPayload
 ): string {
-  return `https://api.impact.com/Advocate/${config.tenantAlias}/Programs/${config.programId}/Participants`;
+  const base = trimTrailingSlashes(IMPACT_ADVOCATE_API_BASE_URL);
+  const tenant = encodeURIComponent(config.tenantAlias);
+  const accountId = encodeURIComponent(payload.accountId);
+  const userId = encodeURIComponent(payload.id);
+  return `${base}/api/v1/${tenant}/open/account/${accountId}/user/${userId}`;
 }
 
 export async function sendImpactAdvocateRegisterParticipantPayload(
@@ -171,10 +201,10 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
   }
 
   try {
-    const url = getImpactAdvocateRegisterParticipantUrl(config);
+    const url = getImpactAdvocateRegisterParticipantUrl(config, payload);
     logImpactAdvocateDebug('[impact-advocate] sending register participant request', {
       url,
-      method: 'POST',
+      method: 'PUT',
       headers: {
         Authorization: 'not_logged',
         Accept: 'application/json',
@@ -184,7 +214,7 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
     });
 
     const response = await fetch(url, {
-      method: 'POST',
+      method: 'PUT',
       headers: {
         Authorization: getImpactAdvocateAuthorizationHeader(config),
         Accept: 'application/json',

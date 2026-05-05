@@ -89,10 +89,11 @@ describe('impact referral participant registration dispatch', () => {
     expect(attempt.next_retry_at).toBeNull();
     expect(attempt.response_status_code).toBe(200);
 
+    const encodedEmail = encodeURIComponent(user.google_user_email);
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.impact.com/Advocate/tenant-alias/Programs/51699/Participants',
+      `https://app.referralsaasquatch.com/api/v1/tenant-alias/open/account/${encodedEmail}/user/${encodedEmail}`,
       expect.objectContaining({
-        method: 'POST',
+        method: 'PUT',
         headers: expect.objectContaining({
           Authorization:
             'Basic ' +
@@ -112,7 +113,7 @@ describe('impact referral participant registration dispatch', () => {
       programId: '51699',
       email: user.google_user_email,
       cookies: 'sq-cookie',
-      locale: 'en-US',
+      locale: 'en_US',
       countryCode: 'US',
     });
   });

@@ -45,7 +45,8 @@ describe('impact advocate', () => {
       programId: '51699',
       email: 'referee@example.com',
       cookies: 'opaque-cookie-value',
-      locale: 'en-US',
+      // SaaSquatch wants en_US, not en-US.
+      locale: 'en_US',
       countryCode: 'US',
     });
   });

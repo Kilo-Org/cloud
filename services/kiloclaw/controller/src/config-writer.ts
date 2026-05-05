@@ -236,10 +236,10 @@ export function generateBaseConfig(
   // Cleanup: the old `/api/openrouter/` URL is unconditionally broken; if a
   // stale entry pointing at it survives from a previous boot, drop it before
   // we rebuild.
-  const existingKilocode = config.models?.providers?.kilocode;
-  const existingBaseUrl: string = (existingKilocode?.baseUrl as string | undefined) ?? '';
-  if (existingBaseUrl.includes('/api/openrouter/')) {
-    delete config.models!.providers!.kilocode;
+  const existingProviders = config.models?.providers;
+  const existingBaseUrl: string = existingProviders?.kilocode?.baseUrl ?? '';
+  if (existingProviders && existingBaseUrl.includes('/api/openrouter/')) {
+    delete existingProviders.kilocode;
     console.log(`Removed stale kilocode provider config (baseUrl: ${existingBaseUrl})`);
   }
 

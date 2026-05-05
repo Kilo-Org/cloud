@@ -10,7 +10,7 @@ import type { SerializedMessage } from 'chat';
 const mockedAfter = jest.fn();
 
 jest.mock('next/server', () => {
-  const actual = jest.requireActual<typeof import('next/server')>('next/server');
+  const actual = jest.requireActual('next/server');
   return {
     ...actual,
     after: (fn: () => Promise<void> | void) => mockedAfter(fn),

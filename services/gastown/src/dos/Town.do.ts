@@ -47,7 +47,11 @@ import { agent_metadata } from '../db/tables/agent-metadata.table';
 import { escalation_metadata } from '../db/tables/escalation-metadata.table';
 import { convoy_metadata } from '../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../db/tables/bead-dependencies.table';
-import { town_events, TownEventRecord } from '../db/tables/town-events.table';
+import {
+  town_events,
+  TownEventRecord,
+  type TownEventType,
+} from '../db/tables/town-events.table';
 import {
   agent_nudges,
   AgentNudgeRecord,
@@ -3896,15 +3900,28 @@ export class TownDO extends DurableObject<Env> {
           reconciler.applyEvent(this.sql, event, { townConfig });
           events.markProcessed(this.sql, event.event_id);
         } catch (err) {
-          logger.error('reconciler: applyEvent failed', {
-            eventId: event.event_id,
-            eventType: event.event_type,
-            error: err instanceof Error ? err.message : String(err),
-          });
-          // Event stays unprocessed — will be retried on the next alarm tick.
-          // Mark it processed anyway after 3 consecutive failures to prevent
-          // a poison event from blocking the entire queue forever.
-          // For now, we skip it and let the next tick retry.
+          const message = err instanceof Error ? err.message : String(err);
+          // Terminal errors referencing a missing bead/agent can never
+          // succeed on retry — mark them processed so the drain loop
+          // stops re-running them every alarm tick.
+          const isMissingEntity =
+            err instanceof Error &&
+            /\b(Bead|Agent) [0-9a-f-]{36} not found\b/.test(err.message);
+          if (isMissingEntity) {
+            logger.warn('reconciler: applyEvent skipped (missing entity)', {
+              eventId: event.event_id,
+              eventType: event.event_type,
+              error: message,
+            });
+            events.markProcessed(this.sql, event.event_id);
+          } else {
+            logger.error('reconciler: applyEvent failed', {
+              eventId: event.event_id,
+              eventType: event.event_type,
+              error: message,
+            });
+            // Event stays unprocessed — will be retried on the next alarm tick.
+          }
         }
       }
     } catch (err) {
@@ -5159,6 +5176,56 @@ export class TownDO extends DurableObject<Env> {
         []
       ),
     ];
+  }
+
+  async debugTownEvents(): Promise<unknown[]> {
+    return [
+      ...query(
+        this.sql,
+        /* sql */ `
+          SELECT ${town_events.event_id},
+                 ${town_events.event_type},
+                 ${town_events.agent_id},
+                 ${town_events.bead_id},
+                 ${town_events.processed_at}
+          FROM ${town_events}
+          ORDER BY ${town_events.created_at} ASC
+        `,
+        []
+      ),
+    ];
+  }
+
+  /**
+   * Test-only helper: directly insert a row into the town_events queue
+   * without going through the producer APIs. Used to reproduce orphan
+   * events (referencing deleted beads/agents) in tests.
+   */
+  async debugInsertTownEvent(input: {
+    event_type: TownEventType;
+    agent_id?: string | null;
+    bead_id?: string | null;
+    payload?: Record<string, unknown>;
+  }): Promise<string> {
+    const eventId = events.insertEvent(this.sql, input.event_type, {
+      agent_id: input.agent_id ?? null,
+      bead_id: input.bead_id ?? null,
+      payload: input.payload ?? {},
+    });
+    await this.armAlarmIfNeeded();
+    return eventId;
+  }
+
+  /**
+   * Test-only helper: insert a container_status event for a given agent.
+   * Mirrors the container observer's upsert so tests can verify that
+   * deleteBead sweeps agent-keyed events.
+   */
+  async debugRecordContainerStatus(
+    agentId: string,
+    payload: { status: string; exit_reason?: string | null }
+  ): Promise<void> {
+    events.upsertContainerStatus(this.sql, agentId, payload);
   }
 
   async destroy(): Promise<void> {

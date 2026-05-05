@@ -93,13 +93,6 @@ export async function processTopUp(
   const didInsertCreditTransaction = (attemptToInsert.rowCount ?? 0) > 0;
 
   if (!didInsertCreditTransaction) {
-    // A prior processTopUp call already committed the credit transaction for
-    // this stripe_payment_id (duplicate webhook / retry). The credit itself
-    // is idempotent, but the confirmation email is not guaranteed to have
-    // been sent — the original process could have exited between the credit
-    // commit and `after(processPostTopUpFreeStuff)`. Attempt to recover the
-    // email via the durable transactional_email_log marker. If a marker already
-    // exists the insert collides and no second email is sent.
     if (!skipPostTopUpFreeStuff) {
       await recoverTopUpConfirmationEmailIfMissing({
         user,
@@ -241,9 +234,6 @@ async function recoverTopUpConfirmationEmailIfMissing(params: {
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
 }): Promise<void> {
-  // Reuse the same gated-send path. The marker insert with
-  // onConflictDoNothing() naturally skips when the original attempt already
-  // sent, and fires the email when it didn't.
   if (IS_IN_AUTOMATED_TEST) {
     await maybeSendTopUpConfirmationEmail(params);
   } else {

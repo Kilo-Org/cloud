@@ -90,7 +90,7 @@ export function InstanceListScreen({
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <ScrollView
           className="flex-1"
-          contentContainerClassName="flex-grow gap-6 px-4 pb-24"
+          contentContainerClassName="flex-grow gap-6 px-4 pb-24 pt-5"
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >

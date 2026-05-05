@@ -136,8 +136,15 @@ export type SweepIO = {
   recoverStuckClaims(): Promise<number>;
   /** Select pending rows whose notice window has opened. */
   selectDue(): Promise<DueNotificationRow[]>;
-  /** Atomic CAS pending → sending. Returns true iff this call won the claim. */
-  claim(notificationId: string): Promise<boolean>;
+  /**
+   * Atomic CAS pending → sending. Returns true iff this call won the
+   * claim. Takes the full row so the claim can re-validate parent
+   * (target/action/stage) state for `kind='notice'` rows in the same
+   * UPDATE — closes the TOCTOU window between selectDue and claim
+   * where the apply path could otherwise drive the target through
+   * pending → running → applied while we hold an in-flight notice.
+   */
+  claim(row: DueNotificationRow): Promise<boolean>;
   markSent(notificationId: string): Promise<void>;
   markFailed(notificationId: string, error: string): Promise<void>;
   /** Channel-specific dispatch (HTTP/RPC). Returns ok/fail per row. */
@@ -172,11 +179,14 @@ export async function runSweepWithIO(io: SweepIO): Promise<SweepResult> {
     const batch = due.slice(i, i + DISPATCH_CONCURRENCY);
     const results = await Promise.allSettled(
       batch.map(async row => {
-        const claimed = await io.claim(row.notification_id);
+        const claimed = await io.claim(row);
         if (!claimed) {
-          // Another concurrent sweep tick won the claim. Don't
-          // dispatch and don't count — the winning sweep is responsible
-          // for the final outcome.
+          // Either another concurrent sweep tick won the claim, OR
+          // the apply path raced ahead and the parent target is no
+          // longer pending. Either way, skip silently — the winning
+          // sweep handles the final outcome, and the stale-notice
+          // case is exactly what the parent-state gate inside claim
+          // is preventing.
           return { kind: 'skipped' as const };
         }
         const dispatchResult = await io.dispatchOne(row);
@@ -235,7 +245,7 @@ export async function runScheduledActionNoticesSweep(env: KiloClawEnv): Promise<
   const io: SweepIO = {
     recoverStuckClaims: () => recoverStuckClaims(db),
     selectDue: () => selectDueNotifications(db),
-    claim: id => claimNotification(db, id),
+    claim: row => claimNotification(db, row),
     markSent: id => markSent(db, id),
     markFailed: (id, error) => markFailed(db, id, error),
     dispatchOne: row => dispatchOne(env, row),
@@ -491,19 +501,47 @@ function mobilePushEventFor(
 
 /**
  * CAS pending → sending. Returns true iff this call won the claim, i.e.
- * the row was 'pending' at execution time and is now 'sending'. Returning
- * false means another concurrent sweep already claimed it (or recovery
- * already reset it back to pending after a previous crash) — caller must
- * skip dispatch in that case.
+ * the row was 'pending' at execution time AND (for `kind='notice'`) the
+ * parent target/action/stage are still in pre-apply states.
+ *
+ * The parent-state gate inside the CAS closes the TOCTOU window between
+ * selectDueNotifications and the dispatch — if the apply path won the
+ * race and moved target.status pending → running between selection and
+ * claim, the EXISTS subquery here returns false and the CAS doesn't fire.
+ * Without this gate, a notice could be claimed and dispatched for an
+ * action that already started or finished applying.
+ *
+ * `kind='cancelled'` rows skip the parent-state gate — those announce
+ * "the previously-noticed action is now off" and must fire regardless
+ * of whether the target moved to applied/skipped/failed.
+ *
+ * Returning false means: another concurrent sweep won the claim, OR
+ * the apply path raced ahead, OR recovery reset the row to pending after
+ * a prior crash. The caller skips dispatch in all three cases.
  */
-async function claimNotification(db: WorkerDb, notificationId: string): Promise<boolean> {
+async function claimNotification(db: WorkerDb, row: DueNotificationRow): Promise<boolean> {
+  const parentStateGate =
+    row.notification_kind === 'cancelled'
+      ? sql`true`
+      : sql`EXISTS (
+          SELECT 1
+          FROM ${kiloclaw_scheduled_action_targets} t
+          INNER JOIN ${kiloclaw_scheduled_actions} a ON a.id = t.scheduled_action_id
+          INNER JOIN ${kiloclaw_scheduled_action_stages} s ON s.id = t.stage_id
+          WHERE t.id = ${row.target_id}
+            AND t.status = 'pending'
+            AND a.status IN ('scheduled', 'running')
+            AND s.status IN ('pending', 'running')
+        )`;
+
   const updated = await db
     .update(kiloclaw_scheduled_action_notifications)
     .set({ status: 'sending', claimed_at: sql`now()` })
     .where(
       and(
-        eq(kiloclaw_scheduled_action_notifications.id, notificationId),
-        eq(kiloclaw_scheduled_action_notifications.status, 'pending')
+        eq(kiloclaw_scheduled_action_notifications.id, row.notification_id),
+        eq(kiloclaw_scheduled_action_notifications.status, 'pending'),
+        parentStateGate
       )
     )
     .returning({ id: kiloclaw_scheduled_action_notifications.id });

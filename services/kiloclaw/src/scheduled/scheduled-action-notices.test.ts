@@ -47,7 +47,7 @@ type FakeIO = SweepIO & {
 function fakeIO(opts: {
   due: DueRow[];
   recovered?: number;
-  claim?: (id: string) => Promise<boolean>;
+  claim?: (row: DueRow) => Promise<boolean>;
   dispatch?: (row: DueRow) => Promise<{ ok: true } | { ok: false; error: string }>;
   markSent?: (id: string) => Promise<void>;
   markFailed?: (id: string, err: string) => Promise<void>;
@@ -70,9 +70,9 @@ function fakeIO(opts: {
       calls.select += 1;
       return opts.due;
     },
-    claim: async id => {
-      calls.claim.push(id);
-      return opts.claim ? opts.claim(id) : true;
+    claim: async row => {
+      calls.claim.push(row.notification_id);
+      return opts.claim ? opts.claim(row) : true;
     },
     dispatchOne: async row => {
       calls.dispatched.push(row.notification_id);
@@ -126,6 +126,46 @@ describe('runSweepWithIO', () => {
     expect(io.calls.dispatched).toEqual([]); // never dispatched
     expect(io.calls.sent).toEqual([]);
     expect(io.calls.failed).toEqual([]);
+  });
+
+  it('skips dispatch when parent state changed between selectDue and claim (apply-race)', async () => {
+    // Simulates the TOCTOU window: selectDue picked a notice while
+    // target.status was still 'pending', but the apply path moved it
+    // to 'running' before our claim CAS. The real claim's EXISTS gate
+    // returns false; the fake mirrors that. Dispatch must NOT fire.
+    const due = [makeRow({ notification_id: 'apply-race', notification_kind: 'notice' })];
+    const io = fakeIO({
+      due,
+      claim: async row => {
+        // Notice for a target that already moved → claim fails.
+        return row.notification_kind !== 'notice';
+      },
+    });
+    const result = await runSweepWithIO(io);
+    expect(result).toEqual({ processed: 1, sent: 0, failed: 0, recovered: 0 });
+    expect(io.calls.dispatched).toEqual([]);
+    expect(io.calls.sent).toEqual([]);
+    expect(io.calls.failed).toEqual([]);
+  });
+
+  it('still dispatches cancelled rows when claim guard would block notices', async () => {
+    // 'cancelled' rows must fire regardless of parent state — they
+    // announce that the previously-noticed action is now off, even if
+    // the action already moved to applied/skipped/failed in the
+    // interim. The real claim's parentStateGate evaluates to true for
+    // kind='cancelled'; the fake mirrors that distinction.
+    const due = [
+      makeRow({ notification_id: 'notice-blocked', notification_kind: 'notice' }),
+      makeRow({ notification_id: 'cancel-fires', notification_kind: 'cancelled' }),
+    ];
+    const io = fakeIO({
+      due,
+      claim: async row => row.notification_kind === 'cancelled',
+    });
+    const result = await runSweepWithIO(io);
+    expect(result).toEqual({ processed: 2, sent: 1, failed: 0, recovered: 0 });
+    expect(io.calls.dispatched).toEqual(['cancel-fires']);
+    expect(io.calls.sent).toEqual(['cancel-fires']);
   });
 
   it('marks failed when dispatchOne reports ok:false', async () => {

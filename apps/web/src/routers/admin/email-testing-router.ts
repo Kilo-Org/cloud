@@ -146,7 +146,7 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         credits_usd: '10.00',
         purchase_date: formatDate(new Date()),
         credits_url: `${NEXTAUTH_URL}/credits`,
-        receipt_section: buildCreditsTopUpReceiptSection(null),
+        receipt_section: buildCreditsTopUpReceiptSection('https://pay.stripe.com/receipts/test'),
       };
   }
   throw new Error(`Unknown template: ${template}`);

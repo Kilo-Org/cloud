@@ -1,13 +1,29 @@
-import { eq } from 'drizzle-orm';
-import { credit_transactions, kilocode_users, transactional_email_log } from '@kilocode/db/schema';
+process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+
+import { and, eq } from 'drizzle-orm';
+import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import {
+  credit_transactions,
+  kiloclaw_email_log,
+  kiloclaw_instances,
+  kiloclaw_subscriptions,
+  kilocode_users,
+  transactional_email_log,
+} from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { processTopUp, resolveStripeReceiptUrl } from '@/lib/credits';
+import {
+  KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+  shouldSendSubscriptionStartedEmailForActivation,
+} from '@/lib/kiloclaw/credit-billing';
+import type * as creditBillingModule from '@/lib/kiloclaw/credit-billing';
 import {
   renderTemplate,
   buildCreditsTopUpReceiptSection,
   subjects,
   sendCreditsTopUpEmail,
+  sendKiloClawSubscriptionStartedEmail,
 } from '@/lib/email';
 import { processFirstTopupBonus } from '@/lib/firstTopupBonus';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
@@ -23,6 +39,22 @@ jest.mock('@/lib/promotionalCredits', () => ({
     amount_usd: 1,
     credit_transaction_id: 'promo-credit-id',
   })),
+}));
+
+jest.mock('@/lib/kiloclaw/instance-lifecycle', () => ({
+  autoResumeIfSuspended: jest.fn(async () => {}),
+  clearTrialInactivityStopAfterTrialTransition: jest.fn(async () => {}),
+}));
+
+jest.mock('@/lib/kilo-pass/usage-triggered-bonus', () => ({
+  computeUsageTriggeredMonthlyBonusDecision: jest.fn(() => ({ bonusPercentApplied: 0 })),
+  maybeIssueKiloPassBonusFromUsageThreshold: jest.fn(async () => {}),
+}));
+
+jest.mock('@/lib/affiliate-events', () => ({
+  enqueueAffiliateEventForUser: jest.fn(async () => {}),
+  buildAffiliateEventDedupeKey: jest.fn(() => 'test-dedupe-key'),
+  recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => {}),
 }));
 
 const processFirstTopupBonusMock = jest.mocked(processFirstTopupBonus);
@@ -91,8 +123,29 @@ describe('creditsTopUp template', () => {
 });
 
 describe('subjects map', () => {
-  test('includes the credits top-up template', () => {
+  test('includes transactional purchase templates', () => {
     expect(subjects.creditsTopUp).toBeTruthy();
+    expect(subjects.kiloClawSubscriptionStarted).toBeTruthy();
+  });
+});
+
+describe('kiloClawSubscriptionStarted template', () => {
+  test('renders required fields', () => {
+    const html = renderTemplate('kiloClawSubscriptionStarted', {
+      plan_name: 'KiloClaw Standard',
+      price_usd: '9.00',
+      billing_period: 'May 1, 2026 - June 1, 2026',
+      next_billing_date: 'June 1, 2026',
+      manage_url: 'https://app.kilocode.ai/claw/subscription',
+      year: '2026',
+    });
+
+    expect(html).toContain('Your KiloClaw subscription is active');
+    expect(html).toContain('KiloClaw Standard');
+    expect(html).toContain('$9.00 USD');
+    expect(html).toContain('May 1, 2026 - June 1, 2026');
+    expect(html).toContain('June 1, 2026');
+    expect(html).toContain('https://app.kilocode.ai/claw/subscription');
   });
 });
 
@@ -506,6 +559,758 @@ describe('sendCreditsTopUpEmail payload', () => {
     });
 
     expect(result).toEqual({ sent: false, reason: 'provider_not_configured' });
+  });
+});
+
+describe('sendKiloClawSubscriptionStartedEmail payload', () => {
+  beforeEach(() => {
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
+  });
+
+  test('emits canonical subject, formatted price/date, and manage subscription URL', async () => {
+    const result = await sendKiloClawSubscriptionStartedEmail({
+      to: 'recipient@example.com',
+      planName: 'KiloClaw Standard',
+      priceCents: 900,
+      billingPeriod: 'May 1, 2026 - June 1, 2026',
+      nextBillingDate: new Date('2026-06-01T00:00:00Z'),
+    });
+
+    expect(result).toEqual({ sent: true });
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.to).toBe('recipient@example.com');
+    expect(params.subject).toBe(subjects.kiloClawSubscriptionStarted);
+    expect(params.html).toContain('KiloClaw Standard');
+    expect(params.html).toContain('$9.00 USD');
+    expect(params.html).toContain('June 1, 2026');
+    expect(params.html).toContain('/claw/subscription');
+  });
+
+  test('zero-cent activation still renders a valid price', async () => {
+    await sendKiloClawSubscriptionStartedEmail({
+      to: 'recipient@example.com',
+      planName: 'KiloClaw Standard',
+      priceCents: 0,
+      billingPeriod: 'May 1, 2026 - June 1, 2026',
+      nextBillingDate: new Date('2026-06-01T00:00:00Z'),
+    });
+
+    const [params] = sendViaMailgunMock.mock.calls[0];
+    expect(params.html).toContain('$0.00 USD');
+  });
+
+  test('neverbounce rejection short-circuits before Mailgun is called', async () => {
+    verifyEmailMock.mockImplementationOnce(async () => false);
+
+    const result = await sendKiloClawSubscriptionStartedEmail({
+      to: 'bad@example.com',
+      planName: 'KiloClaw Standard',
+      priceCents: 900,
+      billingPeriod: 'May 1, 2026 - June 1, 2026',
+      nextBillingDate: new Date('2026-06-01T00:00:00Z'),
+    });
+
+    expect(result).toEqual({ sent: false, reason: 'neverbounce_rejected' });
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
+  });
+
+  test('mailgun misconfiguration surfaces as provider_not_configured', async () => {
+    sendViaMailgunMock.mockImplementationOnce(async () => false);
+
+    const result = await sendKiloClawSubscriptionStartedEmail({
+      to: 'recipient@example.com',
+      planName: 'KiloClaw Standard',
+      priceCents: 900,
+      billingPeriod: 'May 1, 2026 - June 1, 2026',
+      nextBillingDate: new Date('2026-06-01T00:00:00Z'),
+    });
+
+    expect(result).toEqual({ sent: false, reason: 'provider_not_configured' });
+  });
+});
+
+describe('KiloClaw subscription-started idempotency', () => {
+  test('activation eligibility excludes renewals and dunning recovery', () => {
+    expect(shouldSendSubscriptionStartedEmailForActivation('trialing')).toBe(true);
+    expect(shouldSendSubscriptionStartedEmailForActivation('canceled')).toBe(true);
+    expect(shouldSendSubscriptionStartedEmailForActivation('active')).toBe(false);
+    expect(shouldSendSubscriptionStartedEmailForActivation('past_due')).toBe(false);
+    expect(shouldSendSubscriptionStartedEmailForActivation('unpaid')).toBe(false);
+    expect(shouldSendSubscriptionStartedEmailForActivation(null)).toBe(false);
+  });
+
+  test('email log dedupes webhook replays for the same activation period', async () => {
+    const user = await insertTestUser({});
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: `test-sandbox-${crypto.randomUUID()}`,
+      })
+      .returning();
+    const periodStart = new Date().toISOString();
+
+    const first = await db
+      .insert(kiloclaw_email_log)
+      .values({
+        user_id: user.id,
+        instance_id: instance.id,
+        email_type: KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+        period_start: periodStart,
+      })
+      .onConflictDoNothing();
+    expect(first.rowCount).toBe(1);
+
+    const replay = await db
+      .insert(kiloclaw_email_log)
+      .values({
+        user_id: user.id,
+        instance_id: instance.id,
+        email_type: KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+        period_start: periodStart,
+      })
+      .onConflictDoNothing();
+    expect(replay.rowCount).toBe(0);
+  });
+
+  test('email log allows a new row for a later activation period', async () => {
+    const user = await insertTestUser({});
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: user.id,
+        sandbox_id: `test-sandbox-${crypto.randomUUID()}`,
+      })
+      .returning();
+    const firstPeriodStart = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const secondPeriodStart = new Date().toISOString();
+
+    const first = await db
+      .insert(kiloclaw_email_log)
+      .values({
+        user_id: user.id,
+        instance_id: instance.id,
+        email_type: KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+        period_start: firstPeriodStart,
+      })
+      .onConflictDoNothing();
+    expect(first.rowCount).toBe(1);
+
+    const second = await db
+      .insert(kiloclaw_email_log)
+      .values({
+        user_id: user.id,
+        instance_id: instance.id,
+        email_type: KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
+        period_start: secondPeriodStart,
+      })
+      .onConflictDoNothing();
+    expect(second.rowCount).toBe(1);
+
+    const rows = await db
+      .select({ id: kiloclaw_email_log.id })
+      .from(kiloclaw_email_log)
+      .where(
+        and(
+          eq(kiloclaw_email_log.user_id, user.id),
+          eq(kiloclaw_email_log.instance_id, instance.id),
+          eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
+        )
+      );
+    expect(rows).toHaveLength(2);
+  });
+});
+
+describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
+  beforeEach(() => {
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
+    processFirstTopupBonusMock.mockReset();
+    grantCreditForCategoryMock.mockReset().mockResolvedValue({
+      success: true,
+      message: 'ok',
+      amount_usd: 1,
+      credit_transaction_id: 'promo-credit-id',
+    });
+  });
+
+  afterEach(() => {
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
+    processFirstTopupBonusMock.mockReset();
+    grantCreditForCategoryMock.mockReset();
+  });
+
+  async function applyStripeFundedKiloClawPeriod(
+    params: Parameters<typeof creditBillingModule.applyStripeFundedKiloClawPeriod>[0]
+  ): Promise<boolean> {
+    const mod = await import('@/lib/kiloclaw/credit-billing');
+    return mod.applyStripeFundedKiloClawPeriod(params);
+  }
+
+  async function enrollWithCredits(
+    params: Parameters<typeof creditBillingModule.enrollWithCredits>[0]
+  ): Promise<void> {
+    const mod = await import('@/lib/kiloclaw/credit-billing');
+    return mod.enrollWithCredits(params);
+  }
+
+  async function seedSubscription(params: {
+    userId: string;
+    status: 'trialing' | 'canceled' | 'active' | 'past_due' | 'unpaid';
+    plan: 'trial' | 'standard' | 'commit';
+    stripeSubscriptionId: string;
+  }) {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: params.userId,
+        sandbox_id: `test-sandbox-${crypto.randomUUID()}`,
+      })
+      .returning();
+    const now = new Date();
+    const [subscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: params.userId,
+        instance_id: instance.id,
+        stripe_subscription_id: params.stripeSubscriptionId,
+        payment_source: 'stripe',
+        plan: params.plan,
+        status: params.status,
+        trial_started_at:
+          params.plan === 'trial' ? new Date(now.getTime() - 14 * 86_400_000).toISOString() : null,
+        trial_ends_at:
+          params.plan === 'trial' ? new Date(now.getTime() - 7 * 86_400_000).toISOString() : null,
+        current_period_start:
+          params.plan !== 'trial' ? new Date(now.getTime() - 30 * 86_400_000).toISOString() : null,
+        current_period_end:
+          params.plan !== 'trial' ? new Date(now.getTime() - 1 * 86_400_000).toISOString() : null,
+      })
+      .returning();
+    return { instance, subscription };
+  }
+
+  function countSubscriptionStartedSends(): number {
+    return sendViaMailgunMock.mock.calls
+      .map(([params]) => params)
+      .filter(p => p.subject === subjects.kiloClawSubscriptionStarted).length;
+  }
+
+  async function countEmailLogRows(userId: string, instanceId: string): Promise<number> {
+    const rows = await db
+      .select({ id: kiloclaw_email_log.id })
+      .from(kiloclaw_email_log)
+      .where(
+        and(
+          eq(kiloclaw_email_log.user_id, userId),
+          eq(kiloclaw_email_log.instance_id, instanceId),
+          eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
+        )
+      );
+    return rows.length;
+  }
+
+  async function seedCreditEnrollmentAnchor(userId: string) {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: userId,
+        sandbox_id: `test-sandbox-${crypto.randomUUID()}`,
+      })
+      .returning();
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: userId,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+    });
+    return instance;
+  }
+
+  test('trialing trial -> Stripe settlement sends one subscription-started email and writes the log row', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_trialing_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+  });
+
+  test('trialing trial -> credit enrollment sends one subscription-started email and writes the log row', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 50_000_000 });
+    const instance = await seedCreditEnrollmentAnchor(user.id);
+
+    await enrollWithCredits({
+      userId: user.id,
+      instanceId: instance.id,
+      plan: 'standard',
+      hadPaidSubscription: false,
+    });
+
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, instance.id))
+      .limit(1);
+    const [emailLog] = await db
+      .select()
+      .from(kiloclaw_email_log)
+      .where(
+        and(
+          eq(kiloclaw_email_log.user_id, user.id),
+          eq(kiloclaw_email_log.instance_id, instance.id),
+          eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
+        )
+      )
+      .limit(1);
+
+    expect(emailLog?.period_start).toBe(subscription.current_period_start);
+  });
+
+  test('canceled trial -> Stripe settlement sends one subscription-started email', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_canceled_trial_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'canceled',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+  });
+
+  test('canceled paid row -> Stripe settlement sends one subscription-started email for resubscribe', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_canceled_paid_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'canceled',
+      plan: 'standard',
+      stripeSubscriptionId,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+  });
+
+  test('$0 Stripe settlement still sends one subscription-started email', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_zero_amount_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `in_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 0,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+    const [zeroAmountSend] = sendViaMailgunMock.mock.calls.map(([params]) => params);
+    expect(zeroAmountSend.html).toContain('$0.00 USD');
+  });
+
+  test('activate -> cancel -> resubscribe on same instance sends a second subscription-started email', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_resubscribe_${crypto.randomUUID()}`;
+    const { instance, subscription } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+
+    await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_first_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date(Date.now() - 60 * 86_400_000).toISOString(),
+      periodEnd: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+    });
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
+
+    await db
+      .update(kiloclaw_subscriptions)
+      .set({ status: 'canceled' })
+      .where(eq(kiloclaw_subscriptions.id, subscription.id));
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_second_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(2);
+  });
+
+  test('subscription.created before invoice.paid -> settlement still sends one subscription-started email', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_created_before_paid_${crypto.randomUUID()}`;
+    const { instance, subscription } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+
+    const periodStart = new Date().toISOString();
+    const periodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const [activatedSubscription] = await db
+      .update(kiloclaw_subscriptions)
+      .set({
+        status: 'active',
+        plan: 'standard',
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+      })
+      .where(eq(kiloclaw_subscriptions.id, subscription.id))
+      .returning();
+    await insertKiloClawSubscriptionChangeLog(db, {
+      subscriptionId: subscription.id,
+      actor: { actorType: 'system', actorId: 'stripe-webhook' },
+      action: 'status_changed',
+      reason: 'stripe_subscription_created',
+      before: subscription,
+      after: activatedSubscription,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart,
+      periodEnd,
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+  });
+
+  test('active renewal -> no subscription-started email', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_renewal_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'active',
+      plan: 'standard',
+      stripeSubscriptionId,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(0);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
+  });
+
+  test('past_due and unpaid recovery settlements do not send subscription-started email', async () => {
+    for (const status of ['past_due', 'unpaid'] as const) {
+      const user = await insertTestUser({});
+      const stripeSubscriptionId = `sub_${status}_${crypto.randomUUID()}`;
+      const { instance } = await seedSubscription({
+        userId: user.id,
+        status,
+        plan: 'standard',
+        stripeSubscriptionId,
+      });
+
+      const applied = await applyStripeFundedKiloClawPeriod({
+        userId: user.id,
+        metadataInstanceId: instance.id,
+        stripeSubscriptionId,
+        stripePaymentId: `ch_${crypto.randomUUID()}`,
+        plan: 'standard',
+        amountMicrodollars: 9_000_000,
+        periodStart: new Date().toISOString(),
+        periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      });
+
+      expect(applied).toBe(true);
+      expect(countSubscriptionStartedSends()).toBe(0);
+      expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
+    }
+  });
+
+  test('subscription.created log for a different period does not trigger a renewal email', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_renewal_after_prior_${crypto.randomUUID()}`;
+    const { instance, subscription } = await seedSubscription({
+      userId: user.id,
+      status: 'active',
+      plan: 'standard',
+      stripeSubscriptionId,
+    });
+
+    await insertKiloClawSubscriptionChangeLog(db, {
+      subscriptionId: subscription.id,
+      actor: { actorType: 'system', actorId: 'stripe-webhook' },
+      action: 'status_changed',
+      reason: 'stripe_subscription_created',
+      before: { ...subscription, status: 'trialing' },
+      after: subscription,
+    });
+    await insertKiloClawSubscriptionChangeLog(db, {
+      subscriptionId: subscription.id,
+      actor: { actorType: 'system', actorId: 'kiloclaw-credit-billing' },
+      action: 'period_advanced',
+      reason: 'stripe_invoice_settlement',
+      before: { ...subscription, status: 'trialing' },
+      after: subscription,
+    });
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(0);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
+  });
+
+  test('duplicate webhook replay does not send a second email when the log row already exists', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_replay_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+    const periodStart = new Date().toISOString();
+    const periodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const stripePaymentId = `ch_${crypto.randomUUID()}`;
+
+    await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart,
+      periodEnd,
+    });
+    expect(countSubscriptionStartedSends()).toBe(1);
+
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
+
+    await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart,
+      periodEnd,
+    });
+
+    expect(countSubscriptionStartedSends()).toBe(0);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+  });
+
+  test('duplicate webhook recovery sends email once when durable activation log exists but email log is missing', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_recovery_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+    const periodStart = new Date().toISOString();
+    const periodEnd = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const stripePaymentId = `ch_${crypto.randomUUID()}`;
+
+    await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart,
+      periodEnd,
+    });
+    expect(countSubscriptionStartedSends()).toBe(1);
+
+    await db
+      .delete(kiloclaw_email_log)
+      .where(
+        and(
+          eq(kiloclaw_email_log.user_id, user.id),
+          eq(kiloclaw_email_log.instance_id, instance.id),
+          eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
+        )
+      );
+    sendViaMailgunMock.mockClear();
+    verifyEmailMock.mockClear();
+
+    await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart,
+      periodEnd,
+    });
+
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+  });
+
+  test('provider_not_configured clears email log row so a retry can re-attempt', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_provider_unconfigured_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+    sendViaMailgunMock.mockImplementationOnce(async () => false);
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(0);
+  });
+
+  test('neverbounce_rejected keeps email log row so terminal addresses do not retry', async () => {
+    const user = await insertTestUser({});
+    const stripeSubscriptionId = `sub_neverbounce_rejected_${crypto.randomUUID()}`;
+    const { instance } = await seedSubscription({
+      userId: user.id,
+      status: 'trialing',
+      plan: 'trial',
+      stripeSubscriptionId,
+    });
+    verifyEmailMock.mockImplementationOnce(async () => false);
+
+    const applied = await applyStripeFundedKiloClawPeriod({
+      userId: user.id,
+      metadataInstanceId: instance.id,
+      stripeSubscriptionId,
+      stripePaymentId: `ch_${crypto.randomUUID()}`,
+      plan: 'standard',
+      amountMicrodollars: 9_000_000,
+      periodStart: new Date().toISOString(),
+      periodEnd: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    });
+
+    expect(applied).toBe(true);
+    expect(verifyEmailMock).toHaveBeenCalledWith(user.google_user_email);
+    expect(countSubscriptionStartedSends()).toBe(0);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
   });
 });
 

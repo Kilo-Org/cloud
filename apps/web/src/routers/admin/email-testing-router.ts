@@ -148,6 +148,14 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         credits_url: `${NEXTAUTH_URL}/credits`,
         receipt_section: buildCreditsTopUpReceiptSection('https://pay.stripe.com/receipts/test'),
       };
+    case 'kiloClawSubscriptionStarted':
+      return {
+        plan_name: 'KiloClaw Standard',
+        price_usd: '9.00',
+        billing_period: 'May 1, 2026 - June 1, 2026',
+        next_billing_date: formatDate(new Date(Date.now() + 30 * 86_400_000)),
+        manage_url: `${NEXTAUTH_URL}/claw/subscription`,
+      };
   }
   throw new Error(`Unknown template: ${template}`);
 }

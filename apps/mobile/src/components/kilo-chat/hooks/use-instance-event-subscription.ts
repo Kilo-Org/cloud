@@ -1,14 +1,9 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { kiloclawInstanceContext } from '@kilocode/event-service';
-import {
-  botStatusKey,
-  conversationsKey,
-  registerConversationListCacheHandlers,
-} from '@kilocode/kilo-chat-hooks';
+import { conversationsKey, registerConversationListCacheHandlers } from '@kilocode/kilo-chat-hooks';
 
-import { useEventSubscription } from './use-event-subscription';
 import { useCurrentUserId } from './use-current-user-id';
 import { useEventServiceClient, useKiloChatClient } from './use-kilo-chat-client';
 
@@ -20,11 +15,15 @@ export function useInstanceEventSubscription(sandboxId: string | undefined) {
   const ctx = sandboxId ? kiloclawInstanceContext(sandboxId) : null;
   const queryKey = useMemo(() => conversationsKey(sandboxId ?? null), [sandboxId]);
 
-  const invalidateBotStatus = useCallback(() => {
-    void qc.invalidateQueries({ queryKey: botStatusKey(sandboxId ?? null) });
-  }, [qc, sandboxId]);
-
-  useEventSubscription(ctx, 'bot.status', invalidateBotStatus);
+  useEffect(() => {
+    if (!ctx) {
+      return undefined;
+    }
+    eventService.subscribe([ctx]);
+    return () => {
+      eventService.unsubscribe([ctx]);
+    };
+  }, [ctx, eventService]);
 
   useEffect(() => {
     if (!sandboxId) {

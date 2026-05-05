@@ -64,7 +64,6 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('@kilocode/kilo-chat-hooks', () => ({
-  botStatusKey: (sandboxId: string | null) => ['kilo-chat', 'bot-status', sandboxId],
   conversationsKey: (sandboxId: string | null) => ['kilo-chat', 'conversations', sandboxId],
   registerConversationListCacheHandlers: mocks.registerConversationListCacheHandlers,
 }));
@@ -119,7 +118,7 @@ describe('ChatSandboxInstanceEventSubscriptionMount', () => {
     mountInstanceEventSubscription();
 
     expect(testState.subscribedContexts).toEqual([[kiloclawInstanceContext('sandbox-1')]]);
-    expect(mocks.eventServiceOn).toHaveBeenCalledWith('bot.status', expect.any(Function));
+    expect(mocks.eventServiceOn).not.toHaveBeenCalledWith('bot.status', expect.any(Function));
     expect(mocks.registerConversationListCacheHandlers).toHaveBeenCalledTimes(1);
   });
 });

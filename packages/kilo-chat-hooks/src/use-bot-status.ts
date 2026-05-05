@@ -6,9 +6,10 @@ import {
   type KiloChatEventOf,
 } from '@kilocode/kilo-chat';
 
-import { botStatusKey } from './query-keys';
+import { botStatusKey, botStatusRequestKey } from './query-keys';
 
 const POLL_INTERVAL_MS = 15_000;
+const STATUS_STALE_MS = 10_000;
 
 export function useBotStatus(
   client: KiloChatClient,
@@ -32,28 +33,21 @@ export function useBotStatus(
     });
   }, [client, queryClient, sandboxId]);
 
-  useEffect(() => {
-    if (!sandboxId) {
-      return;
-    }
-    let cancelled = false;
-
-    const tick = () => {
-      if (cancelled) {
-        return;
+  useQuery({
+    queryKey: botStatusRequestKey(sandboxId),
+    queryFn: async () => {
+      if (!sandboxId) {
+        return null;
       }
-      void client.requestBotStatus(sandboxId).catch(() => {
+      await client.requestBotStatus(sandboxId).catch(() => {
         // Best effort; the visible status comes from event-service pushes.
       });
-    };
-
-    tick();
-    const timer = setInterval(tick, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [client, sandboxId]);
+      return null;
+    },
+    enabled: sandboxId !== null,
+    refetchInterval: POLL_INTERVAL_MS,
+    staleTime: POLL_INTERVAL_MS,
+  });
 
   const { data } = useQuery({
     queryKey: botStatusKey(sandboxId),
@@ -65,7 +59,7 @@ export function useBotStatus(
       return res.status;
     },
     enabled: sandboxId !== null,
-    staleTime: Infinity,
+    staleTime: STATUS_STALE_MS,
   });
 
   return data ?? null;

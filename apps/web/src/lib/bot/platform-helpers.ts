@@ -4,15 +4,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { platform_integrations } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-
-type PlatformIdentityMessage = {
-  author: Pick<Message['author'], 'userId'>;
-  raw: unknown;
-};
-
-type PlatformIdentityOptions = {
-  getGitHubInstallationId?: (thread: Pick<Thread, 'id'>) => Promise<number | string | undefined>;
-};
+import { bot } from '@/lib/bot';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object';
@@ -32,39 +24,31 @@ export function getSlackTeamId(message: { raw: unknown }): string {
   return teamId;
 }
 
-export function getGitHubInstallationId(message: { raw: unknown }): string {
-  if (!isRecord(message.raw)) throw new Error('Expected an installation.id in message.raw');
-
-  const installation = message.raw.installation;
-  if (!isRecord(installation) || typeof installation.id !== 'number') {
-    throw new Error('Expected an installation.id in message.raw');
-  }
-
-  const installationId = installation.id;
-  return installationId.toString();
-}
-
 /**
  * Extract platform identity coordinates from any adapter's message.
  * Extend the switch for Discord / Teams / Google Chat / etc.
  */
 export async function getPlatformIdentity(
-  thread: Pick<Thread, 'id'>,
-  message: PlatformIdentityMessage,
-  options?: PlatformIdentityOptions
+  thread: Thread,
+  message: Message
 ): Promise<PlatformIdentity> {
   const platform = thread.id.split(':')[0]; // "slack", "discord", "gchat", "teams", ...
 
   switch (platform) {
-    case 'github': {
-      const installationId = options?.getGitHubInstallationId
-        ? await options.getGitHubInstallationId(thread)
-        : getGitHubInstallationId(message);
-      if (!installationId) throw new Error('Expected a GitHub installation id');
-      const teamId = installationId.toString();
-      return { platform: PLATFORM.GITHUB, teamId, userId: message.author.userId };
+    case PLATFORM.GITHUB: {
+      const teamId = await bot.getAdapter(PLATFORM.GITHUB).getInstallationId(thread);
+
+      if (!teamId) {
+        throw new Error(`Could not find GitHub installation ID for thread ${thread.id}`);
+      }
+
+      return {
+        platform: PLATFORM.GITHUB,
+        teamId: teamId.toString(),
+        userId: message.author.userId,
+      };
     }
-    case 'slack': {
+    case PLATFORM.SLACK: {
       const teamId = getSlackTeamId(message);
       return { platform: PLATFORM.SLACK, teamId, userId: message.author.userId };
     }

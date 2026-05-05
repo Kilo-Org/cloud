@@ -27,22 +27,22 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Kilo Code - Open source AI agent VS Code extension',
+  title: 'Pound Code - Open source AI agent VS Code extension',
   description:
     'Write code more efficiently by generating code, automating tasks, and providing suggestions',
   metadataBase: new URL(APP_URL),
   openGraph: {
     type: 'website',
     url: APP_URL,
-    title: 'Kilo Code - Open source AI agent VS Code extension',
+    title: 'Pound Code - Open source AI agent VS Code extension',
     description:
       'Write code more efficiently by generating code, automating tasks, and providing suggestions',
-    siteName: 'Kilo Code',
+    siteName: 'Pound Code',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Kilo Code - Open source AI agent VS Code extension',
+    title: 'Pound Code - Open source AI agent VS Code extension',
     description:
       'Write code more efficiently by generating code, automating tasks, and providing suggestions',
   },

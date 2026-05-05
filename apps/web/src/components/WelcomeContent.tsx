@@ -73,7 +73,7 @@ export default function WelcomeContent({
 
   return (
     <div className="container mx-auto flex max-w-4xl flex-col items-center gap-8">
-      <h1 className="text-4xl font-bold sm:text-5xl">Your Kilo Code Account is Ready</h1>
+      <h1 className="text-4xl font-bold sm:text-5xl">Your Pound Code Account is Ready</h1>
 
       <p className="text-center align-middle text-lg">{welcomeMessage}</p>
 
@@ -112,7 +112,7 @@ export default function WelcomeContent({
               <div className="space-y-3">
                 <h3 className="text-center text-xl font-semibold">VS Code</h3>
                 <p className="text-muted-foreground text-center">
-                  To install Kilo Code in VS Code, you need to have Visual Studio Code installed on
+                  To install Pound Code in VS Code, you need to have Visual Studio Code installed on
                   your computer.
                 </p>
               </div>
@@ -139,7 +139,7 @@ export default function WelcomeContent({
                   <div>
                     <p className="font-medium">Install the extension</p>
                     <p className="text-muted-foreground text-sm">
-                      Click the button below to install Kilo Code directly in VS Code
+                      Click the button below to install Pound Code directly in VS Code
                     </p>
                   </div>
                 </div>
@@ -167,7 +167,7 @@ export default function WelcomeContent({
                 <div className="space-y-3">
                   <h3 className="text-center text-xl font-semibold">{ideName}</h3>
                   <p className="text-muted-foreground text-center">
-                    Continue using Kilo Code in {ideName}. The extension is already installed and
+                    Continue using Pound Code in {ideName}. The extension is already installed and
                     ready to use.
                   </p>
                 </div>
@@ -177,7 +177,7 @@ export default function WelcomeContent({
                     <div>
                       <p className="font-medium">Return to your editor</p>
                       <p className="text-muted-foreground text-sm">
-                        Open {ideName} and use the Kilo Code panel to start coding with AI
+                        Open {ideName} and use the Pound Code panel to start coding with AI
                       </p>
                     </div>
                   </div>
@@ -186,7 +186,7 @@ export default function WelcomeContent({
                     <div>
                       <p className="font-medium">Start coding with AI</p>
                       <p className="text-muted-foreground text-sm">
-                        Use the Kilo Code panel to chat with AI, generate code, and get help with
+                        Use the Pound Code panel to chat with AI, generate code, and get help with
                         your projects
                       </p>
                     </div>
@@ -214,8 +214,8 @@ export default function WelcomeContent({
                 <div className="space-y-3">
                   <h3 className="text-center text-xl font-semibold">JetBrains IDEs</h3>
                   <p className="text-muted-foreground text-center">
-                    Kilo Code is available for all JetBrains IDEs including IntelliJ IDEA, WebStorm,
-                    PyCharm, and more. To install Kilo Code in a JetBrains IDE, you need to have a
+                    Pound Code is available for all JetBrains IDEs including IntelliJ IDEA, WebStorm,
+                    PyCharm, and more. To install Pound Code in a JetBrains IDE, you need to have a
                     JetBrains IDE installed on your computer.
                   </p>
                 </div>
@@ -242,7 +242,7 @@ export default function WelcomeContent({
                     <div>
                       <p className="font-medium">Install from IDE</p>
                       <p className="text-muted-foreground text-sm">
-                        Open your JetBrains IDE → Settings → Plugins → Search for &quot;Kilo
+                        Open your JetBrains IDE → Settings → Plugins → Search for &quot;Pound
                         Code&quot; → Install
                       </p>
                     </div>
@@ -273,7 +273,7 @@ export default function WelcomeContent({
               <div className="space-y-3">
                 <h3 className="text-center text-xl font-semibold">CLI</h3>
                 <p className="text-muted-foreground text-center">
-                  Install Kilo Code CLI to access AI coding assistance directly from your terminal.
+                  Install Pound Code CLI to access AI coding assistance directly from your terminal.
                 </p>
               </div>
               <div className="space-y-4">
@@ -312,7 +312,7 @@ export default function WelcomeContent({
 
       <div className="flex w-full flex-col items-center gap-2">
         <p className="text-muted-foreground text-sm">
-          Get started faster: key concepts of Kilo Code
+          Get started faster: key concepts of Pound Code
         </p>
         <div className="self-stretch overflow-hidden rounded-lg shadow-xl">
           <YouTubeEmbed
@@ -320,7 +320,7 @@ export default function WelcomeContent({
             width="100%"
             height="auto"
             className="aspect-video w-full"
-            title="Your first 14 minutes with Kilo Code"
+            title="Your first 14 minutes with Pound Code"
           />
         </div>
       </div>

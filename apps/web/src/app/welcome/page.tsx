@@ -38,7 +38,7 @@ export default async function WelcomePage({ searchParams }: AppPageProps) {
           installTarget={installTarget}
         />
         <div className="text-muted-foreground flex items-center justify-center text-xs">
-          © {new Date().getFullYear()} Kilo Code
+          © {new Date().getFullYear()} Pound Code
         </div>
       </div>
     </PageContainer>

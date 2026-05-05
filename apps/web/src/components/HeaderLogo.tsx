@@ -61,7 +61,7 @@ export default function HeaderLogo({ className, href }: HeaderLogoProps) {
           </motion.div>
         </AnimatePresence>
       </motion.div>
-      <span className="text-3xl font-bold whitespace-nowrap">Kilo</span>
+      <span className="text-3xl font-bold whitespace-nowrap">Pound</span>
     </>
   );
 

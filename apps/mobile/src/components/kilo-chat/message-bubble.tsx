@@ -163,7 +163,7 @@ function MessageBubbleComponent({
     opacity: longPressHighlight.value,
   }));
 
-  const textColor = isFromMe ? 'text-white' : 'text-foreground';
+  const textColor = isFromMe ? 'text-primary-foreground' : 'text-foreground';
   const deliveryFailureLabel = getDeliveryFailureLabel(message);
 
   return (
@@ -210,7 +210,10 @@ function MessageBubbleComponent({
           >
             <Animated.View
               pointerEvents="none"
-              className="absolute inset-0 rounded-2xl bg-black/5 dark:bg-white/10"
+              className={cn(
+                'absolute inset-0 rounded-2xl bg-black/5',
+                !isFromMe && 'dark:bg-white/10'
+              )}
               style={longPressHighlightStyle}
             />
             {message.deleted ? (
@@ -221,7 +224,7 @@ function MessageBubbleComponent({
                   <View
                     className={cn(
                       'mb-2 border-l-2 py-1 pl-2',
-                      isFromMe ? 'border-white' : 'border-muted-foreground'
+                      isFromMe ? 'border-primary-foreground' : 'border-muted-foreground'
                     )}
                   >
                     <Text numberOfLines={2} className={cn('text-xs opacity-80', textColor)}>
@@ -243,7 +246,10 @@ function MessageBubbleComponent({
                     const Icon = block.resolved.value.startsWith('allow') ? CheckCircle2 : XCircle;
                     return (
                       <View key={block.groupId} className="mt-2 flex-row items-center gap-1.5">
-                        <Icon size={14} color={isFromMe ? '#FFFFFF' : colors.mutedForeground} />
+                        <Icon
+                          size={14}
+                          color={isFromMe ? colors.primaryForeground : colors.mutedForeground}
+                        />
                         <Text className={cn('text-xs opacity-70', textColor)}>{label}</Text>
                       </View>
                     );
@@ -282,7 +288,7 @@ function MessageBubbleComponent({
               <Text
                 className={cn(
                   'mt-1 text-right text-[10px]',
-                  isFromMe ? 'text-white opacity-70' : 'text-muted-foreground'
+                  isFromMe ? 'text-primary-foreground opacity-70' : 'text-muted-foreground'
                 )}
               >
                 {formatTimestamp(timestamp)}

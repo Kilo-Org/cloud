@@ -33,7 +33,7 @@ function withAlpha(color: string, alpha: number): string {
 
 export function getPalette(variant: MarkdownVariant, colors: ThemeColors): MarkdownPalette {
   if (variant === 'user') {
-    const ink = '#FFFFFF';
+    const ink = colors.primaryForeground;
     return {
       textColor: ink,
       mutedTextColor: withAlpha(ink, 0.7),

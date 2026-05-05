@@ -31,9 +31,12 @@ const colors = {
 } satisfies ThemeColors;
 
 describe('markdown palette', () => {
-  it('uses white text for user-authored chat bubbles', () => {
-    const palette = getPalette('user', colors);
+  it('uses the primary foreground for user-authored chat bubbles', () => {
+    const palette = getPalette('user', {
+      ...colors,
+      primaryForeground: '#1A1A10',
+    });
 
-    expect(palette.textColor).toBe('#FFFFFF');
+    expect(palette.textColor).toBe('#1A1A10');
   });
 });

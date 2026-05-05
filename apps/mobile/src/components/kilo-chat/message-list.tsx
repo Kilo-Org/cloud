@@ -2,7 +2,13 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { type ExecApprovalDecision, type Message } from '@kilocode/kilo-chat';
 import { type PendingAction, pendingActionGroupIdForMessage } from '@kilocode/kilo-chat-hooks';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Keyboard, type NativeScrollEvent, type NativeSyntheticEvent, View } from 'react-native';
+import {
+  Keyboard,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,6 +22,8 @@ import {
   shouldScrollToNewestAfterMessagesChange,
 } from './message-list-scroll-state';
 import { type MessageAuthorMember, resolveMessageAuthorLabel } from './message-presentation';
+
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 type Props = {
   messages: Message[];
@@ -153,54 +161,57 @@ export function MessageList({
   }, [scrollToNewest, scrollToNewestRequest]);
 
   return (
-    <FlashList
-      ref={listRef}
-      data={chronological}
-      renderItem={({ item, index }) => {
-        // In chronological order, the previous message in time is data[index - 1].
-        // showAuthor is true when the sender changes relative to the prior message,
-        // or when this is the oldest message (index 0).
-        const previousItem = chronological[index - 1];
-        const showAuthor = previousItem === undefined || previousItem.senderId !== item.senderId;
+    <View className="flex-1 bg-background">
+      <FlashList
+        ref={listRef}
+        style={listStyle}
+        data={chronological}
+        renderItem={({ item, index }) => {
+          // In chronological order, the previous message in time is data[index - 1].
+          // showAuthor is true when the sender changes relative to the prior message,
+          // or when this is the oldest message (index 0).
+          const previousItem = chronological[index - 1];
+          const showAuthor = previousItem === undefined || previousItem.senderId !== item.senderId;
 
-        return (
-          <MessageBubble
-            message={item}
-            currentUserId={currentUserId}
-            isFromMe={currentUserId !== null && item.senderId === currentUserId}
-            showAuthor={showAuthor}
-            authorLabel={resolveMessageAuthorLabel({ senderId: item.senderId, members, botName })}
-            pendingActionGroupId={pendingActionGroupIdForMessage(pendingAction, item.id)}
-            replyToMessage={
-              item.inReplyToMessageId
-                ? (messageMap.get(item.inReplyToMessageId) ?? item.replyTo)
-                : null
-            }
-            onExecuteAction={onExecuteAction}
-            onReactionPress={onReactionPress}
-            onLongPress={onLongPressMessage}
-            onSwipeReply={onSwipeReplyMessage}
-          />
-        );
-      }}
-      keyExtractor={item => item.id}
-      onScroll={handleScroll}
-      onScrollBeginDrag={handleScrollBeginDrag}
-      onContentSizeChange={handleContentSizeChange}
-      scrollEventThrottle={16}
-      onStartReached={fetchOlder}
-      onStartReachedThreshold={0.5}
-      maintainVisibleContentPosition={{
-        // Start rendering from the bottom so the newest message is visible on first render.
-        startRenderingFromBottom: true,
-      }}
-      ListHeaderComponent={
-        isFetchingOlder ? (
-          <View className="px-4 py-2">
-            <Skeleton className="h-16 rounded-md" />
-          </View>
-        ) : null
-      }
-    />
+          return (
+            <MessageBubble
+              message={item}
+              currentUserId={currentUserId}
+              isFromMe={currentUserId !== null && item.senderId === currentUserId}
+              showAuthor={showAuthor}
+              authorLabel={resolveMessageAuthorLabel({ senderId: item.senderId, members, botName })}
+              pendingActionGroupId={pendingActionGroupIdForMessage(pendingAction, item.id)}
+              replyToMessage={
+                item.inReplyToMessageId
+                  ? (messageMap.get(item.inReplyToMessageId) ?? item.replyTo)
+                  : null
+              }
+              onExecuteAction={onExecuteAction}
+              onReactionPress={onReactionPress}
+              onLongPress={onLongPressMessage}
+              onSwipeReply={onSwipeReplyMessage}
+            />
+          );
+        }}
+        keyExtractor={item => item.id}
+        onScroll={handleScroll}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        onContentSizeChange={handleContentSizeChange}
+        scrollEventThrottle={16}
+        onStartReached={fetchOlder}
+        onStartReachedThreshold={0.5}
+        maintainVisibleContentPosition={{
+          // Start rendering from the bottom so the newest message is visible on first render.
+          startRenderingFromBottom: true,
+        }}
+        ListHeaderComponent={
+          isFetchingOlder ? (
+            <View className="px-4 py-2">
+              <Skeleton className="h-16 rounded-md" />
+            </View>
+          ) : null
+        }
+      />
+    </View>
   );
 }

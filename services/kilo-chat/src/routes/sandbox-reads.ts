@@ -1,6 +1,11 @@
 import type { Context, Hono } from 'hono';
 import type { AuthContext } from '../auth';
-import { sandboxIdSchema, ulidSchema } from '@kilocode/kilo-chat';
+import {
+  sandboxIdSchema,
+  ulidSchema,
+  type GetBotStatusResponse,
+  type GetConversationStatusResponse,
+} from '@kilocode/kilo-chat';
 import { withDORetry } from '@kilocode/worker-utils';
 import { userOwnsSandbox } from '../services/sandbox-ownership';
 import { extractSandboxId } from '../services/event-push';
@@ -22,7 +27,7 @@ async function handleGetBotStatus(c: HonoCtx): Promise<Response> {
     stub => stub.getBotStatus(),
     'SandboxStatusDO.getBotStatus'
   );
-  return c.json({ status });
+  return c.json({ status } satisfies GetBotStatusResponse);
 }
 
 async function handleGetConversationStatus(c: HonoCtx): Promise<Response> {
@@ -48,7 +53,7 @@ async function handleGetConversationStatus(c: HonoCtx): Promise<Response> {
     stub => stub.getConversationStatus(conversationId),
     'SandboxStatusDO.getConversationStatus'
   );
-  return c.json({ status });
+  return c.json({ status } satisfies GetConversationStatusResponse);
 }
 
 export function registerSandboxReadRoutes(

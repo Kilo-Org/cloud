@@ -1,6 +1,19 @@
 import { z } from 'zod';
 
+import {
+  instanceLifecycleEventSchema,
+  scheduledActionEventSchema,
+  type InstanceLifecycleEvent,
+  type ScheduledActionEvent,
+} from './notification-events';
 import { pushDataSchema } from './push-data';
+
+export {
+  instanceLifecycleEventSchema,
+  scheduledActionEventSchema,
+  type InstanceLifecycleEvent,
+  type ScheduledActionEvent,
+};
 
 // ── sendPushForConversation ─────────────────────────────────────────
 
@@ -72,9 +85,6 @@ export type ClearBadgeBucketForUserOutput = z.infer<typeof clearBadgeBucketForUs
 
 // ── sendInstanceLifecycleNotification ───────────────────────────────
 
-export const instanceLifecycleEventSchema = z.enum(['ready', 'start_failed']);
-export type InstanceLifecycleEvent = z.infer<typeof instanceLifecycleEventSchema>;
-
 export const sendInstanceLifecycleNotificationInputSchema = z.object({
   userId: z.string().min(1),
   sandboxId: z.string().min(1),
@@ -100,6 +110,27 @@ export const sendInstanceLifecycleNotificationOutputSchema = z.object({
 export type SendInstanceLifecycleNotificationResult = z.infer<
   typeof sendInstanceLifecycleNotificationOutputSchema
 >;
+
+// ── sendScheduledActionNotice ─────────────────────────────────────────
+
+export const sendScheduledActionNoticeInputSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().min(1),
+  sandboxId: z.string().min(1),
+  event: scheduledActionEventSchema,
+  instanceName: z.string().nullable(),
+  scheduledAt: z.string(),
+  targetImageTag: z.string().nullable().optional(),
+});
+export type SendScheduledActionNoticeParams = z.infer<typeof sendScheduledActionNoticeInputSchema>;
+
+export const sendScheduledActionNoticeOutputSchema = z.object({
+  tokenCount: z.number().int().nonnegative(),
+  sent: z.number().int().nonnegative(),
+  staleTokens: z.number().int().nonnegative(),
+  receiptCount: z.number().int().nonnegative(),
+});
+export type SendScheduledActionNoticeResult = z.infer<typeof sendScheduledActionNoticeOutputSchema>;
 
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 

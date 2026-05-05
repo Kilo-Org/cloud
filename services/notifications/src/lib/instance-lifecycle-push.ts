@@ -6,6 +6,7 @@
 
 import {
   type InstanceLifecycleEvent,
+  type PushData,
   type SendInstanceLifecycleNotificationParams,
   type SendInstanceLifecycleNotificationResult,
 } from '@kilocode/notifications';
@@ -48,21 +49,22 @@ export function buildInstanceLifecycleMessages(
   const title = buildTitle(params.event, params.instanceName);
   const body = buildBody(params.event, params.errorMessage);
 
-  return tokens.map(
-    token =>
-      ({
-        to: token,
-        title,
-        body,
-        data: {
-          type: 'instance-lifecycle',
-          event: params.event,
-          sandboxId: params.sandboxId,
-        },
-        sound: 'default',
-        priority: 'high',
-      }) satisfies ExpoPushMessage
-  );
+  return tokens.map(token => {
+    const data = {
+      type: 'instance-lifecycle',
+      event: params.event,
+      sandboxId: params.sandboxId,
+    } satisfies PushData;
+
+    return {
+      to: token,
+      title,
+      body,
+      data,
+      sound: 'default',
+      priority: 'high',
+    } satisfies ExpoPushMessage;
+  });
 }
 
 export type LifecycleDispatchDeps = {

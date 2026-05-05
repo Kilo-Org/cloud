@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { instanceLifecycleEventSchema, scheduledActionEventSchema } from './notification-events';
+
 const nonEmptyStringSchema = z.string().min(1);
 
 /**
@@ -16,17 +18,12 @@ export const pushDataSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('instance-lifecycle'),
-    event: z.enum(['ready', 'start_failed']),
+    event: instanceLifecycleEventSchema,
     sandboxId: z.string().min(1),
   }),
   z.object({
     type: z.literal('scheduled-action'),
-    event: z.enum([
-      'scheduled_restart_notice',
-      'scheduled_restart_cancelled',
-      'scheduled_version_change_notice',
-      'scheduled_version_change_cancelled',
-    ]),
+    event: scheduledActionEventSchema,
     sandboxId: z.string().min(1),
   }),
 ]);

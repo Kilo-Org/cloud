@@ -102,7 +102,13 @@ export function FreeModelUsageStats() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className={
+            (data?.windowAnonymousIpsAtRequestLimit ?? 0) > 0
+              ? 'border-destructive bg-destructive/5'
+              : 'border-primary/40'
+          }
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Anonymous IPs at Limit</CardTitle>
             <CardDescription>
@@ -111,13 +117,25 @@ export function FreeModelUsageStats() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
+            <div
+              className={
+                (data?.windowAnonymousIpsAtRequestLimit ?? 0) > 0
+                  ? 'text-destructive text-3xl font-bold'
+                  : 'text-3xl font-bold'
+              }
+            >
               {formatNumber(data?.windowAnonymousIpsAtRequestLimit ?? 0)}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className={
+            (data?.windowUsersAtRequestLimit ?? 0) > 0
+              ? 'border-destructive bg-destructive/5'
+              : 'border-primary/40'
+          }
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Users at Limit</CardTitle>
             <CardDescription>
@@ -126,7 +144,13 @@ export function FreeModelUsageStats() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
+            <div
+              className={
+                (data?.windowUsersAtRequestLimit ?? 0) > 0
+                  ? 'text-destructive text-3xl font-bold'
+                  : 'text-3xl font-bold'
+              }
+            >
               {formatNumber(data?.windowUsersAtRequestLimit ?? 0)}
             </div>
           </CardContent>

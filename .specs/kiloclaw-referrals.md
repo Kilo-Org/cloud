@@ -132,9 +132,11 @@ interventions, and non-KiloClaw purchases are out of scope.
 
 7. Logged-in users MUST access referral sharing through the Impact Verified Access widget.
 
-8. The system MUST authenticate users to Impact Advocate using the configured Verified Access contract.
+8. The system MUST authenticate users to Impact Advocate using the configured Verified Access contract: the JWT header
+   MUST set `kid` to the Impact Account SID, the JWT payload MUST contain the top-level `user` object, and the JWT MUST
+   be signed with the Impact Advocate Auth Token.
 
-9. The Impact Advocate identity contract for Kilo is: `id = Kilo user ID`, `accountId = Kilo user ID`, and
+9. The Impact Advocate identity contract for Kilo is: `id = plain user email`, `accountId = plain user email`, and
    `email = plain user email`.
 
 10. The system MUST NOT allow users to alter the identity payload used to establish Advocate identity.
@@ -255,7 +257,7 @@ interventions, and non-KiloClaw purchases are out of scope.
 47. Register Participant requests that fail with client errors MUST be logged and MUST NOT be retried until the request
     payload or configuration is corrected.
 
-48. Register Participant requests MUST use the Kilo user ID for Advocate `id` and `accountId`.
+48. Register Participant requests MUST use the user's plain email for Advocate `id` and `accountId`.
 
 49. Register Participant requests MUST include plain-text email only as the Advocate contact email.
 

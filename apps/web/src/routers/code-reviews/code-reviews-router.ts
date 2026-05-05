@@ -402,15 +402,18 @@ export const codeReviewRouter = createTRPCRouter({
           // Worker updates DB status and interrupts cloud agent session when cancellation succeeds.
           return successResult({ message: 'Code review cancelled successfully' });
         } catch (workerError) {
-          // If worker call fails, still update DB status as fallback
-          console.error('Worker cancel failed, updating DB directly:', workerError);
-          await cancelCodeReview(input.reviewId);
-          try {
-            await cancelPRGateCheck(review);
-          } catch (gateError) {
-            logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+          if (review.status === 'queued' && !review.session_id) {
+            console.error('Worker cancel failed, updating DB directly:', workerError);
+            await cancelCodeReview(input.reviewId);
+            try {
+              await cancelPRGateCheck(review);
+            } catch (gateError) {
+              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            }
+            return successResult({ message: 'Code review cancelled (worker unreachable)' });
           }
-          return successResult({ message: 'Code review cancelled (worker unreachable)' });
+          console.error('Worker cancel failed:', workerError);
+          return failureResult('Worker could not cancel code review');
         }
       }
 

@@ -149,4 +149,42 @@ describe('codeReviewRouter.cancel', () => {
     expect(storedReview?.status).toBe('queued');
     expect(storedReview?.completed_at).toBeNull();
   });
+
+  it('does not locally cancel queued reviews with a session when the Worker throws', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'queued', { session_id: 'agent-session-1' }))
+      .returning({ id: cloud_agent_code_reviews.id });
+    mockCancelReview.mockRejectedValue(new Error('Request timeout after 10000ms'));
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.cancel({ reviewId: review.id });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({ success: false, error: 'Worker could not cancel code review' });
+    expect(storedReview?.status).toBe('queued');
+    expect(storedReview?.completed_at).toBeNull();
+  });
+
+  it('does not locally cancel running reviews when the Worker throws', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(reviewValues(testUser.id, 'running', { session_id: 'agent-session-1' }))
+      .returning({ id: cloud_agent_code_reviews.id });
+    mockCancelReview.mockRejectedValue(new Error('Request timeout after 10000ms'));
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.cancel({ reviewId: review.id });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({ success: false, error: 'Worker could not cancel code review' });
+    expect(storedReview?.status).toBe('running');
+    expect(storedReview?.completed_at).toBeNull();
+  });
 });

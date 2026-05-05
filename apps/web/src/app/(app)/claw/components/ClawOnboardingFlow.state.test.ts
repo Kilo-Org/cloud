@@ -48,7 +48,6 @@ function createStatus(status: KiloClawDashboardStatus['status']): KiloClawDashbo
     botVibe: null,
     botEmoji: null,
     workerUrl: 'https://claw.kilo.ai',
-    controllerCapabilitiesVersion: null,
     instanceId: null,
     inboundEmailAddress: null,
     inboundEmailEnabled: false,

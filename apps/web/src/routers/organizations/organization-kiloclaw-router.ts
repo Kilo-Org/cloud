@@ -17,8 +17,7 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { KILOCLAW_API_URL, KILOCLAW_INSTANCE_URL_TEMPLATE } from '@/lib/config.server';
-import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
+import { KILOCLAW_API_URL } from '@/lib/config.server';
 import { sentryLogger } from '@/lib/utils.server';
 import { db } from '@/lib/drizzle';
 import {
@@ -310,7 +309,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   getStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-    const legacyWorkerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
+    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
 
     // No org instance → return a "no instance" sentinel so the frontend
     // renders setup entry points. Without this guard, workerInstanceId(null)
@@ -352,8 +351,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
         botNature: null,
         botVibe: null,
         botEmoji: null,
-        workerUrl: legacyWorkerUrl,
-        controllerCapabilitiesVersion: null,
+        workerUrl,
         name: null,
         instanceId: null,
         inboundEmailAddress: null,
@@ -366,13 +364,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
       client.getStatus(ctx.user.id, workerInstanceId(instance)),
       getInboundEmailAddressForInstance(instance.id),
     ]);
-
-    const workerUrl = workerUrlForInstance({
-      sandboxId: status.sandboxId,
-      controllerCapabilitiesVersion: status.controllerCapabilitiesVersion,
-      template: KILOCLAW_INSTANCE_URL_TEMPLATE,
-      fallback: legacyWorkerUrl,
-    });
 
     return {
       ...status,

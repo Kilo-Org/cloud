@@ -39,7 +39,6 @@ const baseStatus: KiloClawDashboardStatus = {
   botVibe: null,
   botEmoji: null,
   workerUrl: 'https://claw.kilo.ai',
-  controllerCapabilitiesVersion: null,
   instanceId: 'instance-1',
   inboundEmailAddress: 'amber-river-quiet-maple@kiloclaw.ai',
   inboundEmailEnabled: true,

@@ -149,6 +149,31 @@ app.get('/reviews/:reviewId/events', async (c: Context<HonoEnv>) => {
   return c.json(result);
 });
 
+// Route: GET /reviews/:reviewId/status
+app.get('/reviews/:reviewId/status', async (c: Context<HonoEnv>) => {
+  const reviewId = c.req.param('reviewId');
+
+  if (!reviewId) {
+    return c.json({ error: 'reviewId parameter required' }, 400);
+  }
+
+  console.log('[GET /reviews/:reviewId/status] Fetching status', { reviewId });
+
+  const id = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(reviewId);
+
+  const result = await withDORetry(
+    () => c.env.CODE_REVIEW_ORCHESTRATOR.get(id),
+    stub => stub.getStatus(),
+    'getStatus'
+  );
+
+  if (!result) {
+    return c.json({ error: 'Review not found' }, 404);
+  }
+
+  return c.json(result);
+});
+
 // Route: POST /reviews/:reviewId/cancel
 app.post('/reviews/:reviewId/cancel', async (c: Context<HonoEnv>) => {
   const reviewId = c.req.param('reviewId');

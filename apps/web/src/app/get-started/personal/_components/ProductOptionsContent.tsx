@@ -30,6 +30,10 @@ function getAuthenticatedHref(isAuthenticated: boolean, path: string) {
   return isAuthenticated ? path : `/users/sign_in?callbackPath=${path}`;
 }
 
+function getSignInHref(path: string) {
+  return `/users/sign_in?callbackPath=${encodeURIComponent(path)}`;
+}
+
 function CardRow({ card, entranceDelayMs }: { card: RowCard; entranceDelayMs: number }) {
   const isPrimary = card.variant === 'primary';
   const iconTone = card.iconTone ?? 'brand';
@@ -103,6 +107,7 @@ export default function WelcomeContent({ isAuthenticated, dashboardHref }: Welco
   const kiloclawHref = getAuthenticatedHref(isSignedIn, '/claw');
   const teamHref = getAuthenticatedHref(isSignedIn, '/organizations/new');
   const signInHref = `/users/sign_in?callbackPath=/get-started`;
+  const skipDashboardHref = isSignedIn ? dashboardHref : getSignInHref(dashboardHref);
 
   const cards: RowCard[] = [
     {
@@ -225,34 +230,30 @@ export default function WelcomeContent({ isAuthenticated, dashboardHref }: Welco
           />
         </div>
 
-        {isSignedIn ? (
-          <p
-            style={{ animationDelay: '540ms' }}
-            className="text-muted-foreground kilo-fade-up pt-1 text-center text-xs"
+        <div
+          style={{ animationDelay: '540ms' }}
+          className="kilo-fade-up flex flex-col items-center gap-3 pt-1 text-center"
+        >
+          <Link
+            href={skipDashboardHref}
+            className="border-border bg-card/60 hover:border-brand-primary/60 hover:bg-card/80 inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-bold text-white outline-none transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
           >
-            Not ready to choose?{' '}
-            <Link
-              href={dashboardHref}
-              className="inline-flex items-center gap-1 rounded font-semibold text-white outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
-            >
-              Skip to dashboard
-              <ArrowRight className="h-3 w-3" />
-            </Link>
-          </p>
-        ) : (
-          <p
-            style={{ animationDelay: '540ms' }}
-            className="text-muted-foreground kilo-fade-up pt-1 text-center text-xs"
-          >
-            Already have an account?{' '}
-            <Link
-              href={signInHref}
-              className="text-brand-primary rounded font-semibold outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
-            >
-              Sign in
-            </Link>
-          </p>
-        )}
+            Skip to dashboard
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+
+          {!isSignedIn ? (
+            <p className="text-muted-foreground text-xs">
+              Already have an account?{' '}
+              <Link
+                href={signInHref}
+                className="text-brand-primary rounded font-semibold outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
+              >
+                Sign in
+              </Link>
+            </p>
+          ) : null}
+        </div>
       </section>
     </div>
   );

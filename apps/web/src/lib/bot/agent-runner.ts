@@ -214,7 +214,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
   });
 
   const modelSlug =
-    (params.platformIntegration.metadata as { model_slug?: string }).model_slug ??
+    ((params.platformIntegration.metadata || {}) as { model_slug?: string }).model_slug ??
     DEFAULT_BOT_MODEL;
   const owner = ownerFromIntegration(params.platformIntegration);
   const chatPlatform = params.thread.id.split(':')[0];

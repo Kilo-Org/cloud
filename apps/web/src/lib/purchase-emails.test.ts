@@ -4,7 +4,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_instances,
   kiloclaw_subscriptions,
-  top_up_email_log,
+  transactional_email_log,
 } from '@kilocode/db/schema';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import { db } from '@/lib/drizzle';
@@ -242,7 +242,7 @@ describe('processTopUp credit top-up email', () => {
 
   test('recovers confirmation email on webhook retry when first attempt did not send', async () => {
     // Simulate the failure mode: the first processTopUp committed the credit
-    // transaction but exited before firing the email (no top_up_email_log
+    // transaction but exited before firing the email (no transactional_email_log
     // marker). A webhook retry must observe the missing marker and send.
     const user = await insertTestUser({
       total_microdollars_acquired: 0,
@@ -273,9 +273,9 @@ describe('processTopUp credit top-up email', () => {
 
     // Marker row exists to prevent a third attempt from re-sending.
     const [marker] = await db
-      .select({ id: top_up_email_log.id })
-      .from(top_up_email_log)
-      .where(eq(top_up_email_log.stripe_payment_id, stripePaymentId))
+      .select({ id: transactional_email_log.id })
+      .from(transactional_email_log)
+      .where(eq(transactional_email_log.idempotency_key, stripePaymentId))
       .limit(1);
     expect(marker).toBeTruthy();
 
@@ -290,7 +290,7 @@ describe('processTopUp credit top-up email', () => {
     expect(creditsTopUpSends()).toHaveLength(0);
   });
 
-  test('writes a top_up_email_log marker on first-attempt send', async () => {
+  test('writes a transactional_email_log marker on first-attempt send', async () => {
     const user = await insertTestUser({
       total_microdollars_acquired: 0,
       microdollars_used: 0,
@@ -304,11 +304,11 @@ describe('processTopUp credit top-up email', () => {
     expect(first).toBe(true);
 
     const [marker] = await db
-      .select({ stripe_payment_id: top_up_email_log.stripe_payment_id })
-      .from(top_up_email_log)
-      .where(eq(top_up_email_log.stripe_payment_id, stripePaymentId))
+      .select({ idempotency_key: transactional_email_log.idempotency_key })
+      .from(transactional_email_log)
+      .where(eq(transactional_email_log.idempotency_key, stripePaymentId))
       .limit(1);
-    expect(marker).toEqual({ stripe_payment_id: stripePaymentId });
+    expect(marker).toEqual({ idempotency_key: stripePaymentId });
   });
 
   test('recovery path skips email when skipPostTopUpFreeStuff is true on retry', async () => {
@@ -344,9 +344,9 @@ describe('processTopUp credit top-up email', () => {
     expect(creditsTopUpSends()).toHaveLength(0);
 
     const [marker] = await db
-      .select({ id: top_up_email_log.id })
-      .from(top_up_email_log)
-      .where(eq(top_up_email_log.stripe_payment_id, stripePaymentId))
+      .select({ id: transactional_email_log.id })
+      .from(transactional_email_log)
+      .where(eq(transactional_email_log.idempotency_key, stripePaymentId))
       .limit(1);
     expect(marker).toBeUndefined();
   });

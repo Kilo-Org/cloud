@@ -147,27 +147,32 @@ export async function processTopUp(
   return true;
 }
 
-// Best-effort at-most-once dedupe via an insert-before-send marker in
-// `transactional_email_log`. Every send attempt — first-attempt
-// and webhook-retry recovery — first inserts a marker row keyed by
-// (email_type, idempotency_key) with
-// `onConflictDoNothing()`. A rowCount of 0 means an earlier attempt already
-// claimed this payment, so we bail without sending again. If the provider
-// was not configured (e.g. Mailgun env missing in preview/test), the marker
-// is cleared so a future retry can re-attempt.
-//
-// Known gaps shared with every other insert-before-send email path in this
-// codebase (`maybeSendKiloClawSubscriptionStartedEmail` below,
-// `services/kiloclaw-billing/src/lifecycle.ts` ~L850, and the
-// `kiloclaw_email_log`-gated sends in `apps/web/src/app/api/internal/kiloclaw/`):
-//   1. A crash between the marker insert and the provider send permanently
-//      suppresses the email on retry — the marker looks "already sent".
-//   2. Rolling the marker back in the catch block after an ambiguous provider
-//      exception can duplicate the email if the provider actually accepted it.
-// Fixing either properly requires a real outbox (pending/sent/terminal state
-// + provider idempotency keys) applied uniformly across all of the above
-// call sites. Tracked as follow-up tech debt; intentionally NOT fixed in
-// isolation here so the new email paths stay uniform with the existing ones.
+/**
+ * Best-effort at-most-once dedupe via an insert-before-send marker in
+ * `transactional_email_log`. Every send attempt, first-attempt and
+ * webhook-retry recovery, first inserts a marker row keyed by
+ * (email_type, idempotency_key) with `onConflictDoNothing()`. A rowCount of 0
+ * means an earlier attempt already claimed this payment, so we bail without
+ * sending again. If the provider was not configured (e.g. Mailgun env missing
+ * in preview/test), the marker is cleared so a future retry can re-attempt.
+ *
+ * Known gaps shared with every other insert-before-send email path in this
+ * codebase (`maybeSendKiloClawSubscriptionStartedEmail` below,
+ * `services/kiloclaw-billing/src/lifecycle.ts` ~L850, and the
+ * `kiloclaw_email_log`-gated sends in `apps/web/src/app/api/internal/kiloclaw/`):
+ * 1. A crash between the marker insert and the provider send permanently
+ *    suppresses the email on retry; the marker looks "already sent".
+ * 2. Rolling the marker back in the catch block after an ambiguous provider
+ *    exception can duplicate the email if the provider actually accepted it.
+ *
+ * Fixing either properly requires a real outbox (pending/sent/terminal state
+ * + provider idempotency keys) applied uniformly across all of the above
+ * call sites. Tracked as follow-up tech debt; intentionally NOT fixed in
+ * isolation here so the new email paths stay uniform with the existing ones.
+ *
+ * @param params User, top-up amount, Stripe payment identity, and auto-top-up flag.
+ * @returns A promise that resolves after the idempotency check and best-effort send attempt.
+ */
 async function maybeSendTopUpConfirmationEmail(params: {
   user: User;
   amountInCents: number;
@@ -221,10 +226,15 @@ async function maybeSendTopUpConfirmationEmail(params: {
   }
 }
 
-// Called from the duplicate-webhook path in `processTopUp`, where the credit
-// transaction is already committed but the first attempt may have exited
-// before sending the email. Runs the same marker-gated send so a successful
-// prior send still dedupes on the unique index.
+/**
+ * Called from the duplicate-webhook path in `processTopUp`, where the credit
+ * transaction is already committed but the first attempt may have exited
+ * before sending the email. Runs the same marker-gated send so a successful
+ * prior send still dedupes on the unique index.
+ *
+ * @param params User, top-up amount, Stripe payment identity, and auto-top-up flag.
+ * @returns A promise that resolves after the recovery send is performed or scheduled.
+ */
 async function recoverTopUpConfirmationEmailIfMissing(params: {
   user: User;
   amountInCents: number;

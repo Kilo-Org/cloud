@@ -619,13 +619,14 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       .from(kiloclaw_subscriptions)
       .where(eq(kiloclaw_subscriptions.id, targetRow.id))
       .limit(1);
-    // Prefer the in-memory `before.status`. When Stripe's
-    // customer.subscription.created handler ran before invoice.paid, it
-    // already transitioned a non-hybrid row to 'active', hiding the
-    // pre-activation state from this snapshot. Fall back to the durable
-    // `kiloclaw_subscription_change_log` entry written by that handler,
-    // which preserves the pre-Stripe `before_state.status` and records the
-    // Stripe-derived plan/period in `after_state`.
+
+    // Prefer the in-memory `before.status`.
+    // When Stripe's `customer.subscription.created` handler ran
+    // before invoice.paid, it already transitioned a non-hybrid row to 'active',
+    // hiding the pre-activation state from this snapshot.
+    // Fall back to the durable `kiloclaw_subscription_change_log` entry written
+    // by that handler, which preserves the pre-Stripe `before_state.status`
+    // and records the Stripe-derived plan/period in `after_state`.
     shouldSendSubscriptionStartedEmailForNewSettlement =
       shouldSendSubscriptionStartedEmailForActivation(before?.status ?? null) ||
       (await didStripeSubscriptionCreatedRecordEligibleActivation({
@@ -676,8 +677,8 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   }
 
   // Steady-state webhook replays against an already-emailed, already-settled
-  // period hit the duplicate-settlement branch on every retry. The real
-  // idempotency guard is the `kiloclaw_email_log` unique index inside
+  // period hit the duplicate-settlement branch on every retry.
+  // The real idempotency guard is the `kiloclaw_email_log` unique index in
   // `maybeSendKiloClawSubscriptionStartedEmail`, but we can skip the more
   // expensive `kiloclaw_subscription_change_log` scan (and the subsequent
   // no-op send call) when a matching email-log row already exists.
@@ -729,11 +730,15 @@ export async function applyStripeFundedKiloClawPeriod(params: {
 
 export const KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE = 'kiloclaw_subscription_started';
 
-// A settlement activates a paid period (and may produce a "subscription
-// started" email) only when the subscription was NOT already active before
-// settlement. Recovery/dunning states (past_due, unpaid) are excluded; those
-// flows are payment-recovery on an active plan, not a new activation.
-// Eligible: trialing, canceled (including canceled paid rows that resubscribe).
+/**
+ * A settlement activates a paid period (and may produce a "subscription
+ * started" email) only when the subscription was NOT already active before
+ * settlement. Recovery/dunning states (past_due, unpaid) are excluded; those
+ * flows are payment-recovery on an active plan, not a new activation.
+ * Eligible: trialing, canceled (including canceled paid rows that resubscribe).
+ * @param beforeStatus — the previous subscription status
+ * @returns whether to send the "subscription started" email
+ */
 export function shouldSendSubscriptionStartedEmailForActivation(
   beforeStatus: string | null
 ): boolean {
@@ -749,10 +754,16 @@ function stringFieldOrNull(record: Record<string, unknown>, key: string): string
   return typeof value === 'string' ? value : null;
 }
 
-// Compare two timestamp strings by parsing them as Dates. Handles the case
-// where a JSONB-serialized timestamp uses Postgres text form
-// ("2026-05-04 16:52:41.287+00") while the input is ISO-8601
-// ("2026-05-04T16:52:41.287Z"). Returns false for either side unparseable.
+/**
+ * Compare two timestamp strings by parsing them as Dates. Handles the case
+ * where a JSONB-serialized timestamp uses Postgres text form
+ * ("2026-05-04 16:52:41.287+00") while the input is ISO-8601
+ * ("2026-05-04T16:52:41.287Z"). Returns false for either side unparseable.
+ *
+ * @param a First timestamp string to compare.
+ * @param b Second timestamp string to compare.
+ * @returns Whether both timestamps parse to the same millisecond value.
+ */
 function timestampsEqual(a: string | null, b: string | null): boolean {
   if (a === null || b === null) return false;
   const aMs = new Date(a).getTime();
@@ -761,22 +772,27 @@ function timestampsEqual(a: string | null, b: string | null): boolean {
   return aMs === bMs;
 }
 
-// Best-effort check: does `kiloclaw_subscription_change_log` contain a prior
-// `period_advanced` / `stripe_invoice_settlement` entry that transitioned the
-// given subscription into a paid active period for the exact plan and
-// period? Used to recover the subscription-started email when a replay of
-// settlement hits the duplicate-credit path and the original in-transaction
-// email send may have failed. Returns false on missing/malformed rows — the
-// `kiloclaw_email_log` unique index remains the final idempotency guard.
-//
-// Identity is established by subscription_id + action/reason scope + exact
-// plan/period-boundary match on `after_state`. `stripe_invoice_settlement`
-// rows are written only by `applyStripeFundedKiloClawPeriod` (once per
-// successful settlement), and KiloClaw never uses Stripe proration, so
-// renewals move period boundaries forward and two settlements on the same
-// subscription cannot share plan+period. No time-window guard is needed: a
-// legitimately delayed webhook replay (e.g., manual Stripe-dashboard
-// resend well after the period started) should still recover the email.
+/**
+ * Best-effort check: does `kiloclaw_subscription_change_log` contain a prior
+ * `period_advanced` / `stripe_invoice_settlement` entry that transitioned the
+ * given subscription into a paid active period for the exact plan and
+ * period? Used to recover the subscription-started email when a replay of
+ * settlement hits the duplicate-credit path and the original in-transaction
+ * email send may have failed. Returns false on missing/malformed rows; the
+ * `kiloclaw_email_log` unique index remains the final idempotency guard.
+ *
+ * Identity is established by subscription_id + action/reason scope + exact
+ * plan/period-boundary match on `after_state`. `stripe_invoice_settlement`
+ * rows are written only by `applyStripeFundedKiloClawPeriod` (once per
+ * successful settlement), and KiloClaw never uses Stripe proration, so
+ * renewals move period boundaries forward and two settlements on the same
+ * subscription cannot share plan+period. No time-window guard is needed: a
+ * legitimately delayed webhook replay (e.g., manual Stripe-dashboard
+ * resend well after the period started) should still recover the email.
+ *
+ * @param params Subscription and settlement period identity to match.
+ * @returns Whether a prior settlement recorded an eligible paid activation.
+ */
 async function didPriorSettlementRecordPaidActivation(params: {
   subscriptionId: string;
   plan: 'commit' | 'standard';
@@ -826,31 +842,36 @@ async function didPriorSettlementRecordPaidActivation(params: {
   return false;
 }
 
-// Durable pre-settlement activation signal.
-//
-// handleKiloClawSubscriptionCreated can run before invoice.paid and will
-// transition a non-hybrid row to status='active', masking the pre-Stripe
-// status from the in-transaction snapshot used to decide whether this
-// settlement is a first paid activation. The handler writes a
-// `stripe_subscription_created` change-log row that preserves
-// `before_state.status` and records the Stripe-derived plan/period in
-// `after_state`, which is the durable evidence we need.
-//
-// Returns true when a `stripe_subscription_created` entry for this
-// subscription has:
-//   - `before_state.status` that `shouldSendSubscriptionStartedEmailForActivation`
-//     accepts (trialing or canceled), AND
-//   - `after_state.plan` / `after_state.current_period_start` /
-//     `after_state.current_period_end` matching the current settlement.
-//
-// Matching on identity (plan + period boundaries) instead of audit-log
-// ordering avoids relying on `created_at`, which is `now()` and therefore
-// transaction-start scoped rather than a reliable commit/insert chronology
-// under concurrent webhook transactions. A later renewal settlement has a
-// different period than the original activation, so an old
-// `stripe_subscription_created` row from the initial activation cannot match
-// and cannot re-fire the email. The `kiloclaw_email_log` unique index
-// remains the final idempotency guard.
+/**
+ * Durable pre-settlement activation signal.
+ *
+ * `handleKiloClawSubscriptionCreated` can run before `invoice.paid` and will
+ * transition a non-hybrid row to status='active', masking the pre-Stripe
+ * status from the in-transaction snapshot used to decide whether this
+ * settlement is a first paid activation. The handler writes a
+ * `stripe_subscription_created` change-log row that preserves
+ * `before_state.status` and records the Stripe-derived plan/period in
+ * `after_state`, which is the durable evidence we need.
+ *
+ * Returns true when a `stripe_subscription_created` entry for this
+ * subscription has:
+ * - `before_state.status` that `shouldSendSubscriptionStartedEmailForActivation`
+ *   accepts (trialing or canceled), AND
+ * - `after_state.plan` / `after_state.current_period_start` /
+ *   `after_state.current_period_end` matching the current settlement.
+ *
+ * Matching on identity (plan + period boundaries) instead of audit-log
+ * ordering avoids relying on `created_at`, which is `now()` and therefore
+ * transaction-start scoped rather than a reliable commit/insert chronology
+ * under concurrent webhook transactions. A later renewal settlement has a
+ * different period than the original activation, so an old
+ * `stripe_subscription_created` row from the initial activation cannot match
+ * and cannot re-fire the email. The `kiloclaw_email_log` unique index
+ * remains the final idempotency guard.
+ *
+ * @param params Transaction, subscription, and settlement period identity to match.
+ * @returns Whether subscription-created handling recorded an eligible activation.
+ */
 async function didStripeSubscriptionCreatedRecordEligibleActivation(params: {
   tx: CreditBillingTx;
   subscriptionId: string;
@@ -903,28 +924,34 @@ function planDisplayName(plan: 'commit' | 'standard'): string {
   return plan === 'commit' ? 'KiloClaw Commit' : 'KiloClaw Standard';
 }
 
-// Best-effort at-most-once dedupe via insert-before-send on
-// `kiloclaw_email_log`, guarded by the unique index
-// (user_id, instance_id, email_type, period_start). Each activation event
-// (fresh `periodStart`) gets exactly one row; webhook replays of the same
-// event collide on the index and return early. Because the
-// KiloClaw subscription row is reused across cancel+resubscribe (both
-// Stripe and credit paths UPDATE in place), period_start is what actually
-// distinguishes a resubscribe's activation from the original — hence one
-// email per activation, not one per instance lifetime.
-//
-// Known gaps shared with every other insert-before-send email path in this
-// codebase (`maybeSendTopUpConfirmationEmail` in `apps/web/src/lib/credits.ts`,
-// `services/kiloclaw-billing/src/lifecycle.ts` ~L850, and the
-// `kiloclaw_email_log`-gated sends in `apps/web/src/app/api/internal/kiloclaw/`):
-//   1. A crash between the marker insert and the provider send permanently
-//      suppresses the email on retry — the marker looks "already sent".
-//   2. Rolling the marker back in the catch block after an ambiguous provider
-//      exception can duplicate the email if the provider actually accepted it.
-// Fixing either properly requires a real outbox (pending/sent/terminal state
-// + provider idempotency keys) applied uniformly across all of the above
-// call sites. Tracked as follow-up tech debt; intentionally NOT fixed in
-// isolation here so this new email path stays uniform with the existing ones.
+/**
+ * Best-effort at-most-once dedupe via insert-before-send on
+ * `kiloclaw_email_log`, guarded by the unique index
+ * (user_id, instance_id, email_type, period_start). Each activation event
+ * (fresh `periodStart`) gets exactly one row; webhook replays of the same
+ * event collide on the index and return early. Because the
+ * KiloClaw subscription row is reused across cancel+resubscribe (both
+ * Stripe and credit paths UPDATE in place), period_start is what actually
+ * distinguishes a resubscribe's activation from the original, hence one
+ * email per activation, not one per instance lifetime.
+ *
+ * Known gaps shared with every other insert-before-send email path in this
+ * codebase (`maybeSendTopUpConfirmationEmail` in `apps/web/src/lib/credits.ts`,
+ * `services/kiloclaw-billing/src/lifecycle.ts` ~L850, and the
+ * `kiloclaw_email_log`-gated sends in `apps/web/src/app/api/internal/kiloclaw/`):
+ * 1. A crash between the marker insert and the provider send permanently
+ *    suppresses the email on retry; the marker looks "already sent".
+ * 2. Rolling the marker back in the catch block after an ambiguous provider
+ *    exception can duplicate the email if the provider actually accepted it.
+ *
+ * Fixing either properly requires a real outbox (pending/sent/terminal state
+ * + provider idempotency keys) applied uniformly across all of the above
+ * call sites. Tracked as follow-up tech debt; intentionally NOT fixed in
+ * isolation here so this new email path stays uniform with the existing ones.
+ *
+ * @param params User, instance, plan, price, and period details for the activation email.
+ * @returns A promise that resolves after the idempotency check and best-effort send attempt.
+ */
 async function maybeSendKiloClawSubscriptionStartedEmail(params: {
   userId: string;
   instanceId: string;
@@ -1025,10 +1052,15 @@ async function deleteSubscriptionStartedEmailLog(params: {
     );
 }
 
-// Fast-path existence check covered by the
-// `UQ_kiloclaw_email_log_user_instance_type_period` unique index. Used to
-// short-circuit the duplicate-settlement activation recovery path before
-// running the more expensive `kiloclaw_subscription_change_log` scan.
+/**
+ * Fast-path existence check covered by the
+ * `UQ_kiloclaw_email_log_user_instance_type_period` unique index. Used to
+ * short-circuit the duplicate-settlement activation recovery path before
+ * running the more expensive `kiloclaw_subscription_change_log` scan.
+ *
+ * @param params User, instance, and activation period to check.
+ * @returns Whether this activation already has an email-log marker.
+ */
 async function subscriptionStartedEmailAlreadyLoggedForActivation(params: {
   userId: string;
   instanceId: string;

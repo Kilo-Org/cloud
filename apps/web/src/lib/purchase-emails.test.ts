@@ -1,3 +1,5 @@
+process.env.STRIPE_KILOCLAW_STANDARD_INTRO_PRICE_ID ||= 'price_standard_intro';
+
 import { eq, and } from 'drizzle-orm';
 import {
   kiloclaw_email_log,
@@ -272,6 +274,25 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     return rows.length;
   }
 
+  async function seedCreditEnrollmentAnchor(userId: string) {
+    const [instance] = await db
+      .insert(kiloclaw_instances)
+      .values({
+        user_id: userId,
+        sandbox_id: `test-sandbox-${crypto.randomUUID()}`,
+      })
+      .returning();
+    await db.insert(kiloclaw_subscriptions).values({
+      user_id: userId,
+      instance_id: instance.id,
+      plan: 'trial',
+      status: 'trialing',
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+    });
+    return instance;
+  }
+
   test('trialing trial → Stripe settlement sends one subscription-started email and writes the log row', async () => {
     const user = await insertTestUser({});
     const stripeSubscriptionId = `sub_trialing_${crypto.randomUUID()}`;
@@ -296,6 +317,41 @@ describe('applyStripeFundedKiloClawPeriod subscription-started email', () => {
     expect(applied).toBe(true);
     expect(countSubscriptionStartedSends()).toBe(1);
     expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+  });
+
+  test('trialing trial → credit enrollment sends one subscription-started email and writes the log row', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 50_000_000 });
+    const instance = await seedCreditEnrollmentAnchor(user.id);
+
+    const mod = await import('@/lib/kiloclaw/credit-billing');
+    await mod.enrollWithCredits({
+      userId: user.id,
+      instanceId: instance.id,
+      plan: 'standard',
+      hadPaidSubscription: false,
+    });
+
+    expect(countSubscriptionStartedSends()).toBe(1);
+    expect(await countEmailLogRows(user.id, instance.id)).toBe(1);
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, instance.id))
+      .limit(1);
+    const [emailLog] = await db
+      .select()
+      .from(kiloclaw_email_log)
+      .where(
+        and(
+          eq(kiloclaw_email_log.user_id, user.id),
+          eq(kiloclaw_email_log.instance_id, instance.id),
+          eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE)
+        )
+      )
+      .limit(1);
+
+    expect(emailLog?.period_start).toBe(subscription.current_period_start);
   });
 
   test('canceled trial → Stripe settlement sends one subscription-started email', async () => {

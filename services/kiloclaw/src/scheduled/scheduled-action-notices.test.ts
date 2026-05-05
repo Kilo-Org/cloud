@@ -51,7 +51,7 @@ function fakeIO(opts: {
   voidedStale?: number;
   claim?: (row: DueRow) => Promise<boolean>;
   dispatch?: (row: DueRow) => Promise<{ ok: true } | { ok: false; error: string }>;
-  markSent?: (id: string) => Promise<void>;
+  markSent?: (row: DueRow) => Promise<void>;
   markFailed?: (id: string, err: string) => Promise<void>;
 }): FakeIO {
   const calls = {
@@ -85,11 +85,11 @@ function fakeIO(opts: {
       calls.dispatched.push(row.notification_id);
       return opts.dispatch ? opts.dispatch(row) : { ok: true };
     },
-    markSent: async id => {
+    markSent: async row => {
       if (opts.markSent) {
-        await opts.markSent(id);
+        await opts.markSent(row);
       }
-      calls.sent.push(id);
+      calls.sent.push(row.notification_id);
     },
     markFailed: async (id, err) => {
       if (opts.markFailed) {

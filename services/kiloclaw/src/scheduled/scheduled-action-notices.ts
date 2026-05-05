@@ -155,7 +155,16 @@ export type SweepIO = {
    * pending → running → applied while we hold an in-flight notice.
    */
   claim(row: DueNotificationRow): Promise<boolean>;
-  markSent(notificationId: string): Promise<void>;
+  /**
+   * CAS sending → sent on the notification row. Takes the full row so
+   * that for kind='notice' we can also queue a cancellation row in the
+   * same DB round-trip if the parent action moved to 'cancelled' while
+   * we were dispatching. Coupling the cancellation creation to the
+   * actual notice success means a dispatch failure leaves no orphan
+   * cancellation queued — the cancellation only exists if the user
+   * actually got the original notice.
+   */
+  markSent(row: DueNotificationRow): Promise<void>;
   markFailed(notificationId: string, error: string): Promise<void>;
   /** Channel-specific dispatch (HTTP/RPC). Returns ok/fail per row. */
   dispatchOne(row: DueNotificationRow): Promise<{ ok: true } | { ok: false; error: string }>;
@@ -203,7 +212,7 @@ export async function runSweepWithIO(io: SweepIO): Promise<SweepResult> {
         const dispatchResult = await io.dispatchOne(row);
         try {
           if (dispatchResult.ok) {
-            await io.markSent(row.notification_id);
+            await io.markSent(row);
             return { kind: 'sent' as const };
           }
           await io.markFailed(row.notification_id, dispatchResult.error);
@@ -258,7 +267,7 @@ export async function runScheduledActionNoticesSweep(env: KiloClawEnv): Promise<
     voidStaleParents: () => voidStaleParents(db),
     selectDue: () => selectDueNotifications(db),
     claim: row => claimNotification(db, row),
-    markSent: id => markSent(db, id),
+    markSent: row => markSent(db, row),
     markFailed: (id, error) => markFailed(db, id, error),
     dispatchOne: row => dispatchOne(env, row),
   };
@@ -616,18 +625,36 @@ async function recoverStuckClaims(db: WorkerDb): Promise<number> {
   return reset.length;
 }
 
-async function markSent(db: WorkerDb, notificationId: string): Promise<void> {
-  // CAS WHERE status='sending' — only the sweep that claimed this row
-  // (and hasn't been recovered as stuck) can finalize it as sent.
-  await db
-    .update(kiloclaw_scheduled_action_notifications)
-    .set({ status: 'sent', sent_at: sql`now()` })
-    .where(
-      and(
-        eq(kiloclaw_scheduled_action_notifications.id, notificationId),
-        eq(kiloclaw_scheduled_action_notifications.status, 'sending')
-      )
-    );
+async function markSent(db: WorkerDb, row: DueNotificationRow): Promise<void> {
+  // Two operations chained atomically via CTE:
+  //   1. CAS WHERE status='sending' — only the sweep that claimed this
+  //      row (and hasn't been recovered as stuck) can finalize it.
+  //   2. If the row was a notice AND the parent action is already
+  //      'cancelled' (admin cancelled while we were dispatching), queue
+  //      the cancellation row in the same step. Coupling cancellation
+  //      creation to a successful markSent means a dispatch failure
+  //      leaves no orphan cancellation; the cancellation row only
+  //      exists when the user actually received the original notice.
+  // ON CONFLICT keeps the insert idempotent against a separate cancel
+  // transaction that already queued the cancellation from a 'sent' row.
+  await db.execute(sql`
+    WITH finalized AS (
+      UPDATE kiloclaw_scheduled_action_notifications
+      SET status = 'sent', sent_at = now()
+      WHERE id = ${row.notification_id}
+        AND status = 'sending'
+      RETURNING target_id, channel, kind
+    )
+    INSERT INTO kiloclaw_scheduled_action_notifications
+      (target_id, channel, kind, status)
+    SELECT f.target_id, f.channel, 'cancelled', 'pending'
+    FROM finalized f
+    INNER JOIN kiloclaw_scheduled_action_targets t ON t.id = f.target_id
+    INNER JOIN kiloclaw_scheduled_actions a ON a.id = t.scheduled_action_id
+    WHERE f.kind = 'notice'
+      AND a.status = 'cancelled'
+    ON CONFLICT (target_id, kind, channel) DO NOTHING
+  `);
 }
 
 async function markFailed(

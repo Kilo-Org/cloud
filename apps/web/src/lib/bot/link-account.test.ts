@@ -104,8 +104,12 @@ describe('promptLinkAccount', () => {
     );
 
     expect(post).toHaveBeenCalledWith({
-      markdown: expect.stringContaining('[Link your Kilo account]'),
+      markdown: expect.stringContaining('/github/link'),
     });
+    expect(post).toHaveBeenCalledWith({
+      markdown: expect.not.stringContaining('/api/chat/link-account'),
+    });
+    expect(mockCreateLinkAccountTokenFn).not.toHaveBeenCalled();
     expect(postEphemeral).not.toHaveBeenCalled();
   });
 
@@ -120,6 +124,7 @@ describe('promptLinkAccount', () => {
     );
 
     expect(post).not.toHaveBeenCalled();
+    expect(mockCreateLinkAccountTokenFn).toHaveBeenCalledTimes(1);
     expect(postEphemeral).toHaveBeenCalledWith(
       expect.objectContaining({ userId: '123' }),
       expect.anything(),

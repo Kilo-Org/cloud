@@ -15,6 +15,7 @@ import { processLinkedMessage } from '@/lib/bot/run';
 import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
 import { Message, ThreadImpl, type Thread } from 'chat';
 import type { User } from '@kilocode/db';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -99,6 +100,14 @@ export async function GET(request: Request) {
   }
 
   const { contextKey, identity, thread, message } = linkPayload;
+
+  if (identity.platform === PLATFORM.GITHUB) {
+    return errorPage(
+      'Link Not Supported',
+      'GitHub account links must be created from the GitHub link page.',
+      400
+    );
+  }
 
   // Authenticate — redirect to sign-in if no session, then back here
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });

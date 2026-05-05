@@ -1,4 +1,4 @@
-import type { PlatformIdentity } from '@/lib/bot-identity';
+import { githubUserIdentity, type PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
 import { eq, and, sql } from 'drizzle-orm';
 import { platform_integrations } from '@kilocode/db';
@@ -73,6 +73,14 @@ export async function getPlatformIdentity(
   }
 }
 
+export function getPlatformUserIdentity(identity: PlatformIdentity): PlatformIdentity {
+  if (identity.platform === PLATFORM.GITHUB) {
+    return githubUserIdentity(identity.userId);
+  }
+
+  return identity;
+}
+
 /**
  * Look up the platform integration row for a given identity.
  * Platform-agnostic: queries by identity.platform + identity.teamId.
@@ -128,8 +136,6 @@ export async function getPlatformIntegrationByBotUserId(
 
 export function getBotDocumentationUrl(platform: string): string {
   switch (platform) {
-    case PLATFORM.GITHUB:
-      return 'https://kilo.ai/docs/code-with-ai/platforms/github';
     //TODO(remon): Update when we have specific docs pages for other platforms
     default:
       return 'https://kilo.ai/docs/code-with-ai/platforms/slack';

@@ -20,6 +20,7 @@ import {
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
   getPlatformIntegrationById,
+  getPlatformUserIdentity,
 } from './platform-helpers';
 
 describe('platform helpers', () => {
@@ -137,6 +138,22 @@ describe('platform helpers', () => {
     });
   });
 
+  it('converts GitHub installation identities to user-level identities for user lookup', () => {
+    expect(
+      getPlatformUserIdentity({ platform: PLATFORM.GITHUB, teamId: '98765', userId: '12345' })
+    ).toEqual({
+      platform: PLATFORM.GITHUB,
+      teamId: 'user',
+      userId: '12345',
+    });
+  });
+
+  it('keeps Slack identities installation-scoped for user lookup', () => {
+    const identity = { platform: PLATFORM.SLACK, teamId: 'T123', userId: 'U123' };
+
+    expect(getPlatformUserIdentity(identity)).toBe(identity);
+  });
+
   it('throws for GitHub messages without an installation id', () => {
     expect(() =>
       getGitHubInstallationId({
@@ -152,7 +169,7 @@ describe('platform helpers', () => {
       'https://kilo.ai/docs/code-with-ai/platforms/slack'
     );
     expect(getBotDocumentationUrl(PLATFORM.GITHUB)).toBe(
-      'https://kilo.ai/docs/code-with-ai/platforms/github'
+      'https://kilo.ai/docs/code-with-ai/platforms/slack'
     );
     expect(getBotDocumentationUrl(PLATFORM.DISCORD)).toBe(
       'https://kilo.ai/docs/code-with-ai/platforms/slack'

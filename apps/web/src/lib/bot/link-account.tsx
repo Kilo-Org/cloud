@@ -6,6 +6,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { StateAdapter } from 'chat';
 
 const LINK_ACCOUNT_PATH = '/api/chat/link-account';
+const GITHUB_LINK_PATH = '/github/link';
 
 export const LINK_ACCOUNT_ACTION_PREFIX = `link-${APP_URL}${LINK_ACCOUNT_PATH}`;
 
@@ -49,19 +50,21 @@ export async function promptLinkAccount(
 ): Promise<void> {
   // Post to the channel when the @mention is top-level, otherwise into the thread.
   const target = isChannelLevelMessage(thread, message) ? thread.channel : thread;
-  const linkUrl = await buildLinkAccountUrl(identity, thread, message, state);
 
   switch (identity.platform) {
-    case PLATFORM.SLACK:
+    case PLATFORM.SLACK: {
+      const linkUrl = await buildLinkAccountUrl(identity, thread, message, state);
       await target.postEphemeral(message.author, linkAccountCard(linkUrl), {
         fallbackToDM: true,
       });
       return;
+    }
     case PLATFORM.GITHUB:
       await target.post({
         markdown:
           'To use Kilo from GitHub you first need to link your GitHub account to Kilo. ' +
-          `[Link your Kilo account](${linkUrl}) to continue.`,
+          `[Link your Kilo account](${new URL(GITHUB_LINK_PATH, APP_URL).toString()}) to continue. ` +
+          'After linking, mention me again in this issue or pull request.',
       });
       return;
     default:

@@ -891,14 +891,28 @@ function planDisplayName(plan: 'commit' | 'standard'): string {
   return plan === 'commit' ? 'KiloClaw Commit' : 'KiloClaw Standard';
 }
 
-// Idempotency: insert-before-send on `kiloclaw_email_log` guarded by the
-// unique index (user_id, instance_id, email_type, period_start). Each
-// activation event (fresh `periodStart`) gets exactly one row; webhook
-// replays of the same event collide on the index and return early. Because
-// the KiloClaw subscription row is reused across cancel+resubscribe (both
+// Best-effort at-most-once dedupe via insert-before-send on
+// `kiloclaw_email_log`, guarded by the unique index
+// (user_id, instance_id, email_type, period_start). Each activation event
+// (fresh `periodStart`) gets exactly one row; webhook replays of the same
+// event collide on the index and return early. Because the
+// KiloClaw subscription row is reused across cancel+resubscribe (both
 // Stripe and credit paths UPDATE in place), period_start is what actually
 // distinguishes a resubscribe's activation from the original — hence one
 // email per activation, not one per instance lifetime.
+//
+// Known gaps shared with every other insert-before-send email path in this
+// codebase (`maybeSendTopUpConfirmationEmail` in `apps/web/src/lib/credits.ts`,
+// `services/kiloclaw-billing/src/lifecycle.ts` ~L850, and the
+// `kiloclaw_email_log`-gated sends in `apps/web/src/app/api/internal/kiloclaw/`):
+//   1. A crash between the marker insert and the provider send permanently
+//      suppresses the email on retry — the marker looks "already sent".
+//   2. Rolling the marker back in the catch block after an ambiguous provider
+//      exception can duplicate the email if the provider actually accepted it.
+// Fixing either properly requires a real outbox (pending/sent/terminal state
+// + provider idempotency keys) applied uniformly across all of the above
+// call sites. Tracked as follow-up tech debt; intentionally NOT fixed in
+// isolation here so this new email path stays uniform with the existing ones.
 async function maybeSendKiloClawSubscriptionStartedEmail(params: {
   userId: string;
   instanceId: string;

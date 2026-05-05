@@ -146,14 +146,26 @@ export async function processTopUp(
   return true;
 }
 
-// Idempotency is enforced by the unique index on
+// Best-effort at-most-once dedupe via an insert-before-send marker on
 // `top_up_email_log.stripe_payment_id`. Every send attempt — first-attempt
 // and webhook-retry recovery — first inserts a marker row with
 // `onConflictDoNothing()`. A rowCount of 0 means an earlier attempt already
-// sent the email, so we bail without sending again. If the provider was not
-// configured (e.g. Mailgun env missing in preview/test), the marker is
-// cleared so a future retry can re-attempt. Mirrors
-// `maybeSendKiloClawSubscriptionStartedEmail` in credit-billing.ts.
+// claimed this payment, so we bail without sending again. If the provider
+// was not configured (e.g. Mailgun env missing in preview/test), the marker
+// is cleared so a future retry can re-attempt.
+//
+// Known gaps shared with every other insert-before-send email path in this
+// codebase (`maybeSendKiloClawSubscriptionStartedEmail` below,
+// `services/kiloclaw-billing/src/lifecycle.ts` ~L850, and the
+// `kiloclaw_email_log`-gated sends in `apps/web/src/app/api/internal/kiloclaw/`):
+//   1. A crash between the marker insert and the provider send permanently
+//      suppresses the email on retry — the marker looks "already sent".
+//   2. Rolling the marker back in the catch block after an ambiguous provider
+//      exception can duplicate the email if the provider actually accepted it.
+// Fixing either properly requires a real outbox (pending/sent/terminal state
+// + provider idempotency keys) applied uniformly across all of the above
+// call sites. Tracked as follow-up tech debt; intentionally NOT fixed in
+// isolation here so the new email paths stay uniform with the existing ones.
 async function maybeSendTopUpConfirmationEmail(params: {
   user: User;
   amountInCents: number;

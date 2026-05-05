@@ -398,7 +398,7 @@ const githubAdapter = createGitHubAdapter({
   appId: githubAppCredentials.appId,
   privateKey: githubAppCredentials.privateKey,
   webhookSecret: githubAppCredentials.webhookSecret,
-  userName: process.env.NODE_ENV === 'development' ? 'KiloConnect-Development' : 'kilo-code-bot',
+  userName: process.env.NODE_ENV === 'development' ? 'kilocode-dev' : 'kilocode-bot',
 });
 
 export const bot = createKiloBot(slackAdapter, githubAdapter);

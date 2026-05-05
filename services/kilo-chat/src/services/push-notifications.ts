@@ -6,7 +6,7 @@ import { contentBlocksToText } from '../util/content';
 import { logger } from '../util/logger';
 import { fetchSandboxLabel } from './sandbox-lookup';
 
-export const BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS = 80;
+export const BOT_MESSAGE_NOTIFICATION_MIN_TEXT_CHARS = 160;
 export const BOT_MESSAGE_NOTIFICATION_TIMEOUT_MS = 10_000;
 
 export type ConversationPushRecipientMode = 'exclude-sender-human' | 'all-human-members';

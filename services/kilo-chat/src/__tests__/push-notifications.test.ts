@@ -272,8 +272,25 @@ describe('kilo-chat publishes push on message.created', () => {
     const { messageId } = await createMessageRes.json<{ messageId: string }>();
     expect(sendSpy).not.toHaveBeenCalled();
 
-    const longText =
-      'This bot response is now long enough to notify the human member after streaming crosses the eighty character threshold.';
+    const belowThresholdText = 'x'.repeat(120);
+    const belowThresholdEditRes = await botApp.request(
+      `/v1/messages/${messageId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: belowThresholdText }],
+          timestamp: Date.now(),
+        }),
+      },
+      env
+    );
+    expect(belowThresholdEditRes.status).toBe(200);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(sendSpy).not.toHaveBeenCalled();
+
+    const longText = 'x'.repeat(160);
     const editRes = await botApp.request(
       `/v1/messages/${messageId}`,
       {
@@ -282,7 +299,7 @@ describe('kilo-chat publishes push on message.created', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: longText }],
-          timestamp: Date.now(),
+          timestamp: Date.now() + 1,
         }),
       },
       env
@@ -308,7 +325,7 @@ describe('kilo-chat publishes push on message.created', () => {
         body: JSON.stringify({
           conversationId,
           content: [{ type: 'text', text: `${longText} More streamed text.` }],
-          timestamp: Date.now() + 1,
+          timestamp: Date.now() + 2,
         }),
       },
       env

@@ -117,11 +117,24 @@ export async function processTopUp(
   // This is important because Stripe expects a response within a certain timeframe, and if we end up doing too much in
   // sync, we risk timing out, which will make Stripe retry the webhook.
   const processPostTopUpFreeStuff = async () => {
-    await processFirstTopupBonus(user);
+    await runPostTopUpBestEffortStep({
+      source: 'credits_topup_first_bonus',
+      user,
+      stripeChargeOrInvoiceId: config.stripe_payment_id,
+      isAutoTopUp,
+      step: () => processFirstTopupBonus(user),
+    });
     if (isAutoTopUp) {
-      await grantCreditForCategory(user, {
-        credit_category: 'auto-top-up-promo-2025-12-19',
-        counts_as_selfservice: false,
+      await runPostTopUpBestEffortStep({
+        source: 'credits_topup_auto_topup_promo',
+        user,
+        stripeChargeOrInvoiceId: config.stripe_payment_id,
+        isAutoTopUp,
+        step: () =>
+          grantCreditForCategory(user, {
+            credit_category: 'auto-top-up-promo-2025-12-19',
+            counts_as_selfservice: false,
+          }),
       });
     }
 
@@ -138,6 +151,24 @@ export async function processTopUp(
   if (IS_IN_AUTOMATED_TEST) await processPostTopUpFreeStuff();
   else after(processPostTopUpFreeStuff);
   return true;
+}
+
+async function runPostTopUpBestEffortStep(params: {
+  source: string;
+  user: User;
+  stripeChargeOrInvoiceId: string;
+  isAutoTopUp: boolean;
+  step: () => Promise<unknown>;
+}): Promise<void> {
+  const { source, user, stripeChargeOrInvoiceId, isAutoTopUp, step } = params;
+  try {
+    await step();
+  } catch (error) {
+    captureException(error, {
+      tags: { source },
+      extra: { kilo_user_id: user.id, stripeChargeOrInvoiceId, isAutoTopUp },
+    });
+  }
 }
 
 /**

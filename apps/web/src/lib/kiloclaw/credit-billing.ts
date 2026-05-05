@@ -1167,6 +1167,8 @@ export async function enrollWithCredits(params: {
   const now = new Date();
   const periodMonths = plan === 'commit' ? 6 : 1;
   const periodEnd = addMonths(now, periodMonths);
+  const periodStartIso = now.toISOString();
+  const periodEndIso = periodEnd.toISOString();
   const periodKey = format(now, 'yyyy-MM');
   const categoryPrefix =
     plan === 'commit'
@@ -1229,8 +1231,6 @@ export async function enrollWithCredits(params: {
       .limit(1);
 
     // 5c: Upsert subscription row as pure credit
-    const nowIso = now.toISOString();
-    const periodEndIso = periodEnd.toISOString();
     const commitEndsAt = plan === 'commit' ? periodEndIso : null;
     const [mutatedSubscription] = await tx
       .insert(kiloclaw_subscriptions)
@@ -1240,7 +1240,7 @@ export async function enrollWithCredits(params: {
         payment_source: 'credits',
         status: 'active',
         plan,
-        current_period_start: nowIso,
+        current_period_start: periodStartIso,
         current_period_end: periodEndIso,
         credit_renewal_at: periodEndIso,
         stripe_subscription_id: null,
@@ -1259,7 +1259,7 @@ export async function enrollWithCredits(params: {
           payment_source: 'credits',
           status: 'active',
           plan,
-          current_period_start: nowIso,
+          current_period_start: periodStartIso,
           current_period_end: periodEndIso,
           credit_renewal_at: periodEndIso,
           stripe_subscription_id: null,
@@ -1353,6 +1353,17 @@ export async function enrollWithCredits(params: {
 
   if (wasSuspended && instanceId) {
     await autoResumeIfSuspended(userId, instanceId);
+  }
+
+  if (shouldSendSubscriptionStartedEmailForActivation(existingSub?.status ?? null)) {
+    await maybeSendKiloClawSubscriptionStartedEmail({
+      userId,
+      instanceId,
+      plan,
+      amountCents: Math.round(costMicrodollars / 10_000),
+      periodStart: periodStartIso,
+      periodEnd: periodEndIso,
+    });
   }
 
   logInfo('Credit enrollment completed', {

@@ -255,6 +255,7 @@ function createKiloBot(
       slack: slackAdapter,
     },
     state: createChatState(),
+    logger: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   });
 
   chatBot.webhooks.slack = (request, options) =>

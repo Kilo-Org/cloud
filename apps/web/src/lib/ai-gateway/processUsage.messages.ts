@@ -15,6 +15,7 @@ import {
   computeOpenRouterCostFields,
   computeVercelCostMicrodollars,
   drainSseStream,
+  extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
 import type Anthropic from '@anthropic-ai/sdk';
 
@@ -61,7 +62,7 @@ export function processMessagesApiUsage(
       cacheHitTokens,
       cacheWriteTokens,
       cost_mUsd,
-      is_byok: null,
+      is_byok: extractVercelIsByok(vercelGateway),
     };
   }
 

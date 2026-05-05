@@ -16,6 +16,7 @@ import {
   computeOpenRouterCostFields,
   computeVercelCostMicrodollars,
   drainSseStream,
+  extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
@@ -72,7 +73,7 @@ export function processResponsesApiUsage(
       cacheHitTokens,
       cacheWriteTokens: 0,
       cost_mUsd,
-      is_byok: null,
+      is_byok: extractVercelIsByok(vercelGateway),
     };
   }
 

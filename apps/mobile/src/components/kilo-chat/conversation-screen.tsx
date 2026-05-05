@@ -27,13 +27,14 @@ import {
   type Message,
 } from '@kilocode/kilo-chat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AppAwareKeyboardPaddingView } from './app-aware-keyboard-padding';
 import { ConversationHeader } from './conversation-header';
 import { resolveMobileMessageInputAvailability } from './bot-send-state';
 import { executeActionWithMobileFeedback } from './execute-action-feedback';
@@ -520,12 +521,9 @@ export function ConversationScreen({
     return (
       <View className="flex-1">
         <ConversationHeader title={conversationTitle} subtitle={instanceLabel} />
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        <AppAwareKeyboardPaddingView className="flex-1">
           <MessageHistorySkeleton />
-        </KeyboardAvoidingView>
+        </AppAwareKeyboardPaddingView>
       </View>
     );
   }
@@ -534,10 +532,7 @@ export function ConversationScreen({
     return (
       <View className="flex-1">
         <ConversationHeader title={conversationTitle} subtitle={instanceLabel} />
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        <AppAwareKeyboardPaddingView className="flex-1">
           <QueryError
             className="flex-1"
             message="Could not load conversation history"
@@ -545,7 +540,7 @@ export function ConversationScreen({
               void messagesQuery.refetch();
             }}
           />
-        </KeyboardAvoidingView>
+        </AppAwareKeyboardPaddingView>
       </View>
     );
   }
@@ -559,10 +554,7 @@ export function ConversationScreen({
         onSwitchInstance={handleSwitchInstance}
         onOpenOptions={handleOpenConversationOptions}
       />
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <AppAwareKeyboardPaddingView className="flex-1">
         <MessageList
           messages={messages}
           currentUserId={currentUserId}
@@ -603,7 +595,7 @@ export function ConversationScreen({
               : undefined
           }
         />
-      </KeyboardAvoidingView>
+      </AppAwareKeyboardPaddingView>
       <MessageReactionPickerSheet
         visible={reactionPickerMessage !== null}
         recentReactions={recentReactions}

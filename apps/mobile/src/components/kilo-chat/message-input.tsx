@@ -1,11 +1,12 @@
 import { Send, X } from 'lucide-react-native';
-import { useRef, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, Pressable, TextInput, View } from 'react-native';
 import { type Message, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { resolveMessageInputAppStateTransition } from './message-input-app-state';
 import {
   messageInputKeyboardProps,
   messageInputTextStyle,
@@ -39,6 +40,8 @@ type Props = {
   botName?: string | null;
   typingMembers?: Map<string, number>;
 };
+
+const MESSAGE_INPUT_FOCUS_RESTORE_DELAY_MS = 100;
 
 function resolveSendDisabled({
   canSend,
@@ -77,6 +80,9 @@ export function MessageInput({
   const [canSend, setCanSend] = useState(initialText.trim().length > 0);
   const [draftLength, setDraftLength] = useState(initialText.length);
   const inputRef = useRef<TextInput>(null);
+  const inputFocusedRef = useRef(false);
+  const restoreFocusOnActiveRef = useRef(false);
+  const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentReplyingToRef = useRef<string | undefined>(replyingTo?.id);
   currentReplyingToRef.current = replyingTo?.id;
   const overLimit = isMessageInputOverLimit(valueRef.current);
@@ -84,6 +90,42 @@ export function MessageInput({
   const sendDisabled =
     submitDisabled === true || resolveSendDisabled({ canSend, disabled, overLimit });
   const controlsDisabled = disabled === true || submitDisabled === true;
+
+  useEffect(() => {
+    const clearRestoreFocusTimeout = () => {
+      if (restoreFocusTimeoutRef.current !== null) {
+        clearTimeout(restoreFocusTimeoutRef.current);
+        restoreFocusTimeoutRef.current = null;
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      const transition = resolveMessageInputAppStateTransition({
+        nextAppState,
+        restoreFocusOnActive: restoreFocusOnActiveRef.current,
+        wasFocused: inputFocusedRef.current,
+      });
+      restoreFocusOnActiveRef.current = transition.restoreFocusOnActive;
+
+      if (transition.shouldBlur) {
+        clearRestoreFocusTimeout();
+        inputRef.current?.blur();
+      }
+
+      if (transition.shouldFocus && disabled !== true && submitDisabled !== true) {
+        clearRestoreFocusTimeout();
+        restoreFocusTimeoutRef.current = setTimeout(() => {
+          restoreFocusTimeoutRef.current = null;
+          inputRef.current?.focus();
+        }, MESSAGE_INPUT_FOCUS_RESTORE_DELAY_MS);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      clearRestoreFocusTimeout();
+    };
+  }, [disabled, submitDisabled]);
 
   const submit = () => {
     if (disabled || submitDisabled) {
@@ -159,6 +201,12 @@ export function MessageInput({
                   setCanSend,
                   onTyping,
                 });
+              }}
+              onFocus={() => {
+                inputFocusedRef.current = true;
+              }}
+              onBlur={() => {
+                inputFocusedRef.current = false;
               }}
               onSubmitEditing={submit}
               {...messageInputKeyboardProps}

@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
-import { credit_transactions, transactional_email_log } from '@kilocode/db/schema';
+import { credit_transactions, kilocode_users, transactional_email_log } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { processTopUp } from '@/lib/credits';
+import { processTopUp, resolveStripeReceiptUrl } from '@/lib/credits';
 import {
   renderTemplate,
   buildCreditsTopUpReceiptSection,
@@ -47,6 +47,12 @@ jest.mock('@/lib/stripe-client', () => ({
     paymentIntents: { retrieve: jest.fn(async () => ({ latest_charge: null })) },
   },
 }));
+
+import { client as stripeClient } from '@/lib/stripe-client';
+
+const stripeChargeRetrieveMock = jest.mocked(stripeClient.charges.retrieve);
+const stripeInvoiceRetrieveMock = jest.mocked(stripeClient.invoices.retrieve);
+const stripePaymentIntentRetrieveMock = jest.mocked(stripeClient.paymentIntents.retrieve);
 
 describe('creditsTopUp template', () => {
   test('renders required fields', () => {
@@ -227,6 +233,36 @@ describe('processTopUp credit top-up email', () => {
     expect(sendViaMailgunMock).not.toHaveBeenCalled();
   });
 
+  test('uses original credit transaction date when recovering a confirmation email', async () => {
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const stripePaymentId = `ch_recover_date_${Date.now()}_${Math.random()}`;
+    const originalCreatedAt = '2026-01-07T08:30:00.000Z';
+
+    await db.insert(credit_transactions).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: user.id,
+      is_free: false,
+      amount_microdollars: 1500 * 10_000,
+      description: 'Top-up via stripe',
+      original_baseline_microdollars_used: 0,
+      stripe_payment_id: stripePaymentId,
+      created_at: originalCreatedAt,
+    });
+
+    const retry = await processTopUp(user, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    expect(retry).toBe(false);
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+    const [topUpSend] = sendViaMailgunMock.mock.calls[0];
+    expect(topUpSend.html).toContain('January 7, 2026');
+  });
+
   test('writes a transactional_email_log marker on first-attempt send', async () => {
     const user = await insertTestUser({
       total_microdollars_acquired: 0,
@@ -281,6 +317,52 @@ describe('processTopUp credit top-up email', () => {
       .where(eq(transactional_email_log.idempotency_key, stripePaymentId))
       .limit(1);
     expect(marker).toBeUndefined();
+  });
+
+  test('rolls back the credit transaction when the balance update fails before email recovery', async () => {
+    const user = await insertTestUser({
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const stripePaymentId = `ch_atomic_${Date.now()}_${Math.random()}`;
+
+    await expect(
+      db.transaction(async tx => {
+        await tx.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+        await processTopUp(
+          user,
+          1500,
+          { type: 'stripe', stripe_payment_id: stripePaymentId },
+          { dbOrTx: tx }
+        );
+      })
+    ).rejects.toThrow();
+
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, user.id));
+
+    const [txnAfterRollback] = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.stripe_payment_id, stripePaymentId))
+      .limit(1);
+    expect(txnAfterRollback).toBeUndefined();
+
+    const restoredUser = await insertTestUser(user);
+    const retry = await processTopUp(restoredUser, 1500, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+
+    expect(retry).toBe(true);
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+
+    const [updatedUser] = await db
+      .select({ total_microdollars_acquired: kilocode_users.total_microdollars_acquired })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id))
+      .limit(1);
+    expect(updatedUser?.total_microdollars_acquired).toBe(1500 * 10_000);
   });
 
   test('sends confirmation email when first top-up bonus fails after credit commit', async () => {
@@ -424,5 +506,51 @@ describe('sendCreditsTopUpEmail payload', () => {
     });
 
     expect(result).toEqual({ sent: false, reason: 'provider_not_configured' });
+  });
+});
+
+describe('resolveStripeReceiptUrl', () => {
+  beforeEach(() => {
+    stripeChargeRetrieveMock.mockClear();
+    stripeInvoiceRetrieveMock.mockClear();
+    stripePaymentIntentRetrieveMock.mockClear();
+  });
+
+  test('resolves charge receipt URLs', async () => {
+    stripeChargeRetrieveMock.mockResolvedValueOnce({
+      receipt_url: 'https://pay.stripe.com/receipts/ch_test',
+    } as Awaited<ReturnType<typeof stripeClient.charges.retrieve>>);
+
+    await expect(resolveStripeReceiptUrl('ch_test', { skipInAutomatedTest: false })).resolves.toBe(
+      'https://pay.stripe.com/receipts/ch_test'
+    );
+
+    expect(stripeChargeRetrieveMock).toHaveBeenCalledWith('ch_test');
+  });
+
+  test('resolves invoice hosted invoice URLs', async () => {
+    stripeInvoiceRetrieveMock.mockResolvedValueOnce({
+      hosted_invoice_url: 'https://invoice.stripe.com/i/in_test',
+    } as Awaited<ReturnType<typeof stripeClient.invoices.retrieve>>);
+
+    await expect(resolveStripeReceiptUrl('in_test', { skipInAutomatedTest: false })).resolves.toBe(
+      'https://invoice.stripe.com/i/in_test'
+    );
+
+    expect(stripeInvoiceRetrieveMock).toHaveBeenCalledWith('in_test');
+  });
+
+  test('resolves expanded payment intent latest charge receipt URLs', async () => {
+    stripePaymentIntentRetrieveMock.mockResolvedValueOnce({
+      latest_charge: { receipt_url: 'https://pay.stripe.com/receipts/pi_test' },
+    } as Awaited<ReturnType<typeof stripeClient.paymentIntents.retrieve>>);
+
+    await expect(resolveStripeReceiptUrl('pi_test', { skipInAutomatedTest: false })).resolves.toBe(
+      'https://pay.stripe.com/receipts/pi_test'
+    );
+
+    expect(stripePaymentIntentRetrieveMock).toHaveBeenCalledWith('pi_test', {
+      expand: ['latest_charge'],
+    });
   });
 });

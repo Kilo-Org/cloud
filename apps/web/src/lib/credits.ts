@@ -72,8 +72,6 @@ export async function processTopUp(
     (isAutoTopUp ? `Auto top-up via ${config.type}` : `Top-up via ${config.type}`);
   const creditAmountInMicrodollars = amountInCents * 10_000;
 
-  const dbHandle = dbOrTx ?? db;
-
   // Create a credit transaction in our database
   const new_credit_transaction_id = creditTransactionIdOverride ?? crypto.randomUUID();
   const creditTransactionOptions = {
@@ -86,11 +84,32 @@ export async function processTopUp(
     stripe_payment_id: config.stripe_payment_id,
   } satisfies typeof credit_transactions.$inferInsert;
 
-  const attemptToInsert = await dbHandle
-    .insert(credit_transactions)
-    .values(creditTransactionOptions)
-    .onConflictDoNothing();
-  const didInsertCreditTransaction = (attemptToInsert.rowCount ?? 0) > 0;
+  const insertCreditTransactionAndUpdateBalance = async (tx: DrizzleTransaction) => {
+    const attemptToInsert = await tx
+      .insert(credit_transactions)
+      .values(creditTransactionOptions)
+      .onConflictDoNothing();
+    const didInsertCreditTransaction = (attemptToInsert.rowCount ?? 0) > 0;
+
+    if (!didInsertCreditTransaction) return false;
+
+    const updateResult = await tx
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${Math.round(creditAmountInMicrodollars)}`,
+      })
+      .where(eq(kilocode_users.id, user.id));
+
+    if ((updateResult.rowCount ?? 0) === 0) {
+      throw new Error(`Failed to update user balance for top-up: kilo_user_id=${user.id}`);
+    }
+
+    return true;
+  };
+
+  const didInsertCreditTransaction = dbOrTx
+    ? await insertCreditTransactionAndUpdateBalance(dbOrTx)
+    : await db.transaction(insertCreditTransactionAndUpdateBalance);
 
   if (!didInsertCreditTransaction) {
     if (!skipPostTopUpFreeStuff) {
@@ -103,13 +122,6 @@ export async function processTopUp(
     }
     return false;
   }
-
-  await dbHandle
-    .update(kilocode_users)
-    .set({
-      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${Math.round(creditAmountInMicrodollars)}`,
-    })
-    .where(eq(kilocode_users.id, user.id));
 
   if (skipPostTopUpFreeStuff) return true;
 
@@ -201,8 +213,9 @@ async function maybeSendTopUpConfirmationEmail(params: {
   amountInCents: number;
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
+  purchaseDate?: Date;
 }): Promise<void> {
-  const { user, amountInCents, stripeChargeOrInvoiceId, isAutoTopUp } = params;
+  const { user, amountInCents, stripeChargeOrInvoiceId, isAutoTopUp, purchaseDate } = params;
   try {
     const insertResult = await db
       .insert(transactional_email_log)
@@ -224,7 +237,7 @@ async function maybeSendTopUpConfirmationEmail(params: {
       variant: isAutoTopUp ? 'auto' : 'manual',
       amountCents: amountInCents,
       creditsCents: amountInCents,
-      purchaseDate: new Date(),
+      purchaseDate: purchaseDate ?? new Date(),
       receiptUrl,
     });
 
@@ -263,10 +276,24 @@ async function recoverTopUpConfirmationEmailIfMissing(params: {
   stripeChargeOrInvoiceId: string;
   isAutoTopUp: boolean;
 }): Promise<void> {
+  const [creditTransaction] = await db
+    .select({ createdAt: credit_transactions.created_at })
+    .from(credit_transactions)
+    .where(
+      and(
+        eq(credit_transactions.kilo_user_id, params.user.id),
+        eq(credit_transactions.stripe_payment_id, params.stripeChargeOrInvoiceId)
+      )
+    )
+    .limit(1);
+
+  const purchaseDate = creditTransaction ? new Date(creditTransaction.createdAt) : undefined;
+  const recoveryParams = { ...params, purchaseDate };
+
   if (IS_IN_AUTOMATED_TEST) {
-    await maybeSendTopUpConfirmationEmail(params);
+    await maybeSendTopUpConfirmationEmail(recoveryParams);
   } else {
-    after(() => maybeSendTopUpConfirmationEmail(params));
+    after(() => maybeSendTopUpConfirmationEmail(recoveryParams));
   }
 }
 
@@ -281,10 +308,13 @@ async function deleteTopUpEmailMarker(stripeChargeOrInvoiceId: string): Promise<
     );
 }
 
-async function resolveStripeReceiptUrl(stripeChargeOrInvoiceId: string): Promise<string | null> {
+export async function resolveStripeReceiptUrl(
+  stripeChargeOrInvoiceId: string,
+  options: { skipInAutomatedTest?: boolean } = {}
+): Promise<string | null> {
   // Skip outbound Stripe calls in automated tests — they are expensive,
   // flake-prone, and unnecessary for exercising the email path.
-  if (IS_IN_AUTOMATED_TEST) return null;
+  if (IS_IN_AUTOMATED_TEST && options.skipInAutomatedTest !== false) return null;
 
   // Stripe charge IDs start with `ch_`; invoice IDs start with `in_`.
   // Payment intent IDs (`pi_`) are used for organization top-ups.

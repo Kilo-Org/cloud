@@ -28,7 +28,11 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handler', () => ({
 
 import { POST } from './route';
 
-function githubRequest(eventType: string, payload: unknown): Request {
+function githubRequest(
+  eventType: string,
+  payload: unknown,
+  rawBody = JSON.stringify(payload)
+): Request {
   return new Request('https://app.example.com/api/webhooks/github', {
     method: 'POST',
     headers: {
@@ -37,7 +41,7 @@ function githubRequest(eventType: string, payload: unknown): Request {
       'x-github-event': eventType,
       'x-hub-signature-256': 'sha256=test',
     },
-    body: JSON.stringify(payload),
+    body: rawBody,
   });
 }
 
@@ -68,7 +72,9 @@ describe('GitHub webhook route', () => {
       comment: { id: 456, body: '@kilo fix this' },
     };
 
-    const response = await POST(githubRequest('issue_comment', payload) as never);
+    const rawBody = JSON.stringify(payload, null, 2);
+
+    const response = await POST(githubRequest('issue_comment', payload, rawBody) as never);
     await flushAfterCallbacks();
 
     expect(await response.text()).toBe('legacy ok');
@@ -79,8 +85,8 @@ describe('GitHub webhook route', () => {
     const botRequest = mockGithubWebhook.mock.calls[0][0] as Request;
 
     expect(legacyRequest).not.toBe(botRequest);
-    expect(await legacyRequest.json()).toEqual(payload);
-    expect(await botRequest.json()).toEqual(payload);
+    expect(await legacyRequest.text()).toBe(rawBody);
+    expect(await botRequest.text()).toBe(rawBody);
   });
 
   it('also sends installation webhooks to the bot adapter', async () => {

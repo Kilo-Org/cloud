@@ -3,11 +3,11 @@ import { after } from 'next/server';
 import { bot } from '@/lib/bot';
 import { handleGitHubWebhook } from '@/lib/integrations/platforms/github/webhook-handler';
 
-function cloneGitHubRequest(request: NextRequest, body: unknown) {
+function cloneGitHubRequest(request: NextRequest, rawBody: string) {
   return new NextRequest(request.url, {
     method: request.method,
     headers: request.headers,
-    body: JSON.stringify(body),
+    body: rawBody,
   });
 }
 
@@ -18,9 +18,9 @@ function cloneGitHubRequest(request: NextRequest, body: unknown) {
  * Delegates to shared handler with 'standard' app type.
  */
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const rawBody = await request.text();
 
-  const botRequest = cloneGitHubRequest(request, body);
+  const botRequest = cloneGitHubRequest(request, rawBody);
 
   after(async () => {
     const response = await bot.webhooks.github(botRequest, {
@@ -35,5 +35,5 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  return handleGitHubWebhook(cloneGitHubRequest(request, body), 'standard');
+  return handleGitHubWebhook(cloneGitHubRequest(request, rawBody), 'standard');
 }

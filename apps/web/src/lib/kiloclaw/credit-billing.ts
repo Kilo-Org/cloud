@@ -909,6 +909,24 @@ async function maybeSendKiloClawSubscriptionStartedEmail(params: {
 }): Promise<void> {
   const { userId, instanceId, plan, amountCents, periodStart, periodEnd } = params;
   try {
+    // Look up the user BEFORE inserting the marker. Inserting first and
+    // then discovering a missing user would leak the marker and permanently
+    // suppress the email on retry. Mirrors
+    // apps/web/src/app/api/internal/kiloclaw/instance-ready/route.ts:100-151.
+    const [user] = await db
+      .select({ email: kilocode_users.google_user_email })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId))
+      .limit(1);
+
+    if (!user) {
+      logWarning('KiloClaw subscription-started email: user not found', {
+        user_id: userId,
+        instance_id: instanceId,
+      });
+      return;
+    }
+
     const insertResult = await db
       .insert(kiloclaw_email_log)
       .values({
@@ -921,20 +939,6 @@ async function maybeSendKiloClawSubscriptionStartedEmail(params: {
 
     if ((insertResult.rowCount ?? 0) === 0) {
       // This activation was already processed — webhook replay, nothing to send.
-      return;
-    }
-
-    const [user] = await db
-      .select({ email: kilocode_users.google_user_email })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, userId))
-      .limit(1);
-
-    if (!user) {
-      logWarning('KiloClaw subscription-started email: user not found', {
-        user_id: userId,
-        instance_id: instanceId,
-      });
       return;
     }
 

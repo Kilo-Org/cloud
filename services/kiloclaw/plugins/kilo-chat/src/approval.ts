@@ -214,6 +214,9 @@ export function createKiloChatApprovalCapability(): ChannelApprovalCapability {
     // This callback is intentionally permissive because the Worker is the trust
     // boundary, and KiloClaw currently keeps bot-created approval conversations
     // owner-only by not forwarding additionalMembers.
+    // If kilo-chat ever supports more than the owner plus the bot in a
+    // conversation, gate this on session ownership before relaxing those
+    // owner-only conversation constraints.
     authorizeActorAction: () => ({ authorized: true }),
     getActionAvailabilityState: () => ({ kind: 'enabled' as const }),
 

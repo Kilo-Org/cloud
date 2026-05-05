@@ -2773,7 +2773,7 @@ export const app_builder_project_sessions = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     ended_at: timestamp({ withTimezone: true, mode: 'string' }), // null = current/active session
     reason: text().notNull(), // 'initial', 'github_migration', 'upgrade', etc.
-    worker_version: text().notNull().default('v1'), // 'v1' (old cloud-agent) or 'v2' (cloud-agent-next)
+    worker_version: text().notNull().default('v2'), // 'v1' (legacy/R2 only) or 'v2' (cloud-agent-next)
   },
   table => [
     index('IDX_app_builder_project_sessions_project_id').on(table.project_id),

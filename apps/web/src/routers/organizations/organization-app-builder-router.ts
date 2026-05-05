@@ -12,7 +12,7 @@ import {
   sendMessageBaseSchema,
   organizationIdSchema,
   getImageUploadUrlSchema,
-  prepareLegacySessionBaseSchema,
+  legacySessionMessagesBaseSchema,
   migrateToGitHubSchema,
 } from '@/routers/app-builder/schemas';
 import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
@@ -25,7 +25,8 @@ const projectWithOrgIdSchema = projectIdBaseSchema.merge(organizationIdSchema);
 const sendMessageSchema = sendMessageBaseSchema.merge(organizationIdSchema);
 const deployProjectSchema = projectIdBaseSchema.merge(organizationIdSchema);
 const imageUploadUrlWithOrgIdSchema = getImageUploadUrlSchema.merge(organizationIdSchema);
-const prepareLegacySessionSchema = prepareLegacySessionBaseSchema.merge(organizationIdSchema);
+const legacySessionMessagesWithOrgIdSchema =
+  legacySessionMessagesBaseSchema.merge(organizationIdSchema);
 const migrateToGitHubWithOrgIdSchema = migrateToGitHubSchema.merge(organizationIdSchema);
 
 export const organizationAppBuilderRouter = createTRPCRouter({
@@ -81,6 +82,22 @@ export const organizationAppBuilderRouter = createTRPCRouter({
       const owner = { type: 'org' as const, id: input.organizationId };
       const authToken = generateApiToken(ctx.user);
       return appBuilderService.getProject(input.projectId, owner, authToken);
+    }),
+
+  /**
+   * Fetch historical messages for an ended legacy (v1) session belonging to the project.
+   * Loaded lazily when the user expands a past session in the UI.
+   */
+  getLegacySessionMessages: organizationMemberProcedure
+    .input(legacySessionMessagesWithOrgIdSchema)
+    .query(async ({ input }) => {
+      const owner = { type: 'org' as const, id: input.organizationId };
+      const messages = await appBuilderService.getLegacySessionMessages(
+        input.projectId,
+        input.cloudAgentSessionId,
+        owner
+      );
+      return { messages };
     }),
 
   /**
@@ -199,7 +216,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
    *
    * This is a mutation (not subscription) - it triggers the action and returns immediately.
    * The client should then:
-   * 1. Fetch a stream ticket from /api/cloud-agent/sessions/stream-ticket
+   * 1. Fetch a stream ticket from /api/cloud-agent-next/sessions/stream-ticket
    * 2. Connect to the WebSocket URL with the ticket
    */
   startSession: organizationMemberMutationProcedure
@@ -223,7 +240,7 @@ export const organizationAppBuilderRouter = createTRPCRouter({
    *
    * This is a mutation (not subscription) - it triggers the action and returns immediately.
    * The client should then:
-   * 1. Fetch a stream ticket from /api/cloud-agent/sessions/stream-ticket
+   * 1. Fetch a stream ticket from /api/cloud-agent-next/sessions/stream-ticket
    * 2. Connect to the WebSocket URL with the ticket
    */
   sendMessage: organizationMemberMutationProcedure
@@ -246,34 +263,6 @@ export const organizationAppBuilderRouter = createTRPCRouter({
         cloudAgentSessionId: result.cloudAgentSessionId,
         workerVersion: result.workerVersion,
       };
-    }),
-
-  /**
-   * Prepare a legacy session and initiate it for WebSocket-based streaming.
-   *
-   * Legacy sessions (created before the prepare flow) don't have session state stored
-   * in the Durable Object, which means WebSocket replay doesn't work. This endpoint:
-   * 1. Backfills the DO with session metadata
-   * 2. Initiates the session to execute the first message
-   *
-   * Returns the cloudAgentSessionId for WebSocket connection.
-   * The client should connect to the WebSocket to receive the response.
-   */
-  prepareLegacySession: organizationMemberMutationProcedure
-    .input(prepareLegacySessionSchema)
-    .mutation(async ({ ctx, input }) => {
-      const owner = { type: 'org' as const, id: input.organizationId };
-      const authToken = generateApiToken(ctx.user);
-
-      const result = await appBuilderService.prepareLegacySession(
-        input.projectId,
-        owner,
-        authToken,
-        input.model,
-        input.prompt
-      );
-
-      return { cloudAgentSessionId: result.cloudAgentSessionId };
     }),
 
   // ============================================================================

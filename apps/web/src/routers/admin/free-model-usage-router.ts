@@ -3,7 +3,7 @@ import 'server-only';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
-import { and, count, eq, gte } from 'drizzle-orm';
+import { and, count, gte } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { TRPCError } from '@trpc/server';
 import {
@@ -11,6 +11,11 @@ import {
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
   ADMIN_RATE_LIMIT_TEST_MODEL,
 } from '@/lib/constants';
+import { sql } from 'drizzle-orm';
+
+function getWindowStart(): Date {
+  return new Date(Date.now() - FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000);
+}
 
 async function getCallerIp(): Promise<string> {
   const headersList = await headers();
@@ -25,10 +30,6 @@ async function getCallerIp(): Promise<string> {
   return ip;
 }
 
-function getWindowStart(): Date {
-  return new Date(Date.now() - FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000);
-}
-
 async function countUsageForUser(kiloUserId: string): Promise<number> {
   const windowStart = getWindowStart();
   const usage = await db
@@ -36,7 +37,7 @@ async function countUsageForUser(kiloUserId: string): Promise<number> {
     .from(free_model_usage)
     .where(
       and(
-        eq(free_model_usage.kilo_user_id, kiloUserId),
+        sql`${free_model_usage.kilo_user_id} = ${kiloUserId}`,
         gte(free_model_usage.created_at, windowStart.toISOString())
       )
     );

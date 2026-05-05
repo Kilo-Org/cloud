@@ -8,6 +8,7 @@ import {
   sendImpactAdvocateRegisterParticipantPayload,
   type ImpactAdvocateRegisterParticipantPayload,
 } from '@/lib/impact-advocate';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
 import type {
   ParsedImpactAffiliateTouch,
   ParsedImpactReferralTouch,
@@ -40,6 +41,8 @@ export type ImpactAdvocateRegistrationDispatchSummary = {
   retried: number;
   failed: number;
 };
+
+const IMPACT_ADVOCATE_REGISTRATION_CLAIM_STALE_MS = 15 * 60 * 1000;
 
 function getDatabaseClient(database?: DatabaseClient): DatabaseClient {
   return database ?? db;
@@ -98,7 +101,7 @@ export async function recordImpactAffiliateTouch(params: {
     touchMinuteBucket(params.touch.touchedAt),
   ]);
 
-  await database
+  const [insertedTouch] = await database
     .insert(kiloclaw_attribution_touches)
     .values({
       dedupe_key: dedupeKey,
@@ -119,7 +122,22 @@ export async function recordImpactAffiliateTouch(params: {
       touched_at: params.touch.touchedAt.toISOString(),
       expires_at: params.touch.expiresAt.toISOString(),
     })
-    .onConflictDoNothing({ target: [kiloclaw_attribution_touches.dedupe_key] });
+    .onConflictDoNothing({ target: [kiloclaw_attribution_touches.dedupe_key] })
+    .returning({ id: kiloclaw_attribution_touches.id });
+
+  logImpactReferralDebug(
+    insertedTouch
+      ? 'Recorded Impact affiliate attribution touch'
+      : 'Impact affiliate touch already existed',
+    {
+      userId: params.userId ?? null,
+      anonymousIdPresent: Boolean(params.anonymousId?.trim()),
+      touchId: insertedTouch?.id ?? null,
+      landingPath: params.touch.landingPath,
+      trackingValueLength: params.touch.trackingValueLength,
+      isTrackingValueAccepted: params.touch.isTrackingValueAccepted,
+    }
+  );
 }
 
 export async function recordImpactReferralTouch(params: {
@@ -139,7 +157,7 @@ export async function recordImpactReferralTouch(params: {
     touchMinuteBucket(params.touch.touchedAt),
   ]);
 
-  await database
+  const [insertedTouch] = await database
     .insert(kiloclaw_attribution_touches)
     .values({
       dedupe_key: dedupeKey,
@@ -162,7 +180,23 @@ export async function recordImpactReferralTouch(params: {
       touched_at: params.touch.touchedAt.toISOString(),
       expires_at: params.touch.expiresAt.toISOString(),
     })
-    .onConflictDoNothing({ target: [kiloclaw_attribution_touches.dedupe_key] });
+    .onConflictDoNothing({ target: [kiloclaw_attribution_touches.dedupe_key] })
+    .returning({ id: kiloclaw_attribution_touches.id });
+
+  logImpactReferralDebug(
+    insertedTouch
+      ? 'Recorded Impact Advocate referral touch'
+      : 'Impact Advocate referral touch already existed',
+    {
+      userId: params.userId ?? null,
+      anonymousIdPresent: Boolean(params.anonymousId?.trim()),
+      touchId: insertedTouch?.id ?? null,
+      landingPath: params.touch.landingPath,
+      rsCodePresent: Boolean(params.touch.rsCode?.trim()),
+      trackingValueLength: params.touch.trackingValueLength,
+      isTrackingValueAccepted: params.touch.isTrackingValueAccepted,
+    }
+  );
 }
 
 export async function ensureImpactAdvocateParticipantProfile(params: {
@@ -174,23 +208,23 @@ export async function ensureImpactAdvocateParticipantProfile(params: {
 }): Promise<{ id: string }> {
   const database = getDatabaseClient(params.database);
 
+  const isConfigured = isImpactAdvocateConfigured();
+
   const [insertedParticipant] = await database
     .insert(impact_advocate_participants)
     .values({
       user_id: params.user.id,
-      advocate_id: params.user.id,
-      advocate_account_id: params.user.id,
+      advocate_id: params.user.google_user_email,
+      advocate_account_id: params.user.google_user_email,
       opaque_referral_identifier: params.opaqueReferralIdentifier ?? null,
       contact_email: params.user.google_user_email,
       locale: params.locale ?? null,
       country_code: params.countryCode ?? null,
-      registration_state: isImpactAdvocateConfigured()
+      registration_state: isConfigured
         ? ImpactAdvocateRegistrationState.Pending
         : ImpactAdvocateRegistrationState.Failed,
-      last_error_code: isImpactAdvocateConfigured() ? null : 'missing_configuration',
-      last_error_message: isImpactAdvocateConfigured()
-        ? null
-        : 'Impact Advocate configuration is incomplete',
+      last_error_code: isConfigured ? null : 'missing_configuration',
+      last_error_message: isConfigured ? null : 'Impact Advocate configuration is incomplete',
     })
     .onConflictDoNothing({ target: [impact_advocate_participants.user_id] })
     .returning({ id: impact_advocate_participants.id });
@@ -209,8 +243,8 @@ export async function ensureImpactAdvocateParticipantProfile(params: {
   await database
     .update(impact_advocate_participants)
     .set({
-      advocate_id: params.user.id,
-      advocate_account_id: params.user.id,
+      advocate_id: params.user.google_user_email,
+      advocate_account_id: params.user.google_user_email,
       contact_email: params.user.google_user_email,
       locale: params.locale ?? null,
       country_code: params.countryCode ?? null,
@@ -231,6 +265,13 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
   countryCode?: string | null;
 }): Promise<void> {
   if (!params.referralTouch.opaqueTrackingValue) {
+    logImpactReferralDebug(
+      'Skipped Impact Advocate participant registration queue; missing referral cookie value',
+      {
+        userId: params.user.id,
+        landingPath: params.referralTouch.landingPath,
+      }
+    );
     return;
   }
 
@@ -274,6 +315,21 @@ export async function queueImpactAdvocateParticipantRegistration(params: {
     })
     .onConflictDoNothing({ target: [impact_advocate_registration_attempts.dedupe_key] })
     .returning({ id: impact_advocate_registration_attempts.id });
+
+  logImpactReferralDebug(
+    insertedAttempt
+      ? 'Queued Impact Advocate participant registration attempt'
+      : 'Impact Advocate participant registration attempt already existed',
+    {
+      userId: params.user.id,
+      participantId: participant.id,
+      attemptId: insertedAttempt?.id ?? null,
+      impactAdvocateConfigured: isConfigured,
+      trackingValueLength: params.referralTouch.trackingValueLength,
+      localePresent: Boolean(params.locale?.trim()),
+      countryCode: params.countryCode ?? null,
+    }
+  );
 
   if (!insertedAttempt) {
     return;
@@ -386,9 +442,25 @@ async function dispatchImpactAdvocateRegistrationAttemptById(
     })
     .where(eq(impact_advocate_registration_attempts.id, attempt.id));
 
+  logImpactReferralDebug('Dispatching Impact Advocate participant registration attempt', {
+    attemptId: attempt.id,
+    participantId: participant.id,
+    userId: participant.user_id,
+    attemptCount: attempt.attempt_count,
+  });
+
   const result = await sendImpactAdvocateRegisterParticipantPayload(payload);
   const attemptCount = attempt.attempt_count + 1;
   const completedAt = new Date().toISOString();
+
+  logImpactReferralDebug('Impact Advocate participant registration dispatch result', {
+    attemptId: attempt.id,
+    participantId: participant.id,
+    userId: participant.user_id,
+    ok: result.ok,
+    failureKind: result.ok ? null : result.failureKind,
+    statusCode: result.statusCode ?? null,
+  });
 
   if (result.ok) {
     await db.transaction(async tx => {
@@ -472,7 +544,9 @@ export async function dispatchQueuedImpactAdvocateRegistrationAttempts(params?: 
   limit?: number;
 }): Promise<ImpactAdvocateRegistrationDispatchSummary> {
   const limit = params?.limit ?? 100;
-  const nowIso = new Date().toISOString();
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const staleClaimedAt = new Date(now - IMPACT_ADVOCATE_REGISTRATION_CLAIM_STALE_MS).toISOString();
   const rows = await db
     .select({ id: impact_advocate_registration_attempts.id })
     .from(impact_advocate_registration_attempts)
@@ -499,6 +573,13 @@ export async function dispatchQueuedImpactAdvocateRegistrationAttempts(params?: 
             sql`${impact_advocate_registration_attempts.next_retry_at} IS NULL`,
             lte(impact_advocate_registration_attempts.next_retry_at, nowIso)
           )
+        ),
+        and(
+          eq(
+            impact_advocate_registration_attempts.delivery_state,
+            ImpactAdvocateAttemptDeliveryState.Sending
+          ),
+          lte(impact_advocate_registration_attempts.claimed_at, staleClaimedAt)
         )
       )
     )
@@ -514,6 +595,11 @@ export async function dispatchQueuedImpactAdvocateRegistrationAttempts(params?: 
     retried: 0,
     failed: 0,
   };
+
+  logImpactReferralDebug('Claimed queued Impact Advocate participant registration attempts', {
+    claimed: summary.claimed,
+    limit,
+  });
 
   for (const row of rows) {
     const outcome = await dispatchImpactAdvocateRegistrationAttemptById(row.id);

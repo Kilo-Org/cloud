@@ -14,11 +14,14 @@ import {
 
 export const IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID = '51699';
 export const IMPACT_ADVOCATE_DEFAULT_WIDGET_ID = 'p/51699/w/referrerWidget';
+const IMPACT_ADVOCATE_WIDGET_NAME = 'referrerWidget';
+const IMPACT_ADVOCATE_VERIFIED_ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 
 export type ImpactAdvocateIdentityPayload = {
   id: string;
   accountId: string;
   email: string;
+  referable: boolean;
 };
 
 export type ImpactAdvocateRegisterParticipantPayload = {
@@ -29,6 +32,16 @@ export type ImpactAdvocateRegisterParticipantPayload = {
   cookies: string;
   locale?: string;
   countryCode?: string;
+};
+
+type ImpactAdvocateVerifiedAccessTokenPayload = {
+  user: ImpactAdvocateIdentityPayload;
+  exp: number;
+};
+
+type ImpactAdvocateJwtHeaderInput = {
+  alg: 'HS256';
+  kid: string;
 };
 
 export type ImpactAdvocateDispatchResult =
@@ -45,12 +58,38 @@ export type ImpactAdvocateDispatchResult =
       error?: string;
     };
 
+function getDebuggableRegisterParticipantPayload(
+  payload: ImpactAdvocateRegisterParticipantPayload
+) {
+  return {
+    ...payload,
+    cookies: '[omitted: cookie value is sensitive]',
+  };
+}
+
+function isImpactAdvocateDebugLoggingEnabled(): boolean {
+  const value = process.env.IMPACT_ADVOCATE_DEBUG_LOGGING?.trim().toLowerCase();
+  return value === 'true' || value === '1' || value === 'yes';
+}
+
+function logImpactAdvocateDebug(message: string, details: Record<string, unknown>): void {
+  if (!isImpactAdvocateDebugLoggingEnabled()) return;
+  console.warn(`${message} ${JSON.stringify(details)}`);
+}
+
+function getImpactAdvocateWidgetPath(widgetId: string, programId: string): string {
+  const trimmedWidgetId = widgetId.trim();
+  if (!trimmedWidgetId) return `p/${programId}/w/${IMPACT_ADVOCATE_WIDGET_NAME}`;
+  if (trimmedWidgetId.includes('/')) return trimmedWidgetId;
+  return `p/${trimmedWidgetId}/w/${IMPACT_ADVOCATE_WIDGET_NAME}`;
+}
+
 function getImpactAdvocateConfig() {
   const accountSid = IMPACT_ADVOCATE_ACCOUNT_SID || IMPACT_ACCOUNT_SID;
   const authToken = IMPACT_ADVOCATE_AUTH_TOKEN;
   const tenantAlias = IMPACT_ADVOCATE_TENANT_ALIAS;
   const programId = IMPACT_ADVOCATE_PROGRAM_ID || IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID;
-  const widgetId = IMPACT_ADVOCATE_WIDGET_ID || IMPACT_ADVOCATE_DEFAULT_WIDGET_ID;
+  const widgetId = getImpactAdvocateWidgetPath(IMPACT_ADVOCATE_WIDGET_ID, programId);
 
   if (!accountSid || !authToken || !tenantAlias) {
     return null;
@@ -74,12 +113,13 @@ export function getImpactAdvocateWidgetId(): string {
 }
 
 export function buildImpactAdvocateIdentityPayload(
-  user: Pick<User, 'id' | 'google_user_email'>
+  user: Pick<User, 'google_user_email'>
 ): ImpactAdvocateIdentityPayload {
   return {
-    id: user.id,
-    accountId: user.id,
+    id: user.google_user_email,
+    accountId: user.google_user_email,
     email: user.google_user_email,
+    referable: false,
   };
 }
 
@@ -90,16 +130,21 @@ export function buildImpactAdvocateRegisterParticipantPayload(params: {
   countryCode?: string | null;
 }): ImpactAdvocateRegisterParticipantPayload {
   const config = getImpactAdvocateConfig();
-
-  return {
-    id: params.user.id,
-    accountId: params.user.id,
+  const payload: ImpactAdvocateRegisterParticipantPayload = {
+    id: params.user.google_user_email,
+    accountId: params.user.google_user_email,
     programId: config?.programId ?? IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID,
     email: params.user.google_user_email,
     cookies: params.referralCookieValue,
     ...(params.locale ? { locale: params.locale } : {}),
     ...(params.countryCode ? { countryCode: params.countryCode } : {}),
   };
+
+  logImpactAdvocateDebug('[impact-advocate] built register participant payload', {
+    payload: getDebuggableRegisterParticipantPayload(payload),
+  });
+
+  return payload;
 }
 
 function getImpactAdvocateAuthorizationHeader(
@@ -127,7 +172,19 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
   }
 
   try {
-    const response = await fetch(getImpactAdvocateRegisterParticipantUrl(config), {
+    const url = getImpactAdvocateRegisterParticipantUrl(config);
+    logImpactAdvocateDebug('[impact-advocate] sending register participant request', {
+      url,
+      method: 'POST',
+      headers: {
+        Authorization: 'not_logged',
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      payload: getDebuggableRegisterParticipantPayload(payload),
+    });
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: getImpactAdvocateAuthorizationHeader(config),
@@ -168,24 +225,35 @@ export function issueImpactAdvocateVerifiedAccessToken(
   const config = getImpactAdvocateConfig();
   if (!config) return null;
 
+  const header: ImpactAdvocateJwtHeaderInput = {
+    alg: 'HS256',
+    kid: config.accountSid,
+  };
   const options: SignOptions = {
     algorithm: 'HS256',
-    expiresIn: '5m',
-    header: {
-      alg: 'HS256',
-      kid: config.accountSid,
-    },
-    subject: user.id,
+    header,
+    noTimestamp: true,
   };
+  const payload: ImpactAdvocateVerifiedAccessTokenPayload = {
+    user: buildImpactAdvocateIdentityPayload(user),
+    exp: Math.floor(now.getTime() / 1000) + IMPACT_ADVOCATE_VERIFIED_ACCESS_TOKEN_TTL_SECONDS,
+  };
+  const token = jwt.sign(payload, config.authToken, options);
 
-  return jwt.sign(
-    {
-      iss: config.tenantAlias,
-      aud: 'impact-advocate',
-      iat: Math.floor(now.getTime() / 1000),
-      user: buildImpactAdvocateIdentityPayload(user),
+  logImpactAdvocateDebug('[impact-advocate] issued verified access token', {
+    jwtHeader: header,
+    jwtPayload: payload,
+    signOptions: {
+      algorithm: options.algorithm,
+      noTimestamp: options.noTimestamp,
+      expiresIn: options.expiresIn ?? null,
+      subject: options.subject ?? null,
     },
-    config.authToken,
-    options
-  );
+    token: {
+      omitted: 'not_logged',
+      segmentLengths: token.split('.').map(segment => segment.length),
+    },
+  });
+
+  return token;
 }

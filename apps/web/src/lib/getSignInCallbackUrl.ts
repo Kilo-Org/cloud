@@ -16,6 +16,8 @@ export function isValidCallbackPath(path: string): boolean {
     path.startsWith('/get-started') ||
     path.startsWith('/welcome/landing') ||
     path.startsWith('/organizations/') ||
+    path === '/claw' ||
+    path.startsWith('/claw/') ||
     path.startsWith('/cloud') ||
     path.startsWith('/integrations/') ||
     // Admin-managed URL bonus campaigns. Stricter shape enforcement
@@ -54,6 +56,13 @@ export default function getSignInCallbackUrl(searchParams?: NextAppSearchParams)
 
   if (typeof searchParams?.rsEngagementMedium === 'string' && searchParams?.rsEngagementMedium) {
     callbackParams.set('rsEngagementMedium', searchParams.rsEngagementMedium);
+  }
+
+  for (const utmParam of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']) {
+    const value = searchParams?.[utmParam];
+    if (typeof value === 'string' && value) {
+      callbackParams.set(utmParam, value);
+    }
   }
 
   // Always route through /users/after-sign-in to ensure stytch verification check

@@ -107,8 +107,8 @@ describe('impact referral participant registration dispatch', () => {
     const requestBody = fetchMock.mock.calls[0]?.[1]?.body;
     expect(typeof requestBody).toBe('string');
     expect(JSON.parse(String(requestBody))).toEqual({
-      id: user.id,
-      accountId: user.id,
+      id: user.google_user_email,
+      accountId: user.google_user_email,
       programId: '51699',
       email: user.google_user_email,
       cookies: 'sq-cookie',

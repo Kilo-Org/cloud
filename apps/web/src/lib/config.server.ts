@@ -48,6 +48,8 @@ export const IMPACT_ADVOCATE_PROGRAM_ID = getEnvVariable('IMPACT_ADVOCATE_PROGRA
 export const IMPACT_ADVOCATE_ACCOUNT_SID = getEnvVariable('IMPACT_ADVOCATE_ACCOUNT_SID') || '';
 export const IMPACT_ADVOCATE_AUTH_TOKEN = getEnvVariable('IMPACT_ADVOCATE_AUTH_TOKEN') || '';
 export const IMPACT_ADVOCATE_WIDGET_ID = getEnvVariable('IMPACT_ADVOCATE_WIDGET_ID') || '';
+export const IMPACT_ADVOCATE_DEBUG_LOGGING =
+  getEnvVariable('IMPACT_ADVOCATE_DEBUG_LOGGING') === 'true';
 
 if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
 if (!TURNSTILE_SECRET_KEY) throw new Error('TURNSTILE_SECRET_KEY is required');

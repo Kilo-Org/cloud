@@ -30,6 +30,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { redirect } from 'next/navigation';
 import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact-affiliate-utils';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
 import { countryCodeFromHeaders, localeFromHeaders } from '@/lib/impact-referral';
 import {
   parseImpactAffiliateTouchFromUrl,
@@ -421,8 +422,23 @@ async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): P
   if (callbackUrlCookie) {
     try {
       const callbackUrl = new URL(callbackUrlCookie, 'http://localhost');
-      const affiliateTouch = parseImpactAffiliateTouchFromUrl(callbackUrl);
       const referralTouch = parseImpactReferralTouchFromUrl(callbackUrl);
+      const urlImRefParam = callbackUrl.searchParams.get('im_ref')?.trim() || null;
+      const ignoreUrlImRefForReferralTouch = Boolean(
+        referralTouch?.opaqueTrackingValue && urlImRefParam
+      );
+      const affiliateTouch = ignoreUrlImRefForReferralTouch
+        ? null
+        : parseImpactAffiliateTouchFromUrl(callbackUrl);
+
+      logImpactReferralDebug('Auth flow parsed Impact tracking context from callback URL cookie', {
+        affiliateTouchPresent: Boolean(affiliateTouch),
+        referralTouchPresent: Boolean(referralTouch),
+        referralCookieValuePresent: Boolean(referralTouch?.opaqueTrackingValue),
+        affiliateTrackingIdPresent: Boolean(affiliateTouch?.trackingId?.trim()),
+        ignoredUrlImRefForReferralTouch: ignoreUrlImRefForReferralTouch,
+        callbackPath: callbackUrl.pathname,
+      });
 
       return {
         affiliateTrackingId: affiliateTouch?.trackingId ?? null,
@@ -443,6 +459,13 @@ async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): P
   const affiliateTouch = cookieTrackingId
     ? parseImpactAffiliateTouchFromUrl(fallbackUrl, cookieTrackingId)
     : null;
+
+  logImpactReferralDebug('Auth flow parsed Impact tracking context from cookie fallback', {
+    affiliateTouchPresent: Boolean(affiliateTouch),
+    referralTouchPresent: false,
+    affiliateTrackingIdPresent: Boolean(cookieTrackingId?.trim()),
+    cookieTrackingIdLength: cookieTrackingId?.length ?? 0,
+  });
 
   return {
     affiliateTrackingId: cookieTrackingId,
@@ -737,10 +760,24 @@ const authOptions: NextAuthOptions = {
         // For email (magic link) auth, we auto-link to existing users since magic link
         // is verified by email ownership
         const autoLinkToExistingUser = isEmailAuth || isFakeLogin;
-        const { affiliateTrackingId, trackingContext } =
-          !isAccountLinking && !isFakeLogin
-            ? await getImpactTrackingContextFromAuthFlow(requestHeaders)
-            : { affiliateTrackingId: null, trackingContext: {} };
+        if (isAccountLinking) {
+          logImpactReferralDebug('Auth flow skipped Impact tracking context extraction', {
+            provider: accountInfo.provider,
+            isAccountLinking: Boolean(isAccountLinking),
+            isFakeLogin,
+          });
+        }
+
+        const { affiliateTrackingId, trackingContext } = !isAccountLinking
+          ? await getImpactTrackingContextFromAuthFlow(requestHeaders)
+          : { affiliateTrackingId: null, trackingContext: {} };
+
+        logImpactReferralDebug('Auth flow forwarding Impact tracking context to user upsert', {
+          provider: accountInfo.provider,
+          affiliateTrackingIdPresent: Boolean(affiliateTrackingId?.trim()),
+          affiliateTouchPresent: Boolean(trackingContext.affiliateTouch),
+          referralTouchPresent: Boolean(trackingContext.referralTouch),
+        });
         const result =
           isAccountLinking && linkingSession
             ? whenOk(

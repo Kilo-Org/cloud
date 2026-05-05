@@ -5,6 +5,7 @@ describe('impact advocate', () => {
   const originalEnv = {
     IMPACT_ADVOCATE_ACCOUNT_SID: process.env.IMPACT_ADVOCATE_ACCOUNT_SID,
     IMPACT_ADVOCATE_AUTH_TOKEN: process.env.IMPACT_ADVOCATE_AUTH_TOKEN,
+    IMPACT_ADVOCATE_DEBUG_LOGGING: process.env.IMPACT_ADVOCATE_DEBUG_LOGGING,
     IMPACT_ADVOCATE_PROGRAM_ID: process.env.IMPACT_ADVOCATE_PROGRAM_ID,
     IMPACT_ADVOCATE_TENANT_ALIAS: process.env.IMPACT_ADVOCATE_TENANT_ALIAS,
     IMPACT_ADVOCATE_WIDGET_ID: process.env.IMPACT_ADVOCATE_WIDGET_ID,
@@ -12,8 +13,10 @@ describe('impact advocate', () => {
   };
 
   afterEach(() => {
+    jest.restoreAllMocks();
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = originalEnv.IMPACT_ADVOCATE_ACCOUNT_SID;
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = originalEnv.IMPACT_ADVOCATE_AUTH_TOKEN;
+    process.env.IMPACT_ADVOCATE_DEBUG_LOGGING = originalEnv.IMPACT_ADVOCATE_DEBUG_LOGGING;
     process.env.IMPACT_ADVOCATE_PROGRAM_ID = originalEnv.IMPACT_ADVOCATE_PROGRAM_ID;
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = originalEnv.IMPACT_ADVOCATE_TENANT_ALIAS;
     process.env.IMPACT_ADVOCATE_WIDGET_ID = originalEnv.IMPACT_ADVOCATE_WIDGET_ID;
@@ -37,14 +40,60 @@ describe('impact advocate', () => {
         countryCode: 'US',
       })
     ).toEqual({
-      id: 'user_123',
-      accountId: 'user_123',
+      id: 'referee@example.com',
+      accountId: 'referee@example.com',
       programId: '51699',
       email: 'referee@example.com',
       cookies: 'opaque-cookie-value',
       locale: 'en-US',
       countryCode: 'US',
     });
+  });
+
+  it('normalizes bare widget IDs to the full Impact embed widget path', async () => {
+    process.env.IMPACT_ADVOCATE_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
+    process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
+    process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
+    process.env.IMPACT_ADVOCATE_WIDGET_ID = '51699';
+
+    const { getImpactAdvocateWidgetId } = await import('@/lib/impact-advocate');
+
+    expect(getImpactAdvocateWidgetId()).toBe('p/51699/w/referrerWidget');
+  });
+
+  it('logs debug data without tokens, credentials, authorization headers, or cookie values', async () => {
+    process.env.IMPACT_ADVOCATE_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
+    process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
+    process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
+    process.env.IMPACT_ADVOCATE_DEBUG_LOGGING = 'true';
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const {
+      buildImpactAdvocateRegisterParticipantPayload,
+      issueImpactAdvocateVerifiedAccessToken,
+    } = await import('@/lib/impact-advocate');
+
+    buildImpactAdvocateRegisterParticipantPayload({
+      user: { id: 'user_123', google_user_email: 'referee@example.com' },
+      referralCookieValue: 'opaque-cookie-value',
+    });
+    issueImpactAdvocateVerifiedAccessToken(
+      { id: 'user_456', google_user_email: 'referrer@example.com' },
+      new Date('2026-04-23T12:00:00.000Z')
+    );
+
+    const loggedData = JSON.stringify(warnSpy.mock.calls);
+    expect(loggedData).toContain('[impact-advocate] built register participant payload');
+    expect(loggedData).toContain('[impact-advocate] issued verified access token');
+    expect(loggedData).toContain('referee@example.com');
+    expect(loggedData).toContain('referrer@example.com');
+    expect(loggedData).toContain('impact-account-sid');
+    expect(loggedData).toContain('segmentLengths');
+    expect(loggedData).toContain('[omitted: cookie value is sensitive]');
+    expect(loggedData).not.toContain('opaque-cookie-value');
+    expect(loggedData).not.toContain('secret');
   });
 
   it('issues verified access JWTs with the account sid in the kid header', async () => {
@@ -71,15 +120,14 @@ describe('impact advocate', () => {
     }
 
     expect(decoded.header.kid).toBe('impact-account-sid');
-    expect(decoded.payload).toMatchObject({
-      iss: 'tenant-alias',
-      aud: 'impact-advocate',
-      sub: 'user_123',
+    expect(decoded.payload).toEqual({
       user: {
-        id: 'user_123',
-        accountId: 'user_123',
+        id: 'referrer@example.com',
+        accountId: 'referrer@example.com',
         email: 'referrer@example.com',
+        referable: false,
       },
+      exp: Math.floor(new Date('2026-04-23T12:00:00.000Z').getTime() / 1000) + 60 * 60,
     });
   });
 });

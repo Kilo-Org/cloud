@@ -90,6 +90,7 @@ import {
 import { normalizeEmail } from '@/lib/utils';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
 import {
   createDeletedUserEmailTombstone,
   queueImpactAdvocateParticipantRegistration,
@@ -472,6 +473,10 @@ export async function createOrUpdateUser(
 
       if (affiliateTrackingId?.trim()) {
         try {
+          logImpactReferralDebug('Signup recording Impact affiliate attribution and parent event', {
+            userId: inserted.id,
+            trackingIdLength: affiliateTrackingId.trim().length,
+          });
           await recordAffiliateAttributionAndQueueParentEvent({
             database: tx,
             userId: inserted.id,
@@ -490,6 +495,13 @@ export async function createOrUpdateUser(
 
       if (trackingContext?.affiliateTouch) {
         try {
+          logImpactReferralDebug('Signup recording Impact affiliate touch', {
+            userId: inserted.id,
+            anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
+            landingPath: trackingContext.affiliateTouch.landingPath,
+            trackingValueLength: trackingContext.affiliateTouch.trackingValueLength,
+            isTrackingValueAccepted: trackingContext.affiliateTouch.isTrackingValueAccepted,
+          });
           await recordImpactAffiliateTouch({
             database: tx,
             userId: inserted.id,
@@ -506,6 +518,14 @@ export async function createOrUpdateUser(
 
       if (trackingContext?.referralTouch) {
         try {
+          logImpactReferralDebug('Signup recording Impact Advocate referral touch', {
+            userId: inserted.id,
+            anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
+            landingPath: trackingContext.referralTouch.landingPath,
+            rsCodePresent: Boolean(trackingContext.referralTouch.rsCode?.trim()),
+            trackingValueLength: trackingContext.referralTouch.trackingValueLength,
+            isTrackingValueAccepted: trackingContext.referralTouch.isTrackingValueAccepted,
+          });
           await recordImpactReferralTouch({
             database: tx,
             userId: inserted.id,
@@ -520,6 +540,12 @@ export async function createOrUpdateUser(
         }
 
         try {
+          logImpactReferralDebug('Signup queueing Impact Advocate participant registration', {
+            userId: inserted.id,
+            landingPath: trackingContext.referralTouch.landingPath,
+            localePresent: Boolean(trackingContext.locale?.trim()),
+            countryCode: trackingContext.countryCode ?? null,
+          });
           await queueImpactAdvocateParticipantRegistration({
             database: tx,
             user: inserted,

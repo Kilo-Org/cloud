@@ -1,6 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
+import { Plus, Settings2 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, View, type ViewStyle } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -13,7 +14,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatConversationPath } from '@/lib/kilo-chat-routes';
-import { Plus } from 'lucide-react-native';
 
 import { EmptyConversationList } from './empty-conversation-list';
 import { groupConversationsByActivity } from './conversation-list-groups';
@@ -136,6 +136,11 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
     );
   }
 
+  function handleOpenSettings() {
+    void Haptics.selectionAsync();
+    router.push(`/(app)/kiloclaw/${sandboxId}/dashboard` as Href);
+  }
+
   function handleLeave(conversationId: string) {
     leaveConversation.mutate({ conversationId, sandboxId });
   }
@@ -200,7 +205,19 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
         title={sandboxLabel}
         size="large"
         className="px-[22px]"
-        headerRight={<ProfileAvatarButton />}
+        headerRight={
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open instance settings"
+              className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
+              onPress={handleOpenSettings}
+            >
+              <Settings2 size={20} color={colors.foreground} strokeWidth={1.75} />
+            </Pressable>
+            <ProfileAvatarButton />
+          </View>
+        }
       />
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <FlashList

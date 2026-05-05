@@ -43,6 +43,20 @@ type GitHubIssueComment = {
   user?: { login?: string } | null;
 };
 
+type GitHubReviewComment = GitHubIssueComment & {
+  diff_hunk?: string | null;
+  html_url?: string;
+  in_reply_to_id?: number | null;
+  line?: number | null;
+  original_line?: number | null;
+  path?: string | null;
+};
+
+type GitHubReviewThreadContext = {
+  targetComment: GitHubReviewComment | null;
+  comments: GitHubReviewComment[];
+};
+
 function truncate(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
   return text.slice(0, maxLen - 1) + '…';
@@ -148,6 +162,125 @@ function formatGitHubComment(comment: GitHubIssueComment): string {
   return `<github_comment id="${comment.id}" author="${author}" time="${time}">${body}</github_comment>`;
 }
 
+function formatGitHubReviewComment(comment: GitHubReviewComment): string {
+  const author = sanitizeForDelimiters(comment.user?.login ?? 'unknown');
+  const time = comment.created_at ?? 'unknown';
+  const body = sanitizeForDelimiters(
+    truncate(comment.body?.trim() || '(empty comment)', MAX_GITHUB_COMMENT_LENGTH)
+  );
+  return `<github_review_comment id="${comment.id}" author="${author}" time="${time}">${body}</github_review_comment>`;
+}
+
+function pageFromLinkHeader(linkHeader: string | undefined, rel: string): number | null {
+  if (!linkHeader) return null;
+
+  for (const link of linkHeader.split(',')) {
+    if (!link.includes(`rel="${rel}"`)) continue;
+
+    const match = link.match(/[?&]page=(\d+)/);
+    if (!match) return null;
+
+    const page = Number.parseInt(match[1], 10);
+    return Number.isNaN(page) ? null : page;
+  }
+
+  return null;
+}
+
+function hasNextPage(linkHeader: string | undefined): boolean {
+  return pageFromLinkHeader(linkHeader, 'next') !== null;
+}
+
+function sortByCreatedAt<T extends { created_at?: string | null; id: number }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const aTime = a.created_at ? Date.parse(a.created_at) : 0;
+    const bTime = b.created_at ? Date.parse(b.created_at) : 0;
+    if (aTime !== bTime) return aTime - bTime;
+    return a.id - b.id;
+  });
+}
+
+async function fetchRecentIssueComments(
+  octokit: Octokit,
+  coordinates: GitHubThreadCoordinates
+): Promise<GitHubIssueComment[]> {
+  const params = {
+    owner: coordinates.owner,
+    repo: coordinates.repo,
+    issue_number: coordinates.number,
+    per_page: BOT_CONTEXT_MESSAGE_LIMIT,
+  };
+  const firstPage = await octokit.issues.listComments(params);
+  const lastPageNumber = pageFromLinkHeader(firstPage.headers.link, 'last');
+
+  if (!lastPageNumber || lastPageNumber <= 1) {
+    return sortByCreatedAt(firstPage.data).slice(-BOT_CONTEXT_MESSAGE_LIMIT);
+  }
+
+  const lastPage = await octokit.issues.listComments({
+    ...params,
+    page: lastPageNumber,
+  });
+
+  if (lastPage.data.length >= BOT_CONTEXT_MESSAGE_LIMIT || lastPageNumber <= 2) {
+    return sortByCreatedAt(lastPage.data).slice(-BOT_CONTEXT_MESSAGE_LIMIT);
+  }
+
+  const previousPage = await octokit.issues.listComments({
+    ...params,
+    page: lastPageNumber - 1,
+  });
+
+  return sortByCreatedAt([...previousPage.data, ...lastPage.data]).slice(
+    -BOT_CONTEXT_MESSAGE_LIMIT
+  );
+}
+
+async function fetchPullReviewComments(
+  octokit: Octokit,
+  coordinates: GitHubThreadCoordinates
+): Promise<GitHubReviewComment[]> {
+  const comments: GitHubReviewComment[] = [];
+  let page = 1;
+
+  while (true) {
+    const response = await octokit.pulls.listReviewComments({
+      owner: coordinates.owner,
+      repo: coordinates.repo,
+      pull_number: coordinates.number,
+      per_page: 100,
+      page,
+    });
+
+    comments.push(...response.data);
+
+    if (!hasNextPage(response.headers.link)) break;
+    page += 1;
+  }
+
+  return comments;
+}
+
+async function fetchReviewThreadContext(
+  octokit: Octokit,
+  coordinates: GitHubThreadCoordinates
+): Promise<GitHubReviewThreadContext | null> {
+  if (coordinates.reviewCommentId === null) return null;
+
+  const comments = await fetchPullReviewComments(octokit, coordinates);
+  const targetComment =
+    comments.find(comment => comment.id === coordinates.reviewCommentId) ?? null;
+  const rootCommentId = targetComment?.in_reply_to_id ?? coordinates.reviewCommentId;
+  const threadComments = comments.filter(
+    comment => comment.id === rootCommentId || comment.in_reply_to_id === rootCommentId
+  );
+
+  return {
+    targetComment,
+    comments: sortByCreatedAt(threadComments),
+  };
+}
+
 async function getGitHubConversationContext(
   thread: Thread,
   triggerMessage: ContextTriggerMessage,
@@ -165,25 +298,21 @@ async function getGitHubConversationContext(
   );
   const octokit = new Octokit({ auth: tokenData.token });
 
-  const [issueResponse, commentsResponse] = await Promise.all([
+  const [issueResponse, issueComments, reviewThreadContext] = await Promise.all([
     octokit.issues.get({
       owner: coordinates.owner,
       repo: coordinates.repo,
       issue_number: coordinates.number,
     }),
-    octokit.issues.listComments({
-      owner: coordinates.owner,
-      repo: coordinates.repo,
-      issue_number: coordinates.number,
-      per_page: BOT_CONTEXT_MESSAGE_LIMIT,
-    }),
+    fetchRecentIssueComments(octokit, coordinates),
+    fetchReviewThreadContext(octokit, coordinates),
   ]);
 
   const issue: GitHubIssueLike = issueResponse.data;
   const itemType = issue.pull_request ? 'pull request' : 'issue';
   const itemLabel = issue.pull_request ? 'Pull request' : 'Issue';
   const trigger = formatTriggerMessage(triggerMessage, MAX_GITHUB_COMMENT_LENGTH);
-  const comments = commentsResponse.data
+  const comments = issueComments
     .filter(comment => comment.id.toString() !== triggerMessage.id)
     .map(formatGitHubComment);
 
@@ -208,6 +337,39 @@ async function getGitHubConversationContext(
 
   if (comments.length > 0) {
     lines.push('', 'Existing GitHub conversation comments (oldest first):', ...comments);
+  }
+
+  if (reviewThreadContext) {
+    const anchor = reviewThreadContext.comments[0] ?? reviewThreadContext.targetComment;
+    const reviewComments = reviewThreadContext.comments
+      .filter(comment => comment.id.toString() !== triggerMessage.id)
+      .map(formatGitHubReviewComment);
+
+    lines.push('', 'Pull request review thread:');
+
+    if (anchor?.path) {
+      lines.push(`- File: ${sanitizeForDelimiters(anchor.path)}`);
+    }
+
+    const line = anchor?.line ?? anchor?.original_line;
+    if (line) {
+      lines.push(`- Line: ${line}`);
+    }
+
+    if (anchor?.html_url) {
+      lines.push(`- Review comment URL: ${anchor.html_url}`);
+    }
+
+    if (anchor?.diff_hunk) {
+      lines.push(
+        'Diff hunk:',
+        `<github_diff_hunk>${sanitizeForDelimiters(truncate(anchor.diff_hunk, MAX_GITHUB_COMMENT_LENGTH))}</github_diff_hunk>`
+      );
+    }
+
+    if (reviewComments.length > 0) {
+      lines.push('Review comments in this thread (oldest first):', ...reviewComments);
+    }
   }
 
   lines.push('', 'Comment that triggered this bot run:', formatUserMessage(trigger));

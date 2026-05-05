@@ -1,5 +1,6 @@
 const mockIssuesGetFn = jest.fn();
 const mockIssuesListCommentsFn = jest.fn();
+const mockPullsListReviewCommentsFn = jest.fn();
 const mockGenerateGitHubInstallationTokenFn = jest.fn();
 
 function mockIssuesGet(...args: unknown[]) {
@@ -8,6 +9,10 @@ function mockIssuesGet(...args: unknown[]) {
 
 function mockIssuesListComments(...args: unknown[]) {
   return mockIssuesListCommentsFn(...args);
+}
+
+function mockPullsListReviewComments(...args: unknown[]) {
+  return mockPullsListReviewCommentsFn(...args);
 }
 
 function mockGenerateGitHubInstallationToken(...args: unknown[]) {
@@ -19,6 +24,9 @@ jest.mock('@octokit/rest', () => ({
     issues: {
       get: mockIssuesGet,
       listComments: mockIssuesListComments,
+    },
+    pulls: {
+      listReviewComments: mockPullsListReviewComments,
     },
   })),
 }));
@@ -121,6 +129,7 @@ describe('getPlatformContext', () => {
       token: 'ghs_test',
       expires_at: 'never',
     });
+    mockPullsListReviewCommentsFn.mockResolvedValue({ data: [], headers: {} });
   });
 
   it('returns GitHub issue context with repository, description, history, and triggering comment', async () => {
@@ -149,6 +158,7 @@ describe('getPlatformContext', () => {
           user: { login: 'RSO' },
         },
       ],
+      headers: {},
     });
 
     const context = await getPlatformContext(
@@ -168,5 +178,116 @@ describe('getPlatformContext', () => {
     expect(context).not.toContain('<github_comment id="101"');
     expect(context).toContain('Comment that triggered this bot run:');
     expect(context).toContain('@kilocode-dev Please fix this');
+  });
+
+  it('uses the latest issue comments for long GitHub conversations', async () => {
+    mockIssuesGetFn.mockResolvedValue({
+      data: {
+        body: 'Issue description.',
+        html_url: 'https://github.com/Kilo-Org/on-call/issues/37',
+        number: 37,
+        state: 'open',
+        title: 'Remove operational-retro runbook',
+        user: { login: 'RSO' },
+      },
+    });
+    mockIssuesListCommentsFn
+      .mockResolvedValueOnce({
+        data: Array.from({ length: 12 }, (_, index) => ({
+          id: index + 1,
+          body: `old comment ${index + 1}`,
+          created_at: `2026-05-05T07:${String(index).padStart(2, '0')}:00Z`,
+          user: { login: 'alice' },
+        })),
+        headers: {
+          link: '<https://api.github.com/repos/Kilo-Org/on-call/issues/37/comments?page=3>; rel="last"',
+        },
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 200,
+            body: 'most recent context',
+            created_at: '2026-05-05T07:30:00Z',
+            user: { login: 'alice' },
+          },
+        ],
+        headers: {},
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 199,
+            body: 'previous page context',
+            created_at: '2026-05-05T07:29:00Z',
+            user: { login: 'bob' },
+          },
+        ],
+        headers: {},
+      });
+
+    const context = await getPlatformContext(
+      createThread({ id: 'github:Kilo-Org/on-call:issue:37' }),
+      createMessage({ id: '201', text: '@kilocode-dev Please fix this' }),
+      createIntegration()
+    );
+
+    expect(mockIssuesListCommentsFn).toHaveBeenCalledWith(expect.objectContaining({ page: 3 }));
+    expect(context).not.toContain('old comment 1');
+    expect(context).toContain('previous page context');
+    expect(context).toContain('most recent context');
+  });
+
+  it('includes GitHub pull request review thread context', async () => {
+    mockIssuesGetFn.mockResolvedValue({
+      data: {
+        body: 'Pull request description.',
+        html_url: 'https://github.com/Kilo-Org/on-call/pull/37',
+        number: 37,
+        pull_request: {},
+        state: 'open',
+        title: 'Update on-call runbook',
+        user: { login: 'RSO' },
+      },
+    });
+    mockIssuesListCommentsFn.mockResolvedValue({ data: [], headers: {} });
+    mockPullsListReviewCommentsFn.mockResolvedValue({
+      data: [
+        {
+          id: 300,
+          body: 'This conditional is wrong.',
+          created_at: '2026-05-05T07:20:00Z',
+          diff_hunk: '@@ -10,7 +10,7 @@\n- old\n+ new',
+          html_url: 'https://github.com/Kilo-Org/on-call/pull/37#discussion_r300',
+          line: 12,
+          path: 'src/on-call.ts',
+          user: { login: 'alice' },
+        },
+        {
+          id: 301,
+          body: '@kilocode-dev Please fix this',
+          created_at: '2026-05-05T07:32:52Z',
+          in_reply_to_id: 300,
+          line: 12,
+          path: 'src/on-call.ts',
+          user: { login: 'RSO' },
+        },
+      ],
+      headers: {},
+    });
+
+    const context = await getPlatformContext(
+      createThread({ id: 'github:Kilo-Org/on-call:37:rc:301' }),
+      createMessage({ id: '301', text: '@kilocode-dev Please fix this' }),
+      createIntegration()
+    );
+
+    expect(context).toContain('Pull request review thread:');
+    expect(context).toContain('- File: src/on-call.ts');
+    expect(context).toContain('- Line: 12');
+    expect(context).toContain('github_diff_hunk');
+    expect(context).toContain('This conditional is wrong.');
+    expect(context).not.toContain('<github_review_comment id="301"');
+    expect(context).toContain('Comment that triggered this bot run:');
   });
 });

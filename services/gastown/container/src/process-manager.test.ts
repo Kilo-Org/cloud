@@ -24,7 +24,7 @@ vi.mock('./token-refresh', () => ({
   refreshTokenIfNearExpiry: vi.fn(),
 }));
 
-const { applyModelToSession } = await import('./process-manager');
+const { applyModelToSession, withStartAgentLock } = await import('./process-manager');
 
 type PromptCall = {
   path: { id: string };
@@ -115,5 +115,66 @@ describe('applyModelToSession', () => {
         resumedSession: false,
       })
     ).rejects.toThrow('simulated SDK failure');
+  });
+});
+
+describe('withStartAgentLock', () => {
+  it('serialises concurrent callers for the same agentId', async () => {
+    const order: string[] = [];
+    let secondStartedBeforeFirstFinished = false;
+
+    // Fire both in the same microtask so they race on the lock.
+    const first = withStartAgentLock('agent-1', async () => {
+      order.push('first:start');
+      await new Promise(r => setTimeout(r, 20));
+      order.push('first:end');
+      return 1;
+    });
+    const second = withStartAgentLock('agent-1', async () => {
+      // If the lock works, `first:end` has already been pushed.
+      if (!order.includes('first:end')) {
+        secondStartedBeforeFirstFinished = true;
+      }
+      order.push('second:start');
+      order.push('second:end');
+      return 2;
+    });
+
+    const [r1, r2] = await Promise.all([first, second]);
+    expect(r1).toBe(1);
+    expect(r2).toBe(2);
+    expect(secondStartedBeforeFirstFinished).toBe(false);
+    expect(order).toEqual(['first:start', 'first:end', 'second:start', 'second:end']);
+  });
+
+  it('runs concurrently for different agentIds', async () => {
+    const order: string[] = [];
+
+    const a = withStartAgentLock('agent-a', async () => {
+      order.push('a:start');
+      await new Promise(r => setTimeout(r, 20));
+      order.push('a:end');
+    });
+    const b = withStartAgentLock('agent-b', async () => {
+      order.push('b:start');
+      await new Promise(r => setTimeout(r, 20));
+      order.push('b:end');
+    });
+
+    await Promise.all([a, b]);
+
+    // Both should have started before either ended (no serialisation across ids).
+    expect(order.indexOf('b:start')).toBeLessThan(order.indexOf('a:end'));
+  });
+
+  it('releases the lock when the fn throws so subsequent callers can proceed', async () => {
+    await expect(
+      withStartAgentLock('agent-err', async () => {
+        throw new Error('boom');
+      })
+    ).rejects.toThrow('boom');
+
+    const result = await withStartAgentLock('agent-err', async () => 'ok');
+    expect(result).toBe('ok');
   });
 });

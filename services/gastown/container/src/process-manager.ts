@@ -71,6 +71,39 @@ export function isDraining(): boolean {
 // once created, the SDK instance is reused without locking.
 let sdkServerLock: Promise<void> = Promise.resolve();
 
+// Per-agentId mutex for startAgent. Without this, two concurrent POST
+// /agents/start calls for the same agentId (observed in production: two
+// `[control-server] /agents/start:` log lines at the same millisecond)
+// both pass the re-entrancy check at the top of startAgent before either
+// has committed a 'starting' record. The second invocation aborts the
+// first's startupAbortController and both paths race on session creation,
+// idle timers, and SDK instance reference counts — leaving the agent in
+// an inconsistent state (orphaned sessions, leaked sessionCount, etc).
+//
+// Serialising per agentId means the second caller waits for the first to
+// complete (or abort) before proceeding, and then observes a consistent
+// snapshot in `agents.get(agentId)`.
+const startAgentLocks = new Map<string, Promise<unknown>>();
+
+// Exported for tests that exercise the locking behaviour directly without
+// bringing up the whole SDK/process harness. Production callers should use
+// `startAgent` (which wraps `startAgentImpl` with this lock).
+export async function withStartAgentLock<T>(agentId: string, fn: () => Promise<T>): Promise<T> {
+  const previous = startAgentLocks.get(agentId) ?? Promise.resolve();
+  const deferred = Promise.withResolvers<void>();
+  startAgentLocks.set(agentId, deferred.promise);
+  try {
+    await previous.catch(() => {});
+    return await fn();
+  } finally {
+    deferred.resolve();
+    // Only clear the slot if no newer caller has queued behind us.
+    if (startAgentLocks.get(agentId) === deferred.promise) {
+      startAgentLocks.delete(agentId);
+    }
+  }
+}
+
 export function getUptime(): number {
   return Date.now() - startTime;
 }
@@ -1005,8 +1038,19 @@ async function subscribeToEvents(
 /**
  * Start an agent: ensure SDK server, create session, subscribe to events,
  * send initial prompt.
+ *
+ * Serialises concurrent callers for the same agentId so the re-entrancy
+ * handling inside `startAgentImpl` observes a consistent snapshot.
  */
 export async function startAgent(
+  request: StartAgentRequest,
+  workdir: string,
+  env: Record<string, string>
+): Promise<ManagedAgent> {
+  return withStartAgentLock(request.agentId, () => startAgentImpl(request, workdir, env));
+}
+
+async function startAgentImpl(
   request: StartAgentRequest,
   workdir: string,
   env: Record<string, string>

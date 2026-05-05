@@ -16,7 +16,7 @@ import type { Context, Next } from 'hono';
 import { Hono } from 'hono';
 import { getCookie, deleteCookie } from 'hono/cookie';
 import type { z } from 'zod';
-import type { chatWebhookSchema } from '@kilocode/kilo-chat';
+import { sandboxIdSchema, type chatWebhookSchema } from '@kilocode/kilo-chat';
 
 import type { AppEnv, KiloClawEnv, ChatWebhookPayload } from './types';
 import type { SnapshotRestoreMessage } from './schemas/snapshot-restore';
@@ -1086,6 +1086,9 @@ export default class extends WorkerEntrypoint<KiloClawEnv> {
       throw new Error(`Invalid targetBotId: ${targetBotId}`);
     }
     const sandboxId = targetBotId.slice(botPrefix.length);
+    if (!sandboxIdSchema.safeParse(sandboxId).success) {
+      throw new Error(`Invalid sandboxId derived from targetBotId: ${targetBotId}`);
+    }
 
     const { doKey, label } = await this.resolveChatWebhookDoKey(sandboxId);
     const getWebhookStub = () =>

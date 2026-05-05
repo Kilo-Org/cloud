@@ -46,6 +46,7 @@ import type {
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import { InstanceTierKeySchema } from '@kilocode/kiloclaw-instance-tiers';
 import { alias } from 'drizzle-orm/pg-core';
 import {
   eq,
@@ -2794,23 +2795,19 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        machineSize: z.object({
-          cpus: z.number().int().min(1).max(8),
-          memory_mb: z.number().int().min(256).max(16384),
-          cpu_kind: z.enum(['shared', 'performance']).optional(),
-        }),
+        instanceType: InstanceTierKeySchema,
       })
     )
     .mutation(async ({ input, ctx }): Promise<ResizeMachineResponse> => {
       console.log(
-        `[admin-kiloclaw] Machine resize triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: ${JSON.stringify(input.machineSize)}`
+        `[admin-kiloclaw] Machine resize triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: ${input.instanceType}`
       );
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
         const client = new KiloClawInternalClient();
         const result = await client.resizeMachine(
           input.userId,
-          input.machineSize,
+          input.instanceType,
           workerInstanceId(instance)
         );
 
@@ -2821,10 +2818,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
             target_user_id: input.userId,
-            message: `Machine resized: ${JSON.stringify(result.previousSize)} → ${JSON.stringify(result.newSize)}`,
+            message: `Machine resized: ${result.previousTier ?? 'unknown'} → ${result.newTier}`,
             metadata: {
-              previousSize: result.previousSize,
-              newSize: result.newSize,
+              previousTier: result.previousTier,
+              newTier: result.newTier,
+              previousVolumeSizeGb: result.previousVolumeSizeGb,
+              newVolumeSizeGb: result.newVolumeSizeGb,
+              machineSize: result.machineSize,
             },
           });
         } catch (auditErr) {

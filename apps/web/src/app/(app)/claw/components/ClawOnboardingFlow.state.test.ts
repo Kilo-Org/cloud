@@ -31,6 +31,8 @@ function createStatus(status: KiloClawDashboardStatus['status']): KiloClawDashbo
     flyVolumeId: null,
     flyRegion: status === null ? null : 'iad',
     machineSize: null,
+    instanceType: null,
+    volumeSizeGb: null,
     openclawVersion: null,
     imageVariant: null,
     trackedImageTag: null,

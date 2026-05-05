@@ -5,6 +5,7 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
+import { InstanceTierKeySchema, InstanceTypeSchema } from '@kilocode/kiloclaw-instance-tiers';
 import { IMAGE_TAG_RE, IMAGE_TAG_MAX_LENGTH } from '../lib/image-tag-validation';
 
 export const EncryptedEnvelopeSchema = z.object({
@@ -172,6 +173,7 @@ export const InstanceConfigSchema = z.object({
   googleWorkspaceConfigSyncError: z.string().nullable().optional(),
   googleWorkspaceConfigSyncedAt: z.number().nullable().optional(),
   machineSize: MachineSizeSchema.optional(),
+  instanceType: InstanceTierKeySchema.optional(),
   // Region for Fly Volume/Machine. Comma-separated priority list of region codes or aliases.
   // Examples: "us,eu" (try US first, then Europe), "lhr" (London only).
   // If omitted, falls back to the FLY_REGION env var.
@@ -323,6 +325,8 @@ export const PersistedStateSchema = z.object({
   flyVolumeId: z.string().nullable().default(null),
   flyRegion: z.string().nullable().default(null),
   machineSize: MachineSizeSchema.nullable().default(null),
+  instanceType: InstanceTypeSchema.nullable().default(null),
+  volumeSizeGb: z.number().int().min(1).max(500).nullable().default(null),
   // Health check tracking
   healthCheckFailCount: z.number().default(0),
   // Two-phase destroy: IDs pending deletion on Fly. Cleared once Fly confirms.

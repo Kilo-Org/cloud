@@ -10,6 +10,7 @@ import {
   getInstanceById,
   getInstanceBySandboxId,
   markInstanceDestroyed,
+  syncInstanceType,
   syncTrackedImageTag,
 } from '../../db';
 import { appNameFromUserId, appNameFromInstanceId } from '../../fly/apps';
@@ -30,6 +31,8 @@ import {
   findVolumeByName,
 } from '../../northflank/client';
 import { northflankResourceNames } from '../../providers/northflank/names';
+import { tierFromMachineSize } from '@kilocode/kiloclaw-instance-tiers';
+import { DEFAULT_VOLUME_SIZE_GB } from '../../config';
 
 type RestoreOpts = {
   /** If the DO has a stored sandboxId, use it for precise lookup. */
@@ -274,6 +277,35 @@ export async function syncTrackedImageTagToPostgresHelper(
     await syncTrackedImageTag(db, userId, sandboxId, state.trackedImageTag ?? null);
   } catch (err) {
     doWarn(state, 'Failed to sync tracked_image_tag to Postgres', {
+      error: toLoggable(err),
+    });
+  }
+}
+
+export async function syncInstanceTypeToPostgresHelper(
+  env: KiloClawEnv,
+  state: InstanceMutableState,
+  userId: string,
+  sandboxId: string,
+  persist?: (patch: { instanceType: InstanceMutableState['instanceType'] }) => Promise<void>
+): Promise<void> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return;
+
+  try {
+    let instanceType = state.instanceType;
+    if (instanceType === null) {
+      if (state.machineSize === null) return;
+      instanceType =
+        tierFromMachineSize(state.machineSize, state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB) ??
+        'custom';
+      state.instanceType = instanceType;
+      await persist?.({ instanceType });
+    }
+    const db = getWorkerDb(connectionString);
+    await syncInstanceType(db, userId, sandboxId, instanceType);
+  } catch (err) {
+    doWarn(state, 'Failed to sync instance_type to Postgres', {
       error: toLoggable(err),
     });
   }

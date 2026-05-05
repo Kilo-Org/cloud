@@ -1,4 +1,5 @@
 import type { EncryptedEnvelope } from '@/lib/encryption';
+import type { InstanceTierKey, InstanceType } from '@kilocode/kiloclaw-instance-tiers';
 import type { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
 
 /** Mirrors the worker's ImageVersionEntry schema (KV stored version metadata) */
@@ -34,6 +35,7 @@ export type ProvisionInput = {
   userTimezone?: string | null;
   userLocation?: string | null;
   pinnedImageTag?: string;
+  instanceType?: InstanceTierKey;
 };
 
 export type KiloCodeConfigPatchInput = {
@@ -204,6 +206,8 @@ export type PlatformStatusResponse = {
   flyVolumeId: string | null;
   flyRegion: string | null;
   machineSize: MachineSize | null;
+  instanceType: InstanceType | null;
+  volumeSizeGb: number | null;
   openclawVersion: string | null;
   imageVariant: string | null;
   trackedImageTag: string | null;
@@ -561,8 +565,11 @@ export type ReassociateVolumeResponse = {
 
 /** Response from POST /api/platform/resize-machine */
 export type ResizeMachineResponse = {
-  previousSize: { cpus: number; memory_mb: number; cpu_kind?: string } | null;
-  newSize: { cpus: number; memory_mb: number; cpu_kind?: string };
+  previousTier: InstanceType | null;
+  newTier: InstanceTierKey;
+  previousVolumeSizeGb: number | null;
+  newVolumeSizeGb: number;
+  machineSize: MachineSize;
 };
 
 /** Response from GET /api/platform/regions */

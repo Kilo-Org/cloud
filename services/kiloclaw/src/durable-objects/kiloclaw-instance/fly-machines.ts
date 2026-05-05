@@ -19,12 +19,14 @@ import {
 import { guestFromSize, volumeNameFromSandboxId, METADATA_KEY_SANDBOX_ID } from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { reconcileLog, doError, doWarn, toLoggable } from './log';
+import { tierFromMachineSize } from '@kilocode/kiloclaw-instance-tiers';
 
 type FlyRuntimeState = Pick<
   InstanceMutableState,
   | 'userId'
   | 'sandboxId'
   | 'machineSize'
+  | 'volumeSizeGb'
   | 'lastStartedAt'
   | 'flyAppName'
   | 'flyMachineId'
@@ -84,7 +86,7 @@ export async function ensureVolume(
     flyConfig,
     {
       name: volumeNameFromSandboxId(state.sandboxId),
-      size_gb: DEFAULT_VOLUME_SIZE_GB,
+      size_gb: state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB,
       compute: guestFromSize(state.machineSize),
     },
     regions,
@@ -205,7 +207,7 @@ export async function replaceStrandedVolume(
       flyConfig,
       {
         name: volumeNameFromSandboxId(state.sandboxId),
-        size_gb: DEFAULT_VOLUME_SIZE_GB,
+        size_gb: state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB,
         compute,
       },
       regions,
@@ -313,11 +315,15 @@ export async function startExistingMachine(
     if (state.machineSize === null && machine.config?.guest) {
       const { cpus, memory_mb, cpu_kind } = machine.config.guest;
       machineSizePatch = { cpus, memory_mb, cpu_kind };
+      const instanceTypePatch =
+        tierFromMachineSize(machineSizePatch, state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB) ??
+        'custom';
       machineConfig = { ...machineConfig, guest: guestFromSize(machineSizePatch) };
       await persistProviderResult({
         providerState,
         corePatch: {
           machineSize: machineSizePatch,
+          instanceType: instanceTypePatch,
         },
       });
     }

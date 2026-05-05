@@ -229,6 +229,25 @@ export async function syncTrackedImageTag(
     );
 }
 
+export async function syncInstanceType(
+  db: WorkerDb,
+  userId: string,
+  sandboxId: string,
+  instanceType: string | null
+) {
+  await db
+    .update(kiloclaw_instances)
+    .set({ instance_type: instanceType })
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.destroyed_at),
+        sql`${kiloclaw_instances.instance_type} IS DISTINCT FROM ${instanceType}`
+      )
+    );
+}
+
 export async function getGoogleOAuthConnectionByInstanceId(db: WorkerDb, instanceId: string) {
   return await db
     .select()

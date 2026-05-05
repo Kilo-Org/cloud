@@ -14,6 +14,7 @@
     "./client": "./src/client.ts"
   },
   "dependencies": {
+    "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "drizzle-orm": "catalog:",
     "pg": "^8.20.0",
     "zod": "catalog:"

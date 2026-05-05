@@ -17,8 +17,8 @@ import {
   GoogleOAuthConnectionSchema,
   SecretsPatchSchema,
   InstanceIdParam,
-  MachineSizeSchema,
 } from '../schemas/instance-config';
+import { DEFAULT_INSTANCE_TIER, InstanceTierKeySchema } from '@kilocode/kiloclaw-instance-tiers';
 import { ImageVersionEntrySchema, imageVersionKey } from '../schemas/image-version';
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
 import {
@@ -389,6 +389,7 @@ async function insertProvisionedInstanceRecord(params: {
   sandboxId: string;
   orgId: string | null;
   provider: ProviderId;
+  instanceType: string;
 }): Promise<ProvisionedInstanceRecord> {
   const connectionString = params.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
@@ -425,6 +426,7 @@ async function insertProvisionedInstanceRecord(params: {
           sandbox_id: params.sandboxId,
           provider: params.provider,
           organization_id: params.orgId,
+          instance_type: params.instanceType,
         })
         .onConflictDoNothing({ target: kiloclaw_instances.id })
         .returning({
@@ -871,10 +873,11 @@ platform.post('/provision', async c => {
     kilocodeDefaultModel,
     userTimezone,
     userLocation,
-    machineSize,
+    instanceType: requestedInstanceType,
     region,
     pinnedImageTag,
   } = result.data;
+  const instanceType = requestedInstanceType ?? DEFAULT_INSTANCE_TIER;
   const provisionedInstanceId = instanceId ?? crypto.randomUUID();
   const shouldInsertInstanceRecord = !instanceId;
   const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
@@ -914,7 +917,7 @@ platform.post('/provision', async c => {
             kilocodeDefaultModel,
             userTimezone,
             userLocation,
-            machineSize,
+            instanceType,
             region,
             pinnedImageTag,
           },
@@ -954,6 +957,7 @@ platform.post('/provision', async c => {
         sandboxId: provision.sandboxId,
         orgId: orgId ?? null,
         provider: selectedProvider ?? 'fly',
+        instanceType,
       });
       writeEvent(c.env, {
         event: 'instance.record_inserted',
@@ -3340,7 +3344,7 @@ platform.post('/reassociate-volume', async c => {
 // Updates the machine size for an instance. Takes effect on next start/restart.
 const ResizeMachineSchema = z.object({
   userId: z.string().min(1),
-  machineSize: MachineSizeSchema,
+  instanceType: InstanceTierKeySchema,
 });
 
 platform.post('/resize-machine', async c => {
@@ -3355,7 +3359,7 @@ platform.post('/resize-machine', async c => {
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.resizeMachine(result.data.machineSize),
+      stub => stub.resizeMachine(result.data.instanceType),
       'resizeMachine'
     );
     return c.json(response);

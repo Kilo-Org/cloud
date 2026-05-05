@@ -78,6 +78,17 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
+import {
+  compareTierRank,
+  DEFAULT_INSTANCE_TIER,
+  formatTierHardware,
+  getTier,
+  InstanceTierKeySchema,
+  isOfferedTier,
+  OFFERED_TIERS,
+  type InstanceTierKey,
+  type InstanceType,
+} from '@kilocode/kiloclaw-instance-tiers';
 import { defaultScheduledAt } from '@/lib/kiloclaw/scheduled-action-form';
 import { AdminFileEditor } from './AdminFileEditor';
 import { KiloCliRunCard } from './KiloCliRunCard';
@@ -99,6 +110,29 @@ function formatEpochTime(epoch: number | null): string {
 function formatEpochRelativeTime(epoch: number | null): string {
   if (epoch === null) return '—';
   return formatDistanceToNow(new Date(epoch), { addSuffix: true });
+}
+
+function InstanceTypeBadge({ instanceType }: { instanceType: InstanceType | null }) {
+  if (!instanceType) {
+    return <Badge variant="outline">Unknown</Badge>;
+  }
+  if (instanceType === 'custom') {
+    return <Badge variant="secondary">Custom</Badge>;
+  }
+  const tier = getTier(instanceType);
+  return tier.status === 'legacy' ? (
+    <Badge variant="secondary">{instanceType} (legacy)</Badge>
+  ) : (
+    <Badge>{instanceType}</Badge>
+  );
+}
+
+function canResizeToTier(current: InstanceType | null, target: InstanceTierKey): boolean {
+  if (!isOfferedTier(target)) return false;
+  if (current && current !== 'custom' && isOfferedTier(current)) {
+    return compareTierRank(target, current) > 0;
+  }
+  return true;
 }
 
 function useControllerTelemetryDiskUsage(sandboxId: string) {
@@ -1254,7 +1288,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [restoreConfigDialogOpen, setRestoreConfigDialogOpen] = useState(false);
   const [destroyMachineDialogOpen, setDestroyMachineDialogOpen] = useState(false);
   const [resizeMachineDialogOpen, setResizeMachineDialogOpen] = useState(false);
-  const [selectedMachineSize, setSelectedMachineSize] = useState<string>('performance-1x');
+  const [selectedInstanceType, setSelectedInstanceType] =
+    useState<InstanceTierKey>(DEFAULT_INSTANCE_TIER);
   const [resizeConfirmText, setResizeConfirmText] = useState('');
   const [changeVersionDialogOpen, setChangeVersionDialogOpen] = useState(false);
   const [changeVersionSelectedTag, setChangeVersionSelectedTag] = useState<string>('');
@@ -1500,6 +1535,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     data?.destroyed_at === null &&
     data?.workerStatus?.status !== 'restoring' &&
     data?.workerStatus?.status !== 'recovering';
+  const nextResizeTier = data?.workerStatus
+    ? OFFERED_TIERS.find(tier => canResizeToTier(data.workerStatus?.instanceType ?? null, tier))
+    : undefined;
   const hasRuntime = !!runtimeId;
   const hasFlyMachine = isFlyProvider && !!flyMachineId;
   const canRetryMetadataRecovery =
@@ -1741,17 +1779,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     setResizeConfirmText('');
     setResizeError(null);
 
-    const sizeMap: Record<
-      string,
-      { cpus: number; memory_mb: number; cpu_kind: 'shared' | 'performance' }
-    > = {
-      'shared-cpu-2x': { cpus: 2, memory_mb: 3072, cpu_kind: 'shared' },
-      'shared-cpu-4x': { cpus: 4, memory_mb: 3072, cpu_kind: 'shared' },
-      'performance-1x': { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
-      'performance-2x': { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' },
-    };
-    const machineSize = sizeMap[selectedMachineSize];
-    if (!machineSize || !data || !userId) return;
+    if (!data || !userId) return;
 
     try {
       // Step 1: Stop if running — retry up to 3 times since Fly can be slow
@@ -1782,7 +1810,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
       // Step 2: Update DO state
       setResizePhase('resizing');
-      await resizeMachineMutation({ userId, instanceId: data.id, machineSize });
+      await resizeMachineMutation({
+        userId,
+        instanceId: data.id,
+        instanceType: selectedInstanceType,
+      });
 
       // Step 3: Start with new size
       setResizePhase('starting');
@@ -2527,6 +2559,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
                 <div className="flex items-center gap-2">
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <DetailField label="Instance Tier">
+                    <InstanceTypeBadge instanceType={data.workerStatus.instanceType ?? null} />
+                  </DetailField>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Server className="text-muted-foreground h-4 w-4 shrink-0" />
                   <DetailField label="Machine Size">
                     {data.workerStatus.machineSize ? (
                       <code className="text-sm">
@@ -2539,6 +2578,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         default (performance-1x, 3072MB)
                       </span>
                     )}
+                  </DetailField>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <DetailField label="Volume Size">
+                    {data.workerStatus.volumeSizeGb ? `${data.workerStatus.volumeSizeGb} GB` : '—'}
                   </DetailField>
                 </div>
 
@@ -2984,15 +3030,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={machineActionPending || isResizingMachine}
+                  disabled={machineActionPending || isResizingMachine || !nextResizeTier}
                   onClick={() => {
-                    const ms = data?.workerStatus?.machineSize;
-                    const key = ms
-                      ? ms.cpu_kind === 'performance'
-                        ? `performance-${ms.cpus}x`
-                        : `shared-cpu-${ms.cpus}x`
-                      : 'performance-1x';
-                    setSelectedMachineSize(key);
+                    if (!nextResizeTier) return;
+                    setSelectedInstanceType(nextResizeTier);
                     setResizeMachineDialogOpen(true);
                   }}
                 >
@@ -3196,41 +3237,53 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </DialogTitle>
               <DialogDescription className="pt-3">
                 This will stop the machine, update its CPU/memory spec, and restart it. The user
-                will be disconnected during the restart.
+                will be disconnected during the restart. Fly volumes can grow but not shrink.
                 <span className="text-foreground mt-2 block font-medium">
                   User: {data?.user_email ?? data?.user_id}
                 </span>
-                {data?.workerStatus?.machineSize ? (
-                  <span className="mt-2 block text-sm">
-                    Current:{' '}
-                    <code className="text-xs">
-                      {data.workerStatus.machineSize.cpu_kind ?? 'shared'}-cpu-
-                      {data.workerStatus.machineSize.cpus}x,{' '}
-                      {data.workerStatus.machineSize.memory_mb}MB
-                    </code>
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground mt-2 block text-sm">
-                    Current: default (performance-1x, 3072MB)
-                  </span>
-                )}
+                <span className="mt-2 flex items-center gap-2 text-sm">
+                  Current:{' '}
+                  <InstanceTypeBadge instanceType={data?.workerStatus?.instanceType ?? null} />
+                </span>
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <label className="text-sm font-medium">New size</label>
+                <label className="text-sm font-medium">New tier</label>
                 <select
                   className="bg-background border-input mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                  value={selectedMachineSize}
-                  onChange={e => setSelectedMachineSize(e.target.value)}
+                  value={selectedInstanceType}
+                  onChange={e =>
+                    setSelectedInstanceType(InstanceTierKeySchema.parse(e.target.value))
+                  }
                   disabled={isResizingMachine}
                 >
-                  <option value="shared-cpu-2x">shared-cpu-2x, 3GB (~$20/mo)</option>
-                  <option value="shared-cpu-4x">shared-cpu-4x, 3GB (~$24/mo)</option>
-                  <option value="performance-1x">performance-1x, 3GB (~$47/mo)</option>
-                  <option value="performance-2x">performance-2x, 4GB (~$85/mo)</option>
+                  {OFFERED_TIERS.map(tierKey => {
+                    const tier = getTier(tierKey);
+                    return (
+                      <option
+                        key={tierKey}
+                        value={tierKey}
+                        disabled={
+                          !canResizeToTier(data?.workerStatus?.instanceType ?? null, tierKey)
+                        }
+                      >
+                        {tierKey} — {formatTierHardware(tier)}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
+              {getTier(selectedInstanceType).volumeSizeGb >
+                (data?.workerStatus?.volumeSizeGb ?? 10) && (
+                <Alert className="border-orange-500/30 bg-orange-500/10">
+                  <AlertTriangle className="h-4 w-4 text-orange-500" />
+                  <AlertDescription className="text-orange-700 dark:text-orange-300">
+                    Storage will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB to{' '}
+                    {getTier(selectedInstanceType).volumeSizeGb} GB. This cannot be undone.
+                  </AlertDescription>
+                </Alert>
+              )}
               <div>
                 <label className="text-sm font-medium">
                   Type <code className="text-destructive text-xs">RESIZE</code> to confirm

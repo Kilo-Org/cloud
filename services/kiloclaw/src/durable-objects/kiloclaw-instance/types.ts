@@ -89,6 +89,8 @@ export type InstanceMutableState = {
   flyVolumeId: string | null;
   flyRegion: string | null;
   machineSize: MachineSize | null;
+  instanceType: PersistedState['instanceType'];
+  volumeSizeGb: number | null;
   healthCheckFailCount: number;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;

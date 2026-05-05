@@ -197,6 +197,7 @@ describe('northflankProviderAdapter', () => {
 
     const servicePayload = vi.mocked(createDeploymentService).mock.calls[0]?.[2];
     expect(servicePayload?.deployment.instances).toBe(0);
+    expect(servicePayload?.billing.deploymentPlan).toBe('nf-compute-200');
     expect(servicePayload?.deployment.docker).toEqual({ configType: 'default' });
     expect(servicePayload?.deployment.gracePeriodSeconds).toBe(60);
     expect(servicePayload?.deployment.strategy).toBeUndefined();
@@ -253,6 +254,92 @@ describe('northflankProviderAdapter', () => {
       })
     );
     expect(onProviderResult).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses a tier-specific deployment plan when configured', async () => {
+    vi.mocked(findServiceByName).mockResolvedValue(null);
+    vi.mocked(createDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+    vi.mocked(createProjectSecret).mockResolvedValue({ id: 'secret-1', name: 'kc-ki-123' });
+    vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+    vi.mocked(waitForDeploymentCompleted).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+
+    await northflankProviderAdapter.startRuntime({
+      env: { ...env, NF_DEPLOYMENT_PLAN_PERF_4_8: 'nf-compute-perf-4-8' } as never,
+      state: {
+        sandboxId: 'ki_123',
+        instanceType: 'perf-4-8',
+        providerState: {
+          provider: 'northflank',
+          projectId: 'project-1',
+          volumeId: 'volume-1',
+          volumeName: 'kc-ki-123',
+        },
+      } as never,
+      runtimeSpec,
+    });
+
+    const createPayload = vi.mocked(createDeploymentService).mock.calls[0]?.[2];
+    const patchPayload = vi.mocked(patchDeploymentService).mock.calls[0]?.[3];
+    expect(createPayload?.billing.deploymentPlan).toBe('nf-compute-perf-4-8');
+    expect(patchPayload?.billing?.deploymentPlan).toBe('nf-compute-perf-4-8');
+  });
+
+  it('falls back to the default deployment plan when tier env is unset', async () => {
+    vi.mocked(findServiceByName).mockResolvedValue(null);
+    vi.mocked(createDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+    vi.mocked(createProjectSecret).mockResolvedValue({ id: 'secret-1', name: 'kc-ki-123' });
+    vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+    vi.mocked(waitForDeploymentCompleted).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+
+    await northflankProviderAdapter.startRuntime({
+      env: env as never,
+      state: {
+        sandboxId: 'ki_123',
+        instanceType: 'perf-4-16',
+        providerState: {
+          provider: 'northflank',
+          projectId: 'project-1',
+          volumeId: 'volume-1',
+          volumeName: 'kc-ki-123',
+        },
+      } as never,
+      runtimeSpec,
+    });
+
+    const createPayload = vi.mocked(createDeploymentService).mock.calls[0]?.[2];
+    expect(createPayload?.billing.deploymentPlan).toBe('nf-compute-200');
+  });
+
+  it('falls back and warns for legacy Northflank tier labels', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(findServiceByName).mockResolvedValue(null);
+    vi.mocked(createDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+    vi.mocked(createProjectSecret).mockResolvedValue({ id: 'secret-1', name: 'kc-ki-123' });
+    vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+    vi.mocked(waitForDeploymentCompleted).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
+
+    await northflankProviderAdapter.startRuntime({
+      env: env as never,
+      state: {
+        sandboxId: 'ki_123',
+        instanceType: 'shared-2-3',
+        providerState: {
+          provider: 'northflank',
+          projectId: 'project-1',
+          volumeId: 'volume-1',
+          volumeName: 'kc-ki-123',
+        },
+      } as never,
+      runtimeSpec,
+    });
+
+    const createPayload = vi.mocked(createDeploymentService).mock.calls[0]?.[2];
+    expect(createPayload?.billing.deploymentPlan).toBe('nf-compute-200');
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[northflank] Legacy instance tier has no Northflank plan mapping; using default',
+      expect.objectContaining({ instanceType: 'shared-2-3' })
+    );
+    warnSpy.mockRestore();
   });
 
   it('maps missing service IDs to missing runtime observation', async () => {

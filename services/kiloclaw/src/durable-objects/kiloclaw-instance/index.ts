@@ -48,6 +48,7 @@ import type { ImageVariant } from '../../schemas/image-version';
 import {
   LIVE_CHECK_THROTTLE_MS,
   OPENCLAW_BUILTIN_DEFAULT_MODEL,
+  DEFAULT_VOLUME_SIZE_GB,
   RESTARTING_TIMEOUT_MS,
   STARTING_TIMEOUT_MS,
   WORKER_CONTROLLER_CAPABILITIES_VERSION,
@@ -60,6 +61,15 @@ import {
   MAX_CUSTOM_SECRETS,
   type SecretFieldKey,
 } from '@kilocode/kiloclaw-secret-catalog';
+import {
+  compareTierRank,
+  DEFAULT_INSTANCE_TIER,
+  getTier,
+  isOfferedTier,
+  tierFromMachineSize,
+  type InstanceTierKey,
+  type InstanceType,
+} from '@kilocode/kiloclaw-instance-tiers';
 import * as regionHelpers from '../regions';
 import { buildRuntimeSpec } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
@@ -97,6 +107,7 @@ import {
 import {
   restoreFromPostgres,
   markDestroyedInPostgresHelper,
+  syncInstanceTypeToPostgresHelper,
   syncTrackedImageTagToPostgresHelper,
 } from './postgres';
 import {
@@ -129,6 +140,36 @@ import type {
   ProviderResult,
   ProviderRoutingTarget,
 } from '../../providers/types';
+
+function resolvePersistedInstanceType(
+  instanceType: InstanceType | null,
+  machineSize: MachineSize | null,
+  volumeSizeGb: number | null
+): InstanceType | null {
+  return instanceType ?? tierFromMachineSize(machineSize, volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB);
+}
+
+function isDowngradeOrSidegrade(
+  currentType: InstanceType | null,
+  currentSize: MachineSize | null,
+  currentVolumeSizeGb: number,
+  targetTier: ReturnType<typeof getTier>
+): boolean {
+  if (currentType && currentType !== 'custom' && isOfferedTier(currentType)) {
+    return compareTierRank(targetTier.key, currentType) <= 0;
+  }
+  if (currentType && currentType !== 'custom' && !isOfferedTier(currentType)) {
+    return false;
+  }
+  const currentCpus = currentSize?.cpus ?? getTier(DEFAULT_INSTANCE_TIER).machineSize.cpus;
+  const currentMemoryMb =
+    currentSize?.memory_mb ?? getTier(DEFAULT_INSTANCE_TIER).machineSize.memory_mb;
+  return (
+    targetTier.machineSize.cpus < currentCpus ||
+    targetTier.machineSize.memory_mb < currentMemoryMb ||
+    targetTier.volumeSizeGb < currentVolumeSizeGb
+  );
+}
 
 // Re-export extracted helpers so existing consumers don't break.
 export {
@@ -319,6 +360,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     applyProviderState(this.s, result.providerState);
     if (result.corePatch?.machineSize !== undefined) {
       this.s.machineSize = result.corePatch.machineSize;
+    }
+    if (result.corePatch?.instanceType !== undefined) {
+      this.s.instanceType = result.corePatch.instanceType;
     }
     if (result.corePatch?.restartUpdateSent !== undefined) {
       this.s.restartUpdateSent = result.corePatch.restartUpdateSent;
@@ -713,6 +757,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const providerId =
       opts?.provider ?? (isNew ? resolveDefaultProvider(this.env) : this.s.provider);
     const orgId = opts?.orgId ?? null;
+    const inferredInstanceType =
+      this.s.instanceType ??
+      tierFromMachineSize(this.s.machineSize, this.s.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB);
+    const instanceType =
+      config.instanceType ?? inferredInstanceType ?? (isNew ? DEFAULT_INSTANCE_TIER : null);
+    const tier = instanceType && instanceType !== 'custom' ? getTier(instanceType) : null;
+    const nextMachineSize = tier?.machineSize ?? this.s.machineSize ?? null;
+    const nextVolumeSizeGb = tier?.volumeSizeGb ?? this.s.volumeSizeGb ?? null;
     const provider = getProviderAdapter(this.env, { provider: providerId });
     const provisioningState = {
       ...this.s,
@@ -720,13 +772,16 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       sandboxId,
       provider: providerId,
       orgId,
+      instanceType,
+      machineSize: nextMachineSize,
+      volumeSizeGb: nextVolumeSizeGb,
     } satisfies InstanceMutableState;
 
     const provisioning = await provider.ensureProvisioningResources({
       env: this.env,
       state: provisioningState,
       orgId,
-      machineSize: config.machineSize ?? null,
+      machineSize: nextMachineSize,
       region: config.region,
     });
     this.s.userId = userId;
@@ -770,7 +825,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       userLocation,
       kiloExaSearchMode: config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null,
       channels: config.channels ?? null,
-      machineSize: config.machineSize ?? this.s.machineSize ?? null,
+      machineSize: nextMachineSize,
+      instanceType,
+      volumeSizeGb: nextVolumeSizeGb,
     } satisfies Partial<PersistedState>;
 
     const versionFields = {
@@ -830,7 +887,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.userLocation = userLocation;
     this.s.kiloExaSearchMode = config.webSearch?.exaMode ?? this.s.kiloExaSearchMode ?? null;
     this.s.channels = config.channels ?? null;
-    this.s.machineSize = config.machineSize ?? this.s.machineSize ?? null;
+    this.s.machineSize = nextMachineSize;
+    this.s.instanceType = instanceType;
+    this.s.volumeSizeGb = nextVolumeSizeGb;
     if (isNew) {
       this.s.provisionedAt = Date.now();
       this.s.lastStartedAt = null;
@@ -2528,6 +2587,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     flyVolumeId: string | null;
     flyRegion: string | null;
     machineSize: MachineSize | null;
+    instanceType: InstanceType | null;
+    volumeSizeGb: number | null;
     openclawVersion: string | null;
     imageVariant: string | null;
     trackedImageTag: string | null;
@@ -2586,6 +2647,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyVolumeId: this.s.flyVolumeId,
       flyRegion: this.s.flyRegion,
       machineSize: this.s.machineSize,
+      instanceType: resolvePersistedInstanceType(
+        this.s.instanceType,
+        this.s.machineSize,
+        this.s.volumeSizeGb
+      ),
+      volumeSizeGb: this.s.volumeSizeGb,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
       trackedImageTag: this.s.trackedImageTag,
@@ -2663,6 +2730,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     flyVolumeId: string | null;
     flyRegion: string | null;
     machineSize: MachineSize | null;
+    instanceType: InstanceType | null;
+    volumeSizeGb: number | null;
     openclawVersion: string | null;
     imageVariant: string | null;
     trackedImageTag: string | null;
@@ -2749,6 +2818,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyVolumeId: this.s.flyVolumeId,
       flyRegion: this.s.flyRegion,
       machineSize: this.s.machineSize,
+      instanceType: resolvePersistedInstanceType(
+        this.s.instanceType,
+        this.s.machineSize,
+        this.s.volumeSizeGb
+      ),
+      volumeSizeGb: this.s.volumeSizeGb,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
       trackedImageTag: this.s.trackedImageTag,
@@ -2817,6 +2892,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         : undefined,
       channels: this.s.channels ?? undefined,
       machineSize: this.s.machineSize ?? undefined,
+      instanceType:
+        this.s.instanceType === 'custom' ? undefined : (this.s.instanceType ?? undefined),
       customSecretMeta: this.s.customSecretMeta ?? undefined,
       vectorMemoryEnabled: this.s.vectorMemoryEnabled,
       vectorMemoryModel: this.s.vectorMemoryModel,
@@ -2962,9 +3039,12 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
   // ── Machine resize (admin) ─────────────────────────────────────────
 
-  async resizeMachine(newSize: MachineSize): Promise<{
-    previousSize: MachineSize | null;
-    newSize: MachineSize;
+  async resizeMachine(targetTierKey: InstanceTierKey): Promise<{
+    previousTier: InstanceType | null;
+    newTier: InstanceTierKey;
+    previousVolumeSizeGb: number | null;
+    newVolumeSizeGb: number;
+    machineSize: MachineSize;
   }> {
     await this.loadState();
 
@@ -2980,18 +3060,85 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.status === 'recovering') {
       throw new Error('Cannot resize: instance is recovering from an unexpected stop');
     }
+    if (this.s.status === 'starting' || this.s.status === 'restarting') {
+      throw new Error(`Cannot resize: instance is busy (${this.s.status})`);
+    }
+    if (this.s.status !== 'stopped' && getRuntimeId(this.s)) {
+      throw Object.assign(new Error('Instance must be stopped before resizing machine tier'), {
+        status: 409,
+      });
+    }
+    if (this.s.provider === 'northflank') {
+      throw new Error('Instance tier resize is not yet supported on Northflank instances');
+    }
 
-    const previousSize = this.s.machineSize;
+    const targetTier = getTier(targetTierKey);
+    if (targetTier.status !== 'offered') {
+      throw new Error(`Instance tier ${targetTierKey} is not an offerable resize target`);
+    }
 
-    this.s.machineSize = newSize;
-    await this.persist({ machineSize: newSize });
+    const previousTier = resolvePersistedInstanceType(
+      this.s.instanceType,
+      this.s.machineSize,
+      this.s.volumeSizeGb
+    );
+    const previousVolumeSizeGb = this.s.volumeSizeGb;
+    const effectiveCurrentVolumeSizeGb = previousVolumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB;
+
+    if (
+      isDowngradeOrSidegrade(
+        previousTier,
+        this.s.machineSize,
+        effectiveCurrentVolumeSizeGb,
+        targetTier
+      )
+    ) {
+      throw new Error(
+        `Cannot resize from ${previousTier ?? 'custom'} to ${targetTierKey}: downgrades and sidegrades are not allowed`
+      );
+    }
+
+    if (this.s.provider === 'fly' && targetTier.volumeSizeGb > effectiveCurrentVolumeSizeGb) {
+      if (!this.s.flyVolumeId) {
+        throw new Error('Cannot resize: no Fly volume is associated with this instance');
+      }
+      await fly.extendVolume(
+        getFlyConfig(this.env, this.s),
+        this.s.flyVolumeId,
+        targetTier.volumeSizeGb
+      );
+      this.s.volumeSizeGb = targetTier.volumeSizeGb;
+      await this.persist({ volumeSizeGb: targetTier.volumeSizeGb });
+    }
+
+    this.s.instanceType = targetTier.key;
+    this.s.machineSize = targetTier.machineSize;
+    this.s.volumeSizeGb = targetTier.volumeSizeGb;
+    await this.persist({
+      instanceType: targetTier.key,
+      machineSize: targetTier.machineSize,
+      volumeSizeGb: targetTier.volumeSizeGb,
+    });
+
+    if (this.s.sandboxId) {
+      this.ctx.waitUntil(
+        syncInstanceTypeToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
+      );
+    }
 
     console.log(
       `[admin-machine-resize] userId=${this.s.userId} ` +
-        `previous=${JSON.stringify(previousSize)} new=${JSON.stringify(newSize)}`
+        `previousTier=${previousTier ?? 'unknown'} newTier=${targetTier.key} ` +
+        `previousVolume=${previousVolumeSizeGb ?? 'unknown'} newVolume=${targetTier.volumeSizeGb}`
     );
 
-    return { previousSize, newSize };
+    return {
+      previousTier,
+      newTier: targetTier.key,
+      previousVolumeSizeGb,
+      newVolumeSizeGb: targetTier.volumeSizeGb,
+      machineSize: targetTier.machineSize,
+    };
   }
 
   // ── Snapshot restore (admin) ───────────────────────────────────────
@@ -3404,7 +3551,15 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         if (machine.config?.guest) {
           const { cpus, memory_mb, cpu_kind } = machine.config.guest;
           this.s.machineSize = { cpus, memory_mb, cpu_kind };
-          await this.persist({ machineSize: this.s.machineSize });
+          this.s.instanceType =
+            tierFromMachineSize(
+              this.s.machineSize,
+              this.s.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB
+            ) ?? 'custom';
+          await this.persist({
+            machineSize: this.s.machineSize,
+            instanceType: this.s.instanceType,
+          });
         }
       }
 
@@ -3628,6 +3783,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.sandboxId) {
       this.ctx.waitUntil(
         syncTrackedImageTagToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
+      );
+      this.ctx.waitUntil(
+        syncInstanceTypeToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId, patch =>
+          this.persist(patch)
+        )
       );
     }
 

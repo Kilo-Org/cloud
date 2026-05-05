@@ -50,6 +50,8 @@ const fakeStatus = {
   flyVolumeId: 'fake-volume',
   flyRegion: 'iad',
   machineSize: null,
+  instanceType: null,
+  volumeSizeGb: null,
   openclawVersion: 'fake',
   imageVariant: null,
   trackedImageTag: null,

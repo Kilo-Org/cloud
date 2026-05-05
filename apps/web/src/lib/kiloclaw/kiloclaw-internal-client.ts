@@ -56,6 +56,7 @@ import type {
   UpdateProviderRolloutResponse,
   ProviderRolloutConfig,
 } from './types';
+import type { InstanceTierKey } from '@kilocode/kiloclaw-instance-tiers';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
 export interface FileNode {
@@ -985,7 +986,7 @@ export class KiloClawInternalClient {
 
   async resizeMachine(
     userId: string,
-    machineSize: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' },
+    instanceType: InstanceTierKey,
     instanceId?: string
   ): Promise<ResizeMachineResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -993,7 +994,7 @@ export class KiloClawInternalClient {
       `/api/platform/resize-machine${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, machineSize }),
+        body: JSON.stringify({ userId, instanceType }),
       },
       { userId }
     );

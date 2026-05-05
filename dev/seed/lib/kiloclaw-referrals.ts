@@ -1,4 +1,5 @@
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import type { KiloClawPaymentSource, KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
 import {
   credit_transactions,
   impact_advocate_participants,
@@ -36,8 +37,8 @@ type PersonalSubscriptionFixture = {
   name?: string | null;
   organizationId?: string | null;
   plan: 'trial' | 'standard' | 'commit';
-  status: 'trialing' | 'active' | 'past_due' | 'suspended' | 'canceled';
-  paymentSource?: 'credits' | 'hybrid' | 'stripe';
+  status: KiloClawSubscriptionStatus;
+  paymentSource?: KiloClawPaymentSource;
   currentPeriodStart?: string | null;
   currentPeriodEnd?: string | null;
   creditRenewalAt?: string | null;

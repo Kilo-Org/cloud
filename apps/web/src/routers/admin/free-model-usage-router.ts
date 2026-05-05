@@ -4,11 +4,26 @@ import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
 import { and, count, eq, gte } from 'drizzle-orm';
+import { headers } from 'next/headers';
+import { TRPCError } from '@trpc/server';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
   ADMIN_RATE_LIMIT_TEST_MODEL,
 } from '@/lib/constants';
+
+async function getCallerIp(): Promise<string> {
+  const headersList = await headers();
+  const forwarded = headersList.get('x-forwarded-for');
+  const ip = forwarded?.split(',')[0]?.trim();
+  if (!ip) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Unable to determine client IP address',
+    });
+  }
+  return ip;
+}
 
 function getWindowStart(): Date {
   return new Date(Date.now() - FREE_MODEL_RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000);
@@ -55,9 +70,9 @@ export const adminFreeModelUsageRouter = createTRPCRouter({
       };
     }
 
-    // ip_address is NOT NULL; use a sentinel since the per-user limit ignores IP.
+    const ipAddress = await getCallerIp();
     const rows = Array.from({ length: rowsNeeded }, () => ({
-      ip_address: 'admin-rate-limit-test',
+      ip_address: ipAddress,
       model: ADMIN_RATE_LIMIT_TEST_MODEL,
       kilo_user_id: kiloUserId,
     }));

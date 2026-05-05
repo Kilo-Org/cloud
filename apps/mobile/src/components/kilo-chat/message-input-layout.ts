@@ -1,4 +1,4 @@
-import { type TextStyle } from 'react-native';
+import { type TextInputProps, type TextStyle } from 'react-native';
 
 export const MESSAGE_INPUT_MIN_HEIGHT = 40;
 export const MESSAGE_INPUT_MAX_HEIGHT = 128;
@@ -18,6 +18,12 @@ export const messageInputTextStyle = {
   paddingTop: MESSAGE_INPUT_VERTICAL_PADDING,
   textAlignVertical: 'top',
 } satisfies TextStyle;
+
+export const messageInputKeyboardProps = {
+  keyboardType: 'default',
+  returnKeyType: 'default',
+  submitBehavior: 'newline',
+} satisfies Pick<TextInputProps, 'keyboardType' | 'returnKeyType' | 'submitBehavior'>;
 
 export function resolveMessageInputBottomPadding(): number {
   return MESSAGE_INPUT_BOTTOM_CLEARANCE;

@@ -4,6 +4,7 @@ import {
   MESSAGE_INPUT_BORDER_WIDTH,
   MESSAGE_INPUT_LINE_HEIGHT,
   MESSAGE_INPUT_MIN_HEIGHT,
+  messageInputKeyboardProps,
   messageInputTextStyle,
   resolveMessageInputBottomPadding,
 } from './message-input-layout';
@@ -24,5 +25,13 @@ describe('message input layout', () => {
 
   it('keeps composer bottom padding constant across safe-area insets', () => {
     expect(resolveMessageInputBottomPadding()).toBe(8);
+  });
+
+  it('uses a normal multiline keyboard return key instead of submitting from the keyboard', () => {
+    expect(messageInputKeyboardProps).toMatchObject({
+      keyboardType: 'default',
+      returnKeyType: 'default',
+      submitBehavior: 'newline',
+    });
   });
 });

@@ -6,7 +6,11 @@ import { type Message, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { messageInputTextStyle, resolveMessageInputBottomPadding } from './message-input-layout';
+import {
+  messageInputKeyboardProps,
+  messageInputTextStyle,
+  resolveMessageInputBottomPadding,
+} from './message-input-layout';
 import {
   applyMessageInputTextChange,
   isMessageInputOverLimit,
@@ -157,8 +161,7 @@ export function MessageInput({
                 });
               }}
               onSubmitEditing={submit}
-              returnKeyType="send"
-              submitBehavior="submit"
+              {...messageInputKeyboardProps}
             />
           </View>
           {onCancelEdit && (

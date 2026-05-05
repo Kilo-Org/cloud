@@ -121,4 +121,18 @@ describe('ChatSandboxInstanceEventSubscriptionMount', () => {
     expect(mocks.eventServiceOn).not.toHaveBeenCalledWith('bot.status', expect.any(Function));
     expect(mocks.registerConversationListCacheHandlers).toHaveBeenCalledTimes(1);
   });
+
+  it('passes the active conversation to shared instance cache handlers', () => {
+    testState.sandboxId = 'sandbox-1';
+
+    const mountInstanceEventSubscription = ChatSandboxInstanceEventSubscriptionMount;
+    mountInstanceEventSubscription({ activeConversationId: 'conversation-1' });
+
+    expect(mocks.registerConversationListCacheHandlers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeConversationId: 'conversation-1',
+        sandboxId: 'sandbox-1',
+      })
+    );
+  });
 });

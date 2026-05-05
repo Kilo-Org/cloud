@@ -4,9 +4,15 @@ import { useCallback } from 'react';
 import { useInstanceEventSubscription } from '@/components/kilo-chat/hooks/use-instance-event-subscription';
 import { setLastActiveInstance } from '@/lib/last-active-instance';
 
-export function ChatSandboxInstanceEventSubscriptionMount() {
+type ChatSandboxRouteMountsProps = {
+  activeConversationId?: string | null;
+};
+
+export function ChatSandboxInstanceEventSubscriptionMount({
+  activeConversationId = null,
+}: ChatSandboxRouteMountsProps = {}) {
   const { 'sandbox-id': sandboxId } = useLocalSearchParams<{ 'sandbox-id': string }>();
-  useInstanceEventSubscription(sandboxId);
+  useInstanceEventSubscription(sandboxId, activeConversationId);
   return null;
 }
 
@@ -24,10 +30,12 @@ function ChatSandboxLastActiveInstanceMount() {
   return null;
 }
 
-export function ChatSandboxRouteMounts() {
+export function ChatSandboxRouteMounts({
+  activeConversationId = null,
+}: ChatSandboxRouteMountsProps) {
   return (
     <>
-      <ChatSandboxInstanceEventSubscriptionMount />
+      <ChatSandboxInstanceEventSubscriptionMount activeConversationId={activeConversationId} />
       <ChatSandboxLastActiveInstanceMount />
     </>
   );

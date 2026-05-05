@@ -50,7 +50,7 @@ export default function ChatConversationRoute() {
 
   return (
     <>
-      <ChatSandboxRouteMounts />
+      <ChatSandboxRouteMounts activeConversationId={conversationId} />
       <ConversationScreen
         sandboxId={sandboxId}
         conversationId={conversationId}

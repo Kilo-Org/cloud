@@ -6,7 +6,7 @@ import { createGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
-const GITHUB_LINK_CALLBACK_PATH = '/api/github/link/callback';
+const GITHUB_CALLBACK_PATH = '/api/integrations/github/callback';
 
 export async function GET(_request: NextRequest) {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -20,10 +20,7 @@ export async function GET(_request: NextRequest) {
   const credentials = getGitHubAppCredentials('standard');
   const authorizeUrl = new URL(GITHUB_AUTHORIZE_URL);
   authorizeUrl.searchParams.set('client_id', credentials.clientId);
-  authorizeUrl.searchParams.set(
-    'redirect_uri',
-    new URL(GITHUB_LINK_CALLBACK_PATH, APP_URL).toString()
-  );
+  authorizeUrl.searchParams.set('redirect_uri', new URL(GITHUB_CALLBACK_PATH, APP_URL).toString());
   authorizeUrl.searchParams.set('state', createGitHubBotLinkState(user.id));
   authorizeUrl.searchParams.set('scope', 'read:user');
 

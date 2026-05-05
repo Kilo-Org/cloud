@@ -20,6 +20,55 @@ import type {
   Owner,
 } from '@/lib/integrations/core/types';
 import { captureException, captureMessage } from '@sentry/nextjs';
+import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
+import { githubUserIdentity, linkKiloUser } from '@/lib/bot-identity';
+import { bot } from '@/lib/bot';
+
+function htmlPage(title: string, message: string, status = 200): Response {
+  return new Response(
+    `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${title}</title></head>
+<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<div style="text-align:center">
+  <h1>${title}</h1>
+  <p>${message}</p>
+</div>
+</body></html>`,
+    { status, headers: { 'content-type': 'text/html; charset=utf-8' } }
+  );
+}
+
+async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: string }) {
+  const searchParams = request.nextUrl.searchParams;
+  const code = searchParams.get('code');
+  const state = verifyGitHubBotLinkState(searchParams.get('state'));
+
+  if (!code || !state) {
+    return htmlPage(
+      'Link Failed',
+      'Invalid or expired GitHub link request. Please try again.',
+      400
+    );
+  }
+
+  if (state.userId !== user.id) {
+    return htmlPage(
+      'Link Failed',
+      'This GitHub link request was started by another Kilo user.',
+      403
+    );
+  }
+
+  const githubUser = await exchangeGitHubOAuthCode(code, 'standard');
+
+  await bot.initialize();
+  await linkKiloUser(bot.getState(), githubUserIdentity(githubUser.id), user.id);
+
+  return htmlPage(
+    'GitHub account linked',
+    `GitHub account ${githubUser.login} has been linked to your Kilo account.<br>You can return to GitHub and mention Kilo again.`
+  );
+}
 
 /**
  * GitHub App Installation Callback
@@ -41,6 +90,13 @@ export async function GET(request: NextRequest) {
     const installationId = searchParams.get('installation_id') ?? '';
     const setupAction = searchParams.get('setup_action');
     const state = searchParams.get('state'); // Contains owner info (org_ID or user_ID)
+
+    if (!state?.startsWith('org_') && !state?.startsWith('user_')) {
+      const botLinkState = verifyGitHubBotLinkState(state);
+      if (botLinkState) {
+        return await handleGitHubBotLinkCallback(request, user);
+      }
+    }
 
     // 3. Parse owner from state
     let owner: Owner;

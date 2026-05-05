@@ -72,7 +72,7 @@ describe('GET /github/link', () => {
     );
     expect(redirectUrl.searchParams.get('client_id')).toBe('github-client-id');
     expect(redirectUrl.searchParams.get('redirect_uri')).toBe(
-      'http://localhost:3000/api/github/link/callback'
+      'http://localhost:3000/api/integrations/github/callback'
     );
     expect(redirectUrl.searchParams.get('state')).toBe('signed-state');
     expect(redirectUrl.searchParams.get('scope')).toBe('read:user');

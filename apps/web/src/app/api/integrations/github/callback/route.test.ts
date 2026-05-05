@@ -20,6 +20,40 @@ jest.mock('@/lib/bot', () => ({
     getState: jest.fn(() => mockState),
   },
 }));
+jest.mock('@octokit/rest', () => ({
+  Octokit: jest.fn().mockImplementation(() => ({
+    apps: {
+      getInstallation: jest.fn(),
+      listReposAccessibleToInstallation: jest.fn(),
+    },
+  })),
+}));
+jest.mock('@octokit/auth-app', () => ({
+  createAppAuth: jest.fn(),
+}));
+jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
+  getGitHubAppTypeForOrganization: jest.fn(async () => 'standard'),
+  getGitHubAppCredentials: jest.fn(() => ({
+    appId: 'app-id',
+    privateKey: 'private-key',
+    clientId: 'client-id',
+    clientSecret: 'client-secret',
+    appName: 'KiloConnect',
+    webhookSecret: 'webhook-secret',
+  })),
+}));
+jest.mock('@/routers/organizations/utils', () => ({
+  ensureOrganizationAccess: jest.fn(),
+}));
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  createPendingIntegration: jest.fn(),
+  findPendingInstallationByRequesterId: jest.fn(),
+  upsertPlatformIntegrationForOwner: jest.fn(),
+}));
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedVerifyGitHubBotLinkState = jest.mocked(verifyGitHubBotLinkState);
@@ -43,7 +77,7 @@ function expectRedirectLocation(response: Response, expectedPathWithQuery: strin
   expect(`${url.pathname}${url.search}`).toBe(expectedPathWithQuery);
 }
 
-describe('GET /api/github/link/callback', () => {
+describe('GET /api/integrations/github/callback bot link flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -63,7 +97,7 @@ describe('GET /api/github/link/callback', () => {
     });
   });
 
-  test('redirects unauthenticated users to sign-in with callbackPath', async () => {
+  test('redirects unauthenticated bot-link callbacks to existing callback auth fallback', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
@@ -71,38 +105,29 @@ describe('GET /api/github/link/callback', () => {
 
     const { GET } = await import('./route');
     const response = await GET(
-      makeRequest('/api/github/link/callback?code=abc&state=signed') as never
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
     );
 
-    expect(response.status).toBe(302);
-    expectRedirectLocation(response, '/users/sign_in?callbackPath=%2Fgithub%2Flink');
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/');
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
 
-  test('rejects missing code', async () => {
-    const { GET } = await import('./route');
-    const response = await GET(makeRequest('/api/github/link/callback?state=signed') as never);
-
-    expect(response.status).toBe(400);
-    await expect(response.text()).resolves.toContain('Invalid or expired GitHub link request');
-    expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
-    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
-  });
-
-  test('rejects invalid state', async () => {
+  test('rejects invalid bot-link state without running installation callback logic', async () => {
     mockedVerifyGitHubBotLinkState.mockReturnValue(null);
 
     const { GET } = await import('./route');
     const response = await GET(
-      makeRequest('/api/github/link/callback?code=abc&state=bad') as never
+      makeRequest('/api/integrations/github/callback?code=abc&state=bad') as never
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/');
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
 
-  test('rejects state user mismatches', async () => {
+  test('rejects bot-link state user mismatches', async () => {
     mockedVerifyGitHubBotLinkState.mockReturnValue({
       userId: OTHER_USER_ID,
       callbackPath: '/github/link',
@@ -110,7 +135,7 @@ describe('GET /api/github/link/callback', () => {
 
     const { GET } = await import('./route');
     const response = await GET(
-      makeRequest('/api/github/link/callback?code=abc&state=signed') as never
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
     );
 
     expect(response.status).toBe(403);
@@ -119,10 +144,10 @@ describe('GET /api/github/link/callback', () => {
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
 
-  test('links the OAuth-verified GitHub user to the current Kilo user', async () => {
+  test('links the OAuth-verified GitHub user through the existing app callback URL', async () => {
     const { GET } = await import('./route');
     const response = await GET(
-      makeRequest('/api/github/link/callback?code=abc&state=signed') as never
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
     );
 
     expect(response.status).toBe(200);

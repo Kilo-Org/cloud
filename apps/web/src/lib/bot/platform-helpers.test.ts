@@ -12,12 +12,6 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
-jest.mock('@/lib/bot', () => ({
-  bot: {
-    getAdapter: jest.fn(),
-  },
-}));
-
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   getBotDocumentationUrl,
@@ -29,23 +23,12 @@ import {
 } from './platform-helpers';
 import type { Thread, Message } from 'chat';
 
-type MockBotModule = {
-  bot: {
-    getAdapter: jest.Mock;
-  };
-};
-
-const mockBotModule: MockBotModule = jest.requireMock('@/lib/bot');
 const mockGetInstallationId = jest.fn();
 
 describe('platform helpers', () => {
   beforeEach(() => {
     mockLimit.mockReset();
     mockGetInstallationId.mockReset();
-    mockBotModule.bot.getAdapter.mockReset();
-    mockBotModule.bot.getAdapter.mockReturnValue({
-      getInstallationId: mockGetInstallationId,
-    });
   });
 
   it('returns the platform integration for a given identity', async () => {
@@ -128,12 +111,15 @@ describe('platform helpers', () => {
     mockGetInstallationId.mockResolvedValue(98765);
 
     const identity = await getPlatformIdentity(
-      { id: 'github:acme/widgets:42' } as Thread,
-      message as Message
+      { adapter: { name: PLATFORM.GITHUB }, id: 'github:acme/widgets:42' } as Thread,
+      message as Message,
+      mockGetInstallationId
     );
 
-    expect(mockBotModule.bot.getAdapter).toHaveBeenCalledWith(PLATFORM.GITHUB);
-    expect(mockGetInstallationId).toHaveBeenCalledWith({ id: 'github:acme/widgets:42' });
+    expect(mockGetInstallationId).toHaveBeenCalledWith({
+      adapter: { name: PLATFORM.GITHUB },
+      id: 'github:acme/widgets:42',
+    });
     expect(identity).toEqual({
       platform: PLATFORM.GITHUB,
       teamId: '98765',
@@ -151,7 +137,11 @@ describe('platform helpers', () => {
     mockGetInstallationId.mockResolvedValue(null);
 
     await expect(
-      getPlatformIdentity({ id: 'github:acme/widgets:42' } as Thread, message)
+      getPlatformIdentity(
+        { adapter: { name: PLATFORM.GITHUB }, id: 'github:acme/widgets:42' } as Thread,
+        message,
+        mockGetInstallationId
+      )
     ).rejects.toThrow('Could not find GitHub installation ID for thread github:acme/widgets:42');
   });
 

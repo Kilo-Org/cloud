@@ -266,7 +266,9 @@ function createKiloBot(
     thread: Thread,
     message: Message
   ): Promise<void> {
-    const identity = await getPlatformIdentity(thread, message);
+    const identity = await getPlatformIdentity(thread, message, githubThread =>
+      githubAdapter.getInstallationId(githubThread)
+    );
     const userIdentity = getPlatformUserIdentity(identity);
     const [platformIntegration, kiloUserId] = await Promise.all([
       getPlatformIntegration(identity),

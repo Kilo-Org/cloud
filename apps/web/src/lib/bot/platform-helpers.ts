@@ -4,8 +4,9 @@ import { eq, and, sql } from 'drizzle-orm';
 import { platform_integrations } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { bot } from '@/lib/bot';
 import { type SlackEvent } from '@chat-adapter/slack';
+
+type GetGitHubInstallationId = (thread: Thread) => Promise<string | number | null | undefined>;
 
 export function getSlackTeamId(message: Message<SlackEvent>): string {
   const teamId = message.raw.team_id ?? message.raw.team;
@@ -21,13 +22,14 @@ export function getSlackTeamId(message: Message<SlackEvent>): string {
  */
 export async function getPlatformIdentity(
   thread: Thread,
-  message: Message
+  message: Message,
+  getGitHubInstallationId: GetGitHubInstallationId
 ): Promise<PlatformIdentity> {
   const platform = thread.adapter.name;
 
   switch (platform) {
     case PLATFORM.GITHUB: {
-      const teamId = await bot.getAdapter(PLATFORM.GITHUB).getInstallationId(thread);
+      const teamId = await getGitHubInstallationId(thread);
 
       if (!teamId) {
         throw new Error(`Could not find GitHub installation ID for thread ${thread.id}`);

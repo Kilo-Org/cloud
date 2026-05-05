@@ -35,6 +35,10 @@ Target a specific test file: `pnpm test -- <path>`. Run tests for a specific ser
 
 **Before running tests**, ensure the test database is running. If there is no active Postgres instance, run `pnpm test:db` first — this starts the Postgres container and applies migrations. You can check whether Postgres is already running with `docker compose -f dev/docker-compose.yml ps postgres`.
 
+## apps/web UI Work
+
+Before making or reviewing UI changes under `apps/web` — components, routes/pages, layouts, styling, Storybook, visual polish, UX copy, interaction states, responsive behavior, theming, or accessibility — read `design.md` and use `.agents/skills/kilo-design/SKILL.md`. This applies even when the prompt does not explicitly mention design. Skip only for backend-only or non-visual logic changes.
+
 ## Coding Standards
 
 - Prefer `type` over `interface`.

@@ -5,22 +5,13 @@ import { platform_integrations } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { bot } from '@/lib/bot';
+import { type SlackEvent } from '@chat-adapter/slack';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object';
-}
+export function getSlackTeamId(message: Message<SlackEvent>): string {
+  const teamId = message.raw.team_id ?? message.raw.team;
 
-function readStringProperty(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  return typeof value === 'string' ? value : undefined;
-}
-
-export function getSlackTeamId(message: { raw: unknown }): string {
-  if (!isRecord(message.raw)) throw new Error('Expected a teamId in message.raw');
-
-  const teamId =
-    readStringProperty(message.raw, 'team_id') ?? readStringProperty(message.raw, 'team');
   if (!teamId) throw new Error('Expected a teamId in message.raw');
+
   return teamId;
 }
 
@@ -49,7 +40,7 @@ export async function getPlatformIdentity(
       };
     }
     case PLATFORM.SLACK: {
-      const teamId = getSlackTeamId(message);
+      const teamId = getSlackTeamId(message as Message<SlackEvent>);
       return { platform: PLATFORM.SLACK, teamId, userId: message.author.userId };
     }
     default:

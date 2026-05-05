@@ -254,6 +254,13 @@ export function generateBaseConfig(
   // discovery populate the catalog. Stale model entries written by an older
   // `openclaw onboard` are intentionally cleared here.
   config.models.providers.kilocode.models = [];
+  // Auth must come from `KILOCODE_API_KEY` env (env-backed SecretRef in
+  // `auth-profiles.json` for new installs). A literal `apiKey` in
+  // `openclaw.json` is never the source of truth on kiloclaw, but the
+  // previous deletion-based migration was incidentally scrubbing the field.
+  // Preserve that scrub explicitly so any pre-existing plaintext key from a
+  // legacy onboard run does not linger on disk.
+  delete config.models.providers.kilocode.apiKey;
 
   // KiloCode provider base URL override (local dev only).
   // OpenClaw's native kilocode provider hardcodes https://api.kilo.ai/api/gateway/.

@@ -381,6 +381,31 @@ describe('generateBaseConfig', () => {
     expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
+  // Auth must come from `KILOCODE_API_KEY` env, never from a literal `apiKey`
+  // field on disk. The previous deletion-based migration was incidentally
+  // scrubbing the field; this test pins that the new normalization keeps that
+  // scrub so a stale plaintext credential from a legacy onboard run cannot
+  // survive across boots.
+  it('scrubs a stale plaintext apiKey from the kilocode provider entry', () => {
+    const existing = JSON.stringify({
+      models: {
+        providers: {
+          kilocode: {
+            baseUrl: 'https://api.kilo.ai/api/gateway/',
+            api: 'openai-completions',
+            apiKey: 'sk-stale-plaintext',
+            models: [],
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.models.providers.kilocode.apiKey).toBeUndefined();
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+  });
+
   it('keeps gateway provider for org-scoped instances but clears static models', () => {
     const existing = JSON.stringify({
       models: {

@@ -11,7 +11,7 @@ import type {
   KiloExaSearchMode,
 } from '../schemas/instance-config';
 import { deriveGatewayToken } from '../auth/gateway-token';
-import { hostnameLabelFromSandboxId } from '../auth/hostname-label';
+import { hostnameLabelFromSandboxId, instanceUrl } from '../auth/hostname-label';
 import {
   mergeEnvVarsWithSecrets,
   decryptChannelTokens,
@@ -230,13 +230,15 @@ export async function buildEnvVars(
   if (env.DISCORD_DM_POLICY) plainEnv.DISCORD_DM_POLICY = env.DISCORD_DM_POLICY;
 
   // Control UI allowed origins. Starts from the worker-level shared list,
-  // then appends a per-instance virtual host `https://<label>.kiloclaw.ai`
-  // derived from the sandboxId. Two label shapes, distinguishable by prefix:
+  // then appends a per-instance virtual host derived from the sandboxId.
+  // Two label shapes, distinguishable by prefix:
   //   instance-keyed: `i-{32hex}`   (ki_{32hex} sandboxId)
-  //   legacy:         `u-{body}`    (base64url-encoded userId)
-  // OpenClaw's origin check does exact-string matching, so each hostname
-  // must be enumerated explicitly — this covers both instance-keyed and
-  // legacy sandboxes with a single per-instance origin.
+  //   legacy:         `u-{body}`    (base32hex-encoded userId)
+  // The host suffix + scheme are env-configurable (see `instanceUrl` in
+  // `auth/hostname-label.ts`) so dev setups can use
+  // `http://<label>.kiloclaw.localhost:8795` and production stays on
+  // `https://<label>.kiloclaw.ai`. OpenClaw's origin check does exact-string
+  // matching, so each hostname must be enumerated explicitly.
   const originEntries: string[] = [];
   if (env.OPENCLAW_ALLOWED_ORIGINS) {
     for (const raw of env.OPENCLAW_ALLOWED_ORIGINS.split(',')) {
@@ -246,9 +248,23 @@ export async function buildEnvVars(
   }
   const perInstanceLabel = hostnameLabelFromSandboxId(sandboxId);
   if (perInstanceLabel) {
-    const perInstanceOrigin = `https://${perInstanceLabel}.kiloclaw.ai`;
-    if (!originEntries.includes(perInstanceOrigin)) {
-      originEntries.push(perInstanceOrigin);
+    // buildEnvVars runs at machine provision/start time, which is outside
+    // the normal request-middleware chain, so validateRequiredEnv has not
+    // run. Guard explicitly: if the suffix/scheme aren't configured, log
+    // and skip per-instance origin injection rather than aborting the
+    // machine boot. The catch-all proxy refuses requests when the vars
+    // are missing anyway, so the skipped origin wouldn't have been
+    // reachable.
+    try {
+      const perInstanceOrigin = instanceUrl(perInstanceLabel, env);
+      if (!originEntries.includes(perInstanceOrigin)) {
+        originEntries.push(perInstanceOrigin);
+      }
+    } catch (err) {
+      console.warn(
+        '[buildEnvVars] Skipping per-instance origin injection — host config missing:',
+        err instanceof Error ? err.message : err
+      );
     }
   }
   if (originEntries.length > 0) {

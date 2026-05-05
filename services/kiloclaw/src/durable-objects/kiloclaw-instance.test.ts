@@ -8759,6 +8759,51 @@ describe('reassociateVolume', () => {
 });
 
 // ============================================================================
+// instanceType resolution (getStatus self-heal)
+// ============================================================================
+
+describe('getStatus instanceType resolution', () => {
+  it('drops a stale custom label when machineSize is null', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      instanceType: 'custom',
+      machineSize: null,
+      volumeSizeGb: null,
+    });
+
+    const result = await instance.getStatus();
+
+    expect(result.instanceType).toBeNull();
+  });
+
+  it('preserves custom when backed by a non-catalog machineSize', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      instanceType: 'custom',
+      machineSize: { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    const result = await instance.getStatus();
+
+    expect(result.instanceType).toBe('custom');
+  });
+
+  it('does not propagate a stale custom label on re-provision', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      instanceType: 'custom',
+      machineSize: null,
+      volumeSizeGb: null,
+    });
+
+    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+
+    expect(storage._store.get('instanceType')).not.toBe('custom');
+  });
+});
+
+// ============================================================================
 // resizeMachine
 // ============================================================================
 

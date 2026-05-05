@@ -154,6 +154,28 @@ const CHANNEL_ENV_VARS = new Set(
 );
 const BRAVE_SEARCH_FIELD_KEY = 'braveSearchApiKey';
 
+/**
+ * Resolve a coherent instanceType for the given DO state.
+ *
+ * Self-heals two pathological persisted shapes:
+ * - `instanceType === 'custom'` with `machineSize === null`: incoherent — we
+ *   can't actually tell whether it's custom without hardware to compare. Drop
+ *   the stale label and re-run inference.
+ * - `instanceType` is a known catalog key but `machineSize === null`: trust
+ *   the persisted label (catalog tier is its own evidence).
+ *
+ * For null persisted state, falls back to live inference from machineSize +
+ * volumeSizeGb, which returns null when there's nothing to infer from.
+ */
+function resolveInstanceTypeFromState(
+  state: Pick<InstanceMutableState, 'instanceType' | 'machineSize' | 'volumeSizeGb'>
+): InstanceType | null {
+  if (state.instanceType === 'custom' && state.machineSize === null) {
+    return tryInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
+  }
+  return state.instanceType ?? tryInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
+}
+
 export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   private s: InstanceMutableState = createMutableState();
   private startInProgress = false;
@@ -722,8 +744,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const providerId =
       opts?.provider ?? (isNew ? resolveDefaultProvider(this.env) : this.s.provider);
     const orgId = opts?.orgId ?? null;
-    const inferredInstanceType =
-      this.s.instanceType ?? tryInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
+    const inferredInstanceType = resolveInstanceTypeFromState(this.s);
     const instanceType =
       config.instanceType ?? inferredInstanceType ?? (isNew ? DEFAULT_INSTANCE_TIER : null);
     const tier = instanceType && instanceType !== 'custom' ? getTier(instanceType) : null;
@@ -854,6 +875,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.machineSize = nextMachineSize;
     this.s.instanceType = instanceType;
     this.s.volumeSizeGb = nextVolumeSizeGb;
+    console.log('[instance-tier-debug] provision persisting tier', {
+      userId,
+      sandboxId,
+      provider: this.s.provider,
+      isNew,
+      configInstanceType: config.instanceType,
+      inferredInstanceType,
+      finalInstanceType: instanceType,
+      machineSize: nextMachineSize,
+      volumeSizeGb: nextVolumeSizeGb,
+    });
     if (isNew) {
       this.s.provisionedAt = Date.now();
       this.s.lastStartedAt = null;
@@ -2554,8 +2586,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyVolumeId: this.s.flyVolumeId,
       flyRegion: this.s.flyRegion,
       machineSize: this.s.machineSize,
-      instanceType:
-        this.s.instanceType ?? tryInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb),
+      instanceType: resolveInstanceTypeFromState(this.s),
       volumeSizeGb: this.s.volumeSizeGb,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
@@ -2690,8 +2721,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       flyVolumeId: this.s.flyVolumeId,
       flyRegion: this.s.flyRegion,
       machineSize: this.s.machineSize,
-      instanceType:
-        this.s.instanceType ?? tryInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb),
+      instanceType: resolveInstanceTypeFromState(this.s),
       volumeSizeGb: this.s.volumeSizeGb,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
@@ -2946,8 +2976,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       throw new Error(`Instance tier ${targetTierKey} is not an offerable resize target`);
     }
 
-    const previousTier =
-      this.s.instanceType ?? tryInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
+    const previousTier = resolveInstanceTypeFromState(this.s);
     const previousVolumeSizeGb = this.s.volumeSizeGb;
 
     if (
@@ -3420,6 +3449,14 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           const { cpus, memory_mb, cpu_kind } = machine.config.guest;
           this.s.machineSize = { cpus, memory_mb, cpu_kind };
           this.s.instanceType = resolveInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
+          console.log('[instance-tier-debug] restartMachine backfill', {
+            userId: this.s.userId,
+            sandboxId: this.s.sandboxId,
+            provider: this.s.provider,
+            machineSize: this.s.machineSize,
+            volumeSizeGb: this.s.volumeSizeGb,
+            resolvedInstanceType: this.s.instanceType,
+          });
           await this.persist({
             machineSize: this.s.machineSize,
             instanceType: this.s.instanceType,

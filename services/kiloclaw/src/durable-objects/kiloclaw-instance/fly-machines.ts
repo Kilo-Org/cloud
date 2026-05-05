@@ -316,6 +316,13 @@ export async function startExistingMachine(
       const { cpus, memory_mb, cpu_kind } = machine.config.guest;
       machineSizePatch = { cpus, memory_mb, cpu_kind };
       const instanceTypePatch = resolveInstanceTypeLabel(machineSizePatch, state.volumeSizeGb);
+      console.log('[instance-tier-debug] startExistingMachine backfill', {
+        userId: state.userId,
+        sandboxId: state.sandboxId,
+        machineSize: machineSizePatch,
+        volumeSizeGb: state.volumeSizeGb,
+        resolvedInstanceType: instanceTypePatch,
+      });
       machineConfig = { ...machineConfig, guest: guestFromSize(machineSizePatch) };
       await persistProviderResult({
         providerState,

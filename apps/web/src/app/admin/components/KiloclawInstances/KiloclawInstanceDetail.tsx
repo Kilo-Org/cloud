@@ -3255,8 +3255,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 Resize Machine
               </DialogTitle>
               <DialogDescription className="pt-3">
-                This will stop the machine, update its CPU/memory spec, and restart it. The user
-                will be disconnected during the restart. Fly volumes can grow but not shrink.
+                This will stop the machine, update its CPU/memory and storage spec, and restart it.
+                The user will be disconnected during the restart.
                 <span className="text-foreground mt-2 block font-medium">
                   User: {data?.user_email ?? data?.user_id}
                 </span>
@@ -3298,16 +3298,28 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   })}
                 </select>
               </div>
-              {getTier(selectedInstanceType).volumeSizeGb >
-                (data?.workerStatus?.volumeSizeGb ?? 10) && (
-                <Alert className="border-orange-500/30 bg-orange-500/10">
-                  <AlertTriangle className="h-4 w-4 text-orange-500" />
-                  <AlertDescription className="text-orange-700 dark:text-orange-300">
-                    Storage will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB to{' '}
-                    {getTier(selectedInstanceType).volumeSizeGb} GB. This cannot be undone.
-                  </AlertDescription>
-                </Alert>
-              )}
+              {data?.workerStatus?.provider === 'fly' &&
+                getTier(selectedInstanceType).volumeSizeGb >
+                  (data?.workerStatus?.volumeSizeGb ?? 10) && (
+                  <Alert className="border-orange-500/30 bg-orange-500/10">
+                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    <AlertDescription className="text-orange-700 dark:text-orange-300">
+                      Fly volume will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB to{' '}
+                      {getTier(selectedInstanceType).volumeSizeGb} GB. Fly volumes can grow but
+                      cannot be shrunk.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              {data?.workerStatus?.provider === 'docker-local' &&
+                getTier(selectedInstanceType).volumeSizeGb !==
+                  (data?.workerStatus?.volumeSizeGb ?? 10) && (
+                  <Alert className="border-muted-foreground/30 bg-muted/30">
+                    <AlertDescription className="text-muted-foreground">
+                      docker-local uses a host bind mount; storage will stay at its current size
+                      regardless of tier. Only CPU and memory limits will change.
+                    </AlertDescription>
+                  </Alert>
+                )}
               <div>
                 <label className="text-sm font-medium">
                   Type <code className="text-destructive text-xs">RESIZE</code> to confirm

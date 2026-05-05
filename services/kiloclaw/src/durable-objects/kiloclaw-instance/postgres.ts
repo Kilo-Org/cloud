@@ -171,6 +171,13 @@ export async function restoreFromPostgres(
         : await recoverFlyProviderState(env, restoredUserId, instance.sandboxId);
     const recoveredAppName = providerState.provider === 'fly' ? providerState.appName : null;
     const restoredInstanceType = InstanceTypeSchema.nullable().parse(instance.instanceType ?? null);
+    console.log('[instance-tier-debug] restoreFromPostgres restoring tier', {
+      userId: restoredUserId,
+      sandboxId: instance.sandboxId,
+      providerFromDb: instance.provider,
+      providerEffective: provider,
+      restoredInstanceType,
+    });
 
     await ctx.storage.put(
       storageUpdate({
@@ -302,6 +309,14 @@ export async function syncInstanceTypeToPostgresHelper(
     if (instanceType === null) {
       if (state.machineSize === null) return;
       instanceType = resolveInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
+      console.log('[instance-tier-debug] syncInstanceTypeToPostgresHelper inferring tier', {
+        userId,
+        sandboxId,
+        provider: state.provider,
+        machineSize: state.machineSize,
+        volumeSizeGb: state.volumeSizeGb,
+        resolvedInstanceType: instanceType,
+      });
       state.instanceType = instanceType;
       await persist?.({ instanceType });
     }

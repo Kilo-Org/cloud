@@ -1164,6 +1164,14 @@ export async function syncStatusFromLiveCheck(
       const { cpus, memory_mb, cpu_kind } = machine.config.guest;
       state.machineSize = { cpus, memory_mb, cpu_kind };
       state.instanceType = resolveInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
+      console.log('[instance-tier-debug] reconcile live-check backfill', {
+        userId: state.userId,
+        sandboxId: state.sandboxId,
+        provider: state.provider,
+        machineSize: state.machineSize,
+        volumeSizeGb: state.volumeSizeGb,
+        resolvedInstanceType: state.instanceType,
+      });
       await ctx.storage.put(
         storageUpdate({ machineSize: state.machineSize, instanceType: state.instanceType })
       );

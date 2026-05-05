@@ -82,7 +82,7 @@ function minimalEnv(): Record<string, string | undefined> {
 }
 
 describe('generateBaseConfig', () => {
-  it('generates config with gateway and exec defaults, no kilocode provider entry', () => {
+  it('generates config with gateway, exec defaults, and a kilocode provider entry that triggers live discovery', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
@@ -93,8 +93,11 @@ describe('generateBaseConfig', () => {
     expect(config.gateway.auth.token).toBe('test-gw-token');
     expect(config.gateway.controlUi.allowInsecureAuth).toBe(true);
 
-    // No kilocode provider entry in production — built-in provider takes over
-    expect(config.models).toBeUndefined();
+    // The bundled kilocode plugin only loads when this entry is present.
+    // Empty `models` lets live gateway discovery own the catalog.
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.api).toBe('openai-completions');
+    expect(config.models.providers.kilocode.models).toEqual([]);
 
     // No default model override when env var not set, and no memorySearch
     // schema introduced when the feature is off and absent from existing config.
@@ -311,7 +314,7 @@ describe('generateBaseConfig', () => {
     expect(config.gateway.port).toBe(3001);
   });
 
-  it('removes stale kilocode provider with /api/openrouter/ baseUrl', () => {
+  it('removes stale kilocode openrouter entry and rebuilds it pointed at the production gateway', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
@@ -327,17 +330,43 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    // Stale provider deleted, models object cleaned up
-    expect(config.models).toBeUndefined();
+    // Stale entry replaced — old apiKey and models dropped, baseUrl pointed
+    // at the production gateway so the bundled plugin can load.
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.api).toBe('openai-completions');
+    expect(config.models.providers.kilocode.models).toEqual([]);
+    expect(config.models.providers.kilocode.apiKey).toBeUndefined();
   });
 
-  it('removes stale kilocode provider with production /api/gateway/ baseUrl', () => {
+  // Regression: an earlier migration deleted the kilocode provider entry on
+  // personal (non-org) instances, expecting the bundled openclaw kilocode
+  // plugin to auto-activate from KILOCODE_API_KEY alone. It does not — the
+  // plugin only loads when an explicit provider entry is present, so without
+  // it `kilo-auto/balanced` and the rest of the dynamic catalog were never
+  // discovered and the agent failed with "Unknown model".
+  it('keeps kilocode provider entry on personal instances (no KILOCODE_ORGANIZATION_ID) so the bundled plugin loads', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCODE_DEFAULT_MODEL: 'kilocode/kilo-auto/balanced',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.api).toBe('openai-completions');
+    expect(config.models.providers.kilocode.models).toEqual([]);
+    expect(config.models.providers.kilocode.headers?.['X-KiloCode-OrganizationId']).toBeUndefined();
+    expect(config.agents.defaults.model.primary).toBe('kilocode/kilo-auto/balanced');
+  });
+
+  it('preserves kilocode provider with production /api/gateway/ baseUrl and clears stale models', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
           kilocode: {
             baseUrl: 'https://api.kilo.ai/api/gateway/',
-            models: [],
+            api: 'openai-completions',
+            models: [{ id: 'kilo/auto', name: 'Kilo Auto' }],
           },
         },
       },
@@ -345,7 +374,11 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    expect(config.models).toBeUndefined();
+    // Entry preserved (so the plugin loads), stale onboard-written models
+    // cleared so live discovery owns the catalog.
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.api).toBe('openai-completions');
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('keeps gateway provider for org-scoped instances but clears static models', () => {
@@ -396,7 +429,7 @@ describe('generateBaseConfig', () => {
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
   });
 
-  it('preserves non-kilocode providers when removing stale kilocode entry', () => {
+  it('preserves non-kilocode providers when rebuilding stale kilocode openrouter entry', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
@@ -414,9 +447,9 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    // kilocode removed, openai preserved
-    expect(config.models.providers.kilocode).toBeUndefined();
+    // openai preserved, kilocode rebuilt with production gateway URL
     expect(config.models.providers.openai.baseUrl).toBe('https://api.openai.com/v1');
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
   });
 
   it('creates kilocode provider with baseUrl and models: [] when KILOCODE_API_BASE_URL is set', () => {
@@ -428,7 +461,7 @@ describe('generateBaseConfig', () => {
     expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
-  it('preserves existing models array when overriding baseUrl', () => {
+  it('clears stale models when overriding baseUrl, since live discovery owns the catalog', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
@@ -443,9 +476,10 @@ describe('generateBaseConfig', () => {
     const env = { ...minimalEnv(), KILOCODE_API_BASE_URL: 'https://new-tunnel.example.com/' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
-    // baseUrl updated, existing models preserved
+    // baseUrl updated, stale onboard-written models cleared so live
+    // discovery populates the catalog from the new endpoint.
     expect(config.models.providers.kilocode.baseUrl).toBe('https://new-tunnel.example.com/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('sets X-KiloCode-OrganizationId header when KILOCODE_ORGANIZATION_ID is set', () => {
@@ -465,8 +499,10 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    // No kilocode provider entry created when neither baseUrl nor orgId is set
-    expect(config.models).toBeUndefined();
+    // Personal instance: kilocode entry still present (the bundled plugin
+    // requires it to load), but no org header attached.
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.headers?.['X-KiloCode-OrganizationId']).toBeUndefined();
   });
 
   it('preserves existing kilocode baseUrl and headers when adding org header', () => {
@@ -517,7 +553,8 @@ describe('generateBaseConfig', () => {
     // Other headers and config preserved
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('preserved');
     expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    // models cleared so live discovery from the (preserved) baseUrl owns the catalog
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('removes agents.defaults.models allowlist left by openclaw onboard', () => {

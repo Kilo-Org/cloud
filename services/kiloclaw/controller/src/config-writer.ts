@@ -226,43 +226,41 @@ export function generateBaseConfig(
     );
   }
 
-  // Migration: remove stale manually-managed kilocode provider config.
-  // OpenClaw 2026.2.24+ has a built-in kilocode provider that activates when
-  // KILOCODE_API_KEY is in the environment. Stale config entries with the old
-  // /api/openrouter/ URL or the production /api/gateway/ URL conflict with it.
-  // For the production /api/gateway/ URL, skip removal when KILOCODE_ORGANIZATION_ID
-  // is set: org-scoped instances need an explicit provider entry (with the production
-  // baseUrl) to carry the org header. Its model list is cleared below so live gateway
-  // discovery still controls the catalog. The /api/openrouter/ cleanup always runs
-  // since that URL is unconditionally broken.
-  if (config.models?.providers?.kilocode) {
-    const staleBaseUrl: string = config.models.providers.kilocode.baseUrl || '';
-    const isOpenrouterUrl = staleBaseUrl.includes('/api/openrouter/');
-    const isGatewayUrl = staleBaseUrl === 'https://api.kilo.ai/api/gateway/';
-    if (isOpenrouterUrl || (isGatewayUrl && !env.KILOCODE_ORGANIZATION_ID)) {
-      delete config.models.providers.kilocode;
-      console.log(`Removed stale kilocode provider config (baseUrl: ${staleBaseUrl})`);
-      if (Object.keys(config.models.providers).length === 0) {
-        delete config.models.providers;
-      }
-      if (Object.keys(config.models).length === 0) {
-        delete config.models;
-      }
-    }
+  // KiloCode provider entry. The bundled openclaw kilocode plugin only loads
+  // when an explicit `models.providers.kilocode` entry exists in the config —
+  // without it, the plugin's catalog hook never runs and live gateway model
+  // discovery never populates `kilo-auto/*` and the rest of the dynamic
+  // catalog. So we always include this entry (production baseUrl, empty
+  // `models` so live discovery owns the catalog).
+  //
+  // Cleanup: the old `/api/openrouter/` URL is unconditionally broken; if a
+  // stale entry pointing at it survives from a previous boot, drop it before
+  // we rebuild.
+  const existingKilocode = config.models?.providers?.kilocode;
+  const existingBaseUrl: string = (existingKilocode?.baseUrl as string | undefined) ?? '';
+  if (existingBaseUrl.includes('/api/openrouter/')) {
+    delete config.models!.providers!.kilocode;
+    console.log(`Removed stale kilocode provider config (baseUrl: ${existingBaseUrl})`);
   }
+
+  config.models = config.models ?? {};
+  config.models.providers = config.models.providers ?? {};
+  config.models.providers.kilocode = config.models.providers.kilocode ?? {};
+  config.models.providers.kilocode.baseUrl =
+    config.models.providers.kilocode.baseUrl ?? 'https://api.kilo.ai/api/gateway/';
+  config.models.providers.kilocode.api =
+    config.models.providers.kilocode.api ?? 'openai-completions';
+  // Empty array keeps the provider schema-valid while letting live gateway
+  // discovery populate the catalog. Stale model entries written by an older
+  // `openclaw onboard` are intentionally cleared here.
+  config.models.providers.kilocode.models = [];
 
   // KiloCode provider base URL override (local dev only).
   // OpenClaw's native kilocode provider hardcodes https://api.kilo.ai/api/gateway/.
   // In local dev, Fly machines need to route through a Cloudflare tunnel, so we
   // override the base URL when KILOCODE_API_BASE_URL is set.
   if (env.KILOCODE_API_BASE_URL) {
-    config.models = config.models ?? {};
-    config.models.providers = config.models.providers ?? {};
-    config.models.providers.kilocode = config.models.providers.kilocode ?? {};
     config.models.providers.kilocode.baseUrl = env.KILOCODE_API_BASE_URL;
-    // Provider entries require a models array per OpenClaw's strict zod schema.
-    // Empty array is valid — the built-in kilocode provider fills in its catalog.
-    config.models.providers.kilocode.models = config.models.providers.kilocode.models ?? [];
     console.log(`Overriding kilocode base URL: ${env.KILOCODE_API_BASE_URL}`);
   }
 
@@ -270,25 +268,14 @@ export function generateBaseConfig(
   // This is used by OpenClaw provider requests (not Kilo CLI).
   // Header name matches ORGANIZATION_ID_HEADER in src/lib/constants.ts.
   if (env.KILOCODE_ORGANIZATION_ID) {
-    config.models = config.models ?? {};
-    config.models.providers = config.models.providers ?? {};
-    config.models.providers.kilocode = config.models.providers.kilocode ?? {};
-    // Explicit provider entries require a baseUrl per OpenClaw's strict schema.
-    // When KILOCODE_API_BASE_URL already set the URL above, preserve it;
-    // otherwise default to the production gateway URL.
-    config.models.providers.kilocode.baseUrl =
-      config.models.providers.kilocode.baseUrl ?? 'https://api.kilo.ai/api/gateway/';
     config.models.providers.kilocode.headers = config.models.providers.kilocode.headers ?? {};
     config.models.providers.kilocode.headers['X-KiloCode-OrganizationId'] =
       env.KILOCODE_ORGANIZATION_ID;
-    // Empty array keeps the provider schema-valid while allowing OpenClaw to
-    // populate the full Kilo Gateway catalog through live model discovery.
-    config.models.providers.kilocode.models = [];
     console.log('Configured KiloCode organization header from KILOCODE_ORGANIZATION_ID');
   } else {
     // Remove stale org header from previous boots (e.g., instance was transferred
     // from org to personal, or org was deleted).
-    delete config.models?.providers?.kilocode?.headers?.['X-KiloCode-OrganizationId'];
+    delete config.models.providers.kilocode.headers?.['X-KiloCode-OrganizationId'];
   }
 
   // User-selected default model override.

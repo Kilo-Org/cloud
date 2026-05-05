@@ -1,4 +1,4 @@
-import { INSTANCE_TIERS, OFFERED_TIERS } from './catalog';
+import { INSTANCE_TIERS } from './catalog';
 import type { InstanceTierKey, InstanceTierSpec, MachineSize } from './types';
 
 const OFFERED_RANKS: Partial<Record<InstanceTierKey, number>> = {

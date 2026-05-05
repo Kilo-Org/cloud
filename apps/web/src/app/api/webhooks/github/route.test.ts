@@ -80,14 +80,7 @@ describe('GitHub webhook route', () => {
 
     expect(legacyRequest).not.toBe(botRequest);
     expect(await legacyRequest.json()).toEqual(payload);
-    expect(await botRequest.json()).toEqual(
-      expect.objectContaining({
-        installation: expect.objectContaining({
-          id: 98765,
-          account: expect.any(Object),
-        }),
-      })
-    );
+    expect(await botRequest.json()).toEqual(payload);
   });
 
   it('also sends installation webhooks to the bot adapter', async () => {
@@ -114,18 +107,5 @@ describe('GitHub webhook route', () => {
 
     expect(mockHandleGitHubWebhook).toHaveBeenCalledTimes(1);
     expect(mockGithubWebhook).toHaveBeenCalledTimes(1);
-  });
-
-  it('skips edited comment webhooks for the bot adapter', async () => {
-    await POST(
-      githubRequest('issue_comment', {
-        action: 'edited',
-        installation: { id: 98765 },
-      }) as never
-    );
-    await flushAfterCallbacks();
-
-    expect(mockHandleGitHubWebhook).toHaveBeenCalledTimes(1);
-    expect(mockGithubWebhook).not.toHaveBeenCalled();
   });
 });

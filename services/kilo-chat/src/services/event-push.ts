@@ -63,17 +63,23 @@ export async function pushInstanceEvent<N extends KiloChatEventName>(
   humanMemberIds: string[],
   event: N,
   payload: KiloChatEventOf<N>
-): Promise<void> {
+): Promise<Map<string, boolean>> {
   const es = getEventService(env);
-  if (!es) return;
+  if (!es) return new Map();
   const context = kiloclawInstanceContext(sandboxId);
 
   const results = await Promise.allSettled(
-    humanMemberIds.map(userId => es.pushEvent<N>(userId, context, event, payload))
+    humanMemberIds.map(async userId => {
+      const delivered = await es.pushEvent<N>(userId, context, event, payload);
+      return [userId, delivered] as const;
+    })
   );
+  const map = new Map<string, boolean>();
   for (let i = 0; i < results.length; i++) {
     const r = results[i];
-    if (r.status === 'rejected') {
+    if (r.status === 'fulfilled') {
+      map.set(r.value[0], r.value[1]);
+    } else {
       logger.error('event-service pushEvent failed for instance member', {
         userId: humanMemberIds[i],
         sandboxId,
@@ -82,6 +88,7 @@ export async function pushInstanceEvent<N extends KiloChatEventName>(
       });
     }
   }
+  return map;
 }
 
 /**
@@ -125,14 +132,28 @@ export async function pushBotStatus(
   body: BotStatusRequest
 ): Promise<{ ownerUserId: string | null }> {
   const ownerUserId = await lookupSandboxOwnerUserId(env, sandboxId);
-  if (!ownerUserId) return { ownerUserId: null };
+  if (!ownerUserId) {
+    logger.warn('bot.status dropped before event push: no active sandbox owner', {
+      sandboxId,
+      online: body.online,
+      at: body.at,
+    });
+    return { ownerUserId: null };
+  }
 
   // Both legs swallow their own errors internally and always resolve; plain
   // Promise.all is sufficient and will fail fast if that contract ever breaks.
-  await Promise.all([
+  const [, delivery] = await Promise.all([
     persistBotStatus(env, sandboxId, body),
     pushInstanceEvent(env, sandboxId, [ownerUserId], 'bot.status', { sandboxId, ...body }),
   ]);
+  if (delivery.get(ownerUserId) !== true) {
+    logger.warn('bot.status persisted but no subscribed event-service socket received it', {
+      sandboxId,
+      online: body.online,
+      at: body.at,
+    });
+  }
   return { ownerUserId };
 }
 

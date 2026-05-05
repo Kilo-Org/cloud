@@ -43,6 +43,7 @@ import { MessageInput } from './message-input';
 import { type MessageInputSubmitControls } from './message-input-state';
 import { MessageList } from './message-list';
 import { MessageReactionPickerSheet } from './message-reaction-picker-sheet';
+import { debugKiloChat } from './debug';
 import {
   buildSendMessageVariables,
   canCopyMessage,
@@ -122,7 +123,9 @@ export function ConversationScreen({
     instanceContext.organizationId,
     instanceContext.isResolved
   );
-  const instanceStatus = instanceStatusQuery.data?.status ?? null;
+  const { data: instances } = useAllKiloClawInstances();
+  const currentInstance = instances?.find(instance => instance.sandboxId === sandboxId);
+  const instanceStatus = instanceStatusQuery.data?.status ?? currentInstance?.status ?? null;
   const botStatus = useBotStatus(client, sandboxId);
   const botPresence = botStatus ? { online: botStatus.online, lastAt: botStatus.at } : undefined;
   const now = useNowTicker(10_000);
@@ -172,8 +175,41 @@ export function ConversationScreen({
     pendingMutation: sendMutation.isPending || editMessage.isPending,
     editing: editingMessage !== null,
   });
-  const { data: instances } = useAllKiloClawInstances();
-  const currentInstance = instances?.find(instance => instance.sandboxId === sandboxId);
+
+  useEffect(
+    () =>
+      client.onBotStatus((context, event) => {
+        debugKiloChat(
+          event.sandboxId === sandboxId ? 'bot.status event received' : 'bot.status event ignored',
+          {
+            context,
+            routeSandboxId: sandboxId,
+            eventSandboxId: event.sandboxId,
+            online: event.online,
+            ageMs: Date.now() - event.at,
+          }
+        );
+      }),
+    [client, sandboxId]
+  );
+
+  useEffect(() => {
+    debugKiloChat('bot input state', {
+      sandboxId,
+      instanceStatus,
+      hasBotStatus: botStatus !== null,
+      botOnline: botStatus?.online ?? null,
+      botAgeMs: botStatus ? Date.now() - botStatus.at : null,
+      displayState: inputAvailability.botDisplay.state,
+      disabledReason: inputAvailability.disabledReason,
+    });
+  }, [
+    botStatus,
+    inputAvailability.botDisplay.state,
+    inputAvailability.disabledReason,
+    instanceStatus,
+    sandboxId,
+  ]);
   const canSwitchInstance = (instances?.length ?? 0) > 1;
   const instanceLabel = kiloclawConversationEyebrow(currentInstance);
 

@@ -83,11 +83,24 @@ describe('pushInstanceEvent', () => {
     const pushEvent = vi.fn().mockResolvedValue(false);
     const env = { EVENT_SERVICE: { pushEvent } } as unknown as Env;
 
-    await pushInstanceEvent(env, 'sandbox-1', ['member-1', 'member-2'], 'conversation.read', {
-      conversationId,
-      memberId: 'member-1',
-      lastReadAt: 123,
-    });
+    const result = await pushInstanceEvent(
+      env,
+      'sandbox-1',
+      ['member-1', 'member-2'],
+      'conversation.read',
+      {
+        conversationId,
+        memberId: 'member-1',
+        lastReadAt: 123,
+      }
+    );
+
+    expect(result).toEqual(
+      new Map([
+        ['member-1', false],
+        ['member-2', false],
+      ])
+    );
 
     expect(pushEvent).toHaveBeenCalledTimes(2);
     expect(pushEvent).toHaveBeenNthCalledWith(
@@ -112,5 +125,18 @@ describe('pushInstanceEvent', () => {
         lastReadAt: 123,
       }
     );
+  });
+
+  it('reports delivered instance members', async () => {
+    const pushEvent = vi.fn().mockResolvedValue(true);
+    const env = { EVENT_SERVICE: { pushEvent } } as unknown as Env;
+
+    const result = await pushInstanceEvent(env, 'sandbox-1', ['member-1'], 'conversation.read', {
+      conversationId,
+      memberId: 'member-1',
+      lastReadAt: 123,
+    });
+
+    expect(result).toEqual(new Map([['member-1', true]]));
   });
 });

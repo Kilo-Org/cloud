@@ -22,7 +22,7 @@ function computeMobileBotDisplay(params: {
   presence: BotPresence | undefined;
   now: number;
 }): BotDisplay {
-  if (params.instanceStatus !== 'running') {
+  if (params.instanceStatus !== null && params.instanceStatus !== 'running') {
     return { state: 'offline', label: 'Offline' };
   }
   if (!params.presence) {

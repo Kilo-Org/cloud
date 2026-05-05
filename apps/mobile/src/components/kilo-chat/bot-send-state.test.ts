@@ -67,6 +67,34 @@ describe('mobile bot send gate', () => {
     ).toBe(false);
   });
 
+  it('allows fresh bot presence while instance status is unknown', () => {
+    const state = resolveMobileMessageInputAvailability({
+      currentUserId: 'user-1',
+      instanceStatus: null,
+      presence: { online: true, lastAt: NOW - 10_000 },
+      now: NOW,
+      pendingMutation: false,
+      editing: false,
+    });
+
+    expect(state.botDisplay.state).toBe('online');
+    expect(state.disabled).toBe(false);
+  });
+
+  it('blocks sends when instance status is known non-running', () => {
+    const state = resolveMobileMessageInputAvailability({
+      currentUserId: 'user-1',
+      instanceStatus: 'stopped',
+      presence: { online: true, lastAt: NOW - 10_000 },
+      now: NOW,
+      pendingMutation: false,
+      editing: false,
+    });
+
+    expect(state.botDisplay.state).toBe('offline');
+    expect(state.disabled).toBe(true);
+  });
+
   it('keeps the composer enabled during pending sends when the bot can receive messages', () => {
     const state = resolveMobileMessageInputAvailability({
       currentUserId: 'user-1',

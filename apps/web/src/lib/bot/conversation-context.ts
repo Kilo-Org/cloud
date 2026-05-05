@@ -204,36 +204,15 @@ async function fetchRecentIssueComments(
   octokit: Octokit,
   coordinates: GitHubThreadCoordinates
 ): Promise<GitHubIssueComment[]> {
-  const params = {
+  const response = await octokit.issues.listComments({
     owner: coordinates.owner,
     repo: coordinates.repo,
     issue_number: coordinates.number,
+    sort: 'created',
+    direction: 'desc',
     per_page: BOT_CONTEXT_MESSAGE_LIMIT,
-  };
-  const firstPage = await octokit.issues.listComments(params);
-  const lastPageNumber = pageFromLinkHeader(firstPage.headers.link, 'last');
-
-  if (!lastPageNumber || lastPageNumber <= 1) {
-    return sortByCreatedAt(firstPage.data).slice(-BOT_CONTEXT_MESSAGE_LIMIT);
-  }
-
-  const lastPage = await octokit.issues.listComments({
-    ...params,
-    page: lastPageNumber,
   });
-
-  if (lastPage.data.length >= BOT_CONTEXT_MESSAGE_LIMIT || lastPageNumber <= 2) {
-    return sortByCreatedAt(lastPage.data).slice(-BOT_CONTEXT_MESSAGE_LIMIT);
-  }
-
-  const previousPage = await octokit.issues.listComments({
-    ...params,
-    page: lastPageNumber - 1,
-  });
-
-  return sortByCreatedAt([...previousPage.data, ...lastPage.data]).slice(
-    -BOT_CONTEXT_MESSAGE_LIMIT
-  );
+  return sortByCreatedAt(response.data);
 }
 
 async function fetchPullReviewComments(

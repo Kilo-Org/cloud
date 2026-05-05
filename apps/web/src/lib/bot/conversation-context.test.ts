@@ -180,7 +180,7 @@ describe('getPlatformContext', () => {
     expect(context).toContain('@kilocode-dev Please fix this');
   });
 
-  it('uses the latest issue comments for long GitHub conversations', async () => {
+  it('fetches only the newest issue comments in a single request', async () => {
     mockIssuesGetFn.mockResolvedValue({
       data: {
         body: 'Issue description.',
@@ -191,40 +191,23 @@ describe('getPlatformContext', () => {
         user: { login: 'RSO' },
       },
     });
-    mockIssuesListCommentsFn
-      .mockResolvedValueOnce({
-        data: Array.from({ length: 12 }, (_, index) => ({
-          id: index + 1,
-          body: `old comment ${index + 1}`,
-          created_at: `2026-05-05T07:${String(index).padStart(2, '0')}:00Z`,
+    mockIssuesListCommentsFn.mockResolvedValue({
+      data: [
+        {
+          id: 200,
+          body: 'most recent context',
+          created_at: '2026-05-05T07:30:00Z',
           user: { login: 'alice' },
-        })),
-        headers: {
-          link: '<https://api.github.com/repos/Kilo-Org/on-call/issues/37/comments?page=3>; rel="last"',
         },
-      })
-      .mockResolvedValueOnce({
-        data: [
-          {
-            id: 200,
-            body: 'most recent context',
-            created_at: '2026-05-05T07:30:00Z',
-            user: { login: 'alice' },
-          },
-        ],
-        headers: {},
-      })
-      .mockResolvedValueOnce({
-        data: [
-          {
-            id: 199,
-            body: 'previous page context',
-            created_at: '2026-05-05T07:29:00Z',
-            user: { login: 'bob' },
-          },
-        ],
-        headers: {},
-      });
+        {
+          id: 199,
+          body: 'previous context',
+          created_at: '2026-05-05T07:29:00Z',
+          user: { login: 'bob' },
+        },
+      ],
+      headers: {},
+    });
 
     const context = await getPlatformContext(
       createThread({ id: 'github:Kilo-Org/on-call:issue:37' }),
@@ -232,10 +215,19 @@ describe('getPlatformContext', () => {
       createIntegration()
     );
 
-    expect(mockIssuesListCommentsFn).toHaveBeenCalledWith(expect.objectContaining({ page: 3 }));
-    expect(context).not.toContain('old comment 1');
-    expect(context).toContain('previous page context');
-    expect(context).toContain('most recent context');
+    expect(mockIssuesListCommentsFn).toHaveBeenCalledTimes(1);
+    expect(mockIssuesListCommentsFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sort: 'created',
+        direction: 'desc',
+        per_page: 12,
+      })
+    );
+
+    const previousIndex = context.indexOf('previous context');
+    const recentIndex = context.indexOf('most recent context');
+    expect(previousIndex).toBeGreaterThan(-1);
+    expect(recentIndex).toBeGreaterThan(previousIndex);
   });
 
   it('includes GitHub pull request review thread context', async () => {

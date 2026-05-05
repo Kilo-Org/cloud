@@ -11,48 +11,48 @@ export function RateLimitTesting() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const ipUsageQuery = useQuery(trpc.admin.freeModelUsage.getMyIpUsage.queryOptions());
+  const usageQuery = useQuery(trpc.admin.freeModelUsage.getMyUsage.queryOptions());
 
   const rateLimitMutation = useMutation(
-    trpc.admin.freeModelUsage.rateLimitMyIp.mutationOptions({
+    trpc.admin.freeModelUsage.rateLimitMe.mutationOptions({
       onSuccess: data => {
         if (data.alreadyRateLimited) {
           toast.message('Already rate limited', {
-            description: `IP ${data.ipAddress} already has ${data.newTotal} requests in the current window.`,
+            description: `User ${data.kiloUserId} already has ${data.newTotal} requests in the current window.`,
           });
         } else {
           toast.success(
-            `Inserted ${data.rowsInserted} rows for IP ${data.ipAddress}. New total: ${data.newTotal}.`
+            `Inserted ${data.rowsInserted} rows for user ${data.kiloUserId}. New total: ${data.newTotal}.`
           );
         }
         void queryClient.invalidateQueries({
-          queryKey: trpc.admin.freeModelUsage.getMyIpUsage.queryKey(),
+          queryKey: trpc.admin.freeModelUsage.getMyUsage.queryKey(),
         });
       },
       onError: error => {
-        toast.error(error.message || 'Failed to rate limit IP');
+        toast.error(error.message || 'Failed to rate limit user');
       },
     })
   );
 
-  const data = ipUsageQuery.data;
+  const data = usageQuery.data;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Rate Limit Testing</CardTitle>
         <CardDescription>
-          Insert enough requests to trigger the free model rate limit for your current IP address.
+          Insert enough requests to trigger the free model rate limit for your own user id.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {ipUsageQuery.isLoading && (
-          <p className="text-muted-foreground text-sm">Loading IP usage...</p>
+        {usageQuery.isLoading && (
+          <p className="text-muted-foreground text-sm">Loading usage...</p>
         )}
 
-        {ipUsageQuery.error && (
+        {usageQuery.error && (
           <p className="text-sm text-red-500">
-            {ipUsageQuery.error.message || 'Failed to load IP usage'}
+            {usageQuery.error.message || 'Failed to load usage'}
           </p>
         )}
 
@@ -60,8 +60,8 @@ export function RateLimitTesting() {
           <>
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
-                <p className="text-muted-foreground text-sm">Your IP</p>
-                <p className="font-mono text-sm font-medium">{data.ipAddress}</p>
+                <p className="text-muted-foreground text-sm">Your user id</p>
+                <p className="font-mono text-sm font-medium">{data.kiloUserId}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-sm">Usage ({data.windowHours}h window)</p>
@@ -88,7 +88,7 @@ export function RateLimitTesting() {
                 ? 'Inserting rows...'
                 : data.isRateLimited
                   ? 'Already Rate Limited'
-                  : `Rate Limit My IP (insert ${data.limit - data.currentUsage} rows)`}
+                  : `Rate Limit Me (insert ${data.limit - data.currentUsage} rows)`}
             </Button>
           </>
         )}

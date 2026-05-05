@@ -24,9 +24,9 @@ export default function FreeModelUsagePage() {
         </div>
 
         <p className="text-muted-foreground">
-          Monitor IP-based rate limiting for free model usage. This applies to both anonymous and
-          authenticated users. Rate limiting is based on request count per IP address within a
-          rolling window.
+          Monitor rate limiting for free model usage. Authenticated requests are limited per
+          user id; anonymous requests are limited per IP address. Both share the same per-window
+          request cap.
         </p>
 
         <div className="bg-background rounded-lg border p-6">

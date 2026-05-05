@@ -56,7 +56,10 @@ export function FreeModelUsageStats() {
       <Card>
         <CardHeader>
           <CardTitle>Rate Limit Configuration</CardTitle>
-          <CardDescription>Current free model rate limit settings (IP-based)</CardDescription>
+          <CardDescription>
+            Current free model rate limit settings (per user for authenticated requests, per IP
+            for anonymous requests)
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
@@ -101,24 +104,31 @@ export function FreeModelUsageStats() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">IPs at Request Limit</CardTitle>
+            <CardTitle className="text-base">Anonymous IPs at Limit</CardTitle>
             <CardDescription>
-              IPs that have reached {formatNumber(data?.maxRequestsPerWindow ?? 0)} requests
+              Anonymous IPs that have reached {formatNumber(data?.maxRequestsPerWindow ?? 0)}{' '}
+              anonymous requests
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {formatNumber(data?.windowIpsAtRequestLimit ?? 0)}
+              {formatNumber(data?.windowAnonymousIpsAtRequestLimit ?? 0)}
             </div>
-            {(data?.windowUniqueIps ?? 0) > 0 && (
-              <div className="text-muted-foreground text-sm">
-                {(
-                  ((data?.windowIpsAtRequestLimit ?? 0) / (data?.windowUniqueIps ?? 1)) *
-                  100
-                ).toFixed(1)}
-                % of active IPs
-              </div>
-            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Users at Limit</CardTitle>
+            <CardDescription>
+              Authenticated users that have reached {formatNumber(data?.maxRequestsPerWindow ?? 0)}{' '}
+              requests
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {formatNumber(data?.windowUsersAtRequestLimit ?? 0)}
+            </div>
           </CardContent>
         </Card>
       </div>

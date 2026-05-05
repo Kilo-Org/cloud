@@ -11,11 +11,14 @@ import {
 } from '@/lib/constants';
 
 export type FreeModelUsageStatsResponse = {
-  // Current window stats (last 3 hours)
+  // Current window stats
   windowUniqueIps: number;
   windowTotalRequests: number;
   windowAvgRequestsPerIp: number;
-  windowIpsAtRequestLimit: number;
+  // Anonymous IPs whose anonymous-only request count has reached the limit.
+  windowAnonymousIpsAtRequestLimit: number;
+  // Authenticated users whose per-user request count has reached the limit.
+  windowUsersAtRequestLimit: number;
   windowAnonymousRequests: number;
   windowAuthenticatedRequests: number;
 
@@ -53,8 +56,8 @@ export async function GET(
       sql`${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours' AND ${TEST_ROW_FILTER}`
     );
 
-  // Count IPs at or above the rate limit threshold using a SQL subquery
-  const ipsAtLimitResult = await db
+  // Anonymous IPs at the per-IP limit (anonymous-only rows, matching checkFreeModelRateLimit).
+  const anonymousIpsAtLimitResult = await db
     .select({
       count: sql<number>`COUNT(*)`,
     })
@@ -62,8 +65,27 @@ export async function GET(
       sql`(
         SELECT ${free_model_usage.ip_address}
         FROM ${free_model_usage}
-        WHERE ${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours' AND ${TEST_ROW_FILTER}
+        WHERE ${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours'
+          AND ${TEST_ROW_FILTER}
+          AND ${free_model_usage.kilo_user_id} IS NULL
         GROUP BY ${free_model_usage.ip_address}
+        HAVING COUNT(*) >= ${FREE_MODEL_MAX_REQUESTS_PER_WINDOW}
+      ) sub`
+    );
+
+  // Authenticated users at the per-user limit (matching checkFreeModelRateLimitByUser).
+  const usersAtLimitResult = await db
+    .select({
+      count: sql<number>`COUNT(*)`,
+    })
+    .from(
+      sql`(
+        SELECT ${free_model_usage.kilo_user_id}
+        FROM ${free_model_usage}
+        WHERE ${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours'
+          AND ${TEST_ROW_FILTER}
+          AND ${free_model_usage.kilo_user_id} IS NOT NULL
+        GROUP BY ${free_model_usage.kilo_user_id}
         HAVING COUNT(*) >= ${FREE_MODEL_MAX_REQUESTS_PER_WINDOW}
       ) sub`
     );
@@ -93,7 +115,6 @@ export async function GET(
 
   const windowUniqueIps = bigIntToNumber(windowStats.unique_ips);
   const windowTotalRequests = bigIntToNumber(windowStats.total_requests);
-  const ipsAtRequestLimit = bigIntToNumber(ipsAtLimitResult[0]?.count ?? 0);
 
   return NextResponse.json({
     // Current window stats
@@ -101,7 +122,8 @@ export async function GET(
     windowTotalRequests,
     windowAvgRequestsPerIp:
       windowUniqueIps > 0 ? Math.round(windowTotalRequests / windowUniqueIps) : 0,
-    windowIpsAtRequestLimit: ipsAtRequestLimit,
+    windowAnonymousIpsAtRequestLimit: bigIntToNumber(anonymousIpsAtLimitResult[0]?.count ?? 0),
+    windowUsersAtRequestLimit: bigIntToNumber(usersAtLimitResult[0]?.count ?? 0),
     windowAnonymousRequests: bigIntToNumber(windowStats.anonymous_requests),
     windowAuthenticatedRequests: bigIntToNumber(windowStats.authenticated_requests),
 

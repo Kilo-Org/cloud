@@ -620,13 +620,6 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       .where(eq(kiloclaw_subscriptions.id, targetRow.id))
       .limit(1);
 
-    // Prefer the in-memory `before.status`.
-    // When Stripe's `customer.subscription.created` handler ran
-    // before invoice.paid, it already transitioned a non-hybrid row to 'active',
-    // hiding the pre-activation state from this snapshot.
-    // Fall back to the durable `kiloclaw_subscription_change_log` entry written
-    // by that handler, which preserves the pre-Stripe `before_state.status`
-    // and records the Stripe-derived plan/period in `after_state`.
     shouldSendSubscriptionStartedEmailForNewSettlement =
       shouldSendSubscriptionStartedEmailForActivation(before?.status ?? null) ||
       (await didStripeSubscriptionCreatedRecordEligibleActivation({
@@ -676,12 +669,6 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     });
   }
 
-  // Steady-state webhook replays against an already-emailed, already-settled
-  // period hit the duplicate-settlement branch on every retry.
-  // The real idempotency guard is the `kiloclaw_email_log` unique index in
-  // `maybeSendKiloClawSubscriptionStartedEmail`, but we can skip the more
-  // expensive `kiloclaw_subscription_change_log` scan (and the subsequent
-  // no-op send call) when a matching email-log row already exists.
   const shouldSendSubscriptionStartedEmail =
     shouldSendSubscriptionStartedEmailForNewSettlement ||
     (settlementWasDuplicate &&

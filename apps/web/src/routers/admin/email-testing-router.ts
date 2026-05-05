@@ -110,7 +110,8 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         admin_message_section: new RawHtml(
           '<p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
         ),
-        version_change_section: 'Upgrading from v1.2.3 (OpenClaw 0.9.0) to v1.2.4 (OpenClaw 0.9.1).',
+        version_change_section:
+          'Upgrading from v1.2.3 (OpenClaw 0.9.0) to v1.2.4 (OpenClaw 0.9.1).',
       };
     case 'clawSuspendedTrial':
     case 'clawSuspendedSubscription':

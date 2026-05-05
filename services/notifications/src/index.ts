@@ -28,6 +28,11 @@ import { authMiddleware, type AuthContext } from './auth';
 import type { TicketTokenPair } from './lib/expo-push';
 import { sendPushNotifications } from './lib/expo-push';
 import { dispatchInstanceLifecyclePush } from './lib/instance-lifecycle-push';
+import {
+  dispatchScheduledActionPush,
+  type SendScheduledActionNoticeParams,
+  type SendScheduledActionNoticeResult,
+} from './lib/scheduled-action-push';
 import { queue } from './queue-consumer';
 
 export { NotificationChannelDO } from './dos/NotificationChannelDO';
@@ -36,6 +41,11 @@ export type {
   SendInstanceLifecycleNotificationParams,
   SendInstanceLifecycleNotificationResult,
 } from '@kilocode/notifications';
+export type {
+  ScheduledActionEvent,
+  SendScheduledActionNoticeParams,
+  SendScheduledActionNoticeResult,
+} from './lib/scheduled-action-push';
 
 const ALLOWED_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
 
@@ -185,6 +195,33 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
 
     return dispatchInstanceLifecyclePush(params, {
+      getTokens: async userId => {
+        const rows = await db
+          .select({ token: user_push_tokens.token })
+          .from(user_push_tokens)
+          .where(eq(user_push_tokens.user_id, userId));
+        return rows.map(r => r.token);
+      },
+      deleteStaleTokens: async tokens => {
+        await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, tokens));
+      },
+      sendPush: async messages => {
+        const accessToken = await this.env.EXPO_ACCESS_TOKEN.get();
+        return sendPushNotifications(messages, accessToken);
+      },
+      enqueueReceipts: async ticketTokenPairs => {
+        const receiptMsg = { ticketTokenPairs } satisfies ReceiptCheckMessage;
+        await this.env.RECEIPTS_QUEUE.send(receiptMsg, { delaySeconds: 900 });
+      },
+    });
+  }
+
+  async sendScheduledActionNotice(
+    params: SendScheduledActionNoticeParams
+  ): Promise<SendScheduledActionNoticeResult> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+
+    return dispatchScheduledActionPush(params, {
       getTokens: async userId => {
         const rows = await db
           .select({ token: user_push_tokens.token })

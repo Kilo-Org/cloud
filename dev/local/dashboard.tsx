@@ -11,7 +11,7 @@ import {
   resolveGroupTransitiveDeps,
 } from './services';
 import type { ServiceGroup } from './services';
-import { getSessionName, killSession } from './tmux';
+import { getSessionName, killSession, findOtherKiloDevSessions } from './tmux';
 import {
   findRepoRoot,
   probePort,
@@ -143,11 +143,17 @@ function doShowGroup(
 }
 
 function doCleanup(): void {
-  try {
-    const [cmd, args] = buildInfraDownArgs();
-    execFileSync(cmd, args, { stdio: 'ignore' });
-  } catch {
-    // ignore
+  // Docker Compose uses project name "dev" for every worktree — postgres,
+  // redis, and grafana are shared singletons. Skip `compose down` if any
+  // sibling kilo-dev-* tmux session is still running, otherwise closing this
+  // worktree would take down the other worktree's database.
+  if (findOtherKiloDevSessions().length === 0) {
+    try {
+      const [cmd, args] = buildInfraDownArgs();
+      execFileSync(cmd, args, { stdio: 'ignore' });
+    } catch {
+      // ignore
+    }
   }
   try {
     killSession(sessionName);

@@ -14,6 +14,7 @@ export const grok_code_fast_1_optimized_free_model: KiloExclusiveModel = {
   internal_id: 'x-ai/grok-code-fast-1:optimized',
   pricing: null,
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export function isGrokModel(requestedModel: string) {

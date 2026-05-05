@@ -183,16 +183,12 @@ Important: A comment is only NON-BLOCKING if it expresses approval or is purely 
 Respond with ONLY a JSON object (no markdown, no explanation): { "blocking": true/false, "reason": "brief one-sentence explanation" }`;
 
     const startTime = Date.now();
-    const response: unknown = await ctx.env.AI.run(
-      // @ts-expect-error Model may not be in the AiModels type map yet — cast to access it.
-      '@cf/google/gemma-4-26b-a4b-it',
-      {
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 256,
-        temperature: 0,
-        chat_template_kwargs: { enable_thinking: false },
-      }
-    );
+    const response: unknown = await ctx.env.AI.run('@cf/google/gemma-4-26b-a4b-it', {
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 256,
+      temperature: 0,
+      chat_template_kwargs: { enable_thinking: false },
+    });
     const durationMs = Date.now() - startTime;
 
     // Track the AI call via analytics event

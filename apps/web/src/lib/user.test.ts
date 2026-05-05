@@ -42,6 +42,9 @@ import {
   bot_requests,
   bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
+  kiloclaw_scheduled_actions,
+  kiloclaw_scheduled_action_stages,
+  kiloclaw_scheduled_action_targets,
   user_push_tokens,
   security_advisor_scans,
   credit_campaigns,
@@ -90,6 +93,9 @@ describe('User', () => {
     await db.delete(organization_audit_logs);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(kiloclaw_scheduled_action_targets);
+    await db.delete(kiloclaw_scheduled_action_stages);
+    await db.delete(kiloclaw_scheduled_actions);
     await db.delete(credit_campaigns);
     await db.delete(kiloclaw_google_oauth_connections);
     await db.delete(kiloclaw_inbound_email_aliases);
@@ -785,6 +791,71 @@ describe('User', () => {
       expect(logs).toHaveLength(1);
       expect(logs[0].target_user_id).toBe('deleted-user');
       expect(logs[0].actor_email).toBe(adminUser.google_user_email); // admin not anonymized
+    });
+
+    it('should retain kiloclaw_scheduled_action_targets after soft-delete (anonymized FK)', async () => {
+      // Per the GDPR policy in softDeleteUser's doc-comment, scheduled
+      // action targets are retained operational records. The user_id FK
+      // continues to reference the (now anonymized) kilocode_users row.
+      // No PII is stored directly on the target row.
+      const user = await insertTestUser();
+      const adminUser = await insertTestUser();
+
+      const [instance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: user.id,
+          sandbox_id: `test-sdu-scheduled-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // Mark destroyed so softDeleteUser preconditions pass.
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, instance.id));
+
+      const [action] = await db
+        .insert(kiloclaw_scheduled_actions)
+        .values({
+          action_type: 'scheduled_restart',
+          status: 'completed',
+          created_by: adminUser.id,
+          total_count: 1,
+          applied_count: 1,
+          completed_at: new Date().toISOString(),
+        })
+        .returning({ id: kiloclaw_scheduled_actions.id });
+
+      const [stage] = await db
+        .insert(kiloclaw_scheduled_action_stages)
+        .values({
+          scheduled_action_id: action.id,
+          stage_index: 0,
+          scheduled_at: new Date().toISOString(),
+          status: 'completed',
+          applied_count: 1,
+        })
+        .returning({ id: kiloclaw_scheduled_action_stages.id });
+
+      await db.insert(kiloclaw_scheduled_action_targets).values({
+        scheduled_action_id: action.id,
+        stage_id: stage.id,
+        instance_id: instance.id,
+        user_id: user.id,
+        status: 'applied',
+      });
+
+      await expect(softDeleteUser(user.id)).resolves.toBeUndefined();
+
+      // Target row still references the (now anonymized) user. The FK is
+      // intentionally retained — no scrub on this table.
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.user_id, user.id));
+      expect(targets).toHaveLength(1);
+      expect(targets[0].status).toBe('applied');
     });
 
     it('should anonymize credit_campaigns created_by_kilo_user_id', async () => {

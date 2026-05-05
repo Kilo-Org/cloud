@@ -13,6 +13,7 @@ export const minimax_m25_free_model: KiloExclusiveModel = {
   internal_id: 'minimax/minimax-m2.5',
   pricing: null,
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export function isMinimaxModel(model: string) {

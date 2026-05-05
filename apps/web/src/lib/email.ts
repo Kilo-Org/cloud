@@ -31,6 +31,13 @@ export const subjects = {
   clawEarlybirdEndingSoon: 'Your KiloClaw Earlybird Access Ends Soon',
   clawEarlybirdExpiresTomorrow: 'Your KiloClaw Earlybird Access Expires Tomorrow',
   clawInstanceReady: 'Your KiloClaw Instance Is Ready',
+  // Subjects for scheduled-action notices use admin-provided subject
+  // when present (via subjectOverride); these defaults apply when the
+  // admin leaves notice_subject blank.
+  clawScheduledRestartNotice: 'KiloClaw: Restart Scheduled',
+  clawScheduledRestartCancelled: 'KiloClaw: Scheduled Restart Cancelled',
+  clawScheduledVersionChangeNotice: 'KiloClaw: Upgrade Scheduled',
+  clawScheduledVersionChangeCancelled: 'KiloClaw: Scheduled Upgrade Cancelled',
   clawCreditRenewalFailed: 'Action Required: KiloClaw Hosting Renewal Failed',
   clawComplementaryInferenceEnded: 'Your Free AI Inference Period Has Ended',
   accountDeletionRequest: 'Kilo: Account Deletion Request Received',

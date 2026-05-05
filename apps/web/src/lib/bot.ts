@@ -12,9 +12,8 @@ import {
   getPlatformIntegrationByBotUserId,
 } from '@/lib/bot/platform-helpers';
 import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-account';
-import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
-import { processMessage } from '@/lib/bot/run';
+import { processLinkedMessage } from '@/lib/bot/run';
 import { createChatState } from '@/lib/bot/state';
 import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET } from '@/lib/config.server';
 
@@ -273,7 +272,7 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
     }
 
     if (!kiloUserId) {
-      await promptLinkAccount(thread, message, identity);
+      await promptLinkAccount(thread, message, identity, chatBot.getState());
       return;
     }
 
@@ -281,37 +280,16 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
 
     if (!user) {
       await unlinkKiloUser(chatBot.getState(), identity);
-      await promptLinkAccount(thread, message, identity);
+      await promptLinkAccount(thread, message, identity, chatBot.getState());
       return;
     }
 
-    const platform = thread.id.split(':')[0];
-    const botRequestId = await createBotRequest({
-      createdBy: user.id,
-      organizationId: platformIntegration.owned_by_organization_id ?? null,
-      platformIntegrationId: platformIntegration.id,
-      platform,
-      platformThreadId: thread.id,
-      platformMessageId: message.id,
-      userMessage: message.text,
-      modelUsed: undefined,
-    });
-
     chatBot.registerSingleton();
 
-    await thread.startTyping('Thinking...');
-
     try {
-      await processMessage({ thread, message, platformIntegration, user, botRequestId });
+      await processLinkedMessage({ thread, message, platformIntegration, user });
     } catch (error) {
       console.error('[Bot] Unhandled error in message handler:', error);
-      if (botRequestId) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        updateBotRequest(botRequestId, {
-          status: 'error',
-          errorMessage: errMsg.slice(0, 2000),
-        });
-      }
       await thread.post({ markdown: 'Sorry, something went wrong while processing your message.' });
     }
   });

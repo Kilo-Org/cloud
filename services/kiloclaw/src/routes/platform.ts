@@ -29,6 +29,7 @@ import {
 } from '../lib/version-rollout';
 import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
+import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
 import {
   KiloclawStartReasonSchema,
@@ -3851,6 +3852,62 @@ platform.post('/extend-volume', async c => {
     return c.json({ ok: true as const, needsRestart });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'extend-volume');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/scheduled-action/wake
+//
+// Called by the web's scheduleAction tRPC right after persisting a new
+// scheduled-action row in Postgres. Resolves the target instance's DO
+// and calls notifyScheduledActionPending() — which just re-arms the
+// existing reconcile alarm so the next alarm tick picks up the new
+// row via the existing wedge in alarm().
+//
+// In production this is belt-and-suspenders (the platform proactively
+// fires past-due alarms anyway). In `wrangler dev`, stale alarm
+// timestamps don't auto-fire — this route is what prevents the dev
+// scheduler from sitting forever with a never-firing pre-existing
+// alarm.
+const ScheduledActionWakeSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid(),
+});
+
+platform.post('/scheduled-action/wake', async c => {
+  const result = await parseBody(c, ScheduledActionWakeSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, instanceId } = result.data;
+
+  try {
+    const woken = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.notifyScheduledActionPending(),
+      'notifyScheduledActionPending'
+    );
+    return c.json(woken);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-wake');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/scheduled-action/run-notice-sweep
+//
+// Synchronously runs the notice sweep that the cron normally drives.
+// Useful for local dev (where wrangler does not fire scheduled() on
+// the cron cadence) and for ad-hoc admin testing in production. The
+// sweep is idempotent and bounded (MAX_NOTIFICATIONS_PER_TICK), so
+// invoking it on demand is safe.
+platform.post('/scheduled-action/run-notice-sweep', async c => {
+  try {
+    const result = await runScheduledActionNoticesSweep(c.env);
+    return c.json(result);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-run-notice-sweep');
     return jsonError(message, status);
   }
 });

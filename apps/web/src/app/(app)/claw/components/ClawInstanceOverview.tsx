@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { InstanceControls } from './InstanceControls';
 import { InstanceTab } from './InstanceTab';
+import { KiloClawScheduledActionBanner } from './KiloClawScheduledActionBanner';
 import { useClawContext } from './ClawContext';
 
 export function ClawInstanceOverview({
@@ -62,6 +63,11 @@ export function ClawInstanceOverview({
           </AlertDescription>
         </Alert>
       )}
+
+      <KiloClawScheduledActionBanner
+        scheduledAction={status.scheduledAction}
+        instanceName={status.name}
+      />
 
       <Card>
         <CardContent className="border-b p-5">

@@ -19,6 +19,16 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     event: z.enum(['ready', 'start_failed']),
     sandboxId: z.string().min(1),
   }),
+  z.object({
+    type: z.literal('scheduled-action'),
+    event: z.enum([
+      'scheduled_restart_notice',
+      'scheduled_restart_cancelled',
+      'scheduled_version_change_notice',
+      'scheduled_version_change_cancelled',
+    ]),
+    sandboxId: z.string().min(1),
+  }),
 ]);
 
 export type PushData = z.infer<typeof pushDataSchema>;

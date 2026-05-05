@@ -63,6 +63,7 @@ import {
   STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
 } from '@/lib/config.server';
 import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organization-types';
+import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
 import { successResult } from '@/lib/maybe-result';
 
 async function isKiloClawCharge(chargeId: string): Promise<boolean> {
@@ -1382,9 +1383,10 @@ export async function handleUpdateSeatCount(
       throw new Error(`No recognized paid seat item found in subscription ${subscriptionStripeId}`);
     }
 
-    // Calculate the free seat count from non-paid items to preserve them
+    // Calculate the free seat count from non-paid seat-product items to preserve them.
+    // Non-seat add-ons can share the subscription but must not reduce the paid seat quantity.
     const freeSeatCount = subscription.items.data
-      .filter(item => !KNOWN_SEAT_PRICE_IDS.has(item.price.id))
+      .filter(item => isSeatLineItem(item) && !KNOWN_SEAT_PRICE_IDS.has(item.price.id))
       .reduce((total, item) => total + (item.quantity ?? 0), 0);
 
     // The requested newSeatCount is the desired total. Deduct free seats to get paid quantity.

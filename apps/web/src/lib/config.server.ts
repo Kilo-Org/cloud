@@ -209,6 +209,96 @@ export const KILOCLAW_INTERNAL_API_SECRET = getEnvVariable('KILOCLAW_INTERNAL_AP
 export const KILOCLAW_INBOUND_EMAIL_DOMAIN =
   getEnvVariable('KILOCLAW_INBOUND_EMAIL_DOMAIN') || 'kiloclaw.ai';
 
+/**
+ * Per-instance worker URL template.
+ *
+ * Per-instance URLs are the default in BOTH production and dev/test so a
+ * merge of the name-based routing feature flips them on automatically,
+ * without forcing anyone to edit env files.
+ *
+ * Resolution rules (checked in order):
+ *   1. `KILOCLAW_INSTANCE_URL_TEMPLATE=legacy` (case-insensitive) is the
+ *      explicit **kill switch** — disables per-instance URLs entirely and
+ *      falls back to the single-host `KILOCLAW_API_URL`. Operators can
+ *      roll prod back without a code deploy; devs can disable locally.
+ *      A non-empty sentinel is used (rather than empty string) because
+ *      Vercel / Node env pipelines often coerce empty env entries into
+ *      "unset", making an empty-string rollback unreliable.
+ *   2. A non-empty `KILOCLAW_INSTANCE_URL_TEMPLATE` is used verbatim.
+ *      Must contain `{label}`; missing placeholder is a misconfiguration
+ *      warned about at render time (see `workerUrlForInstance`).
+ *   3. Otherwise in `NODE_ENV=production`, default to the canonical
+ *      `https://{label}.kiloclaw.ai` template.
+ *   4. Otherwise (dev/test) derive a template from `KILOCLAW_API_URL`:
+ *      if `KILOCLAW_API_URL` looks like a loopback URL (`http://localhost:<port>`
+ *      / `http://127.0.0.1:<port>`), emit
+ *      `http://{label}.kiloclaw.localhost:<port>` so the browser
+ *      auto-resolves `*.kiloclaw.localhost` to `127.0.0.1` per RFC 6761.
+ *      If `KILOCLAW_API_URL` is missing or unparsable, fall back to the
+ *      same template with the wrangler dev port (`8795`) — matches
+ *      `.dev.vars.example`.
+ *
+ * When the template ends up set and contains `{label}`, `getStatus`
+ * emits a `workerUrl` pointing at the instance's own virtual host
+ * (derived from its sandboxId) for instances whose
+ * `controllerCapabilitiesVersion >= 2`. Pre-v2 instances keep falling
+ * back to `KILOCLAW_API_URL`.
+ *
+ * Exported as a plain function so it's testable without forcing a
+ * re-import of this entire module (which triggers production-only
+ * validation of unrelated secrets).
+ */
+const DEFAULT_DEV_WRANGLER_PORT = '8795';
+
+/**
+ * Sentinel value for `KILOCLAW_INSTANCE_URL_TEMPLATE` that disables the
+ * per-instance URL pattern entirely. Case-insensitive match. Picked as
+ * a non-empty word because empty env values are unreliable across
+ * Vercel / Node / dotenv pipelines (often dropped or indistinguishable
+ * from "unset"), which would mean the kill switch silently fails open.
+ */
+const KILL_SWITCH_SENTINEL = 'legacy';
+
+function deriveDevTemplateFromWorkerUrl(workerUrl: string | undefined): string {
+  const fallback = `http://{label}.kiloclaw.localhost:${DEFAULT_DEV_WRANGLER_PORT}`;
+  if (!workerUrl) return fallback;
+  try {
+    const parsed = new URL(workerUrl);
+    // Only derive when we're pointed at a loopback dev worker. Anything
+    // else (remote staging, preview domains, etc.) uses the same
+    // fallback — operators can still override explicitly.
+    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+      return fallback;
+    }
+    const port = parsed.port || DEFAULT_DEV_WRANGLER_PORT;
+    return `${parsed.protocol}//{label}.kiloclaw.localhost:${port}`;
+  } catch {
+    return fallback;
+  }
+}
+
+export function resolveInstanceUrlTemplate(
+  envVar: string | undefined,
+  nodeEnv: string | undefined,
+  workerUrl: string | undefined
+): string {
+  // Explicit kill switch. Empty string falls through to the production
+  // / dev defaults — operators must set `legacy` to disable, not "".
+  if (envVar !== undefined && envVar.toLowerCase() === KILL_SWITCH_SENTINEL) {
+    return '';
+  }
+  // Non-empty explicit override wins.
+  if (envVar !== undefined && envVar !== '') return envVar;
+  if (nodeEnv === 'production') return 'https://{label}.kiloclaw.ai';
+  return deriveDevTemplateFromWorkerUrl(workerUrl);
+}
+
+export const KILOCLAW_INSTANCE_URL_TEMPLATE = resolveInstanceUrlTemplate(
+  process.env.KILOCLAW_INSTANCE_URL_TEMPLATE,
+  process.env.NODE_ENV,
+  KILOCLAW_API_URL
+);
+
 // KiloClaw Early Bird Checkout
 export const STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID = getEnvVariable(
   'STRIPE_KILOCLAW_EARLYBIRD_PRICE_ID'

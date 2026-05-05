@@ -7,6 +7,8 @@
     ".": "./src/index.ts",
     "./instance-id": "./src/instance-id.ts",
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
+    "./sandbox-id": "./src/sandbox-id.ts",
+    "./hostname-label": "./src/hostname-label.ts",
     "./redact-headers": "./src/redact-headers.ts",
     "./kiloclaw-billing-observability": "./src/kiloclaw-billing-observability.ts"
   },

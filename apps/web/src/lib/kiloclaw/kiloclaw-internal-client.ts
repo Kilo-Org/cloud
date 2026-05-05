@@ -213,6 +213,46 @@ export class KiloClawInternalClient {
     );
   }
 
+  /**
+   * Wake the target instance's DO so it re-arms its alarm after a new
+   * scheduled action has been persisted. Best-effort — failures are
+   * acceptable (the wedge in alarm() will eventually pick up the action
+   * the next time the DO ticks for any other reason). See
+   * services/kiloclaw/src/routes/platform.ts for the route comment
+   * explaining why this is required in dev and merely defensive in
+   * production.
+   */
+  async wakeScheduledAction(userId: string, instanceId: string): Promise<{ ok: true }> {
+    return this.request(
+      '/api/platform/scheduled-action/wake',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, instanceId }),
+      },
+      { userId }
+    );
+  }
+
+  /**
+   * Synchronously runs the notification notice sweep that the cron
+   * normally drives. Used by the admin Scheduler tab "Run notice sweep
+   * now" button so admins can verify notice copy locally (where wrangler
+   * does not fire scheduled() on cadence) and on demand in production.
+   * No userId routing — sweep is fleet-wide.
+   */
+  async runScheduledActionNoticeSweep(): Promise<{
+    processed: number;
+    sent: number;
+    failed: number;
+    recovered: number;
+    voidedStale: number;
+  }> {
+    return this.request('/api/platform/scheduled-action/run-notice-sweep', {
+      method: 'POST',
+      body: '{}',
+    });
+  }
+
   async setUserKiloclawEarlyAccess(
     userId: string,
     value: boolean

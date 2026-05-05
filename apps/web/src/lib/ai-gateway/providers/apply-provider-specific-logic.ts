@@ -7,7 +7,7 @@ import type {
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
 import { applyXaiModelSettings, isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
-import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { applyKiloExclusiveModelSettings } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@/lib/ai-gateway/providers/anthropic';
 import { isClaudeModel, isHaikuModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -112,15 +112,7 @@ export function applyProviderSpecificLogic(
 ) {
   const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
   if (kiloExclusiveModel) {
-    requestToMutate.body.model = kiloExclusiveModel.internal_id;
-    const inferenceProvider = getInferenceProvider(kiloExclusiveModel);
-    if (inferenceProvider) {
-      if (requestToMutate.body.provider) {
-        requestToMutate.body.provider.only = [inferenceProvider];
-      } else {
-        requestToMutate.body.provider = { only: [inferenceProvider] };
-      }
-    }
+    applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);
   }
 
   if (isClaudeModel(requestedModel)) {

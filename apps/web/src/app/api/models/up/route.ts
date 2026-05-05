@@ -57,8 +57,6 @@ const HEALTH_CHECK_EXCLUSIONS = new Set([
   'openrouter/elephant-alpha',
   'openai/gpt-5.4',
   'openai/gpt-5.5',
-  // Temporarily excluded: a single BYOK user spiked to 14k+ req/15min and affected baseline
-  'google/gemma-4-31b-it',
 ]);
 
 function emptyMetrics(): Omit<ModelHealthMetrics, 'monitored'> {

@@ -2,6 +2,7 @@ import { Actions, Card, LinkButton, CardText, type Message, type Thread } from '
 import { createLinkAccountToken, type PlatformIdentity } from '@/lib/bot-identity';
 import { APP_URL } from '@/lib/constants';
 import { isChannelLevelMessage } from '@/lib/bot/helpers';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { StateAdapter } from 'chat';
 
 const LINK_ACCOUNT_PATH = '/api/chat/link-account';
@@ -48,12 +49,22 @@ export async function promptLinkAccount(
 ): Promise<void> {
   // Post to the channel when the @mention is top-level, otherwise into the thread.
   const target = isChannelLevelMessage(thread, message) ? thread.channel : thread;
+  const linkUrl = await buildLinkAccountUrl(identity, thread, message, state);
 
-  await target.postEphemeral(
-    message.author,
-    linkAccountCard(await buildLinkAccountUrl(identity, thread, message, state)),
-    {
-      fallbackToDM: true,
-    }
-  );
+  switch (identity.platform) {
+    case PLATFORM.SLACK:
+      await target.postEphemeral(message.author, linkAccountCard(linkUrl), {
+        fallbackToDM: true,
+      });
+      return;
+    case PLATFORM.GITHUB:
+      await target.post({
+        markdown:
+          'To use Kilo from GitHub you first need to link your GitHub account to Kilo. ' +
+          `[Link your Kilo account](${linkUrl}) to continue.`,
+      });
+      return;
+    default:
+      throw new Error(`Unsupported platform: ${identity.platform}`);
+  }
 }

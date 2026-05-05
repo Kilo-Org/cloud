@@ -3306,7 +3306,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     <AlertDescription className="text-orange-700 dark:text-orange-300">
                       Fly volume will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB to{' '}
                       {getTier(selectedInstanceType).volumeSizeGb} GB. Fly volumes can grow but
-                      cannot be shrunk.
+                      cannot be shrunk, so you will not be able to downgrade this instance.
                     </AlertDescription>
                   </Alert>
                 )}

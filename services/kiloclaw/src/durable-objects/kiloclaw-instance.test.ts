@@ -217,6 +217,9 @@ function createFakeStorage() {
     setAlarm(time: number): void {
       alarmTime = time;
     },
+    getAlarm(): number | null {
+      return alarmTime;
+    },
     deleteAlarm(): void {
       alarmTime = null;
     },
@@ -8800,6 +8803,114 @@ describe('getStatus instanceType resolution', () => {
     await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
 
     expect(storage._store.get('instanceType')).not.toBe('custom');
+  });
+});
+
+// ============================================================================
+// instanceType backfill from live Fly machine config
+// ============================================================================
+
+describe('instanceType alarm-driven backfill', () => {
+  it('backfills machineSize and instanceType during alarm reconcile when DO state is legacy', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+  });
+
+  it('does nothing when machineSize is already populated', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      instanceType: 'perf-1-3',
+      volumeSizeGb: 10,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' } },
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+  });
+
+  it('writes custom when the live Fly guest does not match any catalog tier', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' } },
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('instanceType')).toBe('custom');
+  });
+});
+
+describe('getDebugState live-check dispatch', () => {
+  it('dispatches a Fly live check on getDebugState when running and past the throttle', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+      lastLiveCheckAt: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
+    });
+
+    await instance.getDebugState();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(flyClient.getMachine).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'acct-test' },
+      'machine-1'
+    );
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
   });
 });
 

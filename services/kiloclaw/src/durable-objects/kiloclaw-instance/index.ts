@@ -190,6 +190,25 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /**
+   * Dispatch a fire-and-forget live check against Fly when status is running
+   * and we're past the throttle window. Used by both `getStatus` (user-facing)
+   * and `getDebugState` (admin-facing) so admins see live data — including
+   * tier backfill for legacy instances — without waiting for the next alarm.
+   */
+  private maybeDispatchLiveCheck(): void {
+    if (
+      this.s.status === 'running' &&
+      this.s.provider === 'fly' &&
+      this.s.flyMachineId &&
+      (this.s.lastLiveCheckAt === null ||
+        Date.now() - this.s.lastLiveCheckAt >= LIVE_CHECK_THROTTLE_MS)
+    ) {
+      this.s.lastLiveCheckAt = Date.now();
+      this.ctx.waitUntil(syncStatusFromLiveCheck(this.ctx, this.s, this.env));
+    }
+  }
+
+  /**
    * Resolve the image version for a pin/rollout decision and write the four
    * image fields (openclawVersion, imageVariant, trackedImageTag,
    * trackedImageDigest) on `this.s`. Does NOT persist — callers are
@@ -2552,17 +2571,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     controllerCapabilitiesVersion: number | null;
   }> {
     await this.loadState();
-
-    if (
-      this.s.status === 'running' &&
-      this.s.provider === 'fly' &&
-      this.s.flyMachineId &&
-      (this.s.lastLiveCheckAt === null ||
-        Date.now() - this.s.lastLiveCheckAt >= LIVE_CHECK_THROTTLE_MS)
-    ) {
-      this.s.lastLiveCheckAt = Date.now();
-      this.ctx.waitUntil(syncStatusFromLiveCheck(this.ctx, this.s, this.env));
-    }
+    this.maybeDispatchLiveCheck();
 
     return {
       userId: this.s.userId,
@@ -2681,6 +2690,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     envKeyAppDOKeySet: boolean | null;
   }> {
     await this.loadState();
+    this.maybeDispatchLiveCheck();
     const alarmScheduledAt = await this.ctx.storage.getAlarm();
 
     // Fetch env key diagnostics from the App DO (best-effort, don't fail the whole response).

@@ -753,6 +753,7 @@ async function reconcileMachine(
 
   try {
     const machine = await fly.getMachine(flyConfig, state.flyMachineId);
+    await backfillMachineSizeFromFlyConfig(ctx, state, machine, 'reconcile-alarm');
     const result = await syncStatusWithFly(ctx, state, machine.state, rctx);
     await reconcileMachineMount(flyConfig, ctx, state, machine, rctx);
     return { reconciled: true, result };
@@ -763,6 +764,45 @@ async function reconcileMachine(
     }
     return { reconciled: false, result: {} };
   }
+}
+
+/**
+ * Backfill machineSize and instanceType from live Fly machine config.
+ *
+ * No-op when machineSize is already set or the Fly machine has no guest config.
+ * Called from any path that already has a fresh `getMachine` response: alarm
+ * reconcile, the user-facing live-check, future restart paths. Keeps the
+ * "we observed live hardware → write it back" logic in one place so callers
+ * don't drift.
+ */
+async function backfillMachineSizeFromFlyConfig(
+  ctx: DurableObjectState,
+  state: InstanceMutableState,
+  machine: { config?: { guest?: { cpus: number; memory_mb: number; cpu_kind?: string } } },
+  source: string
+): Promise<void> {
+  if (state.machineSize !== null) return;
+  const guest = machine.config?.guest;
+  if (!guest) return;
+  const { cpus, memory_mb, cpu_kind } = guest;
+  state.machineSize = {
+    cpus,
+    memory_mb,
+    cpu_kind: cpu_kind as 'shared' | 'performance' | undefined,
+  };
+  state.instanceType = resolveInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
+  console.log('[instance-tier-debug] backfill from Fly guest', {
+    source,
+    userId: state.userId,
+    sandboxId: state.sandboxId,
+    provider: state.provider,
+    machineSize: state.machineSize,
+    volumeSizeGb: state.volumeSizeGb,
+    resolvedInstanceType: state.instanceType,
+  });
+  await ctx.storage.put(
+    storageUpdate({ machineSize: state.machineSize, instanceType: state.instanceType })
+  );
 }
 
 /**
@@ -1158,24 +1198,7 @@ export async function syncStatusFromLiveCheck(
     const flyConfig = { apiToken: env.FLY_API_TOKEN, appName };
 
     const machine = await fly.getMachine(flyConfig, state.flyMachineId);
-
-    // Backfill machineSize from live Fly machine config for legacy instances
-    if (state.machineSize === null && machine.config?.guest) {
-      const { cpus, memory_mb, cpu_kind } = machine.config.guest;
-      state.machineSize = { cpus, memory_mb, cpu_kind };
-      state.instanceType = resolveInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
-      console.log('[instance-tier-debug] reconcile live-check backfill', {
-        userId: state.userId,
-        sandboxId: state.sandboxId,
-        provider: state.provider,
-        machineSize: state.machineSize,
-        volumeSizeGb: state.volumeSizeGb,
-        resolvedInstanceType: state.instanceType,
-      });
-      await ctx.storage.put(
-        storageUpdate({ machineSize: state.machineSize, instanceType: state.instanceType })
-      );
-    }
+    await backfillMachineSizeFromFlyConfig(ctx, state, machine, 'live-check');
 
     if (machine.state === 'started') {
       state.healthCheckFailCount = 0;

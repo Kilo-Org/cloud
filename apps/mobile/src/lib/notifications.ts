@@ -120,6 +120,7 @@ export function checkInitialNotification(): void {
   if (path) {
     pendingNotificationLink = path;
   }
+  Notifications.clearLastNotificationResponse();
 }
 
 export async function registerForPushNotifications(): Promise<string | null> {

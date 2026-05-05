@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import {
+  credit_transactions,
   kilocode_users,
   kiloclaw_instances,
-  kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import {
@@ -15,7 +15,7 @@ import {
   KiloClawSubscriptionChangeActorType,
   KiloClawSubscriptionStatus,
 } from '@kilocode/db/schema-types';
-import { and, eq, inArray, isNull, like, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNull, like, sql } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import type { SeedResult } from '../index';
@@ -34,7 +34,7 @@ function printUsage(): void {
   console.log('  --name=<name>                  Instance name (default: Fake local KiloClaw)');
   console.log('');
   console.log(
-    'The script deletes prior fake instances for the same user (sandbox_id starts with ki_fake_)'
+    'The script retires prior fake instances for the same user (sandbox_id starts with ki_fake_)'
   );
   console.log('and refuses to run if the user already has a non-fake active personal instance.');
 }
@@ -143,6 +143,29 @@ function paymentSourceForPlan(plan: KiloClawPlan): KiloClawPaymentSource | null 
   return plan === KiloClawPlan.Trial ? null : KiloClawPaymentSource.Credits;
 }
 
+function costMicrodollarsForPlan(plan: KiloClawPlan): number | null {
+  switch (plan) {
+    case KiloClawPlan.Trial:
+      return null;
+    case KiloClawPlan.Standard:
+      return 9_000_000;
+    case KiloClawPlan.Commit:
+      return 48_000_000;
+  }
+}
+
+function periodKey(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function deductionCategoryForPlan(plan: KiloClawPlan, instanceId: string, date: Date): string {
+  const prefix =
+    plan === KiloClawPlan.Commit ? 'kiloclaw-subscription-commit' : 'kiloclaw-subscription';
+  return `${prefix}:${instanceId}:${periodKey(date)}`;
+}
+
 async function assertUserExists(userId: string): Promise<void> {
   const db = getSeedDb();
   const [user] = await db
@@ -181,6 +204,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         and(
           eq(kiloclaw_instances.user_id, options.userId),
           isNull(kiloclaw_instances.organization_id),
+          isNull(kiloclaw_instances.destroyed_at),
           like(kiloclaw_instances.sandbox_id, `${FAKE_SANDBOX_PREFIX}%`)
         )
       );
@@ -188,25 +212,49 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
     if (priorFakeInstanceIds.length > 0) {
       const priorFakeSubscriptions = await tx
-        .select({ id: kiloclaw_subscriptions.id })
+        .select()
         .from(kiloclaw_subscriptions)
         .where(inArray(kiloclaw_subscriptions.instance_id, priorFakeInstanceIds));
       const priorFakeSubscriptionIds = priorFakeSubscriptions.map(subscription => subscription.id);
 
       if (priorFakeSubscriptionIds.length > 0) {
-        await tx
-          .delete(kiloclaw_subscription_change_log)
-          .where(
-            inArray(kiloclaw_subscription_change_log.subscription_id, priorFakeSubscriptionIds)
+        const retiredSubscriptions = await tx
+          .update(kiloclaw_subscriptions)
+          .set({
+            status: KiloClawSubscriptionStatus.Canceled,
+            cancel_at_period_end: false,
+            pending_conversion: false,
+          })
+          .where(inArray(kiloclaw_subscriptions.id, priorFakeSubscriptionIds))
+          .returning();
+
+        for (const retiredSubscription of retiredSubscriptions) {
+          const priorSubscription = priorFakeSubscriptions.find(
+            subscription => subscription.id === retiredSubscription.id
           );
-        await tx
-          .delete(kiloclaw_subscriptions)
-          .where(inArray(kiloclaw_subscriptions.id, priorFakeSubscriptionIds));
+          await insertKiloClawSubscriptionChangeLog(tx, {
+            subscriptionId: retiredSubscription.id,
+            actor: {
+              actorType: KiloClawSubscriptionChangeActorType.System,
+              actorId: 'dev-seed:kiloclaw/fake-instance',
+            },
+            action: KiloClawSubscriptionChangeAction.Canceled,
+            reason: 'dev_seed:replace_fake_instance',
+            before: priorSubscription ?? null,
+            after: retiredSubscription,
+          });
+        }
       }
 
       await tx
-        .delete(kiloclaw_instances)
-        .where(inArray(kiloclaw_instances.id, priorFakeInstanceIds));
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: nowIso })
+        .where(
+          and(
+            inArray(kiloclaw_instances.id, priorFakeInstanceIds),
+            isNull(kiloclaw_instances.destroyed_at)
+          )
+        );
     }
 
     const activePersonalInstances = await tx
@@ -216,8 +264,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         and(
           eq(kiloclaw_instances.user_id, options.userId),
           isNull(kiloclaw_instances.organization_id),
-          isNull(kiloclaw_instances.destroyed_at),
-          ne(kiloclaw_instances.sandbox_id, sandboxId)
+          isNull(kiloclaw_instances.destroyed_at)
         )
       );
 
@@ -246,6 +293,65 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         tracked_image_tag: 'fake-local-instance',
       })
       .returning();
+
+    const costMicrodollars = costMicrodollarsForPlan(options.plan);
+    if (costMicrodollars !== null) {
+      const [user] = await tx
+        .select({
+          microdollarsUsed: kilocode_users.microdollars_used,
+          totalMicrodollarsAcquired: kilocode_users.total_microdollars_acquired,
+        })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, options.userId))
+        .limit(1);
+
+      if (!user) {
+        throw new Error(`User ${options.userId} was not found. Sign in locally first.`);
+      }
+
+      const balanceMicrodollars = user.totalMicrodollarsAcquired - user.microdollarsUsed;
+      const creditGrantMicrodollars = Math.max(costMicrodollars - balanceMicrodollars, 0);
+
+      if (creditGrantMicrodollars > 0) {
+        await tx.insert(credit_transactions).values({
+          id: randomUUID(),
+          kilo_user_id: options.userId,
+          amount_microdollars: creditGrantMicrodollars,
+          is_free: true,
+          description: `Dev seed credits for KiloClaw ${options.plan} enrollment`,
+          credit_category: `dev-seed:kiloclaw-fake-instance-credit:${instance.id}`,
+          check_category_uniqueness: true,
+          original_baseline_microdollars_used: user.microdollarsUsed,
+          created_at: nowIso,
+        });
+
+        await tx
+          .update(kilocode_users)
+          .set({
+            total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${creditGrantMicrodollars}`,
+          })
+          .where(eq(kilocode_users.id, options.userId));
+      }
+
+      await tx.insert(credit_transactions).values({
+        id: randomUUID(),
+        kilo_user_id: options.userId,
+        amount_microdollars: -costMicrodollars,
+        is_free: false,
+        description: `Dev seed KiloClaw ${options.plan} enrollment`,
+        credit_category: deductionCategoryForPlan(options.plan, instance.id, now),
+        check_category_uniqueness: true,
+        original_baseline_microdollars_used: user.microdollarsUsed,
+        created_at: nowIso,
+      });
+
+      await tx
+        .update(kilocode_users)
+        .set({
+          microdollars_used: sql`${kilocode_users.microdollars_used} + ${costMicrodollars}`,
+        })
+        .where(eq(kilocode_users.id, options.userId));
+    }
 
     const [subscription] = await tx
       .insert(kiloclaw_subscriptions)
@@ -278,7 +384,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       after: subscription,
     });
 
-    return { instance, subscription, deletedPriorFakeInstances: priorFakeInstanceIds.length };
+    return { instance, subscription, retiredPriorFakeInstances: priorFakeInstanceIds.length };
   });
 
   console.log('');
@@ -292,6 +398,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     plan: result.subscription.plan,
     status: result.subscription.status,
     periodEnd: result.subscription.current_period_end ?? result.subscription.trial_ends_at,
-    deletedPriorFakeInstances: result.deletedPriorFakeInstances,
+    retiredPriorFakeInstances: result.retiredPriorFakeInstances,
   };
 }

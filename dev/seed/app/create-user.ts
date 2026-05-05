@@ -4,6 +4,7 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
+import { normalizeSeedEmail } from '../lib/email';
 import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
 import type { SeedResult } from '../index';
 
@@ -48,12 +49,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const db = getSeedDb();
   const trimmedName = name.trim();
   const trimmedEmail = email.trim();
-  const normalizedEmail = trimmedEmail.toLowerCase();
+  const normalizedEmail = normalizeSeedEmail(trimmedEmail);
 
   const existing = await db
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
-    .where(eq(kilocode_users.google_user_email, trimmedEmail))
+    .where(eq(kilocode_users.normalized_email, normalizedEmail))
     .limit(1);
 
   if (existing.length > 0) {

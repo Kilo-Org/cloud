@@ -104,7 +104,6 @@ function parseArgs(args: string[]): AddCreditsOptions {
   let categoryProvided = false;
   let isIdempotent = false;
   let expiryDateIso: string | null = null;
-  let positionalUsdSeen = false;
 
   for (const arg of args.slice(1)) {
     if (arg === '--help' || arg === '-h') {
@@ -189,11 +188,10 @@ function parseArgs(args: string[]): AddCreditsOptions {
       throw new Error(`Unknown argument: ${arg}`);
     }
 
-    if (positionalUsdSeen || amountMicrodollars !== null) {
+    if (amountMicrodollars !== null) {
       throw new Error(`Unexpected positional argument: ${arg}`);
     }
     amountMicrodollars = parseUsdToMicrodollars(arg, 'amount');
-    positionalUsdSeen = true;
   }
 
   if (amountMicrodollars === null) {

@@ -20,8 +20,10 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@kilocode/db": "workspace:*",
     "@kilocode/event-service": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
+    "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"

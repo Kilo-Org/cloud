@@ -12,7 +12,7 @@
 #
 # Values you may need to set manually:
 #   AGENT_ENV_VARS_PRIVATE_KEY            (get from 1Password)
-#   FLY_IMAGE_TAG / FLY_IMAGE_DIGEST / OPENCLAW_VERSION
+#   FLY_IMAGE_TAG / FLY_IMAGE_DIGEST / FLY_IMAGE_CONTENT_MODE / OPENCLAW_VERSION
 #                                         (set by scripts/push-dev.sh,
 #                                          or ask a team member for values)
 
@@ -115,6 +115,9 @@ FLY_IMAGE_TAG=latest
 # Docker image digest (sha256:...) for immutable image references.
 # Set automatically by scripts/push-dev.sh when pushing images.
 FLY_IMAGE_DIGEST=
+# Image content hash mode: "production" for Dockerfile or "local" for
+# Dockerfile.local plus openclaw-build/openclaw-*.tgz.
+FLY_IMAGE_CONTENT_MODE=production
 # OpenClaw version (must match the openclaw@x.x.x version in the Dockerfile).
 # Used by the worker to self-register the version → image tag mapping in KV,
 # enabling per-user version tracking. Without this, version tracking fields
@@ -161,7 +164,3 @@ NEXT_PUBLIC_POSTHOG_KEY=phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z
 # In wrangler dev, it connects to the remote Postgres via the Hyperdrive service.
 # To use a local Postgres instead, add "localConnectionString" to the hyperdrive
 # config in wrangler.jsonc (see https://developers.cloudflare.com/hyperdrive/configuration/local-development/).
-
-# StreamChat API Key
-STREAM_CHAT_API_KEY=...
-STREAM_CHAT_API_SECRET=...

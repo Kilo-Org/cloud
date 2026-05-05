@@ -11,6 +11,7 @@ import {
   kiloclaw_inbound_email_reserved_aliases,
   kiloclaw_instances,
   kiloclaw_scheduled_actions,
+  kiloclaw_scheduled_action_notifications,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
   kiloclaw_subscriptions,
@@ -2389,6 +2390,114 @@ describe('admin.kiloclawInstances scheduled actions', () => {
       });
       expect(second.cancelled).toBe(false);
       expect(second.status).toBe('cancelled');
+    });
+
+    it('voids pending notice rows so the sweep does not deliver after cancel', async () => {
+      // scheduleAction with default notify=true queues 3 pending notice
+      // rows (email, webapp, mobile_push) per target. After cancel,
+      // those rows must transition to 'failed' so selectDueNotifications
+      // never picks them up again.
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      const beforeCancel = await db
+        .select()
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      expect(beforeCancel.length).toBeGreaterThan(0);
+      expect(
+        beforeCancel.every(
+          row =>
+            row.kiloclaw_scheduled_action_notifications.kind === 'notice' &&
+            row.kiloclaw_scheduled_action_notifications.status === 'pending'
+        )
+      ).toBe(true);
+
+      await caller.admin.kiloclawInstances.cancelScheduledAction({ id: created.id });
+
+      const afterCancel = await db
+        .select()
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+      const noticeRows = afterCancel
+        .map(row => row.kiloclaw_scheduled_action_notifications)
+        .filter(n => n.kind === 'notice');
+      expect(noticeRows.length).toBe(beforeCancel.length);
+      expect(noticeRows.every(n => n.status === 'failed')).toBe(true);
+      expect(
+        noticeRows.every(n => n.error_message === 'action cancelled before notice was dispatched')
+      ).toBe(true);
+    });
+  });
+
+  describe('cancelScheduledActionTarget', () => {
+    it('voids pending notice rows for only the cancelled target', async () => {
+      // Two targets in one action; cancel one. Pending notice rows for
+      // the cancelled target should transition to 'failed'; the other
+      // target's notice rows should stay 'pending'.
+      const secondUser = await insertTestUser();
+      const [secondInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: secondUser.id,
+          sandbox_id: `test-cancel-target-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      const caller = await createCallerForUser(adminUser.id);
+      const created = await caller.admin.kiloclawInstances.scheduleAction({
+        actionType: 'scheduled_restart',
+        instanceIds: [testInstanceId, secondInstance.id],
+        scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+
+      await caller.admin.kiloclawInstances.cancelScheduledActionTarget({
+        scheduledActionId: created.id,
+        instanceId: testInstanceId,
+      });
+
+      const allNotices = await db
+        .select({
+          status: kiloclaw_scheduled_action_notifications.status,
+          error_message: kiloclaw_scheduled_action_notifications.error_message,
+          instance_id: kiloclaw_scheduled_action_targets.instance_id,
+        })
+        .from(kiloclaw_scheduled_action_notifications)
+        .innerJoin(
+          kiloclaw_scheduled_action_targets,
+          eq(
+            kiloclaw_scheduled_action_targets.id,
+            kiloclaw_scheduled_action_notifications.target_id
+          )
+        )
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, created.id));
+
+      const cancelledTargetRows = allNotices.filter(n => n.instance_id === testInstanceId);
+      const otherTargetRows = allNotices.filter(n => n.instance_id === secondInstance.id);
+
+      expect(cancelledTargetRows.length).toBeGreaterThan(0);
+      expect(cancelledTargetRows.every(n => n.status === 'failed')).toBe(true);
+
+      expect(otherTargetRows.length).toBeGreaterThan(0);
+      expect(otherTargetRows.every(n => n.status === 'pending')).toBe(true);
     });
   });
 });

@@ -7,10 +7,23 @@ import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile, Copy } from 'lucid
 import { EmojiQuickPick } from './EmojiQuickPick';
 import { EmojiPicker } from './EmojiPicker';
 import { ReactionPills } from './ReactionPills';
-import type { Message, ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
-import { ulidToTimestamp, contentBlocksToText } from '@kilocode/kilo-chat';
+import type {
+  Message,
+  ContentBlock,
+  ExecApprovalDecision,
+  ReplyToMessageSnapshot,
+} from '@kilocode/kilo-chat';
+import {
+  buildMessageActionAvailability,
+  MESSAGE_TEXT_MAX_CHARS,
+  ulidToTimestamp,
+  contentBlocksToText,
+} from '@kilocode/kilo-chat';
 import { useKiloChatContext } from './kiloChatContext';
 import { toast } from 'sonner';
+import { isMessageEditOverLimit, submitMessageEdit } from './message-edit-state';
+
+const EDIT_COUNTER_SHOW_AT = Math.floor(MESSAGE_TEXT_MAX_CHARS * 0.8);
 
 const MemoizedMarkdown = memo(function MemoizedMarkdown({ content }: { content: string }) {
   return (
@@ -32,9 +45,9 @@ const MemoizedMarkdown = memo(function MemoizedMarkdown({ content }: { content: 
 type MessageBubbleProps = {
   message: Message;
   isOwn: boolean;
-  replyToMessage?: Message | null;
+  replyToMessage?: Message | ReplyToMessageSnapshot | null;
   pendingDeleteId: string | null;
-  onEdit: (messageId: string, content: ContentBlock[]) => void;
+  onEdit: (messageId: string, content: ContentBlock[]) => Promise<boolean>;
   onDelete: (messageId: string) => void;
   onConfirmDelete: (messageId: string) => void;
   onCancelDelete: () => void;
@@ -42,9 +55,17 @@ type MessageBubbleProps = {
   onAddReaction: (messageId: string, emoji: string) => void;
   onRemoveReaction: (messageId: string, emoji: string) => void;
   onExecuteAction: (messageId: string, groupId: string, value: ExecApprovalDecision) => void;
-  actionPending?: boolean;
-  currentUserId: string;
+  pendingActionGroupId: string | null;
+  currentUserId: string | null;
 };
+
+function getReplyPreviewText(replyToMessage: Message | ReplyToMessageSnapshot): string {
+  const preview =
+    'previewText' in replyToMessage
+      ? (replyToMessage.previewText ?? 'Message')
+      : contentBlocksToText(replyToMessage.content);
+  return preview.length > 60 ? `${preview.slice(0, 60)}...` : preview;
+}
 
 export const MessageBubble = memo(function MessageBubble({
   message,
@@ -59,12 +80,13 @@ export const MessageBubble = memo(function MessageBubble({
   onAddReaction,
   onRemoveReaction,
   onExecuteAction,
-  actionPending,
+  pendingActionGroupId,
   currentUserId,
 }: MessageBubbleProps) {
   const { assistantName } = useKiloChatContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [showQuickPick, setShowQuickPick] = useState(false);
   const [showFullPicker, setShowFullPicker] = useState(false);
@@ -79,36 +101,63 @@ export const MessageBubble = memo(function MessageBubble({
   });
 
   const textContent = message.deleted ? '' : contentBlocksToText(message.content);
+  const editOverLimit = isMessageEditOverLimit(editText);
+  const showEditCounter = editText.length >= EDIT_COUNTER_SHOW_AT || editOverLimit;
+  const baseActionAvailability = buildMessageActionAvailability(message, isOwn);
+  const actionAvailability =
+    currentUserId === null
+      ? {
+          canReact: false,
+          canEdit: false,
+          canDelete: false,
+          canReply: false,
+          canExecuteAction: false,
+        }
+      : baseActionAvailability;
 
   const myReactions = new Set(
-    message.reactions.filter(r => r.memberIds.includes(currentUserId)).map(r => r.emoji)
+    currentUserId === null
+      ? []
+      : message.reactions.filter(r => r.memberIds.includes(currentUserId)).map(r => r.emoji)
   );
 
   function handleStartEdit() {
+    if (!actionAvailability.canEdit) return;
     setEditText(textContent);
     setIsEditing(true);
   }
 
-  function handleSaveEdit() {
-    const trimmed = editText.trim();
-    if (!trimmed) return;
-    // Short-circuit no-op edits so we don't bump updatedAt and flash the
-    // "(edited)" label when the user presses Enter without changes.
-    if (trimmed === textContent.trim()) {
-      setIsEditing(false);
-      return;
+  const canSaveEdit =
+    actionAvailability.canEdit && !isSavingEdit && editText.trim().length > 0 && !editOverLimit;
+
+  async function handleSaveEdit() {
+    if (!canSaveEdit) return;
+    setIsSavingEdit(true);
+    try {
+      await submitMessageEdit({
+        messageId: message.id,
+        editText,
+        originalText: textContent,
+        onEdit,
+        closeEditor: () => {
+          setIsEditing(false);
+          setEditText('');
+        },
+      });
+    } finally {
+      setIsSavingEdit(false);
     }
-    onEdit(message.id, [{ type: 'text', text: trimmed }]);
-    setIsEditing(false);
   }
 
   function handleCancelEdit() {
     setIsEditing(false);
     setEditText('');
+    setIsSavingEdit(false);
   }
 
   function handleQuickPickSelect(emoji: string) {
     setShowQuickPick(false);
+    if (!actionAvailability.canReact) return;
     if (myReactions.has(emoji)) {
       onRemoveReaction(message.id, emoji);
     } else {
@@ -119,6 +168,7 @@ export const MessageBubble = memo(function MessageBubble({
   function handleFullPickerSelect(emoji: string) {
     setShowFullPicker(false);
     setShowQuickPick(false);
+    if (!actionAvailability.canReact) return;
     if (myReactions.has(emoji)) {
       onRemoveReaction(message.id, emoji);
     } else {
@@ -134,13 +184,15 @@ export const MessageBubble = memo(function MessageBubble({
         isOwn ? 'right-full mr-1' : 'left-full ml-1'
       }`}
     >
-      <button
-        onClick={() => setShowQuickPick(prev => !prev)}
-        className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
-        title="React"
-      >
-        <Smile className="h-3.5 w-3.5" />
-      </button>
+      {actionAvailability.canReact && (
+        <button
+          onClick={() => setShowQuickPick(prev => !prev)}
+          className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+          title="React"
+        >
+          <Smile className="h-3.5 w-3.5" />
+        </button>
+      )}
       <button
         onClick={() => {
           void navigator.clipboard.writeText(textContent).then(
@@ -153,7 +205,7 @@ export const MessageBubble = memo(function MessageBubble({
       >
         <Copy className="h-3.5 w-3.5" />
       </button>
-      {isOwn && !message.deliveryFailed && (
+      {actionAvailability.canEdit && (
         <button
           onClick={handleStartEdit}
           className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
@@ -162,7 +214,7 @@ export const MessageBubble = memo(function MessageBubble({
           <Pencil className="h-3.5 w-3.5" />
         </button>
       )}
-      {isOwn && (
+      {actionAvailability.canDelete && (
         <button
           onClick={() => onDelete(message.id)}
           className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
@@ -171,7 +223,7 @@ export const MessageBubble = memo(function MessageBubble({
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
-      {!message.deliveryFailed && (
+      {actionAvailability.canReply && (
         <button
           onClick={() => onReply(message)}
           className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
@@ -185,7 +237,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   return (
     <div
-      className={`group flex px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
+      className={`group flex [content-visibility:auto] [contain-intrinsic-size:0_120px] px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => {
         if (!showFullPicker) {
@@ -207,19 +259,14 @@ export const MessageBubble = memo(function MessageBubble({
             {replyToMessage.deleted ? (
               <span className="italic opacity-70">original message deleted</span>
             ) : (
-              <span>
-                {(() => {
-                  const preview = contentBlocksToText(replyToMessage.content);
-                  return preview.length > 60 ? `${preview.slice(0, 60)}...` : preview;
-                })()}
-              </span>
+              <span>{getReplyPreviewText(replyToMessage)}</span>
             )}
           </div>
         )}
 
         <div className="relative min-w-0 max-w-full">
           {actionButtons}
-          {showQuickPick && (
+          {showQuickPick && actionAvailability.canReact && (
             <div className={`absolute z-20 ${isOwn ? 'right-full mr-1' : 'left-full ml-1'} top-0`}>
               <EmojiQuickPick
                 currentUserReactions={myReactions}
@@ -231,7 +278,7 @@ export const MessageBubble = memo(function MessageBubble({
               />
             </div>
           )}
-          {showFullPicker && (
+          {showFullPicker && actionAvailability.canReact && (
             <EmojiPicker
               onSelect={handleFullPickerSelect}
               onClose={() => setShowFullPicker(false)}
@@ -256,16 +303,26 @@ export const MessageBubble = memo(function MessageBubble({
                   onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSaveEdit();
+                      if (canSaveEdit) void handleSaveEdit();
                     }
                     if (e.key === 'Escape') handleCancelEdit();
                   }}
                   autoFocus
                 />
+                <div
+                  className={`mt-1 text-right text-[11px] ${
+                    editOverLimit ? 'text-destructive' : 'opacity-70'
+                  } ${showEditCounter ? '' : 'invisible'}`}
+                  aria-live="polite"
+                >
+                  {editText.length.toLocaleString('en-US')} /{' '}
+                  {MESSAGE_TEXT_MAX_CHARS.toLocaleString('en-US')}
+                </div>
                 <div className="mt-1 flex items-center gap-1">
                   <button
-                    onClick={handleSaveEdit}
-                    className="rounded p-0.5 hover:opacity-70 cursor-pointer transition-opacity"
+                    onClick={() => void handleSaveEdit()}
+                    disabled={!canSaveEdit}
+                    className="rounded p-0.5 hover:opacity-70 cursor-pointer transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                     title="Save (Enter)"
                   >
                     <Check className="h-3 w-3" />
@@ -337,8 +394,12 @@ export const MessageBubble = memo(function MessageBubble({
                       {actionsBlock.actions.map(action => (
                         <button
                           key={action.value}
-                          disabled={actionPending}
+                          disabled={
+                            pendingActionGroupId === actionsBlock.groupId ||
+                            !actionAvailability.canExecuteAction
+                          }
                           onClick={() =>
+                            actionAvailability.canExecuteAction &&
                             onExecuteAction(message.id, actionsBlock.groupId, action.value)
                           }
                           className={`rounded-md px-3 py-1 text-xs font-medium cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -376,7 +437,7 @@ export const MessageBubble = memo(function MessageBubble({
               <span>{timeStr}</span>
             </div>
           </div>
-          {!message.deleted && !message.deliveryFailed && (
+          {actionAvailability.canReact && (
             <ReactionPills
               reactions={message.reactions}
               currentUserId={currentUserId}

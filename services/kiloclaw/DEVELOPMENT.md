@@ -94,10 +94,12 @@ Control how the three processes are displayed with `--display <mode>`:
 
 ### Other flags
 
-| Flag                       | Description                                          |
-| -------------------------- | ---------------------------------------------------- |
-| `--has-controller-changes` | Build and push a new Docker image before starting    |
-| `--tunnel-name <name>`     | Use a named Cloudflare tunnel instead of a quick one |
+| Flag                          | Description                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| `--has-controller-changes`    | Build and push a new Docker image before starting                              |
+| `--local-openclaw-image`      | Build and push with `Dockerfile.local` and one local OpenClaw tarball          |
+| `--production-openclaw-image` | Use the production `Dockerfile` even when `.dev.vars` records local image mode |
+| `--tunnel-name <name>`        | Use a named Cloudflare tunnel instead of a quick one                           |
 
 ### Script configuration
 
@@ -208,16 +210,17 @@ KiloClaw uses the KiloCode provider only.
 
 ### Fly.io
 
-| Variable           | Description                                                                             | Source       | Auto-managed |
-| ------------------ | --------------------------------------------------------------------------------------- | ------------ | ------------ |
-| `FLY_API_TOKEN`    | Fly org token                                                                           | dev-start.sh | Yes          |
-| `FLY_ORG_SLUG`     | Fly org slug (read by script for token creation)                                        | Example      | No           |
-| `FLY_REGISTRY_APP` | Shared Fly app that holds Docker images (e.g., `kiloclaw-dev`)                          | Example      | No           |
-| `FLY_APP_NAME`     | Legacy fallback app name for existing instances (may be removed in future)              | Example      | No           |
-| `FLY_REGION`       | Region priority list, e.g. `us,eu`. Tries US first, falls back to EU, then gives up.    | Example      | No           |
-| `FLY_IMAGE_TAG`    | Docker image tag. Set automatically by `scripts/push-dev.sh`, or use `latest` to start. | push-dev.sh  | Yes          |
-| `FLY_IMAGE_DIGEST` | Docker image digest. Set automatically by `scripts/push-dev.sh`.                        | push-dev.sh  | Yes          |
-| `OPENCLAW_VERSION` | OpenClaw version in the image. Set automatically by `scripts/push-dev.sh`.              | push-dev.sh  | Yes          |
+| Variable                 | Description                                                                             | Source       | Auto-managed |
+| ------------------------ | --------------------------------------------------------------------------------------- | ------------ | ------------ |
+| `FLY_API_TOKEN`          | Fly org token                                                                           | dev-start.sh | Yes          |
+| `FLY_ORG_SLUG`           | Fly org slug (read by script for token creation)                                        | Example      | No           |
+| `FLY_REGISTRY_APP`       | Shared Fly app that holds Docker images (e.g., `kiloclaw-dev`)                          | Example      | No           |
+| `FLY_APP_NAME`           | Legacy fallback app name for existing instances (may be removed in future)              | Example      | No           |
+| `FLY_REGION`             | Region priority list, e.g. `us,eu`. Tries US first, falls back to EU, then gives up.    | Example      | No           |
+| `FLY_IMAGE_TAG`          | Docker image tag. Set automatically by `scripts/push-dev.sh`, or use `latest` to start. | push-dev.sh  | Yes          |
+| `FLY_IMAGE_DIGEST`       | Docker image digest. Set automatically by `scripts/push-dev.sh`.                        | push-dev.sh  | Yes          |
+| `FLY_IMAGE_CONTENT_MODE` | Image hash mode, `production` or `local`. Set automatically by `scripts/push-dev.sh`.   | push-dev.sh  | Yes          |
+| `OPENCLAW_VERSION`       | OpenClaw version in the image. Set automatically by `scripts/push-dev.sh`.              | push-dev.sh  | Yes          |
 
 `FLY_IMAGE_TAG`, `FLY_IMAGE_DIGEST`, and `OPENCLAW_VERSION` together control
 what version gets deployed by default for your dev instances. The build script
@@ -446,6 +449,17 @@ won't be committed.
 This uses `Dockerfile.local` instead of the default `Dockerfile`. The script
 validates that a tarball exists in `openclaw-build/` before building. Everything
 else (tagging, pushing, `.dev.vars` updates) works the same as a normal push.
+
+`push-dev.sh --local` records `FLY_IMAGE_CONTENT_MODE=local` in `.dev.vars`.
+Normal `dev-start.sh` runs preserve that mode, hash `Dockerfile.local` plus the
+selected tarball, and call `push-dev.sh --local` if the local image inputs
+change. You can also opt in explicitly with `./scripts/dev-start.sh
+--local-openclaw-image` or set `LOCAL_OPENCLAW_IMAGE=true` in
+`scripts/.dev-start.conf`.
+
+To switch back to the production OpenClaw package, run `./scripts/push-dev.sh`
+once or pass `--production-openclaw-image` to `dev-start.sh` when intentionally
+rebuilding the production image.
 
 ### 4. Deploy
 

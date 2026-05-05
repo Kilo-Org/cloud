@@ -15,7 +15,11 @@ export async function handleKiloChatReadAction(
   const limit = readNumberParam(args.params, 'limit');
   const before = readStringParam(args.params, 'before');
 
-  const { messages } = await args.client.listMessages({ conversationId, limit, before });
+  const { messages, hasMore, nextCursor } = await args.client.listMessages({
+    conversationId,
+    limit,
+    before,
+  });
 
   if (messages.length === 0) {
     return { content: [{ type: 'text', text: 'No messages in this conversation.' }] };
@@ -30,6 +34,10 @@ export async function handleKiloChatReadAction(
       typeof msg.updatedAt === 'number' ? ` (${new Date(msg.updatedAt).toISOString()})` : '';
     return `[${msg.id}] ${msg.senderId}${timestamp}: ${text}`;
   });
+
+  if (hasMore && nextCursor) {
+    lines.push('', `More messages available. nextCursor: ${nextCursor}`);
+  }
 
   return { content: [{ type: 'text', text: lines.join('\n') }] };
 }

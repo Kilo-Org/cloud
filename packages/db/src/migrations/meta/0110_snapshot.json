@@ -1,5 +1,5 @@
 {
-  "id": "43c35ee1-7344-4a27-a5ef-d59e3ce18ac9",
+  "id": "b5dec53e-5f7f-46a2-9620-afadcf3f6acc",
   "prevId": "4c1ec3c4-df75-4028-a0ab-68a0ad3c1c4d",
   "version": "7",
   "dialect": "postgresql",
@@ -9707,12 +9707,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "instance_type": {
-          "name": "instance_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -9791,22 +9785,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "IDX_kiloclaw_instances_instance_type": {
-          "name": "IDX_kiloclaw_instances_instance_type",
-          "columns": [
-            {
-              "expression": "instance_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"kiloclaw_instances\".\"destroyed_at\" is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -9840,12 +9818,129 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "CHK_kiloclaw_instances_instance_type": {
-          "name": "CHK_kiloclaw_instances_instance_type",
-          "value": "\"kiloclaw_instances\".\"instance_type\" IS NULL OR \"kiloclaw_instances\".\"instance_type\" IN ('perf-1-3', 'perf-4-8', 'perf-4-16', 'shared-2-3', 'shared-2-4', 'custom')"
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.kiloclaw_scheduled_action_notifications": {
+      "name": "kiloclaw_scheduled_action_notifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'notice'"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
+      "indexes": {
+        "UQ_kiloclaw_scheduled_action_notifications_target_kind_channel": {
+          "name": "UQ_kiloclaw_scheduled_action_notifications_target_kind_channel",
+          "columns": [
+            {
+              "expression": "target_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "channel",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_scheduled_action_notifications_pending": {
+          "name": "IDX_kiloclaw_scheduled_action_notifications_pending",
+          "columns": [
+            {
+              "expression": "target_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_scheduled_action_notifications\".\"status\" = 'pending'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "kiloclaw_scheduled_action_notifications_target_id_kiloclaw_scheduled_action_targets_id_fk": {
+          "name": "kiloclaw_scheduled_action_notifications_target_id_kiloclaw_scheduled_action_targets_id_fk",
+          "tableFrom": "kiloclaw_scheduled_action_notifications",
+          "tableTo": "kiloclaw_scheduled_action_targets",
+          "columnsFrom": [
+            "target_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.kiloclaw_scheduled_action_stages": {

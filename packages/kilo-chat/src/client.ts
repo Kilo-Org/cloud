@@ -6,9 +6,12 @@ import {
   createConversationResponseSchema,
   createMessageResponseSchema,
   editMessageResponseSchema,
+  markConversationReadResponseSchema,
   messageListResponseSchema,
   addReactionResponseSchema,
+  removeReactionResponseSchema,
   okResponseSchema,
+  executeActionResponseSchema,
   getBotStatusResponseSchema,
   getConversationStatusResponseSchema,
   type listConversationsQuerySchema,
@@ -25,6 +28,7 @@ import {
 import type {
   KiloChatClientConfig,
   ConversationListResponse,
+  MessageListResponse,
   ConversationDetailResponse,
   CreateConversationRequest,
   CreateConversationResponse,
@@ -33,6 +37,8 @@ import type {
   EditMessageRequest,
   EditMessageResponse,
   RenameConversationRequest,
+  MarkConversationReadRequest,
+  MarkConversationReadResponse,
   Message,
   MessageCreatedEvent,
   MessageUpdatedEvent,
@@ -42,6 +48,9 @@ import type {
   TypingEvent,
   ReactionAddedEvent,
   ReactionRemovedEvent,
+  AddReactionResponse,
+  RemoveReactionResponse,
+  ExecuteActionResponse,
   ConversationCreatedEvent,
   ConversationRenamedEvent,
   ConversationLeftEvent,
@@ -61,6 +70,7 @@ export class KiloChatClient {
   private readonly es: KiloChatClientConfig['eventService'];
   private readonly baseUrl: string;
   private readonly getToken: () => Promise<string>;
+  private readonly onUnauthorized: KiloChatClientConfig['onUnauthorized'];
   private readonly fetchFn: typeof globalThis.fetch;
   // Per-conversation send queues. Each sendMessage call chains onto the tail
   // of its conversation's queue so concurrent callers cannot race ahead of
@@ -73,18 +83,20 @@ export class KiloChatClient {
     this.es = config.eventService;
     this.baseUrl = config.baseUrl;
     this.getToken = config.getToken;
+    this.onUnauthorized = config.onUnauthorized;
     this.fetchFn = config.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
   // ── Mutations via HTTP ────────────────────────────────────────────────────
 
   async sendMessage(req: CreateMessageRequest): Promise<CreateMessageResponse> {
+    const body = req satisfies CreateMessageRequest;
     const prev = this.sendQueues.get(req.conversationId) ?? Promise.resolve();
     const next = prev.then(
       () =>
         this.httpRequest('/v1/messages', {
           method: 'POST',
-          body: req,
+          body,
           schema: createMessageResponseSchema,
         }),
       // A failed prior send must not block subsequent sends — swallow the
@@ -92,25 +104,28 @@ export class KiloChatClient {
       () =>
         this.httpRequest('/v1/messages', {
           method: 'POST',
-          body: req,
+          body,
           schema: createMessageResponseSchema,
         })
     );
     this.sendQueues.set(req.conversationId, next);
     // Best-effort cleanup so the map doesn't grow unbounded for long-lived
     // clients. Only clear if this send is still the tail.
-    void next.finally(() => {
+    const cleanup = (): void => {
       if (this.sendQueues.get(req.conversationId) === next) {
         this.sendQueues.delete(req.conversationId);
       }
-    });
+    };
+    void next.then(cleanup, cleanup);
     return next;
   }
 
   async editMessage(messageId: string, req: EditMessageRequest): Promise<EditMessageResponse> {
+    const body = req satisfies EditMessageRequest;
+
     return this.httpRequest(`/v1/messages/${messageId}`, {
       method: 'PATCH',
-      body: req,
+      body,
       schema: editMessageResponseSchema,
     });
   }
@@ -119,17 +134,21 @@ export class KiloChatClient {
     messageId: string,
     req: z.input<typeof deleteMessageQuerySchema>
   ): Promise<void> {
+    const query = req satisfies z.input<typeof deleteMessageQuerySchema>;
+
     await this.httpRequest(`/v1/messages/${messageId}`, {
       method: 'DELETE',
-      query: req,
+      query,
       schema: voidSchema,
     });
   }
 
   async createConversation(req: CreateConversationRequest): Promise<CreateConversationResponse> {
+    const body = req satisfies CreateConversationRequest;
+
     return this.httpRequest('/v1/conversations', {
       method: 'POST',
-      body: req,
+      body,
       schema: createConversationResponseSchema,
     });
   }
@@ -138,9 +157,11 @@ export class KiloChatClient {
     conversationId: string,
     req: RenameConversationRequest
   ): Promise<{ ok: true }> {
+    const body = req satisfies RenameConversationRequest;
+
     return this.httpRequest(`/v1/conversations/${conversationId}`, {
       method: 'PATCH',
-      body: req,
+      body,
       schema: okResponseSchema,
     });
   }
@@ -166,20 +187,28 @@ export class KiloChatClient {
     });
   }
 
-  async markConversationRead(conversationId: string): Promise<void> {
-    await this.httpRequest(`/v1/conversations/${conversationId}/mark-read`, {
+  async markConversationRead(
+    conversationId: string,
+    req: MarkConversationReadRequest
+  ): Promise<MarkConversationReadResponse> {
+    const body = req satisfies MarkConversationReadRequest;
+
+    return this.httpRequest(`/v1/conversations/${conversationId}/mark-read`, {
       method: 'POST',
-      schema: voidSchema,
+      body,
+      schema: markConversationReadResponseSchema,
     });
   }
 
   async addReaction(
     messageId: string,
     req: z.input<typeof reactionRequestBodySchema>
-  ): Promise<{ id: string }> {
+  ): Promise<AddReactionResponse> {
+    const body = req satisfies z.input<typeof reactionRequestBodySchema>;
+
     return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'POST',
-      body: req,
+      body,
       schema: addReactionResponseSchema,
     });
   }
@@ -187,11 +216,13 @@ export class KiloChatClient {
   async removeReaction(
     messageId: string,
     req: z.input<typeof reactionRequestBodySchema>
-  ): Promise<void> {
-    await this.httpRequest(`/v1/messages/${messageId}/reactions`, {
+  ): Promise<RemoveReactionResponse> {
+    const query = req satisfies z.input<typeof reactionRequestBodySchema>;
+
+    return this.httpRequest(`/v1/messages/${messageId}/reactions`, {
       method: 'DELETE',
-      query: req,
-      schema: voidSchema,
+      query,
+      schema: removeReactionResponseSchema,
     });
   }
 
@@ -199,10 +230,12 @@ export class KiloChatClient {
     conversationId: string,
     messageId: string,
     req: z.input<typeof executeActionRequestSchema>
-  ): Promise<{ ok: true }> {
+  ): Promise<ExecuteActionResponse> {
+    const body = req satisfies z.input<typeof executeActionRequestSchema>;
+
     return this.httpRequest(
       `/v1/conversations/${conversationId}/messages/${messageId}/execute-action`,
-      { method: 'POST', body: req, schema: okResponseSchema }
+      { method: 'POST', body, schema: executeActionResponseSchema }
     );
   }
 
@@ -211,8 +244,14 @@ export class KiloChatClient {
   async listConversations(
     opts?: z.input<typeof listConversationsQuerySchema>
   ): Promise<ConversationListResponse> {
+    const query = {
+      sandboxId: opts?.sandboxId,
+      limit: opts?.limit,
+      cursor: opts?.cursor,
+    } satisfies z.input<typeof listConversationsQuerySchema>;
+
     return this.httpRequest('/v1/conversations', {
-      query: { sandboxId: opts?.sandboxId, limit: opts?.limit, cursor: opts?.cursor },
+      query,
       schema: conversationListResponseSchema,
     });
   }
@@ -249,11 +288,23 @@ export class KiloChatClient {
     conversationId: string,
     opts?: z.input<typeof listMessagesQuerySchema>
   ): Promise<Message[]> {
-    const res = await this.httpRequest(`/v1/conversations/${conversationId}/messages`, {
-      query: { before: opts?.before, limit: opts?.limit },
+    const res = await this.listMessagesPage(conversationId, opts);
+    return res.messages;
+  }
+
+  async listMessagesPage(
+    conversationId: string,
+    opts?: z.input<typeof listMessagesQuerySchema>
+  ): Promise<MessageListResponse> {
+    const query = {
+      before: opts?.before,
+      limit: opts?.limit,
+    } satisfies z.input<typeof listMessagesQuerySchema>;
+
+    return this.httpRequest(`/v1/conversations/${conversationId}/messages`, {
+      query,
       schema: messageListResponseSchema,
     });
-    return res.messages;
   }
 
   // ── Typed event subscriptions ─────────────────────────────────────────────
@@ -339,6 +390,38 @@ export class KiloChatClient {
   // ── Private HTTP helper ───────────────────────────────────────────────────
 
   private async httpRequest<T>(
+    path: string,
+    opts: {
+      method?: string;
+      body?: unknown;
+      query?: Record<string, unknown>;
+      schema: z.ZodType<T>;
+    }
+  ): Promise<T> {
+    try {
+      return await this.httpRequestOnce(path, opts);
+    } catch (err) {
+      const onUnauthorized = this.onUnauthorized;
+      if (!this.shouldRecoverFromUnauthorized(err) || onUnauthorized === undefined) {
+        throw err;
+      }
+      const decision = await onUnauthorized();
+      if (decision !== 'retry') {
+        throw err;
+      }
+      return this.httpRequestOnce(path, opts);
+    }
+  }
+
+  private shouldRecoverFromUnauthorized(err: unknown): err is KiloChatApiError {
+    return (
+      this.onUnauthorized !== undefined &&
+      err instanceof KiloChatApiError &&
+      (err.status === 401 || err.status === 403)
+    );
+  }
+
+  private async httpRequestOnce<T>(
     path: string,
     opts: {
       method?: string;

@@ -25,6 +25,7 @@
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
+    "@kilocode/notifications": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@northflank/js-client": "^0.9.3",
     "drizzle-orm": "catalog:",

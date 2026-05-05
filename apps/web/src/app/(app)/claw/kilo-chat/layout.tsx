@@ -1,26 +1,26 @@
 'use client';
 
-import { useCallback } from 'react';
 import { useUser } from '@/hooks/useUser';
 import { useKiloClawStatus } from '@/hooks/useKiloClaw';
-import { getKiloChatToken } from './token';
 import { KiloChatLayout } from './components/KiloChatLayout';
 
 export default function KiloChatRootLayout({ children }: { children: React.ReactNode }) {
   const { data: user } = useUser();
-  const { data: status, isLoading } = useKiloClawStatus();
-
-  const getToken = useCallback(() => getKiloChatToken(), []);
+  const { data: status, error, isError, isLoading, refetch } = useKiloClawStatus();
+  const instanceErrorMessage =
+    error instanceof Error ? error.message : error ? 'Unknown error' : null;
 
   return (
     <KiloChatLayout
-      getToken={getToken}
-      currentUserId={user?.id ?? ''}
+      currentUserId={user?.id ?? null}
       sandboxId={status?.sandboxId ?? null}
       basePath="/claw/kilo-chat"
       noInstanceRedirect="/claw/new"
       instanceStatus={status?.status ?? null}
       isInstanceLoading={isLoading}
+      isInstanceError={isError}
+      instanceErrorMessage={instanceErrorMessage}
+      onRetryInstanceStatus={() => void refetch()}
       assistantName={status?.botName ?? null}
     >
       {children}

@@ -33,9 +33,7 @@ function withAlpha(color: string, alpha: number): string {
 
 export function getPalette(variant: MarkdownVariant, colors: ThemeColors): MarkdownPalette {
   if (variant === 'user') {
-    // User bubbles sit on `accent-soft` (lime); ink-on-lime is the correct
-    // foreground, and translucent ink produces subtle codespan / divider tints.
-    const ink = colors.accentSoftForeground;
+    const ink = colors.primaryForeground;
     return {
       textColor: ink,
       mutedTextColor: withAlpha(ink, 0.7),

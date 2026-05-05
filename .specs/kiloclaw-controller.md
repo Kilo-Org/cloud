@@ -335,14 +335,21 @@ patches to `openclaw.json`. The patches MUST include:
 2. Gateway auth token from `OPENCLAW_GATEWAY_TOKEN`.
 3. `allowInsecureAuth` when `AUTO_APPROVE_DEVICES=true`.
 4. Allowed origins from `OPENCLAW_ALLOWED_ORIGINS`.
-5. Stale kilocode provider migration (remove entries with old base
-   URLs).
-6. KiloCode API base URL override from `KILOCODE_API_BASE_URL`.
+5. KiloCode provider entry MUST always be present at
+   `models.providers.kilocode` with `baseUrl`
+   `https://api.kilo.ai/api/gateway/`, `api` `openai-completions`, and
+   `models` set to `[]`. The bundled openclaw kilocode plugin only loads
+   when this entry is present; without it, live model discovery never
+   runs and `kilo-auto/*` is unreachable. Stale entries written with
+   the old `/api/openrouter/` base URL MUST be dropped before the entry
+   is rebuilt.
+6. KiloCode API base URL override from `KILOCODE_API_BASE_URL` (local
+   dev tunnel).
 7. Org-scoped KiloCode provider configuration from
    `KILOCODE_ORGANIZATION_ID`: MUST set the
-   `X-KiloCode-OrganizationId` header and MUST set the provider's
-   `models` array to `[]` so OpenClaw uses live gateway model discovery
-   rather than a stale static catalog.
+   `X-KiloCode-OrganizationId` header on the kilocode provider entry.
+   When `KILOCODE_ORGANIZATION_ID` is unset, the controller MUST
+   remove any stale `X-KiloCode-OrganizationId` header from the entry.
 8. Default model from `KILOCODE_DEFAULT_MODEL`.
 9. Agent default user timezone from `KILOCLAW_USER_TIMEZONE`.
 10. Remove `agents.defaults.models` allowlist (KiloClaw users see all

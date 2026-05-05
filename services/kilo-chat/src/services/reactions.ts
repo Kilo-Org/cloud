@@ -37,7 +37,12 @@ export async function addReactionFor(
         result.memberContext.sandboxId,
         result.memberContext.humanMemberIds,
         'reaction.added',
-        { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
+        {
+          messageId: params.messageId,
+          operationId: result.id,
+          memberId: callerId,
+          emoji: params.emoji,
+        }
       );
       ctx.waitUntil(pushPromise);
     }
@@ -53,7 +58,8 @@ export type RemoveReactionParams = {
 };
 
 export type RemoveReactionResult =
-  | { ok: true }
+  | { ok: true; removed: true; removed_id: string }
+  | { ok: true; removed: false; id: string | null }
   | { ok: false; code: 'forbidden' | 'not_found' | 'internal'; error: string };
 
 export async function removeReactionFor(
@@ -80,11 +86,18 @@ export async function removeReactionFor(
         result.memberContext.sandboxId,
         result.memberContext.humanMemberIds,
         'reaction.removed',
-        { messageId: params.messageId, memberId: callerId, emoji: params.emoji }
+        {
+          messageId: params.messageId,
+          operationId: result.removed_id,
+          memberId: callerId,
+          emoji: params.emoji,
+        }
       );
       ctx.waitUntil(pushPromise);
     }
   }
 
-  return { ok: true };
+  if (!result.removed) return { ok: true, removed: false, id: result.removed_id };
+
+  return { ok: true, removed: true, removed_id: result.removed_id };
 }

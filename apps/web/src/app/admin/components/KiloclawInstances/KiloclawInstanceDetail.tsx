@@ -88,7 +88,12 @@ import {
   type InstanceTierKey,
   type InstanceType,
 } from '@kilocode/kiloclaw-instance-tiers';
-import { defaultScheduledAt } from '@/lib/kiloclaw/scheduled-action-form';
+import {
+  defaultScheduledAt,
+  defaultNotifyFormState,
+  type NotifyFormState,
+} from '@/lib/kiloclaw/scheduled-action-form';
+import { ScheduleNotifyFields } from '../KiloclawScheduler/ScheduleNotifyFields';
 import { AdminFileEditor } from './AdminFileEditor';
 import { KiloCliRunCard } from './KiloCliRunCard';
 import { BumpVolumeTo15GbButton } from './BumpVolumeTo15GbDialog';
@@ -1301,6 +1306,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [changeVersionMode, setChangeVersionMode] = useState<'now' | 'scheduled'>('now');
   const [changeVersionScheduledAt, setChangeVersionScheduledAt] =
     useState<string>(defaultScheduledAt);
+  const [changeVersionNotify, setChangeVersionNotify] =
+    useState<NotifyFormState>(defaultNotifyFormState);
   const [upgradeLatestConfirmOpen, setUpgradeLatestConfirmOpen] = useState(false);
   const [resizePhase, setResizePhase] = useState<
     'idle' | 'stopping' | 'resizing' | 'starting' | 'waiting' | 'done' | 'error'
@@ -3502,6 +3509,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             if (!open) {
               setChangeVersionSelectedTag('');
               setChangeVersionMode('now');
+              setChangeVersionNotify(defaultNotifyFormState());
             }
           }}
         >
@@ -3568,15 +3576,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <TabsContent value="now" className="text-muted-foreground mt-3 text-xs">
                   Applies immediately. End-user session is interrupted with no notice.
                 </TabsContent>
-                <TabsContent value="scheduled" className="mt-3 space-y-2">
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      Notifications aren't implemented yet — the end user gets no warning before
-                      their session is interrupted at the scheduled time. Use cautiously on customer
-                      instances until the notifications work lands.
-                    </AlertDescription>
-                  </Alert>
+                <TabsContent value="scheduled" className="mt-3 space-y-3">
                   <label htmlFor="change-version-scheduled-at" className="text-sm font-medium">
                     Scheduled at (local time)
                   </label>
@@ -3594,6 +3594,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     Fires on the next instance reconcile alarm tick after this time (cadence ~5
                     minutes for running instances). Treat as a "no earlier than" bound.
                   </p>
+                  <ScheduleNotifyFields
+                    idPrefix="change-version"
+                    state={changeVersionNotify}
+                    onChange={setChangeVersionNotify}
+                    disabled={isSchedulingVersionChange}
+                  />
                 </TabsContent>
               </Tabs>
 
@@ -3689,6 +3695,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     imageTag: changeVersionSelectedTag,
                     overridePins: !!changeVersionPinData,
                     scheduledAt: local.toISOString(),
+                    notify: changeVersionNotify.notify,
+                    noticeLeadHours: changeVersionNotify.noticeLeadHours,
+                    noticeSubject: changeVersionNotify.noticeSubject,
+                    noticeBody: changeVersionNotify.noticeBody,
+                    noticeChannels: changeVersionNotify.noticeChannels,
                   });
                 }}
                 disabled={

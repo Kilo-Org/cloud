@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createKiloChatApprovalCapability } from './approval.js';
+import { editMessageRequestSchema } from './synced/schemas.js';
+
+const validConversationId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+
+function getNativeRuntime() {
+  const runtime = createKiloChatApprovalCapability().nativeRuntime;
+  if (!runtime) throw new Error('Expected native runtime');
+  return runtime;
+}
 
 describe('createKiloChatApprovalCapability', () => {
   const capability = createKiloChatApprovalCapability();
@@ -126,5 +135,72 @@ describe('createKiloChatApprovalCapability', () => {
         request: { request: {} },
       } as never)
     ).toBe(false);
+  });
+
+  it('does not edit Kilo Chat again when the final approval payload is resolved', async () => {
+    const rt = getNativeRuntime();
+    const result = rt.presentation.buildResolvedResult({
+      view: {
+        approvalKind: 'plugin',
+        approvalId: 'approval-1',
+        title: 'Deploy change',
+        description: 'Deploy the proposed change',
+        metadata: [],
+        decision: 'deny',
+        resolvedBy: 'user-1',
+      },
+    } as never);
+    expect(result.action).toBe('update');
+
+    const fetchCalls: Array<{ input: string | URL | Request; init: RequestInit | undefined }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      fetchCalls.push({ input, init });
+      return new Response(JSON.stringify({ messageId: 'msg-1' }));
+    };
+    const originalFetch = globalThis.fetch;
+    const originalGatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN;
+    globalThis.fetch = fetchImpl;
+    process.env.OPENCLAW_GATEWAY_TOKEN = 'gateway-token';
+    try {
+      await rt.transport.updateEntry({
+        entry: {
+          messageId: 'msg-1',
+          conversationId: validConversationId,
+          approvalId: 'approval-1',
+        },
+        payload: result.payload,
+      } as never);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalGatewayToken === undefined) {
+        delete process.env.OPENCLAW_GATEWAY_TOKEN;
+      } else {
+        process.env.OPENCLAW_GATEWAY_TOKEN = originalGatewayToken;
+      }
+    }
+
+    expect(fetchCalls).toHaveLength(0);
+  });
+
+  it('builds expired approval edits that match the canonical edit payload schema', () => {
+    const rt = getNativeRuntime();
+    const result = rt.presentation.buildExpiredResult({
+      view: {
+        approvalKind: 'plugin',
+        approvalId: 'approval-1',
+        title: 'Deploy change',
+        description: 'Deploy the proposed change',
+        metadata: [],
+      },
+    } as never);
+    expect(result.action).toBe('update');
+
+    const parsed = editMessageRequestSchema.safeParse({
+      conversationId: validConversationId,
+      content: result.payload,
+      timestamp: 1,
+    });
+
+    expect(parsed.success).toBe(true);
   });
 });

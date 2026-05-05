@@ -122,6 +122,13 @@
       "entrypoint": "NotificationsService",
     },
   ],
+  "triggers": {
+    // 1-minute cadence sweep for the scheduled-action notice fan-out.
+    // Selects pending notification rows whose dispatch window has
+    // opened and POSTs each to the backend's internal side-effects
+    // endpoint. See services/kiloclaw/src/scheduled/scheduled-action-notices.ts.
+    "crons": ["* * * * *"],
+  },
   "vars": {
     "FLY_APP_NAME": "kiloclaw-machines", // Legacy fallback for existing instances
     "FLY_REGISTRY_APP": "kiloclaw-machines", // Shared Docker image registry

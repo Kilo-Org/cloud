@@ -25,7 +25,6 @@ import {
   Webhook,
   Settings,
   MessageSquare,
-  MessagesSquare,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -58,7 +57,6 @@ export default function OrganizationAppSidebar({
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
-  const isKiloChatEnabled = useFeatureFlagEnabled('kilo-chat-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
@@ -142,15 +140,6 @@ export default function OrganizationAppSidebar({
       icon: MessageSquare,
       url: `/organizations/${organizationId}/claw/chat`,
     },
-    ...(isKiloChatEnabled || isDevelopment
-      ? [
-          {
-            title: 'Kilo Chat',
-            icon: MessagesSquare,
-            url: `/organizations/${organizationId}/claw/kilo-chat`,
-          },
-        ]
-      : []),
     {
       title: 'Settings',
       icon: Settings,

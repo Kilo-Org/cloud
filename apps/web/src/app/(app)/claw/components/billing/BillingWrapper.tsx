@@ -19,7 +19,7 @@ function EarlybirdActiveCard({
   onSubscribeClick: () => void;
 }) {
   return (
-    <div className="border-brand-primary/30 bg-brand-primary/5 flex items-center gap-3 rounded-xl border p-4">
+    <div className="border-brand-primary/30 bg-brand-primary/5 flex shrink-0 items-center gap-3 rounded-xl border p-4">
       <span className="text-xl">🦀</span>
       <div className="flex-1">
         <span className="text-brand-primary text-sm font-semibold">

@@ -9,6 +9,7 @@
   "logpush": true,
   "placement": { "mode": "smart" },
   "dev": { "port": 8809 },
+  "vars": { "WORKER_ENV": "production" },
   "routes": [
     {
       "pattern": "events.kiloapps.io",
@@ -17,12 +18,24 @@
   ],
 
   "durable_objects": {
-    "bindings": [{ "name": "USER_SESSION_DO", "class_name": "UserSessionDO" }],
+    "bindings": [
+      { "name": "USER_SESSION_DO", "class_name": "UserSessionDO" },
+      { "name": "CONNECTION_TICKET_DO", "class_name": "ConnectionTicketDO" },
+    ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["UserSessionDO"] },
     { "tag": "v2", "new_sqlite_classes": ["TicketDO"] },
     { "tag": "v3", "deleted_classes": ["TicketDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["ConnectionTicketDO"] },
+  ],
+
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
   ],
 
   "secrets_store_secrets": [

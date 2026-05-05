@@ -42,6 +42,34 @@ for envfile in .env.local .env.development.local; do
   fi
 done
 
+read_env_value() {
+  local key="$1"
+  local file
+  local value
+
+  for file in .env.development.local .env.local "$REPO_ROOT/.env.development.local" "$REPO_ROOT/.env.local"; do
+    if [ -f "$file" ]; then
+      value=$(awk -F= -v key="$key" '
+        $1 == key {
+          value = substr($0, length(key) + 2)
+          gsub(/^["'\'']|["'\'']$/, "", value)
+          print value
+          exit
+        }
+      ' "$file")
+      if [ -n "$value" ]; then
+        echo "$value"
+        return
+      fi
+    fi
+  done
+}
+
 export PORT
+APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-$(read_env_value APP_URL_OVERRIDE)}"
+NEXTAUTH_URL="${NEXTAUTH_URL:-$(read_env_value NEXTAUTH_URL)}"
+NEXT_DEV_HOSTNAME="${NEXT_DEV_HOSTNAME:-0.0.0.0}"
+export APP_URL_OVERRIDE
+export NEXT_DEV_HOSTNAME
 export NEXTAUTH_URL="${NEXTAUTH_URL:-${APP_URL_OVERRIDE:-http://localhost:$PORT}}"
-exec next dev -p "$PORT" "$@"
+exec next dev -H "$NEXT_DEV_HOSTNAME" -p "$PORT" "$@"

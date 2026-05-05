@@ -187,6 +187,8 @@ const nativeRuntime: ChannelApprovalNativeRuntimeAdapter<
     },
 
     updateEntry: async ({ entry, payload }) => {
+      // Resolved action blocks are output-only: create/edit routes reject
+      // `resolved` actions, and /execute-action owns the state transition.
       if (hasResolvedActionsBlock(payload)) return;
 
       const client = makeClient();

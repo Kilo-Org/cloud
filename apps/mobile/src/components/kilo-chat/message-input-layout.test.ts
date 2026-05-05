@@ -5,6 +5,7 @@ import {
   MESSAGE_INPUT_LINE_HEIGHT,
   MESSAGE_INPUT_MIN_HEIGHT,
   messageInputTextStyle,
+  resolveMessageInputBottomPadding,
 } from './message-input-layout';
 
 describe('message input layout', () => {
@@ -19,5 +20,9 @@ describe('message input layout', () => {
       paddingTop: expectedPadding,
       textAlignVertical: 'top',
     });
+  });
+
+  it('keeps composer bottom padding constant across safe-area insets', () => {
+    expect(resolveMessageInputBottomPadding()).toBe(8);
   });
 });

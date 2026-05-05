@@ -602,7 +602,6 @@ export function ConversationScreen({
                 }
               : undefined
           }
-          bottomInset={bottom}
         />
       </KeyboardAvoidingView>
       <MessageReactionPickerSheet

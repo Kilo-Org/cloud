@@ -6,7 +6,7 @@ import { type Message, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { messageInputTextStyle } from './message-input-layout';
+import { messageInputTextStyle, resolveMessageInputBottomPadding } from './message-input-layout';
 import {
   applyMessageInputTextChange,
   isMessageInputOverLimit,
@@ -32,12 +32,9 @@ type Props = {
   onCancelReply?: () => void;
   disabledReason?: string | null;
   clearOnSubmit?: boolean;
-  bottomInset?: number;
   botName?: string | null;
   typingMembers?: Map<string, number>;
 };
-
-const COMPOSER_BOTTOM_CLEARANCE = 8;
 
 function resolveSendDisabled({
   canSend,
@@ -68,7 +65,6 @@ export function MessageInput({
   onCancelReply,
   disabledReason,
   clearOnSubmit,
-  bottomInset = 0,
   botName,
   typingMembers = new Map(),
 }: Props) {
@@ -105,7 +101,9 @@ export function MessageInput({
 
   return (
     <View
-      style={{ paddingBottom: Math.max(bottomInset, COMPOSER_BOTTOM_CLEARANCE) }}
+      style={{
+        paddingBottom: resolveMessageInputBottomPadding(),
+      }}
       className="border-t border-border bg-background px-4 pt-2"
     >
       {replyingTo && (

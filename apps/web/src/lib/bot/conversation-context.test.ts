@@ -230,6 +230,35 @@ describe('getPlatformContext', () => {
     expect(recentIndex).toBeGreaterThan(previousIndex);
   });
 
+  it('caps pull request review comment pagination to avoid hammering the GitHub API', async () => {
+    mockIssuesGetFn.mockResolvedValue({
+      data: {
+        body: 'Pull request description.',
+        html_url: 'https://github.com/Kilo-Org/on-call/pull/37',
+        number: 37,
+        pull_request: {},
+        state: 'open',
+        title: 'Update on-call runbook',
+        user: { login: 'RSO' },
+      },
+    });
+    mockIssuesListCommentsFn.mockResolvedValue({ data: [], headers: {} });
+    mockPullsListReviewCommentsFn.mockImplementation(({ page }: { page: number }) => ({
+      data: [],
+      headers: {
+        link: `<https://api.github.com/repos/Kilo-Org/on-call/pulls/37/comments?page=${page + 1}>; rel="next"`,
+      },
+    }));
+
+    await getPlatformContext(
+      createThread({ id: 'github:Kilo-Org/on-call:37:rc:301' }),
+      createMessage({ id: '301', text: '@kilocode-dev Please fix this' }),
+      createIntegration()
+    );
+
+    expect(mockPullsListReviewCommentsFn).toHaveBeenCalledTimes(5);
+  });
+
   it('includes GitHub pull request review thread context', async () => {
     mockIssuesGetFn.mockResolvedValue({
       data: {

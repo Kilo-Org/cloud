@@ -215,28 +215,35 @@ async function fetchRecentIssueComments(
   return sortByCreatedAt(response.data);
 }
 
+const MAX_REVIEW_COMMENT_PAGES = 5;
+const REVIEW_COMMENT_PAGE_SIZE = 100;
+
 async function fetchPullReviewComments(
   octokit: Octokit,
   coordinates: GitHubThreadCoordinates
 ): Promise<GitHubReviewComment[]> {
   const comments: GitHubReviewComment[] = [];
-  let page = 1;
 
-  while (true) {
+  for (let page = 1; page <= MAX_REVIEW_COMMENT_PAGES; page += 1) {
     const response = await octokit.pulls.listReviewComments({
       owner: coordinates.owner,
       repo: coordinates.repo,
       pull_number: coordinates.number,
-      per_page: 100,
+      per_page: REVIEW_COMMENT_PAGE_SIZE,
       page,
     });
 
     comments.push(...response.data);
 
-    if (!hasNextPage(response.headers.link)) break;
-    page += 1;
+    if (!hasNextPage(response.headers.link)) return comments;
   }
 
+  console.warn('[bot] Hit review comment pagination cap', {
+    owner: coordinates.owner,
+    repo: coordinates.repo,
+    pullNumber: coordinates.number,
+    cap: MAX_REVIEW_COMMENT_PAGES * REVIEW_COMMENT_PAGE_SIZE,
+  });
   return comments;
 }
 

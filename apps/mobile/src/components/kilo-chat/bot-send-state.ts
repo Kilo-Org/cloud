@@ -14,6 +14,7 @@ type MessageInputAvailability = {
   botDisplay: BotDisplay;
   disabled: boolean;
   disabledReason: string | null;
+  submitDisabled: boolean;
 };
 
 function computeMobileBotDisplay(params: {
@@ -54,20 +55,31 @@ export function resolveMobileMessageInputAvailability(params: {
     now: params.now,
   });
 
-  if (params.pendingMutation) {
-    return { botDisplay, disabled: true, disabledReason: null };
-  }
-
   if (params.currentUserId === null) {
-    return { botDisplay, disabled: true, disabledReason: 'Loading user...' };
+    return {
+      botDisplay,
+      disabled: true,
+      disabledReason: 'Loading user...',
+      submitDisabled: true,
+    };
   }
 
   if (params.editing) {
-    return { botDisplay, disabled: false, disabledReason: null };
+    return {
+      botDisplay,
+      disabled: false,
+      disabledReason: null,
+      submitDisabled: params.pendingMutation,
+    };
   }
 
   if (botDisplay.state === 'online' || botDisplay.state === 'idle') {
-    return { botDisplay, disabled: false, disabledReason: null };
+    return {
+      botDisplay,
+      disabled: false,
+      disabledReason: null,
+      submitDisabled: params.pendingMutation,
+    };
   }
 
   return {
@@ -77,5 +89,6 @@ export function resolveMobileMessageInputAvailability(params: {
       botDisplay.state === 'unknown'
         ? 'Waiting for bot status...'
         : 'Bot is offline. Messages will resume when it reconnects.',
+    submitDisabled: true,
   };
 }

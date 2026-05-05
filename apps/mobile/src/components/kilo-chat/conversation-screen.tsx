@@ -59,7 +59,6 @@ import { useMarkRead } from './hooks/use-mark-read';
 import { useMessageCacheUpdater, useMessages, useSendMessage } from './hooks/use-messages';
 import { useNowTicker } from './hooks/use-now-ticker';
 import { useCurrentUserId } from './hooks/use-current-user-id';
-import { TypingIndicator } from './typing-indicator';
 import { useAllKiloClawInstances, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawStatus } from '@/lib/hooks/use-kiloclaw-queries';
 import { kiloclawConversationEyebrow } from '@/lib/kiloclaw-display';
@@ -112,6 +111,7 @@ export function ConversationScreen({
   const [reactionPickerMessage, setReactionPickerMessage] = useState<Message | null>(null);
   const [recentReactions, setRecentReactions] = useState<string[]>([]);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [scrollToNewestRequest, setScrollToNewestRequest] = useState(0);
   const pendingActionRef = useRef<PendingAction | null>(null);
   const instanceContext = useInstanceContext(sandboxId);
   const instanceStatusQuery = useKiloClawStatus(
@@ -266,6 +266,7 @@ export function ConversationScreen({
           },
         }
       );
+      setScrollToNewestRequest(request => request + 1);
     },
     [conversationId, editMessage, editingMessage, inputAvailability.disabled, sendMutation]
   );
@@ -570,19 +571,22 @@ export function ConversationScreen({
           fetchOlder={fetchOlder}
           isFetchingOlder={messagesQuery.isFetchingNextPage}
           pendingAction={pendingAction}
+          scrollToNewestRequest={scrollToNewestRequest}
           onExecuteAction={handleExecuteAction}
           onLongPressMessage={handleLongPressMessage}
           onSwipeReplyMessage={handleSwipeReplyMessage}
           onReactionPress={handleReactionPress}
         />
-        <TypingIndicator typingMembers={typingMembers} />
         <MessageInput
           key={editingMessage?.id ?? 'compose'}
           onSend={handleSend}
           onTyping={sendTyping}
           disabled={inputAvailability.disabled}
+          submitDisabled={inputAvailability.submitDisabled}
           disabledReason={inputAvailability.disabledReason}
           initialText={editingText}
+          botName={instanceLabel}
+          typingMembers={typingMembers}
           replyingTo={replyingTo}
           onCancelReply={
             replyingTo

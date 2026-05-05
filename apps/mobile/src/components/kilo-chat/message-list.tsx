@@ -6,7 +6,15 @@ import { Keyboard, type NativeScrollEvent, type NativeSyntheticEvent, View } fro
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
 import { Skeleton } from '@/components/ui/skeleton';
-import { createMessageListKeyboardScrollScheduler } from './message-list-keyboard-scroll';
+import {
+  createMessageListKeyboardScrollScheduler,
+  createMessageListNewestScrollScheduler,
+} from './message-list-keyboard-scroll';
+import {
+  isMessageListAtBottom,
+  messageListNewestScrollKey,
+  shouldScrollToNewestAfterMessagesChange,
+} from './message-list-scroll-state';
 import { type MessageAuthorMember, resolveMessageAuthorLabel } from './message-presentation';
 
 type Props = {
@@ -17,6 +25,7 @@ type Props = {
   fetchOlder?: () => void;
   isFetchingOlder: boolean;
   pendingAction: PendingAction | null;
+  scrollToNewestRequest: number;
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
   onReactionPress: (message: Message, emoji: string) => void;
   onLongPressMessage?: (m: Message) => void;
@@ -31,6 +40,7 @@ export function MessageList({
   fetchOlder,
   isFetchingOlder,
   pendingAction,
+  scrollToNewestRequest,
   onExecuteAction,
   onReactionPress,
   onLongPressMessage,
@@ -38,6 +48,10 @@ export function MessageList({
 }: Props) {
   const listRef = useRef<FlashListRef<Message>>(null);
   const scrollOffsetRef = useRef(0);
+  const initialNewestMessage = messages.at(-1);
+  const newestMessageKeyRef = useRef(messageListNewestScrollKey(initialNewestMessage));
+  const isAtBottomRef = useRef(true);
+  const scrollToNewestRequestRef = useRef(scrollToNewestRequest);
   const keyboardScrollScheduler = useMemo(
     () =>
       createMessageListKeyboardScrollScheduler({
@@ -48,17 +62,37 @@ export function MessageList({
       }),
     []
   );
+  const newestScrollScheduler = useMemo(
+    () =>
+      createMessageListNewestScrollScheduler({
+        scrollToEnd: params => {
+          listRef.current?.scrollToEnd(params);
+        },
+      }),
+    []
+  );
   // useMessages returns messages oldest-to-newest.
   // FlashList v2 does not support `inverted`; instead we use maintainVisibleContentPosition
   // with startRenderingFromBottom, which expects chronological order.
   const chronological = messages;
+  const newestMessage = chronological.at(-1);
   const messageMap = useMemo(
     () => new Map(chronological.map(message => [message.id, message])),
     [chronological]
   );
+  const scrollToNewest = useCallback(() => {
+    isAtBottomRef.current = true;
+    newestScrollScheduler.schedule();
+  }, [newestScrollScheduler]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    scrollOffsetRef.current = contentOffset.y;
+    isAtBottomRef.current = isMessageListAtBottom({
+      contentHeight: contentSize.height,
+      viewportHeight: layoutMeasurement.height,
+      offsetY: contentOffset.y,
+    });
   }, []);
 
   useEffect(() => {
@@ -69,8 +103,30 @@ export function MessageList({
     return () => {
       subscription.remove();
       keyboardScrollScheduler.cancel();
+      newestScrollScheduler.cancel();
     };
-  }, [keyboardScrollScheduler]);
+  }, [keyboardScrollScheduler, newestScrollScheduler]);
+
+  useEffect(() => {
+    const newestMessageKey = messageListNewestScrollKey(newestMessage);
+    const shouldScroll = shouldScrollToNewestAfterMessagesChange({
+      newestMessageKey,
+      previousNewestMessageKey: newestMessageKeyRef.current,
+      wasAtBottom: isAtBottomRef.current,
+    });
+    newestMessageKeyRef.current = newestMessageKey;
+    if (shouldScroll) {
+      scrollToNewest();
+    }
+  }, [newestMessage, scrollToNewest]);
+
+  useEffect(() => {
+    if (scrollToNewestRequestRef.current === scrollToNewestRequest) {
+      return;
+    }
+    scrollToNewestRequestRef.current = scrollToNewestRequest;
+    scrollToNewest();
+  }, [scrollToNewest, scrollToNewestRequest]);
 
   return (
     <FlashList

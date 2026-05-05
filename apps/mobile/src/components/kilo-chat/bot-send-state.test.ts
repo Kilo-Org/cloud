@@ -67,7 +67,7 @@ describe('mobile bot send gate', () => {
     ).toBe(false);
   });
 
-  it('keeps pending mutations disabled even when the bot can receive sends', () => {
+  it('keeps the composer enabled during pending sends when the bot can receive messages', () => {
     const state = resolveMobileMessageInputAvailability({
       currentUserId: 'user-1',
       instanceStatus: 'running',
@@ -77,7 +77,8 @@ describe('mobile bot send gate', () => {
       editing: false,
     });
 
-    expect(state.disabled).toBe(true);
+    expect(state.disabled).toBe(false);
     expect(state.disabledReason).toBeNull();
+    expect(state.submitDisabled).toBe(true);
   });
 });

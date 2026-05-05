@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createMessageListKeyboardScrollScheduler,
+  createMessageListNewestScrollScheduler,
   MESSAGE_LIST_KEYBOARD_SCROLL_RETRY_DELAY_MS,
 } from './message-list-keyboard-scroll';
 
@@ -30,5 +31,23 @@ describe('message list keyboard scroll scheduler', () => {
       { animated: true, offset: 560 },
       { animated: true, offset: 560 },
     ]);
+  });
+
+  it('scrolls to the newest message immediately and after layout settles', () => {
+    vi.useFakeTimers();
+    const calls: { animated: boolean }[] = [];
+    const scheduler = createMessageListNewestScrollScheduler({
+      scrollToEnd: params => {
+        calls.push(params);
+      },
+    });
+
+    scheduler.schedule();
+
+    expect(calls).toEqual([{ animated: true }]);
+
+    vi.advanceTimersByTime(MESSAGE_LIST_KEYBOARD_SCROLL_RETRY_DELAY_MS);
+
+    expect(calls).toEqual([{ animated: true }, { animated: true }]);
   });
 });

@@ -15,6 +15,7 @@ import {
   submitMessageInputDraft,
 } from './message-input-state';
 import { getReplyPreviewText } from './message-presentation';
+import { TypingIndicator } from './typing-indicator';
 
 type Props = {
   onSend: (
@@ -24,6 +25,7 @@ type Props = {
   ) => void;
   onTyping?: () => void;
   disabled?: boolean;
+  submitDisabled?: boolean;
   initialText?: string;
   onCancelEdit?: () => void;
   replyingTo?: Message | null;
@@ -31,6 +33,8 @@ type Props = {
   disabledReason?: string | null;
   clearOnSubmit?: boolean;
   bottomInset?: number;
+  botName?: string | null;
+  typingMembers?: Map<string, number>;
 };
 
 const COMPOSER_BOTTOM_CLEARANCE = 8;
@@ -57,6 +61,7 @@ export function MessageInput({
   onSend,
   onTyping,
   disabled,
+  submitDisabled,
   initialText = '',
   onCancelEdit,
   replyingTo,
@@ -64,6 +69,8 @@ export function MessageInput({
   disabledReason,
   clearOnSubmit,
   bottomInset = 0,
+  botName,
+  typingMembers = new Map(),
 }: Props) {
   const colors = useThemeColors();
   const valueRef = useRef(initialText);
@@ -74,10 +81,12 @@ export function MessageInput({
   currentReplyingToRef.current = replyingTo?.id;
   const overLimit = isMessageInputOverLimit(valueRef.current);
   const showCounter = shouldShowMessageInputCounter(valueRef.current);
-  const sendDisabled = resolveSendDisabled({ canSend, disabled, overLimit });
+  const sendDisabled =
+    submitDisabled === true || resolveSendDisabled({ canSend, disabled, overLimit });
+  const controlsDisabled = disabled === true || submitDisabled === true;
 
   const submit = () => {
-    if (disabled) {
+    if (disabled || submitDisabled) {
       return;
     }
     submitMessageInputDraft({
@@ -109,10 +118,10 @@ export function MessageInput({
           </View>
           <Pressable
             onPress={onCancelReply}
-            disabled={disabled}
+            disabled={controlsDisabled}
             className={cn(
               'h-8 w-8 items-center justify-center rounded-md bg-secondary',
-              disabled && 'opacity-50'
+              controlsDisabled && 'opacity-50'
             )}
           >
             <X size={16} color={colors.foreground} />
@@ -150,15 +159,17 @@ export function MessageInput({
                 });
               }}
               onSubmitEditing={submit}
+              returnKeyType="send"
+              submitBehavior="submit"
             />
           </View>
           {onCancelEdit && (
             <Pressable
               onPress={onCancelEdit}
-              disabled={disabled}
+              disabled={controlsDisabled}
               className={cn(
                 'h-10 w-10 items-center justify-center rounded-md bg-secondary',
-                disabled && 'opacity-50'
+                controlsDisabled && 'opacity-50'
               )}
             >
               <X size={18} color={colors.foreground} />
@@ -182,6 +193,7 @@ export function MessageInput({
             </Text>
           </View>
         ) : null}
+        <TypingIndicator botName={botName} typingMembers={typingMembers} />
       </View>
     </View>
   );

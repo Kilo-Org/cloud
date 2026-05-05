@@ -37,15 +37,65 @@ export type ImpactAdvocateIdentityPayload = {
   referable: boolean;
 };
 
+/**
+ * SaaSquatch / Impact Advocate Upsert User accepts a strict allow-list of
+ * fields. Per the program integration spec, these are the only keys SaaSquatch
+ * will accept; any extra field is rejected with `INVALID_JSON_REQUEST`.
+ *
+ * Required: id, accountId, email, cookies.
+ * Optional: firstName, lastName, locale, countryCode, segments, customFields.
+ *
+ * Note: `programId` is intentionally NOT part of this type. Earlier code
+ * persisted it into request_payload rows; sanitizeRegisterParticipantPayloadForWire
+ * strips it (and any other unknown field) before the request goes out, so old
+ * rows can still be retried without a data migration.
+ */
 export type ImpactAdvocateRegisterParticipantPayload = {
   id: string;
   accountId: string;
-  programId: string;
   email: string;
   cookies: string;
+  firstName?: string;
+  lastName?: string;
   locale?: string;
   countryCode?: string;
+  segments?: string[];
+  customFields?: Record<string, unknown>;
 };
+
+const REGISTER_PARTICIPANT_ALLOWED_FIELDS = new Set<string>([
+  'id',
+  'accountId',
+  'email',
+  'cookies',
+  'firstName',
+  'lastName',
+  'locale',
+  'countryCode',
+  'segments',
+  'customFields',
+]);
+
+/**
+ * Allow-list filter applied at the moment we hit the wire. Drops anything
+ * SaaSquatch would reject and re-normalises locale (`en-US` -> `en_US`) so
+ * persisted rows from before the locale fix retry cleanly.
+ */
+export function sanitizeRegisterParticipantPayloadForWire(
+  payload: Record<string, unknown>
+): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (!REGISTER_PARTICIPANT_ALLOWED_FIELDS.has(key)) continue;
+    if (key === 'locale' && typeof value === 'string') {
+      const normalized = normalizeAdvocateLocale(value);
+      if (normalized) sanitized[key] = normalized;
+      continue;
+    }
+    sanitized[key] = value;
+  }
+  return sanitized;
+}
 
 type ImpactAdvocateVerifiedAccessTokenPayload = {
   user: ImpactAdvocateIdentityPayload;
@@ -140,12 +190,10 @@ export function buildImpactAdvocateRegisterParticipantPayload(params: {
   locale?: string | null;
   countryCode?: string | null;
 }): ImpactAdvocateRegisterParticipantPayload {
-  const config = getImpactAdvocateConfig();
   const normalizedLocale = normalizeAdvocateLocale(params.locale);
   const payload: ImpactAdvocateRegisterParticipantPayload = {
     id: params.user.google_user_email,
     accountId: params.user.google_user_email,
-    programId: config?.programId ?? IMPACT_ADVOCATE_DEFAULT_PROGRAM_ID,
     email: params.user.google_user_email,
     cookies: params.referralCookieValue,
     ...(normalizedLocale ? { locale: normalizedLocale } : {}),
@@ -202,6 +250,9 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
 
   try {
     const url = getImpactAdvocateRegisterParticipantUrl(config, payload);
+    const sanitizedPayload = sanitizeRegisterParticipantPayloadForWire(
+      payload as unknown as Record<string, unknown>
+    );
     logImpactAdvocateDebug('[impact-advocate] sending register participant request', {
       url,
       method: 'PUT',
@@ -210,7 +261,9 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      payload: getDebuggableRegisterParticipantPayload(payload),
+      payload: getDebuggableRegisterParticipantPayload(
+        sanitizedPayload as ImpactAdvocateRegisterParticipantPayload
+      ),
     });
 
     const response = await fetch(url, {
@@ -220,7 +273,7 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(sanitizedPayload),
     });
 
     const responseBody = await response.text();

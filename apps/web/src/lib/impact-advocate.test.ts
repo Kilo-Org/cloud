@@ -42,7 +42,6 @@ describe('impact advocate', () => {
     ).toEqual({
       id: 'referee@example.com',
       accountId: 'referee@example.com',
-      programId: '51699',
       email: 'referee@example.com',
       cookies: 'opaque-cookie-value',
       // SaaSquatch wants en_US, not en-US.
@@ -129,6 +128,32 @@ describe('impact advocate', () => {
         referable: false,
       },
       exp: Math.floor(new Date('2026-04-23T12:00:00.000Z').getTime() / 1000) + 60 * 60,
+    });
+  });
+
+  it('strips legacy programId and normalises locale at send time', async () => {
+    const { sanitizeRegisterParticipantPayloadForWire } = await import('@/lib/impact-advocate');
+
+    // Legacy persisted shape: extra programId, BCP 47 locale, plus an unknown
+    // garbage field. Sanitiser must produce SaaSquatch-acceptable JSON.
+    const sanitized = sanitizeRegisterParticipantPayloadForWire({
+      id: 'referee@example.com',
+      accountId: 'referee@example.com',
+      email: 'referee@example.com',
+      cookies: 'sq-cookie',
+      locale: 'en-US',
+      countryCode: 'US',
+      programId: '51699',
+      garbage: 'should be dropped',
+    });
+
+    expect(sanitized).toEqual({
+      id: 'referee@example.com',
+      accountId: 'referee@example.com',
+      email: 'referee@example.com',
+      cookies: 'sq-cookie',
+      locale: 'en_US',
+      countryCode: 'US',
     });
   });
 });

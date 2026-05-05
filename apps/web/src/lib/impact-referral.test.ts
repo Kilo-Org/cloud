@@ -110,7 +110,6 @@ describe('impact referral participant registration dispatch', () => {
     expect(JSON.parse(String(requestBody))).toEqual({
       id: user.google_user_email,
       accountId: user.google_user_email,
-      programId: '51699',
       email: user.google_user_email,
       cookies: 'sq-cookie',
       locale: 'en_US',

@@ -70,10 +70,12 @@ function isImpactAdvocateRegisterParticipantPayload(
     return false;
   }
 
+  // Only assert the SaaSquatch-required fields. Extra keys (e.g. legacy
+  // `programId` rows persisted before the endpoint fix) are tolerated here
+  // and stripped at send time by sanitizeRegisterParticipantPayloadForWire.
   return (
     typeof value.id === 'string' &&
     typeof value.accountId === 'string' &&
-    typeof value.programId === 'string' &&
     typeof value.email === 'string' &&
     typeof value.cookies === 'string' &&
     (value.locale === undefined || typeof value.locale === 'string') &&

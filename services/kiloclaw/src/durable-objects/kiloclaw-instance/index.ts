@@ -3037,6 +3037,53 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     };
   }
 
+  /**
+   * Record a Fly volume extend that's already happened on the Fly side.
+   *
+   * Used by the admin `/extend-volume` route, which performs the Fly API
+   * call directly (not through the DO) and then needs the DO to catch up
+   * its persisted `volumeSizeGb` so the resize-policy check stays honest.
+   *
+   * Sets `instanceType = 'custom'` because an arbitrary extend is by
+   * definition off the catalog ladder — even if the new shape happens to
+   * match a tier's volume size, the catalog match would be coincidental.
+   * A subsequent admin resize to a named tier replaces 'custom' via the
+   * normal path.
+   *
+   * Caller is responsible for ensuring the Fly volume actually got extended
+   * to `newSizeGb` before calling this. The DO does not double-check Fly.
+   */
+  async recordVolumeExtend(newSizeGb: number): Promise<{
+    previousVolumeSizeGb: number | null;
+    newVolumeSizeGb: number;
+    instanceType: InstanceType | null;
+  }> {
+    await this.loadState();
+    if (!this.s.userId) {
+      throw new Error('Instance is not provisioned');
+    }
+    if (!Number.isInteger(newSizeGb) || newSizeGb < 1 || newSizeGb > 500) {
+      throw new Error(`Invalid volume size: ${newSizeGb}`);
+    }
+    const previousVolumeSizeGb = this.s.volumeSizeGb;
+    this.s.volumeSizeGb = newSizeGb;
+    this.s.instanceType = 'custom';
+    await this.persist({ volumeSizeGb: newSizeGb, instanceType: 'custom' });
+    if (this.s.sandboxId) {
+      this.ctx.waitUntil(
+        syncInstanceTypeToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
+      );
+    }
+    console.log(
+      `[admin-volume-extend] userId=${this.s.userId} previousSize=${previousVolumeSizeGb ?? 'unknown'} newSize=${newSizeGb}`
+    );
+    return {
+      previousVolumeSizeGb,
+      newVolumeSizeGb: newSizeGb,
+      instanceType: this.s.instanceType,
+    };
+  }
+
   // ── Snapshot restore (admin) ───────────────────────────────────────
 
   /**

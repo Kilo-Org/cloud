@@ -9207,6 +9207,55 @@ describe('resizeMachine', () => {
 });
 
 // ============================================================================
+// recordVolumeExtend
+// ============================================================================
+
+describe('recordVolumeExtend', () => {
+  it('persists the new volume size, marks the instance custom, and syncs Postgres', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      instanceType: 'perf-1-3',
+      volumeSizeGb: 10,
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    const result = await instance.recordVolumeExtend(15);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousVolumeSizeGb).toBe(10);
+    expect(result.newVolumeSizeGb).toBe(15);
+    expect(result.instanceType).toBe('custom');
+    expect(storage._store.get('volumeSizeGb')).toBe(15);
+    expect(storage._store.get('instanceType')).toBe('custom');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'custom'
+    );
+  });
+
+  it('rejects invalid sizes', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    await expect(instance.recordVolumeExtend(0)).rejects.toThrow('Invalid volume size');
+    await expect(instance.recordVolumeExtend(501)).rejects.toThrow('Invalid volume size');
+    await expect(instance.recordVolumeExtend(10.5)).rejects.toThrow('Invalid volume size');
+  });
+
+  it('rejects when not provisioned', async () => {
+    const { instance } = createInstance();
+    await expect(instance.recordVolumeExtend(20)).rejects.toThrow('Instance is not provisioned');
+  });
+});
+
+// ============================================================================
 // updateExecPreset
 // ============================================================================
 

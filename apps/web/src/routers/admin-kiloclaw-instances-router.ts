@@ -2666,11 +2666,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           .string()
           .min(1)
           .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+        targetSizeGb: z.number().int().min(1).max(500),
       })
     )
     .mutation(async ({ input, ctx }) => {
       console.log(
-        `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} size=15GB`
+        `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} targetSizeGb=${input.targetSizeGb}`
       );
       const instance = await resolveInstance(input.userId, input.instanceId);
       const client = new KiloClawInternalClient();
@@ -2695,6 +2696,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           message: `Fly resource mismatch: expected app=${status.flyAppName} volume=${status.flyVolumeId}, got app=${input.appName} volume=${input.volumeId}`,
         });
       }
+      const currentSizeGb = status.volumeSizeGb ?? 10;
+      if (input.targetSizeGb <= currentSizeGb) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Target size must be greater than current size (${currentSizeGb} GB)`,
+        });
+      }
 
       const fallbackMessage = 'Failed to extend Fly volume';
       try {
@@ -2702,6 +2710,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           input.userId,
           input.appName,
           input.volumeId,
+          input.targetSizeGb,
           instanceId
         );
 
@@ -2712,11 +2721,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
             target_user_id: input.userId,
-            message: `Fly volume extended to 15GB: app=${input.appName} volume=${input.volumeId}`,
+            message: `Fly volume extended to ${input.targetSizeGb}GB: app=${input.appName} volume=${input.volumeId}`,
             metadata: {
               appName: input.appName,
               volumeId: input.volumeId,
-              sizeGb: 15,
+              previousSizeGb: currentSizeGb,
+              sizeGb: input.targetSizeGb,
             },
           });
         } catch (auditErr) {

@@ -1026,6 +1026,7 @@ export class KiloClawInternalClient {
     userId: string,
     appName: string,
     volumeId: string,
+    targetSizeGb: number,
     instanceId?: string
   ): Promise<{ ok: true; needsRestart: boolean }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -1033,7 +1034,7 @@ export class KiloClawInternalClient {
       `/api/platform/extend-volume${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, appName, volumeId }),
+        body: JSON.stringify({ userId, appName, volumeId, targetSizeGb }),
       },
       { userId }
     );

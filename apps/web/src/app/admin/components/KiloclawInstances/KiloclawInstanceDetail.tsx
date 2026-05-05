@@ -96,7 +96,7 @@ import {
 import { ScheduleNotifyFields } from '../KiloclawScheduler/ScheduleNotifyFields';
 import { AdminFileEditor } from './AdminFileEditor';
 import { KiloCliRunCard } from './KiloCliRunCard';
-import { BumpVolumeTo15GbButton } from './BumpVolumeTo15GbDialog';
+import { ExtendVolumeButton } from './ExtendVolumeDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useKiloclawInstanceEvents,
@@ -3935,11 +3935,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     </CardDescription>
                   </div>
                 </div>
-                <BumpVolumeTo15GbButton
+                <ExtendVolumeButton
                   userId={data.user_id}
                   instanceId={data.id}
                   appName={data.workerStatus?.flyAppName}
                   volumeId={volumeId}
+                  currentSizeGb={data.workerStatus?.volumeSizeGb ?? null}
                   userLabel={data.user_email ?? data.user_id}
                   disabled={
                     data.workerStatus?.status === 'recovering' ||

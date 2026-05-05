@@ -3798,8 +3798,10 @@ platform.post('/destroy-fly-machine', async c => {
 });
 
 // POST /api/platform/extend-volume
-// Temporary workaround: extend a Fly volume to exactly 15 GB.
-const EXTEND_VOLUME_TARGET_SIZE_GB = 15;
+// Admin workaround for granting users temporary additional storage.
+// Fly volumes can grow but cannot shrink, so once extended an instance
+// is effectively pinned to the larger size — flips DO instanceType to
+// 'custom' to reflect that.
 const ExtendVolumeSchema = z.object({
   userId: z.string().min(1),
   appName: z
@@ -3811,6 +3813,7 @@ const ExtendVolumeSchema = z.object({
     .string()
     .min(1)
     .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+  targetSizeGb: z.number().int().min(1).max(500),
 });
 
 const FlyExtendVolumeResponseSchema = z.object({
@@ -3824,7 +3827,7 @@ platform.post('/extend-volume', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
-  const { appName, volumeId } = result.data;
+  const { appName, volumeId, targetSizeGb, userId } = result.data;
   const apiToken = c.env.FLY_API_TOKEN;
   if (!apiToken) {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
@@ -3835,13 +3838,13 @@ platform.post('/extend-volume', async c => {
     const resp = await fetch(url, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ size_gb: EXTEND_VOLUME_TARGET_SIZE_GB }),
+      body: JSON.stringify({ size_gb: targetSizeGb }),
     });
 
     if (!resp.ok) {
       const body = await resp.text();
       console.error(
-        `[platform] extend-volume failed (${resp.status}) volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}:`,
+        `[platform] extend-volume failed (${resp.status}) volume=${volumeId} size=${targetSizeGb}:`,
         body
       );
       return jsonError(`Fly API error (${resp.status}): ${body}`, resp.status);
@@ -3857,8 +3860,27 @@ platform.post('/extend-volume', async c => {
     }
     // Default to true so the admin always sees the redeploy warning when Fly omits the flag
     const needsRestart = extendParsed.data.needs_restart ?? true;
+
+    // Catch the DO up to the new on-disk size so resize-policy comparisons stay honest.
+    try {
+      await withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.recordVolumeExtend(targetSizeGb),
+        'recordVolumeExtend'
+      );
+    } catch (err) {
+      // Don't fail the whole request — Fly is already extended; alarm/live-check
+      // will eventually re-observe and self-heal DO state.
+      console.error(
+        `[platform] extend-volume succeeded on Fly but DO recordVolumeExtend failed for volume=${volumeId}:`,
+        err
+      );
+    }
+
     console.log(
-      `[platform] extend-volume ok: volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}GB (target total) needsRestart=${needsRestart}`
+      `[platform] extend-volume ok: volume=${volumeId} size=${targetSizeGb}GB needsRestart=${needsRestart}`
     );
     return c.json({ ok: true as const, needsRestart });
   } catch (err) {

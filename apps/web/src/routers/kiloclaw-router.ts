@@ -30,6 +30,7 @@ import {
   kiloclaw_email_log,
   kiloclaw_cli_runs,
   kiloclaw_scheduled_actions,
+  kiloclaw_scheduled_action_notifications,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
   kilocode_users,
@@ -884,9 +885,16 @@ type KiloCodeConfigPublicResponse = Pick<
 
 /**
  * Soonest pending scheduled action targeting this instance, or null.
- * Powers the in-workspace "upcoming X at Y" banner on getStatus. Filter
- * matches the admin-side conflict check: target.status IN ('pending',
- * 'running'); parent.status IN ('scheduled', 'running').
+ * Powers the in-workspace "upcoming X at Y" banner on getStatus.
+ *
+ * The banner is gated on the (target, kind='notice', channel='webapp')
+ * notification row, NOT just on target/action existence — admins who
+ * schedule with `notify: false` or who drop 'webapp' from
+ * `noticeChannels` should NOT see a banner. The notification row also
+ * has to be in 'pending' or 'sent' (not 'failed' — voided on cancel
+ * or by the orphaned-user guard) and the notice lead-time window has
+ * to have opened so the banner appears at the same moment the email
+ * fires, not the instant the schedule is created.
  */
 async function getUpcomingScheduledActionForInstance(
   instanceId: string
@@ -909,6 +917,18 @@ async function getUpcomingScheduledActionForInstance(
       kiloclaw_scheduled_action_stages,
       eq(kiloclaw_scheduled_action_stages.id, kiloclaw_scheduled_action_targets.stage_id)
     )
+    // INNER join — no webapp/notice row means the admin opted out of
+    // the in-app banner (notify=false, or dropped 'webapp' from
+    // noticeChannels). The unique (target_id, kind, channel) index
+    // makes this an O(1) lookup.
+    .innerJoin(
+      kiloclaw_scheduled_action_notifications,
+      and(
+        eq(kiloclaw_scheduled_action_notifications.target_id, kiloclaw_scheduled_action_targets.id),
+        eq(kiloclaw_scheduled_action_notifications.kind, 'notice'),
+        eq(kiloclaw_scheduled_action_notifications.channel, 'webapp')
+      )
+    )
     .leftJoin(
       targetCatalog,
       eq(targetCatalog.image_tag, kiloclaw_scheduled_action_targets.target_image_tag)
@@ -924,7 +944,16 @@ async function getUpcomingScheduledActionForInstance(
         // that window is fine because the action is about to fire
         // (or just did) regardless.
         eq(kiloclaw_scheduled_action_targets.status, 'pending'),
-        inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+        inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running']),
+        // Banner-visible iff the notice row is queued or already sent.
+        // 'failed' covers cancellation-voided rows and orphaned-user
+        // guard rows — neither should drive a banner.
+        inArray(kiloclaw_scheduled_action_notifications.status, ['pending', 'sent']),
+        // Honor notice_lead_hours. Without this, the banner pops the
+        // moment an admin schedules (potentially weeks before the
+        // action fires), but the email/push wouldn't fire until
+        // scheduled_at - lead_hours. They should appear together.
+        sql`now() >= (${kiloclaw_scheduled_action_stages.scheduled_at}::timestamptz - (${kiloclaw_scheduled_actions.notice_lead_hours} * interval '1 hour'))`
       )
     )
     .orderBy(asc(kiloclaw_scheduled_action_stages.scheduled_at))

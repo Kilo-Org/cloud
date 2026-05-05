@@ -310,9 +310,30 @@ async function selectDueNotifications(db: WorkerDb): Promise<DueNotificationRow[
     .where(
       and(
         eq(kiloclaw_scheduled_action_notifications.status, 'pending'),
+        // 'cancelled' rows fire on the next tick regardless of lead time
+        // or parent state — they announce "the previously-noticed action
+        // is now off". 'notice' rows additionally require:
+        //   - The lead-time window has opened (now >= scheduled_at - lead).
+        //   - The target is still pending (action hasn't applied yet).
+        //   - The parent action is still scheduled or running (not
+        //     completed/cancelled/failed).
+        //   - The stage is still pending or running.
+        // Without those gates a 'notice' row could fire AFTER the action
+        // already applied (e.g. sweep delayed past apply, or
+        // notice_lead_hours=0): the user would receive a "your bot will
+        // restart soon" message for an action that already ran. The
+        // cancellation path explicitly voids pending notices to handle
+        // its own race; the apply-path equivalent is handled here at
+        // query time so we don't have to mutate notification rows from
+        // every place a target completes.
         sql`(
           ${kiloclaw_scheduled_action_notifications.kind} = 'cancelled'
-          OR now() >= (${kiloclaw_scheduled_action_stages.scheduled_at}::timestamptz - (${kiloclaw_scheduled_actions.notice_lead_hours} * interval '1 hour'))
+          OR (
+            now() >= (${kiloclaw_scheduled_action_stages.scheduled_at}::timestamptz - (${kiloclaw_scheduled_actions.notice_lead_hours} * interval '1 hour'))
+            AND ${kiloclaw_scheduled_action_targets.status} = 'pending'
+            AND ${kiloclaw_scheduled_actions.status} IN ('scheduled', 'running')
+            AND ${kiloclaw_scheduled_action_stages.status} IN ('pending', 'running')
+          )
         )`
       )
     )

@@ -27,6 +27,7 @@ export function setActiveChatInstance(instanceId: string | null) {
 // Keep in sync with the `data` payloads emitted by:
 //   - services/notifications/src/dos/NotificationChannelDO.ts (chat)
 //   - services/notifications/src/lib/notifications-service.ts (instance-lifecycle)
+//   - services/notifications/src/lib/scheduled-action-push.ts (scheduled-action)
 const notificationDataSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('chat'),
@@ -35,6 +36,16 @@ const notificationDataSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('instance-lifecycle'),
     event: z.enum(['ready', 'start_failed']),
+    instanceId: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal('scheduled-action'),
+    event: z.enum([
+      'scheduled_restart_notice',
+      'scheduled_restart_cancelled',
+      'scheduled_version_change_notice',
+      'scheduled_version_change_cancelled',
+    ]),
     instanceId: z.string().min(1),
   }),
 ]);

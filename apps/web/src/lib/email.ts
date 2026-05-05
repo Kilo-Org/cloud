@@ -42,6 +42,7 @@ export const subjects = {
   clawComplementaryInferenceEnded: 'Your Free AI Inference Period Has Ended',
   accountDeletionRequest: 'Kilo: Account Deletion Request Received',
   creditsTopUp: 'Your Kilo credit top-up',
+  kiloClawSubscriptionStarted: 'Your KiloClaw subscription is active',
 } as const;
 
 export type TemplateName = keyof typeof subjects;

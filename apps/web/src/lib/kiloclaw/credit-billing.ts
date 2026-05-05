@@ -1045,31 +1045,6 @@ async function deleteSubscriptionStartedEmailLog(params: {
     );
 }
 
-// Fast-path existence check covered by the
-// `UQ_kiloclaw_email_log_user_instance_type_period` unique index. Used to
-// short-circuit the duplicate-settlement activation recovery path before
-// running the more expensive `kiloclaw_subscription_change_log` scan.
-async function subscriptionStartedEmailAlreadyLoggedForActivation(params: {
-  userId: string;
-  instanceId: string;
-  periodStart: string;
-}): Promise<boolean> {
-  const { userId, instanceId, periodStart } = params;
-  const [existing] = await db
-    .select({ id: kiloclaw_email_log.id })
-    .from(kiloclaw_email_log)
-    .where(
-      and(
-        eq(kiloclaw_email_log.user_id, userId),
-        eq(kiloclaw_email_log.instance_id, instanceId),
-        eq(kiloclaw_email_log.email_type, KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE),
-        eq(kiloclaw_email_log.period_start, periodStart)
-      )
-    )
-    .limit(1);
-  return existing !== undefined;
-}
-
 /**
  * Fast-path existence check covered by the
  * `UQ_kiloclaw_email_log_user_instance_type_period` unique index. Used to

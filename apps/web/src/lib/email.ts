@@ -462,3 +462,28 @@ export async function sendCreditsTopUpEmail(
     },
   });
 }
+
+type SendKiloClawSubscriptionStartedEmailProps = {
+  to: string;
+  planName: string;
+  priceCents: number;
+  billingPeriod: string;
+  nextBillingDate: Date;
+};
+
+export async function sendKiloClawSubscriptionStartedEmail(
+  props: SendKiloClawSubscriptionStartedEmailProps
+): Promise<SendResult> {
+  const manage_url = `${NEXTAUTH_URL}/claw/subscription`;
+  return send({
+    to: props.to,
+    templateName: 'kiloClawSubscriptionStarted',
+    templateVars: {
+      plan_name: props.planName,
+      price_usd: formatUsd(props.priceCents),
+      billing_period: props.billingPeriod,
+      next_billing_date: formatDate(props.nextBillingDate),
+      manage_url,
+    },
+  });
+}

@@ -49,7 +49,10 @@ import {
   canToggleReaction,
   createSendMessageClientId,
 } from './message-presentation';
-import { getMessageHistoryContentState } from './message-history-state';
+import {
+  getMessageHistoryContentState,
+  shouldMarkLatestMessageRead,
+} from './message-history-state';
 import { useConversationPresence } from './hooks/use-conversation-presence';
 import { useConversationEventSubscription } from './hooks/use-conversation-event-subscription';
 import { useLeaveConversation } from './hooks/use-conversations';
@@ -133,6 +136,10 @@ export function ConversationScreen({
   const hasInitialMessages = messageHistoryState === 'ready';
   const messages = hasInitialMessages ? (messagesQuery.data?.messages ?? []) : [];
   const latestMessageId = latestMarkReadMessageId(messages);
+  const latestMarkReadMessageSenderId =
+    latestMessageId === null
+      ? null
+      : (messages.find(message => message.id === latestMessageId)?.senderId ?? null);
   const fetchOlder = useCallback(() => {
     if (messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage) {
       void messagesQuery.fetchNextPage();
@@ -457,6 +464,14 @@ export function ConversationScreen({
     if (!hasInitialMessages || latestMessageId === null || currentMarkReadMarker === null) {
       return;
     }
+    if (
+      !shouldMarkLatestMessageRead({
+        currentUserId,
+        latestMessageSenderId: latestMarkReadMessageSenderId,
+      })
+    ) {
+      return;
+    }
     const marker = currentMarkReadMarker;
     void attemptMarkCurrentConversationRead({
       marker,
@@ -474,8 +489,10 @@ export function ConversationScreen({
   }, [
     conversationId,
     currentMarkReadMarker,
+    currentUserId,
     hasInitialMessages,
     latestMessageId,
+    latestMarkReadMessageSenderId,
     markRead,
     sandboxId,
   ]);

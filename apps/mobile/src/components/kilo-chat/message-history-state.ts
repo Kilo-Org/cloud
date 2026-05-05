@@ -20,3 +20,16 @@ export function getMessageHistoryContentState({
   }
   return 'ready';
 }
+
+export function shouldMarkLatestMessageRead({
+  currentUserId,
+  latestMessageSenderId,
+}: {
+  currentUserId: string | null;
+  latestMessageSenderId: string | null;
+}): boolean {
+  if (latestMessageSenderId === null) {
+    return false;
+  }
+  return currentUserId === null || latestMessageSenderId !== currentUserId;
+}

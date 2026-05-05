@@ -1107,9 +1107,10 @@ describe('reconciliation: machine status sync', () => {
       const { instance: inst, waitUntilPromises } = createInstance(storage);
       await inst.alarm();
       if (i === SELF_HEAL_THRESHOLD - 1) {
-        // 2 = recovery launch + tracked_image_tag Postgres sync (always enqueued
-        // by alarm() when sandboxId is set; see kiloclaw-instance/index.ts).
-        expect(waitUntilPromises).toHaveLength(2);
+        // 3 = recovery launch + tracked_image_tag Postgres sync + scheduled-action
+        // apply pass (both syncs are always enqueued by alarm() when sandboxId is
+        // set; see kiloclaw-instance/index.ts).
+        expect(waitUntilPromises).toHaveLength(3);
       }
     }
 
@@ -1127,8 +1128,9 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    // 1 = tracked_image_tag Postgres sync only; no recovery launched.
-    expect(waitUntilPromises).toHaveLength(1);
+    // 2 = tracked_image_tag Postgres sync + scheduled-action apply pass; no
+    // recovery launched.
+    expect(waitUntilPromises).toHaveLength(2);
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('healthCheckFailCount')).toBe(0);
     expect(storage._store.get('recoveryStartedAt')).toBeUndefined();
@@ -1142,8 +1144,9 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    // 1 = tracked_image_tag Postgres sync only; no fresh recovery launched.
-    expect(waitUntilPromises).toHaveLength(1);
+    // 2 = tracked_image_tag Postgres sync + scheduled-action apply pass; no
+    // fresh recovery launched.
+    expect(waitUntilPromises).toHaveLength(2);
   });
 
   it('does not clean up a pending recovery volume while recovery is still in progress', async () => {
@@ -7303,9 +7306,9 @@ describe('applyPinnedVersion', () => {
     });
 
     (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
-      openclawVersion: '2026.4.15',
+      openclawVersion: '2026.4.23',
       variant: 'default',
-      imageTag: '2026-04-15',
+      imageTag: '2026-04-23',
       imageDigest: 'sha256:latest',
       publishedAt: new Date().toISOString(),
       rolloutPercent: 100,
@@ -7314,11 +7317,11 @@ describe('applyPinnedVersion', () => {
 
     const applied = await instance.applyPinnedVersion(null);
 
-    expect(applied.imageTag).toBe('2026-04-15');
-    expect(applied.openclawVersion).toBe('2026.4.15');
+    expect(applied.imageTag).toBe('2026-04-23');
+    expect(applied.openclawVersion).toBe('2026.4.23');
     expect(selectImageVersionForInstance).toHaveBeenCalledOnce();
     expect(resolveVersionByTag).not.toHaveBeenCalled();
-    expect(storage._store.get('trackedImageTag')).toBe('2026-04-15');
+    expect(storage._store.get('trackedImageTag')).toBe('2026-04-23');
   });
 
   it('when cleared, passes currentImageTag=null to the selector so non-cohort users can fall off the pinned candidate', async () => {
@@ -7335,7 +7338,7 @@ describe('applyPinnedVersion', () => {
     // ignoreCurrentImageTag, it should instead be invoked with
     // currentImageTag=null and return :latest.
     (selectImageVersionForInstance as Mock).mockResolvedValueOnce({
-      openclawVersion: '2026.4.15',
+      openclawVersion: '2026.4.23',
       variant: 'default',
       imageTag: 'latest-tag',
       imageDigest: 'sha256:latest',

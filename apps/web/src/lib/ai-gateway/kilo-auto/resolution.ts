@@ -85,28 +85,35 @@ function gatewaySupportsApiKind(
   return provider?.supportedChatApis.some(k => k === apiKind) ?? false;
 }
 
+export type ResolveAutoModelResult =
+  | { kind: 'ok'; resolved: ResolvedAutoModel }
+  | { kind: 'no_free_models_available' };
+
 export async function resolveAutoModel(
   params: ResolveAutoModelParams,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
-): Promise<ResolvedAutoModel> {
+): Promise<ResolveAutoModelResult> {
   const { model, modeHeader, featureHeader, sessionId, apiKind, clientIp } = params;
   if (model === KILO_AUTO_FREE_MODEL.id) {
     const openRouterModels = await getOpenRouterModels();
     const candidates = getAutoFreeCandidates(openRouterModels, apiKind);
     if (candidates.length === 0) {
-      throw new Error('No free model candidates available');
+      return { kind: 'no_free_models_available' };
     }
     const randomNumber = getRandomNumber(
       'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp),
       candidates.length
     );
-    return { model: candidates[randomNumber] };
+    return { kind: 'ok', resolved: { model: candidates[randomNumber] } };
   }
   if (model === KILO_AUTO_SMALL_MODEL.id) {
     return {
-      model:
-        (await balancePromise) > 0 ? GEMMA_4_31B_IT_ID : gemma_4_26b_a4b_it_free_model.public_id,
+      kind: 'ok',
+      resolved: {
+        model:
+          (await balancePromise) > 0 ? GEMMA_4_31B_IT_ID : gemma_4_26b_a4b_it_free_model.public_id,
+      },
     };
   }
   const mode = resolveMode(modeHeader, featureHeader);
@@ -114,7 +121,7 @@ export async function resolveAutoModel(
     if (mode === 'claw' && featureHeader === 'kiloclaw') {
       const user = await userPromise;
       if (user && (await userIsWithinFirstKiloClawInstanceWindow({ userId: user.id }))) {
-        return BALANCED_CLAW_SETUP_MODEL;
+        return { kind: 'ok', resolved: BALANCED_CLAW_SETUP_MODEL };
       }
     }
 
@@ -123,14 +130,17 @@ export async function resolveAutoModel(
     // so we use a fallback in those cases.
     // This should be rare, both CLI and KiloClaw default to chat completions.
     if (apiKind === 'responses') {
-      return BALANCED_RESPONSES_FALLBACK_MODEL;
+      return { kind: 'ok', resolved: BALANCED_RESPONSES_FALLBACK_MODEL };
     } else if (apiKind === 'messages') {
-      return BALANCED_MESSAGES_FALLBACK_MODEL;
+      return { kind: 'ok', resolved: BALANCED_MESSAGES_FALLBACK_MODEL };
     } else {
-      return BALANCED_QWEN_MODEL;
+      return { kind: 'ok', resolved: BALANCED_QWEN_MODEL };
     }
   }
-  return (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL;
+  return {
+    kind: 'ok',
+    resolved: (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL,
+  };
 }
 
 export async function applyResolvedAutoModel(
@@ -138,8 +148,12 @@ export async function applyResolvedAutoModel(
   request: GatewayRequest,
   userPromise: Promise<User | null>,
   balancePromise: Promise<number>
-) {
-  const resolved = await resolveAutoModel(params, userPromise, balancePromise);
+): Promise<ResolveAutoModelResult> {
+  const result = await resolveAutoModel(params, userPromise, balancePromise);
+  if (result.kind !== 'ok') {
+    return result;
+  }
+  const resolved = result.resolved;
   request.body.model = resolved.model;
   if (resolved.reasoning) {
     if (request.kind === 'messages') {
@@ -163,4 +177,5 @@ export async function applyResolvedAutoModel(
       request.body.verbosity = resolved.verbosity as OpenRouterChatCompletionRequest['verbosity'];
     }
   }
+  return result;
 }

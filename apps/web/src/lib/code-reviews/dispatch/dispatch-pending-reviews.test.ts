@@ -413,29 +413,36 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockDispatchReview).not.toHaveBeenCalled();
   });
 
-  it('prioritizes fresh pending reviews before stale queued recovery reviews', async () => {
-    const recentTimestamp = minutesAgo(1);
-    const olderStaleQueuedTimestamp = minutesAgo(6);
+  it('prioritizes fresh pending reviews over older stale queued recovery reviews', async () => {
+    const staleQueuedCreatedAt = minutesAgo(30);
+    const staleQueuedUpdatedAt = minutesAgo(6);
+    const pendingCreatedAt = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS - 1);
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
 
-    const [staleQueuedReview, pendingReview] = await db
+    const insertedReviews = await db
       .insert(cloud_agent_code_reviews)
       .values([
         reviewValues({
           owner,
           status: 'queued',
-          createdAt: olderStaleQueuedTimestamp,
-          updatedAt: olderStaleQueuedTimestamp,
+          createdAt: staleQueuedCreatedAt,
+          updatedAt: staleQueuedUpdatedAt,
         }),
         reviewValues({
           owner,
           status: 'pending',
-          createdAt: recentTimestamp,
-          updatedAt: recentTimestamp,
+          createdAt: pendingCreatedAt,
+          updatedAt: pendingCreatedAt,
         }),
       ])
       .returning({ id: cloud_agent_code_reviews.id });
+    const staleQueuedReview = insertedReviews[0];
+    const pendingReview = insertedReviews[1];
+
+    if (!staleQueuedReview || !pendingReview) {
+      throw new Error('Expected stale queued and pending reviews to be inserted');
+    }
 
     const result = await tryDispatchPendingReviews({
       type: 'user',
@@ -448,33 +455,22 @@ describe('tryDispatchPendingReviews', () => {
       pending: 0,
       activeCount: 1,
     });
-    expect(mockPrepareReviewPayload).toHaveBeenCalledWith(
-      expect.objectContaining({ reviewId: expect.any(String) })
-    );
-
-    const preparedReviewId = mockPrepareReviewPayload.mock.calls[0]?.[0]?.reviewId;
-    if (typeof preparedReviewId !== 'string') {
-      throw new Error('Expected review ID to be prepared');
-    }
-    const pendingStoredReview = await db.query.cloud_agent_code_reviews.findFirst({
-      where: eq(cloud_agent_code_reviews.id, pendingReview.id),
+    expect(mockDispatchReview).toHaveBeenCalledTimes(1);
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith({
+      reviewId: pendingReview.id,
+      owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      agentConfig: { id: 'test-agent-config', config: {} },
+      platform: 'github',
     });
-    const staleQueuedStoredReview = await db.query.cloud_agent_code_reviews.findFirst({
-      where: eq(cloud_agent_code_reviews.id, staleQueuedReview.id),
-    });
-
-    expect(preparedReviewId).toBe(pendingReview.id);
-    expect(pendingStoredReview?.status).toBe('queued');
-    expect(staleQueuedStoredReview?.status).toBe('queued');
-    expect(new Date(staleQueuedStoredReview?.updated_at ?? '').getTime()).toBe(
-      new Date(olderStaleQueuedTimestamp).getTime()
+    expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: staleQueuedReview.id })
     );
   });
 
   it('keeps a dispatch timeout claimed when the Worker status probe finds queued DO state', async () => {
     const recentTimestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS - 1);
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
     mockDispatchReview.mockRejectedValue(new Error('Request timeout after 10000ms'));
     mockGetReviewStatus.mockResolvedValue({ reviewId: 'unused', status: 'queued' });
 
@@ -489,6 +485,10 @@ describe('tryDispatchPendingReviews', () => {
         })
       )
       .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
 
     const result = await tryDispatchPendingReviews({
       type: 'user',
@@ -512,7 +512,7 @@ describe('tryDispatchPendingReviews', () => {
   it('releases a dispatch timeout claim when the Worker status probe finds no DO state', async () => {
     const recentTimestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS - 1);
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
     mockDispatchReview.mockRejectedValue(new Error('Request timeout after 10000ms'));
     mockGetReviewStatus.mockResolvedValue(null);
 
@@ -527,6 +527,10 @@ describe('tryDispatchPendingReviews', () => {
         })
       )
       .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
 
     const result = await tryDispatchPendingReviews({
       type: 'user',
@@ -550,7 +554,7 @@ describe('tryDispatchPendingReviews', () => {
   it('keeps a dispatch timeout claim when the Worker status probe also fails', async () => {
     const recentTimestamp = minutesAgo(1);
     const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
-    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS - 1);
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
     mockDispatchReview.mockRejectedValue(new Error('Request timeout after 10000ms'));
     mockGetReviewStatus.mockRejectedValue(new Error('status probe timeout'));
 
@@ -565,6 +569,10 @@ describe('tryDispatchPendingReviews', () => {
         })
       )
       .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
 
     const result = await tryDispatchPendingReviews({
       type: 'user',

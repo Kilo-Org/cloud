@@ -57,9 +57,19 @@ function findOtherKiloDevSessions(): string[] {
   }
 }
 
-function createSession(sessionName: string): void {
+function createSession(sessionName: string, env?: Record<string, string>): void {
   const repoRoot = getWorktreeRoot();
-  execSync(`tmux new-session -d -s ${sessionName} -n dashboard -c ${repoRoot}`, {
+  // When another tmux server is already running (e.g. from a sibling worktree),
+  // `tmux new-session` attaches to that existing server and inherits its
+  // environment — NOT our current process.env. Pass critical vars with -e so
+  // panes see this worktree's values (e.g. KILO_PORT_OFFSET).
+  const envArgs = env
+    ? Object.entries(env)
+        .map(([k, v]) => `-e ${escapeForShell(`${k}=${v}`)}`)
+        .join(' ')
+    : '';
+  const envPrefix = envArgs ? `${envArgs} ` : '';
+  execSync(`tmux new-session -d ${envPrefix}-s ${sessionName} -n dashboard -c ${repoRoot}`, {
     stdio: 'ignore',
   });
   // Destroy the session when no clients are attached (e.g. terminal window closed).

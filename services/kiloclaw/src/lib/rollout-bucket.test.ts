@@ -11,7 +11,7 @@ describe('rolloutBucket', () => {
   });
 
   it('is deterministic for the same key', async () => {
-    const key = 'tag:kiloclaw-2026.4.15-abc:instance:550e8400-e29b-41d4-a716-446655440000';
+    const key = 'tag:kiloclaw-2026.4.23-abc:instance:550e8400-e29b-41d4-a716-446655440000';
     const a = await rolloutBucket(key);
     const b = await rolloutBucket(key);
     expect(a).toBe(b);
@@ -37,8 +37,8 @@ describe('rolloutBucket', () => {
 
   it('changes the bucket for a fixed instanceId when the salt (imageTag) changes', async () => {
     const instanceId = '550e8400-e29b-41d4-a716-446655440001';
-    const a = await rolloutBucket(`tag:kiloclaw-2026.4.15-aaa:instance:${instanceId}`);
-    const b = await rolloutBucket(`tag:kiloclaw-2026.4.15-bbb:instance:${instanceId}`);
+    const a = await rolloutBucket(`tag:kiloclaw-2026.4.23-aaa:instance:${instanceId}`);
+    const b = await rolloutBucket(`tag:kiloclaw-2026.4.23-bbb:instance:${instanceId}`);
     // Two different salts (rebuilds of the same upstream version) must produce
     // independent draws so the same instance is not always the canary.
     expect(a).not.toBe(b);

@@ -3949,4 +3949,43 @@ platform.post('/extend-volume', async c => {
   }
 });
 
+// POST /api/platform/scheduled-action/wake
+//
+// Called by the web's scheduleAction tRPC right after persisting a new
+// scheduled-action row in Postgres. Resolves the target instance's DO
+// and calls notifyScheduledActionPending() — which just re-arms the
+// existing reconcile alarm so the next alarm tick picks up the new
+// row via the existing wedge in alarm().
+//
+// In production this is belt-and-suspenders (the platform proactively
+// fires past-due alarms anyway). In `wrangler dev`, stale alarm
+// timestamps don't auto-fire — this route is what prevents the dev
+// scheduler from sitting forever with a never-firing pre-existing
+// alarm.
+const ScheduledActionWakeSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid(),
+});
+
+platform.post('/scheduled-action/wake', async c => {
+  const result = await parseBody(c, ScheduledActionWakeSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, instanceId } = result.data;
+
+  try {
+    const woken = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.notifyScheduledActionPending(),
+      'notifyScheduledActionPending'
+    );
+    return c.json(woken);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-wake');
+    return jsonError(message, status);
+  }
+});
+
 export { platform };

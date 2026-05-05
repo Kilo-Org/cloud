@@ -102,6 +102,7 @@ export const qwen36_plus_model: KiloExclusiveModel = {
     },
   ]),
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export const qwen36_flash_model: KiloExclusiveModel = {
@@ -136,6 +137,7 @@ export const qwen36_flash_model: KiloExclusiveModel = {
     },
   ]),
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export const qwen36_max_preview_model: KiloExclusiveModel = {
@@ -170,6 +172,7 @@ export const qwen36_max_preview_model: KiloExclusiveModel = {
     },
   ]),
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export const qwen36_27b_model: KiloExclusiveModel = {
@@ -190,6 +193,7 @@ export const qwen36_27b_model: KiloExclusiveModel = {
     input_cache_write_per_million: null,
   }),
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export const alibabaDirectModels: ReadonlyArray<KiloExclusiveModel> = [

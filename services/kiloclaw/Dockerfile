@@ -2,10 +2,10 @@
 ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
 
-FROM debian:bookworm-slim AS runtime
+FROM debian:trixie-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
-ENV NODE_VERSION=24.14.1
+ENV NODE_VERSION=24.15.0
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \
@@ -55,7 +55,7 @@ RUN npm install -g pnpm
 # Patch: bump model discovery timeout from 5s to 60s — shared-cpu machines
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Remove this sed patch once openclaw exposes a configurable timeout.
-RUN npm install -g openclaw@2026.4.15 \
+RUN npm install -g openclaw@2026.4.23 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && FOUND_FILES=$(find "$OC_DIST" -name 'provider-models-*.js' | wc -l | tr -d ' ') \
     && if [ "$FOUND_FILES" -eq 0 ]; then echo "ERROR: provider-models-*.js not found in openclaw dist" >&2; exit 1; fi \
@@ -105,10 +105,10 @@ RUN npm install -g github:Kilo-Org/openclaw-channel-streamchat#fix/plugin-name-r
 RUN npm install -g @steipete/summarize@0.12.0
 
 # Install Kilo CLI (agentic coding assistant for the terminal)
-RUN npm install -g @kilocode/cli@7.2.22
+RUN npm install -g @kilocode/cli@7.2.31
 
 # Install Go (available at runtime for users to `go install` additional tools)
-ENV GO_VERSION=1.26.0
+ENV GO_VERSION=1.26.2
 RUN ARCH="$(dpkg --print-architecture)" \
     && curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz -o /tmp/go.tar.gz \
     && EXPECTED_SHA256="$(curl -fsSL https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz.sha256)" \
@@ -122,11 +122,13 @@ RUN ARCH="$(dpkg --print-architecture)" \
 #   so user-installed tools persist across restarts and are included in snapshots.
 # - npm/Node (installed to /usr/local) and apt packages (/usr/bin) are unaffected.
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
-RUN GOBIN=/usr/local/bin go install github.com/steipete/gogcli/cmd/gog@v0.12.0 \
+RUN ARCH="$(dpkg --print-architecture)" \
+    && curl -fsSL "https://github.com/steipete/gogcli/releases/download/v0.14.0/gogcli_0.14.0_linux_${ARCH}.tar.gz" \
+       | tar xz -C /usr/local/bin gog \
     && mv /usr/local/bin/gog /usr/local/bin/gog.real \
     && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.3.0 \
     && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.2 \
-    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.0.3 \
+    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.1.0 \
     && GOBIN=/usr/local/bin go install github.com/steipete/gifgrep/cmd/gifgrep@v0.2.3 \
     && go clean -cache -modcache
 
@@ -176,11 +178,11 @@ RUN cd /tmp/kiloclaw-morning-briefing \
 # file. By building in a separate stage, Bun (~100MB) stays out of the
 # final image. Bun installed to /root/.bun/ which gets shadowed by the
 # Fly Volume mount at /root, so it was unreachable at runtime anyway.
-FROM debian:bookworm-slim AS controller-builder
+FROM debian:trixie-slim AS controller-builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl unzip \
-    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.2.4" \
+    && curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.13" \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH="/root/.bun/bin:$PATH"
 
@@ -226,8 +228,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-04-24-v66-openclaw-2026.4.15-add-kilo-chat-plugin
-RUN echo "12"
+# Build cache bust: 2026-05-01-v67-openclaw-2026.4.23
+RUN echo "13"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

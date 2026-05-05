@@ -177,7 +177,11 @@ async function cmdUp(targets: string[], repoRoot: string): Promise<void> {
   }
 
   // --- Create tmux session ---
-  createSession(sessionName);
+  // Pass KILO_PORT_OFFSET into the session environment so panes see it even
+  // when an existing tmux server (from a sibling worktree) is running with a
+  // different offset. Without this, new windows inherit the server env, not
+  // ours, and services bind to base ports — causing conflicts.
+  createSession(sessionName, { KILO_PORT_OFFSET: String(portOffset) });
 
   // --- Start each service in its own tmux window ---
   const SIDEBAR_WIDTH = 40;
@@ -499,7 +503,7 @@ async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> 
   console.log(`Restarted ${serviceName}`);
 }
 
-async function cmdStop(repoRoot: string): Promise<void> {
+async function cmdStop(repoRoot: string, force: boolean): Promise<void> {
   const sessionName = getSessionName();
 
   if (sessionExists(sessionName)) {
@@ -507,12 +511,24 @@ async function cmdStop(repoRoot: string): Promise<void> {
     console.log(`Killed tmux session ${sessionName}`);
   }
 
-  console.log('Stopping Docker infrastructure…');
-  try {
-    const [cmd, args] = buildInfraDownArgs();
-    execFileSync(cmd, args, { cwd: repoRoot, stdio: 'inherit' });
-  } catch {
-    // docker compose down may fail if nothing is running
+  // Docker Compose uses project name "dev" for every worktree, so containers
+  // (postgres, redis, grafana) are shared singletons. Tearing them down here
+  // would break any other worktree's running session — skip when siblings
+  // are active unless --force is passed.
+  const otherSessions = findOtherKiloDevSessions();
+  if (otherSessions.length > 0 && !force) {
+    console.log(
+      `Leaving Docker infrastructure running (other sessions active: ${otherSessions.join(', ')})`
+    );
+    console.log('  Pass --force to tear down shared containers anyway.');
+  } else {
+    console.log('Stopping Docker infrastructure…');
+    try {
+      const [cmd, args] = buildInfraDownArgs();
+      execFileSync(cmd, args, { cwd: repoRoot, stdio: 'inherit' });
+    } catch {
+      // docker compose down may fail if nothing is running
+    }
   }
 
   console.log(`${GREEN}All services stopped.${RESET}`);
@@ -543,7 +559,8 @@ function printUsage(): void {
   console.log(`
 Usage:
   dev:start [targets...]  Start services (default: core)
-  dev:stop                Stop all services
+  dev:stop [--force]      Stop all services (skips shared Docker infra if
+                          other kilo-dev sessions are running; --force overrides)
   dev:status [--json]     Show running services and their ports
   dev:restart <service>   Restart a running service
   dev:env [targets...]    Sync env vars (.dev.vars + .env.development.local)
@@ -568,7 +585,7 @@ async function main() {
       await cmdUp(args.slice(1), repoRoot);
       break;
     case 'stop':
-      await cmdStop(repoRoot);
+      await cmdStop(repoRoot, args.includes('--force') || args.includes('-f'));
       break;
     case 'status':
       await cmdStatus(repoRoot, args.includes('--json'));

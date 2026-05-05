@@ -4,6 +4,7 @@ import {
   type OpenRouterInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 
 export type KiloExclusiveModelFlag = 'reasoning' | 'vision' | 'stealth' | 'vercel-routing';
 
@@ -35,7 +36,32 @@ export type KiloExclusiveModel = {
   pricing: Pricing | null;
   /** Features allowed to use this model. Empty array means no restriction. */
   exclusive_to: ReadonlyArray<FeatureValue>;
+  /**
+   * Upstream inference providers this model may be routed to; empty means no
+   * restriction. Only honored by the OpenRouter and Vercel AI Gateway upstreams.
+   */
+  inference_provider_restriction: ReadonlyArray<OpenRouterInferenceProviderId>;
 };
+
+/** Rewrites a gateway request to target a Kilo-exclusive model. */
+export function applyKiloExclusiveModelSettings(
+  requestToMutate: GatewayRequest,
+  kiloExclusiveModel: KiloExclusiveModel
+) {
+  requestToMutate.body.model = kiloExclusiveModel.internal_id;
+  const restriction = kiloExclusiveModel.inference_provider_restriction;
+  if (restriction.length === 0) {
+    return;
+  }
+  const provider = requestToMutate.body.provider;
+  if (provider?.only) {
+    provider.only = [...new Set(provider.only).intersection(new Set<string>(restriction))];
+  } else if (provider) {
+    provider.only = [...restriction];
+  } else {
+    requestToMutate.body.provider = { only: [...restriction] };
+  }
+}
 
 export function getInferenceProvider(
   model: KiloExclusiveModel

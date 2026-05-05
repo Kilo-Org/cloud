@@ -50,7 +50,13 @@ import {
   AffiliateEventType,
   AffiliateEventDeliveryState,
 } from './schema-types';
-import type { CustomLlmDefinition, KiloClawAdminAuditAction } from './schema-types';
+import type {
+  CustomLlmDefinition,
+  KiloClawAdminAuditAction,
+  KiloClawScheduledActionStatus,
+  KiloClawScheduledActionStageStatus,
+  KiloClawScheduledActionTargetStatus,
+} from './schema-types';
 import type {
   OrganizationModeConfig,
   OrganizationPlan,
@@ -4062,6 +4068,170 @@ export const kiloclaw_version_pins = pgTable('kiloclaw_version_pins', {
 });
 
 export type KiloClawVersionPin = typeof kiloclaw_version_pins.$inferSelect;
+
+// ─── Scheduled Admin Actions ───────────────────────────────────────────
+//
+// Generic scheduled-action framework with `action_type` discriminator.
+// First action type is `scheduled_restart` (no-op redeploy at a chosen
+// time). `version_change` lands in a follow-on PR. The discriminator lets
+// future action types drop in without a schema rebuild.
+//
+// Boundary: this scheduler is kiloclaw-scoped. Other domains build their
+// own. Don't extract into shared infrastructure until at least three
+// domains have shipped their own implementations.
+
+export const kiloclaw_scheduled_actions = pgTable(
+  'kiloclaw_scheduled_actions',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+
+    // Discriminator. PR 1 emits 'scheduled_restart'. PR 3 adds
+    // 'version_change'. Future types add new values; type-specific
+    // columns below stay nullable so unrelated types ignore them.
+    action_type: text().$type<'scheduled_restart' | 'version_change'>().notNull(),
+
+    // version_change-specific fields. Nullable; ignored by other action
+    // types. Live on the parent for v1 (one populated type at a time);
+    // migrate to a JSON payload column or sibling table if a future
+    // action type has very different fields.
+    target_image_tag: text().references(() => kiloclaw_image_catalog.image_tag, {
+      onDelete: 'restrict',
+    }),
+    override_pins: boolean().notNull().default(false),
+
+    // Notice config. Populated for any action type that triggers user
+    // notification in PR 2+; PR 1 leaves these as empty strings since
+    // scheduled_restart in PR 1 doesn't notify.
+    notice_lead_hours: integer().notNull().default(24), // 0..168
+    notice_subject: text().notNull().default(''),
+    notice_body: text().notNull().default(''),
+
+    reason: text(), // optional admin-facing label
+
+    status: text().$type<KiloClawScheduledActionStatus>().notNull().default('scheduled'),
+
+    created_by: text()
+      .notNull()
+      .references(() => kilocode_users.id),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    cancelled_at: timestamp({ withTimezone: true, mode: 'string' }),
+
+    total_count: integer().notNull().default(0),
+    applied_count: integer().notNull().default(0),
+    skipped_count: integer().notNull().default(0),
+    failed_count: integer().notNull().default(0),
+  },
+  table => [
+    index('IDX_kiloclaw_scheduled_actions_status').on(table.status),
+    index('IDX_kiloclaw_scheduled_actions_action_type').on(table.action_type),
+    index('IDX_kiloclaw_scheduled_actions_created_by').on(table.created_by),
+  ]
+);
+
+export type KiloClawScheduledAction = typeof kiloclaw_scheduled_actions.$inferSelect;
+export type NewKiloClawScheduledAction = typeof kiloclaw_scheduled_actions.$inferInsert;
+
+export const kiloclaw_scheduled_action_stages = pgTable(
+  'kiloclaw_scheduled_action_stages',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    scheduled_action_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_scheduled_actions.id, { onDelete: 'cascade' }),
+
+    stage_index: integer().notNull(), // 0-based per parent
+    scheduled_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+
+    status: text().$type<KiloClawScheduledActionStageStatus>().notNull().default('pending'),
+
+    notice_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+
+    applied_count: integer().notNull().default(0),
+    skipped_count: integer().notNull().default(0),
+    failed_count: integer().notNull().default(0),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_scheduled_action_stages_parent_index').on(
+      table.scheduled_action_id,
+      table.stage_index
+    ),
+    // Notice-tick lookup (used in PR 2): stages whose notice window has
+    // opened. Partial index for cheap sweep.
+    index('IDX_kiloclaw_scheduled_action_stages_notice_due')
+      .on(table.scheduled_at)
+      .where(sql`${table.notice_sent_at} IS NULL AND ${table.status} = 'pending'`),
+  ]
+);
+
+export type KiloClawScheduledActionStage = typeof kiloclaw_scheduled_action_stages.$inferSelect;
+export type NewKiloClawScheduledActionStage = typeof kiloclaw_scheduled_action_stages.$inferInsert;
+
+export const kiloclaw_scheduled_action_targets = pgTable(
+  'kiloclaw_scheduled_action_targets',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    scheduled_action_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_scheduled_actions.id, { onDelete: 'cascade' }),
+    stage_id: uuid().references(() => kiloclaw_scheduled_action_stages.id, {
+      onDelete: 'set null',
+    }),
+    instance_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_instances.id, { onDelete: 'cascade' }),
+
+    // Captured at schedule time so a deleted catalog row can't lose
+    // history. Informational only in v1 (no rollback).
+    source_image_tag: text(),
+    target_image_tag: text(), // null for non-version-change action types
+
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id),
+
+    applied_at: timestamp({ withTimezone: true, mode: 'string' }),
+
+    // 'running' is a transient claim state set by the DO apply path
+    // immediately before it dispatches the side effect (restartMachine).
+    // Without it, two concurrent waitUntil passes can both find the
+    // same pending row and both fire the side effect — only one wins
+    // the final CAS but both restarts have already been kicked off.
+    // The claim CAS (pending → running) makes the dispatch
+    // single-writer without needing a row lock.
+    status: text().$type<KiloClawScheduledActionTargetStatus>().notNull().default('pending'),
+    skip_reason: text(),
+    error_message: text(),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_scheduled_action_targets_parent_instance').on(
+      table.scheduled_action_id,
+      table.instance_id
+    ),
+    index('IDX_kiloclaw_scheduled_action_targets_stage').on(table.stage_id),
+    // DO apply path lookup: pending targets for an instance whose stage
+    // has fired. Partial index keeps the lookup cheap on large fleets.
+    index('IDX_kiloclaw_scheduled_action_targets_pending_by_instance')
+      .on(table.instance_id)
+      .where(sql`${table.status} = 'pending'`),
+  ]
+);
+
+export type KiloClawScheduledActionTarget = typeof kiloclaw_scheduled_action_targets.$inferSelect;
+export type NewKiloClawScheduledActionTarget =
+  typeof kiloclaw_scheduled_action_targets.$inferInsert;
 
 // KiloClaw Early Bird Purchases — records one-time earlybird payments.
 // Unique on user_id enforces at most one purchase per user.

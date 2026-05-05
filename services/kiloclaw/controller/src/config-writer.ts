@@ -105,6 +105,8 @@ type ConfigObject = Record<string, any>;
 type EnvLike = Record<string, string | undefined>;
 
 const INBOUND_EMAIL_HOOK_ID = 'cloudflare-email-inbound';
+const DEFAULT_HOOK_SESSION_KEY_PREFIX = 'hook:';
+const INBOUND_EMAIL_SESSION_KEY_PREFIX = 'inbound-email:';
 
 function migrateHookMapping(mapping: ConfigObject): ConfigObject {
   if (mapping.id === INBOUND_EMAIL_HOOK_ID) {
@@ -541,6 +543,23 @@ export function generateBaseConfig(
     config.hooks.enabled = true;
     config.hooks.token = env.KILOCLAW_HOOKS_TOKEN;
     config.hooks.path = '/hooks';
+    config.hooks.allowedSessionKeyPrefixes = Array.isArray(config.hooks.allowedSessionKeyPrefixes)
+      ? config.hooks.allowedSessionKeyPrefixes
+      : [];
+    if (
+      !(config.hooks.allowedSessionKeyPrefixes as string[]).includes(
+        DEFAULT_HOOK_SESSION_KEY_PREFIX
+      )
+    ) {
+      (config.hooks.allowedSessionKeyPrefixes as string[]).push(DEFAULT_HOOK_SESSION_KEY_PREFIX);
+    }
+    if (
+      !(config.hooks.allowedSessionKeyPrefixes as string[]).includes(
+        INBOUND_EMAIL_SESSION_KEY_PREFIX
+      )
+    ) {
+      (config.hooks.allowedSessionKeyPrefixes as string[]).push(INBOUND_EMAIL_SESSION_KEY_PREFIX);
+    }
 
     config.hooks.mappings = Array.isArray(config.hooks.mappings)
       ? config.hooks.mappings.map((mapping: ConfigObject) => migrateHookMapping(mapping))

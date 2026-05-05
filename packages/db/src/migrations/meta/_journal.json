@@ -764,6 +764,13 @@
       "when": 1777634740320,
       "tag": "0108_wise_psylocke",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1777664842970,
+      "tag": "0109_conscious_kingpin",
+      "breakpoints": true
     }
   ]
 }

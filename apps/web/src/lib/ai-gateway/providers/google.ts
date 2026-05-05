@@ -25,6 +25,7 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   internal_id: 'google/gemma-4-26b-a4b-it',
   pricing: null,
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export function isGemini3Model(model: string) {

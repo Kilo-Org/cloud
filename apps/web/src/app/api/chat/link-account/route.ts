@@ -1,9 +1,20 @@
 import { bot } from '@/lib/bot';
 import { APP_URL } from '@/lib/constants';
-import { linkKiloUser, verifyLinkToken, type PlatformIdentity } from '@/lib/bot-identity';
+import { captureException } from '@sentry/nextjs';
+import { after } from 'next/server';
+import {
+  consumeLinkAccountContext,
+  linkKiloUser,
+  verifyLinkToken,
+  type PlatformIdentity,
+} from '@/lib/bot-identity';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
 import { getPlatformIntegration } from '@/lib/bot/platform-helpers';
+import { processLinkedMessage } from '@/lib/bot/run';
+import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
+import { Message, ThreadImpl, type Thread } from 'chat';
+import type { User } from '@kilocode/db';
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -65,7 +76,8 @@ async function verifyIntegrationAccess(
  *  2. Authenticate the user via NextAuth session (redirect to sign-in if needed).
  *  3. Verify the user belongs to the org that owns the integration.
  *  4. Write the platform identity → Kilo user mapping into Redis.
- *  5. Show a success page.
+ *  5. Re-process the original chat message when the link token has one.
+ *  6. Show a success page.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -75,15 +87,18 @@ export async function GET(request: Request) {
     return errorPage('Bad Request', 'Missing token parameter.', 400);
   }
 
-  const identity = verifyLinkToken(token);
+  await bot.initialize();
+  const linkPayload = await verifyLinkToken(bot.getState(), token);
 
-  if (!identity) {
+  if (!linkPayload) {
     return errorPage(
       'Link Expired',
       'Invalid or expired link. Please go back to your chat and try again.',
       400
     );
   }
+
+  const { contextKey, identity, thread, message } = linkPayload;
 
   // Authenticate — redirect to sign-in if no session, then back here
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -99,9 +114,13 @@ export async function GET(request: Request) {
     return errorPage('Access Denied', access.error, 403);
   }
 
-  await bot.initialize();
-
   await linkKiloUser(bot.getState(), identity, user.id);
+
+  if (await consumeLinkAccountContext(bot.getState(), contextKey)) {
+    after(() =>
+      reprocessLinkedMessage(identity, ThreadImpl.fromJSON(thread), Message.fromJSON(message), user)
+    );
+  }
 
   return new Response(
     `<!DOCTYPE html>
@@ -110,9 +129,40 @@ export async function GET(request: Request) {
 <div style="text-align:center">
   <h1>Account linked</h1>
   <p>Your ${identity.platform} account has been linked to your Kilo account.<br>
-     You can close this tab and @mention Kilo again in your chat.</p>
+     You can close this tab and return to your chat. Kilo is processing your message.</p>
 </div>
 </body></html>`,
     { headers: { 'content-type': 'text/html; charset=utf-8' } }
   );
+}
+
+async function reprocessLinkedMessage(
+  identity: PlatformIdentity,
+  thread: Thread,
+  message: Message,
+  user: User
+): Promise<void> {
+  try {
+    const platformIntegration = await getPlatformIntegration(identity);
+    if (!platformIntegration) return;
+
+    await withBotPlatformAuthContext(platformIntegration, async () => {
+      await processLinkedMessage({
+        thread,
+        message,
+        platformIntegration,
+        user,
+      });
+    });
+  } catch (error) {
+    console.error('[Bot] Failed to reprocess linked message:', error);
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'link-account-reprocess-message' },
+      extra: {
+        threadId: thread.id,
+        messageId: message.id,
+        userId: user.id,
+      },
+    });
+  }
 }

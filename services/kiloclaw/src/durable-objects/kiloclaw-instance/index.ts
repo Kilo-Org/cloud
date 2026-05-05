@@ -104,6 +104,7 @@ import {
   LIFECYCLE_NOTIFICATION_RESET,
   maybeDispatchStartFailurePush,
 } from './lifecycle-push';
+import { runScheduledActionApply } from './scheduled-action-apply';
 import { legacyDoKeysForIdentity } from '../../lib/instance-routing';
 import {
   beginUnexpectedStopRecovery,
@@ -3437,6 +3438,26 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
   }
 
+  /**
+   * Wake the DO and re-arm its alarm so a freshly-scheduled action will
+   * fire on the next reconcile tick. Called by the web's scheduleAction
+   * tRPC right after it persists the parent + stage + target rows.
+   *
+   * Why this is needed: the wedge in `alarm()` queries Postgres for due
+   * targets, but it can only run when `alarm()` actually fires. In
+   * production Cloudflare, alarms with past timestamps fire immediately
+   * (so this method is belt-and-suspenders). In `wrangler dev`, stale
+   * alarm timestamps don't auto-fire — the DO needs a fresh setAlarm
+   * call to get back on the cadence. Calling scheduleAlarm() here sets
+   * a fresh near-future alarm time and unblocks the wedge.
+   */
+  async notifyScheduledActionPending(): Promise<{ ok: true }> {
+    await this.loadState();
+    if (!this.s.status) return { ok: true };
+    await this.scheduleAlarm();
+    return { ok: true };
+  }
+
   private async restartMachineInBackground(): Promise<void> {
     try {
       await this.loadState();
@@ -3607,6 +3628,45 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.sandboxId) {
       this.ctx.waitUntil(
         syncTrackedImageTagToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
+      );
+    }
+
+    // Best-effort scheduled-action apply pass. Queries Postgres for any
+    // pending targets for this instance whose stage time has passed and
+    // whose parent action is still actionable, dispatches per
+    // action_type, and records outcomes. Wrapped in waitUntil so a slow
+    // apply doesn't block reconcile; wrapped in try/catch inside the
+    // helper so Postgres failures never break this alarm.
+    if (this.s.sandboxId) {
+      this.ctx.waitUntil(
+        runScheduledActionApply({
+          env: this.env,
+          state: this.s,
+          restartCurrentInstance: async (imageTag?: string) => {
+            // Call the public restartMachine entry point (not the
+            // internal *InBackground variant). The entry point sets
+            // status='restarting' and triggers the background restart
+            // via waitUntil. Calling the internal variant directly
+            // bypasses the status flip, which causes its own initial
+            // guard ("status is not 'restarting' → abort") to bail
+            // silently and the actual restart never happens.
+            //
+            // imageTag is optional: omit for `scheduled_restart`
+            // (redeploys current tag); pass for `version_change`
+            // (redeploys on the chosen target tag).
+            const result = await this.restartMachine(imageTag ? { imageTag } : undefined);
+            if (!result.success) {
+              throw new Error(result.error ?? 'restartMachine returned failure');
+            }
+          },
+        }).then(
+          () => undefined,
+          err => {
+            doWarn(this.s, 'scheduled-action-apply pass threw', {
+              error: toLoggable(err),
+            });
+          }
+        )
       );
     }
 

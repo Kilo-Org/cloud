@@ -4475,32 +4475,35 @@ export const kiloclaw_email_log = pgTable(
 
 export type KiloClawEmailLog = typeof kiloclaw_email_log.$inferSelect;
 
-// Outbox marker for top-up confirmation emails, keyed by the Stripe payment id
-// (`ch_…` / `in_…` / `pi_…`). `processTopUp` commits the credit_transactions
-// row before firing the email via `after()`. If the process exits between
-// those two steps and Stripe retries the webhook, the credit-transactions
-// unique index dedupes the credit but the email would otherwise be lost.
-// Inserting a marker row on the first successful send — and attempting an
-// insert on every webhook replay — lets a retry observe "marker missing,
-// credit already committed" and recover the email exactly once. The unique
-// index on `stripe_payment_id` is the whole dedupe mechanism.
-export const top_up_email_log = pgTable(
-  'top_up_email_log',
+// Outbox marker for transactional emails that need durable idempotency beyond
+// their triggering side effect. For top-up confirmations, `processTopUp`
+// commits the credit_transactions row before firing the email via `after()`;
+// if the process exits between those steps, a webhook retry can observe that
+// the transactional email marker is missing and recover the email exactly once.
+export const transactional_email_log = pgTable(
+  'transactional_email_log',
   {
     id: uuid()
       .default(sql`gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    stripe_payment_id: text().notNull(),
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id),
+    email_type: text().notNull(),
+    idempotency_key: text().notNull(),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
-  table => [uniqueIndex('UQ_top_up_email_log_stripe_payment_id').on(table.stripe_payment_id)]
+  table => [
+    uniqueIndex('UQ_transactional_email_log_type_idempotency_key').on(
+      table.email_type,
+      table.idempotency_key
+    ),
+    index('IDX_transactional_email_log_user_id').on(table.user_id),
+  ]
 );
 
-export type TopUpEmailLog = typeof top_up_email_log.$inferSelect;
+export type TransactionalEmailLog = typeof transactional_email_log.$inferSelect;
 
 // Bot Request Logs — tracks each message handled by the new bot (src/lib/bot.ts).
 // Rows are created as 'pending' on receipt and updated as processing progresses.

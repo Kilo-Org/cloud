@@ -1,9 +1,9 @@
-import { credit_transactions, top_up_email_log } from '@kilocode/db/schema';
+import { credit_transactions, transactional_email_log } from '@kilocode/db/schema';
 
 import type { User } from '@kilocode/db/schema';
 import { kilocode_users } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { sql, eq } from 'drizzle-orm';
+import { and, sql, eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import Stripe from 'stripe';
 import { after } from 'next/server';
@@ -51,6 +51,7 @@ type ProcessTopUpOptions = {
 };
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const CREDITS_TOP_UP_CONFIRMATION_EMAIL_TYPE = 'credits_top_up_confirmation';
 
 export async function processTopUp(
   user: User,
@@ -97,7 +98,7 @@ export async function processTopUp(
     // is idempotent, but the confirmation email is not guaranteed to have
     // been sent — the original process could have exited between the credit
     // commit and `after(processPostTopUpFreeStuff)`. Attempt to recover the
-    // email via the durable top_up_email_log marker. If a marker already
+    // email via the durable transactional_email_log marker. If a marker already
     // exists the insert collides and no second email is sent.
     if (!skipPostTopUpFreeStuff) {
       await recoverTopUpConfirmationEmailIfMissing({
@@ -146,9 +147,10 @@ export async function processTopUp(
   return true;
 }
 
-// Best-effort at-most-once dedupe via an insert-before-send marker on
-// `top_up_email_log.stripe_payment_id`. Every send attempt — first-attempt
-// and webhook-retry recovery — first inserts a marker row with
+// Best-effort at-most-once dedupe via an insert-before-send marker in
+// `transactional_email_log`. Every send attempt — first-attempt
+// and webhook-retry recovery — first inserts a marker row keyed by
+// (email_type, idempotency_key) with
 // `onConflictDoNothing()`. A rowCount of 0 means an earlier attempt already
 // claimed this payment, so we bail without sending again. If the provider
 // was not configured (e.g. Mailgun env missing in preview/test), the marker
@@ -175,10 +177,11 @@ async function maybeSendTopUpConfirmationEmail(params: {
   const { user, amountInCents, stripeChargeOrInvoiceId, isAutoTopUp } = params;
   try {
     const insertResult = await db
-      .insert(top_up_email_log)
+      .insert(transactional_email_log)
       .values({
-        stripe_payment_id: stripeChargeOrInvoiceId,
         user_id: user.id,
+        email_type: CREDITS_TOP_UP_CONFIRMATION_EMAIL_TYPE,
+        idempotency_key: stripeChargeOrInvoiceId,
       })
       .onConflictDoNothing();
 
@@ -201,7 +204,7 @@ async function maybeSendTopUpConfirmationEmail(params: {
     // is terminal for that address, so retrying would loop forever. Keep the
     // marker so we never try again for this payment.
     if (!sendResult.sent && sendResult.reason === 'provider_not_configured') {
-      await deleteTopUpEmailLog(stripeChargeOrInvoiceId);
+      await deleteTopUpEmailMarker(stripeChargeOrInvoiceId);
     }
   } catch (error) {
     captureException(error, {
@@ -211,7 +214,7 @@ async function maybeSendTopUpConfirmationEmail(params: {
     // Best-effort rollback so a retry can re-attempt — mirrors the pattern in
     // `maybeSendKiloClawSubscriptionStartedEmail`.
     try {
-      await deleteTopUpEmailLog(stripeChargeOrInvoiceId);
+      await deleteTopUpEmailMarker(stripeChargeOrInvoiceId);
     } catch {
       // Leave the marker in place; we prefer missing one email over duplicate sends.
     }
@@ -238,10 +241,15 @@ async function recoverTopUpConfirmationEmailIfMissing(params: {
   }
 }
 
-async function deleteTopUpEmailLog(stripeChargeOrInvoiceId: string): Promise<void> {
+async function deleteTopUpEmailMarker(stripeChargeOrInvoiceId: string): Promise<void> {
   await db
-    .delete(top_up_email_log)
-    .where(eq(top_up_email_log.stripe_payment_id, stripeChargeOrInvoiceId));
+    .delete(transactional_email_log)
+    .where(
+      and(
+        eq(transactional_email_log.email_type, CREDITS_TOP_UP_CONFIRMATION_EMAIL_TYPE),
+        eq(transactional_email_log.idempotency_key, stripeChargeOrInvoiceId)
+      )
+    );
 }
 
 async function resolveStripeReceiptUrl(stripeChargeOrInvoiceId: string): Promise<string | null> {

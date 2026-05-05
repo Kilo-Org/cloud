@@ -1100,9 +1100,9 @@ describe('reconciliation: machine status sync', () => {
       await inst.alarm();
       if (i === SELF_HEAL_THRESHOLD - 1) {
         // 3 = recovery launch + tracked_image_tag Postgres sync + scheduled-action
-        // apply pass (both syncs are always enqueued by alarm() when sandboxId is
-        // set; see kiloclaw-instance/index.ts).
-        expect(waitUntilPromises).toHaveLength(4);
+        // apply pass. instance_type Postgres sync is no longer unconditional —
+        // it now only fires when DO state actually changes (backfill or resize).
+        expect(waitUntilPromises).toHaveLength(3);
       }
     }
 
@@ -1120,8 +1120,10 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    // 3 = tracked_image_tag sync + instance_type sync + scheduled-action apply pass; no recovery launched.
-    expect(waitUntilPromises).toHaveLength(3);
+    // 2 = tracked_image_tag sync + scheduled-action apply pass; no recovery
+    // launched. instance_type Postgres sync no longer fires unconditionally —
+    // only when backfill or resize changes DO state.
+    expect(waitUntilPromises).toHaveLength(2);
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('healthCheckFailCount')).toBe(0);
     expect(storage._store.get('recoveryStartedAt')).toBeUndefined();
@@ -1135,8 +1137,9 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    // 3 = tracked_image_tag sync + instance_type sync + scheduled-action apply pass; no fresh recovery launched.
-    expect(waitUntilPromises).toHaveLength(3);
+    // 2 = tracked_image_tag sync + scheduled-action apply pass; no fresh
+    // recovery launched, no instance_type sync (state unchanged).
+    expect(waitUntilPromises).toHaveLength(2);
   });
 
   it('does not clean up a pending recovery volume while recovery is still in progress', async () => {
@@ -8812,7 +8815,7 @@ describe('getStatus instanceType resolution', () => {
 
 describe('instanceType alarm-driven backfill', () => {
   it('backfills machineSize and instanceType during alarm reconcile when DO state is legacy', async () => {
-    const { instance, storage } = createInstance();
+    const { instance, storage, waitUntilPromises } = createInstance();
     await seedRunning(storage, {
       provider: 'fly',
       flyMachineId: 'machine-1',
@@ -8826,8 +8829,11 @@ describe('instanceType alarm-driven backfill', () => {
       state: 'started',
       config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
     });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
 
     await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
 
     expect(storage._store.get('machineSize')).toEqual({
       cpus: 1,
@@ -8835,10 +8841,16 @@ describe('instanceType alarm-driven backfill', () => {
       cpu_kind: 'performance',
     });
     expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'perf-1-3'
+    );
   });
 
-  it('does nothing when machineSize is already populated', async () => {
-    const { instance, storage } = createInstance();
+  it('does not touch DO state or Postgres when machineSize is already populated', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
     await seedRunning(storage, {
       provider: 'fly',
       flyMachineId: 'machine-1',
@@ -8852,8 +8864,11 @@ describe('instanceType alarm-driven backfill', () => {
       state: 'started',
       config: { guest: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' } },
     });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
 
     await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
 
     expect(storage._store.get('instanceType')).toBe('perf-1-3');
     expect(storage._store.get('machineSize')).toEqual({
@@ -8861,10 +8876,11 @@ describe('instanceType alarm-driven backfill', () => {
       memory_mb: 3072,
       cpu_kind: 'performance',
     });
+    expect(dbModule.syncInstanceType).not.toHaveBeenCalled();
   });
 
-  it('writes custom when the live Fly guest does not match any catalog tier', async () => {
-    const { instance, storage } = createInstance();
+  it('writes custom and syncs Postgres when the live Fly guest does not match any catalog tier', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
     await seedRunning(storage, {
       provider: 'fly',
       flyMachineId: 'machine-1',
@@ -8878,15 +8894,24 @@ describe('instanceType alarm-driven backfill', () => {
       state: 'started',
       config: { guest: { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' } },
     });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
 
     await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
 
     expect(storage._store.get('instanceType')).toBe('custom');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'custom'
+    );
   });
 });
 
 describe('getDebugState live-check dispatch', () => {
-  it('dispatches a Fly live check on getDebugState when running and past the throttle', async () => {
+  it('dispatches a Fly live check on getDebugState when running and past the throttle, and syncs Postgres on backfill', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
     await seedRunning(storage, {
       provider: 'fly',
@@ -8902,6 +8927,8 @@ describe('getDebugState live-check dispatch', () => {
       state: 'started',
       config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
     });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
 
     await instance.getDebugState();
     await Promise.allSettled(waitUntilPromises);
@@ -8911,6 +8938,37 @@ describe('getDebugState live-check dispatch', () => {
       'machine-1'
     );
     expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'perf-1-3'
+    );
+  });
+
+  it('does not sync Postgres on getDebugState when state is already populated (no-op alarm)', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      instanceType: 'perf-1-3',
+      volumeSizeGb: 10,
+      lastLiveCheckAt: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.getDebugState();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(dbModule.syncInstanceType).not.toHaveBeenCalled();
   });
 });
 

@@ -32,7 +32,6 @@ import {
   findVolumeByName,
 } from '../../northflank/client';
 import { northflankResourceNames } from '../../providers/northflank/names';
-import { resolveInstanceTypeLabel } from '@kilocode/kiloclaw-instance-tiers';
 
 type RestoreOpts = {
   /** If the DO has a stored sandboxId, use it for precise lookup. */
@@ -171,13 +170,6 @@ export async function restoreFromPostgres(
         : await recoverFlyProviderState(env, restoredUserId, instance.sandboxId);
     const recoveredAppName = providerState.provider === 'fly' ? providerState.appName : null;
     const restoredInstanceType = InstanceTypeSchema.nullable().parse(instance.instanceType ?? null);
-    console.log('[instance-tier-debug] restoreFromPostgres restoring tier', {
-      userId: restoredUserId,
-      sandboxId: instance.sandboxId,
-      providerFromDb: instance.provider,
-      providerEffective: provider,
-      restoredInstanceType,
-    });
 
     await ctx.storage.put(
       storageUpdate({
@@ -294,34 +286,32 @@ export async function syncTrackedImageTagToPostgresHelper(
   }
 }
 
+/**
+ * Best-effort sync of `state.instanceType` to the `kiloclaw_instances` row.
+ *
+ * Only call this from sites that have just *changed* the DO's `instanceType`
+ * (resize, alarm-driven backfill from live Fly guest). Do not call from the
+ * alarm tick unconditionally — that paid a Hyperdrive round trip per running
+ * instance per tick for a SQL no-op once the column was populated.
+ *
+ * No-op when:
+ * - HYPERDRIVE is not configured (dev/test),
+ * - `instanceType` is null (we don't have anything authoritative to write),
+ * - the column already matches (`syncInstanceType` uses `IS DISTINCT FROM`).
+ */
 export async function syncInstanceTypeToPostgresHelper(
   env: KiloClawEnv,
   state: InstanceMutableState,
   userId: string,
-  sandboxId: string,
-  persist?: (patch: { instanceType: InstanceMutableState['instanceType'] }) => Promise<void>
+  sandboxId: string
 ): Promise<void> {
   const connectionString = env.HYPERDRIVE?.connectionString;
   if (!connectionString) return;
+  if (state.instanceType === null) return;
 
   try {
-    let instanceType = state.instanceType;
-    if (instanceType === null) {
-      if (state.machineSize === null) return;
-      instanceType = resolveInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
-      console.log('[instance-tier-debug] syncInstanceTypeToPostgresHelper inferring tier', {
-        userId,
-        sandboxId,
-        provider: state.provider,
-        machineSize: state.machineSize,
-        volumeSizeGb: state.volumeSizeGb,
-        resolvedInstanceType: instanceType,
-      });
-      state.instanceType = instanceType;
-      await persist?.({ instanceType });
-    }
     const db = getWorkerDb(connectionString);
-    await syncInstanceType(db, userId, sandboxId, instanceType);
+    await syncInstanceType(db, userId, sandboxId, state.instanceType);
   } catch (err) {
     doWarn(state, 'Failed to sync instance_type to Postgres', {
       error: toLoggable(err),

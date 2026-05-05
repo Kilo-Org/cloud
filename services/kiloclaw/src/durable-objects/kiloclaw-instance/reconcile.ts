@@ -35,6 +35,7 @@ import {
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
 import type { ReconcileContext } from './log';
 import { ensureVolume, staleProvisionAgeMs } from './fly-machines';
+import { syncInstanceTypeToPostgresHelper } from './postgres';
 import { mintFreshApiKey } from './config';
 import * as gateway from './gateway';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
@@ -118,6 +119,7 @@ export async function reconcileWithFly(
   const { reconciled: machineReconciled, result } = await reconcileMachine(
     flyConfig,
     ctx,
+    env,
     state,
     rctx
   );
@@ -744,6 +746,7 @@ async function reconcileVolume(
 async function reconcileMachine(
   flyConfig: FlyClientConfig,
   ctx: DurableObjectState,
+  env: KiloClawEnv,
   state: InstanceMutableState,
   rctx: ReconcileContext
 ): Promise<{ reconciled: boolean; result: ReconcileWithFlyResult }> {
@@ -753,7 +756,7 @@ async function reconcileMachine(
 
   try {
     const machine = await fly.getMachine(flyConfig, state.flyMachineId);
-    await backfillMachineSizeFromFlyConfig(ctx, state, machine, 'reconcile-alarm');
+    await backfillMachineSizeFromFlyConfig(ctx, env, state, machine, 'reconcile-alarm');
     const result = await syncStatusWithFly(ctx, state, machine.state, rctx);
     await reconcileMachineMount(flyConfig, ctx, state, machine, rctx);
     return { reconciled: true, result };
@@ -774,9 +777,16 @@ async function reconcileMachine(
  * reconcile, the user-facing live-check, future restart paths. Keeps the
  * "we observed live hardware → write it back" logic in one place so callers
  * don't drift.
+ *
+ * When the backfill actually writes new state, fires a fire-and-forget
+ * Postgres sync via `ctx.waitUntil` so the denormalized
+ * `kiloclaw_instances.instance_type` column catches up immediately. The
+ * alarm path no longer syncs Postgres unconditionally — sync happens only
+ * when DO state actually changes.
  */
 async function backfillMachineSizeFromFlyConfig(
   ctx: DurableObjectState,
+  env: KiloClawEnv,
   state: InstanceMutableState,
   machine: { config?: { guest?: { cpus: number; memory_mb: number; cpu_kind?: string } } },
   source: string
@@ -803,6 +813,9 @@ async function backfillMachineSizeFromFlyConfig(
   await ctx.storage.put(
     storageUpdate({ machineSize: state.machineSize, instanceType: state.instanceType })
   );
+  if (state.sandboxId && state.userId) {
+    ctx.waitUntil(syncInstanceTypeToPostgresHelper(env, state, state.userId, state.sandboxId));
+  }
 }
 
 /**
@@ -1198,7 +1211,7 @@ export async function syncStatusFromLiveCheck(
     const flyConfig = { apiToken: env.FLY_API_TOKEN, appName };
 
     const machine = await fly.getMachine(flyConfig, state.flyMachineId);
-    await backfillMachineSizeFromFlyConfig(ctx, state, machine, 'live-check');
+    await backfillMachineSizeFromFlyConfig(ctx, env, state, machine, 'live-check');
 
     if (machine.state === 'started') {
       state.healthCheckFailCount = 0;

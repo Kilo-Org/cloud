@@ -894,17 +894,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     this.s.machineSize = nextMachineSize;
     this.s.instanceType = instanceType;
     this.s.volumeSizeGb = nextVolumeSizeGb;
-    console.log('[instance-tier-debug] provision persisting tier', {
-      userId,
-      sandboxId,
-      provider: this.s.provider,
-      isNew,
-      configInstanceType: config.instanceType,
-      inferredInstanceType,
-      finalInstanceType: instanceType,
-      machineSize: nextMachineSize,
-      volumeSizeGb: nextVolumeSizeGb,
-    });
     if (isNew) {
       this.s.provisionedAt = Date.now();
       this.s.lastStartedAt = null;
@@ -3459,14 +3448,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
           const { cpus, memory_mb, cpu_kind } = machine.config.guest;
           this.s.machineSize = { cpus, memory_mb, cpu_kind };
           this.s.instanceType = resolveInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
-          console.log('[instance-tier-debug] restartMachine backfill', {
-            userId: this.s.userId,
-            sandboxId: this.s.sandboxId,
-            provider: this.s.provider,
-            machineSize: this.s.machineSize,
-            volumeSizeGb: this.s.volumeSizeGb,
-            resolvedInstanceType: this.s.instanceType,
-          });
           await this.persist({
             machineSize: this.s.machineSize,
             instanceType: this.s.instanceType,
@@ -3660,11 +3641,6 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.sandboxId) {
       this.ctx.waitUntil(
         syncTrackedImageTagToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
-      );
-      this.ctx.waitUntil(
-        syncInstanceTypeToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId, patch =>
-          this.persist(patch)
-        )
       );
     }
 

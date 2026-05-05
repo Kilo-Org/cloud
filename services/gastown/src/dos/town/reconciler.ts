@@ -289,6 +289,17 @@ export function applyEvent(
         console.warn(`${LOG} applyEvent: bead_cancelled missing bead_id`);
         return;
       }
+      // Tolerate the bead having been deleted after the event was enqueued.
+      // Without this guard updateBeadStatus throws `Bead <id> not found`,
+      // the drain loop can't mark the event processed, and the error
+      // recurs on every alarm tick forever.
+      const existing = beadOps.getBead(sql, event.bead_id);
+      if (!existing) {
+        console.warn(
+          `${LOG} applyEvent: bead_cancelled target bead ${event.bead_id} no longer exists — skipping`
+        );
+        return;
+      }
       const cancelStatus =
         payload.cancel_status === 'closed' || payload.cancel_status === 'failed'
           ? payload.cancel_status

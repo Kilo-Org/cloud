@@ -1,14 +1,18 @@
 import { useState } from 'react';
-import { Platform, Pressable, View } from 'react-native';
+import { Linking, Platform, Pressable, View } from 'react-native';
 import { ShieldCheck } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 
 import { Text } from '@/components/ui/text';
 import { KiloPassSubscriptionSheet } from '@/components/kilo-pass/kilo-pass-subscription-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { WEB_BASE_URL } from '@/lib/config';
 import { useTRPC } from '@/lib/trpc';
+import { getKiloPassSubscriptionCardState } from '@/lib/kilo-pass/subscription-card-state';
 import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
 import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+
+const KILO_PASS_MANAGE_URL = `${WEB_BASE_URL}/subscriptions/kilo-pass`;
 
 export function KiloPassSubscriptionCard() {
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -23,16 +27,17 @@ export function KiloPassSubscriptionCard() {
   }
 
   const subscription = stateQuery.data?.subscription;
-  const title = subscription ? 'Kilo Pass active' : 'Kilo Pass';
-  const description = subscription
-    ? `$${subscription.currentPeriodBaseCreditsUsd.toFixed(0)} monthly credits`
-    : 'Monthly credits with bonus progress';
+  const cardState = getKiloPassSubscriptionCardState(subscription);
 
   return (
     <>
       <Pressable
         className="rounded-lg border border-border bg-card p-3 active:opacity-80"
         onPress={() => {
+          if (cardState.action === 'open-web-management') {
+            void Linking.openURL(KILO_PASS_MANAGE_URL);
+            return;
+          }
           setSheetVisible(true);
         }}
       >
@@ -41,12 +46,10 @@ export function KiloPassSubscriptionCard() {
             <ShieldCheck size={19} color={colors.primary} />
           </View>
           <View className="flex-1">
-            <Text className="font-semibold">{title}</Text>
-            <Text className="text-xs text-muted-foreground">{description}</Text>
+            <Text className="font-semibold">{cardState.title}</Text>
+            <Text className="text-xs text-muted-foreground">{cardState.description}</Text>
           </View>
-          <Text className="text-xs font-medium text-primary">
-            {subscription ? 'Manage' : 'Subscribe'}
-          </Text>
+          <Text className="text-xs font-medium text-primary">{cardState.actionLabel}</Text>
         </View>
       </Pressable>
 

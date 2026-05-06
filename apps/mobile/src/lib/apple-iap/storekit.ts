@@ -1,4 +1,10 @@
-import { type Purchase } from 'expo-iap';
+import {
+  fetchProducts,
+  finishTransaction,
+  initConnection,
+  type Purchase,
+  requestPurchase,
+} from 'expo-iap';
 
 export type StoreKitProduct = {
   id: string;
@@ -13,9 +19,8 @@ export type StoreKitPurchaseResult = {
 };
 
 export async function fetchStoreKitProducts(productIds: string[]): Promise<StoreKitProduct[]> {
-  const iap = await import('expo-iap');
-  await iap.initConnection();
-  const products = await iap.fetchProducts({ skus: productIds, type: 'in-app' });
+  await initConnection();
+  const products = await fetchProducts({ skus: productIds, type: 'in-app' });
   return (products ?? []).map(product => ({
     id: product.id,
     title: product.title,
@@ -24,9 +29,8 @@ export async function fetchStoreKitProducts(productIds: string[]): Promise<Store
 }
 
 export async function purchaseStoreKitProduct(productId: string): Promise<StoreKitPurchaseResult> {
-  const iap = await import('expo-iap');
-  await iap.initConnection();
-  const purchaseResult = await iap.requestPurchase({
+  await initConnection();
+  const purchaseResult = await requestPurchase({
     request: { apple: { sku: productId } },
     type: 'in-app',
   });
@@ -43,6 +47,5 @@ export async function purchaseStoreKitProduct(productId: string): Promise<StoreK
 }
 
 export async function finishStoreKitTransaction(nativeTransaction: Purchase): Promise<void> {
-  const iap = await import('expo-iap');
-  await iap.finishTransaction({ purchase: nativeTransaction, isConsumable: true });
+  await finishTransaction({ purchase: nativeTransaction, isConsumable: true });
 }

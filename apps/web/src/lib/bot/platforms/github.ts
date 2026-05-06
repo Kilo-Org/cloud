@@ -1,6 +1,5 @@
 import { BOT_CONTEXT_MESSAGE_LIMIT } from '@/lib/bot/constants';
 import { createGitHubLinkToken } from '@/lib/bot/github-link-token';
-import { getGitHubRepositoryReference, isGitHubRepositoryLinked } from '@/lib/bot/platform-helpers';
 import {
   formatTriggerMessage,
   formatUserMessage,
@@ -11,14 +10,73 @@ import type { BotPlatform } from '@/lib/bot/platforms/types';
 import { APP_URL } from '@/lib/constants';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import type { GitHubAdapter } from '@chat-adapter/github';
+import type { GitHubAdapter, GitHubRawMessage } from '@chat-adapter/github';
 import { Octokit } from '@octokit/rest';
+import type { PlatformIntegration } from '@kilocode/db';
+import type { Message, Thread } from 'chat';
 
 type GitHubInstallationLookup = Pick<GitHubAdapter, 'getInstallationId'>;
 
 const GITHUB_LINK_PATH = '/github/link';
 const MAX_GITHUB_BODY_LENGTH = 4000;
 const MAX_GITHUB_COMMENT_LENGTH = 1200;
+
+type GitHubRepositoryReference = {
+  id: number | null;
+  fullName: string | null;
+};
+
+function parseGitHubRepositoryFullName(id: string | undefined): string | null {
+  if (!id) return null;
+
+  const match = id.match(/^github:([^/]+\/[^:]+)(?::|$)/);
+  if (!match) return null;
+
+  return match[1] ?? null;
+}
+
+function getGitHubRepositoryReferenceFromRaw(raw: unknown): GitHubRepositoryReference {
+  const repository = (raw as Partial<GitHubRawMessage>).repository;
+
+  return {
+    id: repository?.id ?? null,
+    fullName: repository?.full_name ?? null,
+  };
+}
+
+export function getGitHubRepositoryReference(
+  thread: Thread,
+  message: Message
+): GitHubRepositoryReference {
+  const rawReference = getGitHubRepositoryReferenceFromRaw(message.raw);
+  return {
+    id: rawReference.id,
+    fullName:
+      rawReference.fullName ??
+      parseGitHubRepositoryFullName(thread.id) ??
+      parseGitHubRepositoryFullName(thread.channelId),
+  };
+}
+
+export function isGitHubRepositoryLinked(
+  integration: PlatformIntegration,
+  repository: GitHubRepositoryReference
+): boolean {
+  if (repository.id === null && repository.fullName === null) return false;
+
+  if (integration.repository_access === 'all') return true;
+  if (integration.repository_access !== 'selected') return false;
+
+  const repositories = integration.repositories ?? [];
+  return repositories.some(linkedRepository => {
+    if (repository.id !== null && linkedRepository.id === repository.id) return true;
+
+    return (
+      repository.fullName !== null &&
+      linkedRepository.full_name.toLowerCase() === repository.fullName.toLowerCase()
+    );
+  });
+}
 
 type GitHubThreadCoordinates = {
   owner: string;

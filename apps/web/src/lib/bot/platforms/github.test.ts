@@ -38,7 +38,11 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
 import type { Message, Thread } from 'chat';
 import type { PlatformIntegration } from '@kilocode/db';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { createGitHubBotPlatform } from './github';
+import {
+  createGitHubBotPlatform,
+  getGitHubRepositoryReference,
+  isGitHubRepositoryLinked,
+} from './github';
 
 const githubPlatform = createGitHubBotPlatform({
   getInstallationId: jest.fn(),
@@ -153,6 +157,105 @@ describe('createGitHubBotPlatform.isEnabledForBot', () => {
     expect(githubPlatform.isEnabledForBot(integrationWithMetadata({ bot_enabled: false }))).toBe(
       false
     );
+  });
+});
+
+describe('getGitHubRepositoryReference', () => {
+  it('uses GitHub webhook repository metadata when available', () => {
+    const reference = getGitHubRepositoryReference(
+      {
+        adapter: { name: PLATFORM.GITHUB },
+        channelId: 'github:acme/fallback',
+        id: 'github:acme/fallback:42',
+      } as Thread,
+      {
+        raw: {
+          repository: {
+            id: 123,
+            full_name: 'acme/widgets',
+          },
+        },
+      } as Message
+    );
+
+    expect(reference).toEqual({ id: 123, fullName: 'acme/widgets' });
+  });
+
+  it('falls back to the repository encoded in the GitHub thread id', () => {
+    const reference = getGitHubRepositoryReference(
+      {
+        adapter: { name: PLATFORM.GITHUB },
+        channelId: 'github:acme/widgets',
+        id: 'github:acme/widgets:issue:42',
+      } as Thread,
+      { raw: {} } as Message
+    );
+
+    expect(reference).toEqual({ id: null, fullName: 'acme/widgets' });
+  });
+
+  it('falls back to the repository encoded in the GitHub channel id', () => {
+    const reference = getGitHubRepositoryReference(
+      {
+        adapter: { name: PLATFORM.GITHUB },
+        channelId: 'github:acme/widgets',
+        id: 'github:malformed',
+      } as Thread,
+      { raw: {} } as Message
+    );
+
+    expect(reference).toEqual({ id: null, fullName: 'acme/widgets' });
+  });
+});
+
+describe('isGitHubRepositoryLinked', () => {
+  function integrationWithRepositoryAccess(
+    repositoryAccess: PlatformIntegration['repository_access'],
+    repositories: PlatformIntegration['repositories']
+  ): PlatformIntegration {
+    return { repository_access: repositoryAccess, repositories } as PlatformIntegration;
+  }
+
+  const selectedIntegration = integrationWithRepositoryAccess('selected', [
+    { id: 123, name: 'widgets', full_name: 'acme/widgets', private: true },
+  ]);
+
+  it('allows all repositories when the integration has all repository access', () => {
+    const integration = integrationWithRepositoryAccess('all', null);
+
+    expect(isGitHubRepositoryLinked(integration, { id: null, fullName: 'acme/widgets' })).toBe(
+      true
+    );
+  });
+
+  it('allows selected repositories by id', () => {
+    expect(isGitHubRepositoryLinked(selectedIntegration, { id: 123, fullName: null })).toBe(true);
+  });
+
+  it('allows selected repositories by case-insensitive full name', () => {
+    expect(
+      isGitHubRepositoryLinked(selectedIntegration, { id: null, fullName: 'ACME/Widgets' })
+    ).toBe(true);
+  });
+
+  it('blocks repositories not selected for the installation', () => {
+    expect(isGitHubRepositoryLinked(selectedIntegration, { id: 456, fullName: 'acme/other' })).toBe(
+      false
+    );
+  });
+
+  it('blocks when repository access has not been synced yet', () => {
+    const integration = integrationWithRepositoryAccess(null, null);
+
+    expect(isGitHubRepositoryLinked(integration, { id: 123, fullName: 'acme/widgets' })).toBe(
+      false
+    );
+  });
+
+  it('blocks when the repository cannot be identified', () => {
+    const integration = integrationWithRepositoryAccess('all', null);
+
+    expect(isGitHubRepositoryLinked(integration, { id: null, fullName: null })).toBe(false);
   });
 });
 

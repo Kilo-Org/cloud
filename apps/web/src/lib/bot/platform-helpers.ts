@@ -2,46 +2,7 @@ import { type PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
 import { eq, and, sql } from 'drizzle-orm';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
-import type { Message, Thread } from 'chat';
-import type { GitHubRawMessage } from '@chat-adapter/github';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
-
-export type GitHubRepositoryReference = {
-  id: number | null;
-  fullName: string | null;
-};
-
-function parseGitHubRepositoryFullName(id: string | undefined): string | null {
-  if (!id) return null;
-
-  const match = id.match(/^github:([^/]+\/[^:]+)(?::|$)/);
-  if (!match) return null;
-
-  return match[1] ?? null;
-}
-
-function getGitHubRepositoryReferenceFromRaw(raw: unknown): GitHubRepositoryReference {
-  const repository = (raw as Partial<GitHubRawMessage>).repository;
-
-  return {
-    id: repository?.id ?? null,
-    fullName: repository?.full_name ?? null,
-  };
-}
-
-export function getGitHubRepositoryReference(
-  thread: Thread,
-  message: Message
-): GitHubRepositoryReference {
-  const rawReference = getGitHubRepositoryReferenceFromRaw(message.raw);
-  return {
-    id: rawReference.id,
-    fullName:
-      rawReference.fullName ??
-      parseGitHubRepositoryFullName(thread.id) ??
-      parseGitHubRepositoryFullName(thread.channelId),
-  };
-}
 
 /**
  * Look up the platform integration row for a given identity.
@@ -109,24 +70,4 @@ export async function getPlatformIntegrationByBotUserId(
     .limit(1);
 
   return integration ?? null;
-}
-
-export function isGitHubRepositoryLinked(
-  integration: PlatformIntegration,
-  repository: GitHubRepositoryReference
-): boolean {
-  if (repository.id === null && repository.fullName === null) return false;
-
-  if (integration.repository_access === 'all') return true;
-  if (integration.repository_access !== 'selected') return false;
-
-  const repositories = integration.repositories ?? [];
-  return repositories.some(linkedRepository => {
-    if (repository.id !== null && linkedRepository.id === repository.id) return true;
-
-    return (
-      repository.fullName !== null &&
-      linkedRepository.full_name.toLowerCase() === repository.fullName.toLowerCase()
-    );
-  });
 }

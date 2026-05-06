@@ -3,6 +3,7 @@ import { db } from '@/lib/drizzle';
 import { eq, and, sql } from 'drizzle-orm';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
+import type { GitHubRawMessage } from '@chat-adapter/github';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { type SlackEvent } from '@chat-adapter/slack';
 
@@ -12,20 +13,6 @@ export type GitHubRepositoryReference = {
   id: number | null;
   fullName: string | null;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function getStringProperty(value: Record<string, unknown>, key: string): string | null {
-  const property = value[key];
-  return typeof property === 'string' && property.length > 0 ? property : null;
-}
-
-function getNumberProperty(value: Record<string, unknown>, key: string): number | null {
-  const property = value[key];
-  return typeof property === 'number' && Number.isFinite(property) ? property : null;
-}
 
 function parseGitHubRepositoryFullName(id: string | undefined): string | null {
   if (!id) return null;
@@ -37,14 +24,11 @@ function parseGitHubRepositoryFullName(id: string | undefined): string | null {
 }
 
 function getGitHubRepositoryReferenceFromRaw(raw: unknown): GitHubRepositoryReference {
-  if (!isRecord(raw)) return { id: null, fullName: null };
-
-  const repository = raw.repository;
-  if (!isRecord(repository)) return { id: null, fullName: null };
+  const repository = (raw as Partial<GitHubRawMessage>).repository;
 
   return {
-    id: getNumberProperty(repository, 'id'),
-    fullName: getStringProperty(repository, 'full_name'),
+    id: repository?.id ?? null,
+    fullName: repository?.full_name ?? null,
   };
 }
 

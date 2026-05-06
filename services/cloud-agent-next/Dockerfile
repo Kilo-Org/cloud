@@ -6,12 +6,9 @@ ARG VCS_REF=""
 ARG KILOCODE_CLI_VERSION="7.1.23"
 
 # Install latest stable git + git-lfs from the git-core PPA, GitHub CLI, and supporting tools.
-# The default Ubuntu git (2.34.1 on 22.04) does not support `merge.conflictStyle=zdiff3`,
-# which Cloud Agent Next relies on for clearer merge conflict markers. The git-core PPA
-# ships the latest stable git (>= 2.45 at time of writing), which adds zdiff3 support.
-# git-lfs from the same PPA is kept in lockstep with git, and `git lfs install --system`
-# enables LFS smudge/clean filters globally so cloned repos with LFS objects work out of
-# the box.
+# The default Ubuntu git (2.34.1 on 22.04) is outdated; the git-core PPA ships the latest
+# stable release. git-lfs is installed from the same PPA so it stays in lockstep with git,
+# and `git lfs install --system` enables LFS smudge/clean filters globally.
 RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
@@ -36,16 +33,6 @@ RUN set -eux; \
 		jq \
 		openssh-client; \
 	git lfs install --system --skip-repo; \
-	git --version; \
-	git_version="$(git --version | awk '{print $3}')"; \
-	major="$(echo "$git_version" | cut -d. -f1)"; \
-	minor="$(echo "$git_version" | cut -d. -f2)"; \
-	if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 45 ]; }; then \
-		echo "ERROR: git $git_version is older than required 2.45 (zdiff3 support)" >&2; \
-		exit 1; \
-	fi; \
-	git config --system merge.conflictStyle zdiff3; \
-	git config --system --get merge.conflictStyle | grep -q '^zdiff3$'; \
 	apt-get clean; \
 	rm -rf /var/lib/apt/lists/*
 

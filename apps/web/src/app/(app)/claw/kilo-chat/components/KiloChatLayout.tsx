@@ -197,6 +197,11 @@ export function KiloChatLayout({
   // conversation so they never sit on a blank index page. Reset the guard
   // when sandboxId changes so switching between instances (e.g. between
   // organizations) re-evaluates without remounting.
+  //
+  // The ref intentionally stays set even after a failed mutation: if the
+  // server-side create fails, retrying via this effect would loop on
+  // persistent errors. The manual "+ New conversation" button in
+  // ConversationList is the recovery path.
   const hasAutoCreatedConversation = useRef(false);
   useEffect(() => {
     hasAutoCreatedConversation.current = false;
@@ -209,7 +214,7 @@ export function KiloChatLayout({
       !sandboxId ||
       createConversation.isPending ||
       !data ||
-      (data.conversations?.length ?? 0) > 0
+      data.conversations.length > 0
     ) {
       return;
     }

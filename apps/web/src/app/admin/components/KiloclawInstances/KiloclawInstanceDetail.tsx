@@ -2590,25 +2590,29 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               <Alert className="mb-4 border-amber-500/30 bg-amber-500/10">
                 <Shield className="h-4 w-4 text-amber-500" />
                 <AlertDescription className="text-amber-700 dark:text-amber-300">
-                  <span className="font-medium">
-                    Admin size override: {data.workerStatus.adminMachineSizeOverride.cpus}×{' '}
-                    {data.workerStatus.adminMachineSizeOverride.cpu_kind ?? 'shared'},{' '}
-                    {data.workerStatus.adminMachineSizeOverride.memory_mb}MB
-                  </span>
-                  {data.workerStatus.adminMachineSizeOverrideMetadata && (
-                    <>
-                      {' · '}
-                      <strong>
-                        {data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail}
-                      </strong>
-                      {', '}
-                      {formatEpochRelativeTime(
-                        data.workerStatus.adminMachineSizeOverrideMetadata.setAt
-                      )}
-                      {' — '}
-                      <em>{data.workerStatus.adminMachineSizeOverrideMetadata.reason}</em>
-                    </>
-                  )}
+                  {/* Wrap in a single <p> so AlertDescription's grid layout
+                      doesn't put each inline child on its own row. */}
+                  <p>
+                    <span className="font-medium">
+                      Admin size override: {data.workerStatus.adminMachineSizeOverride.cpus}×{' '}
+                      {data.workerStatus.adminMachineSizeOverride.cpu_kind ?? 'shared'},{' '}
+                      {data.workerStatus.adminMachineSizeOverride.memory_mb}MB
+                    </span>
+                    {data.workerStatus.adminMachineSizeOverrideMetadata && (
+                      <>
+                        {' · '}
+                        <strong>
+                          {data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail}
+                        </strong>
+                        {', '}
+                        {formatEpochRelativeTime(
+                          data.workerStatus.adminMachineSizeOverrideMetadata.setAt
+                        )}
+                        {' — '}
+                        <em>{data.workerStatus.adminMachineSizeOverrideMetadata.reason}</em>
+                      </>
+                    )}
+                  </p>
                 </AlertDescription>
               </Alert>
             )}

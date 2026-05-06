@@ -22,7 +22,11 @@ import {
   selectRecoveryCandidate,
   volumeIdFromMachine,
 } from '../machine-recovery';
-import { METADATA_KEY_USER_ID, METADATA_KEY_SANDBOX_ID } from '../machine-config';
+import {
+  METADATA_KEY_USER_ID,
+  METADATA_KEY_SANDBOX_ID,
+  parseMachineSizeFromFlyGuest,
+} from '../machine-config';
 import type { InstanceMutableState, DestroyResult } from './types';
 import { getAppKey } from './types';
 import {
@@ -798,12 +802,15 @@ async function backfillMachineSizeFromFlyConfig(
   if (state.adminMachineSizeOverride !== null) return;
   const guest = machine.config?.guest;
   if (!guest) return;
-  const { cpus, memory_mb, cpu_kind } = guest;
-  state.machineSize = {
-    cpus,
-    memory_mb,
-    cpu_kind: cpu_kind as 'shared' | 'performance' | undefined,
-  };
+  const parsedSize = parseMachineSizeFromFlyGuest(guest);
+  if (!parsedSize) {
+    doWarn(state, 'Skipping machineSize backfill: live Fly guest failed schema validation', {
+      source,
+      guest,
+    });
+    return;
+  }
+  state.machineSize = parsedSize;
   state.instanceType = resolveInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
   console.log('[instance-tier-debug] backfill from Fly guest', {
     source,

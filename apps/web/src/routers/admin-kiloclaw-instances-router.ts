@@ -50,8 +50,10 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { InstanceTierKeySchema } from '@kilocode/kiloclaw-instance-tiers';
 import {
+  AdminSizeOverridePayloadSchema,
   AdminSizeOverridePresetSchema,
   presetToMachineSize,
+  type AdminSizeOverridePayload,
 } from '@/lib/kiloclaw/admin-size-override';
 import { alias } from 'drizzle-orm/pg-core';
 import {
@@ -74,48 +76,22 @@ const initiatingAdminUsers = alias(kilocode_users, 'initiating_admin_users');
 const pinnedByUsers = alias(kilocode_users, 'pinned_by_users');
 
 /**
- * Validate and narrow the JSONB `admin_size_override` column into the
- * row-level shape exposed by the admin tRPC. Bad payloads return null
- * (treated as "no override") rather than crashing the list query.
+ * Validate the JSONB `admin_size_override` column via the shared Zod
+ * schema. Bad payloads return null and emit a warn so DO/Postgres
+ * divergence surfaces (the DO is the only writer; a malformed payload
+ * means schema drift or a manually-edited row).
  */
 function parseAdminSizeOverride(value: unknown): AdminSizeOverrideRow | null {
   if (value === null || value === undefined) return null;
-  if (typeof value !== 'object') {
-    console.warn(
-      '[admin-kiloclaw] Dropping malformed admin_size_override payload (not an object)',
-      { value }
-    );
+  const parsed = AdminSizeOverridePayloadSchema.safeParse(value);
+  if (!parsed.success) {
+    console.warn('[admin-kiloclaw] Dropping malformed admin_size_override payload', {
+      value,
+      issues: parsed.error.issues,
+    });
     return null;
   }
-  const v = value as Record<string, unknown>;
-  const size = v.size as Record<string, unknown> | undefined;
-  if (
-    !size ||
-    typeof size.cpus !== 'number' ||
-    typeof size.memory_mb !== 'number' ||
-    typeof v.reason !== 'string' ||
-    typeof v.actorId !== 'string' ||
-    typeof v.actorEmail !== 'string' ||
-    typeof v.setAt !== 'number'
-  ) {
-    console.warn(
-      '[admin-kiloclaw] Dropping malformed admin_size_override payload (schema mismatch)',
-      { value }
-    );
-    return null;
-  }
-  const cpuKind = size.cpu_kind;
-  return {
-    size: {
-      cpus: size.cpus,
-      memory_mb: size.memory_mb,
-      ...(cpuKind === 'shared' || cpuKind === 'performance' ? { cpu_kind: cpuKind } : {}),
-    },
-    reason: v.reason,
-    actorId: v.actorId,
-    actorEmail: v.actorEmail,
-    setAt: v.setAt,
-  };
+  return parsed.data;
 }
 
 /**
@@ -417,13 +393,11 @@ export type AdminKiloclawInstance = {
   admin_size_override: AdminSizeOverrideRow | null;
 };
 
-export type AdminSizeOverrideRow = {
-  size: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' };
-  reason: string;
-  actorId: string;
-  actorEmail: string;
-  setAt: number;
-};
+// Re-export the shared payload as the row type so the router and the lib
+// share a single canonical schema. The shape is whatever
+// `AdminSizeOverridePayloadSchema` enforces (validated at the JSONB column
+// boundary by `parseAdminSizeOverride`).
+export type AdminSizeOverrideRow = AdminSizeOverridePayload;
 
 export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
   inbound_email_address: string | null;
@@ -3051,6 +3025,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       );
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
         const client = new KiloClawInternalClient();
         const result = await client.resizeMachine(
           input.userId,
@@ -3104,6 +3079,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       );
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
         const size = presetToMachineSize(input.preset);
         const client = new KiloClawInternalClient();
         const result = await client.setAdminMachineSizeOverride(
@@ -3157,6 +3133,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       );
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
         const client = new KiloClawInternalClient();
         const result = await client.clearAdminMachineSizeOverride(
           input.userId,

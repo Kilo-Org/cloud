@@ -885,10 +885,18 @@ platform.post('/provision', async c => {
   if (requestedInstanceType && !isOfferedTier(requestedInstanceType)) {
     return c.json({ error: 'instanceType must be an offered tier' }, 400);
   }
-  const instanceType = requestedInstanceType ?? DEFAULT_INSTANCE_TIER;
   const provisionedInstanceId = instanceId ?? crypto.randomUUID();
   const shouldInsertInstanceRecord = !instanceId;
   const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
+  // Only default to the catalog tier on FRESH inserts. On re-provision (config
+  // updates with an existing instanceId), pass `undefined` so the DO's
+  // `inferredInstanceType` path preserves existing tier / machineSize /
+  // volumeSizeGb. `provision()` is overloaded as the entrypoint for both
+  // fresh-create and config-update flows; defaulting unconditionally would
+  // silently overwrite custom (e.g. extend-volume) and legacy tiers on the
+  // next config change.
+  const instanceType =
+    requestedInstanceType ?? (shouldInsertInstanceRecord ? DEFAULT_INSTANCE_TIER : undefined);
   const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionRoute = '/api/platform/provision';
   const provisionStartedAt = performance.now();
@@ -965,7 +973,11 @@ platform.post('/provision', async c => {
         sandboxId: provision.sandboxId,
         orgId: orgId ?? null,
         provider: selectedProvider ?? 'fly',
-        instanceType,
+        // Inside this branch `shouldInsertInstanceRecord` is true, so the
+        // worker-side tier default has already been applied to `instanceType`
+        // — but TS can't narrow `string | undefined` from the broader scope.
+        // Re-derive locally so the helper signature stays `string`.
+        instanceType: requestedInstanceType ?? DEFAULT_INSTANCE_TIER,
       });
       writeEvent(c.env, {
         event: 'instance.record_inserted',

@@ -19,6 +19,7 @@ import {
 import {
   effectiveMachineSize,
   guestFromSize,
+  parseMachineSizeFromFlyGuest,
   volumeNameFromSandboxId,
   METADATA_KEY_SANDBOX_ID,
 } from '../machine-config';
@@ -326,17 +327,24 @@ export async function startExistingMachine(
       state.adminMachineSizeOverride === null &&
       machine.config?.guest
     ) {
-      const { cpus, memory_mb, cpu_kind } = machine.config.guest;
-      machineSizePatch = { cpus, memory_mb, cpu_kind };
-      const instanceTypePatch = resolveInstanceTypeLabel(machineSizePatch, state.volumeSizeGb);
-      machineConfig = { ...machineConfig, guest: guestFromSize(machineSizePatch) };
-      await persistProviderResult({
-        providerState,
-        corePatch: {
-          machineSize: machineSizePatch,
-          instanceType: instanceTypePatch,
-        },
-      });
+      const parsedSize = parseMachineSizeFromFlyGuest(machine.config.guest);
+      if (parsedSize) {
+        machineSizePatch = parsedSize;
+        const instanceTypePatch = resolveInstanceTypeLabel(machineSizePatch, state.volumeSizeGb);
+        machineConfig = { ...machineConfig, guest: guestFromSize(machineSizePatch) };
+        await persistProviderResult({
+          providerState,
+          corePatch: {
+            machineSize: machineSizePatch,
+            instanceType: instanceTypePatch,
+          },
+        });
+      } else {
+        doWarn(state, 'Skipping machineSize backfill: live Fly guest failed schema validation', {
+          source: 'startExistingMachine',
+          guest: machine.config.guest,
+        });
+      }
     }
 
     // failed machines are restartable via updateMachine (Fly re-launches on the next available host)

@@ -71,7 +71,11 @@ import {
   type InstanceType,
 } from '@kilocode/kiloclaw-instance-tiers';
 import * as regionHelpers from '../regions';
-import { buildRuntimeSpec, effectiveMachineSize } from '../machine-config';
+import {
+  buildRuntimeSpec,
+  effectiveMachineSize,
+  parseMachineSizeFromFlyGuest,
+} from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
 
 // Domain modules
@@ -3689,18 +3693,35 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         });
       }
 
-      // Backfill machineSize from live machine for legacy instances
-      if (this.s.provider === 'fly' && this.s.machineSize === null && this.s.flyMachineId) {
+      // Backfill machineSize from live machine for legacy instances. Skipped
+      // when an admin override is active (override-shape isn't tier hardware).
+      if (
+        this.s.provider === 'fly' &&
+        this.s.machineSize === null &&
+        this.s.adminMachineSizeOverride === null &&
+        this.s.flyMachineId
+      ) {
         const flyConfig = getFlyConfig(this.env, this.s);
         const machine = await fly.getMachine(flyConfig, this.s.flyMachineId);
         if (machine.config?.guest) {
-          const { cpus, memory_mb, cpu_kind } = machine.config.guest;
-          this.s.machineSize = { cpus, memory_mb, cpu_kind };
-          this.s.instanceType = resolveInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
-          await this.persist({
-            machineSize: this.s.machineSize,
-            instanceType: this.s.instanceType,
-          });
+          const parsedSize = parseMachineSizeFromFlyGuest(machine.config.guest);
+          if (parsedSize) {
+            this.s.machineSize = parsedSize;
+            this.s.instanceType = resolveInstanceTypeLabel(this.s.machineSize, this.s.volumeSizeGb);
+            await this.persist({
+              machineSize: this.s.machineSize,
+              instanceType: this.s.instanceType,
+            });
+          } else {
+            doWarn(
+              this.s,
+              'Skipping machineSize backfill: live Fly guest failed schema validation',
+              {
+                source: 'restart-backfill',
+                guest: machine.config.guest,
+              }
+            );
+          }
         }
       }
 

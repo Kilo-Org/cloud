@@ -69,6 +69,15 @@ import {
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
+import { tryUnlinkBotIdentitiesForDeletedUser } from '@/lib/bot-identity-cleanup';
+
+jest.mock('@/lib/bot-identity-cleanup', () => ({
+  tryUnlinkBotIdentitiesForDeletedUser: jest.fn(async () => undefined),
+}));
+
+const mockedTryUnlinkBotIdentitiesForDeletedUser = jest.mocked(
+  tryUnlinkBotIdentitiesForDeletedUser
+);
 
 jest.mock('@/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
@@ -80,6 +89,8 @@ jest.mock('@/lib/stripe-client', () => ({
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
+    jest.clearAllMocks();
+
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
@@ -317,6 +328,8 @@ describe('User', () => {
       });
 
       await softDeleteUser(user.id);
+
+      expect(mockedTryUnlinkBotIdentitiesForDeletedUser).toHaveBeenCalledWith(user.id);
 
       const softDeleted = await findUserById(user.id);
       expect(softDeleted).toBeDefined();

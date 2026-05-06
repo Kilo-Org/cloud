@@ -13,6 +13,7 @@ const REDIS_DELETE_BATCH_SIZE = 100;
 
 type RedisScanClient = {
   scanIterator(options: { MATCH: string; COUNT: number }): AsyncIterable<string | string[]>;
+  get(key: string): Promise<string | null>;
   del(keys: string[]): Promise<unknown>;
 };
 
@@ -87,6 +88,84 @@ export async function unlinkKiloUser(
 ): Promise<void> {
   const { platform, teamId, userId } = identity;
   await state.delete(botIdentityRedisKey(platform, teamId, userId));
+}
+
+function serializedValueMatchesKiloUserId(value: string | null, kiloUserId: string): boolean {
+  if (value === null) return false;
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed === kiloUserId;
+  } catch {
+    return value === kiloUserId;
+  }
+}
+
+async function unlinkMatchingKiloUserKeys(
+  state: StateAdapter,
+  pattern: string,
+  kiloUserId: string
+): Promise<number> {
+  if (!hasRedisClient(state)) {
+    return 0;
+  }
+
+  const client = state.getClient();
+  let pendingKeys: string[] = [];
+  let deletedKeys = 0;
+
+  async function deletePendingKeys(): Promise<void> {
+    if (pendingKeys.length === 0) return;
+
+    const keysToDelete = pendingKeys;
+    pendingKeys = [];
+    deletedKeys += keysToDelete.length;
+    await client.del(keysToDelete);
+  }
+
+  async function queueIfLinkedToKiloUser(redisKey: string): Promise<void> {
+    const value = await client.get(redisKey);
+    if (!serializedValueMatchesKiloUserId(value, kiloUserId)) return;
+
+    pendingKeys.push(redisKey);
+    if (pendingKeys.length >= REDIS_DELETE_BATCH_SIZE) {
+      await deletePendingKeys();
+    }
+  }
+
+  for await (const scannedKeys of client.scanIterator({
+    MATCH: pattern,
+    COUNT: REDIS_SCAN_BATCH_SIZE,
+  })) {
+    if (Array.isArray(scannedKeys)) {
+      for (const redisKey of scannedKeys) {
+        await queueIfLinkedToKiloUser(redisKey);
+      }
+    } else {
+      await queueIfLinkedToKiloUser(scannedKeys);
+    }
+  }
+
+  await deletePendingKeys();
+  return deletedKeys;
+}
+
+export async function unlinkTeamKiloUser(
+  state: StateAdapter,
+  platform: string,
+  teamId: string,
+  kiloUserId: string
+): Promise<number> {
+  const pattern = `${CHAT_SDK_CACHE_KEY_PREFIX}${botIdentityRedisKey(platform, teamId, '*')}`;
+  return await unlinkMatchingKiloUserKeys(state, pattern, kiloUserId);
+}
+
+export async function unlinkKiloUserFromBotIdentities(
+  state: StateAdapter,
+  kiloUserId: string
+): Promise<number> {
+  const pattern = `${CHAT_SDK_CACHE_KEY_PREFIX}${botIdentityRedisKey('*', '*', '*')}`;
+  return await unlinkMatchingKiloUserKeys(state, pattern, kiloUserId);
 }
 
 export async function unlinkTeamKiloUsers(

@@ -82,6 +82,7 @@ import {
 import { normalizeEmail } from '@/lib/utils';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
+import { tryUnlinkBotIdentitiesForDeletedUser } from '@/lib/bot-identity-cleanup';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -605,6 +606,7 @@ export class SoftDeletePreconditionError extends Error {
  * - user_admin_notes
  * - referral_codes (user's own code)
  * - magic_link_tokens (email-based)
+ * - Kilo Bot linked account identity cache
  * - organization_memberships (removed from all orgs)
  * - organization_membership_removals (tombstones deleted; removed_by anonymized)
  * - organization_invitations (sent by user + addressed to user's email)
@@ -941,6 +943,8 @@ export async function softDeleteUser(userId: string) {
       .set({ kilo_user_id: 'deleted', public_ip: null })
       .where(eq(security_advisor_scans.kilo_user_id, userId));
   });
+
+  await tryUnlinkBotIdentitiesForDeletedUser(userId);
 }
 
 // We always stytch approve users who accept organization invites

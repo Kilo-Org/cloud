@@ -26,6 +26,7 @@ import { logExceptInTest } from '@/lib/utils.server';
 import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { failureResult, successResult } from '@/lib/maybe-result';
+import { tryUnlinkBotIdentitiesForOrganizationMember } from '@/lib/bot-identity-cleanup';
 
 export async function getOrganizationById(
   id: Organization['id'],
@@ -243,7 +244,7 @@ export async function removeUserFromOrganization(
   userId: User['id'],
   removedBy?: User['id']
 ): Promise<{ rowCount: number | null }> {
-  return await db.transaction(async tx => {
+  const result = await db.transaction(async tx => {
     // Look up the user's current role before deleting
     const [membership] = await tx
       .select({ role: organization_memberships.role })
@@ -289,6 +290,12 @@ export async function removeUserFromOrganization(
 
     return result;
   });
+
+  if ((result.rowCount ?? 0) > 0) {
+    await tryUnlinkBotIdentitiesForOrganizationMember(organizationId, userId);
+  }
+
+  return result;
 }
 
 export async function updateUserRoleInOrganization(

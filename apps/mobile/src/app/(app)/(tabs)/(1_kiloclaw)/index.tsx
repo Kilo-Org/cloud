@@ -1,7 +1,8 @@
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyStateContent } from '@/components/kiloclaw/empty-state-content';
 import { getKiloClawEntryDecision } from '@/components/kiloclaw/instance-entry-state';
@@ -16,10 +17,12 @@ import { useKiloClawMobileOnboardingState } from '@/lib/hooks/use-kiloclaw-queri
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useUnreadCounts } from '@/lib/hooks/use-unread-counts';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
+import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 
 export default function KiloClawTab() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { bottom } = useSafeAreaInsets();
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const instancesQuery = useAllKiloClawInstances();
   const { data: instances } = instancesQuery;
@@ -30,6 +33,9 @@ export default function KiloClawTab() {
   useForegroundInvalidateKiloclawState();
 
   const showInstanceSkeleton = entryDecision.kind === 'loading' || onboardingQuery.isPending;
+  const emptyStateContainerStyle = {
+    paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS),
+  };
 
   const handleRefresh = useCallback(() => {
     void (async () => {
@@ -105,6 +111,7 @@ export default function KiloClawTab() {
           <Animated.View
             entering={FadeIn.duration(200)}
             className="flex-1 items-center justify-center"
+            style={emptyStateContainerStyle}
           >
             <EmptyStateContent
               foregroundColor={colors.foreground}

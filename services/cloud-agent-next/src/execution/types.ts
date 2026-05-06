@@ -10,8 +10,8 @@
 import type { ExecutionId, SessionId, UserId } from '../types/ids.js';
 import type { AgentMode } from '../schema.js';
 import type { Images, EncryptedSecrets as SchemaEncryptedSecrets } from '../router/schemas.js';
-import type { EncryptedSecrets } from '../utils/encryption.js';
 import type { MCPServerConfig, RuntimeSkill, RuntimeAgent } from '../persistence/types.js';
+import type { SessionProfileBundle } from '../session-profile.js';
 
 // ---------------------------------------------------------------------------
 // Execution Modes
@@ -60,21 +60,12 @@ export type InitializeContext = {
   gitUrl?: string;
   /** Git token for authentication */
   gitToken?: string;
-  /** Environment variables to set in the session (plaintext) */
-  envVars?: Record<string, string>;
   /**
-   * Encrypted secret env vars from agent environment profiles.
-   * Stored encrypted, decrypted only at session execution time.
+   * Profile-derived configuration snapshot (envVars, encryptedSecrets,
+   * setupCommands, mcpServers, runtimeSkills, runtimeAgents). Adding a new
+   * profile field is a single-line change in {@link SessionProfileBundle}.
    */
-  encryptedSecrets?: SchemaEncryptedSecrets;
-  /** Setup commands to run after clone (e.g., npm install) */
-  setupCommands?: string[];
-  /** MCP server configurations */
-  mcpServers?: Record<string, MCPServerConfig>;
-  /** Runtime skills materialized into SKILL.md files in the sandbox */
-  runtimeSkills?: readonly RuntimeSkill[];
-  /** Custom modes materialized into KILO_CONFIG_CONTENT.agent.<slug> */
-  runtimeAgents?: readonly RuntimeAgent[];
+  profile?: SessionProfileBundle;
   /** Branch to checkout (if not session-specific) */
   upstreamBranch?: string;
   /** Bot ID for sandbox isolation */
@@ -242,8 +233,6 @@ export type InitContext = {
   gitUrl?: string;
   githubToken?: string;
   gitToken?: string;
-  envVars?: Record<string, string>;
-  setupCommands?: string[];
   upstreamBranch?: string;
   kiloSessionId?: string;
   isPreparedSession?: boolean;
@@ -251,14 +240,11 @@ export type InitContext = {
   kilocodeToken: string;
   /** Kilocode model to use */
   kilocodeModel?: string;
-  /** Encrypted secrets for agent environment profiles */
-  encryptedSecrets?: EncryptedSecrets;
-  /** MCP server configurations */
-  mcpServers?: Record<string, MCPServerConfig>;
-  /** Runtime skills materialized into SKILL.md files in the sandbox */
-  runtimeSkills?: readonly RuntimeSkill[];
-  /** Custom modes materialized into KILO_CONFIG_CONTENT.agent.<slug> */
-  runtimeAgents?: readonly RuntimeAgent[];
+  /**
+   * Profile-derived configuration snapshot (envVars, encryptedSecrets,
+   * setupCommands, mcpServers, runtimeSkills, runtimeAgents).
+   */
+  profile?: SessionProfileBundle;
   /** Bot ID for bot-specific sessions */
   botId?: string;
   /** GitHub app type for determining which app to use */
@@ -279,12 +265,12 @@ export type ExistingSessionMetadata = {
   sessionHome?: string;
   upstreamBranch?: string;
   appendSystemPrompt?: string;
-  /** MCP servers previously stored on the session (for fast-path re-injection) */
-  mcpServers?: Record<string, MCPServerConfig>;
-  /** Runtime skills previously stored on the session (for fast-path re-materialization) */
-  runtimeSkills?: readonly RuntimeSkill[];
-  /** Custom modes previously stored on the session */
-  runtimeAgents?: readonly RuntimeAgent[];
+  /**
+   * Profile snapshot stored on the session at prepare time. Used by the
+   * fast path to re-inject MCP servers, runtime skills, and runtime modes
+   * when recreating the sandbox session.
+   */
+  profile?: SessionProfileBundle;
   /** GitHub repo (for token updates) */
   githubRepo?: string;
   /** Git URL (for token updates) */

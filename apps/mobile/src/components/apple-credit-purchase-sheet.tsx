@@ -109,7 +109,9 @@ export function AppleCreditPurchaseSheet({
                           Pay {product.localizedPrice}
                         </Text>
                       </View>
-                      {isActive && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+                      {isActive && (
+                        <ActivityIndicator size="small" color={colors.mutedForeground} />
+                      )}
                     </View>
                   </Button>
                 );

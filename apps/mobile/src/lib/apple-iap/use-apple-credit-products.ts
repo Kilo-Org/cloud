@@ -48,7 +48,9 @@ export function useAppleCreditProducts() {
   });
 
   return {
-    products: isIos ? joinAppleCreditProducts(backendProducts.data?.products, storeKitProducts.data) : [],
+    products: isIos
+      ? joinAppleCreditProducts(backendProducts.data?.products, storeKitProducts.data)
+      : [],
     isLoading: isIos && (backendProducts.isLoading || storeKitProducts.isLoading),
     isFetching: isIos && (backendProducts.isFetching || storeKitProducts.isFetching),
     isError: isIos && (backendProducts.isError || storeKitProducts.isError),

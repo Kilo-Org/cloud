@@ -23,9 +23,7 @@ export async function fetchStoreKitProducts(productIds: string[]): Promise<Store
   }));
 }
 
-export async function purchaseStoreKitProduct(
-  productId: string
-): Promise<StoreKitPurchaseResult> {
+export async function purchaseStoreKitProduct(productId: string): Promise<StoreKitPurchaseResult> {
   const iap = await import('expo-iap');
   await iap.initConnection();
   const purchaseResult = await iap.requestPurchase({

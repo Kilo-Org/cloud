@@ -57,6 +57,7 @@ export default function OrganizationAppSidebar({
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
+  const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
@@ -159,11 +160,15 @@ export default function OrganizationAppSidebar({
     url: string;
     className?: string;
   }> = [
-    {
-      title: 'App Builder',
-      icon: Plus,
-      url: `/organizations/${organizationId}/app-builder`,
-    },
+    ...(isAppBuilderEnabled || isDevelopment
+      ? [
+          {
+            title: 'App Builder',
+            icon: Plus,
+            url: `/organizations/${organizationId}/app-builder`,
+          },
+        ]
+      : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,

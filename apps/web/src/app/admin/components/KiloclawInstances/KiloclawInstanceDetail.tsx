@@ -2597,10 +2597,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   </span>
                   {data.workerStatus.adminMachineSizeOverrideMetadata && (
                     <>
-                      {' · set by '}
+                      {' · '}
                       <strong>
                         {data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail}
-                      </strong>{' '}
+                      </strong>
+                      {', '}
                       {formatEpochRelativeTime(
                         data.workerStatus.adminMachineSizeOverrideMetadata.setAt
                       )}
@@ -2608,10 +2609,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       <em>{data.workerStatus.adminMachineSizeOverrideMetadata.reason}</em>
                     </>
                   )}
-                  <span className="mt-1 block text-xs opacity-80">
-                    Billing stays on the customer's tier; this override is invisible to the customer
-                    dashboard.
-                  </span>
                 </AlertDescription>
               </Alert>
             )}

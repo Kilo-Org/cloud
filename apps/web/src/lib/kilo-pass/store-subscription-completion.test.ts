@@ -116,6 +116,53 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(storePurchases).toHaveLength(1);
   });
 
+  it('returns idempotently when the same provider transaction is completed concurrently', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const purchase = applePurchase();
+
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () => completeStoreKiloPassPurchase({ user, purchase }))
+    );
+
+    const subscriptionIds = new Set(results.map(result => result.subscriptionId));
+    expect(subscriptionIds.size).toBe(1);
+    expect(results.filter(result => result.alreadyProcessed)).toHaveLength(3);
+
+    const subscriptions = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(
+        and(
+          eq(kilo_pass_subscriptions.payment_provider, purchase.paymentProvider),
+          eq(kilo_pass_subscriptions.provider_subscription_id, purchase.providerSubscriptionId)
+        )
+      );
+    expect(subscriptions).toHaveLength(1);
+
+    const storePurchases = await db
+      .select()
+      .from(kilo_pass_store_purchases)
+      .where(
+        and(
+          eq(kilo_pass_store_purchases.payment_provider, purchase.paymentProvider),
+          eq(kilo_pass_store_purchases.provider_transaction_id, purchase.providerTransactionId)
+        )
+      );
+    expect(storePurchases).toHaveLength(1);
+
+    const issuances = await db
+      .select()
+      .from(kilo_pass_issuances)
+      .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, results[0]?.subscriptionId ?? ''));
+    expect(issuances).toHaveLength(1);
+
+    const items = await db
+      .select()
+      .from(kilo_pass_issuance_items)
+      .where(eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuances[0]?.id ?? ''));
+    expect(items).toHaveLength(1);
+  });
+
   it('rejects when the same provider transaction is replayed by another user', async () => {
     const firstUser = await insertTestUser();
     const secondUser = await insertTestUser();

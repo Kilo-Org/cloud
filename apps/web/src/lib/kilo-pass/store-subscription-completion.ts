@@ -68,6 +68,18 @@ function getProviderPaymentId(purchase: ValidatedStoreKiloPassPurchase): string 
   return `kilo-pass:${purchase.paymentProvider}:${purchase.providerTransactionId}`;
 }
 
+function findStorePurchaseByProviderTransaction(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  purchase: ValidatedStoreKiloPassPurchase
+) {
+  return tx.query.kilo_pass_store_purchases.findFirst({
+    where: and(
+      eq(kilo_pass_store_purchases.payment_provider, purchase.paymentProvider),
+      eq(kilo_pass_store_purchases.provider_transaction_id, purchase.providerTransactionId)
+    ),
+  });
+}
+
 export async function completeStoreKiloPassPurchase(params: {
   user: User;
   purchase: ValidatedStoreKiloPassPurchase;
@@ -75,12 +87,7 @@ export async function completeStoreKiloPassPurchase(params: {
   const { user, purchase } = params;
 
   return db.transaction(async tx => {
-    const existingPurchase = await tx.query.kilo_pass_store_purchases.findFirst({
-      where: and(
-        eq(kilo_pass_store_purchases.payment_provider, purchase.paymentProvider),
-        eq(kilo_pass_store_purchases.provider_transaction_id, purchase.providerTransactionId)
-      ),
-    });
+    const existingPurchase = await findStorePurchaseByProviderTransaction(tx, purchase);
 
     if (existingPurchase) {
       if (existingPurchase.kilo_user_id !== user.id) {
@@ -110,68 +117,93 @@ export async function completeStoreKiloPassPurchase(params: {
       throw new Error('You already have an active Kilo Pass subscription');
     }
 
-    const existingForProviderSubscription = await tx.query.kilo_pass_subscriptions.findFirst({
-      where: and(
-        eq(kilo_pass_subscriptions.payment_provider, purchase.paymentProvider),
-        eq(kilo_pass_subscriptions.provider_subscription_id, purchase.providerSubscriptionId)
-      ),
-    });
-
     const nextYearlyIssueAt = getNextYearlyIssueAt({
       cadence: purchase.cadence,
       purchasedAtIso: purchase.purchasedAtIso,
     });
 
-    const subscriptionRows = existingForProviderSubscription
-      ? await tx
-          .update(kilo_pass_subscriptions)
-          .set({
-            kilo_user_id: user.id,
-            tier: purchase.tier,
-            cadence: purchase.cadence,
-            status: 'active',
-            cancel_at_period_end: false,
-            ended_at: null,
-            next_yearly_issue_at: nextYearlyIssueAt,
-          })
-          .where(eq(kilo_pass_subscriptions.id, existingForProviderSubscription.id))
-          .returning({ id: kilo_pass_subscriptions.id })
-      : await tx
-          .insert(kilo_pass_subscriptions)
-          .values({
-            kilo_user_id: user.id,
-            payment_provider: purchase.paymentProvider,
-            provider_subscription_id: purchase.providerSubscriptionId,
-            stripe_subscription_id: null,
-            tier: purchase.tier,
-            cadence: purchase.cadence,
-            status: 'active',
-            cancel_at_period_end: false,
-            started_at: purchase.purchasedAtIso,
-            ended_at: null,
-            current_streak_months: 1,
-            next_yearly_issue_at: nextYearlyIssueAt,
-          })
-          .returning({ id: kilo_pass_subscriptions.id });
+    const subscriptionRows = await tx
+      .insert(kilo_pass_subscriptions)
+      .values({
+        kilo_user_id: user.id,
+        payment_provider: purchase.paymentProvider,
+        provider_subscription_id: purchase.providerSubscriptionId,
+        stripe_subscription_id: null,
+        tier: purchase.tier,
+        cadence: purchase.cadence,
+        status: 'active',
+        cancel_at_period_end: false,
+        started_at: purchase.purchasedAtIso,
+        ended_at: null,
+        current_streak_months: 1,
+        next_yearly_issue_at: nextYearlyIssueAt,
+      })
+      .onConflictDoUpdate({
+        target: [
+          kilo_pass_subscriptions.payment_provider,
+          kilo_pass_subscriptions.provider_subscription_id,
+        ],
+        targetWhere: sql`${kilo_pass_subscriptions.provider_subscription_id} IS NOT NULL`,
+        set: {
+          kilo_user_id: user.id,
+          tier: purchase.tier,
+          cadence: purchase.cadence,
+          status: 'active',
+          cancel_at_period_end: false,
+          ended_at: null,
+          next_yearly_issue_at: nextYearlyIssueAt,
+        },
+      })
+      .returning({ id: kilo_pass_subscriptions.id });
 
     const subscriptionId = subscriptionRows[0]?.id;
     if (!subscriptionId) {
       throw new Error('Failed to persist store Kilo Pass subscription');
     }
 
-    await tx.insert(kilo_pass_store_purchases).values({
-      kilo_pass_subscription_id: subscriptionId,
-      kilo_user_id: user.id,
-      payment_provider: purchase.paymentProvider,
-      product_id: purchase.productId,
-      provider_subscription_id: purchase.providerSubscriptionId,
-      provider_transaction_id: purchase.providerTransactionId,
-      provider_original_transaction_id: purchase.providerOriginalTransactionId,
-      purchase_token: purchase.purchaseToken,
-      environment: purchase.environment,
-      purchased_at: purchase.purchasedAtIso,
-      raw_payload_json: purchase.rawPayload,
-    });
+    const purchaseRows = await tx
+      .insert(kilo_pass_store_purchases)
+      .values({
+        kilo_pass_subscription_id: subscriptionId,
+        kilo_user_id: user.id,
+        payment_provider: purchase.paymentProvider,
+        product_id: purchase.productId,
+        provider_subscription_id: purchase.providerSubscriptionId,
+        provider_transaction_id: purchase.providerTransactionId,
+        provider_original_transaction_id: purchase.providerOriginalTransactionId,
+        purchase_token: purchase.purchaseToken,
+        environment: purchase.environment,
+        purchased_at: purchase.purchasedAtIso,
+        raw_payload_json: purchase.rawPayload,
+      })
+      .onConflictDoNothing({
+        target: [
+          kilo_pass_store_purchases.payment_provider,
+          kilo_pass_store_purchases.provider_transaction_id,
+        ],
+      })
+      .returning({
+        id: kilo_pass_store_purchases.id,
+      });
+
+    if (!purchaseRows[0]) {
+      const replayedPurchase = await findStorePurchaseByProviderTransaction(tx, purchase);
+
+      if (!replayedPurchase) {
+        throw new Error('Failed to persist store Kilo Pass purchase');
+      }
+
+      if (replayedPurchase.kilo_user_id !== user.id) {
+        throw new Error('Store transaction already belongs to another user');
+      }
+
+      return {
+        subscriptionId: replayedPurchase.kilo_pass_subscription_id,
+        tier: purchase.tier,
+        cadence: purchase.cadence,
+        alreadyProcessed: true,
+      };
+    }
 
     const issueMonth = computeIssueMonth(dayjs(purchase.purchasedAtIso));
     const issuanceHeader = await createOrGetIssuanceHeader(tx, {

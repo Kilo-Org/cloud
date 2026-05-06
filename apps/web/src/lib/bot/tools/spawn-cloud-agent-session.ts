@@ -9,8 +9,6 @@ import {
   getGitHubTokenForUser,
 } from '@/lib/cloud-agent/github-integration-helpers';
 import {
-  getGitLabTokenForOrganization,
-  getGitLabTokenForUser,
   getGitLabInstanceUrlForOrganization,
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
@@ -135,19 +133,7 @@ export default async function spawnCloudAgentSession(
   const kilocodeOrganizationId = owner.type === 'org' ? owner.id : undefined;
 
   if (args.gitlabProject) {
-    // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
-    const gitlabToken =
-      owner.type === 'org'
-        ? await getGitLabTokenForOrganization(owner.id)
-        : await getGitLabTokenForUser(owner.id);
-
-    if (!gitlabToken) {
-      return {
-        response:
-          'Error: No GitLab token available. Please ensure a GitLab integration is connected in your Kilo Code settings.',
-      };
-    }
-
+    // GitLab path: send gitUrl without forwarding tokens from web.
     const instanceUrl =
       owner.type === 'org'
         ? await getGitLabInstanceUrlForOrganization(owner.id)
@@ -168,7 +154,6 @@ export default async function spawnCloudAgentSession(
       mode,
       model,
       gitUrl,
-      gitToken: gitlabToken,
       platform: 'gitlab',
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,

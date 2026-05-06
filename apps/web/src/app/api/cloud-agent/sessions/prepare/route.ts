@@ -8,8 +8,6 @@ import {
   getGitHubInstallationIdForUser,
 } from '@/lib/cloud-agent/github-integration-helpers';
 import {
-  getGitLabTokenForUser,
-  getGitLabTokenForOrganization,
   validateGitLabRepoAccessForUser,
   validateGitLabRepoAccessForOrganization,
   buildGitLabCloneUrl,
@@ -86,9 +84,8 @@ export async function POST(request: Request) {
       githubInstallationId = await getGitHubInstallationIdForUser(user.id);
     }
 
-    // Determine which platform we're using and get the appropriate token/validation
+    // Determine which platform we're using and validate repository access.
     let gitUrl: string | undefined;
-    let gitToken: string | undefined;
     let repoIdentifier: string; // For error messages
 
     if (input.githubRepo) {
@@ -116,25 +113,6 @@ export async function POST(request: Request) {
     } else if (input.gitlabProject) {
       // GitLab flow
       repoIdentifier = input.gitlabProject;
-
-      gitToken = input.organizationId
-        ? await getGitLabTokenForOrganization(input.organizationId)
-        : await getGitLabTokenForUser(user.id);
-
-      if (!gitToken) {
-        return NextResponse.json(
-          {
-            error: 'GitLab integration not configured',
-            details: [
-              {
-                path: 'gitlabProject',
-                message: 'No GitLab integration found. Please connect your GitLab account first.',
-              },
-            ],
-          },
-          { status: 400 }
-        );
-      }
 
       const hasRepoAccess = input.organizationId
         ? await validateGitLabRepoAccessForOrganization(input.organizationId, input.gitlabProject)
@@ -234,7 +212,6 @@ export async function POST(request: Request) {
         githubInstallationId,
         // GitLab-specific params (only set for GitLab projects)
         gitUrl,
-        gitToken,
         // Platform detection: explicit instead of URL-based
         platform: input.gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB,
         // Common params

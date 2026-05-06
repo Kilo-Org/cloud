@@ -21,7 +21,6 @@ import {
 } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   fetchGitLabRepositoriesForOrganization,
-  getGitLabTokenForOrganization,
   getGitLabInstanceUrlForOrganization,
   buildGitLabCloneUrl,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
@@ -216,27 +215,18 @@ export const organizationCloudAgentRouter = createTRPCRouter({
           setupCommands,
         });
 
-        // Determine git source: GitLab uses gitUrl/gitToken, GitHub uses githubRepo/githubToken
+        // Determine git source: GitLab uses gitUrl without sending tokens from web.
         let gitParams: {
           githubRepo?: string;
           githubToken?: string;
           gitUrl?: string;
-          gitToken?: string;
           platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
-          // GitLab flow: convert gitlabProject to gitUrl + gitToken
-          const gitToken = await getGitLabTokenForOrganization(organizationId);
-          if (!gitToken) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'No GitLab integration found. Please connect your GitLab account first.',
-            });
-          }
           const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
+          gitParams = { gitUrl, platform: PLATFORM.GITLAB };
         } else {
           // GitHub flow: use githubRepo + githubToken
           const githubToken = await getGitHubTokenForOrganization(organizationId);
@@ -299,21 +289,13 @@ export const organizationCloudAgentRouter = createTRPCRouter({
           githubRepo?: string;
           githubToken?: string;
           gitUrl?: string;
-          gitToken?: string;
           platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
-          const gitToken = await getGitLabTokenForOrganization(organizationId);
-          if (!gitToken) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'No GitLab integration found. Please connect your GitLab account first.',
-            });
-          }
           const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
+          gitParams = { gitUrl, platform: PLATFORM.GITLAB };
         } else {
           const githubToken = await getGitHubTokenForOrganization(organizationId);
           gitParams = { githubRepo, githubToken, platform: PLATFORM.GITHUB };

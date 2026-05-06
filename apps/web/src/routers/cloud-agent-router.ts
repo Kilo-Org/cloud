@@ -17,7 +17,6 @@ import {
 } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   fetchGitLabRepositoriesForUser,
-  getGitLabTokenForUser,
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
@@ -138,27 +137,18 @@ export const cloudAgentRouter = createTRPCRouter({
           setupCommands,
         });
 
-        // Determine git source: GitLab uses gitUrl/gitToken, GitHub uses githubRepo/githubToken
+        // Determine git source: GitLab uses gitUrl without sending tokens from web.
         let gitParams: {
           githubRepo?: string;
           githubToken?: string;
           gitUrl?: string;
-          gitToken?: string;
           platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
-          // GitLab flow: convert gitlabProject to gitUrl + gitToken
-          const gitToken = await getGitLabTokenForUser(ctx.user.id);
-          if (!gitToken) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'No GitLab integration found. Please connect your GitLab account first.',
-            });
-          }
           const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
+          gitParams = { gitUrl, platform: PLATFORM.GITLAB };
         } else {
           // GitHub flow: use githubRepo + githubToken
           const githubToken = await getGitHubTokenForUser(ctx.user.id);
@@ -213,21 +203,13 @@ export const cloudAgentRouter = createTRPCRouter({
           githubRepo?: string;
           githubToken?: string;
           gitUrl?: string;
-          gitToken?: string;
           platform?: 'github' | 'gitlab';
         };
 
         if (gitlabProject) {
-          const gitToken = await getGitLabTokenForUser(ctx.user.id);
-          if (!gitToken) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'No GitLab integration found. Please connect your GitLab account first.',
-            });
-          }
           const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
           const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
+          gitParams = { gitUrl, platform: PLATFORM.GITLAB };
         } else {
           const githubToken = await getGitHubTokenForUser(ctx.user.id);
           gitParams = { githubRepo, githubToken, platform: PLATFORM.GITHUB };

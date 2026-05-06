@@ -47,8 +47,8 @@ function applyToolChoiceSetting(
 function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
     return [
-      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,
+      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'], // 2026-05-06 order swapped: bedrock seems to have enabled overly aggressive guardrails
     ];
   }
   if (isMinimaxModel(requestedModel)) {

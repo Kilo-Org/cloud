@@ -1,6 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type Purchase, useIAP } from 'expo-iap';
+import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { useTRPC } from '@/lib/trpc';
@@ -17,6 +18,16 @@ type AppStoreKiloPassPurchaseActionsDeps = {
   showError: (message: string) => void;
 };
 
+function isRecoverableKiloPassPurchase(purchase: Purchase): boolean {
+  if (purchase.purchaseState === 'pending') {
+    return false;
+  }
+  if (purchase.store !== 'apple') {
+    return false;
+  }
+  return purchase.productId.startsWith('kilopass.');
+}
+
 function getPurchaseToken(purchase: Purchase): string {
   const token = purchase.purchaseToken;
   if (!token) {
@@ -26,6 +37,17 @@ function getPurchaseToken(purchase: Purchase): string {
 }
 
 export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurchaseActionsDeps) {
+  async function handlePurchaseSuccess(purchase: Purchase) {
+    try {
+      const signedTransactionJws = getPurchaseToken(purchase);
+      await deps.completeAppStorePurchase({ signedTransactionJws });
+      await deps.invalidateAfterCompletion();
+      await deps.finishTransaction({ purchase, isConsumable: false });
+    } catch (error) {
+      deps.showError(error instanceof Error ? error.message : 'Failed to complete purchase.');
+    }
+  }
+
   return {
     purchase: async (product: AppStoreKiloPassProduct) => {
       await deps.requestPurchase({
@@ -33,15 +55,15 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
         type: 'subs',
       });
     },
-    handlePurchaseSuccess: async (purchase: Purchase) => {
-      try {
-        const signedTransactionJws = getPurchaseToken(purchase);
-        await deps.completeAppStorePurchase({ signedTransactionJws });
-        await deps.invalidateAfterCompletion();
-        await deps.finishTransaction({ purchase, isConsumable: false });
-      } catch (error) {
-        deps.showError(error instanceof Error ? error.message : 'Failed to complete purchase.');
-      }
+    handlePurchaseSuccess,
+    recoverPurchases: async (purchases: Purchase[]) => {
+      await Promise.all(
+        purchases
+          .filter(purchase => isRecoverableKiloPassPurchase(purchase))
+          .map(async purchase => {
+            await handlePurchaseSuccess(purchase);
+          })
+      );
     },
   };
 }
@@ -49,6 +71,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
 export function useStoreKiloPassPurchase() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const recoveredPurchaseIdsRef = useRef(new Set<string>());
   const completeAppStorePurchase = useMutation(
     trpc.kiloPass.completeAppStorePurchase.mutationOptions()
   );
@@ -70,16 +93,59 @@ export function useStoreKiloPassPurchase() {
       void actions.handlePurchaseSuccess(purchase);
     },
   });
+  const {
+    availablePurchases,
+    connected,
+    finishTransaction,
+    getAvailablePurchases,
+    requestPurchase,
+  } = actionsRef;
 
-  const actions = createAppStoreKiloPassPurchaseActions({
-    requestPurchase: actionsRef.requestPurchase,
-    completeAppStorePurchase: completeAppStorePurchase.mutateAsync,
-    finishTransaction: actionsRef.finishTransaction,
-    invalidateAfterCompletion,
-    showError: message => {
-      toast.error(message);
-    },
-  });
+  const actions = useMemo(
+    () =>
+      createAppStoreKiloPassPurchaseActions({
+        requestPurchase,
+        completeAppStorePurchase: completeAppStorePurchase.mutateAsync,
+        finishTransaction,
+        invalidateAfterCompletion,
+        showError: message => {
+          toast.error(message);
+        },
+      }),
+    [
+      completeAppStorePurchase.mutateAsync,
+      finishTransaction,
+      invalidateAfterCompletion,
+      requestPurchase,
+    ]
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || !connected) {
+      return;
+    }
+
+    void getAvailablePurchases();
+  }, [connected, getAvailablePurchases]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || availablePurchases.length === 0) {
+      return;
+    }
+
+    const unrecoveredPurchases = availablePurchases.filter(purchase => {
+      const id = purchase.transactionId ?? purchase.id;
+      if (recoveredPurchaseIdsRef.current.has(id)) {
+        return false;
+      }
+      recoveredPurchaseIdsRef.current.add(id);
+      return true;
+    });
+
+    if (unrecoveredPurchases.length > 0) {
+      void actions.recoverPurchases(unrecoveredPurchases);
+    }
+  }, [actions, availablePurchases]);
 
   return {
     purchase: actions.purchase,

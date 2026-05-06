@@ -5,9 +5,16 @@ import { type AppStoreKiloPassProduct } from './store-products';
 
 vi.mock('expo-iap', () => ({
   useIAP: () => ({
+    availablePurchases: [],
+    connected: false,
     finishTransaction: vi.fn(),
+    getAvailablePurchases: vi.fn(),
     requestPurchase: vi.fn(),
   }),
+}));
+
+vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -125,6 +132,51 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     await actions.handlePurchaseSuccess(purchase);
 
     expect(invalidateAfterCompletion).toHaveBeenCalled();
+    expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
+  });
+
+  it('recovers unfinished Kilo Pass App Store purchases', async () => {
+    const finishTransaction = vi.fn();
+    const completeAppStorePurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const purchase = {
+      id: 'purchase-1',
+      ids: null,
+      isAutoRenewing: true,
+      platform: 'ios',
+      productId: product.appleProductId,
+      purchaseState: 'purchased',
+      purchaseToken: 'signed-jws',
+      quantity: 1,
+      store: 'apple',
+      transactionDate: Date.now(),
+      transactionId: 'tx-1',
+    } satisfies Purchase;
+    const actions = createAppStoreKiloPassPurchaseActions({
+      completeAppStorePurchase,
+      finishTransaction,
+      invalidateAfterCompletion: vi.fn(),
+      requestPurchase: vi.fn(),
+      showError: () => undefined,
+    });
+
+    await actions.recoverPurchases([
+      purchase,
+      {
+        ...purchase,
+        id: 'other-purchase',
+        productId: 'not-kilopass',
+        transactionId: 'other-tx',
+      },
+      {
+        ...purchase,
+        id: 'pending-purchase',
+        purchaseState: 'pending',
+        transactionId: 'pending-tx',
+      },
+    ]);
+
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(completeAppStorePurchase).toHaveBeenCalledWith({ signedTransactionJws: 'signed-jws' });
     expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
   });
 });

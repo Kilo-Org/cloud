@@ -561,6 +561,10 @@ function MorningBriefingCard({
     mutations.disableMorningBriefing.isPending;
 
   const statusLabel = (() => {
+    if (isControllerOutOfDate) {
+      return 'Upgrade Required';
+    }
+
     if (isWarmupState) {
       return 'Instance Warming Up';
     }
@@ -593,13 +597,14 @@ function MorningBriefingCard({
 
     return observedEnabled ? 'Enabled' : 'Disabled';
   })();
-  const statusVariant = isWarmupState
-    ? 'secondary'
-    : statusLabel === 'Instance Stopped'
+  const statusVariant =
+    isControllerOutOfDate || isWarmupState
       ? 'secondary'
-      : observedEnabled || (isTransitioning && desiredEnabled)
-        ? 'default'
-        : 'secondary';
+      : statusLabel === 'Instance Stopped'
+        ? 'secondary'
+        : observedEnabled || (isTransitioning && desiredEnabled)
+          ? 'default'
+          : 'secondary';
 
   const readySources = [
     sourceReadiness.github.configured ? 'GitHub' : null,
@@ -624,7 +629,11 @@ function MorningBriefingCard({
   const canUseBriefingControls = controlsEnabled && desiredEnabled;
   const lastDelivery = briefingStatus?.lastDelivery ?? [];
   const showLastDelivery =
-    !isWarmupState && actionsReady && hasResolvedBriefingToggleState && lastDelivery.length > 0;
+    !isWarmupState &&
+    !isControllerOutOfDate &&
+    actionsReady &&
+    hasResolvedBriefingToggleState &&
+    lastDelivery.length > 0;
   const deliveryChannelLabel = {
     telegram: 'Telegram',
     discord: 'Discord',

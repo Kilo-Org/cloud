@@ -35,6 +35,8 @@ export {
   type MergedSkillForSession,
   type MergedAgentForSession,
   type ClientMcpServerValue,
+  type InlineSkillInput,
+  type InlineAgentInput,
 } from './profile-session-config';
 
 // Utilities

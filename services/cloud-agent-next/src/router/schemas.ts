@@ -238,9 +238,11 @@ export const PrepareSessionInput = z
       .describe('Organization ID (UUID, optional)'),
 
     // Profile resolution — cloud-agent-next resolves the profile stack
-    // (repo binding + default + explicit override) server-side and merges
-    // the resulting envVars / setupCommands / mcpServers / encryptedSecrets
-    // / runtimeSkills / runtimeAgents with the inline fields above.
+    // (repo binding + default + explicit override) server-side and stacks
+    // the inline fields above as one more layer on top. All six collections
+    // (envVars / setupCommands / encryptedSecrets / mcpServers /
+    // runtimeSkills / runtimeAgents) follow the same precedence: inline
+    // wins on collision with the profile-derived value.
     profileId: z
       .string()
       .uuid()

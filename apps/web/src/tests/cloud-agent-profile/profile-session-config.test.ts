@@ -12,6 +12,7 @@ import {
   agent_environment_profile_repo_bindings,
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
+  agent_environment_profile_agents,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -136,6 +137,20 @@ async function addSkill(
   });
 }
 
+async function addAgent(
+  profileId: string,
+  slug: string,
+  name: string,
+  prompt: string
+): Promise<void> {
+  await db.insert(agent_environment_profile_agents).values({
+    profile_id: profileId,
+    slug,
+    name,
+    config: { prompt },
+  });
+}
+
 describe('mergeProfileConfiguration', () => {
   afterEach(async () => {
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -144,6 +159,8 @@ describe('mergeProfileConfiguration', () => {
     await db.delete(agent_environment_profile_mcp_servers);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_skills);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(agent_environment_profile_agents);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_commands);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -668,5 +685,124 @@ describe('mergeProfileConfiguration', () => {
     } else {
       throw new Error('Expected local MCP server in record');
     }
+  });
+
+  describe('inline layer', () => {
+    test('inline mcpServers layer on top of profile — inline wins on name', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'with-mcp', { isDefault: true });
+      await addMcpLocal(profileId, 'shared', ['node', 'profile.js']);
+      await addMcpLocal(profileId, 'profile-only', ['node', 'profile-only.js']);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        mcpServers: {
+          shared: { type: 'local', command: ['node', 'inline.js'] },
+          'inline-only': { type: 'local', command: ['node', 'inline-only.js'] },
+        },
+      });
+
+      expect(result.mcpServers?.map(s => s.name).sort()).toEqual([
+        'inline-only',
+        'profile-only',
+        'shared',
+      ]);
+      const shared = result.mcpServers?.find(s => s.name === 'shared');
+      expect(shared).toMatchObject({ type: 'local', command: ['node', 'inline.js'] });
+    });
+
+    test('disabled inline MCP server does not shadow an enabled profile entry', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'with-mcp', { isDefault: true });
+      await addMcpLocal(profileId, 'demo', ['node', 'profile.js']);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        mcpServers: {
+          demo: { type: 'local', command: ['node', 'inline.js'], enabled: false },
+        },
+      });
+
+      // Profile's enabled `demo` survives — disabled inline entries are skipped, not delete-keys.
+      const demo = result.mcpServers?.find(s => s.name === 'demo');
+      expect(demo).toMatchObject({ type: 'local', command: ['node', 'profile.js'] });
+    });
+
+    test('inline runtimeSkills layer on top of profile — inline wins on name', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'with-skills', { isDefault: true });
+      await addSkill(profileId, 'shared', '---\nname: shared\n---\nprofile body');
+      await addSkill(profileId, 'profile-only', '---\nname: profile-only\n---\nbody');
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        runtimeSkills: [
+          { name: 'shared', rawMarkdown: 'inline body for shared' },
+          { name: 'inline-only', rawMarkdown: 'inline-only body', files: { 'a.md': 'a' } },
+        ],
+      });
+
+      expect(result.skills?.map(s => s.name).sort()).toEqual([
+        'inline-only',
+        'profile-only',
+        'shared',
+      ]);
+      expect(result.skills?.find(s => s.name === 'shared')?.rawMarkdown).toBe(
+        'inline body for shared'
+      );
+      expect(result.skills?.find(s => s.name === 'inline-only')?.files).toEqual({ 'a.md': 'a' });
+    });
+
+    test('inline runtimeAgents layer on top of profile — inline wins on slug', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'with-agents', { isDefault: true });
+      await addAgent(profileId, 'reviewer', 'Reviewer', 'profile reviewer prompt');
+      await addAgent(profileId, 'profile-only', 'Profile Only', 'profile-only prompt');
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        runtimeAgents: [
+          { slug: 'reviewer', name: 'Reviewer', config: { prompt: 'inline reviewer prompt' } },
+          { slug: 'inline-only', name: 'Inline Only', config: { prompt: 'inline-only prompt' } },
+        ],
+      });
+
+      expect(result.agents?.map(a => a.slug).sort()).toEqual([
+        'inline-only',
+        'profile-only',
+        'reviewer',
+      ]);
+      expect(result.agents?.find(a => a.slug === 'reviewer')?.config.prompt).toBe(
+        'inline reviewer prompt'
+      );
+    });
+
+    test('inline encryptedSecrets layer on top of profile — inline wins on key', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'with-secrets', { isDefault: true });
+      await addVar(profileId, 'API_KEY', fakeEnvelope, true);
+
+      const inlineEnvelope = {
+        encryptedData: 'aW5saW5lLWRhdGE=',
+        encryptedDEK: 'aW5saW5lLWRlaw==',
+        algorithm: 'rsa-aes-256-gcm' as const,
+        version: 1 as const,
+      };
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        encryptedSecrets: { API_KEY: inlineEnvelope, INLINE_ONLY: inlineEnvelope },
+      });
+
+      expect(result.encryptedSecrets).toEqual({
+        API_KEY: inlineEnvelope, // inline wins over profile envelope
+        INLINE_ONLY: inlineEnvelope,
+      });
+    });
   });
 });

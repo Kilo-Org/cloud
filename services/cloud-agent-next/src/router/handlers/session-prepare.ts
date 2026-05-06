@@ -6,6 +6,7 @@ import {
   profileMcpServersToClientRecord,
   ProfileNotFoundError,
   type ClientMcpServerValue,
+  type InlineAgentInput,
   type MergeProfileConfigurationResult,
   type ProfileOwner,
 } from '@kilocode/cloud-agent-profile';
@@ -100,6 +101,12 @@ async function resolveProfileForInput(
       platform: input.platform,
       envVars: input.envVars,
       setupCommands: input.setupCommands,
+      encryptedSecrets: input.encryptedSecrets,
+      mcpServers: input.mcpServers as Record<string, ClientMcpServerValue> | undefined,
+      runtimeSkills: input.runtimeSkills,
+      // Cast: the runtime-agent schema permits looser color/permission shapes
+      // than db's AgentConfig, but configs are forwarded opaquely to the CLI.
+      runtimeAgents: input.runtimeAgents as InlineAgentInput[] | undefined,
     });
   } catch (err) {
     if (err instanceof ProfileNotFoundError) {
@@ -110,16 +117,15 @@ async function resolveProfileForInput(
 }
 
 /**
- * Collapse the caller's inline fields with the profile-resolved values into
- * the canonical `SessionProfileBundle` shape consumed by the session service.
- * When resolution did not run (null) the inline values pass through unchanged.
- * Otherwise each collection follows the same precedence the web router used
- * before this refactor: `profile (auto + explicit override) < inline`.
+ * Project the resolved bundle (or the unresolved inline pass-through) into
+ * the canonical `SessionProfileBundle` shape consumed by the session
+ * service. When resolution ran, `mergeProfileConfiguration` has already
+ * stacked the inline layer on top of the profile layers — this function
+ * just reshapes mcpServers from the profile's array form to the worker's
+ * record form.
  *
- * `ClientMcpServerValue` (what the profile package returns) is structurally
- * identical to the worker's `MCPServerConfig` — both discriminated unions of
- * local/remote servers with encrypted-envelope secret values — so the bundle
- * carries them as `MCPServerConfig` without coercion.
+ * `ClientMcpServerValue` is structurally identical to the worker's
+ * `MCPServerConfig`, so the record passes through without coercion.
  */
 function applyProfileResolution(
   input: PrepareInput,
@@ -136,22 +142,13 @@ function applyProfileResolution(
     };
   }
 
-  const profileMcpRecord = profileMcpServersToClientRecord(resolved.mcpServers);
-  const inlineMcp = input.mcpServers as Record<string, ClientMcpServerValue> | undefined;
-  const mergedMcp =
-    profileMcpRecord || inlineMcp ? { ...profileMcpRecord, ...inlineMcp } : undefined;
-
   return {
-    // `mergeProfileConfiguration` already merged inline envVars/setupCommands
-    // on top of the profile stack, so these are the authoritative values.
     envVars: resolved.envVars,
     setupCommands: resolved.setupCommands,
-    // Profile is the sole source for encryptedSecrets / runtimeSkills /
-    // runtimeAgents — matches today's web-side semantics.
     encryptedSecrets: resolved.encryptedSecrets,
+    mcpServers: profileMcpServersToClientRecord(resolved.mcpServers),
     runtimeSkills: resolved.skills,
     runtimeAgents: resolved.agents,
-    mcpServers: mergedMcp,
   };
 }
 

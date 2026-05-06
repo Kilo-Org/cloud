@@ -3,6 +3,7 @@ import type { WorkerDb } from '@kilocode/db';
 import { agent_environment_profiles } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { EncryptedEnvelope } from '@kilocode/encryption';
+import type { AgentConfig } from '@kilocode/db/schema-types';
 import { getEffectiveDefaultProfileId, getDefaultProfile } from './profile-service';
 import { getBindingForRepo } from './repo-binding-service';
 import { getVarsForSession } from './profile-vars-service';
@@ -41,6 +42,29 @@ export type MergedSkillForSession = {
 
 export type MergedAgentForSession = AgentForSession;
 
+/**
+ * Permissive shape for an inline runtime skill supplied by the caller. The
+ * cloud-agent-next service validates a stricter shape at its API boundary;
+ * this type stays loose so the package does not depend on service-side
+ * schemas.
+ */
+export type InlineSkillInput = {
+  name: string;
+  rawMarkdown: string;
+  files?: Record<string, string>;
+};
+
+/**
+ * Permissive shape for an inline runtime agent. `config` aliases the
+ * authoritative `AgentConfig` from the db package — runtime configs that
+ * round-trip through cloud-agent-next are structurally compatible.
+ */
+export type InlineAgentInput = {
+  slug: string;
+  name: string;
+  config: AgentConfig;
+};
+
 export type MergeProfileConfigurationArgs = {
   /** Unambiguous profile identifier selected by the caller. */
   profileId?: string;
@@ -49,8 +73,18 @@ export type MergeProfileConfigurationArgs = {
   userId?: string;
   repoFullName?: string;
   platform?: 'github' | 'gitlab';
+  /**
+   * Inline values supplied alongside the profile stack. They form a single
+   * implicit "inline layer" applied on top of the resolved profile layers,
+   * so each collection follows the same precedence: repo-binding base <
+   * effective default / explicit override (top) < inline.
+   */
   envVars?: Record<string, string>;
   setupCommands?: string[];
+  encryptedSecrets?: Record<string, EncryptedEnvelope>;
+  mcpServers?: Record<string, ClientMcpServerValue>;
+  runtimeSkills?: InlineSkillInput[];
+  runtimeAgents?: InlineAgentInput[];
 };
 
 export type MergeProfileConfigurationResult = {
@@ -95,21 +129,149 @@ async function verifyProfileIdAccessible(
   throw new ProfileNotFoundError(profileId);
 }
 
+/**
+ * Normalized per-source contribution. Profile rows and inline args are both
+ * shaped into this so the merge becomes a single reduce.
+ */
+type Layer = {
+  envVars: Record<string, string>;
+  secrets: Record<string, EncryptedEnvelope>;
+  commands: string[];
+  mcpServers: McpServerForSession[];
+  skills: SkillForSession[];
+  agents: AgentForSession[];
+};
+
+type ProfileLayerData = {
+  vars: Awaited<ReturnType<typeof getVarsForSession>>;
+  commands: string[];
+  mcpServers: McpServerForSession[];
+  skills: SkillForSession[];
+  agents: AgentForSession[];
+};
+
+function profileToLayer(data: ProfileLayerData): Layer {
+  const envVars: Record<string, string> = {};
+  const secrets: Record<string, EncryptedEnvelope> = {};
+  for (const variable of data.vars) {
+    if (variable.isSecret) {
+      secrets[variable.key] = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
+    } else {
+      envVars[variable.key] = variable.value;
+    }
+  }
+  return {
+    envVars,
+    secrets,
+    commands: [...data.commands],
+    mcpServers: [...data.mcpServers],
+    skills: [...data.skills],
+    agents: [...data.agents],
+  };
+}
+
+function clientRecordToMcpServers(
+  record: Record<string, ClientMcpServerValue>
+): McpServerForSession[] {
+  return Object.entries(record).map(([name, server]) => {
+    if (server.type === 'local') {
+      return {
+        name,
+        type: 'local',
+        enabled: server.enabled ?? true,
+        timeout: server.timeout,
+        command: server.command,
+        environment: server.environment,
+      };
+    }
+    return {
+      name,
+      type: 'remote',
+      enabled: server.enabled ?? true,
+      timeout: server.timeout,
+      url: server.url,
+      headers: server.headers,
+    };
+  });
+}
+
+function inlineToLayer(args: MergeProfileConfigurationArgs): Layer | null {
+  const { envVars, encryptedSecrets, setupCommands, mcpServers, runtimeSkills, runtimeAgents } =
+    args;
+  const hasInline =
+    !!envVars ||
+    !!encryptedSecrets ||
+    (setupCommands?.length ?? 0) > 0 ||
+    !!mcpServers ||
+    (runtimeSkills?.length ?? 0) > 0 ||
+    (runtimeAgents?.length ?? 0) > 0;
+  if (!hasInline) return null;
+
+  return {
+    envVars: { ...(envVars ?? {}) },
+    secrets: { ...(encryptedSecrets ?? {}) },
+    commands: setupCommands ? [...setupCommands] : [],
+    mcpServers: mcpServers ? clientRecordToMcpServers(mcpServers) : [],
+    skills: (runtimeSkills ?? []).map(s => ({
+      name: s.name,
+      rawMarkdown: s.rawMarkdown,
+      files: s.files ?? {},
+    })),
+    agents: runtimeAgents ? [...runtimeAgents] : [],
+  };
+}
+
+/**
+ * Reduce layers into a single result. Precedence: later layer wins per key.
+ *
+ * Disabled MCP servers (`enabled === false`) are skipped — they neither
+ * contribute nor shadow an enabled entry of the same name in an earlier
+ * layer. This matches the per-profile behavior so the inline layer behaves
+ * symmetrically.
+ */
+function mergeLayers(layers: Layer[]): MergeProfileConfigurationResult {
+  const envVars: Record<string, string> = {};
+  const secrets: Record<string, EncryptedEnvelope> = {};
+  const commands: string[] = [];
+  const mcpByName = new Map<string, McpServerForSession>();
+  const skillByName = new Map<string, MergedSkillForSession>();
+  const agentBySlug = new Map<string, MergedAgentForSession>();
+
+  for (const layer of layers) {
+    Object.assign(envVars, layer.envVars);
+    Object.assign(secrets, layer.secrets);
+    commands.push(...layer.commands);
+    for (const server of layer.mcpServers) {
+      if (!server.enabled) continue;
+      mcpByName.set(server.name, server);
+    }
+    for (const skill of layer.skills) {
+      skillByName.set(skill.name, {
+        name: skill.name,
+        rawMarkdown: skill.rawMarkdown,
+        files: skill.files,
+      });
+    }
+    for (const agent of layer.agents) {
+      agentBySlug.set(agent.slug, agent);
+    }
+  }
+
+  return {
+    envVars: Object.keys(envVars).length > 0 ? envVars : undefined,
+    setupCommands: commands.length > 0 ? commands : undefined,
+    encryptedSecrets: Object.keys(secrets).length > 0 ? secrets : undefined,
+    mcpServers: mcpByName.size > 0 ? Array.from(mcpByName.values()) : undefined,
+    skills: skillByName.size > 0 ? Array.from(skillByName.values()) : undefined,
+    agents: agentBySlug.size > 0 ? Array.from(agentBySlug.values()) : undefined,
+  };
+}
+
 export async function mergeProfileConfiguration(
   db: WorkerDb,
-  {
-    profileId,
-    owner,
-    userId,
-    repoFullName,
-    platform,
-    envVars = {},
-    setupCommands = [],
-  }: MergeProfileConfigurationArgs
+  args: MergeProfileConfigurationArgs
 ): Promise<MergeProfileConfigurationResult> {
-  let mergedEnvVars = { ...envVars };
-  let mergedSetupCommands = [...setupCommands];
-  let encryptedSecrets: Record<string, EncryptedEnvelope> | undefined;
+  const { profileId, owner, userId, repoFullName, platform } = args;
 
   // Look up the inputs to resolution.
   const repoBindingProfileId =
@@ -153,96 +315,18 @@ export async function mergeProfileConfiguration(
     })
   );
 
+  // Stack layers in precedence order: repo-binding base < explicit/default
+  // top < inline. The inline layer is built from the args and treated as
+  // just one more profile so the merge logic does not branch on its source.
+  const layers: Layer[] = [];
   const baseData = base ? profileData.find(d => d.profileId === base.profileId) : null;
   const topData = top ? profileData.find(d => d.profileId === top.profileId) : null;
+  if (baseData) layers.push(profileToLayer(baseData));
+  if (topData) layers.push(profileToLayer(topData));
+  const inline = inlineToLayer(args);
+  if (inline) layers.push(inline);
 
-  // Process the base layer (repo binding).
-  const baseEnvVars: Record<string, string> = {};
-  const baseSecrets: Record<string, EncryptedEnvelope> = {};
-  const baseCommands: string[] = [];
-  const baseMcpServers: McpServerForSession[] = baseData?.mcpServers ?? [];
-  const baseSkills: SkillForSession[] = baseData?.skills ?? [];
-  const baseAgents: AgentForSession[] = baseData?.agents ?? [];
-
-  if (baseData) {
-    for (const variable of baseData.vars) {
-      if (variable.isSecret) {
-        const parsed = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
-        baseSecrets[variable.key] = parsed;
-      } else {
-        baseEnvVars[variable.key] = variable.value;
-      }
-    }
-    baseCommands.push(...baseData.commands);
-  }
-
-  // Process the top layer (explicit pick or default).
-  const topEnvVars: Record<string, string> = {};
-  const topSecrets: Record<string, EncryptedEnvelope> = {};
-  const topCommands: string[] = [];
-  const topMcpServers: McpServerForSession[] = topData?.mcpServers ?? [];
-  const topSkills: SkillForSession[] = topData?.skills ?? [];
-  const topAgents: AgentForSession[] = topData?.agents ?? [];
-
-  if (topData) {
-    for (const variable of topData.vars) {
-      if (variable.isSecret) {
-        const parsed = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
-        topSecrets[variable.key] = parsed;
-      } else {
-        topEnvVars[variable.key] = variable.value;
-      }
-    }
-    topCommands.push(...topData.commands);
-  }
-
-  // Merge env vars: base < top < manual
-  mergedEnvVars = { ...baseEnvVars, ...topEnvVars, ...envVars };
-  // Merge commands: base, then top, then manual
-  mergedSetupCommands = [...baseCommands, ...topCommands, ...setupCommands];
-  // Merge secrets: base < top (top wins on key collision)
-  const allSecrets = { ...baseSecrets, ...topSecrets };
-  if (Object.keys(allSecrets).length > 0) {
-    encryptedSecrets = allSecrets;
-  }
-
-  // MCP servers: merge by name across profile layers only (later wins).
-  // Skips disabled servers entirely.
-  const mcpByName = new Map<string, McpServerForSession>();
-  for (const server of [...baseMcpServers, ...topMcpServers]) {
-    if (!server.enabled) continue;
-    mcpByName.set(server.name, server);
-  }
-  const mcpServers = mcpByName.size > 0 ? Array.from(mcpByName.values()) : undefined;
-
-  // Skills: merge by name across profile layers only (later wins).
-  // Disabled skills are already filtered out in getSkillsForSession.
-  const skillByName = new Map<string, MergedSkillForSession>();
-  for (const skill of [...baseSkills, ...topSkills]) {
-    skillByName.set(skill.name, {
-      name: skill.name,
-      rawMarkdown: skill.rawMarkdown,
-      files: skill.files,
-    });
-  }
-  const skills = skillByName.size > 0 ? Array.from(skillByName.values()) : undefined;
-
-  // Agents: merge by slug across profile layers only (later wins).
-  // Disabled agents are already filtered out in getAgentsForSession.
-  const agentBySlug = new Map<string, MergedAgentForSession>();
-  for (const agent of [...baseAgents, ...topAgents]) {
-    agentBySlug.set(agent.slug, agent);
-  }
-  const agents = agentBySlug.size > 0 ? Array.from(agentBySlug.values()) : undefined;
-
-  return {
-    envVars: Object.keys(mergedEnvVars).length > 0 ? mergedEnvVars : undefined,
-    setupCommands: mergedSetupCommands.length > 0 ? mergedSetupCommands : undefined,
-    encryptedSecrets,
-    mcpServers,
-    skills,
-    agents,
-  };
+  return mergeLayers(layers);
 }
 
 /**

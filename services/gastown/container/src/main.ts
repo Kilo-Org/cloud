@@ -23,7 +23,7 @@ log.info('container.cold_start', {
 // We deliberately DO NOT call process.exit here: visibility is the goal.
 // If a specific rejection turns out to be fatal state corruption we can
 // escalate it individually.
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', reason => {
   const err =
     reason instanceof Error
       ? { message: reason.message, stack: reason.stack, name: reason.name }
@@ -33,7 +33,6 @@ process.on('unhandledRejection', (reason, promise) => {
     townId: TOWN_ID,
     uptimeMs: getUptime(),
     activeAgents: activeAgentCount(),
-    event: 'unhandled_rejection',
   });
 });
 

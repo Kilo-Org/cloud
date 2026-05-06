@@ -194,6 +194,95 @@ export const credit_transactions = pgTable(
 
 export type CreditTransaction = typeof credit_transactions.$inferSelect;
 
+export const apple_iap_purchases = pgTable(
+  'apple_iap_purchases',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id),
+    apple_transaction_id: text().notNull(),
+    apple_original_transaction_id: text().notNull(),
+    apple_web_order_line_item_id: text(),
+    product_id: text().notNull(),
+    environment: text().notNull(),
+    bundle_id: text().notNull(),
+    purchase_date: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    gross_price_cents: integer().notNull(),
+    credited_cents: integer().notNull(),
+    credited_microdollars: bigint({ mode: 'number' }).notNull(),
+    signed_transaction_jws: text().notNull(),
+    status: text().notNull(),
+    credit_transaction_id: uuid()
+      .notNull()
+      .references(() => credit_transactions.id),
+    refunded_at: timestamp({ withTimezone: true, mode: 'string' }),
+    refund_credit_transaction_id: uuid().references(() => credit_transactions.id),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_apple_iap_purchases_transaction_id').on(table.apple_transaction_id),
+    uniqueIndex('UQ_apple_iap_purchases_credit_transaction_id').on(table.credit_transaction_id),
+    uniqueIndex('UQ_apple_iap_purchases_refund_credit_transaction_id')
+      .on(table.refund_credit_transaction_id)
+      .where(isNotNull(table.refund_credit_transaction_id)),
+    index('IDX_apple_iap_purchases_user_id').on(table.kilo_user_id),
+    index('IDX_apple_iap_purchases_original_transaction_id').on(
+      table.apple_original_transaction_id
+    ),
+    check(
+      'apple_iap_purchases_status_check',
+      sql`${table.status} IN ('granted', 'refunded', 'revoked')`
+    ),
+    check(
+      'apple_iap_purchases_environment_check',
+      sql`${table.environment} IN ('Sandbox', 'Production')`
+    ),
+    check('apple_iap_purchases_credited_positive_check', sql`${table.credited_cents} > 0`),
+  ]
+);
+
+export type AppleIapPurchase = typeof apple_iap_purchases.$inferSelect;
+
+export const apple_iap_notifications = pgTable(
+  'apple_iap_notifications',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    notification_uuid: text().notNull(),
+    notification_type: text().notNull(),
+    subtype: text(),
+    environment: text().notNull(),
+    apple_transaction_id: text(),
+    apple_original_transaction_id: text(),
+    signed_payload_jws: text().notNull(),
+    processed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_apple_iap_notifications_uuid').on(table.notification_uuid),
+    index('IDX_apple_iap_notifications_transaction_id').on(table.apple_transaction_id),
+    index('IDX_apple_iap_notifications_original_transaction_id').on(
+      table.apple_original_transaction_id
+    ),
+    check(
+      'apple_iap_notifications_environment_check',
+      sql`${table.environment} IN ('Sandbox', 'Production')`
+    ),
+  ]
+);
+
+export type AppleIapNotification = typeof apple_iap_notifications.$inferSelect;
+
 export const credit_campaigns = pgTable(
   'credit_campaigns',
   {

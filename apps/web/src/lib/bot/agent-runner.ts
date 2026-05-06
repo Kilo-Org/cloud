@@ -5,9 +5,8 @@ import {
   MAX_ITERATIONS,
   SUMMARY_MODEL,
 } from '@/lib/bot/constants';
-import { getPlatformContext } from '@/lib/bot/conversation-context';
-import { buildPrSignature, getRequesterInfo } from '@/lib/bot/pr-signature';
-import { getBotDocumentationUrl } from '@/lib/bot/platform-helpers';
+import { botPlatforms, type BotPlatform } from '@/lib/bot/platforms';
+import { buildPrSignature } from '@/lib/bot/pr-signature';
 import {
   linkBotRequestToSession,
   recordBotRequestCloudAgentSession,
@@ -90,17 +89,17 @@ function serializeStep(step: StepResult<ToolSet>, stepNumberOffset: number): Bot
 }
 
 async function buildSystemPrompt(
+  botPlatform: BotPlatform,
   platformIntegration: PlatformIntegration,
   thread: Thread,
   triggerMessage: BotAgentMessageLike
 ) {
   const owner = ownerFromIntegration(platformIntegration);
-  const botDocumentationUrl = getBotDocumentationUrl(platformIntegration.platform);
 
   const [githubContext, gitlabContext, conversationContext] = await Promise.all([
     getGitHubRepositoryContext(owner),
     getGitLabRepositoryContext(owner),
-    getPlatformContext(thread, triggerMessage, platformIntegration),
+    botPlatform.getConversationContext({ thread, triggerMessage, platformIntegration }),
   ]);
 
   return `You are Kilo Bot, a helpful AI assistant.
@@ -111,7 +110,7 @@ async function buildSystemPrompt(
 - If the user's request is ambiguous, ask 1-2 clarifying questions instead of guessing.
 
 ## Answering questions about Kilo Bot
-- When users ask what you can do, how you work, or for general help, include a link to the Bot documentation: ${botDocumentationUrl}
+- When users ask what you can do, how you work, or for general help, include a link to the Bot documentation: ${botPlatform.documentationUrl}
 - Provide the docs link along with your answer so users can learn more.
 
 ## Context you may receive
@@ -214,20 +213,22 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     ((params.platformIntegration.metadata || {}) as { model_slug?: string }).model_slug ??
     DEFAULT_BOT_MODEL;
   const owner = ownerFromIntegration(params.platformIntegration);
-  const chatPlatform = params.thread.id.split(':')[0];
+  const chatPlatform = params.thread.adapter.name;
+  const botPlatform = botPlatforms.requireByAdapter(params.thread.adapter);
 
   // Build PR signature from requester info (display name + message permalink)
   let prSignature: string | undefined;
   if (params.rawMessage) {
+    const rawMessage = params.rawMessage;
+    const displayName =
+      rawMessage.author.fullName || rawMessage.author.userName || rawMessage.author.userId;
     try {
-      const requesterInfo = await getRequesterInfo(
-        params.thread,
-        params.rawMessage,
-        params.platformIntegration
-      );
-      if (requesterInfo) {
-        prSignature = buildPrSignature(requesterInfo);
-      }
+      const requesterInfo = await botPlatform.getRequesterInfo({
+        message: rawMessage,
+        platformIntegration: params.platformIntegration,
+        displayName,
+      });
+      prSignature = buildPrSignature(requesterInfo);
     } catch (error) {
       console.warn('[KiloBot] Failed to build PR signature, continuing without it:', error);
     }
@@ -257,6 +258,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
   const agent = new ToolLoopAgent({
     model: provider.chatModel(modelSlug),
     instructions: await buildSystemPrompt(
+      botPlatform,
       params.platformIntegration,
       params.thread,
       params.message

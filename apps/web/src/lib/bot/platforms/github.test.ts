@@ -38,7 +38,11 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
 import type { Message, Thread } from 'chat';
 import type { PlatformIntegration } from '@kilocode/db';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { getPlatformContext } from './conversation-context';
+import { createGitHubBotPlatform } from './github';
+
+const githubPlatform = createGitHubBotPlatform({
+  getInstallationId: jest.fn(),
+});
 
 function createMessage(params: { id: string; text: string; author?: string }): Message {
   return {
@@ -122,7 +126,37 @@ function createIntegration(overrides: Partial<PlatformIntegration> = {}): Platfo
   };
 }
 
-describe('getPlatformContext', () => {
+describe('createGitHubBotPlatform.isEnabledForBot', () => {
+  function integrationWithMetadata(metadata: PlatformIntegration['metadata']): PlatformIntegration {
+    return { metadata } as PlatformIntegration;
+  }
+
+  it('returns true only when metadata.bot_enabled is the boolean true', () => {
+    expect(githubPlatform.isEnabledForBot(integrationWithMetadata({ bot_enabled: true }))).toBe(
+      true
+    );
+  });
+
+  it('returns false when metadata is missing the flag', () => {
+    expect(githubPlatform.isEnabledForBot(integrationWithMetadata({}))).toBe(false);
+    expect(githubPlatform.isEnabledForBot(integrationWithMetadata(null))).toBe(false);
+  });
+
+  it('returns false for truthy non-boolean values to avoid accidental enables', () => {
+    expect(githubPlatform.isEnabledForBot(integrationWithMetadata({ bot_enabled: 'true' }))).toBe(
+      false
+    );
+    expect(githubPlatform.isEnabledForBot(integrationWithMetadata({ bot_enabled: 1 }))).toBe(false);
+  });
+
+  it('returns false when explicitly disabled', () => {
+    expect(githubPlatform.isEnabledForBot(integrationWithMetadata({ bot_enabled: false }))).toBe(
+      false
+    );
+  });
+});
+
+describe('createGitHubBotPlatform.getConversationContext', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGenerateGitHubInstallationTokenFn.mockResolvedValue({
@@ -161,11 +195,11 @@ describe('getPlatformContext', () => {
       headers: {},
     });
 
-    const context = await getPlatformContext(
-      createThread({ id: 'github:Kilo-Org/on-call:issue:37' }),
-      createMessage({ id: '101', text: '@kilocode-dev Please fix this' }),
-      createIntegration()
-    );
+    const context = await githubPlatform.getConversationContext({
+      thread: createThread({ id: 'github:Kilo-Org/on-call:issue:37' }),
+      triggerMessage: createMessage({ id: '101', text: '@kilocode-dev Please fix this' }),
+      platformIntegration: createIntegration(),
+    });
 
     expect(context).toContain('GitHub context:');
     expect(context).toContain('- Repository: Kilo-Org/on-call');
@@ -209,11 +243,11 @@ describe('getPlatformContext', () => {
       headers: {},
     });
 
-    const context = await getPlatformContext(
-      createThread({ id: 'github:Kilo-Org/on-call:issue:37' }),
-      createMessage({ id: '201', text: '@kilocode-dev Please fix this' }),
-      createIntegration()
-    );
+    const context = await githubPlatform.getConversationContext({
+      thread: createThread({ id: 'github:Kilo-Org/on-call:issue:37' }),
+      triggerMessage: createMessage({ id: '201', text: '@kilocode-dev Please fix this' }),
+      platformIntegration: createIntegration(),
+    });
 
     expect(mockIssuesListCommentsFn).toHaveBeenCalledTimes(1);
     expect(mockIssuesListCommentsFn).toHaveBeenCalledWith(
@@ -250,11 +284,11 @@ describe('getPlatformContext', () => {
       },
     }));
 
-    await getPlatformContext(
-      createThread({ id: 'github:Kilo-Org/on-call:37:rc:301' }),
-      createMessage({ id: '301', text: '@kilocode-dev Please fix this' }),
-      createIntegration()
-    );
+    await githubPlatform.getConversationContext({
+      thread: createThread({ id: 'github:Kilo-Org/on-call:37:rc:301' }),
+      triggerMessage: createMessage({ id: '301', text: '@kilocode-dev Please fix this' }),
+      platformIntegration: createIntegration(),
+    });
 
     expect(mockPullsListReviewCommentsFn).toHaveBeenCalledTimes(5);
   });
@@ -297,11 +331,11 @@ describe('getPlatformContext', () => {
       headers: {},
     });
 
-    const context = await getPlatformContext(
-      createThread({ id: 'github:Kilo-Org/on-call:37:rc:301' }),
-      createMessage({ id: '301', text: '@kilocode-dev Please fix this' }),
-      createIntegration()
-    );
+    const context = await githubPlatform.getConversationContext({
+      thread: createThread({ id: 'github:Kilo-Org/on-call:37:rc:301' }),
+      triggerMessage: createMessage({ id: '301', text: '@kilocode-dev Please fix this' }),
+      platformIntegration: createIntegration(),
+    });
 
     expect(context).toContain('Pull request review thread:');
     expect(context).toContain('- File: src/on-call.ts');

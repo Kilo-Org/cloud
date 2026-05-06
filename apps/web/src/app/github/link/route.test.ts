@@ -4,15 +4,22 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { createGitHubBotLinkState, verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { verifyGitHubLinkToken } from '@/lib/bot/github-link-token';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
-import { getPlatformIntegrationById, isGitHubBotEnabled } from '@/lib/bot/platform-helpers';
+import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { failureResult } from '@/lib/maybe-result';
+
+const mockIsEnabledForBot = jest.fn();
 
 jest.mock('@/lib/user.server');
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot/github-link-token');
 jest.mock('@/lib/integrations/platforms/github/app-selector');
 jest.mock('@/lib/bot/platform-helpers');
+jest.mock('@/lib/bot/platforms', () => ({
+  botPlatforms: {
+    require: jest.fn(() => ({ isEnabledForBot: mockIsEnabledForBot })),
+  },
+}));
 jest.mock('@/lib/organizations/organizations');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -21,7 +28,6 @@ const mockedVerifyGitHubBotLinkState = jest.mocked(verifyGitHubBotLinkState);
 const mockedVerifyGitHubLinkToken = jest.mocked(verifyGitHubLinkToken);
 const mockedGetGitHubAppCredentials = jest.mocked(getGitHubAppCredentials);
 const mockedGetPlatformIntegrationById = jest.mocked(getPlatformIntegrationById);
-const mockedIsGitHubBotEnabled = jest.mocked(isGitHubBotEnabled);
 const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
@@ -69,7 +75,7 @@ describe('GET /github/link', () => {
       owned_by_user_id: null,
       platform_installation_id: INSTALLATION_ID,
     } as never);
-    mockedIsGitHubBotEnabled.mockReturnValue(true);
+    mockIsEnabledForBot.mockReturnValue(true);
     mockedIsOrganizationMember.mockResolvedValue(true);
   });
 
@@ -173,7 +179,7 @@ describe('GET /github/link', () => {
   });
 
   test('rejects integrations without bot_enabled metadata before redirecting to GitHub', async () => {
-    mockedIsGitHubBotEnabled.mockReturnValue(false);
+    mockIsEnabledForBot.mockReturnValue(false);
 
     const { GET } = await import('./route');
     const response = await GET(makeRequest('/github/link?token=signed-token') as never);

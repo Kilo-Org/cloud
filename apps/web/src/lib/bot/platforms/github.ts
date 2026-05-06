@@ -35,24 +35,18 @@ function parseGitHubRepositoryFullName(id: string | undefined): string | null {
   return match[1] ?? null;
 }
 
-function getGitHubRepositoryReferenceFromRaw(raw: unknown): GitHubRepositoryReference {
-  const repository = (raw as Partial<GitHubRawMessage>).repository;
-
-  return {
-    id: repository?.id ?? null,
-    fullName: repository?.full_name ?? null,
-  };
-}
-
 export function getGitHubRepositoryReference(
   thread: Thread,
   message: Message
 ): GitHubRepositoryReference {
-  const rawReference = getGitHubRepositoryReferenceFromRaw(message.raw);
+  // GitHub adapter messages always carry a GitHubRawMessage.raw, but tests
+  // exercise fallback paths with sparse fixtures, so treat raw as partial.
+  const { repository } = (message as Message<Partial<GitHubRawMessage>>).raw;
+
   return {
-    id: rawReference.id,
+    id: repository?.id ?? null,
     fullName:
-      rawReference.fullName ??
+      repository?.full_name ??
       parseGitHubRepositoryFullName(thread.id) ??
       parseGitHubRepositoryFullName(thread.channelId),
   };
@@ -273,16 +267,9 @@ async function fetchReviewThreadContext(
   };
 }
 
-function isGitHubBotEnabledForIntegration(
-  integration: Parameters<NonNullable<BotPlatform['isEnabledForBot']>>[0]
-): boolean {
-  const metadata = integration.metadata;
-  return (
-    !!metadata &&
-    typeof metadata === 'object' &&
-    'bot_enabled' in metadata &&
-    metadata.bot_enabled === true
-  );
+function isGitHubBotEnabledForIntegration(integration: PlatformIntegration): boolean {
+  const metadata = integration.metadata as { bot_enabled?: boolean } | null;
+  return metadata?.bot_enabled === true;
 }
 
 export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup): BotPlatform {

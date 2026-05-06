@@ -17,7 +17,7 @@ import { getAccessTokenFromInstallation } from '@/lib/integrations/slack-service
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getSlackMessagePermalink } from '@/lib/slack-bot/slack-utils';
 import { captureException } from '@sentry/nextjs';
-import { SlackAdapter } from '@chat-adapter/slack';
+import { SlackAdapter, type SlackEvent } from '@chat-adapter/slack';
 import type { PlatformIntegration } from '@kilocode/db';
 import type { HomeView } from '@slack/types';
 import { WebClient } from '@slack/web-api';
@@ -61,32 +61,6 @@ const SLACK_CHANNEL_INVITE_MESSAGE = {
   markdown:
     "Hey, I'm Kilo, an AI coding assistant. Mention me in this channel when you want help investigating bugs, reviewing PRs, explaining code, or starting implementation work. AI can make mistakes, so please review responses before relying on them. Sessions created with Kilo from Slack are stored at https://app.kilo.ai.",
 } as const;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object';
-}
-
-function getRawObject(message: Message): Record<string, unknown> | null {
-  return isRecord(message.raw) ? message.raw : null;
-}
-
-function getSlackTeamId(message: Message): string {
-  const raw = getRawObject(message);
-  const teamId = raw?.team_id ?? raw?.team;
-
-  if (typeof teamId !== 'string' || !teamId) {
-    throw new Error('Expected a teamId in message.raw');
-  }
-
-  return teamId;
-}
-
-function isSlackChannelLevelMessage(message: Message): boolean {
-  const raw = getRawObject(message);
-  const threadTs = raw?.thread_ts;
-  const ts = raw?.ts;
-  return !threadTs || threadTs === ts;
-}
 
 function linkAccountCard(linkUrl: string) {
   return Card({
@@ -250,11 +224,10 @@ async function getSlackRequesterInfo(
     return { displayName, platform: PLATFORM.SLACK };
   }
 
-  const raw = getRawObject(message);
-  const channelId = raw?.channel;
+  const { channel: channelId } = (message as Message<SlackEvent>).raw;
   const messageTs = message.id;
 
-  if (typeof channelId !== 'string' || !messageTs) {
+  if (!channelId || !messageTs) {
     return { displayName, platform: PLATFORM.SLACK };
   }
 
@@ -270,16 +243,23 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
     documentationUrl: 'https://kilo.ai/docs/code-with-ai/platforms/slack',
     usesGenericLinkAccountRoute: true,
     async getIdentity({ message }) {
+      const { team_id, team } = (message as Message<SlackEvent>).raw;
+      const teamId = team_id ?? team;
+      if (!teamId) {
+        throw new Error('Expected a teamId in message.raw');
+      }
       return {
         platform: PLATFORM.SLACK,
-        teamId: getSlackTeamId(message),
+        teamId,
         userId: message.author.userId,
       };
     },
     isEnabledForBot: () => true,
     canHandleMessage: () => true,
     async promptLinkAccount({ thread, message, identity, state }) {
-      const target = isSlackChannelLevelMessage(message) ? thread.channel : thread;
+      const { thread_ts, ts } = (message as Message<SlackEvent>).raw;
+      const isChannelLevel = !thread_ts || thread_ts === ts;
+      const target = isChannelLevel ? thread.channel : thread;
       const url = new URL(LINK_ACCOUNT_PATH, APP_URL);
       url.searchParams.set(
         'token',

@@ -5,7 +5,11 @@ import { kilo_pass_subscriptions } from '@kilocode/db/schema';
 import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import type { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import {
+  type KiloPassPaymentProvider,
+  type KiloPassCadence,
+  type KiloPassTier,
+} from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { getOpenPauseEvent } from '@/lib/kilo-pass/pause-events';
@@ -16,6 +20,8 @@ type DbOrTx = Db | DrizzleTransaction;
 export type KiloPassSubscriptionState = {
   subscriptionId: string;
   stripeSubscriptionId: string;
+  paymentProvider: KiloPassPaymentProvider;
+  providerSubscriptionId: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
   status: Stripe.Subscription.Status;
@@ -28,7 +34,9 @@ export type KiloPassSubscriptionState = {
 
 type KiloPassSubscriptionRowForState = {
   subscriptionId: string;
-  stripeSubscriptionId: string;
+  stripeSubscriptionId: string | null;
+  paymentProvider: KiloPassPaymentProvider;
+  providerSubscriptionId: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
   status: Stripe.Subscription.Status;
@@ -109,6 +117,8 @@ export async function getKiloPassStateForUser(
     .select({
       subscriptionId: kilo_pass_subscriptions.id,
       stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
+      paymentProvider: kilo_pass_subscriptions.payment_provider,
+      providerSubscriptionId: kilo_pass_subscriptions.provider_subscription_id,
       tier: kilo_pass_subscriptions.tier,
       cadence: kilo_pass_subscriptions.cadence,
       status: kilo_pass_subscriptions.status,
@@ -136,7 +146,9 @@ export async function getKiloPassStateForUser(
 
   return {
     subscriptionId: selected.subscriptionId,
-    stripeSubscriptionId: selected.stripeSubscriptionId,
+    stripeSubscriptionId: selected.stripeSubscriptionId ?? selected.providerSubscriptionId ?? '',
+    paymentProvider: selected.paymentProvider,
+    providerSubscriptionId: selected.providerSubscriptionId,
     tier: selected.tier,
     cadence: selected.cadence,
     status: isPaused ? 'paused' : selected.status,

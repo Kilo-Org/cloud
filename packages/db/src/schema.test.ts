@@ -65,11 +65,23 @@ describe('database schema', () => {
     const expectedEnumValues = {
       KiloPassTier: ['tier_19', 'tier_49', 'tier_199'],
       KiloPassCadence: ['monthly', 'yearly'],
-      KiloPassIssuanceSource: ['stripe_invoice', 'cron'],
+      KiloPassPaymentProvider: ['stripe', 'app_store', 'google_play'],
+      KiloPassIssuanceSource: [
+        'stripe_invoice',
+        'app_store_transaction',
+        'google_play_transaction',
+        'cron',
+      ],
       KiloPassIssuanceItemKind: ['base', 'bonus', 'promo_first_month_50pct'],
       KiloPassAuditLogAction: [
         'stripe_webhook_received',
         'kilo_pass_invoice_paid_handled',
+        'store_purchase_completed',
+        'store_notification_received',
+        'store_subscription_renewed',
+        'store_subscription_canceled',
+        'store_subscription_expired',
+        'store_subscription_refunded',
         'base_credits_issued',
         'bonus_credits_issued',
         'bonus_credits_skipped_idempotent',
@@ -168,5 +180,10 @@ describe('database schema', () => {
         );
       }
     }
+  });
+
+  it('exposes provider-aware Kilo Pass store tables', () => {
+    expect(Object.hasOwn(schema, 'kilo_pass_store_events')).toBe(true);
+    expect(Object.hasOwn(schema, 'kilo_pass_store_purchases')).toBe(true);
   });
 });

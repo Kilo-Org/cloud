@@ -19,6 +19,7 @@ import {
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
   KiloPassTier,
+  KiloPassPaymentProvider,
 } from '@/lib/kilo-pass/enums';
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
 import { and, desc, eq, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
@@ -47,6 +48,9 @@ import type Stripe from 'stripe';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
 import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
+import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
+import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
+import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 
 const CursorInputSchema = z.object({
   cursor: z.string().nullable().optional(),
@@ -81,6 +85,7 @@ function parseOffsetCursor(cursor: string | null | undefined): number {
 const KiloPassTierSchema = z.enum(KiloPassTier);
 
 const KiloPassCadenceSchema = z.enum(KiloPassCadence);
+const KiloPassPaymentProviderSchema = z.enum(KiloPassPaymentProvider);
 
 const KiloPassSubscriptionStatusSchema = z.union([
   z.literal('active'),
@@ -96,6 +101,8 @@ const KiloPassSubscriptionStatusSchema = z.union([
 const KiloPassSubscriptionStateBaseSchema = z.object({
   subscriptionId: z.string(),
   stripeSubscriptionId: z.string(),
+  paymentProvider: KiloPassPaymentProviderSchema,
+  providerSubscriptionId: z.string().nullable(),
   tier: KiloPassTierSchema,
   cadence: KiloPassCadenceSchema,
   status: KiloPassSubscriptionStatusSchema,
@@ -129,6 +136,13 @@ const GetStateOutputSchema = z.object({
 
 const GetAverageMonthlyUsageLast3MonthsOutputSchema = z.object({
   averageMonthlyUsageUsd: z.number(),
+});
+
+const CompleteStorePurchaseOutputSchema = z.object({
+  subscriptionId: z.string(),
+  tier: KiloPassTierSchema,
+  cadence: KiloPassCadenceSchema,
+  alreadyProcessed: z.boolean(),
 });
 
 function isTwoMonthPromoOfferActive(): boolean {
@@ -167,6 +181,35 @@ async function getIsFirstTimeSubscriberEver(params: {
     .limit(1);
 
   return otherSubscriptions.length === 0;
+}
+
+async function getIsFirstTimeSubscriberEverBySubscriptionId(params: {
+  kiloUserId: string;
+  subscriptionId: string;
+}): Promise<boolean> {
+  const otherSubscriptions = await db
+    .select({ id: kilo_pass_subscriptions.id })
+    .from(kilo_pass_subscriptions)
+    .where(
+      and(
+        eq(kilo_pass_subscriptions.kilo_user_id, params.kiloUserId),
+        ne(kilo_pass_subscriptions.id, params.subscriptionId)
+      )
+    )
+    .limit(1);
+
+  return otherSubscriptions.length === 0;
+}
+
+function assertStripeManagedSubscription(subscription: {
+  paymentProvider: KiloPassPaymentProvider;
+}): void {
+  if (subscription.paymentProvider !== KiloPassPaymentProvider.Stripe) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Manage this Kilo Pass subscription through the mobile app store.',
+    });
+  }
 }
 
 async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Promise<boolean> {
@@ -345,6 +388,18 @@ const GetScheduledChangeOutputSchema = z.object({
 });
 
 export const kiloPassRouter = createTRPCRouter({
+  getMobileStoreProducts: baseProcedure.query(() => ({
+    products: getAllMobileStoreKiloPassProducts(),
+  })),
+
+  completeAppStorePurchase: baseProcedure
+    .input(z.object({ signedTransactionJws: z.string().min(1) }))
+    .output(CompleteStorePurchaseOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const purchase = await verifyAppleKiloPassTransactionJws(input.signedTransactionJws);
+      return completeStoreKiloPassPurchase({ user: ctx.user, purchase });
+    }),
+
   getAverageMonthlyUsageLast3Months: baseProcedure
     .output(GetAverageMonthlyUsageLast3MonthsOutputSchema)
     .query(async ({ ctx }) => {
@@ -385,6 +440,53 @@ export const kiloPassRouter = createTRPCRouter({
     const subscriptionBase = await getKiloPassStateForUser(db, ctx.user.id);
     if (!subscriptionBase) {
       return { subscription: null, isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive() };
+    }
+
+    if (subscriptionBase.paymentProvider !== KiloPassPaymentProvider.Stripe) {
+      const isFirstTimeSubscriberEver = await getIsFirstTimeSubscriberEverBySubscriptionId({
+        kiloUserId: ctx.user.id,
+        subscriptionId: subscriptionBase.subscriptionId,
+      });
+      const baseAmountUsd = getMonthlyPriceUsd(subscriptionBase.tier);
+      const startedAtUtc = subscriptionBase.startedAt
+        ? dayjs(subscriptionBase.startedAt).utc()
+        : null;
+      const nextBillingAt =
+        startedAtUtc?.isValid() === true
+          ? startedAtUtc
+              .add(1, subscriptionBase.cadence === KiloPassCadence.Yearly ? 'year' : 'month')
+              .toISOString()
+          : null;
+      const isBonusUnlocked = await getIsBonusUnlockedForSubscriptionId(
+        subscriptionBase.subscriptionId
+      );
+
+      return {
+        subscription: {
+          ...subscriptionBase,
+          nextBonusCreditsUsd:
+            subscriptionBase.cadence === KiloPassCadence.Yearly
+              ? roundToCents(computeYearlyCadenceMonthlyBonusUsd(subscriptionBase.tier))
+              : roundToCents(
+                  baseAmountUsd *
+                    computeMonthlyCadenceBonusPercent({
+                      tier: subscriptionBase.tier,
+                      streakMonths: Math.max(1, subscriptionBase.currentStreakMonths + 1),
+                      isFirstTimeSubscriberEver,
+                      subscriptionStartedAtIso: subscriptionBase.startedAt,
+                    })
+                ),
+          nextBillingAt,
+          isFirstTimeSubscriberEver,
+          currentPeriodBaseCreditsUsd: baseAmountUsd,
+          currentPeriodUsageUsd: 0,
+          currentPeriodHostingCostUsd: 0,
+          currentPeriodBonusCreditsUsd: null,
+          isBonusUnlocked,
+          refillAt: subscriptionBase.nextYearlyIssueAt ?? nextBillingAt,
+        },
+        isEligibleForFirstMonthPromo: false,
+      };
     }
 
     const stripeCustomerId = ctx.user.stripe_customer_id;
@@ -631,6 +733,7 @@ export const kiloPassRouter = createTRPCRouter({
       if (!subscription) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
       }
+      assertStripeManagedSubscription(subscription);
 
       // Can only cancel active subscriptions that aren't already pending cancellation
       if (subscription.status !== 'active' || subscription.cancelAtPeriodEnd) {
@@ -695,6 +798,7 @@ export const kiloPassRouter = createTRPCRouter({
       if (!subscription) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
       }
+      assertStripeManagedSubscription(subscription);
 
       if (!subscription.cancelAtPeriodEnd) {
         throw new TRPCError({
@@ -744,6 +848,7 @@ export const kiloPassRouter = createTRPCRouter({
       if (!subscription) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
       }
+      assertStripeManagedSubscription(subscription);
 
       if (subscription.status !== 'paused') {
         throw new TRPCError({
@@ -773,6 +878,9 @@ export const kiloPassRouter = createTRPCRouter({
     .query(async ({ ctx }) => {
       const subscription = await getKiloPassStateForUser(db, ctx.user.id);
       if (!subscription) {
+        return { scheduledChange: null };
+      }
+      if (subscription.paymentProvider !== KiloPassPaymentProvider.Stripe) {
         return { scheduledChange: null };
       }
 
@@ -817,6 +925,7 @@ export const kiloPassRouter = createTRPCRouter({
       if (!subscription) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
       }
+      assertStripeManagedSubscription(subscription);
 
       // Only allow scheduling changes for active subscriptions.
       if (subscription.status !== 'active') {
@@ -1017,6 +1126,7 @@ export const kiloPassRouter = createTRPCRouter({
       if (!subscription) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
       }
+      assertStripeManagedSubscription(subscription);
 
       const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
         columns: { id: true, stripe_schedule_id: true },
@@ -1054,6 +1164,7 @@ export const kiloPassRouter = createTRPCRouter({
       if (!subscription) {
         return { entries: [], hasMore: false, cursor: null };
       }
+      assertStripeManagedSubscription(subscription);
 
       const limit = input.limit ?? 10;
       const invoices = await stripe.invoices.list({
@@ -1179,7 +1290,12 @@ export const kiloPassRouter = createTRPCRouter({
 
   getChurnkeyAuthHash: baseProcedure
     .output(z.object({ hash: z.string(), customerId: z.string() }))
-    .query(({ ctx }) => {
+    .query(async ({ ctx }) => {
+      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
+      if (subscription) {
+        assertStripeManagedSubscription(subscription);
+      }
+
       const stripeCustomerId = ctx.user.stripe_customer_id;
       if (!stripeCustomerId) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Missing Stripe customer for user.' });

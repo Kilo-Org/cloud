@@ -28,6 +28,7 @@ import * as z from 'zod';
 import {
   KiloPassTier,
   KiloPassCadence,
+  KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
   KiloPassAuditLogAction,
@@ -114,6 +115,7 @@ export function enumCheck<T extends Record<string, string>>(
 export const SCHEMA_CHECK_ENUMS = {
   KiloPassTier,
   KiloPassCadence,
+  KiloPassPaymentProvider,
   KiloPassIssuanceSource,
   KiloPassIssuanceItemKind,
   KiloPassAuditLogAction,
@@ -441,7 +443,12 @@ export const kilo_pass_subscriptions = pgTable(
     kilo_user_id: text()
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    stripe_subscription_id: text().notNull().unique(),
+    payment_provider: text()
+      .notNull()
+      .$type<KiloPassPaymentProvider>()
+      .default(KiloPassPaymentProvider.Stripe),
+    provider_subscription_id: text(),
+    stripe_subscription_id: text().unique(),
     tier: text().notNull().$type<KiloPassTier>(),
     cadence: text().notNull().$type<KiloPassCadence>(),
     status: text().notNull().$type<StripeSubscriptionStatus>(),
@@ -468,11 +475,24 @@ export const kilo_pass_subscriptions = pgTable(
   },
   table => [
     index('IDX_kilo_pass_subscriptions_kilo_user_id').on(table.kilo_user_id),
+    index('IDX_kilo_pass_subscriptions_payment_provider').on(table.payment_provider),
     index('IDX_kilo_pass_subscriptions_status').on(table.status),
     index('IDX_kilo_pass_subscriptions_cadence').on(table.cadence),
+    uniqueIndex('UQ_kilo_pass_subscriptions_provider_subscription')
+      .on(table.payment_provider, table.provider_subscription_id)
+      .where(sql`${table.provider_subscription_id} IS NOT NULL`),
     check(
       'kilo_pass_subscriptions_current_streak_months_non_negative_check',
       sql`${table.current_streak_months} >= 0`
+    ),
+    check(
+      'kilo_pass_subscriptions_provider_subscription_required_check',
+      sql`${table.provider_subscription_id} IS NOT NULL OR ${table.payment_provider} = 'stripe'`
+    ),
+    enumCheck(
+      'kilo_pass_subscriptions_payment_provider_check',
+      table.payment_provider,
+      KiloPassPaymentProvider
     ),
     enumCheck('kilo_pass_subscriptions_tier_check', table.tier, KiloPassTier),
     enumCheck('kilo_pass_subscriptions_cadence_check', table.cadence, KiloPassCadence),
@@ -481,6 +501,89 @@ export const kilo_pass_subscriptions = pgTable(
 
 export type KiloPassSubscription = typeof kilo_pass_subscriptions.$inferSelect;
 export type NewKiloPassSubscription = typeof kilo_pass_subscriptions.$inferInsert;
+
+export const kilo_pass_store_events = pgTable(
+  'kilo_pass_store_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    payment_provider: text().notNull().$type<KiloPassPaymentProvider>(),
+    event_id: text().notNull(),
+    provider_subscription_id: text(),
+    provider_transaction_id: text(),
+    product_id: text().notNull(),
+    environment: text().notNull(),
+    payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    processed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_kilo_pass_store_events_provider_event').on(
+      table.payment_provider,
+      table.event_id
+    ),
+    index('IDX_kilo_pass_store_events_provider_subscription').on(
+      table.payment_provider,
+      table.provider_subscription_id
+    ),
+    enumCheck(
+      'kilo_pass_store_events_payment_provider_check',
+      table.payment_provider,
+      KiloPassPaymentProvider
+    ),
+  ]
+);
+
+export type KiloPassStoreEvent = typeof kilo_pass_store_events.$inferSelect;
+export type NewKiloPassStoreEvent = typeof kilo_pass_store_events.$inferInsert;
+
+export const kilo_pass_store_purchases = pgTable(
+  'kilo_pass_store_purchases',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    kilo_pass_subscription_id: uuid()
+      .notNull()
+      .references(() => kilo_pass_subscriptions.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    payment_provider: text().notNull().$type<KiloPassPaymentProvider>(),
+    product_id: text().notNull(),
+    provider_subscription_id: text().notNull(),
+    provider_transaction_id: text().notNull(),
+    provider_original_transaction_id: text(),
+    purchase_token: text(),
+    environment: text().notNull(),
+    purchased_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    raw_payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_kilo_pass_store_purchases_provider_transaction').on(
+      table.payment_provider,
+      table.provider_transaction_id
+    ),
+    index('IDX_kilo_pass_store_purchases_subscription_id').on(table.kilo_pass_subscription_id),
+    index('IDX_kilo_pass_store_purchases_user_id').on(table.kilo_user_id),
+    enumCheck(
+      'kilo_pass_store_purchases_payment_provider_check',
+      table.payment_provider,
+      KiloPassPaymentProvider
+    ),
+  ]
+);
+
+export type KiloPassStorePurchase = typeof kilo_pass_store_purchases.$inferSelect;
+export type NewKiloPassStorePurchase = typeof kilo_pass_store_purchases.$inferInsert;
 
 export const kilo_pass_issuances = pgTable(
   'kilo_pass_issuances',

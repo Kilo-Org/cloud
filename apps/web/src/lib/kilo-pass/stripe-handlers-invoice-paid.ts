@@ -40,6 +40,7 @@ import {
   KiloPassAuditLogResult,
   KiloPassCadence,
   KiloPassIssuanceSource,
+  KiloPassPaymentProvider,
 } from '@/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
 import { processTopUp } from '@/lib/credits';
@@ -303,6 +304,8 @@ export async function handleKiloPassInvoicePaid(params: {
         .insert(kilo_pass_subscriptions)
         .values({
           kilo_user_id: kiloUserId,
+          payment_provider: KiloPassPaymentProvider.Stripe,
+          provider_subscription_id: subscription.id,
           stripe_subscription_id: subscription.id,
           tier,
           cadence,
@@ -314,6 +317,8 @@ export async function handleKiloPassInvoicePaid(params: {
           target: kilo_pass_subscriptions.stripe_subscription_id,
           set: {
             kilo_user_id: kiloUserId,
+            payment_provider: KiloPassPaymentProvider.Stripe,
+            provider_subscription_id: subscription.id,
             tier,
             cadence,
             status: subscription.status,

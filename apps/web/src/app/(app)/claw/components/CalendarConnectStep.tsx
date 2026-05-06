@@ -12,6 +12,13 @@ type CalendarConnectStepViewProps = {
   connectUrl: string;
   isConnected: boolean;
   connectedAccountEmail?: string | null;
+  /**
+   * Whether the kiloclaw instance row is provisioned. The
+   * /api/integrations/google/connect route requires an active instance and
+   * bounces the user out of onboarding when it can't find one, so the Connect
+   * button stays disabled until the instance row exists.
+   */
+  instanceReady: boolean;
   onSkip: () => void;
   onContinue: () => void;
   onConnectClick?: () => void;
@@ -41,6 +48,7 @@ export function CalendarConnectStepView({
   connectUrl,
   isConnected,
   connectedAccountEmail,
+  instanceReady,
   onSkip,
   onContinue,
   onConnectClick,
@@ -121,11 +129,15 @@ export function CalendarConnectStepView({
             <Button variant="primary" onClick={() => onContinue()}>
               Continue
             </Button>
-          ) : (
+          ) : instanceReady ? (
             <Button asChild variant="primary">
               <Link href={connectUrl} onClick={() => onConnectClick?.()}>
                 Connect Google Calendar
               </Link>
+            </Button>
+          ) : (
+            <Button variant="primary" disabled>
+              Setting up your instance…
             </Button>
           )}
         </div>

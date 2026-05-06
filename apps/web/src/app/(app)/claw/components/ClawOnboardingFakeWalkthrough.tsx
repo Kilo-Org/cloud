@@ -25,6 +25,7 @@ import { ProvisioningStepView } from './ProvisioningStep';
 
 const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
   identity: 'Identity',
+  calendar: 'Calendar',
   channels: 'Channels',
   provisioning: 'Provisioning',
   pairing: 'Pairing',
@@ -219,6 +220,7 @@ function renderFakeStep({
           connectUrl="#"
           isConnected={false}
           connectedAccountEmail={null}
+          instanceReady
           onConnectClick={() => setStep('channels')}
           onSkip={() => setStep('channels')}
           onContinue={() => setStep('channels')}

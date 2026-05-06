@@ -112,7 +112,7 @@ export function KiloPassSubscriptionSheet({
                           {formatTier(product)} · {formatCadence(product)}
                         </Text>
                         <Text className="text-xs text-muted-foreground">
-                          Same Kilo Pass credits and bonus progress as web.
+                          Base credits plus monthly bonus progress.
                         </Text>
                       </View>
                       <View className="items-end gap-2">

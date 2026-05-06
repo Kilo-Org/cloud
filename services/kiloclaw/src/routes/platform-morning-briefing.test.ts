@@ -119,6 +119,7 @@ describe('platform morning-briefing warm-up handling', () => {
       observedEnabled: false,
       reconcileState: 'idle',
       code: 'controller_route_unavailable',
+      error: 'Morning Briefing unavailable (controller too old)',
     });
   });
 

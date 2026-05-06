@@ -2003,7 +2003,7 @@ platform.get('/morning-briefing/status', async c => {
           enabled: false,
           desiredEnabled: false,
           observedEnabled: false,
-          reconcileState: 'idle' as const,
+          reconcileState: 'idle',
           code: 'controller_route_unavailable',
           error: 'Morning Briefing unavailable (controller too old)',
         },

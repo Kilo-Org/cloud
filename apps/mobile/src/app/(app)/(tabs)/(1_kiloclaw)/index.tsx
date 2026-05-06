@@ -94,15 +94,18 @@ export default function KiloClawTab() {
         className="px-[22px]"
         headerRight={<ProfileAvatarButton />}
       />
-      <Animated.View layout={LinearTransition} className="flex-1 items-center justify-center px-4">
+      <Animated.View layout={LinearTransition} className="flex-1 px-4">
         {showInstanceSkeleton ? (
-          <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 px-4">
+          <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 px-4 pt-5">
             <Skeleton className="h-16 w-full rounded-xl" />
             <Skeleton className="h-16 w-full rounded-xl" />
             <Skeleton className="h-16 w-full rounded-xl" />
           </Animated.View>
         ) : (
-          <Animated.View entering={FadeIn.duration(200)}>
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            className="flex-1 items-center justify-center"
+          >
             <EmptyStateContent
               foregroundColor={colors.foreground}
               state={onboardingQuery.data}

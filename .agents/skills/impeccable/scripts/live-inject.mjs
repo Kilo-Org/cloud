@@ -28,10 +28,7 @@ const MARKER_CLOSE_TEXT = 'impeccable-live-end';
  * matching them would silently inject tracking scripts into third-party
  * code. The user cannot turn these off via config — they are the floor.
  */
-const HARD_EXCLUDES = [
-  '**/node_modules/**',
-  '**/.git/**',
-];
+const HARD_EXCLUDES = ['**/node_modules/**', '**/.git/**'];
 
 export async function injectCli() {
   const args = process.argv.slice(2);
@@ -61,13 +58,27 @@ Output (JSON):
     try {
       cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
     } catch (err) {
-      console.log(JSON.stringify({ ok: false, error: 'config_invalid', message: err.message, path: CONFIG_PATH }));
+      console.log(
+        JSON.stringify({
+          ok: false,
+          error: 'config_invalid',
+          message: err.message,
+          path: CONFIG_PATH,
+        })
+      );
       return;
     }
     try {
       validateConfig(cfg);
     } catch (err) {
-      console.log(JSON.stringify({ ok: false, error: 'config_invalid', message: err.message, path: CONFIG_PATH }));
+      console.log(
+        JSON.stringify({
+          ok: false,
+          error: 'config_invalid',
+          message: err.message,
+          path: CONFIG_PATH,
+        })
+      );
       return;
     }
     console.log(JSON.stringify({ ok: true, config: cfg, path: CONFIG_PATH }));
@@ -85,7 +96,7 @@ Output (JSON):
   const resolvedFiles = resolveFiles(process.cwd(), config);
 
   if (args.includes('--remove')) {
-    const results = resolvedFiles.map((relFile) => {
+    const results = resolvedFiles.map(relFile => {
       const absFile = path.resolve(process.cwd(), relFile);
       if (!fs.existsSync(absFile)) return { file: relFile, error: 'file_not_found' };
       const content = fs.readFileSync(absFile, 'utf-8');
@@ -111,14 +122,18 @@ Output (JSON):
     process.exit(1);
   }
 
-  const results = resolvedFiles.map((relFile) => {
+  const results = resolvedFiles.map(relFile => {
     const absFile = path.resolve(process.cwd(), relFile);
     if (!fs.existsSync(absFile)) return { file: relFile, error: 'file_not_found' };
     const content = fs.readFileSync(absFile, 'utf-8');
     const withoutOld = revertCspMeta(removeTag(content, config.commentSyntax));
     const withTag = insertTag(withoutOld, config, port);
     if (withTag === withoutOld) {
-      return { file: relFile, error: 'insertion_point_not_found', anchor: config.insertBefore || config.insertAfter };
+      return {
+        file: relFile,
+        error: 'insertion_point_not_found',
+        anchor: config.insertBefore || config.insertAfter,
+      };
     }
     const updated = patchCspMeta(withTag, port);
     fs.writeFileSync(absFile, updated, 'utf-8');
@@ -128,7 +143,7 @@ Output (JSON):
       cspPatched: updated !== withTag,
     };
   });
-  const anyInserted = results.some((r) => r.inserted);
+  const anyInserted = results.some(r => r.inserted);
   console.log(JSON.stringify({ ok: anyInserted, port, results }));
   if (!anyInserted) process.exit(1);
 }
@@ -146,8 +161,8 @@ export function resolveFiles(rootDir, config) {
   const allExcludes = [...HARD_EXCLUDES, ...userExcludes];
   const excludeRegexes = allExcludes.map(globToRegex);
 
-  const isExcluded = (relPath) => excludeRegexes.some((re) => re.test(relPath));
-  const isGlob = (s) => /[*?[]/.test(s);
+  const isExcluded = relPath => excludeRegexes.some(re => re.test(relPath));
+  const isGlob = s => /[*?[]/.test(s);
 
   const seen = new Set();
   const out = [];
@@ -231,14 +246,14 @@ function validateConfig(cfg) {
   if (!Array.isArray(cfg.files) || cfg.files.length === 0) {
     throw new Error('config.files (non-empty string array) required');
   }
-  if (!cfg.files.every((f) => typeof f === 'string' && f.length > 0)) {
+  if (!cfg.files.every(f => typeof f === 'string' && f.length > 0)) {
     throw new Error('config.files must contain only non-empty strings');
   }
   if (cfg.exclude !== undefined) {
     if (!Array.isArray(cfg.exclude)) {
       throw new Error('config.exclude, if present, must be a string array');
     }
-    if (!cfg.exclude.every((f) => typeof f === 'string' && f.length > 0)) {
+    if (!cfg.exclude.every(f => typeof f === 'string' && f.length > 0)) {
       throw new Error('config.exclude must contain only non-empty strings');
     }
   }
@@ -249,20 +264,36 @@ function validateConfig(cfg) {
     throw new Error("config.commentSyntax must be 'html' or 'jsx'");
   }
   if (cfg.cspChecked !== undefined && typeof cfg.cspChecked !== 'boolean') {
-    throw new Error("config.cspChecked, if present, must be a boolean");
+    throw new Error('config.cspChecked, if present, must be a boolean');
   }
 }
 
-function commentOpen(syntax) { return syntax === 'jsx' ? '{/*' : '<!--'; }
-function commentClose(syntax) { return syntax === 'jsx' ? '*/}' : '-->'; }
+function commentOpen(syntax) {
+  return syntax === 'jsx' ? '{/*' : '<!--';
+}
+function commentClose(syntax) {
+  return syntax === 'jsx' ? '*/}' : '-->';
+}
 
 function buildTagBlock(syntax, port) {
   const open = commentOpen(syntax);
   const close = commentClose(syntax);
   return (
-    open + ' ' + MARKER_OPEN_TEXT + ' ' + close + '\n' +
-    '<script src="http://localhost:' + port + '/live.js"></script>\n' +
-    open + ' ' + MARKER_CLOSE_TEXT + ' ' + close + '\n'
+    open +
+    ' ' +
+    MARKER_OPEN_TEXT +
+    ' ' +
+    close +
+    '\n' +
+    '<script src="http://localhost:' +
+    port +
+    '/live.js"></script>\n' +
+    open +
+    ' ' +
+    MARKER_CLOSE_TEXT +
+    ' ' +
+    close +
+    '\n'
   );
 }
 
@@ -282,7 +313,8 @@ function insertTag(content, config, port) {
   if (idx === -1) return content;
   const after = idx + config.insertAfter.length;
   // Preserve a single trailing newline if the anchor didn't end with one
-  const prefix = content[after] === '\n' ? content.slice(0, after + 1) : content.slice(0, after) + '\n';
+  const prefix =
+    content[after] === '\n' ? content.slice(0, after + 1) : content.slice(0, after) + '\n';
   return prefix + block + content.slice(prefix.length);
 }
 
@@ -398,7 +430,8 @@ export function patchCspMeta(content, port) {
     // `<meta … />` round-trips byte-for-byte.
     const trailingWs = (attrs.match(/[ \t]*$/) || [''])[0];
     const attrsBody = attrs.slice(0, attrs.length - trailingWs.length);
-    const newAttrs = attrsBody.replace(contentAttr.full, newContentAttr) + ' ' + marker + trailingWs;
+    const newAttrs =
+      attrsBody.replace(contentAttr.full, newContentAttr) + ' ' + marker + trailingWs;
     const newTag = tag.full.replace(attrs, newAttrs);
 
     result = result.slice(0, tag.start) + newTag + result.slice(tag.end);
@@ -419,8 +452,11 @@ export function revertCspMeta(content) {
     if (!contentAttr) continue;
 
     let originalValue;
-    try { originalValue = Buffer.from(origAttr.value, 'base64').toString('utf-8'); }
-    catch { continue; }
+    try {
+      originalValue = Buffer.from(origAttr.value, 'base64').toString('utf-8');
+    } catch {
+      continue;
+    }
 
     const newContentAttr = `content=${contentAttr.quote}${originalValue}${contentAttr.quote}`;
     let newAttrs = tag.attrs.replace(contentAttr.full, newContentAttr);

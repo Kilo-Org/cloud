@@ -46,7 +46,7 @@ function isGitIgnored(absPath, cwd) {
       stdio: 'ignore',
     });
     return true; // exit 0 = ignored
-  } catch (err) {
+  } catch {
     // Exit code 1 = not ignored. Exit code 128 = not a git repo or other error.
     // In both cases, treat as "not known to be ignored."
     return false;
@@ -60,10 +60,16 @@ function hasGeneratedHeader(absPath) {
     const buf = Buffer.alloc(HEADER_SCAN_BYTES);
     const bytesRead = fs.readSync(fd, buf, 0, HEADER_SCAN_BYTES, 0);
     const head = buf.slice(0, bytesRead).toString('utf-8');
-    return HEADER_MARKERS.some((re) => re.test(head));
+    return HEADER_MARKERS.some(re => re.test(head));
   } catch {
     return false;
   } finally {
-    if (fd !== undefined) { try { fs.closeSync(fd); } catch {} }
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* close best-effort */
+      }
+    }
   }
 }

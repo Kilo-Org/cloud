@@ -23,7 +23,7 @@ const PER_REQUEST_TIMEOUT_MS = 270_000;
 function readServerInfo() {
   const record = readLiveServerInfo(process.cwd());
   if (!record) {
-    console.error('No running live server found. Start one with: npx impeccable live');
+    console.error('Live server is not running. Start it with: npx impeccable live');
     process.exit(1);
   }
   return record.info;
@@ -75,7 +75,9 @@ Options:
     const fileIdx = args.indexOf('--file');
     const filePath = fileIdx !== -1 && fileIdx + 1 < args.length ? args[fileIdx + 1] : undefined;
     // Message is any remaining positional arg that isn't a flag
-    const message = args.find((a, i) => i > replyIdx + 2 && !a.startsWith('--') && i !== fileIdx + 1) || undefined;
+    const message =
+      args.find((a, i) => i > replyIdx + 2 && !a.startsWith('--') && i !== fileIdx + 1) ||
+      undefined;
 
     if (!id) {
       console.error('Usage: npx impeccable poll --reply <id> <status> [--file path] [message]');
@@ -88,7 +90,7 @@ Options:
       // Success — silent exit (agent doesn't need output for replies)
     } catch (err) {
       if (err.cause?.code === 'ECONNREFUSED') {
-        console.error('Live server not running. Start one with: npx impeccable live');
+        console.error('Live server is not running. Start it with: npx impeccable live');
       } else {
         console.error('Reply failed:', err.message);
       }
@@ -140,18 +142,23 @@ Options:
     if (event.type === 'accept' || event.type === 'discard') {
       const __dirname = path.dirname(fileURLToPath(import.meta.url));
       const acceptScript = path.join(__dirname, 'live-accept.mjs');
-      const scriptArgs = event.type === 'discard'
-        ? ['--id', event.id, '--discard']
-        : ['--id', event.id, '--variant', event.variantId];
-      if (event.type === 'accept' && event.paramValues && Object.keys(event.paramValues).length > 0) {
+      const scriptArgs =
+        event.type === 'discard'
+          ? ['--id', event.id, '--discard']
+          : ['--id', event.id, '--variant', event.variantId];
+      if (
+        event.type === 'accept' &&
+        event.paramValues &&
+        Object.keys(event.paramValues).length > 0
+      ) {
         scriptArgs.push('--param-values', JSON.stringify(event.paramValues));
       }
       try {
-        const out = execFileSync(
-          'node',
-          [acceptScript, ...scriptArgs],
-          { encoding: 'utf-8', cwd: process.cwd(), timeout: 30_000 }
-        );
+        const out = execFileSync('node', [acceptScript, ...scriptArgs], {
+          encoding: 'utf-8',
+          cwd: process.cwd(),
+          timeout: 30_000,
+        });
         event._acceptResult = JSON.parse(out.trim());
       } catch (err) {
         event._acceptResult = { handled: false, mode: 'error', error: err.message };
@@ -170,7 +177,11 @@ Options:
         event._completionAck = { ok: false, error: err.message };
       }
       if (!event._completionAck) {
-        event._completionAck = completionAckForAcceptResult(event.id, completionType, event._acceptResult);
+        event._completionAck = completionAckForAcceptResult(
+          event.id,
+          completionType,
+          event._acceptResult
+        );
       }
     }
 
@@ -178,14 +189,18 @@ Options:
     // JSON but skips nested fields. One line is enough — the full checklist
     // is in reference/live.md.
     if (event._acceptResult?.carbonize === true) {
-      process.stderr.write('\n⚠ Carbonize cleanup REQUIRED before next poll. After cleanup, run live-complete.mjs --id ' + event.id + '. See reference/live.md "Required after accept".\n\n');
+      process.stderr.write(
+        '\n⚠ Carbonize cleanup REQUIRED before next poll. After cleanup, run live-complete.mjs --id ' +
+          event.id +
+          '. See reference/live.md "Required after accept".\n\n'
+      );
     }
 
     // Print the event as JSON — the agent reads this from stdout
     console.log(JSON.stringify(event));
   } catch (err) {
     if (err.cause?.code === 'ECONNREFUSED') {
-      console.error('Live server not running. Start one with: npx impeccable live');
+      console.error('Live server is not running. Start it with: npx impeccable live');
     } else {
       console.error('Poll failed:', err.message);
     }

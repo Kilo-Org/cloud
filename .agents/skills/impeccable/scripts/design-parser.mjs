@@ -23,7 +23,10 @@ function parseFrontmatter(md) {
 
   let end = -1;
   for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim() === '---') { end = i; break; }
+    if (lines[i].trim() === '---') {
+      end = i;
+      break;
+    }
   }
   if (end === -1) return { frontmatter: null, body: md };
 
@@ -108,9 +111,6 @@ function parseScalar(raw) {
 
 const HEX_RE = /#[0-9a-fA-F]{3,8}\b/g;
 const OKLCH_RE = /oklch\([^)]+\)/gi;
-const RGBA_RE = /rgba?\([^)]+\)/gi;
-const BOX_SHADOW_RE = /(?:box-shadow:\s*)?((?:-?\d[\w\d\s\-.,/()#%]*)+)/;
-const NAMED_RULE_RE = /\*\*(The [^*]+?Rule)\.\*\*\s*(.+)/;
 
 // ---------- Section splitting ----------
 
@@ -202,10 +202,19 @@ function collectParagraphs(lines) {
   };
   for (const raw of lines) {
     const trimmed = raw.trim();
-    if (trimmed === '') { flush(); continue; }
+    if (trimmed === '') {
+      flush();
+      continue;
+    }
     // Horizontal rules (---, ***) and headings/bullets end a paragraph.
-    if (/^(?:-{3,}|\*{3,}|_{3,})$/.test(trimmed)) { flush(); continue; }
-    if (raw.startsWith('#') || raw.match(/^[-*]\s/)) { flush(); continue; }
+    if (/^(?:-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      flush();
+      continue;
+    }
+    if (raw.startsWith('#') || raw.match(/^[-*]\s/)) {
+      flush();
+      continue;
+    }
     buf.push(trimmed);
   }
   flush();
@@ -271,7 +280,9 @@ function extractNamedRules(lines) {
   for (let i = 0; i < lines.length; i++) {
     const h3 = lines[i].match(/^###\s+(.+?)\s*$/);
     if (!h3) continue;
-    const headerName = stripBold(h3[1]).replace(/["“”]/g, '').trim();
+    const headerName = stripBold(h3[1])
+      .replace(/["“”]/g, '')
+      .trim();
     if (!/^The\b.*\b(Rule|Fallback|Principle)\b/i.test(headerName)) continue;
     if (seen.has(headerName.toLowerCase())) continue;
 
@@ -292,7 +303,10 @@ function extractNamedRules(lines) {
   for (const b of collectBullets(lines)) {
     const mm = b.match(/^\*\*([^*]+?)\*\*\s*(.+)$/);
     if (!mm) continue;
-    const nameRaw = mm[1].replace(/[.:]\s*$/, '').replace(/["“”]/g, '').trim();
+    const nameRaw = mm[1]
+      .replace(/[.:]\s*$/, '')
+      .replace(/["“”]/g, '')
+      .trim();
     if (!/^The\b.+\b(Rule|Fallback|Principle)$/i.test(nameRaw)) continue;
     if (seen.has(nameRaw.toLowerCase())) continue;
     seen.add(nameRaw.toLowerCase());
@@ -319,9 +333,7 @@ function extractOverview(section) {
 
   // Philosophy paragraphs: everything that isn't a rule header or key-char block
   const paragraphs = collectParagraphs(section.lines).filter(
-    (p) =>
-      !p.startsWith('**Creative North Star') &&
-      !p.startsWith('**Key Characteristics')
+    p => !p.startsWith('**Creative North Star') && !p.startsWith('**Key Characteristics')
   );
 
   return {
@@ -344,13 +356,13 @@ function extractColors(section) {
     if (!sub.name || /Named Rules?/i.test(sub.name) || /^The\s/i.test(sub.name)) continue;
 
     const bullets = collectBullets(sub.lines);
-    const parsed = bullets.map((b) => parseColorBullet(b)).filter(Boolean);
+    const parsed = bullets.map(b => parseColorBullet(b)).filter(Boolean);
     if (parsed.length === 0) continue;
 
     // If every bullet starts with a role keyword (Primary/Secondary/...), promote
     // each bullet to its own group. Otherwise keep the subsection as the group.
     const allRoleBullets =
-      parsed.length > 0 && parsed.every((p) => p.name && ROLE_KEYWORDS.test(p.name));
+      parsed.length > 0 && parsed.every(p => p.name && ROLE_KEYWORDS.test(p.name));
 
     if (allRoleBullets) {
       for (const p of parsed) {
@@ -365,14 +377,14 @@ function extractColors(section) {
   // scanning the whole section as a flat bullet list.
   if (groups.length === 0) {
     const flat = collectBullets(section.lines)
-      .map((b) => parseColorBullet(b))
+      .map(b => parseColorBullet(b))
       .filter(Boolean);
     if (flat.length) {
       for (const p of flat) {
         if (p.name && ROLE_KEYWORDS.test(p.name)) {
           groups.push({ role: p.name, colors: [p] });
         } else {
-          const fallback = groups.find((g) => g.role === 'Palette');
+          const fallback = groups.find(g => g.role === 'Palette');
           if (fallback) fallback.colors.push(p);
           else groups.push({ role: 'Palette', colors: [p] });
         }
@@ -444,11 +456,11 @@ function buildColor(name, rawValue, description) {
 
 function collectColorValues(s) {
   const out = [];
-  s.replace(HEX_RE, (v) => {
+  s.replace(HEX_RE, v => {
     out.push(v);
     return v;
   });
-  s.replace(OKLCH_RE, (v) => {
+  s.replace(OKLCH_RE, v => {
     out.push(v);
     return v;
   });
@@ -461,36 +473,6 @@ function detectFormat(v) {
   if (/^oklch/i.test(v)) return 'oklch';
   if (/^rgb/i.test(v)) return 'rgb';
   return 'unknown';
-}
-
-function scanInlineColors(lines) {
-  const out = [];
-  for (const line of lines) {
-    if (!/^\s*[-*]\s/.test(line)) continue;
-    const trimmed = line.replace(/^\s*[-*]\s+/, '');
-    const color = parseColorBullet(trimmed);
-    if (color) out.push(color);
-  }
-  return out;
-}
-
-function parseStitchInlineGroups(lines) {
-  // Stitch writes: `*   **Primary (`#00478d` to `#005eb8`):** Use for "..."`
-  // Each bullet IS its own role. Group them under the spoken role name.
-  const out = [];
-  for (const line of lines) {
-    if (!/^\s*[-*]\s/.test(line)) continue;
-    const trimmed = line.replace(/^\s*[-*]\s+/, '').trim();
-    const m = trimmed.match(
-      /^\*\*([A-Z][a-zA-Z]+)\s*\(([^)]+)\):\*\*\s*(.*)$/
-    );
-    if (m) {
-      const role = m[1];
-      const color = buildColor(role, m[2], m[3]);
-      out.push({ role, colors: [color] });
-    }
-  }
-  return out;
 }
 
 function extractTypography(section) {
@@ -527,11 +509,13 @@ function extractTypography(section) {
 
   // Character paragraph — either a **Character:** label, or fall back to the
   // first free paragraph under the section header (Stitch style).
-  const characterMatch = text.match(/\*\*Character:\*\*\s*([^\n]+(?:\n[^\n]+)*?)(?=\n\n|\n###|\n##|$)/);
+  const characterMatch = text.match(
+    /\*\*Character:\*\*\s*([^\n]+(?:\n[^\n]+)*?)(?=\n\n|\n###|\n##|$)/
+  );
   let character = characterMatch ? characterMatch[1].replace(/\n/g, ' ').trim() : null;
   if (!character) {
     const paragraphs = collectParagraphs(section.lines).filter(
-      (p) => !/^\*\*[\w\s/&]+Font/i.test(p) && !/^\*\*[\w\s/&]+\([^)]+\)/.test(p)
+      p => !/^\*\*[\w\s/&]+Font/i.test(p) && !/^\*\*[\w\s/&]+\([^)]+\)/.test(p)
     );
     if (paragraphs.length) character = paragraphs[0];
   }
@@ -539,7 +523,7 @@ function extractTypography(section) {
   // Hierarchy bullets under ### Hierarchy
   const subs = splitSubsections(section.lines);
   let hierarchy = [];
-  const hierSub = subs.find((s) => s.name && /hierarch/i.test(s.name));
+  const hierSub = subs.find(s => s.name && /hierarch/i.test(s.name));
   if (hierSub) {
     const bullets = collectBullets(hierSub.lines);
     hierarchy = bullets.map(parseTypeBullet).filter(Boolean);
@@ -572,7 +556,7 @@ function parseTypeBullet(bullet) {
   const m = bullet.match(/^\*\*(.+?)\*\*\s*\(([^)]+)\):\s*(.*)$/);
   if (!m) return null;
   const name = m[1].trim();
-  const specs = m[2].split(',').map((s) => s.trim());
+  const specs = m[2].split(',').map(s => s.trim());
   return {
     name,
     specs,
@@ -588,7 +572,7 @@ function extractElevation(section) {
 
   const shadows = [];
   const seen = new Set();
-  const dedupe = (entry) => {
+  const dedupe = entry => {
     const key = (entry.name || '') + '::' + entry.value;
     if (seen.has(key)) return;
     seen.add(key);
@@ -637,8 +621,7 @@ function extractInlineShadows(text) {
         .replace(/^(?:a|an|the)\s+/i, '')
         .trim();
       if (stripped) {
-        name =
-          stripped.charAt(0).toUpperCase() + stripped.slice(1) + ' shadow';
+        name = stripped.charAt(0).toUpperCase() + stripped.slice(1) + ' shadow';
       }
     }
     out.push({
@@ -659,8 +642,7 @@ function parseShadowBullet(bullet) {
   if (!m) return null;
   const rawValue = m[2].replace(/^box-shadow:\s*/i, '').trim();
   const looksLikeShadow =
-    /box-shadow|rgba?\(|\bpx\b|\brem\b|^-?\d+\s/i.test(rawValue) &&
-    /\d/.test(rawValue);
+    /box-shadow|rgba?\(|\bpx\b|\brem\b|^-?\d+\s/i.test(rawValue) && /\d/.test(rawValue);
   if (!looksLikeShadow) return null;
   const name = stripBold(m[1]).trim();
   return {
@@ -692,7 +674,11 @@ function extractComponents(section) {
         const value = stripBold(m[2]).trim();
         // Heuristic: "Primary", "Secondary", "Hover", "Focus" etc are variants;
         // "Shape", "Background", "Padding" are properties.
-        if (/^(primary|secondary|tertiary|ghost|hover|focus|active|disabled|default|error|selected|unselected|state)$/i.test(key.split(/[\s/]/)[0])) {
+        if (
+          /^(primary|secondary|tertiary|ghost|hover|focus|active|disabled|default|error|selected|unselected|state)$/i.test(
+            key.split(/[\s/]/)[0]
+          )
+        ) {
           variants.push({ name: key, description: value });
         } else {
           properties[key.toLowerCase()] = value;
@@ -723,7 +709,7 @@ function extractDosDonts(section) {
   for (const sub of subs.slice(1)) {
     if (!sub.name) continue;
     const subName = normalizeApostrophes(sub.name);
-    const bullets = collectBullets(sub.lines).map((b) => stripBold(b).trim());
+    const bullets = collectBullets(sub.lines).map(b => stripBold(b).trim());
     if (/^do'?t?:?$/i.test(subName) || /^do:?$/i.test(subName)) {
       dos.push(...bullets);
     } else if (/^don'?t:?$/i.test(subName)) {
@@ -735,9 +721,9 @@ function extractDosDonts(section) {
   for (const b of collectBullets(section.lines)) {
     const stripped = normalizeApostrophes(stripBold(b).trim());
     if (/^don'?t\b/i.test(stripped)) {
-      if (!donts.some((d) => normalizeApostrophes(d) === stripped)) donts.push(stripped);
+      if (!donts.some(d => normalizeApostrophes(d) === stripped)) donts.push(stripped);
     } else if (/^do\b/i.test(stripped)) {
-      if (!dos.some((d) => normalizeApostrophes(d) === stripped)) dos.push(stripped);
+      if (!dos.some(d => normalizeApostrophes(d) === stripped)) dos.push(stripped);
     }
   }
 

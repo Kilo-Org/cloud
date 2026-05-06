@@ -1,0 +1,1038 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>KiloClaw subscription modal prototype</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(16% 0.006 110);
+        --surface: oklch(21% 0.007 110);
+        --surface-raised: oklch(25% 0.008 110);
+        --surface-soft: oklch(19% 0.006 110);
+        --muted: oklch(34% 0.007 110);
+        --text: oklch(97% 0.004 110);
+        --text-muted: oklch(72% 0.005 110);
+        --text-subtle: oklch(56% 0.005 110);
+        --border: oklch(100% 0 0 / 0.11);
+        --border-strong: oklch(100% 0 0 / 0.2);
+        --primary: oklch(93% 0.21 118);
+        --primary-hover: oklch(88% 0.2 118);
+        --on-primary: oklch(18% 0.006 110);
+        --success: oklch(74% 0.18 153);
+        --warning: oklch(80% 0.17 82);
+        --danger: oklch(66% 0.21 28);
+        --focus: oklch(93% 0.21 118 / 0.42);
+        --radius-sm: 6px;
+        --radius-md: 8px;
+        --radius-lg: 10px;
+        --radius-xl: 14px;
+        --shadow-dialog: 0 24px 80px oklch(0% 0 0 / 0.48);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 20% 0%, oklch(22% 0.035 125 / 0.32), transparent 34rem),
+          linear-gradient(180deg, oklch(13% 0.006 110), oklch(10% 0.006 110));
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        font-variant-numeric: tabular-nums;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .page {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+          max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      }
+
+      .backdrop {
+        position: fixed;
+        inset: 0;
+        background:
+          linear-gradient(oklch(0% 0 0 / 0.62), oklch(0% 0 0 / 0.78)),
+          repeating-linear-gradient(
+            0deg,
+            transparent 0,
+            transparent 39px,
+            oklch(100% 0 0 / 0.035) 40px
+          );
+      }
+
+      .modal {
+        position: relative;
+        z-index: 1;
+        width: min(1120px, 100%);
+        max-height: min(900px, calc(100vh - 32px));
+        overflow: auto;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-xl);
+        background: var(--surface);
+        box-shadow: var(--shadow-dialog);
+      }
+
+      .modal-header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 16px;
+        align-items: start;
+        padding: 28px 28px 18px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--primary);
+        font-size: 0.72rem;
+        font-weight: 650;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 18ch;
+        font-size: 2rem;
+        line-height: 1.1;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .lead {
+        margin: 12px 0 0;
+        max-width: 64ch;
+        color: var(--text-muted);
+        font-size: 1rem;
+      }
+
+      .close {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+
+      .close:hover {
+        background: oklch(100% 0 0 / 0.06);
+        color: var(--text);
+      }
+
+      .close:focus-visible,
+      .step-button:focus-visible,
+      .option:focus-visible,
+      .primary-action:focus-visible,
+      .secondary-action:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      .progress {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .step-button {
+        min-height: 64px;
+        border: 0;
+        border-right: 1px solid var(--border);
+        background: var(--surface-soft);
+        color: var(--text-muted);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .step-button:last-child {
+        border-right: 0;
+      }
+
+      .step-button[aria-current="step"] {
+        background: var(--surface);
+        color: var(--text);
+      }
+
+      .step-inner {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 14px 24px;
+      }
+
+      .step-index {
+        width: 28px;
+        height: 28px;
+        display: grid;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 1px solid var(--border-strong);
+        border-radius: 999px;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+
+      .step-button[aria-current="step"] .step-index,
+      .step-button[data-complete="true"] .step-index {
+        border-color: oklch(93% 0.21 118 / 0.5);
+        background: oklch(93% 0.21 118 / 0.12);
+        color: var(--primary);
+      }
+
+      .step-title {
+        display: block;
+        color: inherit;
+        font-size: 0.92rem;
+        font-weight: 650;
+      }
+
+      .step-meta {
+        display: block;
+        color: var(--text-subtle);
+        font-size: 0.78rem;
+      }
+
+      .content {
+        padding: 26px 28px 0;
+      }
+
+      .panel {
+        display: none;
+      }
+
+      .panel[data-active="true"] {
+        display: block;
+      }
+
+      .grid {
+        display: grid;
+        gap: 24px;
+      }
+
+      .plan-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 16px;
+        align-items: end;
+      }
+
+      .section-title {
+        margin: 0;
+        color: var(--text);
+        font-size: 1.12rem;
+        font-weight: 700;
+      }
+
+      .section-copy {
+        margin: 6px 0 0;
+        max-width: 66ch;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+      }
+
+      .segmented {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+        gap: 4px;
+        padding: 4px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: oklch(100% 0 0 / 0.045);
+      }
+
+      .segmented button {
+        min-height: 40px;
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 650;
+      }
+
+      .segmented button[aria-pressed="true"] {
+        background: var(--surface-raised);
+        color: var(--text);
+        box-shadow: inset 0 0 0 1px var(--border-strong);
+      }
+
+      .segmented button:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      .size-list,
+      .payment-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .option {
+        width: 100%;
+        display: grid;
+        gap: 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--surface-soft);
+        color: var(--text);
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .option:hover {
+        border-color: var(--border-strong);
+        background: oklch(24% 0.008 110);
+      }
+
+      .option[aria-pressed="true"] {
+        border-color: oklch(93% 0.21 118 / 0.58);
+        background:
+          linear-gradient(90deg, oklch(93% 0.21 118 / 0.08), transparent 42%),
+          var(--surface-soft);
+      }
+
+      .size-option {
+        grid-template-columns: minmax(0, 1.1fr) minmax(300px, 1.4fr) auto;
+        align-items: center;
+        padding: 18px;
+      }
+
+      .payment-option {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        padding: 18px;
+      }
+
+      .payment-option > span:first-child {
+        display: block;
+        min-width: 0;
+      }
+
+      .option-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 750;
+      }
+
+      .option-subtitle {
+        margin: 4px 0 0;
+        color: var(--text-muted);
+        font-size: 0.86rem;
+      }
+
+      .specs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .spec {
+        min-height: 58px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: oklch(100% 0 0 / 0.035);
+      }
+
+      .spec-value {
+        display: block;
+        color: var(--text);
+        font-size: 0.88rem;
+        font-weight: 700;
+      }
+
+      .spec-label {
+        display: block;
+        margin-top: 2px;
+        color: var(--text-subtle);
+        font-size: 0.74rem;
+      }
+
+      .price {
+        min-width: 112px;
+        text-align: right;
+      }
+
+      .price strong {
+        font-size: 1.45rem;
+        line-height: 1;
+      }
+
+      .price span {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: center;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--surface-soft);
+      }
+
+      .summary-label {
+        margin: 0;
+        color: var(--text-subtle);
+        font-size: 0.78rem;
+        font-weight: 650;
+      }
+
+      .summary-value {
+        margin: 3px 0 0;
+        font-size: 1rem;
+        font-weight: 750;
+      }
+
+      .summary-price {
+        color: var(--primary);
+        font-size: 1.35rem;
+        font-weight: 780;
+        white-space: nowrap;
+      }
+
+      .funding-detail {
+        display: none;
+        width: 100%;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+      }
+
+      .option[aria-pressed="true"] .funding-detail {
+        display: block;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .detail {
+        padding: 9px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: oklch(100% 0 0 / 0.035);
+      }
+
+      .detail span {
+        display: block;
+        color: var(--text-subtle);
+        font-size: 0.72rem;
+      }
+
+      .detail strong {
+        display: block;
+        margin-top: 2px;
+        font-size: 0.86rem;
+      }
+
+      .callout {
+        display: block;
+        width: 100%;
+        min-height: 42px;
+        margin-top: 12px;
+        padding: 10px 12px;
+        border: 1px solid oklch(80% 0.17 82 / 0.38);
+        border-radius: var(--radius-sm);
+        background: oklch(80% 0.17 82 / 0.09);
+        color: oklch(87% 0.12 82);
+        font-size: 0.83rem;
+      }
+
+      .footer {
+        position: sticky;
+        bottom: 0;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 16px;
+        align-items: center;
+        margin-top: 26px;
+        padding: 16px 28px;
+        border-top: 1px solid var(--border);
+        background: oklch(21% 0.007 110 / 0.96);
+      }
+
+      .footer-note {
+        color: var(--text-muted);
+        font-size: 0.86rem;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
+      .primary-action,
+      .secondary-action {
+        min-height: 40px;
+        border-radius: var(--radius-sm);
+        padding: 0 16px;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      .primary-action {
+        border: 0;
+        background: var(--primary);
+        color: var(--on-primary);
+      }
+
+      .primary-action:hover {
+        background: var(--primary-hover);
+      }
+
+      .primary-action:disabled {
+        cursor: not-allowed;
+        opacity: 0.42;
+      }
+
+      .secondary-action {
+        border: 1px solid var(--border);
+        background: var(--surface-raised);
+        color: var(--text);
+      }
+
+      .secondary-action:hover {
+        background: var(--muted);
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      @media (max-width: 860px) {
+        .modal {
+          max-height: calc(100vh - 20px);
+        }
+
+        .modal-header {
+          padding: 22px 20px 16px;
+        }
+
+        h1 {
+          font-size: 1.55rem;
+        }
+
+        .content {
+          padding: 20px 20px 0;
+        }
+
+        .plan-row,
+        .summary,
+        .footer {
+          grid-template-columns: 1fr;
+        }
+
+        .payment-option {
+          grid-template-columns: 1fr;
+        }
+
+        .size-option {
+          grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .size-option .specs {
+          grid-column: 1 / -1;
+        }
+
+        .price {
+          min-width: 0;
+          text-align: left;
+        }
+
+        .size-option .price {
+          text-align: right;
+        }
+
+        .footer {
+          padding: 14px 20px;
+        }
+
+        .actions {
+          justify-content: stretch;
+        }
+
+        .actions > button {
+          flex: 1;
+        }
+      }
+
+      @media (max-width: 600px) {
+        .page {
+          padding: 0;
+          place-items: stretch;
+        }
+
+        .modal {
+          width: 100%;
+          min-height: 100vh;
+          max-height: none;
+          border-width: 0;
+          border-radius: 0;
+        }
+
+        .content {
+          padding-bottom: 104px;
+        }
+
+        .progress {
+          grid-template-columns: 1fr;
+        }
+
+        .step-button {
+          min-height: 54px;
+          border-right: 0;
+        }
+
+        .step-button:first-child {
+          border-bottom: 1px solid var(--border);
+        }
+
+        .segmented,
+        .detail-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .payment-option .detail-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .specs {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .spec {
+          min-height: 68px;
+          padding: 9px 10px;
+        }
+
+        .footer {
+          position: fixed;
+          right: 0;
+          bottom: 0;
+          left: 0;
+          z-index: 2;
+          box-shadow: 0 -18px 36px oklch(0% 0 0 / 0.34);
+        }
+
+        .payment-option .price strong {
+          color: var(--text-muted);
+          font-size: 0.95rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="backdrop" aria-hidden="true"></div>
+
+      <main class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow">KiloClaw hosting</p>
+            <h1 id="modal-title">Choose subscription</h1>
+            <p class="lead">
+              Pick compute for this instance, then choose whether renewal comes from Kilo
+              Credits or Stripe.
+            </p>
+          </div>
+          <button class="close" type="button" aria-label="Close modal">
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M18 6 6 18M6 6l12 12"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </header>
+
+        <nav class="progress" aria-label="Subscription steps">
+          <button class="step-button" id="step-hosting" type="button" aria-current="step">
+            <span class="step-inner">
+              <span class="step-index">1</span>
+              <span>
+                <span class="step-title">Hosting</span>
+                <span class="step-meta" id="hosting-meta">Standard Good selected</span>
+              </span>
+            </span>
+          </button>
+          <button class="step-button" id="step-payment" type="button">
+            <span class="step-inner">
+              <span class="step-index">2</span>
+              <span>
+                <span class="step-title">Payment</span>
+                <span class="step-meta" id="payment-meta">Choose funding source</span>
+              </span>
+            </span>
+          </button>
+        </nav>
+
+        <section class="content">
+          <div class="panel" id="hosting-panel" data-active="true">
+            <div class="grid">
+              <div class="plan-row">
+                <div>
+                  <h2 class="section-title">Choose hosting plan</h2>
+                  <p class="section-copy">
+                    Commit lowers monthly cost with 6-month billing. Standard keeps month-to-month
+                    flexibility.
+                  </p>
+                </div>
+                <div class="segmented" role="group" aria-label="Billing plan">
+                  <button type="button" data-plan="standard" aria-pressed="true">Standard</button>
+                  <button type="button" data-plan="commit" aria-pressed="false">Commit</button>
+                </div>
+              </div>
+
+              <div class="size-list" aria-label="Instance size">
+                <button class="option size-option" type="button" data-size="good" aria-pressed="true">
+                  <span>
+                    <span class="option-title">Good</span>
+                    <span class="option-subtitle">Solo agent work, smaller repos, light tools</span>
+                  </span>
+                  <span class="specs" aria-hidden="true">
+                    <span class="spec">
+                      <span class="spec-value">1</span>
+                      <span class="spec-label">performance core</span>
+                    </span>
+                    <span class="spec">
+                      <span class="spec-value">3 GB</span>
+                      <span class="spec-label">memory</span>
+                    </span>
+                    <span class="spec">
+                      <span class="spec-value">10 GB</span>
+                      <span class="spec-label">storage</span>
+                    </span>
+                  </span>
+                  <span class="price"><strong id="good-price">$9</strong><span>/mo</span></span>
+                </button>
+
+                <button class="option size-option" type="button" data-size="better" aria-pressed="false">
+                  <span>
+                    <span class="option-title">Better</span>
+                    <span class="option-subtitle">Larger repos, heavier toolchains, parallel context</span>
+                  </span>
+                  <span class="specs" aria-hidden="true">
+                    <span class="spec">
+                      <span class="spec-value">4</span>
+                      <span class="spec-label">performance cores</span>
+                    </span>
+                    <span class="spec">
+                      <span class="spec-value">8 GB</span>
+                      <span class="spec-label">memory</span>
+                    </span>
+                    <span class="spec">
+                      <span class="spec-value">20 GB</span>
+                      <span class="spec-label">storage</span>
+                    </span>
+                  </span>
+                  <span class="price"><strong id="better-price">$86</strong><span>/mo</span></span>
+                </button>
+
+                <button class="option size-option" type="button" data-size="best" aria-pressed="false">
+                  <span>
+                    <span class="option-title">Best</span>
+                    <span class="option-subtitle">Memory-heavy builds, indexing, long-running sessions</span>
+                  </span>
+                  <span class="specs" aria-hidden="true">
+                    <span class="spec">
+                      <span class="spec-value">4</span>
+                      <span class="spec-label">performance cores</span>
+                    </span>
+                    <span class="spec">
+                      <span class="spec-value">16 GB</span>
+                      <span class="spec-label">memory</span>
+                    </span>
+                    <span class="spec">
+                      <span class="spec-value">40 GB</span>
+                      <span class="spec-label">storage</span>
+                    </span>
+                  </span>
+                  <span class="price"><strong id="best-price">$172</strong><span>/mo</span></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" id="payment-panel">
+            <div class="grid">
+              <div class="summary" aria-live="polite">
+                <div>
+                  <p class="summary-label">Selected hosting</p>
+                  <p class="summary-value" id="summary-value">Standard Good, 1 core, 3 GB memory</p>
+                </div>
+                <div class="summary-price" id="summary-price">$9/mo</div>
+              </div>
+
+              <div>
+                <h2 class="section-title">Choose payment</h2>
+                <p class="section-copy">
+                  Kilo Credits renew from your balance. Credit card redirects to Stripe checkout.
+                </p>
+              </div>
+
+              <div class="payment-list" aria-label="Payment source">
+                <button class="option payment-option" type="button" data-payment="credits" aria-pressed="false">
+                  <span>
+                    <span class="option-title">Kilo Credits</span>
+                    <span class="option-subtitle">Use available credits for this subscription period.</span>
+                    <span class="funding-detail">
+                      <span class="detail-grid">
+                        <span class="detail">
+                          <span>Available balance</span>
+                          <strong>$42.00</strong>
+                        </span>
+                        <span class="detail">
+                          <span>Due today</span>
+                          <strong id="credit-due">$9.00</strong>
+                        </span>
+                        <span class="detail">
+                          <span>Remaining</span>
+                          <strong id="credit-remaining">$33.00</strong>
+                        </span>
+                      </span>
+                      <span class="callout hidden" id="credit-shortfall">
+                        Balance short by <strong id="shortfall-value">$44.00</strong>. Add credits before
+                        this subscription can start.
+                      </span>
+                    </span>
+                  </span>
+                  <span class="price"><strong>Credits</strong></span>
+                </button>
+
+                <button class="option payment-option" type="button" data-payment="stripe" aria-pressed="false">
+                  <span>
+                    <span class="option-title">Credit card</span>
+                    <span class="option-subtitle">Go to Stripe checkout and activate after payment.</span>
+                  </span>
+                  <span class="price"><strong>Stripe</strong></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer class="footer">
+          <div class="footer-note" id="footer-note">Next: choose how this instance is funded.</div>
+          <div class="actions">
+            <button class="secondary-action hidden" id="back-action" type="button">Back</button>
+            <button class="primary-action" id="primary-action" type="button">Continue</button>
+          </div>
+        </footer>
+      </main>
+    </div>
+
+    <script>
+      const prices = {
+        standard: { good: 9, better: 86, best: 172 },
+        commit: { good: 8, better: 76, best: 152 },
+      };
+
+      const specs = {
+        good: "1 core, 3 GB memory",
+        better: "4 cores, 8 GB memory",
+        best: "4 cores, 16 GB memory",
+      };
+
+      const balance = 42;
+      let currentStep = "hosting";
+      let plan = "standard";
+      let size = "good";
+      let payment = "";
+
+      const titleCase = value => value.charAt(0).toUpperCase() + value.slice(1);
+      const money = value => `$${value.toFixed(2)}`;
+
+      const hostingPanel = document.querySelector("#hosting-panel");
+      const paymentPanel = document.querySelector("#payment-panel");
+      const stepHosting = document.querySelector("#step-hosting");
+      const stepPayment = document.querySelector("#step-payment");
+      const primaryAction = document.querySelector("#primary-action");
+      const backAction = document.querySelector("#back-action");
+      const footerNote = document.querySelector("#footer-note");
+
+      function selectedPrice() {
+        return prices[plan][size];
+      }
+
+      function hasCreditShortfall() {
+        return balance < selectedPrice();
+      }
+
+      function updatePriceLabels() {
+        for (const key of Object.keys(prices[plan])) {
+          document.querySelector(`#${key}-price`).textContent = `$${prices[plan][key]}`;
+        }
+      }
+
+      function updateSummary() {
+        const price = selectedPrice();
+        document.querySelector("#hosting-meta").textContent =
+          `${titleCase(plan)} ${titleCase(size)} selected`;
+        document.querySelector("#summary-value").textContent =
+          `${titleCase(plan)} ${titleCase(size)}, ${specs[size]}`;
+        document.querySelector("#summary-price").textContent = `$${price}/mo`;
+        document.querySelector("#credit-due").textContent = money(price);
+
+        const remaining = balance - price;
+        document.querySelector("#credit-remaining").textContent =
+          remaining >= 0 ? money(remaining) : "$0.00";
+        document.querySelector("#credit-shortfall").classList.toggle("hidden", remaining >= 0);
+        document.querySelector("#shortfall-value").textContent = money(Math.abs(remaining));
+
+        const paymentMeta =
+          payment === "credits"
+            ? "Kilo Credits selected"
+            : payment === "stripe"
+              ? "Credit card selected"
+              : "Choose funding source";
+        document.querySelector("#payment-meta").textContent = paymentMeta;
+      }
+
+      function updateStep() {
+        const isHosting = currentStep === "hosting";
+        hostingPanel.dataset.active = String(isHosting);
+        paymentPanel.dataset.active = String(!isHosting);
+        stepHosting.setAttribute("aria-current", isHosting ? "step" : "false");
+        stepHosting.dataset.complete = String(!isHosting);
+        stepPayment.setAttribute("aria-current", !isHosting ? "step" : "false");
+        backAction.classList.toggle("hidden", isHosting);
+
+        const creditShortfall = hasCreditShortfall();
+        primaryAction.textContent = isHosting
+          ? "Continue"
+          : payment === "credits"
+            ? creditShortfall
+              ? "Add Kilo Credits"
+              : "Pay with Kilo Credits"
+            : payment === "stripe"
+              ? "Continue to Stripe"
+              : "Choose payment";
+        primaryAction.disabled = !isHosting && !payment;
+
+        footerNote.textContent = isHosting
+          ? "Next: choose how this instance is funded."
+          : payment === "credits"
+            ? creditShortfall
+              ? "Add credits to cover the shortfall before this subscription starts."
+              : "Kilo Credits will be deducted when you confirm."
+            : payment === "stripe"
+              ? "Stripe opens next. Subscription activates after checkout completes."
+              : "Select one payment source to continue.";
+      }
+
+      function render() {
+        updatePriceLabels();
+        updateSummary();
+        updateStep();
+      }
+
+      document.querySelectorAll("[data-plan]").forEach(button => {
+        button.addEventListener("click", () => {
+          plan = button.dataset.plan;
+          document.querySelectorAll("[data-plan]").forEach(item => {
+            item.setAttribute("aria-pressed", String(item === button));
+          });
+          payment = "";
+          document.querySelectorAll("[data-payment]").forEach(item => {
+            item.setAttribute("aria-pressed", "false");
+          });
+          render();
+        });
+      });
+
+      document.querySelectorAll("[data-size]").forEach(button => {
+        button.addEventListener("click", () => {
+          size = button.dataset.size;
+          document.querySelectorAll("[data-size]").forEach(item => {
+            item.setAttribute("aria-pressed", String(item === button));
+          });
+          payment = "";
+          document.querySelectorAll("[data-payment]").forEach(item => {
+            item.setAttribute("aria-pressed", "false");
+          });
+          render();
+        });
+      });
+
+      document.querySelectorAll("[data-payment]").forEach(button => {
+        button.addEventListener("click", () => {
+          payment = button.dataset.payment;
+          document.querySelectorAll("[data-payment]").forEach(item => {
+            item.setAttribute("aria-pressed", String(item === button));
+          });
+          render();
+        });
+      });
+
+      stepHosting.addEventListener("click", () => {
+        currentStep = "hosting";
+        render();
+      });
+
+      stepPayment.addEventListener("click", () => {
+        currentStep = "payment";
+        render();
+      });
+
+      primaryAction.addEventListener("click", () => {
+        if (currentStep === "hosting") {
+          currentStep = "payment";
+          render();
+        }
+      });
+
+      backAction.addEventListener("click", () => {
+        currentStep = "hosting";
+        render();
+      });
+
+      render();
+    </script>
+  </body>
+</html>

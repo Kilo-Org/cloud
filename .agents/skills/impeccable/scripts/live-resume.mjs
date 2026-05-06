@@ -19,14 +19,22 @@ function parseArgs(argv) {
 export async function resumeCli() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
-    console.log(`Usage: node live-resume.mjs [--id SESSION_ID]\n\nPrint the active durable session checkpoint and the next safe agent action.`);
+    console.log(
+      `Usage: node live-resume.mjs [--id SESSION_ID]\n\nPrint the active durable session checkpoint and the next safe agent action.`
+    );
     return;
   }
 
   const store = createLiveSessionStore({ cwd: process.cwd(), sessionId: args.id || undefined });
   const snapshot = args.id ? store.getSnapshot(args.id) : store.listActiveSessions()[0] || null;
   if (!snapshot) {
-    console.log(JSON.stringify({ active: false, nextAction: 'No active durable live session found.' }, null, 2));
+    console.log(
+      JSON.stringify(
+        { active: false, nextAction: 'No active durable live session found.' },
+        null,
+        2
+      )
+    );
     return;
   }
 
@@ -39,7 +47,9 @@ export async function resumeCli() {
         ? `Run live-complete.mjs --id ${snapshot.id} after verifying the accepted variant is written.`
         : `Inspect ${snapshot.id}; no pending agent event is currently queued.`;
 
-  console.log(JSON.stringify({ active: true, snapshot, pendingEvent: pending, nextAction }, null, 2));
+  console.log(
+    JSON.stringify({ active: true, snapshot, pendingEvent: pending, nextAction }, null, 2)
+  );
 }
 
 const _running = process.argv[1];

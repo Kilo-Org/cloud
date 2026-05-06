@@ -13,7 +13,7 @@
  * in the project root and creates/removes the pin in all of them.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,17 +21,44 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // All known harness directories
 const HARNESS_DIRS = [
-  '.claude', '.cursor', '.gemini', '.codex', '.agents',
-  '.trae', '.trae-cn', '.pi', '.opencode', '.kiro', '.rovodev',
+  '.claude',
+  '.cursor',
+  '.gemini',
+  '.codex',
+  '.agents',
+  '.trae',
+  '.trae-cn',
+  '.pi',
+  '.opencode',
+  '.kiro',
+  '.rovodev',
 ];
 
 // Valid sub-command names
 const VALID_COMMANDS = [
-  'craft', 'teach', 'extract', 'document', 'shape',
-  'critique', 'audit',
-  'polish', 'bolder', 'quieter', 'distill', 'harden', 'onboard', 'live',
-  'animate', 'colorize', 'typeset', 'layout', 'delight', 'overdrive',
-  'clarify', 'adapt', 'optimize',
+  'craft',
+  'teach',
+  'extract',
+  'document',
+  'shape',
+  'critique',
+  'audit',
+  'polish',
+  'bolder',
+  'quieter',
+  'distill',
+  'harden',
+  'onboard',
+  'live',
+  'animate',
+  'colorize',
+  'typeset',
+  'layout',
+  'delight',
+  'overdrive',
+  'clarify',
+  'adapt',
+  'optimize',
 ];
 
 // Marker to identify pinned skills (so unpin doesn't delete user skills)
@@ -186,7 +213,7 @@ function unpin(command, projectRoot) {
 }
 
 // --- CLI ---
-const [,, action, command] = process.argv;
+const [, , action, command] = process.argv;
 
 if (!action || !command) {
   console.log('Usage: node pin.mjs <pin|unpin> <command>');

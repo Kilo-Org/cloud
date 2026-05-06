@@ -1,0 +1,1413 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KiloClaw · subscribe · prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: #121212;
+      --surface: #2B2B2B;
+      --surface-raised: #333333;
+      --muted: #3D3D3D;
+      --foreground: #FAFAFA;
+      --foreground-muted: #A3A3A3;
+      --foreground-subtle: #7A7A7A;
+      --border: rgba(255, 255, 255, 0.1);
+      --border-strong: rgba(255, 255, 255, 0.18);
+      --input-bg: rgba(255, 255, 255, 0.04);
+      --input-bg-hover: rgba(255, 255, 255, 0.06);
+      --primary: #EDFF00;
+      --primary-hover: #D6E600;
+      --primary-ring: rgba(237, 255, 0, 0.35);
+      --primary-soft: rgba(237, 255, 0, 0.05);
+      --on-primary: #1F1F1F;
+      --secondary: #3D3D3D;
+      --secondary-hover: #4D4D4D;
+      --link: #3B82F6;
+      --link-hover: #60A5FA;
+      --green-400: #4ADE80;
+      --yellow-400: #FACC15;
+      --red-400: #F87171;
+      --red-500: #EF4444;
+      --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .mono {
+      font-family: 'Roboto Mono', ui-monospace, "SFMono-Regular", monospace;
+      font-feature-settings: "tnum" 1, "calt" 1;
+    }
+
+    /* ─── Demo controls strip ─────────────────────────────── */
+    .demo-chrome {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 60;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px 8px 12px;
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--foreground-muted);
+    }
+    .demo-chrome .lbl {
+      font-weight: 500;
+      color: var(--foreground);
+      letter-spacing: -0.005em;
+    }
+    .demo-chrome .sep { opacity: 0.35; }
+    .demo-chrome label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .demo-chrome select {
+      background: var(--input-bg);
+      color: var(--foreground);
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      padding: 4px 26px 4px 8px;
+      font: inherit;
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 11px;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23A3A3A3' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+    }
+    .demo-chrome select:focus-visible {
+      outline: 2px solid var(--primary-ring);
+      outline-offset: 2px;
+    }
+    .demo-chrome .reset {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--foreground-muted);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 11px;
+    }
+    .demo-chrome .reset:hover { background: var(--muted); color: var(--foreground); }
+
+    /* ─── Page backdrop ────────────────────────────────────── */
+    .page-bg {
+      position: fixed;
+      inset: 0;
+      background: var(--background);
+      z-index: 0;
+      overflow: hidden;
+      contain: layout paint;
+    }
+    .page-bg::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(0deg, transparent calc(100% - 1px), rgba(255, 255, 255, 0.018) 100%),
+        linear-gradient(90deg, transparent calc(100% - 1px), rgba(255, 255, 255, 0.018) 100%);
+      background-size: 32px 32px;
+    }
+    .page-bg .topbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 16px;
+      color: var(--foreground-subtle);
+      font-size: 13px;
+    }
+    .page-bg .topbar .crumb {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .page-bg .topbar .crumb .sep { opacity: 0.4; }
+    .page-bg .topbar .crumb .here { color: var(--foreground); }
+    .page-bg .topbar .logo {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      background: var(--primary);
+      display: grid;
+      place-items: center;
+      color: var(--on-primary);
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: -0.04em;
+    }
+    .page-bg .sidebar {
+      position: absolute;
+      top: 56px;
+      left: 0;
+      bottom: 0;
+      width: 220px;
+      border-right: 1px solid var(--border);
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .page-bg .sidebar .group-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--foreground-subtle);
+      padding: 10px 8px 4px;
+    }
+    .page-bg .sidebar .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      color: var(--foreground-muted);
+      font-size: 13px;
+    }
+    .page-bg .sidebar .nav-item.active {
+      background: var(--muted);
+      color: var(--foreground);
+    }
+    .page-bg .sidebar .nav-item .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--foreground-subtle);
+      opacity: 0.6;
+    }
+    .page-bg .sidebar .nav-item.active .dot { background: var(--primary); opacity: 1; }
+    .page-bg .content {
+      position: absolute;
+      top: 56px;
+      left: 220px;
+      right: 0;
+      bottom: 0;
+      padding: 24px 32px;
+      color: var(--foreground-subtle);
+    }
+    .page-bg .content .h {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--foreground);
+      margin: 0 0 4px;
+      letter-spacing: -0.01em;
+    }
+    .page-bg .content .sub {
+      font-size: 13px;
+      margin: 0 0 20px;
+    }
+    .page-bg .content .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .page-bg .content .tile {
+      height: 92px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .page-bg .content .tile.tall { height: 220px; }
+
+    @media (max-width: 720px) {
+      .page-bg .sidebar { display: none; }
+      .page-bg .content { left: 0; padding: 24px 16px; }
+    }
+
+    /* ─── Dialog ───────────────────────────────────────────── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.66);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      z-index: 50;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow-y: auto;
+      padding: 24px;
+      animation: overlay-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @keyframes overlay-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    .dialog {
+      width: 100%;
+      max-width: 640px;
+      background: var(--surface);
+      color: var(--foreground);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: var(--shadow-dialog);
+      position: relative;
+      margin: auto;
+      animation: dialog-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @keyframes dialog-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      border: 0;
+      background: transparent;
+      color: var(--foreground-muted);
+      cursor: pointer;
+      transition: color 120ms ease, background 120ms ease;
+    }
+    .close:hover { color: var(--foreground); background: var(--muted); }
+    .close:focus-visible {
+      outline: 2px solid var(--primary-ring);
+      outline-offset: 2px;
+    }
+
+    /* ─── Step indicator ───────────────────────────────────── */
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 0 0 18px;
+      padding-right: 36px;
+      font-size: 12px;
+      color: var(--foreground-subtle);
+      font-weight: 500;
+    }
+    .step {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .step .dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border-strong);
+      background: var(--input-bg);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--foreground-muted);
+      transition: background 180ms cubic-bezier(0.22, 1, 0.36, 1),
+                  color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+                  border-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .step[data-state="active"] { color: var(--foreground); }
+    .step[data-state="active"] .dot {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: var(--on-primary);
+    }
+    .step[data-state="done"] { color: var(--foreground-muted); }
+    .step[data-state="done"] .dot {
+      background: var(--input-bg);
+      border-color: var(--border-strong);
+      color: var(--foreground);
+    }
+    .step[data-state="done"] .num { display: none; }
+    .step[data-state="done"] .check { display: inline; }
+    .step .check { display: none; }
+    .stepper .divider {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ─── Title block ──────────────────────────────────────── */
+    .title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      margin: 0 0 4px;
+      color: var(--foreground);
+    }
+    .subtitle {
+      color: var(--foreground-muted);
+      font-size: 0.875rem;
+      margin: 0 0 18px;
+    }
+    .subtitle .instance {
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 0.8125rem;
+      color: var(--foreground);
+      background: var(--input-bg);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    /* ─── Field group ──────────────────────────────────────── */
+    .group {
+      border: 0;
+      padding: 0;
+      margin: 0 0 14px;
+    }
+    .group-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--foreground-subtle);
+      margin-bottom: 8px;
+    }
+    .group-label .meta {
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--foreground-subtle);
+    }
+
+    /* ─── Radio cards ──────────────────────────────────────── */
+    .plan-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .size-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+    .method-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .card {
+      position: relative;
+      display: block;
+      padding: 14px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 140ms ease,
+                  border-color 140ms ease,
+                  box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .card:hover {
+      background: var(--input-bg-hover);
+      border-color: var(--border-strong);
+    }
+    .card[data-selected="true"] {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      box-shadow: inset 0 0 0 1px var(--primary);
+    }
+    .card[data-disabled="true"] {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .card[data-disabled="true"]:hover {
+      background: var(--input-bg);
+      border-color: var(--border);
+      box-shadow: none;
+    }
+    .card[data-disabled="true"][data-selected="true"] {
+      background: var(--input-bg);
+      border-color: var(--border);
+      box-shadow: none;
+    }
+    .card input[type="radio"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .card:has(input:focus-visible) {
+      outline: 2px solid var(--primary-ring);
+      outline-offset: 2px;
+    }
+
+    /* plan card content */
+    .plan-card .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .plan-card .name {
+      font-weight: 600;
+      font-size: 0.875rem;
+      letter-spacing: -0.005em;
+    }
+    .plan-card .cadence {
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--foreground-subtle);
+    }
+    .plan-card .price {
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 1.125rem;
+      font-weight: 500;
+      color: var(--foreground);
+      margin-bottom: 4px;
+      letter-spacing: -0.01em;
+    }
+    .plan-card .price .unit {
+      color: var(--foreground-subtle);
+      font-size: 0.75rem;
+      font-weight: 400;
+      margin-left: 2px;
+    }
+    .plan-card .helper {
+      font-size: 0.75rem;
+      color: var(--foreground-muted);
+      line-height: 1.45;
+    }
+    .plan-card .helper .save {
+      color: var(--green-400);
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+    }
+    .plan-card .helper .first {
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      color: var(--foreground);
+    }
+
+    /* size card */
+    .size-card .name {
+      font-weight: 600;
+      font-size: 0.875rem;
+      margin-bottom: 8px;
+      letter-spacing: -0.005em;
+    }
+    .size-card .specs {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--foreground-muted);
+    }
+    .size-card .price {
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: var(--foreground);
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      letter-spacing: -0.01em;
+    }
+    .size-card .price .unit {
+      color: var(--foreground-subtle);
+      font-size: 0.75rem;
+      font-weight: 400;
+      margin-left: 2px;
+    }
+
+    /* method card */
+    .method-card .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+    .method-card .name {
+      font-weight: 600;
+      font-size: 0.875rem;
+      letter-spacing: -0.005em;
+    }
+    .method-card .badge {
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--foreground-subtle);
+    }
+    .method-card .body {
+      color: var(--foreground-muted);
+      font-size: 0.8125rem;
+    }
+    .method-card .body .mono {
+      color: var(--foreground);
+    }
+    .method-card .ledger {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 16px;
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 0.8125rem;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border);
+    }
+    .method-card .ledger dt {
+      color: var(--foreground-muted);
+      margin: 0;
+    }
+    .method-card .ledger dd {
+      margin: 0;
+      color: var(--foreground);
+      text-align: right;
+    }
+    .method-card .ledger .row-strong dt,
+    .method-card .ledger .row-strong dd {
+      color: var(--foreground);
+      font-weight: 500;
+    }
+    .method-card .ledger .neg { color: var(--foreground); }
+    .method-card .warn {
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: rgba(250, 204, 21, 0.07);
+      border: 1px solid rgba(250, 204, 21, 0.18);
+      border-radius: 6px;
+      color: var(--yellow-400);
+      font-size: 0.8125rem;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      line-height: 1.45;
+    }
+    .method-card .warn svg { flex: 0 0 14px; margin-top: 1px; }
+    .method-card .warn .link { color: var(--yellow-400); text-decoration: underline; text-underline-offset: 2px; }
+    .method-card .warn .link:hover { color: #FDE68A; }
+
+    /* card source line (credits-only) */
+    .method-card .card-source {
+      margin: 8px 0 0;
+      padding: 0;
+      font-size: 0.75rem;
+      color: var(--foreground-subtle);
+    }
+
+    /* group-level inline help */
+    .group-help {
+      margin: 8px 0 0;
+      padding: 0;
+      font-size: 0.75rem;
+      color: var(--foreground-subtle);
+      line-height: 1.5;
+    }
+
+    /* keyboard hint pill */
+    .kbd-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--foreground-subtle);
+      white-space: nowrap;
+    }
+    .kbd-hint kbd {
+      display: inline-grid;
+      place-items: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 4px;
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      background: var(--input-bg);
+      font-family: inherit;
+      font-size: 11px;
+      color: var(--foreground-muted);
+    }
+
+    /* recap line */
+    .recap {
+      font-size: 0.8125rem;
+      color: var(--foreground-muted);
+      margin: 0 0 16px;
+      padding: 10px 12px;
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      align-items: baseline;
+    }
+    .recap .key {
+      color: var(--foreground-subtle);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .recap .pillval {
+      color: var(--foreground);
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+      font-size: 0.8125rem;
+    }
+    .recap .sep {
+      color: var(--foreground-subtle);
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+    }
+
+    /* ─── Buttons / footer ─────────────────────────────────── */
+    .footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .footer .left { margin-right: auto; display: flex; gap: 8px; align-items: center; }
+    .footer .helper {
+      font-size: 12px;
+      color: var(--foreground-subtle);
+      font-family: 'Roboto Mono', ui-monospace, monospace;
+    }
+
+    .btn {
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: var(--on-primary);
+    }
+    .btn-primary:hover { background: var(--primary-hover); }
+    /* loading state: keep the primary look so the spinner stays visible.
+       higher specificity than .btn-primary:disabled so it wins. */
+    .btn-primary.is-loading,
+    .btn-primary.is-loading:disabled {
+      background: var(--primary);
+      color: var(--on-primary);
+      cursor: progress;
+      opacity: 1;
+    }
+    /* lock primary button width so spinner state never reflows */
+    #continue-btn { min-width: 132px; }
+    #subscribe-btn { min-width: 198px; }
+    .btn-primary:disabled {
+      background: var(--muted);
+      color: var(--foreground-subtle);
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: var(--secondary);
+      color: var(--foreground);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: var(--secondary-hover); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--foreground-muted);
+    }
+    .btn-ghost:hover { color: var(--foreground); background: var(--muted); }
+    .btn:focus-visible {
+      outline: 2px solid var(--primary-ring);
+      outline-offset: 2px;
+    }
+    .btn .spinner {
+      width: 13px;
+      height: 13px;
+      border: 1.5px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 999px;
+      animation: spin 600ms linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* step transitions */
+    .step-panel { transition: opacity 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+    .step-panel[hidden] { display: none; }
+    .step-panel.is-leaving { opacity: 0; }
+
+    /* ─── Responsive ───────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .overlay { padding: 60px 12px 16px; }
+      .dialog { padding: 20px 18px; }
+      .stepper { padding-right: 32px; }
+      .plan-grid { grid-template-columns: 1fr; }
+      .size-grid { grid-template-columns: 1fr; }
+      .footer { flex-wrap: wrap; gap: 8px; }
+      .footer .left { order: 2; width: 100%; justify-content: flex-start; }
+      .footer .btn-primary, .footer .btn-secondary { flex: 1; min-width: 0; }
+      #continue-btn, #subscribe-btn { min-width: 0; }
+      .kbd-hint { display: none; }
+      .recap .sep { display: none; }
+      .demo-chrome {
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        font-size: 11px;
+        gap: 6px;
+        padding: 6px 8px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      .demo-chrome .lbl,
+      .demo-chrome .sep { display: none; }
+      .demo-chrome label { gap: 4px; flex: 0 0 auto; }
+      .demo-chrome select { font-size: 11px; padding: 3px 22px 3px 6px; }
+      .demo-chrome .reset { flex: 0 0 auto; }
+      .recap { font-size: 0.75rem; padding: 8px 10px; }
+      .page-bg .sidebar { display: none; }
+      .page-bg .content { left: 0; padding: 24px 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Demo controls -->
+  <div class="demo-chrome" aria-label="Prototype controls">
+    <span class="lbl">Prototype</span>
+    <span class="sep">·</span>
+    <label>
+      Credit balance
+      <select id="balance-toggle">
+        <option value="200">$200 · sufficient</option>
+        <option value="42">$42 · low</option>
+        <option value="0">$0 · empty</option>
+      </select>
+    </label>
+    <span class="sep">·</span>
+    <button class="reset" id="reopen-btn">Re-open dialog</button>
+  </div>
+
+  <!-- Faux Kilo Cloud surface behind the modal -->
+  <div class="page-bg" aria-hidden="true">
+    <div class="topbar">
+      <span class="logo">K</span>
+      <span class="crumb">
+        <span>Kilo Cloud</span>
+        <span class="sep">/</span>
+        <span>Personal</span>
+        <span class="sep">/</span>
+        <span class="here">claw-prod-08</span>
+      </span>
+    </div>
+    <div class="sidebar">
+      <span class="group-title">Workspace</span>
+      <span class="nav-item"><span class="dot"></span>Overview</span>
+      <span class="nav-item active"><span class="dot"></span>KiloClaw</span>
+      <span class="nav-item"><span class="dot"></span>Cloud Agents</span>
+      <span class="nav-item"><span class="dot"></span>Code Reviews</span>
+      <span class="group-title">Account</span>
+      <span class="nav-item"><span class="dot"></span>Credits</span>
+      <span class="nav-item"><span class="dot"></span>Billing</span>
+      <span class="nav-item"><span class="dot"></span>Settings</span>
+    </div>
+    <div class="content">
+      <h1 class="h">claw-prod-08</h1>
+      <p class="sub">Hosting plan and billing for this instance.</p>
+      <div class="row">
+        <div class="tile"></div>
+        <div class="tile"></div>
+        <div class="tile"></div>
+      </div>
+      <div class="tile tall"></div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+    <div class="dialog">
+      <button class="close" id="close-btn" aria-label="Close dialog">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M3 3 L11 11 M11 3 L3 11" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <!-- Step indicator -->
+      <div class="stepper" aria-label="Subscription steps">
+        <div class="step" data-state="active" data-step="1">
+          <span class="dot">
+            <span class="num">1</span>
+            <svg class="check" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 5.2 4 7.2 8 3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          Plan and size
+        </div>
+        <div class="divider" aria-hidden="true"></div>
+        <div class="step" data-state="pending" data-step="2">
+          <span class="dot">
+            <span class="num">2</span>
+            <svg class="check" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 5.2 4 7.2 8 3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          Payment
+        </div>
+      </div>
+
+      <!-- ── Step 1: plan + size ─────────────────────────────── -->
+      <section class="step-panel" id="panel-1" data-panel="1">
+        <h2 class="title" id="dialog-title">Subscribe this instance</h2>
+        <p class="subtitle">Pick a plan and size for <span class="instance">claw-prod-08</span>. You can switch later.</p>
+
+        <fieldset class="group" role="radiogroup" aria-label="Hosting plan">
+          <div class="group-label">
+            Plan
+            <span class="meta" id="plan-meta-label">monthly · cancel anytime</span>
+          </div>
+          <div class="plan-grid">
+            <label class="card plan-card" data-plan="commit" data-selected="false">
+              <input type="radio" name="plan" value="commit">
+              <div class="head">
+                <span class="name">Commit</span>
+                <span class="cadence">6 months</span>
+              </div>
+              <div class="price"><span data-bind="commit-price">$76</span><span class="unit">/mo</span></div>
+              <div class="helper">
+                <span class="save" data-bind="commit-save">Save $10/mo</span> · billed <span data-bind="commit-period">$456 every 6 months</span>.
+              </div>
+            </label>
+            <label class="card plan-card" data-plan="standard" data-selected="true">
+              <input type="radio" name="plan" value="standard" checked>
+              <div class="head">
+                <span class="name">Standard</span>
+                <span class="cadence">monthly</span>
+              </div>
+              <div class="price"><span data-bind="standard-price">$86</span><span class="unit">/mo</span></div>
+              <div class="helper">
+                Cancel anytime. <span class="first">$4 first month</span>.
+              </div>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="group" role="radiogroup" aria-label="Instance size">
+          <div class="group-label">
+            Size
+            <span class="meta">cores · memory · storage</span>
+          </div>
+          <div class="size-grid">
+            <label class="card size-card" data-size="good" data-selected="false">
+              <input type="radio" name="size" value="good">
+              <div class="name">Good</div>
+              <ul class="specs">
+                <li>1 performance core</li>
+                <li>3 GB memory</li>
+                <li>10 GB storage</li>
+              </ul>
+              <div class="price"><span data-bind="good-price">$9</span><span class="unit">/mo</span></div>
+            </label>
+            <label class="card size-card" data-size="better" data-selected="true">
+              <input type="radio" name="size" value="better" checked>
+              <div class="name">Better</div>
+              <ul class="specs">
+                <li>4 performance cores</li>
+                <li>8 GB memory</li>
+                <li>20 GB storage</li>
+              </ul>
+              <div class="price"><span data-bind="better-price">$86</span><span class="unit">/mo</span></div>
+            </label>
+            <label class="card size-card" data-size="best" data-selected="false">
+              <input type="radio" name="size" value="best">
+              <div class="name">Best</div>
+              <ul class="specs">
+                <li>4 performance cores</li>
+                <li>16 GB memory</li>
+                <li>40 GB storage</li>
+              </ul>
+              <div class="price"><span data-bind="best-price">$172</span><span class="unit">/mo</span></div>
+            </label>
+          </div>
+          <p class="group-help">Performance cores are dedicated CPU threads, not shared with other tenants.</p>
+        </fieldset>
+
+        <div class="footer">
+          <div class="left">
+            <button class="btn btn-ghost" type="button" data-action="cancel">Cancel</button>
+            <span class="helper" id="step1-helper" aria-live="polite"></span>
+          </div>
+          <span class="kbd-hint" id="step1-kbd" hidden aria-label="Press Enter to continue"><kbd>↵</kbd></span>
+          <button class="btn btn-primary" type="button" id="continue-btn">Continue</button>
+        </div>
+      </section>
+
+      <!-- ── Step 2: payment ─────────────────────────────────── -->
+      <section class="step-panel" id="panel-2" data-panel="2" hidden>
+        <h2 class="title">How would you like to pay?</h2>
+        <div class="recap" id="recap">
+          <span class="key">Subscribing</span>
+          <span class="pillval" data-bind="recap-plan">Standard</span>
+          <span class="sep">·</span>
+          <span class="pillval" data-bind="recap-size">Better</span>
+          <span class="sep">·</span>
+          <span class="pillval" data-bind="recap-price">$86.00/mo</span>
+          <span class="sep" data-bind="recap-extra-sep">·</span>
+          <span class="pillval" data-bind="recap-extra">$4.00 first month</span>
+        </div>
+
+        <fieldset class="group" role="radiogroup" aria-label="Payment method">
+          <div class="group-label">Method</div>
+          <div class="method-stack">
+            <label class="card method-card" data-method="credits" data-selected="true" id="credits-card">
+              <input type="radio" name="method" value="credits" checked>
+              <div class="head">
+                <span class="name">Pay with Kilo Credits</span>
+                <span class="badge" data-bind="credits-renews-on">Renews 2026-06-06</span>
+              </div>
+              <div class="body">Deduct from your balance now and on each renewal.</div>
+              <dl class="ledger">
+                <dt>Balance</dt><dd data-bind="balance-now">$200.00</dd>
+                <dt>Charge today</dt><dd class="neg" data-bind="this-period">−$4.00</dd>
+                <div class="row-strong" style="display: contents;">
+                  <dt>After</dt><dd data-bind="balance-after">$196.00</dd>
+                </div>
+              </dl>
+              <p class="card-source">From your personal credits balance.</p>
+              <div class="warn" id="credits-warn" hidden>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path d="M7 2.2v4.4M7 9.4v.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  <circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.2"/>
+                </svg>
+                <span><span id="credits-warn-msg">Not enough credits.</span> <a href="#" class="link" id="topup-link">Top up</a>, or pay with a card below.</span>
+              </div>
+            </label>
+
+            <label class="card method-card" data-method="stripe" data-selected="false">
+              <input type="radio" name="method" value="stripe">
+              <div class="head">
+                <span class="name">Pay with a card via Stripe</span>
+                <span class="badge" data-bind="stripe-renews-on">Renews 2026-06-06</span>
+              </div>
+              <div class="body">Charge your card now and on each renewal.</div>
+              <dl class="ledger">
+                <dt>Charge today</dt><dd data-bind="stripe-today">$4.00</dd>
+                <dt>Then</dt><dd data-bind="stripe-then">$86.00/mo</dd>
+                <div class="row-strong" style="display: contents;">
+                  <dt>Credits used</dt><dd data-bind="stripe-credits-used">$0.00</dd>
+                </div>
+              </dl>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="footer">
+          <div class="left">
+            <button class="btn btn-ghost" type="button" data-action="cancel">Cancel</button>
+          </div>
+          <button class="btn btn-secondary" type="button" id="back-btn">Back</button>
+          <span class="kbd-hint" id="step2-kbd" aria-label="Press Command Enter to subscribe"><kbd class="kbd-mod">⌘</kbd><kbd>↵</kbd></span>
+          <button class="btn btn-primary" type="button" id="subscribe-btn">
+            <span id="subscribe-label">Subscribe with credits</span>
+          </button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    // ── Pricing matrix (USD/mo) ──
+    const PRICING = {
+      standard: { good: 9,  better: 86,  best: 172 },
+      commit:   { good: 8,  better: 76,  best: 152 },
+    };
+    const STANDARD_FIRST_MONTH = 4; // dollars
+    const SIZE_LABEL = { good: 'Good', better: 'Better', best: 'Best' };
+
+    // ── State ──
+    const state = {
+      step: 1,
+      plan: 'standard',
+      size: 'better',
+      method: 'credits',
+      balance: 200,
+    };
+
+    const fmt = (n) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const fmtNoCents = (n) => `$${n.toLocaleString('en-US')}`;
+
+    // ── Helpers ──
+    function periodCost() {
+      // First period cost in dollars.
+      // Standard first month = $4; commit pays 6 months upfront.
+      if (state.plan === 'standard') return STANDARD_FIRST_MONTH;
+      return PRICING.commit[state.size] * 6;
+    }
+    function ongoingCost() {
+      if (state.plan === 'standard') return PRICING.standard[state.size];
+      return PRICING.commit[state.size] * 6;
+    }
+    function ongoingCadence() {
+      return state.plan === 'standard' ? '/mo' : ' every 6 months';
+    }
+
+    // ── Step 1 rendering ──
+    function renderPlanAndSize() {
+      const stdPrice = PRICING.standard[state.size];
+      const commitPrice = PRICING.commit[state.size];
+      const save = stdPrice - commitPrice;
+      const commitPeriod = commitPrice * 6;
+
+      document.querySelector('[data-bind="commit-price"]').textContent = fmtNoCents(commitPrice);
+      document.querySelector('[data-bind="standard-price"]').textContent = fmtNoCents(stdPrice);
+      document.querySelector('[data-bind="commit-save"]').textContent = `Save ${fmtNoCents(save)}/mo`;
+      document.querySelector('[data-bind="commit-period"]').textContent = `${fmtNoCents(commitPeriod)} every 6 months`;
+
+      ['good', 'better', 'best'].forEach((s) => {
+        document.querySelector(`[data-bind="${s}-price"]`).textContent = fmtNoCents(PRICING[state.plan][s]);
+      });
+
+      document.getElementById('plan-meta-label').textContent =
+        state.plan === 'commit' ? '6-month commitment · auto-renews' : 'monthly · cancel anytime';
+
+      document.querySelectorAll('[data-plan]').forEach((el) => {
+        el.dataset.selected = el.dataset.plan === state.plan;
+      });
+      document.querySelectorAll('[data-size]').forEach((el) => {
+        el.dataset.selected = el.dataset.size === state.size;
+      });
+
+      const cont = document.getElementById('continue-btn');
+      const helper = document.getElementById('step1-helper');
+      const kbd = document.getElementById('step1-kbd');
+      const ready = !!state.plan && !!state.size;
+      cont.disabled = !ready;
+      helper.textContent = ready ? '' : 'Pick a plan and size to continue';
+      if (kbd) kbd.hidden = !ready;
+    }
+
+    // ── Step 2 rendering ──
+    function renderRecap() {
+      const planLabel = state.plan === 'commit' ? 'Commit' : 'Standard';
+      const sizeLabel = SIZE_LABEL[state.size];
+      const ongoing = ongoingCost();
+      const cadence = ongoingCadence();
+
+      document.querySelector('[data-bind="recap-plan"]').textContent = planLabel;
+      document.querySelector('[data-bind="recap-size"]').textContent = sizeLabel;
+      document.querySelector('[data-bind="recap-price"]').textContent = `${fmt(ongoing)}${cadence}`;
+
+      const extra = document.querySelector('[data-bind="recap-extra"]');
+      const extraSep = document.querySelector('[data-bind="recap-extra-sep"]');
+      if (state.plan === 'standard') {
+        extra.textContent = `${fmt(STANDARD_FIRST_MONTH)} first month`;
+        extra.style.display = '';
+        extraSep.style.display = '';
+      } else {
+        extra.style.display = 'none';
+        extraSep.style.display = 'none';
+      }
+    }
+
+    function renderPaymentMath() {
+      const period = periodCost();
+      const ongoing = ongoingCost();
+      const cadence = ongoingCadence();
+      const balance = state.balance;
+      const after = balance - period;
+      const sufficient = after >= 0;
+
+      // Credits ledger
+      document.querySelector('[data-bind="balance-now"]').textContent = fmt(balance);
+      document.querySelector('[data-bind="this-period"]').textContent = `−${fmt(period)}`;
+      document.querySelector('[data-bind="balance-after"]').textContent = sufficient ? fmt(after) : '—';
+
+      // Stripe ledger (mirror structure)
+      document.querySelector('[data-bind="stripe-today"]').textContent = fmt(period);
+      document.querySelector('[data-bind="stripe-then"]').textContent = `${fmt(ongoing)}${cadence}`;
+      document.querySelector('[data-bind="stripe-credits-used"]').textContent = fmt(0);
+
+      // Renew date in both badges
+      const renews = new Date();
+      if (state.plan === 'standard') renews.setMonth(renews.getMonth() + 1);
+      else renews.setMonth(renews.getMonth() + 6);
+      const renewsIso = renews.toISOString().slice(0, 10);
+      document.querySelector('[data-bind="credits-renews-on"]').textContent = `Renews ${renewsIso}`;
+      document.querySelector('[data-bind="stripe-renews-on"]').textContent = `Renews ${renewsIso}`;
+
+      // Sufficiency on credits card
+      const creditsCard = document.getElementById('credits-card');
+      const creditsRadio = document.querySelector('input[name="method"][value="credits"]');
+      const warn = document.getElementById('credits-warn');
+      const warnMsg = document.getElementById('credits-warn-msg');
+
+      if (sufficient) {
+        creditsCard.dataset.disabled = 'false';
+        creditsRadio.disabled = false;
+        warn.hidden = true;
+      } else {
+        creditsCard.dataset.disabled = 'true';
+        creditsRadio.disabled = true;
+        warn.hidden = false;
+        warnMsg.textContent = `Not enough credits to cover ${fmt(period)}.`;
+        if (state.method === 'credits') {
+          state.method = 'stripe';
+        }
+      }
+
+      // Reflect method selection
+      document.querySelectorAll('input[name="method"]').forEach((r) => {
+        r.checked = r.value === state.method;
+      });
+      document.querySelectorAll('[data-method]').forEach((el) => {
+        el.dataset.selected = el.dataset.method === state.method;
+      });
+
+      // Subscribe label
+      document.getElementById('subscribe-label').textContent =
+        state.method === 'credits' ? 'Subscribe with credits' : 'Subscribe via card';
+    }
+
+    // ── Step transition (crossfade) ──
+    function gotoStep(n) {
+      if (n === state.step) return;
+      const fromId = state.step === 1 ? 'panel-1' : 'panel-2';
+      const toId = n === 1 ? 'panel-1' : 'panel-2';
+      const from = document.getElementById(fromId);
+      const to = document.getElementById(toId);
+      const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const apply = () => {
+        from.hidden = true;
+        from.classList.remove('is-leaving');
+        to.hidden = false;
+        state.step = n;
+
+        // step indicator
+        const s1 = document.querySelector('.step[data-step="1"]');
+        const s2 = document.querySelector('.step[data-step="2"]');
+        if (n === 1) {
+          s1.dataset.state = 'active';
+          s2.dataset.state = 'pending';
+        } else {
+          s1.dataset.state = 'done';
+          s2.dataset.state = 'active';
+          renderRecap();
+          renderPaymentMath();
+        }
+
+        // focus first interactive element of the new panel
+        requestAnimationFrame(() => {
+          const focusTarget = to.querySelector('input[type="radio"]:checked, button, [tabindex]');
+          if (focusTarget) focusTarget.focus({ preventScroll: true });
+        });
+      };
+
+      if (reduceMotion) { apply(); return; }
+      from.classList.add('is-leaving');
+      setTimeout(apply, 150);
+    }
+
+    // ── Wire up ──
+    // ── Persistence (last plan + size) ──
+    const PERSIST_PLAN = 'kiloclaw-last-plan';
+    const PERSIST_SIZE = 'kiloclaw-last-size';
+    function persistSelection() {
+      try {
+        localStorage.setItem(PERSIST_PLAN, state.plan);
+        localStorage.setItem(PERSIST_SIZE, state.size);
+      } catch (_) { /* private mode, ignore */ }
+    }
+    function loadPersistedSelection() {
+      try {
+        const p = localStorage.getItem(PERSIST_PLAN);
+        const s = localStorage.getItem(PERSIST_SIZE);
+        if (p === 'commit' || p === 'standard') state.plan = p;
+        if (s === 'good' || s === 'better' || s === 'best') state.size = s;
+        document.querySelectorAll('input[name="plan"]').forEach((r) => { r.checked = (r.value === state.plan); });
+        document.querySelectorAll('input[name="size"]').forEach((r) => { r.checked = (r.value === state.size); });
+      } catch (_) { /* ignore */ }
+    }
+
+    document.querySelectorAll('input[name="plan"]').forEach((input) => {
+      input.addEventListener('change', () => {
+        state.plan = input.value;
+        renderPlanAndSize();
+        persistSelection();
+      });
+    });
+    document.querySelectorAll('input[name="size"]').forEach((input) => {
+      input.addEventListener('change', () => {
+        state.size = input.value;
+        renderPlanAndSize();
+        persistSelection();
+      });
+    });
+    document.querySelectorAll('input[name="method"]').forEach((input) => {
+      input.addEventListener('change', () => {
+        if (input.disabled) return;
+        state.method = input.value;
+        document.querySelectorAll('[data-method]').forEach((el) => {
+          el.dataset.selected = el.dataset.method === state.method;
+        });
+        document.getElementById('subscribe-label').textContent =
+          state.method === 'credits' ? 'Subscribe with credits' : 'Subscribe via card';
+      });
+    });
+
+    document.getElementById('continue-btn').addEventListener('click', () => gotoStep(2));
+    document.getElementById('back-btn').addEventListener('click', () => gotoStep(1));
+    document.querySelectorAll('[data-action="cancel"]').forEach((b) => b.addEventListener('click', closeDialog));
+    document.getElementById('close-btn').addEventListener('click', closeDialog);
+
+    document.getElementById('subscribe-btn').addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      const label = document.getElementById('subscribe-label');
+      const original = label.textContent;
+      btn.disabled = true;
+      btn.classList.add('is-loading');
+      btn.setAttribute('aria-busy', 'true');
+      btn.innerHTML = '<span class="spinner" aria-hidden="true"></span><span>Submitting…</span>';
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.classList.remove('is-loading');
+        btn.removeAttribute('aria-busy');
+        btn.innerHTML = `<span id="subscribe-label">${original}</span>`;
+        const action = state.method === 'credits' ? 'deduct credits' : 'redirect to Stripe';
+        alert(`Prototype: would ${action} for ${state.plan}/${state.size}.`);
+      }, 900);
+    });
+
+    document.getElementById('topup-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      alert('Prototype: would open the credit top-up flow.');
+    });
+
+    // ── Open / close + background inert ──
+    function setOverlayInert(open) {
+      const bg = document.querySelector('.page-bg');
+      if (bg) bg.inert = open;
+    }
+    function closeDialog() {
+      const overlay = document.getElementById('overlay');
+      overlay.style.display = 'none';
+      setOverlayInert(false);
+    }
+    function openDialog() {
+      const overlay = document.getElementById('overlay');
+      overlay.style.display = ''; // revert to CSS (flex)
+      setOverlayInert(true);
+      const p1 = document.getElementById('panel-1');
+      const p2 = document.getElementById('panel-2');
+      p1.hidden = false; p2.hidden = true;
+      state.step = 1;
+      document.querySelector('.step[data-step="1"]').dataset.state = 'active';
+      document.querySelector('.step[data-step="2"]').dataset.state = 'pending';
+    }
+    document.getElementById('reopen-btn').addEventListener('click', openDialog);
+    document.getElementById('overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'overlay') closeDialog();
+    });
+
+    // ── Keyboard shortcuts ──
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || '');
+    document.querySelectorAll('.kbd-mod').forEach((el) => { el.textContent = isMac ? '⌘' : 'Ctrl'; });
+
+    function isOverlayOpen() {
+      return document.getElementById('overlay').style.display !== 'none';
+    }
+    function shouldSwallowEnter() {
+      const tag = document.activeElement && document.activeElement.tagName;
+      // Buttons and links handle their own activation; let them.
+      return tag === 'BUTTON' || tag === 'A' || tag === 'TEXTAREA' || tag === 'SELECT';
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (isOverlayOpen()) closeDialog();
+        return;
+      }
+      if (!isOverlayOpen()) return;
+      if (e.key !== 'Enter') return;
+
+      // Cmd/Ctrl+Enter submits step 2 from anywhere in the overlay
+      if (e.metaKey || e.ctrlKey) {
+        if (state.step === 2) {
+          e.preventDefault();
+          const btn = document.getElementById('subscribe-btn');
+          if (!btn.disabled) btn.click();
+        }
+        return;
+      }
+      if (e.shiftKey || e.altKey) return;
+      if (shouldSwallowEnter()) return;
+      const overlay = document.getElementById('overlay');
+      if (!overlay.contains(document.activeElement)) return;
+
+      e.preventDefault();
+      if (state.step === 1) {
+        const cont = document.getElementById('continue-btn');
+        if (!cont.disabled) cont.click();
+      } else {
+        const sub = document.getElementById('subscribe-btn');
+        if (!sub.disabled) sub.click();
+      }
+    });
+
+    document.getElementById('balance-toggle').addEventListener('change', (e) => {
+      state.balance = parseInt(e.target.value, 10);
+      if (state.step === 2) renderPaymentMath();
+    });
+
+    // initial paint
+    loadPersistedSelection();
+    renderPlanAndSize();
+    setOverlayInert(true);
+  </script>
+</body>
+</html>

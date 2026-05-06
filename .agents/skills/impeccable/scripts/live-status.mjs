@@ -27,12 +27,14 @@ export async function statusCli() {
   const store = createLiveSessionStore({ cwd: process.cwd() });
   const activeSessions = store.listActiveSessions();
   const payload = {
-    liveServer: server ? {
-      status: server.status,
-      port: server.port,
-      connectedClients: server.connectedClients,
-      pendingEvents: server.pendingEvents,
-    } : null,
+    liveServer: server
+      ? {
+          status: server.status,
+          port: server.port,
+          connectedClients: server.connectedClients,
+          pendingEvents: server.pendingEvents,
+        }
+      : null,
     activeSessions: server?.activeSessions || activeSessions,
     recoveryHint: server
       ? 'Run live-poll.mjs to continue pending work, or live-complete.mjs --id <session> after manual cleanup.'

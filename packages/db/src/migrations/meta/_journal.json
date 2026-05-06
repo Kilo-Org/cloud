@@ -806,6 +806,13 @@
       "when": 1778050833487,
       "tag": "0114_steep_hercules",
       "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "7",
+      "when": 1778063303197,
+      "tag": "0115_real_energizer",
+      "breakpoints": true
     }
   ]
 }

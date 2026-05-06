@@ -1250,7 +1250,7 @@ export const stytch_fingerprints = pgTable(
     index('idx_fingerprint_data').on(table.fingerprint_data),
     index('idx_hardware_fingerprint').on(table.hardware_fingerprint),
     index('idx_kilo_user_id').on(table.kilo_user_id),
-    index('idx_reasons').on(table.reasons),
+    index('idx_stytch_fingerprints_reasons_gin').using('gin', table.reasons),
     index('idx_verdict_action').on(table.verdict_action),
     index('idx_visitor_fingerprint').on(table.visitor_fingerprint),
   ]

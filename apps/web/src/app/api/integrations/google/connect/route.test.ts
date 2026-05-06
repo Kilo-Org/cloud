@@ -4,6 +4,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
 import { createGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
+import type * as OAuthStateModule from '@/lib/integrations/google/oauth-state';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { failureResult } from '@/lib/maybe-result';
 
@@ -14,7 +15,19 @@ jest.mock('@/routers/organizations/utils', () => ({
 }));
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/integrations/google-service');
-jest.mock('@/lib/integrations/google/oauth-state');
+// Partial-mock so GOOGLE_OAUTH_RETURN_TO_REGEX (and any other constants) keep
+// their real values; only the createGoogleOAuthState / verifyGoogleOAuthState
+// functions need to be jest.fn() for assertions.
+jest.mock('@/lib/integrations/google/oauth-state', () => {
+  const actual = jest.requireActual<typeof OAuthStateModule>(
+    '@/lib/integrations/google/oauth-state'
+  );
+  return {
+    ...actual,
+    createGoogleOAuthState: jest.fn(),
+    verifyGoogleOAuthState: jest.fn(),
+  };
+});
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
@@ -154,5 +167,67 @@ describe('GET /api/integrations/google/connect', () => {
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/claw/settings?error=invalid_organization');
     expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+  });
+
+  test('passes a valid returnTo through to the OAuth state', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        '/api/integrations/google/connect?returnTo=%2Fclaw%2Fnew%3Fstep%3Dcalendar'
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: { type: 'user', id: USER_ID },
+        instanceId: INSTANCE_ID,
+        capabilities: ['calendar_read'],
+        returnTo: '/claw/new?step=calendar',
+      }),
+      USER_ID
+    );
+  });
+
+  test('drops protocol-relative returnTo values to prevent open redirects', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/connect?returnTo=%2F%2Fevil.example.com') as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
+  test('drops absolute-URL returnTo values', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        '/api/integrations/google/connect?returnTo=https%3A%2F%2Fevil.example.com%2Fclaw%2Fnew'
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
+  test('drops returnTo values with a URI fragment', async () => {
+    // Fragments are disallowed by RETURN_TO_REGEX because the helpers in
+    // callback/route.ts append the success/error param using a `?`/`&`
+    // separator; a fragment in the returnTo would push the param past the
+    // `#` where browsers ignore it.
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/connect?returnTo=%2Fclaw%2Fnew%23section') as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
   });
 });

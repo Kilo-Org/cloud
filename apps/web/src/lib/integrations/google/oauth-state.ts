@@ -8,10 +8,13 @@ const GOOGLE_OAUTH_STATE_PREFIX = 'google:';
 
 // Constrain returnTo to a relative path so it can never be hijacked into an
 // open-redirect to an external host. Must start with `/`, may contain a
-// non-protocol-style path, optionally followed by a query string and/or
-// fragment. Disallows `//` after the leading slash so we don't accidentally
-// accept protocol-relative URLs like `//evil.example.com`.
-const RETURN_TO_REGEX = /^\/(?!\/)[^?#]*(\?[^#]*)?(#.*)?$/;
+// non-protocol-style path, optionally followed by a query string. Fragments
+// are disallowed — buildGoogleRedirectPath / appendQueryParam append the
+// success/error param using a `?` or `&` separator, and a fragment in the
+// returnTo would push the appended param past the `#` where browsers ignore
+// it. Disallows `//` after the leading slash so we don't accidentally accept
+// protocol-relative URLs like `//evil.example.com`.
+const RETURN_TO_REGEX = /^\/(?!\/)[^?#]*(\?[^#]*)?$/;
 
 const GoogleOAuthStatePayloadSchema = z.object({
   owner: z.discriminatedUnion('type', [

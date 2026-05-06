@@ -253,10 +253,16 @@ function ClawOnboardingFlowInner({
     hasResumedFromQuery.current = true;
     if (stepParam === 'calendar') {
       setOnboardingStep('calendar');
+      posthog?.capture('claw_setup_calendar_resumed', {
+        outcome:
+          successParam === 'google_connected' ? 'connected' : errorParam ? 'error' : 'unknown',
+      });
     }
     if (successParam === 'google_connected') {
+      posthog?.capture('claw_setup_calendar_oauth_completed');
       toast.success('Calendar connected');
     } else if (errorParam) {
+      posthog?.capture('claw_setup_calendar_oauth_failed', { reason: errorParam });
       toast.error('Could not connect calendar — please try again or skip for now.');
     }
     // Strip the consumed query params so the URL stays clean and the resume
@@ -267,7 +273,7 @@ function ClawOnboardingFlowInner({
     next.delete('error');
     const nextSearch = next.toString();
     router.replace(nextSearch ? `${pathname}?${nextSearch}` : (pathname ?? '/claw/new'));
-  }, [searchParams, router, pathname, botIdentity]);
+  }, [searchParams, router, pathname, botIdentity, posthog]);
 
   // NOTE: When mode === 'post-provisioning' (i.e. an existing instance is
   // already running) and the gateway is ready, renderStep is 'complete' on
@@ -357,10 +363,7 @@ function ClawOnboardingFlowInner({
 
   function renderCalendarStep() {
     const returnTo = `${basePath}/new?step=calendar`;
-    const connectParams = new URLSearchParams({
-      capabilities: 'calendar_read',
-      returnTo,
-    });
+    const connectParams = new URLSearchParams({ returnTo });
     if (organizationId) {
       connectParams.set('organizationId', organizationId);
     }

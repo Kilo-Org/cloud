@@ -3179,13 +3179,17 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         ? 'border-amber-500 text-amber-500 hover:bg-amber-500/10'
                         : ''
                     }
+                    // Button stays clickable when the instance is running so
+                    // admins can discover the affordance; the dialog itself
+                    // disables Set/Clear until the machine is stopped and
+                    // surfaces an inline "must be stopped" message. The DO RPC
+                    // is the authoritative guard.
                     disabled={
                       machineActionPending ||
                       isResizingMachine ||
                       isMutatingSizeOverride ||
                       !hasRuntime ||
-                      !!data?.destroyed_at ||
-                      currentStatus !== 'stopped'
+                      !!data?.destroyed_at
                     }
                     onClick={() => {
                       setSizeOverrideMode(
@@ -3525,6 +3529,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <span className="text-foreground mt-2 block font-medium">
                   User: {data?.user_email ?? data?.user_id}
                 </span>
+                {currentStatus === 'running' && (
+                  <span className="mt-2 block text-xs text-amber-600 dark:text-amber-400">
+                    Machine is currently running. The change will apply on the next stop/start cycle
+                    (manual restart, customer-initiated, or admin-triggered).
+                  </span>
+                )}
                 {data?.workerStatus?.adminMachineSizeOverride && (
                   <span className="text-foreground mt-2 block">
                     Current override:{' '}

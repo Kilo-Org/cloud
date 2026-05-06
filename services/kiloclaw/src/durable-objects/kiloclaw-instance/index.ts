@@ -2962,6 +2962,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       cannotPrefix: 'resize',
       beforePhrase: 'resizing machine tier',
       notSupportedSubject: 'Instance tier resize',
+      // Tier resize calls fly.extendVolume on storage growth; Fly volume
+      // extends require the machine to be stopped.
+      requireStopped: true,
     });
 
     const targetTier = getTier(targetTierKey);
@@ -3063,19 +3066,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Shared guard for admin operations that mutate hardware-related state
    * (`resizeMachine`, `setAdminMachineSizeOverride`, `clearAdminMachineSizeOverride`).
    *
-   * Operations are allowed only when the instance is provisioned, not in
-   * a transitional/destroying state, the runtime is stopped (or doesn't
-   * exist yet), and the provider is not Northflank.
+   * Always rejects: not-provisioned, destroying / restoring / recovering /
+   * starting / restarting transitional states, and Northflank instances
+   * (none of these paths are wired up for Northflank's async pod-rollout
+   * model yet).
    *
-   * Takes three message fragments so each call site reads naturally:
+   * Optionally rejects when the instance is running (`requireStopped: true`).
+   * Tier resize requires stopped because it extends the Fly volume in place,
+   * which Fly's API only allows on stopped machines. Override set/clear are
+   * pure DO state writes — the Fly `updateMachine(guest=...)` call doesn't
+   * happen until the machine's next stop/start cycle, where Fly's own state
+   * machine enforces the constraint. So override paths pass
+   * `requireStopped: false` and let the customer or admin decide when to
+   * trigger the cycle that picks up the new override.
+   *
+   * Takes message fragments so each call site reads naturally:
    * - `cannotPrefix` slots into "Cannot {prefix}: ..."
    * - `beforePhrase` slots into "Instance must be stopped before {phrase}"
+   *   (only used when `requireStopped: true`)
    * - `notSupportedSubject` slots into "{subject} is not yet supported on Northflank instances"
    */
   private assertAdminSizeChangeAllowed(args: {
     cannotPrefix: string;
-    beforePhrase: string;
+    beforePhrase?: string;
     notSupportedSubject: string;
+    requireStopped: boolean;
   }): void {
     if (!this.s.userId) {
       throw new Error('Instance is not provisioned');
@@ -3094,10 +3109,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     if (this.s.status === 'starting' || this.s.status === 'restarting') {
       throw new Error(`Cannot ${args.cannotPrefix}: instance is busy (${this.s.status})`);
     }
-    if (this.s.status !== 'stopped' && getRuntimeId(this.s)) {
-      throw Object.assign(new Error(`Instance must be stopped before ${args.beforePhrase}`), {
-        status: 409,
-      });
+    if (args.requireStopped && this.s.status !== 'stopped' && getRuntimeId(this.s)) {
+      throw Object.assign(
+        new Error(`Instance must be stopped before ${args.beforePhrase ?? args.cannotPrefix}`),
+        { status: 409 }
+      );
     }
     if (this.s.provider === 'northflank') {
       throw new Error(`${args.notSupportedSubject} is not yet supported on Northflank instances`);
@@ -3110,7 +3126,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Set a temporary admin override for the machine's CPU/RAM. Wins over
    * the tier-derived `machineSize` for runtime spec construction without
    * touching `instanceType` or `volumeSizeGb` (so billing stays on the
-   * customer's tier). Stopped-machine-only; Fly + docker-local only.
+   * customer's tier). Fly + docker-local only.
+   *
+   * Can be set on a running instance — the override is a pure DO state
+   * write and takes effect on the next stop/start cycle (manual restart,
+   * customer-initiated stop/start, or any other path that flows through
+   * `startExistingMachine`). The current container keeps running on the
+   * tier hardware until that cycle.
    *
    * Override is sticky until cleared explicitly or until a tier resize
    * auto-clears it. See `~/fd-plans/kiloclaw/admin-machine-size-override.md`.
@@ -3127,8 +3149,13 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
     this.assertAdminSizeChangeAllowed({
       cannotPrefix: 'set admin size override',
-      beforePhrase: 'setting an admin size override',
       notSupportedSubject: 'Admin size override',
+      // Override is a pure DO state write; it takes effect on the next
+      // stop/start cycle when `startExistingMachine` calls
+      // `fly.updateMachine(guest=...)`. Setting on a running machine is
+      // safe — current container keeps running, override applies on next
+      // restart.
+      requireStopped: false,
     });
     if (this.s.machineSize === null) {
       throw new Error(
@@ -3213,8 +3240,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
 
     this.assertAdminSizeChangeAllowed({
       cannotPrefix: 'clear admin size override',
-      beforePhrase: 'clearing an admin size override',
       notSupportedSubject: 'Admin size override',
+      // Same as set: clear is a DO state write; revert to tier hardware
+      // happens on next restart when `startExistingMachine` calls Fly.
+      requireStopped: false,
     });
 
     this.s.adminMachineSizeOverride = null;

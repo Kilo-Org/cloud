@@ -9342,17 +9342,29 @@ describe('setAdminMachineSizeOverride', () => {
     expect(storage._store.get('volumeSizeGb')).toBe(10);
   });
 
-  it('rejects when instance is running', async () => {
-    const { instance, storage } = createInstance();
+  it('persists override on a running instance — applies on next restart', async () => {
+    // Set is a pure DO state write; the Fly `updateMachine(guest=...)` call
+    // doesn't happen until the next stop/start cycle. The current container
+    // keeps running on tier hardware in the meantime.
+    const { instance, storage, waitUntilPromises } = createInstance();
     await seedRunning(storage, {
       instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
       volumeSizeGb: 10,
     });
 
-    await expect(instance.setAdminMachineSizeOverride(overrideArgs)).rejects.toThrow(
-      'Instance must be stopped before setting an admin size override'
-    );
+    const result = await instance.setAdminMachineSizeOverride(overrideArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.newOverride).toEqual(overrideArgs.size);
+    expect(storage._store.get('adminMachineSizeOverride')).toEqual(overrideArgs.size);
+    // Tier hardware untouched.
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('status')).toBe('running');
   });
 
   it('rejects on Northflank instances', async () => {
@@ -9490,8 +9502,10 @@ describe('clearAdminMachineSizeOverride', () => {
     );
   });
 
-  it('rejects when instance is running and an override is active', async () => {
-    const { instance, storage } = createInstance();
+  it('clears override on a running instance — revert applies on next restart', async () => {
+    // Mirror of the running-instance set test: clear is a DO state write;
+    // the running container keeps the override hardware until next restart.
+    const { instance, storage, waitUntilPromises } = createInstance();
     await seedRunning(storage, {
       instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
@@ -9505,9 +9519,16 @@ describe('clearAdminMachineSizeOverride', () => {
       },
     });
 
-    await expect(instance.clearAdminMachineSizeOverride(clearArgs)).rejects.toThrow(
-      'Instance must be stopped before clearing an admin size override'
-    );
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toEqual({
+      cpus: 4,
+      memory_mb: 8192,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('adminMachineSizeOverride')).toBeNull();
+    expect(storage._store.get('status')).toBe('running');
   });
 
   it('is a no-op even on a destroying instance when no override is active', async () => {

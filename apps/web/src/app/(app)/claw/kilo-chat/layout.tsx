@@ -22,6 +22,7 @@ export default function KiloChatRootLayout({ children }: { children: React.React
       instanceErrorMessage={instanceErrorMessage}
       onRetryInstanceStatus={() => void refetch()}
       assistantName={status?.botName ?? null}
+      assistantEmoji={status?.botEmoji ?? null}
     >
       {children}
     </KiloChatLayout>

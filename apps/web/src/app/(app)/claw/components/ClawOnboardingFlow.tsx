@@ -218,6 +218,11 @@ function ClawOnboardingFlowInner({
 
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
 
+  // NOTE: When mode === 'post-provisioning' (i.e. an existing instance is
+  // already running) and the gateway is ready, renderStep is 'complete' on
+  // first render and the redirect below fires immediately. This is intentional:
+  // the onboarding wizard is for new users; returning users with a working
+  // instance go straight to chat rather than seeing a wizard surface.
   const hasRedirectedToChat = useRef(false);
   useEffect(() => {
     // Wait for the gateway to actually be ready before redirecting; the chat

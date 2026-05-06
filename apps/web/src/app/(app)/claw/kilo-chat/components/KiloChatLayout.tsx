@@ -32,7 +32,7 @@ type KiloChatLayoutProps = {
   onRetryInstanceStatus: () => void;
   instanceStatus: string | null;
   assistantName: string | null;
-  assistantEmoji?: string | null;
+  assistantEmoji: string | null;
   className?: string;
   children: React.ReactNode;
 };
@@ -48,7 +48,7 @@ export function KiloChatLayout({
   onRetryInstanceStatus,
   instanceStatus,
   assistantName,
-  assistantEmoji = null,
+  assistantEmoji,
   className,
   children,
 }: KiloChatLayoutProps) {

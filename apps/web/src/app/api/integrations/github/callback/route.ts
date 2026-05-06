@@ -22,7 +22,7 @@ import type {
 } from '@/lib/integrations/core/types';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
-import { githubUserIdentity, linkKiloUser } from '@/lib/bot-identity';
+import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -85,7 +85,15 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
   const githubUser = await exchangeGitHubOAuthCode(code, appType);
 
   await bot.initialize();
-  await linkKiloUser(bot.getState(), githubUserIdentity(githubUser.id), user.id);
+  await linkKiloUser(
+    bot.getState(),
+    {
+      platform: PLATFORM.GITHUB,
+      teamId: state.installationId,
+      userId: githubUser.id,
+    },
+    user.id
+  );
 
   return htmlPage(
     'GitHub account linked',

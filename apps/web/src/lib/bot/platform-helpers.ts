@@ -1,4 +1,4 @@
-import { githubUserIdentity, type PlatformIdentity } from '@/lib/bot-identity';
+import { type PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
 import { eq, and, sql } from 'drizzle-orm';
 import { platform_integrations } from '@kilocode/db';
@@ -48,14 +48,6 @@ export async function getPlatformIdentity(
     default:
       throw new Error(`PlatformNotSupported: ${platform}`);
   }
-}
-
-export function getPlatformUserIdentity(identity: PlatformIdentity): PlatformIdentity {
-  if (identity.platform === PLATFORM.GITHUB) {
-    return githubUserIdentity(identity.userId);
-  }
-
-  return identity;
 }
 
 /**

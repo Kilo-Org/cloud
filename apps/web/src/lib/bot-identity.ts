@@ -6,8 +6,6 @@ import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { botIdentityRedisKey } from '@/lib/redis-keys';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
-export const GITHUB_USER_IDENTITY_TEAM_ID = 'user';
-
 const CHAT_SDK_CACHE_KEY_PREFIX = 'chat-sdk:cache:';
 const LINK_ACCOUNT_CONTEXT_KEY_PREFIX = 'link-account-context:';
 const REDIS_SCAN_BATCH_SIZE = 100;
@@ -38,14 +36,6 @@ export type PlatformIdentity = {
   /** Platform-specific user ID (e.g. Slack's "U123ABC") */
   userId: string;
 };
-
-export function githubUserIdentity(githubUserId: string): PlatformIdentity {
-  return {
-    platform: PLATFORM.GITHUB,
-    teamId: GITHUB_USER_IDENTITY_TEAM_ID,
-    userId: githubUserId,
-  };
-}
 
 type LinkTokenPayload = {
   identity: PlatformIdentity;

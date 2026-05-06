@@ -1,11 +1,20 @@
 const mockCreateLinkAccountTokenFn = jest.fn();
+const mockCreateGitHubLinkTokenFn = jest.fn();
 
 function mockCreateLinkAccountToken(...args: unknown[]) {
   return mockCreateLinkAccountTokenFn(...args);
 }
 
+function mockCreateGitHubLinkToken(...args: unknown[]) {
+  return mockCreateGitHubLinkTokenFn(...args);
+}
+
 jest.mock('@/lib/bot-identity', () => ({
   createLinkAccountToken: mockCreateLinkAccountToken,
+}));
+
+jest.mock('@/lib/bot/github-link-token', () => ({
+  createGitHubLinkToken: mockCreateGitHubLinkToken,
 }));
 
 jest.mock(
@@ -20,6 +29,7 @@ jest.mock(
 );
 
 import type { Message, Thread, Channel, StateAdapter } from 'chat';
+import type { PlatformIntegration } from '@kilocode/db';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { promptLinkAccount } from './link-account';
 
@@ -87,30 +97,48 @@ function createThread() {
   return { channel, post, postEphemeral, thread };
 }
 
+function createPlatformIntegration(
+  overrides: Partial<PlatformIntegration> = {}
+): PlatformIntegration {
+  return {
+    id: 'pi_github_1',
+    platform: PLATFORM.GITHUB,
+    platform_installation_id: '98765',
+    ...overrides,
+  } as PlatformIntegration;
+}
+
 describe('promptLinkAccount', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateLinkAccountTokenFn.mockResolvedValue('link-token');
+    mockCreateGitHubLinkTokenFn.mockReturnValue('github-link-token');
   });
 
-  it('posts a visible link-account message in GitHub threads', async () => {
+  it('posts a visible link-account message in GitHub threads with a signed token URL', async () => {
     const { post, postEphemeral, thread } = createThread();
+    const platformIntegration = createPlatformIntegration();
 
     await promptLinkAccount(
       thread,
       createMessage(),
       { platform: PLATFORM.GITHUB, teamId: '98765', userId: '123' },
+      platformIntegration,
       {} as StateAdapter
     );
 
     expect(post).toHaveBeenCalledWith({
-      markdown: expect.stringContaining('/github/link'),
+      markdown: expect.stringContaining('/github/link?token=github-link-token'),
     });
     expect(post).toHaveBeenCalledWith({
-      markdown: expect.stringContaining('installation_id=98765'),
+      markdown: expect.not.stringContaining('installation_id='),
     });
     expect(post).toHaveBeenCalledWith({
       markdown: expect.not.stringContaining('/api/chat/link-account'),
+    });
+    expect(mockCreateGitHubLinkTokenFn).toHaveBeenCalledWith({
+      platformIntegrationId: 'pi_github_1',
+      installationId: '98765',
     });
     expect(mockCreateLinkAccountTokenFn).not.toHaveBeenCalled();
     expect(postEphemeral).not.toHaveBeenCalled();
@@ -118,15 +146,21 @@ describe('promptLinkAccount', () => {
 
   it('uses an ephemeral link-account prompt for non-GitHub platforms', async () => {
     const { post, postEphemeral, thread } = createThread();
+    const platformIntegration = createPlatformIntegration({
+      platform: PLATFORM.SLACK,
+      platform_installation_id: 'T123',
+    });
 
     await promptLinkAccount(
       thread,
       createMessage(),
       { platform: PLATFORM.SLACK, teamId: 'T123', userId: '123' },
+      platformIntegration,
       {} as StateAdapter
     );
 
     expect(post).not.toHaveBeenCalled();
+    expect(mockCreateGitHubLinkTokenFn).not.toHaveBeenCalled();
     expect(mockCreateLinkAccountTokenFn).toHaveBeenCalledTimes(1);
     expect(postEphemeral).toHaveBeenCalledWith(
       expect.objectContaining({ userId: '123' }),

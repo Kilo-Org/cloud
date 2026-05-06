@@ -2,7 +2,9 @@ import { Actions, Card, LinkButton, CardText, type Message, type Thread } from '
 import { createLinkAccountToken, type PlatformIdentity } from '@/lib/bot-identity';
 import { APP_URL } from '@/lib/constants';
 import { isChannelLevelMessage } from '@/lib/bot/helpers';
+import { createGitHubLinkToken } from '@/lib/bot/github-link-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import type { PlatformIntegration } from '@kilocode/db';
 import type { StateAdapter } from 'chat';
 
 const LINK_ACCOUNT_PATH = '/api/chat/link-account';
@@ -29,6 +31,21 @@ async function buildLinkAccountUrl(
   return url.toString();
 }
 
+function buildGitHubLinkUrl(
+  platformIntegration: PlatformIntegration,
+  installationId: string
+): string {
+  const url = new URL(GITHUB_LINK_PATH, APP_URL);
+  url.searchParams.set(
+    'token',
+    createGitHubLinkToken({
+      platformIntegrationId: platformIntegration.id,
+      installationId,
+    })
+  );
+  return url.toString();
+}
+
 function linkAccountCard(linkUrl: string) {
   return Card({
     title: 'Link your Kilo account',
@@ -46,6 +63,7 @@ export async function promptLinkAccount(
   thread: Thread,
   message: Message,
   identity: PlatformIdentity,
+  platformIntegration: PlatformIntegration,
   state: StateAdapter
 ): Promise<void> {
   // Post to the channel when the @mention is top-level, otherwise into the thread.
@@ -60,13 +78,12 @@ export async function promptLinkAccount(
       return;
     }
     case PLATFORM.GITHUB: {
-      const linkUrl = new URL(GITHUB_LINK_PATH, APP_URL);
-      linkUrl.searchParams.set('installation_id', identity.teamId);
+      const linkUrl = buildGitHubLinkUrl(platformIntegration, identity.teamId);
 
       await target.post({
         markdown:
           'To use Kilo from GitHub you first need to link your GitHub account to Kilo. ' +
-          `[Link your Kilo account](${linkUrl.toString()}) to continue. ` +
+          `[Link your Kilo account](${linkUrl}) to continue. ` +
           'After linking, mention me again in this issue or pull request.',
       });
       return;

@@ -11,7 +11,6 @@ import {
   getPlatformIdentity,
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
-  getPlatformUserIdentity,
 } from '@/lib/bot/platform-helpers';
 import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-account';
 import { findUserById } from '@/lib/user';
@@ -269,10 +268,9 @@ function createKiloBot(
     const identity = await getPlatformIdentity(thread, message, githubThread =>
       githubAdapter.getInstallationId(githubThread)
     );
-    const userIdentity = getPlatformUserIdentity(identity);
     const [platformIntegration, kiloUserId] = await Promise.all([
       getPlatformIntegration(identity),
-      resolveKiloUserId(chatBot.getState(), userIdentity),
+      resolveKiloUserId(chatBot.getState(), identity),
     ]);
 
     if (!platformIntegration) {
@@ -283,15 +281,15 @@ function createKiloBot(
     }
 
     if (!kiloUserId) {
-      await promptLinkAccount(thread, message, identity, chatBot.getState());
+      await promptLinkAccount(thread, message, identity, platformIntegration, chatBot.getState());
       return;
     }
 
     const user = await findUserById(kiloUserId);
 
     if (!user) {
-      await unlinkKiloUser(chatBot.getState(), userIdentity);
-      await promptLinkAccount(thread, message, identity, chatBot.getState());
+      await unlinkKiloUser(chatBot.getState(), identity);
+      await promptLinkAccount(thread, message, identity, platformIntegration, chatBot.getState());
       return;
     }
 

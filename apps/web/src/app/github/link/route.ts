@@ -3,9 +3,10 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { APP_URL } from '@/lib/constants';
 import { createGitHubBotLinkState } from '@/lib/bot/github-link-state';
+import { verifyGitHubLinkToken } from '@/lib/bot/github-link-token';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
-import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
-import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
+import { isOrganizationMember } from '@/lib/organizations/organizations';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_CALLBACK_PATH = '/api/integrations/github/callback';
@@ -25,12 +26,13 @@ function errorPage(title: string, message: string, status: number): Response {
 }
 
 export async function GET(request: NextRequest) {
-  const installationId = request.nextUrl.searchParams.get('installation_id');
+  const token = request.nextUrl.searchParams.get('token');
+  const verifiedToken = verifyGitHubLinkToken(token);
 
-  if (!installationId) {
+  if (!verifiedToken) {
     return errorPage(
-      'Bad Request',
-      'Missing GitHub installation context. Please use the link from the GitHub bot reply.',
+      'Link Expired',
+      'Invalid or expired GitHub link. Please return to GitHub and mention Kilo again to get a fresh link.',
       400
     );
   }
@@ -39,14 +41,29 @@ export async function GET(request: NextRequest) {
 
   if (authFailedResponse) {
     const signInUrl = new URL('/users/sign_in', APP_URL);
-    signInUrl.searchParams.set('callbackPath', `/github/link?installation_id=${installationId}`);
+    signInUrl.searchParams.set('callbackPath', `/github/link?token=${token}`);
     return NextResponse.redirect(signInUrl);
   }
 
-  const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, installationId);
+  const integration = await getPlatformIntegrationById(verifiedToken.platformIntegrationId).catch(
+    () => null
+  );
 
   if (!integration) {
     return errorPage('Link Failed', 'No matching GitHub integration was found.', 404);
+  }
+
+  if (integration.owned_by_organization_id) {
+    const isMember = await isOrganizationMember(integration.owned_by_organization_id, user.id);
+    if (!isMember) {
+      return errorPage(
+        'Access Denied',
+        'You are not a member of the organization that owns this GitHub integration.',
+        403
+      );
+    }
+  } else if (integration.owned_by_user_id && integration.owned_by_user_id !== user.id) {
+    return errorPage('Access Denied', 'You are not the owner of this GitHub integration.', 403);
   }
 
   const appType = integration.github_app_type ?? 'standard';
@@ -54,7 +71,10 @@ export async function GET(request: NextRequest) {
   const authorizeUrl = new URL(GITHUB_AUTHORIZE_URL);
   authorizeUrl.searchParams.set('client_id', credentials.clientId);
   authorizeUrl.searchParams.set('redirect_uri', new URL(GITHUB_CALLBACK_PATH, APP_URL).toString());
-  authorizeUrl.searchParams.set('state', createGitHubBotLinkState(user.id, installationId));
+  authorizeUrl.searchParams.set(
+    'state',
+    createGitHubBotLinkState(user.id, verifiedToken.installationId)
+  );
   authorizeUrl.searchParams.set('scope', 'read:user');
 
   return NextResponse.redirect(authorizeUrl);

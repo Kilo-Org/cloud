@@ -19,7 +19,6 @@ import {
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
   getPlatformIntegrationById,
-  getPlatformUserIdentity,
 } from './platform-helpers';
 import type { Thread, Message } from 'chat';
 
@@ -143,22 +142,6 @@ describe('platform helpers', () => {
         mockGetInstallationId
       )
     ).rejects.toThrow('Could not find GitHub installation ID for thread github:acme/widgets:42');
-  });
-
-  it('converts GitHub installation identities to user-level identities for user lookup', () => {
-    expect(
-      getPlatformUserIdentity({ platform: PLATFORM.GITHUB, teamId: '98765', userId: '12345' })
-    ).toEqual({
-      platform: PLATFORM.GITHUB,
-      teamId: 'user',
-      userId: '12345',
-    });
-  });
-
-  it('keeps Slack identities installation-scoped for user lookup', () => {
-    const identity = { platform: PLATFORM.SLACK, teamId: 'T123', userId: 'U123' };
-
-    expect(getPlatformUserIdentity(identity)).toBe(identity);
   });
 
   it('returns platform-specific bot documentation URLs', () => {

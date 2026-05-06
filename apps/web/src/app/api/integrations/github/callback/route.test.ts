@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
-import { githubUserIdentity, linkKiloUser } from '@/lib/bot-identity';
+import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
 import { failureResult } from '@/lib/maybe-result';
 import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
@@ -64,7 +64,6 @@ jest.mock('@sentry/nextjs', () => ({
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedVerifyGitHubBotLinkState = jest.mocked(verifyGitHubBotLinkState);
 const mockedExchangeGitHubOAuthCode = jest.mocked(exchangeGitHubOAuthCode);
-const mockedGithubUserIdentity = jest.mocked(githubUserIdentity);
 const mockedLinkKiloUser = jest.mocked(linkKiloUser);
 const mockedBot = jest.mocked(bot);
 const mockedFindIntegrationByInstallationId = jest.mocked(findIntegrationByInstallationId);
@@ -100,11 +99,6 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       callbackPath: '/github/link',
     });
     mockedExchangeGitHubOAuthCode.mockResolvedValue({ id: GITHUB_USER_ID, login: 'octocat' });
-    mockedGithubUserIdentity.mockReturnValue({
-      platform: 'github',
-      teamId: 'user',
-      userId: GITHUB_USER_ID,
-    });
     mockedFindIntegrationByInstallationId.mockResolvedValue({
       owned_by_organization_id: 'org_1',
       owned_by_user_id: null,
@@ -178,7 +172,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
 
-  test('links the OAuth-verified GitHub user through the existing app callback URL', async () => {
+  test('links the OAuth-verified GitHub user per installation', async () => {
     const { GET } = await import('./route');
     const response = await GET(
       makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
@@ -189,11 +183,10 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'standard');
     expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith('github', INSTALLATION_ID);
     expect(mockedIsOrganizationMember).toHaveBeenCalledWith('org_1', USER_ID);
-    expect(mockedGithubUserIdentity).toHaveBeenCalledWith(GITHUB_USER_ID);
     expect(mockedBot.initialize).toHaveBeenCalled();
     expect(mockedLinkKiloUser).toHaveBeenCalledWith(
       mockState,
-      { platform: 'github', teamId: 'user', userId: GITHUB_USER_ID },
+      { platform: 'github', teamId: INSTALLATION_ID, userId: GITHUB_USER_ID },
       USER_ID
     );
   });

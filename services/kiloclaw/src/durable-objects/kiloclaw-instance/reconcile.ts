@@ -812,15 +812,6 @@ async function backfillMachineSizeFromFlyConfig(
   }
   state.machineSize = parsedSize;
   state.instanceType = resolveInstanceTypeLabel(state.machineSize, state.volumeSizeGb);
-  console.log('[instance-tier-debug] backfill from Fly guest', {
-    source,
-    userId: state.userId,
-    sandboxId: state.sandboxId,
-    provider: state.provider,
-    machineSize: state.machineSize,
-    volumeSizeGb: state.volumeSizeGb,
-    resolvedInstanceType: state.instanceType,
-  });
   await ctx.storage.put(
     storageUpdate({ machineSize: state.machineSize, instanceType: state.instanceType })
   );

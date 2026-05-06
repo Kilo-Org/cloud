@@ -1,0 +1,305 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-06T00:00:00.000Z",
+  "title": "Design System: Kilo Cloud",
+  "extensions": {
+    "colorMeta": {
+      "background": {
+        "role": "neutral",
+        "displayName": "App Canvas",
+        "canonical": "#121212",
+        "tonalRamp": [
+          "oklch(0.12 0 0)",
+          "oklch(0.18 0 0)",
+          "oklch(0.24 0 0)",
+          "oklch(0.32 0 0)",
+          "oklch(0.45 0 0)",
+          "oklch(0.62 0 0)",
+          "oklch(0.78 0 0)",
+          "oklch(0.94 0 0)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Dashboard Surface",
+        "canonical": "#2B2B2B",
+        "tonalRamp": [
+          "oklch(0.14 0 0)",
+          "oklch(0.20 0 0)",
+          "oklch(0.26 0 0)",
+          "oklch(0.34 0 0)",
+          "oklch(0.46 0 0)",
+          "oklch(0.62 0 0)",
+          "oklch(0.78 0 0)",
+          "oklch(0.94 0 0)"
+        ]
+      },
+      "primary": {
+        "role": "primary",
+        "displayName": "Kilo Action Yellow-Green",
+        "canonical": "#EDFF00",
+        "tonalRamp": [
+          "oklch(0.18 0.06 108)",
+          "oklch(0.30 0.09 108)",
+          "oklch(0.42 0.11 108)",
+          "oklch(0.55 0.13 108)",
+          "oklch(0.68 0.14 108)",
+          "oklch(0.80 0.15 108)",
+          "oklch(0.90 0.15 108)",
+          "oklch(0.95 0.15 108)"
+        ]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Workhorse Gray",
+        "canonical": "#3D3D3D",
+        "tonalRamp": [
+          "oklch(0.14 0 0)",
+          "oklch(0.20 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.34 0 0)",
+          "oklch(0.44 0 0)",
+          "oklch(0.58 0 0)",
+          "oklch(0.74 0 0)",
+          "oklch(0.90 0 0)"
+        ]
+      },
+      "link": {
+        "role": "secondary",
+        "displayName": "Legacy Link Blue",
+        "canonical": "#3B82F6",
+        "tonalRamp": [
+          "oklch(0.18 0.08 264)",
+          "oklch(0.30 0.12 264)",
+          "oklch(0.42 0.16 264)",
+          "oklch(0.54 0.20 264)",
+          "oklch(0.64 0.22 264)",
+          "oklch(0.74 0.18 264)",
+          "oklch(0.84 0.12 264)",
+          "oklch(0.94 0.06 264)"
+        ]
+      },
+      "red-500": {
+        "role": "tertiary",
+        "displayName": "Destructive Red",
+        "canonical": "#EF4444",
+        "tonalRamp": [
+          "oklch(0.18 0.06 25)",
+          "oklch(0.30 0.10 25)",
+          "oklch(0.42 0.14 25)",
+          "oklch(0.54 0.18 25)",
+          "oklch(0.64 0.20 25)",
+          "oklch(0.74 0.16 25)",
+          "oklch(0.84 0.10 25)",
+          "oklch(0.94 0.05 25)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Empty-state hero moments and onboarding only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles and major decision screens."
+      },
+      "title": { "displayName": "Title", "purpose": "Card groups, dialogs, and page sections." },
+      "body": { "displayName": "Body", "purpose": "Default product UI text." },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Commands, terminal output, costs, timestamps, and dense numeric columns."
+      }
+    },
+    "shadows": [
+      {
+        "name": "input-recess",
+        "value": "0 1px 0 0 rgb(0 0 0 / 0.2)",
+        "purpose": "Inputs and small recessed controls."
+      },
+      {
+        "name": "floating-chrome",
+        "value": "0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4)",
+        "purpose": "Popovers, tooltips, menus, and dropdowns."
+      },
+      {
+        "name": "dialog-lift",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4)",
+        "purpose": "Dialogs over a dark overlay."
+      },
+      {
+        "name": "agent-glow",
+        "value": "0 0 24px #EDFF0059",
+        "purpose": "Focused or streaming agent surfaces only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-strong",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Purposeful state transitions and entrances."
+      },
+      {
+        "name": "sidebar-width",
+        "value": "200ms linear",
+        "purpose": "Sidebar expand and collapse width transition."
+      }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" },
+      { "name": "sidebar-mobile", "value": "md:hidden sheet behavior" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "One per surface. The action the user came to perform.",
+      "html": "<button class=\"ds-btn-primary\">Create session</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:36px; padding:0 14px; border:0; border-radius:6px; background:#EDFF00; color:#1F1F1F; font-family:Inter, ui-sans-serif, system-ui, sans-serif; font-size:14px; font-weight:500; cursor:pointer; transition:background-color 160ms cubic-bezier(0.23,1,0.32,1), box-shadow 160ms cubic-bezier(0.23,1,0.32,1); } .ds-btn-primary:hover { background:#D6E600; } .ds-btn-primary:focus-visible { outline:none; box-shadow:0 0 0 3px #EDFF0059; } .ds-btn-primary:disabled { opacity:.5; pointer-events:none; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Default non-primary action for dense product surfaces.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:36px; padding:0 14px; border:1px solid #FFFFFF1A; border-radius:6px; background:#3D3D3D; color:#FAFAFA; font-family:Inter, ui-sans-serif, system-ui, sans-serif; font-size:14px; font-weight:500; cursor:pointer; transition:background-color 160ms cubic-bezier(0.23,1,0.32,1), box-shadow 160ms cubic-bezier(0.23,1,0.32,1); } .ds-btn-secondary:hover { background:#4D4D4D; } .ds-btn-secondary:focus-visible { outline:none; box-shadow:0 0 0 3px #EDFF0059; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Quiet inline or row-level action. No chrome at rest.",
+      "html": "<button class=\"ds-btn-ghost\">View details</button>",
+      "css": ".ds-btn-ghost { display:inline-flex; align-items:center; justify-content:center; height:36px; padding:0 4px; border:0; border-radius:6px; background:transparent; color:#FAFAFA; font-family:Inter, ui-sans-serif, system-ui, sans-serif; font-size:14px; font-weight:500; text-decoration:underline; text-decoration-color:rgba(255,255,255,.35); text-underline-offset:4px; cursor:pointer; transition:color 160ms cubic-bezier(0.23,1,0.32,1), text-decoration-color 160ms cubic-bezier(0.23,1,0.32,1); } .ds-btn-ghost:hover { text-decoration-color:rgba(255,255,255,1); } .ds-btn-ghost:focus-visible { outline:none; box-shadow:0 0 0 3px #EDFF0059; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Compact recessed field aligned to button height.",
+      "html": "<input class=\"ds-input\" placeholder=\"Search sessions\" />",
+      "css": ".ds-input { display:flex; width:100%; min-width:0; height:36px; padding:0 12px; border:1px solid #FFFFFF2E; border-radius:6px; background:#FFFFFF0A; color:#FAFAFA; font-family:Inter, ui-sans-serif, system-ui, sans-serif; font-size:14px; box-shadow:0 1px 0 0 rgb(0 0 0 / .2); transition:box-shadow 160ms cubic-bezier(0.23,1,0.32,1), border-color 160ms cubic-bezier(0.23,1,0.32,1); } .ds-input::placeholder { color:#A3A3A3; } .ds-input:focus-visible { outline:none; border-color:#EDFF00; box-shadow:0 0 0 3px #EDFF0059; } .ds-input[aria-invalid=\"true\"] { border-color:#EF4444; box-shadow:0 0 0 3px rgba(239,68,68,.28); }"
+    },
+    {
+      "name": "Dashboard Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Default product container. Lift comes from value step plus border.",
+      "html": "<section class=\"ds-card\"><div class=\"ds-card-title\">Usage this month</div><p class=\"ds-card-copy\">Kilo Credits, model usage, and active seats stay visible without decoration.</p></section>",
+      "css": ".ds-card { border:1px solid #FFFFFF1A; border-radius:14px; background:#2B2B2B; color:#FAFAFA; padding:24px; font-family:Inter, ui-sans-serif, system-ui, sans-serif; } .ds-card-title { font-size:20px; line-height:1.3; font-weight:600; letter-spacing:-.015em; margin:0 0 8px; } .ds-card-copy { margin:0; max-width:65ch; color:#A3A3A3; font-size:14px; line-height:1.5; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-status",
+      "description": "Status follows the translucent fill, matching ring, bright text pattern.",
+      "html": "<span class=\"ds-badge-status\"><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"3\" fill=\"currentColor\" /></svg>Running</span>",
+      "css": ".ds-badge-status { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:6px; background:rgba(59,130,246,.20); color:#60A5FA; box-shadow:inset 0 0 0 1px rgba(59,130,246,.20); font-family:Inter, ui-sans-serif, system-ui, sans-serif; font-size:12px; font-weight:500; line-height:1.3; } .ds-badge-status svg { width:12px; height:12px; flex:none; }"
+    },
+    {
+      "name": "Sidebar Navigation Item",
+      "kind": "nav",
+      "refersTo": "sidebar",
+      "description": "Compact left navigation row with muted default and value-step active state.",
+      "html": "<button class=\"ds-sidebar-item\" data-active=\"true\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 5h16M4 12h16M4 19h16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" /></svg><span>Cloud sessions</span></button>",
+      "css": ".ds-sidebar-item { display:flex; width:100%; align-items:center; gap:8px; height:32px; padding:0 8px; border:0; border-radius:6px; background:transparent; color:#A3A3A3; font-family:Inter, ui-sans-serif, system-ui, sans-serif; font-size:14px; font-weight:500; text-align:left; cursor:pointer; transition:background-color 160ms cubic-bezier(0.23,1,0.32,1), color 160ms cubic-bezier(0.23,1,0.32,1); } .ds-sidebar-item svg { width:16px; height:16px; flex:none; } .ds-sidebar-item:hover, .ds-sidebar-item[data-active=\"true\"] { background:#3D3D3D; color:#FAFAFA; } .ds-sidebar-item:focus-visible { outline:none; box-shadow:0 0 0 2px #EDFF0059; }"
+    },
+    {
+      "name": "Terminal Surface",
+      "kind": "custom",
+      "refersTo": "terminal",
+      "description": "Agent and command output surface. Mono, flush, and restrained.",
+      "html": "<pre class=\"ds-terminal\"><span class=\"ds-terminal-prompt\">$</span> kilo run --headless\n<span class=\"ds-terminal-muted\">session started 3 minutes ago</span></pre>",
+      "css": ".ds-terminal { margin:0; padding:16px; border:1px solid #FFFFFF1A; border-radius:10px; background:#121212; color:#FAFAFA; font-family:'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; line-height:1.5; white-space:pre-wrap; } .ds-terminal-prompt { color:#EDFF00; } .ds-terminal-muted { color:#A3A3A3; } .ds-terminal:focus-within { box-shadow:0 0 24px #EDFF0059; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Operator Console",
+    "overview": "Kilo Cloud is a trustworthy infrastructure tool for developers, organization admins, and internal operators. It should feel like a calm console for real work: dense, legible, fast to scan, and specific about state, cost, access, and next action.\n\nThe system is dark-first because the product sits next to editors, terminals, and long-running agent sessions. The physical scene is a developer or admin checking active sessions, usage, billing, or security findings during focused work on a laptop or large monitor. Low glare, compact density, and predictable contrast matter more than decorative atmosphere.\n\nThe surface rejects generic SaaS dashboards, neon AI hype, decorative glass or gradient-heavy interfaces, playful consumer app UI, corporate enterprise portals, and vague marketing pages. The single atmospheric exception is the agent surface, where terminal-styled mono and a thin yellow-green glow can signal live work. Everywhere else, utility wins.",
+    "keyCharacteristics": [
+      "Dark-first near-black canvas with stepped charcoal surfaces.",
+      "Borders carry structure: white at low alpha, not solid gray.",
+      "Kilo yellow-green is scarce and action-oriented.",
+      "Compact dashboard rhythm: 36px controls, 48px table rows, 24px card padding.",
+      "Developer-to-developer clarity: concrete nouns, precise costs, states, timestamps, and links.",
+      "Existing implementation drift exists in a few legacy components: some button variants still hardcode blue, and the app-level `--primary` token is not yet the Kilo yellow-green. Treat those as migration targets, not design precedent."
+    ],
+    "rules": [
+      {
+        "name": "The Yellow Acts Rule",
+        "body": "Yellow-green means the primary action or live agent focus. If two yellow buttons appear on one surface, one of them is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The Border Carries Structure Rule",
+        "body": "Use low-alpha white borders to separate surfaces. Do not tint borders to create hierarchy.",
+        "section": "colors"
+      },
+      {
+        "name": "The Blue Is Inline Rule",
+        "body": "Blue is a legacy inline link role only. It is prohibited as a primary button, badge accent outside its status role, or marketing flourish.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Earns Its Place Rule",
+        "body": "Use mono only where alignment or code semantics matter. Do not use mono as decoration or inline emphasis in prose.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "User-facing product chrome uses sentence case. Title Case is wrong for buttons, nav, section titles, badges, dialogs, and empty states.",
+        "section": "typography"
+      },
+      {
+        "name": "The Dense Data Rule",
+        "body": "Numbers that must be compared across rows use Roboto Mono with tabular alignment.",
+        "section": "typography"
+      },
+      {
+        "name": "The Value Step Rule",
+        "body": "Lift comes from background value plus border. A card should still read correctly if every shadow is removed.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Glass Is Sticky Chrome Rule",
+        "body": "Backdrop blur belongs on topbars or persistent overlays only. Glass cards are prohibited.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Shadow Must Float Rule",
+        "body": "If an element is part of normal page flow, do not add a shadow to make it look important.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use `background` under `surface` under `surface-raised` to build hierarchy.",
+      "Do use Kilo yellow-green for exactly one primary action per surface.",
+      "Do use low-alpha white borders: `border` for default structure, `border-strong` for inputs and focused chrome.",
+      "Do keep product surfaces compact: 36px controls, 48px rows, 24px card padding, and 24px vertical card gaps.",
+      "Do use Roboto Mono for costs, latencies, token counts, timestamps, commands, and terminal output.",
+      "Do use concrete labels, costs, states, timestamps, links, and next actions.",
+      "Do preserve sentence case and the Kilo naming rules from PRODUCT.md.",
+      "Do use Lucide icons with restrained sizing and consistent stroke.",
+      "Do treat current blue primary buttons and near-white app `--primary` as legacy drift to migrate away from."
+    ],
+    "donts": [
+      "Don't create generic SaaS dashboards.",
+      "Don't create neon AI hype.",
+      "Don't use decorative glass or gradient-heavy interfaces.",
+      "Don't make the product feel like a playful consumer app UI.",
+      "Don't make the product feel like a corporate enterprise portal.",
+      "Don't create vague marketing pages inside product chrome.",
+      "Don't use blue as a primary button background. Blue is inline link/accent only.",
+      "Don't put more than one yellow button on a screen.",
+      "Don't introduce new status hues beyond the documented status palette.",
+      "Don't use pure black or pure white in product surfaces.",
+      "Don't add per-element drop shadows to default cards.",
+      "Don't use glass cards, side-stripe borders, gradient text, hero-metric templates, or repeated identical icon-card grids.",
+      "Don't use ambiguous billing language. Kilo Credits are purchased usage credit; tokens are model input and output volume.",
+      "Don't use old names such as \"Kilo For Teams,\" \"Kilo for Enterprise,\" \"Kilo for Organizations,\" \"Kilo Code Deploy,\" \"Kilo Managed Indexing,\" or \"Kilo Cloud Agents.\""
+    ]
+  }
+}

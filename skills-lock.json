@@ -6,6 +6,12 @@
       "sourceType": "github",
       "computedHash": "72efa2277fea08f43b393c74abaacc9fa575e20bc63bdc9d46829b8a39352852"
     },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": "skill/SKILL.md",
+      "computedHash": "8cdf2e788eaca3af7d02026ef9cec55b506100a00d130f938e3fb1ad669c0ad0"
+    },
     "workers-best-practices": {
       "source": "cloudflare/skills",
       "sourceType": "github",

@@ -19,6 +19,15 @@ scripts/          CI and one-off scripts
 - **tRPC routers**: `apps/web/src/routers/`
 - **Env vars**: `.env.local` at repo root (pulled via `vercel env pull`)
 
+## Design Context
+
+Before UI, UX, or frontend copy work, read both root design context files:
+
+- `PRODUCT.md` — product register, users, purpose, voice, anti-references, naming rules, accessibility principles.
+- `DESIGN.md` — visual system, colors, typography, spacing, components, layout, and do/don't rules.
+
+Default register is `product`: Kilo Cloud is a developer-facing operational surface. Prioritize utility, concrete workflow clarity, precise billing and product naming, and a human developer-to-developer voice. Kilo yellow-green is the scarce primary action color; blue is an inline link/accent role only.
+
 ## Verification
 
 After making changes, verify your work with the narrowest relevant checks. Avoid running the full `pnpm typecheck` by default; it is slow enough to make development environments unusable. Prefer targeted package checks or `scripts/typecheck-all.sh --changes-only`, and mention in your final response when the full typecheck was skipped for this reason. Run the full suite when appropriate. **Always run `pnpm format` before committing** — CI will reject unformatted code.

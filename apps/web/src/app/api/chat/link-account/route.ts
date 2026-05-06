@@ -8,9 +8,11 @@ import {
   verifyLinkToken,
   type PlatformIdentity,
 } from '@/lib/bot-identity';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
-import { getPlatformIntegration } from '@/lib/bot/platform-helpers';
+import {
+  canKiloUserAccessPlatformIntegration,
+  getPlatformIntegration,
+} from '@/lib/bot/platform-helpers';
 import { processLinkedMessage } from '@/lib/bot/run';
 import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
 import { Message, ThreadImpl, type Thread } from 'chat';
@@ -46,19 +48,7 @@ async function verifyIntegrationAccess(
     return { ok: false, error: 'No matching integration found for this platform.' };
   }
 
-  if (integration.owned_by_organization_id) {
-    const isMember = await isOrganizationMember(integration.owned_by_organization_id, kiloUserId);
-    if (!isMember) {
-      return {
-        ok: false,
-        error: 'You are not a member of the organization that owns this integration.',
-      };
-    }
-  } else if (integration.owned_by_user_id) {
-    if (integration.owned_by_user_id !== kiloUserId) {
-      return { ok: false, error: 'You are not the owner of this integration.' };
-    }
-  } else {
+  if (!(await canKiloUserAccessPlatformIntegration(integration, kiloUserId))) {
     return { ok: false, error: 'This integration has invalid ownership data.' };
   }
 

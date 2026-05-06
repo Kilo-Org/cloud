@@ -8,6 +8,7 @@ import { resolveKiloUserId, unlinkKiloUser, unlinkTeamKiloUsers } from '@/lib/bo
 import { isSlackMissingScopeError, postSlackReinstallInstruction } from '@/lib/bot/helpers';
 import { deleteInstallationByTeamId } from '@/lib/integrations/slack-service';
 import {
+  canKiloUserAccessPlatformIntegration,
   getGitHubRepositoryReference,
   getPlatformIdentity,
   getPlatformIntegration,
@@ -307,6 +308,12 @@ function createKiloBot(
     const user = await findUserById(kiloUserId);
 
     if (!user) {
+      await unlinkKiloUser(chatBot.getState(), identity);
+      await promptLinkAccount(thread, message, identity, platformIntegration, chatBot.getState());
+      return;
+    }
+
+    if (!(await canKiloUserAccessPlatformIntegration(platformIntegration, user.id))) {
       await unlinkKiloUser(chatBot.getState(), identity);
       await promptLinkAccount(thread, message, identity, platformIntegration, chatBot.getState());
       return;

@@ -3,7 +3,10 @@ import { NextRequest } from 'next/server';
 import { bot } from '@/lib/bot';
 import { verifyLinkToken, linkKiloUser } from '@/lib/bot-identity';
 import { getUserFromAuth } from '@/lib/user.server';
-import { getPlatformIntegration } from '@/lib/bot/platform-helpers';
+import {
+  canKiloUserAccessPlatformIntegration,
+  getPlatformIntegration,
+} from '@/lib/bot/platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { SerializedMessage } from 'chat';
 
@@ -29,9 +32,6 @@ jest.mock('@/lib/bot-identity', () => ({
 }));
 jest.mock('@/lib/user.server');
 jest.mock('@/lib/bot/platform-helpers');
-jest.mock('@/lib/organizations/organizations', () => ({
-  isOrganizationMember: jest.fn(async () => true),
-}));
 jest.mock('@/lib/bot/run', () => ({
   processLinkedMessage: jest.fn(async () => undefined),
 }));
@@ -59,6 +59,9 @@ const mockedVerifyLinkToken = jest.mocked(verifyLinkToken);
 const mockedLinkKiloUser = jest.mocked(linkKiloUser);
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetPlatformIntegration = jest.mocked(getPlatformIntegration);
+const mockedCanKiloUserAccessPlatformIntegration = jest.mocked(
+  canKiloUserAccessPlatformIntegration
+);
 
 function makeRequest(pathWithQuery: string) {
   return new NextRequest(`http://localhost:3000${pathWithQuery}`);
@@ -76,6 +79,7 @@ describe('GET /api/chat/link-account', () => {
       owned_by_user_id: 'kilo-user-id',
       owned_by_organization_id: null,
     } as never);
+    mockedCanKiloUserAccessPlatformIntegration.mockResolvedValue(true);
   });
 
   test('rejects GitHub link token payloads before linking', async () => {
@@ -119,6 +123,59 @@ describe('GET /api/chat/link-account', () => {
     expect(mockedBot.initialize).toHaveBeenCalled();
     expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
     expect(mockedGetPlatformIntegration).not.toHaveBeenCalled();
+    expect(mockedLinkKiloUser).not.toHaveBeenCalled();
+    expect(mockedAfter).not.toHaveBeenCalled();
+  });
+
+  test('rejects link requests when the user cannot access the integration owner', async () => {
+    const identity = { platform: PLATFORM.SLACK, teamId: 'T123', userId: 'U123' };
+    const integration = {
+      owned_by_user_id: null,
+      owned_by_organization_id: 'org-1',
+    };
+    mockedVerifyLinkToken.mockResolvedValue({
+      contextKey: 'context-key',
+      identity,
+      thread: {
+        _type: 'chat:Thread',
+        adapterName: 'slack',
+        channelId: 'C123',
+        id: 'slack:C123:1',
+        isDM: false,
+      },
+      message: {
+        _type: 'chat:Message',
+        attachments: [],
+        author: {
+          fullName: 'User',
+          isBot: false,
+          isMe: false,
+          userId: 'U123',
+          userName: 'user',
+        },
+        formatted: { type: 'root', children: [] },
+        id: 'm_1',
+        metadata: {
+          dateSent: '2026-05-05T07:32:52.000Z',
+          edited: false,
+        },
+        raw: {},
+        text: '@Kilo fix this',
+        threadId: 'slack:C123:1',
+      } satisfies SerializedMessage,
+    });
+    mockedGetPlatformIntegration.mockResolvedValue(integration as never);
+    mockedCanKiloUserAccessPlatformIntegration.mockResolvedValue(false);
+
+    const { GET } = await import('./route');
+    const response = await GET(makeRequest('/api/chat/link-account?token=signed') as never);
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toContain('Access Denied');
+    expect(mockedCanKiloUserAccessPlatformIntegration).toHaveBeenCalledWith(
+      expect.objectContaining(integration),
+      'kilo-user-id'
+    );
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
     expect(mockedAfter).not.toHaveBeenCalled();
   });

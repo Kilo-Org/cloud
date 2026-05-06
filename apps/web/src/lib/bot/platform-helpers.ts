@@ -6,6 +6,7 @@ import type { Message, Thread } from 'chat';
 import type { GitHubRawMessage } from '@chat-adapter/github';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { type SlackEvent } from '@chat-adapter/slack';
+import { isOrganizationMember } from '@/lib/organizations/organizations';
 
 type GetGitHubInstallationId = (thread: Thread) => Promise<string | number | null | undefined>;
 
@@ -105,6 +106,21 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
     .limit(1);
 
   return integration ?? null;
+}
+
+export async function canKiloUserAccessPlatformIntegration(
+  integration: PlatformIntegration,
+  kiloUserId: string
+): Promise<boolean> {
+  if (integration.owned_by_organization_id) {
+    return await isOrganizationMember(integration.owned_by_organization_id, kiloUserId);
+  }
+
+  if (integration.owned_by_user_id) {
+    return integration.owned_by_user_id === kiloUserId;
+  }
+
+  return false;
 }
 
 export async function getPlatformIntegrationById(platformIntegrationId: string) {

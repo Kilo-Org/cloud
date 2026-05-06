@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach, beforeEach } from '@jest/globals';
+import { describe, test, expect, afterEach } from '@jest/globals';
 import { db, sql } from '@/lib/drizzle';
 import {
   organizations,
@@ -20,21 +20,8 @@ import {
 } from './organizations';
 import { fromMicrodollars } from '@/lib/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
-import { tryUnlinkBotIdentitiesForOrganizationMember } from '@/lib/bot-identity-cleanup';
-
-jest.mock('@/lib/bot-identity-cleanup', () => ({
-  tryUnlinkBotIdentitiesForOrganizationMember: jest.fn(async () => undefined),
-}));
-
-const mockedTryUnlinkBotIdentitiesForOrganizationMember = jest.mocked(
-  tryUnlinkBotIdentitiesForOrganizationMember
-);
 
 describe('Organizations', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   afterEach(async () => {
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_user_limits);
@@ -245,10 +232,6 @@ describe('Organizations', () => {
       // Verify user was removed
       memberOrgs = await getUserOrganizationsWithSeats(member.id);
       expect(memberOrgs).toHaveLength(0);
-      expect(mockedTryUnlinkBotIdentitiesForOrganizationMember).toHaveBeenCalledWith(
-        organization.id,
-        member.id
-      );
     });
 
     test('should handle removing non-existent membership gracefully', async () => {
@@ -261,7 +244,6 @@ describe('Organizations', () => {
 
       expect(result).toBeDefined();
       // Should not throw error, just return empty result
-      expect(mockedTryUnlinkBotIdentitiesForOrganizationMember).not.toHaveBeenCalled();
     });
 
     test('should remove specific user without affecting others', async () => {

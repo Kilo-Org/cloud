@@ -16,6 +16,17 @@ const GOOGLE_OAUTH_STATE_PREFIX = 'google:';
 // protocol-relative URLs like `//evil.example.com`.
 const RETURN_TO_REGEX = /^\/(?!\/)[^?#]*(\?[^#]*)?$/;
 
+/**
+ * Defense-in-depth check: even though RETURN_TO_REGEX rejects external hosts,
+ * a crafted `/foo/../admin` would still resolve to `/admin` after URL
+ * normalization. Block any `..` or `.` path segment so the redirect target
+ * stays anchored to the path the caller actually wrote.
+ */
+export function returnToHasPathTraversal(value: string): boolean {
+  const pathOnly = value.split('?')[0] ?? '';
+  return pathOnly.split('/').some(segment => segment === '..' || segment === '.');
+}
+
 const GoogleOAuthStatePayloadSchema = z.object({
   owner: z.discriminatedUnion('type', [
     z.object({ type: z.literal('user'), id: z.string().min(1) }),
@@ -23,7 +34,12 @@ const GoogleOAuthStatePayloadSchema = z.object({
   ]),
   instanceId: z.string().uuid(),
   capabilities: z.array(GoogleCapabilitySchema).min(1),
-  returnTo: z.string().regex(RETURN_TO_REGEX).max(2048).optional(),
+  returnTo: z
+    .string()
+    .regex(RETURN_TO_REGEX)
+    .max(2048)
+    .refine(v => !returnToHasPathTraversal(v), 'returnTo must not contain path traversal segments')
+    .optional(),
 });
 
 export const GOOGLE_OAUTH_RETURN_TO_REGEX = RETURN_TO_REGEX;

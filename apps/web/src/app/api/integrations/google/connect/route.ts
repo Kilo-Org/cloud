@@ -9,6 +9,7 @@ import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
 import {
   createGoogleOAuthState,
   GOOGLE_OAUTH_RETURN_TO_REGEX,
+  returnToHasPathTraversal,
 } from '@/lib/integrations/google/oauth-state';
 import { DEFAULT_GOOGLE_CAPABILITIES } from '@/lib/integrations/google/capabilities';
 import { captureException, captureMessage } from '@sentry/nextjs';
@@ -81,7 +82,8 @@ export async function GET(request: NextRequest) {
     const returnTo =
       returnToParam &&
       GOOGLE_OAUTH_RETURN_TO_REGEX.test(returnToParam) &&
-      returnToParam.length <= 2048
+      returnToParam.length <= 2048 &&
+      !returnToHasPathTraversal(returnToParam)
         ? returnToParam
         : undefined;
 

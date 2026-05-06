@@ -124,6 +124,7 @@ function ClawOnboardingFlowInner({
   const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
   const [onboardingSaveSession, setOnboardingSaveSession] = useState(0);
   const hasCapturedIdentityView = useRef(false);
+  const hasCapturedCalendarView = useRef(false);
   const hasCapturedDoneView = useRef(false);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
@@ -183,6 +184,16 @@ function ClawOnboardingFlowInner({
     hasCapturedIdentityView.current = true;
     posthog?.capture('claw_page_viewed');
     posthog?.capture('claw_setup_identity_viewed');
+  }, [flowState.renderStep, posthog]);
+
+  // Fire `claw_setup_calendar_viewed` when the calendar step actually
+  // renders, matching the "viewed = rendered" semantic of identity above
+  // (and unlike the older advance-fire pattern still used by channels and
+  // provisioning). Ref guard so re-renders inside the step don't re-fire.
+  useEffect(() => {
+    if (flowState.renderStep !== 'calendar' || hasCapturedCalendarView.current) return;
+    hasCapturedCalendarView.current = true;
+    posthog?.capture('claw_setup_calendar_viewed');
   }, [flowState.renderStep, posthog]);
 
   useEffect(() => {
@@ -352,7 +363,6 @@ function ClawOnboardingFlowInner({
             preset: DEFAULT_ONBOARDING_EXEC_PRESET,
             defaulted: true,
           });
-          posthog?.capture('claw_setup_calendar_viewed');
           setBotIdentity(identity);
           setOnboardingStep('calendar');
         }}

@@ -237,6 +237,21 @@ describe('GET /api/integrations/google/connect', () => {
     expect(stateArg).not.toHaveProperty('returnTo');
   });
 
+  test('drops returnTo values with path-traversal segments', async () => {
+    // /claw/../admin would normalize to /admin after URL resolution. Even
+    // though the regex permits it, we reject any `.` or `..` segment for
+    // defense in depth.
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/connect?returnTo=%2Fclaw%2F..%2Fadmin') as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
   test('drops returnTo values with a URI fragment', async () => {
     // Fragments are disallowed by RETURN_TO_REGEX because the helpers in
     // callback/route.ts append the success/error param using a `?`/`&`

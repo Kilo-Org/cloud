@@ -669,6 +669,112 @@ export function configureLinear(env: EnvLike): void {
   }
 }
 
+// ---- Step 6b: ClawMetry observability sync ----
+
+const CLAWMETRY_DIR = '/root/.clawmetry';
+const CLAWMETRY_TOKEN_PATH = '/root/.clawmetry/token';
+const CLAWMETRY_PROVISION_TIMEOUT_MS = 8_000;
+
+type ClawMetryProvisionResponse = {
+  ok?: boolean;
+  cm_token?: string;
+  error?: string;
+};
+
+/**
+ * Provision ClawMetry sync for this instance and start the daemon.
+ *
+ * ClawMetry is a free observability dashboard for OpenClaw runtimes
+ * (https://clawmetry.com). The Python package is pre-installed in the image;
+ * this step (a) auto-creates a free ClawMetry account for the user via the
+ * partner provisioning endpoint, (b) writes the returned token to
+ * `~/.clawmetry/token`, and (c) spawns the sync daemon (detached) so events
+ * flow to app.clawmetry.com.
+ *
+ * Gated on CLAWMETRY_PARTNER_KEY — until the operator sets that env var on
+ * the instance, this is a silent no-op (zero behavior change). KILOCLAW_USER_EMAIL
+ * (or GITHUB_EMAIL as fallback) identifies the account to provision.
+ *
+ * Failures here NEVER block boot — observability is nice-to-have. We log,
+ * skip, and let the gateway start normally.
+ */
+export function provisionClawMetrySync(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
+  if (env.KILOCLAW_CLAWMETRY_DISABLED === 'true') {
+    console.log('ClawMetry: disabled via KILOCLAW_CLAWMETRY_DISABLED');
+    return;
+  }
+  const partnerKey = env.CLAWMETRY_PARTNER_KEY;
+  if (!partnerKey) {
+    console.log('ClawMetry: not configured (CLAWMETRY_PARTNER_KEY missing)');
+    return;
+  }
+  const userEmail = env.KILOCLAW_USER_EMAIL ?? env.GITHUB_EMAIL;
+  if (!userEmail) {
+    console.warn('ClawMetry: skipping — neither KILOCLAW_USER_EMAIL nor GITHUB_EMAIL is set');
+    return;
+  }
+
+  const apiBase = env.CLAWMETRY_API_BASE ?? 'https://app.clawmetry.com';
+  const provisionUrl = `${apiBase}/api/partner/kiloclaw/provision`;
+
+  let token: string;
+  try {
+    const result = deps.execFileSync(
+      'curl',
+      [
+        '-sS',
+        '--max-time',
+        String(Math.ceil(CLAWMETRY_PROVISION_TIMEOUT_MS / 1000)),
+        '-X',
+        'POST',
+        '-H',
+        'Content-Type: application/json',
+        '-H',
+        `X-Partner-Key: ${partnerKey}`,
+        '-d',
+        JSON.stringify({ email: userEmail, source: 'kiloclaw' }),
+        provisionUrl,
+      ],
+      { stdio: 'pipe' }
+    );
+    const parsed = JSON.parse(String(result)) as ClawMetryProvisionResponse;
+    if (!parsed.ok || !parsed.cm_token) {
+      console.warn(`ClawMetry: provisioning failed — ${parsed.error ?? 'no token in response'}`);
+      return;
+    }
+    token = parsed.cm_token;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`ClawMetry: provisioning request failed — ${message}`);
+    return;
+  }
+
+  if (!deps.existsSync(CLAWMETRY_DIR)) {
+    deps.mkdirSync(CLAWMETRY_DIR, { recursive: true, mode: 0o700 });
+  }
+  deps.writeFileSync(CLAWMETRY_TOKEN_PATH, token);
+  deps.chmodSync(CLAWMETRY_TOKEN_PATH, 0o600);
+
+  // Spawn `clawmetry sync` detached, fire-and-forget. ClawMetry's own
+  // process supervisor handles its lifecycle from here. Failure to start
+  // does not block boot — gateway is the critical path, observability is
+  // best-effort.
+  try {
+    deps.execFileSync(
+      'sh',
+      [
+        '-c',
+        `nohup clawmetry sync --token "$(cat ${CLAWMETRY_TOKEN_PATH})" >/var/log/clawmetry-sync.log 2>&1 &`,
+      ],
+      { stdio: 'pipe' }
+    );
+    console.log(`ClawMetry: sync daemon started for ${userEmail}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`ClawMetry: failed to start sync daemon — ${message}`);
+  }
+}
+
 // ---- Step 7: Onboard / doctor + config patching ----
 
 /**
@@ -1258,6 +1364,7 @@ export async function bootstrapNonCritical(
   const steps: BootstrapStep[] = [
     { phase: 'github', run: () => configureGitHub(env, deps) },
     { phase: 'linear', run: () => configureLinear(env) },
+    { phase: 'clawmetry-sync', run: () => provisionClawMetrySync(env, deps) },
     {
       phase: 'gateway-client-device-scopes',
       run: () => runGatewayClientDeviceScopeRemediation(deps),

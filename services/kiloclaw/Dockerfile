@@ -9,7 +9,7 @@ ENV NODE_VERSION=24.15.0
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \
-       build-essential python3 ffmpeg tmux chromium \
+       build-essential python3 python3-venv ffmpeg tmux chromium \
     && ARCH="$(dpkg --print-architecture)" \
     && case "${ARCH}" in \
          amd64) NODE_ARCH="x64" ;; \
@@ -73,6 +73,27 @@ RUN npm install -g openclaw@2026.4.23 \
     && if grep -q 'MESSAGE_ACTION_TARGET_MODE\[action\] !== "none"' "$CT_FILE"; then echo "ERROR: actionRequiresTarget patch failed" >&2; exit 1; fi \
     && echo "OK: patched actionRequiresTarget in $(basename "$CT_FILE")" \
     && openclaw --version
+
+# Install ClawMetry — observability dashboard for the OpenClaw runtime.
+# Pre-installed so every KiloClaw instance has it available; the controller's
+# bootstrap step `provisionClawMetrySync` activates it (one-time account
+# auto-provisioning + sync daemon) when CLAWMETRY_PARTNER_KEY is set on the
+# instance env.
+#
+# Uses the upstream one-line installer instead of pinning a PyPI version.
+# This delegates version selection + bootstrap (venv layout, symlink, future
+# install steps) to ClawMetry's install.sh so it can evolve without a PR
+# back to this repo. Trade-off: builds are not bit-reproducible across
+# rebuilds — the image picks up whatever version PyPI has at build time.
+# That's intentional; the integration is best-effort observability and the
+# sync daemon is fail-soft (see provisionClawMetrySync).
+#
+# install.sh creates a venv at /root/.clawmetry and symlinks the binary at
+# /root/.local/bin/clawmetry. We add that to PATH so subsequent build steps
+# and runtime callers can invoke `clawmetry` by name.
+ENV PATH="/root/.local/bin:${PATH}"
+RUN curl -fsSL https://clawmetry.com/install.sh | bash \
+    && clawmetry --version
 
 # Bake bundled plugin runtime deps into the image so first boot is pure
 # startup — no npm install from `openclaw doctor` on shared-cpu Fly machines.

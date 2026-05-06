@@ -7,6 +7,7 @@ import {
   generateHooksToken,
   configureGitHub,
   configureLinear,
+  provisionClawMetrySync,
   runOnboardOrDoctor,
   formatBotIdentityMarkdown,
   writeBotIdentityFile,
@@ -563,6 +564,174 @@ describe('configureLinear', () => {
     expect(env.LINEAR_API_KEY).toBeUndefined();
     expect(logSpy).toHaveBeenCalledWith('Linear: not configured');
     logSpy.mockRestore();
+  });
+});
+
+// ---- provisionClawMetrySync ----
+
+describe('provisionClawMetrySync', () => {
+  it('skips silently when CLAWMETRY_PARTNER_KEY is missing', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { deps, execCalls, writeCalls } = fakeDeps();
+
+    provisionClawMetrySync({ KILOCLAW_USER_EMAIL: 'a@b.c' }, deps);
+
+    expect(execCalls).toEqual([]);
+    expect(writeCalls).toEqual([]);
+    expect(logSpy).toHaveBeenCalledWith(
+      'ClawMetry: not configured (CLAWMETRY_PARTNER_KEY missing)'
+    );
+    logSpy.mockRestore();
+  });
+
+  it('skips when KILOCLAW_CLAWMETRY_DISABLED=true even with key + email', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { deps, execCalls } = fakeDeps();
+
+    provisionClawMetrySync(
+      {
+        KILOCLAW_CLAWMETRY_DISABLED: 'true',
+        CLAWMETRY_PARTNER_KEY: 'pk_test',
+        KILOCLAW_USER_EMAIL: 'a@b.c',
+      },
+      deps
+    );
+
+    expect(execCalls).toEqual([]);
+    expect(logSpy).toHaveBeenCalledWith('ClawMetry: disabled via KILOCLAW_CLAWMETRY_DISABLED');
+    logSpy.mockRestore();
+  });
+
+  it('warns and exits when no email is available', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { deps, execCalls } = fakeDeps();
+
+    provisionClawMetrySync({ CLAWMETRY_PARTNER_KEY: 'pk_test' }, deps);
+
+    expect(execCalls).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'ClawMetry: skipping — neither KILOCLAW_USER_EMAIL nor GITHUB_EMAIL is set'
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('provisions a token, writes it to disk with 600, and starts the daemon', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { deps, execCalls, writeCalls, chmodCalls, mkdirCalls } = fakeDeps();
+    deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
+      execCalls.push({ cmd, args });
+      if (cmd === 'curl') {
+        return JSON.stringify({ ok: true, cm_token: 'cm_abc123' });
+      }
+      return '';
+    });
+
+    provisionClawMetrySync(
+      {
+        CLAWMETRY_PARTNER_KEY: 'pk_test',
+        KILOCLAW_USER_EMAIL: 'user@kilocode.ai',
+      },
+      deps
+    );
+
+    const curlCall = execCalls.find(c => c.cmd === 'curl');
+    expect(curlCall).toBeDefined();
+    expect(curlCall?.args).toContain('https://app.clawmetry.com/api/partner/kiloclaw/provision');
+    expect(curlCall?.args).toContain('X-Partner-Key: pk_test');
+    expect(curlCall?.args.some(a => a.includes('user@kilocode.ai'))).toBe(true);
+
+    expect(mkdirCalls).toContain('/root/.clawmetry');
+    expect(writeCalls).toEqual([{ path: '/root/.clawmetry/token', data: 'cm_abc123' }]);
+    expect(chmodCalls).toEqual([{ path: '/root/.clawmetry/token', mode: 0o600 }]);
+
+    const daemonCall = execCalls.find(c => c.cmd === 'sh');
+    expect(daemonCall).toBeDefined();
+    expect(daemonCall?.args[1]).toContain('clawmetry sync');
+    expect(daemonCall?.args[1]).toContain('nohup');
+
+    expect(logSpy).toHaveBeenCalledWith('ClawMetry: sync daemon started for user@kilocode.ai');
+    logSpy.mockRestore();
+  });
+
+  it('falls back to GITHUB_EMAIL when KILOCLAW_USER_EMAIL is absent', () => {
+    const { deps, execCalls } = fakeDeps();
+    deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
+      execCalls.push({ cmd, args });
+      if (cmd === 'curl') return JSON.stringify({ ok: true, cm_token: 'cm_x' });
+      return '';
+    });
+
+    provisionClawMetrySync(
+      { CLAWMETRY_PARTNER_KEY: 'pk_test', GITHUB_EMAIL: 'fallback@x.com' },
+      deps
+    );
+
+    const curlCall = execCalls.find(c => c.cmd === 'curl');
+    expect(curlCall?.args.some(a => a.includes('fallback@x.com'))).toBe(true);
+  });
+
+  it('warns but does not throw when provisioning request errors', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { deps, execCalls, writeCalls } = fakeDeps();
+    deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
+      execCalls.push({ cmd, args });
+      if (cmd === 'curl') throw new Error('network down');
+      return '';
+    });
+
+    expect(() =>
+      provisionClawMetrySync(
+        { CLAWMETRY_PARTNER_KEY: 'pk_test', KILOCLAW_USER_EMAIL: 'a@b.c' },
+        deps
+      )
+    ).not.toThrow();
+    expect(writeCalls).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('ClawMetry: provisioning request failed')
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('warns and skips daemon spawn when partner endpoint returns ok:false', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { deps, execCalls, writeCalls } = fakeDeps();
+    deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
+      execCalls.push({ cmd, args });
+      if (cmd === 'curl') {
+        return JSON.stringify({ ok: false, error: 'partner key invalid' });
+      }
+      return '';
+    });
+
+    provisionClawMetrySync({ CLAWMETRY_PARTNER_KEY: 'pk_bad', KILOCLAW_USER_EMAIL: 'a@b.c' }, deps);
+
+    expect(writeCalls).toEqual([]);
+    expect(execCalls.find(c => c.cmd === 'sh')).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith('ClawMetry: provisioning failed — partner key invalid');
+    warnSpy.mockRestore();
+  });
+
+  it('honors CLAWMETRY_API_BASE override (for staging / self-hosted)', () => {
+    const { deps, execCalls } = fakeDeps();
+    deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
+      execCalls.push({ cmd, args });
+      if (cmd === 'curl') return JSON.stringify({ ok: true, cm_token: 'cm_x' });
+      return '';
+    });
+
+    provisionClawMetrySync(
+      {
+        CLAWMETRY_PARTNER_KEY: 'pk_test',
+        KILOCLAW_USER_EMAIL: 'a@b.c',
+        CLAWMETRY_API_BASE: 'https://staging.clawmetry.com',
+      },
+      deps
+    );
+
+    const curlCall = execCalls.find(c => c.cmd === 'curl');
+    expect(curlCall?.args).toContain(
+      'https://staging.clawmetry.com/api/partner/kiloclaw/provision'
+    );
   });
 });
 
@@ -1736,6 +1905,7 @@ describe('bootstrapNonCritical', () => {
     expect(phases).toEqual([
       'github',
       'linear',
+      'clawmetry-sync',
       'gateway-client-device-scopes',
       'onboard',
       'tools-md',
@@ -1772,6 +1942,7 @@ describe('bootstrapNonCritical', () => {
     expect(phases).toEqual([
       'github',
       'linear',
+      'clawmetry-sync',
       'gateway-client-device-scopes',
       'onboard',
       'tools-md',
@@ -1799,6 +1970,7 @@ describe('bootstrapNonCritical', () => {
     expect(phases).toEqual([
       'github',
       'linear',
+      'clawmetry-sync',
       'gateway-client-device-scopes',
       'onboard',
       'tools-md',
@@ -1833,7 +2005,13 @@ describe('bootstrapNonCritical', () => {
     );
 
     expect(result).toEqual({ ok: false, phase: 'doctor', error: 'doctor exited 1' });
-    expect(phases).toEqual(['github', 'linear', 'gateway-client-device-scopes', 'doctor']);
+    expect(phases).toEqual([
+      'github',
+      'linear',
+      'clawmetry-sync',
+      'gateway-client-device-scopes',
+      'doctor',
+    ]);
   });
 });
 
@@ -1865,6 +2043,7 @@ describe('bootstrap', () => {
       'feature-flags',
       'github',
       'linear',
+      'clawmetry-sync',
       'gateway-client-device-scopes',
       'onboard',
       'tools-md',

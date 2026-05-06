@@ -31,6 +31,8 @@ vi.mock('../session-service.js', () => ({
   ),
   runSetupCommands: vi.fn().mockResolvedValue(undefined),
   writeAuthFile: vi.fn().mockResolvedValue(undefined),
+  writeGlobalRules: vi.fn().mockResolvedValue(undefined),
+  writeRuntimeSkills: vi.fn().mockResolvedValue(undefined),
   SessionService: class SessionService {
     buildContext = vi.fn((options: Record<string, unknown>) => ({
       ...options,

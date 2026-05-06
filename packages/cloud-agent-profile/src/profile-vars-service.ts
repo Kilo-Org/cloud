@@ -1,25 +1,23 @@
-import 'server-only';
-import { db } from '@/lib/drizzle';
+import type { WorkerDb } from '@kilocode/db';
 import { agent_environment_profile_vars } from '@kilocode/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { encryptWithPublicKey } from '@/lib/encryption';
-import { AGENT_ENV_VARS_PUBLIC_KEY } from '@/lib/config.server';
+import { encryptWithPublicKey } from '@kilocode/encryption';
 import type { ProfileOwner, ProfileVarResponse } from './types';
 import { verifyProfileOwnership } from './profile-utils';
 
 /**
- * Encrypt a value using the agent env vars public key.
+ * Encrypt a value using the agent env vars public key (base64-encoded).
  */
-function encryptValue(value: string): string {
-  if (!AGENT_ENV_VARS_PUBLIC_KEY) {
+function encryptValue(publicKeyBase64: string, value: string): string {
+  if (!publicKeyBase64) {
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Agent environment encryption key not configured',
     });
   }
 
-  const publicKey = Buffer.from(AGENT_ENV_VARS_PUBLIC_KEY, 'base64');
+  const publicKey = Buffer.from(publicKeyBase64, 'base64');
   const envelope = encryptWithPublicKey(value, publicKey);
   return JSON.stringify(envelope);
 }
@@ -29,15 +27,17 @@ function encryptValue(value: string): string {
  * If isSecret is true, the value is encrypted before storage.
  */
 export async function setVar(
+  db: WorkerDb,
+  publicKeyBase64: string,
   profileId: string,
   key: string,
   value: string,
   isSecret: boolean,
   owner: ProfileOwner
 ): Promise<void> {
-  await verifyProfileOwnership(profileId, owner);
+  await verifyProfileOwnership(db, profileId, owner);
 
-  const storedValue = isSecret ? encryptValue(value) : value;
+  const storedValue = isSecret ? encryptValue(publicKeyBase64, value) : value;
 
   await db
     .insert(agent_environment_profile_vars)
@@ -61,11 +61,12 @@ export async function setVar(
  * Delete an environment variable from a profile.
  */
 export async function deleteVar(
+  db: WorkerDb,
   profileId: string,
   key: string,
   owner: ProfileOwner
 ): Promise<void> {
-  await verifyProfileOwnership(profileId, owner);
+  await verifyProfileOwnership(db, profileId, owner);
 
   const result = await db
     .delete(agent_environment_profile_vars)
@@ -90,10 +91,11 @@ export async function deleteVar(
  * Secret values are masked as '***'.
  */
 export async function listVars(
+  db: WorkerDb,
   profileId: string,
   owner: ProfileOwner
 ): Promise<ProfileVarResponse[]> {
-  await verifyProfileOwnership(profileId, owner);
+  await verifyProfileOwnership(db, profileId, owner);
 
   const vars = await db
     .select({
@@ -130,7 +132,7 @@ export type VarForSession = {
  * Returns encrypted envelopes for secrets (not decrypted).
  * This is an internal function - no ownership check.
  */
-export async function getVarsForSession(profileId: string): Promise<VarForSession[]> {
+export async function getVarsForSession(db: WorkerDb, profileId: string): Promise<VarForSession[]> {
   const vars = await db
     .select({
       key: agent_environment_profile_vars.key,
@@ -152,11 +154,13 @@ export async function getVarsForSession(profileId: string): Promise<VarForSessio
  * Useful for importing or updating multiple vars at once.
  */
 export async function setVars(
+  db: WorkerDb,
+  publicKeyBase64: string,
   profileId: string,
   vars: Array<{ key: string; value: string; isSecret: boolean }>,
   owner: ProfileOwner
 ): Promise<void> {
-  await verifyProfileOwnership(profileId, owner);
+  await verifyProfileOwnership(db, profileId, owner);
 
   if (vars.length === 0) {
     return;
@@ -165,7 +169,7 @@ export async function setVars(
   const values = vars.map(v => ({
     profile_id: profileId,
     key: v.key,
-    value: v.isSecret ? encryptValue(v.value) : v.value,
+    value: v.isSecret ? encryptValue(publicKeyBase64, v.value) : v.value,
     is_secret: v.isSecret,
   }));
 

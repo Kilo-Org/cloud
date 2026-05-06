@@ -311,6 +311,9 @@ describe('router sessionId validation', () => {
               INTERNAL_API_SECRET_PROD: {
                 get: vi.fn().mockResolvedValue('test-secret'),
               } as unknown as TRPCContext['env']['INTERNAL_API_SECRET_PROD'],
+              HYPERDRIVE: {
+                connectionString: 'postgresql://test',
+              } as unknown as TRPCContext['env']['HYPERDRIVE'],
             },
           };
           cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
@@ -682,6 +685,9 @@ describe('router sessionId validation', () => {
             INTERNAL_API_SECRET_PROD: {
               get: vi.fn().mockResolvedValue('test-secret'),
             } as unknown as TRPCContext['env']['INTERNAL_API_SECRET_PROD'],
+            HYPERDRIVE: {
+              connectionString: 'postgresql://test',
+            } as unknown as TRPCContext['env']['HYPERDRIVE'],
           },
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
@@ -936,6 +942,9 @@ describe('router sessionId validation', () => {
             INTERNAL_API_SECRET_PROD: {
               get: vi.fn().mockResolvedValue('test-secret'),
             } as unknown as TRPCContext['env']['INTERNAL_API_SECRET_PROD'],
+            HYPERDRIVE: {
+              connectionString: 'postgresql://test',
+            } as unknown as TRPCContext['env']['HYPERDRIVE'],
           },
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;

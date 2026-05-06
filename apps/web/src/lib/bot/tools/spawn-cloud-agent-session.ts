@@ -22,7 +22,10 @@ import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { resolveBotSessionProfile } from '@/lib/bot/tools/resolve-bot-session-profile';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
-import type { MergeProfileConfigurationResult } from '@/lib/agent/profile-session-config';
+import {
+  profileMcpServersToClientRecord,
+  type MergeProfileConfigurationResult,
+} from '@kilocode/cloud-agent-profile';
 import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
@@ -177,6 +180,9 @@ export default async function spawnCloudAgentSession(
       envVars: profileConfig.envVars,
       encryptedSecrets: profileConfig.encryptedSecrets,
       setupCommands: profileConfig.setupCommands,
+      mcpServers: profileMcpServersToClientRecord(profileConfig.mcpServers),
+      runtimeSkills: profileConfig.skills,
+      runtimeAgents: profileConfig.agents,
     };
     initiateInput = { kilocodeOrganizationId };
   } else {
@@ -206,6 +212,9 @@ export default async function spawnCloudAgentSession(
       envVars: profileConfig.envVars,
       encryptedSecrets: profileConfig.encryptedSecrets,
       setupCommands: profileConfig.setupCommands,
+      mcpServers: profileMcpServersToClientRecord(profileConfig.mcpServers),
+      runtimeSkills: profileConfig.skills,
+      runtimeAgents: profileConfig.agents,
     };
     initiateInput = { githubToken, kilocodeOrganizationId };
   }

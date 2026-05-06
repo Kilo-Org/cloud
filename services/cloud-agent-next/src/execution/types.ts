@@ -11,7 +11,7 @@ import type { ExecutionId, SessionId, UserId } from '../types/ids.js';
 import type { AgentMode } from '../schema.js';
 import type { Images, EncryptedSecrets as SchemaEncryptedSecrets } from '../router/schemas.js';
 import type { EncryptedSecrets } from '../utils/encryption.js';
-import type { MCPServerConfig } from '../persistence/types.js';
+import type { MCPServerConfig, RuntimeSkill, RuntimeAgent } from '../persistence/types.js';
 
 // ---------------------------------------------------------------------------
 // Execution Modes
@@ -71,6 +71,10 @@ export type InitializeContext = {
   setupCommands?: string[];
   /** MCP server configurations */
   mcpServers?: Record<string, MCPServerConfig>;
+  /** Runtime skills materialized into SKILL.md files in the sandbox */
+  runtimeSkills?: readonly RuntimeSkill[];
+  /** Custom modes materialized into KILO_CONFIG_CONTENT.agent.<slug> */
+  runtimeAgents?: readonly RuntimeAgent[];
   /** Branch to checkout (if not session-specific) */
   upstreamBranch?: string;
   /** Bot ID for sandbox isolation */
@@ -123,6 +127,8 @@ type InitiateExecutionRequest = BaseExecutionRequest & {
   encryptedSecrets?: SchemaEncryptedSecrets;
   setupCommands?: string[];
   mcpServers?: Record<string, MCPServerConfig>;
+  runtimeSkills?: readonly RuntimeSkill[];
+  runtimeAgents?: readonly RuntimeAgent[];
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   upstreamBranch?: string;
@@ -249,6 +255,10 @@ export type InitContext = {
   encryptedSecrets?: EncryptedSecrets;
   /** MCP server configurations */
   mcpServers?: Record<string, MCPServerConfig>;
+  /** Runtime skills materialized into SKILL.md files in the sandbox */
+  runtimeSkills?: readonly RuntimeSkill[];
+  /** Custom modes materialized into KILO_CONFIG_CONTENT.agent.<slug> */
+  runtimeAgents?: readonly RuntimeAgent[];
   /** Bot ID for bot-specific sessions */
   botId?: string;
   /** GitHub app type for determining which app to use */
@@ -269,6 +279,12 @@ export type ExistingSessionMetadata = {
   sessionHome?: string;
   upstreamBranch?: string;
   appendSystemPrompt?: string;
+  /** MCP servers previously stored on the session (for fast-path re-injection) */
+  mcpServers?: Record<string, MCPServerConfig>;
+  /** Runtime skills previously stored on the session (for fast-path re-materialization) */
+  runtimeSkills?: readonly RuntimeSkill[];
+  /** Custom modes previously stored on the session */
+  runtimeAgents?: readonly RuntimeAgent[];
   /** GitHub repo (for token updates) */
   githubRepo?: string;
   /** Git URL (for token updates) */

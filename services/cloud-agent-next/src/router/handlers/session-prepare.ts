@@ -1,5 +1,14 @@
 import { TRPCError } from '@trpc/server';
+import type * as z from 'zod';
 import { getSandbox } from '@cloudflare/sandbox';
+import {
+  mergeProfileConfiguration,
+  profileMcpServersToClientRecord,
+  ProfileNotFoundError,
+  type ClientMcpServerValue,
+  type MergeProfileConfigurationResult,
+  type ProfileOwner,
+} from '@kilocode/cloud-agent-profile';
 import { logger, withLogTags } from '../../logger.js';
 import {
   generateSessionId,
@@ -7,7 +16,9 @@ import {
   determineBranchName,
   runSetupCommands,
   writeAuthFile,
+  writeGlobalRules,
 } from '../../session-service.js';
+import type { SessionProfileBundle } from '../../session-profile.js';
 
 import { internalApiProtectedProcedure } from '../auth.js';
 import {
@@ -15,6 +26,7 @@ import {
   PrepareSessionOutput,
   UpdateSessionInput,
   UpdateSessionOutput,
+  isBuiltinMode,
 } from '../schemas.js';
 import { generateSandboxId, getSandboxNamespace } from '../../sandbox-id.js';
 import {
@@ -32,11 +44,141 @@ import {
   resolveGitHubTokenForRepo,
   resolveManagedGitLabToken,
 } from '../../services/git-token-service-client.js';
+import { getCanPgDb } from '../../db/pg.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
   updateSession: typeof updateSessionHandler;
 };
+
+/**
+ * Platform that always gets full profile resolution applied — the main
+ * user-facing cloud-agent chat UI. Other callers must opt in via `profileId`.
+ */
+const CLOUD_AGENT_WEB_PLATFORM = 'cloud-agent-web';
+
+type PrepareInput = z.infer<typeof PrepareSessionInput>;
+
+/**
+ * Derive a GitLab project path (e.g. "group/subgroup/project") from a clone
+ * URL produced by `buildGitLabCloneUrl`. Returns `undefined` when the URL is
+ * malformed so callers fall back to "no repo binding" gracefully.
+ */
+function deriveRepoFullNameFromGitUrl(gitUrl: string): string | undefined {
+  try {
+    const url = new URL(gitUrl);
+    const path = url.pathname.replace(/^\/+/, '').replace(/\.git$/i, '');
+    return path || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Pick a stable `repoFullName` for repo-binding lookup across platforms. */
+function repoFullNameForBindingLookup(input: PrepareInput): string | undefined {
+  if (input.githubRepo) return input.githubRepo;
+  if (input.platform === 'gitlab' && input.gitUrl) {
+    return deriveRepoFullNameFromGitUrl(input.gitUrl);
+  }
+  return undefined;
+}
+
+/**
+ * Resolve the caller's profile stack in Postgres when we should — see the
+ * "When cloud agent resolves a profile" section of the refactor plan for the rule.
+ *
+ * Returns `null` when no resolution runs so that the handler can keep passing
+ * inline fields through verbatim.
+ */
+async function resolveProfileForInput(
+  ctx: { env: Pick<Env, 'HYPERDRIVE'>; userId: string },
+  input: PrepareInput
+): Promise<MergeProfileConfigurationResult | null> {
+  const shouldResolve = !!input.profileId || input.createdOnPlatform === CLOUD_AGENT_WEB_PLATFORM;
+  if (!shouldResolve) return null;
+
+  const owner: ProfileOwner = input.kilocodeOrganizationId
+    ? { type: 'organization', id: input.kilocodeOrganizationId }
+    : { type: 'user', id: ctx.userId };
+  // In org context we also allow the user's personal profile to apply.
+  const userId = input.kilocodeOrganizationId ? ctx.userId : undefined;
+
+  const db = getCanPgDb(ctx.env);
+
+  try {
+    return await mergeProfileConfiguration(db, {
+      profileId: input.profileId,
+      owner,
+      userId,
+      repoFullName: repoFullNameForBindingLookup(input),
+      platform: input.platform,
+      envVars: input.envVars,
+      setupCommands: input.setupCommands,
+    });
+  } catch (err) {
+    if (err instanceof ProfileNotFoundError) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: err.message });
+    }
+    throw err;
+  }
+}
+
+/**
+ * Collapse the caller's inline fields with the profile-resolved values into
+ * the canonical `SessionProfileBundle` shape consumed by the session service.
+ * When resolution did not run (null) the inline values pass through unchanged.
+ * Otherwise each collection follows the same precedence the web router used
+ * before this refactor: `profile (auto + explicit override) < inline`.
+ *
+ * `ClientMcpServerValue` (what the profile package returns) is structurally
+ * identical to the worker's `MCPServerConfig` — both discriminated unions of
+ * local/remote servers with encrypted-envelope secret values — so the bundle
+ * carries them as `MCPServerConfig` without coercion.
+ */
+function applyProfileResolution(
+  input: PrepareInput,
+  resolved: MergeProfileConfigurationResult | null
+): SessionProfileBundle {
+  if (!resolved) {
+    return {
+      envVars: input.envVars,
+      encryptedSecrets: input.encryptedSecrets,
+      setupCommands: input.setupCommands,
+      mcpServers: input.mcpServers,
+      runtimeSkills: input.runtimeSkills,
+      runtimeAgents: input.runtimeAgents,
+    };
+  }
+
+  const profileMcpRecord = profileMcpServersToClientRecord(resolved.mcpServers);
+  const inlineMcp = input.mcpServers as Record<string, ClientMcpServerValue> | undefined;
+  const mergedMcp =
+    profileMcpRecord || inlineMcp ? { ...profileMcpRecord, ...inlineMcp } : undefined;
+
+  return {
+    // `mergeProfileConfiguration` already merged inline envVars/setupCommands
+    // on top of the profile stack, so these are the authoritative values.
+    envVars: resolved.envVars,
+    setupCommands: resolved.setupCommands,
+    // Profile is the sole source for encryptedSecrets / runtimeSkills /
+    // runtimeAgents — matches today's web-side semantics.
+    encryptedSecrets: resolved.encryptedSecrets,
+    runtimeSkills: resolved.skills,
+    runtimeAgents: resolved.agents,
+    mcpServers: mergedMcp,
+  };
+}
+
+function assertModeAvailableForProfile(mode: string, profile: SessionProfileBundle): void {
+  if (isBuiltinMode(mode)) return;
+  const slugs = new Set((profile.runtimeAgents ?? []).map(a => a.slug));
+  if (slugs.has(mode)) return;
+
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: `Mode "${mode}" is not a built-in slug and does not match any runtimeAgents on this session`,
+  });
+}
 
 function setUpdateValue(updates: Record<string, unknown>, key: string, value: unknown): void {
   if (value !== undefined) {
@@ -118,6 +260,15 @@ const prepareSessionHandler = internalApiProtectedProcedure
         sandboxId,
       });
       logger.info('Preparing new session with workspace setup');
+
+      // Resolve profile (repo binding + default + explicit override) server-side.
+      // Runs only when the caller either set an explicit profileId, or this
+      // session comes from the main user-facing chat UI ('cloud-agent-web').
+      // Other callers (app-builder, security-agent, webhooks without profileId,
+      // etc.) keep getting their inline fields verbatim — same as before.
+      const resolved = await resolveProfileForInput(ctx, input);
+      const effective = applyProfileResolution(input, resolved);
+      assertModeAvailableForProfile(input.mode, effective);
 
       // 2. Lookup GitHub installation + generate token via git-token-service RPC
       let resolvedGithubToken = input.githubToken;
@@ -219,6 +370,10 @@ const prepareSessionHandler = internalApiProtectedProcedure
           gitUrl: input.gitUrl,
           platform: input.platform,
           initialMessageId: input.initialMessageId,
+          // Carry the resolved profile into the DO up-front so the chat page
+          // can render custom-mode options (runtimeAgents) immediately after
+          // navigation, before the async prepare() alarm fires.
+          profile: effective,
         });
 
         if (!registerResult.success) {
@@ -254,10 +409,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
             mode: input.mode,
             model: input.model,
             variant: input.variant,
-            envVars: input.envVars,
-            encryptedSecrets: input.encryptedSecrets,
-            setupCommands: input.setupCommands,
-            mcpServers: input.mcpServers,
+            profile: effective,
             upstreamBranch: input.upstreamBranch,
             autoCommit: input.autoCommit,
             condenseOnComplete: input.condenseOnComplete,
@@ -322,18 +474,17 @@ const prepareSessionHandler = internalApiProtectedProcedure
       });
 
       logger.info('Creating execution session');
-      const session = await sessionService.getOrCreateSession(
+      const session = await sessionService.getOrCreateSession({
         sandbox,
         context,
-        ctx.env,
-        ctx.authToken,
-        input.model,
-        input.kilocodeOrganizationId,
-        input.encryptedSecrets,
-        input.createdOnPlatform,
-        input.appendSystemPrompt,
-        input.mcpServers
-      );
+        env: ctx.env,
+        originalToken: ctx.authToken,
+        kilocodeModel: input.model,
+        originalOrgId: input.kilocodeOrganizationId,
+        createdOnPlatform: input.createdOnPlatform,
+        appendSystemPrompt: input.appendSystemPrompt,
+        profile: effective,
+      });
 
       // 7. Clone repository
       const cloneOptions = input.shallow ? { shallow: true } : undefined;
@@ -385,13 +536,15 @@ const prepareSessionHandler = internalApiProtectedProcedure
       }
 
       // 9. Run setup commands
-      if (input.setupCommands && input.setupCommands.length > 0) {
-        logger.withFields({ count: input.setupCommands.length }).info('Running setup commands');
-        await runSetupCommands(session, context, input.setupCommands, true); // fail-fast
+      if (effective.setupCommands && effective.setupCommands.length > 0) {
+        logger.withFields({ count: effective.setupCommands.length }).info('Running setup commands');
+        await runSetupCommands(session, context, effective.setupCommands, true); // fail-fast
       }
 
-      // 10. Write auth file for session ingest
+      // 10. Write auth file for session ingest, plus global rules.
+      // (runtime skills were written by getOrCreateSession above)
       await writeAuthFile(sandbox, sessionHome, ctx.authToken);
+      await writeGlobalRules(sandbox, sessionHome, cloudAgentSessionId);
 
       // 11. Start wrapper (which starts kilo server in-process and creates session)
       logger.info('Starting wrapper');
@@ -466,10 +619,12 @@ const prepareSessionHandler = internalApiProtectedProcedure
           gitToken: resolvedGitToken,
           platform: input.platform,
           gitlabTokenManaged,
-          envVars: input.envVars,
-          encryptedSecrets: input.encryptedSecrets,
-          setupCommands: input.setupCommands,
-          mcpServers: input.mcpServers,
+          envVars: effective.envVars,
+          encryptedSecrets: effective.encryptedSecrets,
+          setupCommands: effective.setupCommands,
+          mcpServers: effective.mcpServers,
+          runtimeSkills: effective.runtimeSkills,
+          runtimeAgents: effective.runtimeAgents,
           upstreamBranch: input.upstreamBranch,
           autoCommit: input.autoCommit,
           condenseOnComplete: input.condenseOnComplete,
@@ -578,6 +733,12 @@ const updateSessionHandler = internalApiProtectedProcedure
       });
       setCollectionUpdate(updates, 'mcpServers', input.mcpServers, value => {
         return Object.keys(value).length === 0;
+      });
+      setCollectionUpdate(updates, 'runtimeSkills', input.runtimeSkills, value => {
+        return value.length === 0;
+      });
+      setCollectionUpdate(updates, 'runtimeAgents', input.runtimeAgents, value => {
+        return value.length === 0;
       });
 
       // 3. Call tryUpdate() on DO

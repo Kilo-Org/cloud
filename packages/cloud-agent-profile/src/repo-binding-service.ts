@@ -1,4 +1,4 @@
-import 'server-only';
+import type { WorkerDb } from '@kilocode/db';
 import { TRPCError } from '@trpc/server';
 import type { ProfileOwner } from './types';
 import { verifyProfileOwnership } from './profile-utils';
@@ -21,25 +21,27 @@ type RepoBinding = {
  * Atomic upsert — safe against concurrent calls for the same owner+repo+platform.
  */
 export async function bindProfileToRepo(
+  db: WorkerDb,
   owner: ProfileOwner,
   repoFullName: string,
   platform: 'github' | 'gitlab',
   profileId: string
 ): Promise<void> {
-  await verifyProfileOwnership(profileId, owner);
-  await upsertBinding(owner, repoFullName.toLowerCase(), platform, profileId);
+  await verifyProfileOwnership(db, profileId, owner);
+  await upsertBinding(db, owner, repoFullName.toLowerCase(), platform, profileId);
 }
 
 /**
  * Remove the profile binding for a repository.
  */
 export async function unbindRepo(
+  db: WorkerDb,
   owner: ProfileOwner,
   repoFullName: string,
   platform: 'github' | 'gitlab'
 ): Promise<void> {
   const repoLower = repoFullName.toLowerCase();
-  const binding = await findBinding(owner, repoLower, platform);
+  const binding = await findBinding(db, owner, repoLower, platform);
 
   if (!binding) {
     throw new TRPCError({
@@ -48,7 +50,7 @@ export async function unbindRepo(
     });
   }
 
-  await deleteBinding(binding.bindingId);
+  await deleteBinding(db, binding.bindingId);
 }
 
 /**
@@ -56,18 +58,19 @@ export async function unbindRepo(
  * Returns the profile_id if found, null otherwise.
  */
 export async function getBindingForRepo(
+  db: WorkerDb,
   owner: ProfileOwner,
   repoFullName: string,
   platform: 'github' | 'gitlab'
 ): Promise<string | null> {
   const repoLower = repoFullName.toLowerCase();
-  const binding = await findBinding(owner, repoLower, platform);
+  const binding = await findBinding(db, owner, repoLower, platform);
   return binding?.profileId ?? null;
 }
 
 /**
  * List all repo-profile bindings for the given owner.
  */
-export async function listBindings(owner: ProfileOwner): Promise<RepoBinding[]> {
-  return selectBindingsWithProfiles(owner);
+export async function listBindings(db: WorkerDb, owner: ProfileOwner): Promise<RepoBinding[]> {
+  return selectBindingsWithProfiles(db, owner);
 }

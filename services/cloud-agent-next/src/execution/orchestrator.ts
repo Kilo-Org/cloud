@@ -17,6 +17,9 @@ import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { ExecutionPlan, ExecutionResult } from './types.js';
 import { ExecutionError } from './errors.js';
 import { SessionService, type PreparedSession } from '../session-service.js';
+import type { SessionProfileBundle } from '../session-profile.js';
+import type { MCPServerConfig, RuntimeSkill, RuntimeAgent } from '../persistence/types.js';
+import type { EncryptedSecrets } from '../router/schemas.js';
 import { logger } from '../logger.js';
 import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { updateGitRemoteToken } from '../workspace.js';
@@ -41,6 +44,30 @@ function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string)
         timeoutLayer: 'outer',
       })
   );
+}
+
+/**
+ * Assemble a {@link SessionProfileBundle} from the individually-typed fields
+ * the orchestrator carries on `initContext` / `existingMetadata`. `readonly`
+ * skill/agent arrays stored on `CloudAgentSessionState` are copied so the
+ * bundle stays mutable (DO payload schemas infer mutable arrays).
+ */
+function buildProfileBundle(fields: {
+  envVars?: Record<string, string>;
+  encryptedSecrets?: EncryptedSecrets;
+  setupCommands?: string[];
+  mcpServers?: Record<string, MCPServerConfig>;
+  runtimeSkills?: readonly RuntimeSkill[];
+  runtimeAgents?: readonly RuntimeAgent[];
+}): SessionProfileBundle {
+  return {
+    envVars: fields.envVars,
+    encryptedSecrets: fields.encryptedSecrets,
+    setupCommands: fields.setupCommands,
+    mcpServers: fields.mcpServers,
+    runtimeSkills: fields.runtimeSkills ? [...fields.runtimeSkills] : undefined,
+    runtimeAgents: fields.runtimeAgents ? [...fields.runtimeAgents] : undefined,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -294,17 +321,27 @@ export class ExecutionOrchestrator {
         };
 
         const session = await withWorkspacePreparationTimeout(
-          this.sessionService.getOrCreateSession(
+          this.sessionService.getOrCreateSession({
             sandbox,
             context,
-            this.deps.env,
-            initContext.kilocodeToken,
-            initContext.kilocodeModel ?? 'default',
-            orgId,
-            initContext.encryptedSecrets,
-            initContext.createdOnPlatform,
-            existingMetadata.appendSystemPrompt
-          ),
+            env: this.deps.env,
+            originalToken: initContext.kilocodeToken,
+            kilocodeModel: initContext.kilocodeModel ?? 'default',
+            originalOrgId: orgId,
+            createdOnPlatform: initContext.createdOnPlatform,
+            appendSystemPrompt: existingMetadata.appendSystemPrompt,
+            // Previously dropped on the fast path: MCP servers, runtime
+            // skills, and runtime modes stored during prepare() must flow
+            // back in when we recreate the sandbox session.
+            profile: buildProfileBundle({
+              envVars: initContext.envVars,
+              encryptedSecrets: initContext.encryptedSecrets,
+              setupCommands: initContext.setupCommands,
+              mcpServers: initContext.mcpServers ?? existingMetadata.mcpServers,
+              runtimeSkills: initContext.runtimeSkills ?? existingMetadata.runtimeSkills,
+              runtimeAgents: initContext.runtimeAgents ?? existingMetadata.runtimeAgents,
+            }),
+          }),
           'prepared session creation'
         );
 
@@ -343,10 +380,14 @@ export class ExecutionOrchestrator {
             kilocodeModel: initContext.kilocodeModel ?? 'default',
             kiloSessionId: initContext.kiloSessionId,
             env: this.deps.env,
-            envVars: initContext.envVars,
-            encryptedSecrets: initContext.encryptedSecrets,
-            setupCommands: initContext.setupCommands,
-            mcpServers: initContext.mcpServers,
+            profile: buildProfileBundle({
+              envVars: initContext.envVars,
+              encryptedSecrets: initContext.encryptedSecrets,
+              setupCommands: initContext.setupCommands,
+              mcpServers: initContext.mcpServers,
+              runtimeSkills: initContext.runtimeSkills,
+              runtimeAgents: initContext.runtimeAgents,
+            }),
             botId: initContext.botId,
             githubAppType: initContext.githubAppType,
             createdOnPlatform: initContext.createdOnPlatform,
@@ -373,10 +414,14 @@ export class ExecutionOrchestrator {
           gitUrl: initContext.gitUrl,
           gitToken: initContext.gitToken,
           env: this.deps.env,
-          envVars: initContext.envVars,
-          encryptedSecrets: initContext.encryptedSecrets,
-          setupCommands: initContext.setupCommands,
-          mcpServers: initContext.mcpServers,
+          profile: buildProfileBundle({
+            envVars: initContext.envVars,
+            encryptedSecrets: initContext.encryptedSecrets,
+            setupCommands: initContext.setupCommands,
+            mcpServers: initContext.mcpServers,
+            runtimeSkills: initContext.runtimeSkills,
+            runtimeAgents: initContext.runtimeAgents,
+          }),
           upstreamBranch: initContext.upstreamBranch,
           botId: initContext.botId,
           githubAppType: initContext.githubAppType,

@@ -77,6 +77,8 @@ vi.mock('./session-service.js', () => ({
   ),
   runSetupCommands: vi.fn().mockResolvedValue(undefined),
   writeAuthFile: vi.fn().mockResolvedValue(undefined),
+  writeGlobalRules: vi.fn().mockResolvedValue(undefined),
+  writeRuntimeSkills: vi.fn().mockResolvedValue(undefined),
   InvalidSessionMetadataError: class InvalidSessionMetadataError extends Error {
     constructor(
       public readonly userId: string,
@@ -977,11 +979,36 @@ describe('UpdateSessionInput schema validation', () => {
       expect(result.success).toBe(true);
     }
 
-    const result = schemas.UpdateSessionInput.safeParse({
+    // Non-built-in slugs pass schema validation as long as they look like a
+    // slug — the handler cross-checks them against the session's
+    // stored runtimeAgents. Reject only malformed slugs at the schema layer.
+    const badSlug = schemas.UpdateSessionInput.safeParse({
       cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-      mode: 'invalid-mode',
+      mode: 'Invalid Mode!',
     });
-    expect(result.success).toBe(false);
+    expect(badSlug.success).toBe(false);
+
+    // A well-formed custom slug is allowed, but when runtimeAgents is provided
+    // in the same payload the slug must match one of them.
+    const unknownWithRuntimeAgents = schemas.UpdateSessionInput.safeParse({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      mode: 'my-custom',
+      runtimeAgents: [],
+    });
+    expect(unknownWithRuntimeAgents.success).toBe(false);
+
+    const knownWithRuntimeAgents = schemas.UpdateSessionInput.safeParse({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      mode: 'my-custom',
+      runtimeAgents: [
+        {
+          slug: 'my-custom',
+          name: 'My Custom',
+          config: { prompt: 'Do things' },
+        },
+      ],
+    });
+    expect(knownWithRuntimeAgents.success).toBe(true);
   });
 
   it('requires appendSystemPrompt for custom mode updates', () => {

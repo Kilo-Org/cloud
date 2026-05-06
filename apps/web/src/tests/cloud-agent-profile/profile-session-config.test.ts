@@ -1,14 +1,26 @@
+/**
+ * Integration test for `mergeProfileConfiguration` from
+ * `@kilocode/cloud-agent-profile`, exercised against the web Postgres test
+ * harness because that's where the Drizzle migrations, seed helpers, and
+ * Jest setup already live.
+ */
 import { db } from '@/lib/drizzle';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
   agent_environment_profile_commands,
   agent_environment_profile_repo_bindings,
+  agent_environment_profile_mcp_servers,
+  agent_environment_profile_skills,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { mergeProfileConfiguration, ProfileNotFoundError } from './profile-session-config';
-import type { ProfileOwner } from './types';
+import {
+  mergeProfileConfiguration,
+  ProfileNotFoundError,
+  profileMcpServersToClientRecord,
+  type ProfileOwner,
+} from '@kilocode/cloud-agent-profile';
 
 // A valid encrypted envelope JSON that satisfies the zod schema
 const fakeEnvelope = JSON.stringify({
@@ -17,6 +29,13 @@ const fakeEnvelope = JSON.stringify({
   algorithm: 'rsa-aes-256-gcm',
   version: 1,
 });
+
+const fakeEnvelopeObject = {
+  encryptedData: 'dGVzdC1lbmNyeXB0ZWQtZGF0YQ==',
+  encryptedDEK: 'dGVzdC1lbmNyeXB0ZWQtZGVr',
+  algorithm: 'rsa-aes-256-gcm' as const,
+  version: 1 as const,
+};
 
 async function createProfile(
   owner: ProfileOwner,
@@ -75,10 +94,53 @@ async function bindRepo(
   });
 }
 
+async function addMcpLocal(
+  profileId: string,
+  name: string,
+  command: string[],
+  opts: {
+    enabled?: boolean;
+    /** Encrypted env envelopes keyed by env var name. */
+    environment?: Record<string, typeof fakeEnvelopeObject>;
+  } = {}
+): Promise<string> {
+  const [server] = await db
+    .insert(agent_environment_profile_mcp_servers)
+    .values({
+      profile_id: profileId,
+      name,
+      type: 'local',
+      enabled: opts.enabled ?? true,
+      config: { command, environment: opts.environment },
+    })
+    .returning({ id: agent_environment_profile_mcp_servers.id });
+
+  return server.id;
+}
+
+async function addSkill(
+  profileId: string,
+  name: string,
+  rawMarkdown: string,
+  opts: { enabled?: boolean } = {}
+): Promise<void> {
+  await db.insert(agent_environment_profile_skills).values({
+    profile_id: profileId,
+    name,
+    source_type: 'custom',
+    raw_markdown: rawMarkdown,
+    enabled: opts.enabled ?? true,
+  });
+}
+
 describe('mergeProfileConfiguration', () => {
   afterEach(async () => {
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_repo_bindings);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(agent_environment_profile_mcp_servers);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(agent_environment_profile_skills);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_commands);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -91,7 +153,7 @@ describe('mergeProfileConfiguration', () => {
     const user = await insertTestUser();
     const owner: ProfileOwner = { type: 'user', id: user.id };
 
-    const result = await mergeProfileConfiguration({ owner });
+    const result = await mergeProfileConfiguration(db, { owner });
 
     expect(result).toEqual({
       envVars: undefined,
@@ -104,7 +166,7 @@ describe('mergeProfileConfiguration', () => {
     const user = await insertTestUser();
     const owner: ProfileOwner = { type: 'user', id: user.id };
 
-    const result = await mergeProfileConfiguration({
+    const result = await mergeProfileConfiguration(db, {
       owner,
       envVars: { FOO: 'bar' },
     });
@@ -118,7 +180,7 @@ describe('mergeProfileConfiguration', () => {
     const user = await insertTestUser();
     const owner: ProfileOwner = { type: 'user', id: user.id };
 
-    const result = await mergeProfileConfiguration({
+    const result = await mergeProfileConfiguration(db, {
       owner,
       setupCommands: ['npm install'],
     });
@@ -135,33 +197,34 @@ describe('mergeProfileConfiguration', () => {
     await addVar(profileId, 'DB_HOST', 'localhost');
     await addCommands(profileId, ['echo hello']);
 
-    const result = await mergeProfileConfiguration({ owner });
+    const result = await mergeProfileConfiguration(db, { owner });
 
     expect(result.envVars).toEqual({ DB_HOST: 'localhost' });
     expect(result.setupCommands).toEqual(['echo hello']);
   });
 
-  test('loads named profile by name', async () => {
+  test('loads profile by id', async () => {
     const user = await insertTestUser();
     const owner: ProfileOwner = { type: 'user', id: user.id };
     const profileId = await createProfile(owner, 'staging');
     await addVar(profileId, 'ENV', 'staging');
     await addCommands(profileId, ['setup.sh']);
 
-    const result = await mergeProfileConfiguration({
+    const result = await mergeProfileConfiguration(db, {
       owner,
-      profileName: 'staging',
+      profileId,
     });
 
     expect(result.envVars).toEqual({ ENV: 'staging' });
     expect(result.setupCommands).toEqual(['setup.sh']);
   });
 
-  test('throws ProfileNotFoundError for unknown profile name', async () => {
+  test('throws ProfileNotFoundError for unknown profile id', async () => {
     const user = await insertTestUser();
     const owner: ProfileOwner = { type: 'user', id: user.id };
+    const unknownId = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 
-    await expect(mergeProfileConfiguration({ owner, profileName: 'nonexistent' })).rejects.toThrow(
+    await expect(mergeProfileConfiguration(db, { owner, profileId: unknownId })).rejects.toThrow(
       ProfileNotFoundError
     );
   });
@@ -174,7 +237,7 @@ describe('mergeProfileConfiguration', () => {
     await addCommands(profileId, ['repo-setup']);
     await bindRepo(owner, 'org/repo', 'github', profileId);
 
-    const result = await mergeProfileConfiguration({
+    const result = await mergeProfileConfiguration(db, {
       owner,
       repoFullName: 'org/repo',
       platform: 'github',
@@ -184,7 +247,7 @@ describe('mergeProfileConfiguration', () => {
     expect(result.setupCommands).toEqual(['repo-setup']);
   });
 
-  test('merges repo binding (base) with override profile and manual args', async () => {
+  test('merges repo binding (base) with explicit override and manual args', async () => {
     const user = await insertTestUser();
     const owner: ProfileOwner = { type: 'user', id: user.id };
 
@@ -195,14 +258,15 @@ describe('mergeProfileConfiguration', () => {
     await addCommands(baseProfileId, ['base-cmd']);
     await bindRepo(owner, 'org/repo', 'github', baseProfileId);
 
-    // Override: default profile
-    const overrideProfileId = await createProfile(owner, 'override-profile', { isDefault: true });
+    // Override: explicitly picked by the caller
+    const overrideProfileId = await createProfile(owner, 'override-profile');
     await addVar(overrideProfileId, 'SHARED', 'from-override');
     await addVar(overrideProfileId, 'OVERRIDE_ONLY', 'override-val');
     await addCommands(overrideProfileId, ['override-cmd']);
 
-    const result = await mergeProfileConfiguration({
+    const result = await mergeProfileConfiguration(db, {
       owner,
+      profileId: overrideProfileId,
       repoFullName: 'org/repo',
       platform: 'github',
       envVars: { SHARED: 'from-manual', MANUAL: 'manual-val' },
@@ -220,16 +284,55 @@ describe('mergeProfileConfiguration', () => {
     expect(result.setupCommands).toEqual(['base-cmd', 'override-cmd', 'manual-cmd']);
   });
 
-  test('deduplicates when repo binding and override resolve to same profile', async () => {
+  test('repo binding suppresses the effective default (default is a fallback, not a co-layer)', async () => {
     const user = await insertTestUser();
     const owner: ProfileOwner = { type: 'user', id: user.id };
-    const profileId = await createProfile(owner, 'shared-profile', { isDefault: true });
+
+    const repoProfileId = await createProfile(owner, 'repo-profile');
+    await addVar(repoProfileId, 'FROM', 'repo');
+    await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+
+    // Also have a default, which should NOT be layered when a repo binding applies.
+    const defaultProfileId = await createProfile(owner, 'default-profile', { isDefault: true });
+    await addVar(defaultProfileId, 'FROM', 'default');
+    await addVar(defaultProfileId, 'DEFAULT_ONLY', 'default-val');
+
+    const result = await mergeProfileConfiguration(db, {
+      owner,
+      repoFullName: 'org/repo',
+      platform: 'github',
+    });
+
+    // Only repo profile applies; default is not co-applied.
+    expect(result.envVars).toEqual({ FROM: 'repo' });
+  });
+
+  test('explicit pick suppresses the default (default is only a fallback)', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+
+    const defaultProfileId = await createProfile(owner, 'default-profile', { isDefault: true });
+    await addVar(defaultProfileId, 'FROM', 'default');
+
+    const pickedProfileId = await createProfile(owner, 'picked-profile');
+    await addVar(pickedProfileId, 'FROM', 'picked');
+
+    const result = await mergeProfileConfiguration(db, { owner, profileId: pickedProfileId });
+
+    expect(result.envVars).toEqual({ FROM: 'picked' });
+  });
+
+  test('deduplicates when explicit override equals the repo binding', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+    const profileId = await createProfile(owner, 'shared-profile');
     await addVar(profileId, 'KEY', 'val');
     await addCommands(profileId, ['cmd']);
     await bindRepo(owner, 'org/repo', 'github', profileId);
 
-    const result = await mergeProfileConfiguration({
+    const result = await mergeProfileConfiguration(db, {
       owner,
+      profileId,
       repoFullName: 'org/repo',
       platform: 'github',
     });
@@ -246,7 +349,7 @@ describe('mergeProfileConfiguration', () => {
     await addVar(profileId, 'PLAIN', 'plaintext');
     await addVar(profileId, 'SECRET_KEY', fakeEnvelope, true);
 
-    const result = await mergeProfileConfiguration({ owner });
+    const result = await mergeProfileConfiguration(db, { owner });
 
     expect(result.envVars).toEqual({ PLAIN: 'plaintext' });
     expect(result.encryptedSecrets).toEqual({
@@ -281,11 +384,12 @@ describe('mergeProfileConfiguration', () => {
     await addVar(baseProfileId, 'BASE_SECRET', baseEnvelope, true);
     await bindRepo(owner, 'org/repo', 'github', baseProfileId);
 
-    const overrideProfileId = await createProfile(owner, 'override', { isDefault: true });
+    const overrideProfileId = await createProfile(owner, 'override');
     await addVar(overrideProfileId, 'SHARED_SECRET', overrideEnvelope, true);
 
-    const result = await mergeProfileConfiguration({
+    const result = await mergeProfileConfiguration(db, {
       owner,
+      profileId: overrideProfileId,
       repoFullName: 'org/repo',
       platform: 'github',
     });
@@ -297,7 +401,7 @@ describe('mergeProfileConfiguration', () => {
   });
 
   describe('organization context', () => {
-    test('org default profile takes precedence via getEffectiveDefaultProfileId', async () => {
+    test('personal default profile takes precedence via getEffectiveDefaultProfileId', async () => {
       const user = await insertTestUser();
       const org = await createTestOrganization('test-org', user.id, 0);
       const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
@@ -313,68 +417,62 @@ describe('mergeProfileConfiguration', () => {
       const orgProfileId = await createProfile(orgOwner, 'org-default', { isDefault: true });
       await addVar(orgProfileId, 'SOURCE', 'org');
 
-      const result = await mergeProfileConfiguration({
+      const result = await mergeProfileConfiguration(db, {
         owner: orgOwner,
         userId: user.id,
       });
 
-      // Org default wins
+      // Personal default wins — user-specific preference overrides org baseline
+      expect(result.envVars).toEqual({ SOURCE: 'personal' });
+    });
+
+    test('falls back to org default when user has no personal default', async () => {
+      const user = await insertTestUser();
+      const org = await createTestOrganization('test-org', user.id, 0);
+      const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
+
+      // Org default only
+      const orgProfileId = await createProfile(orgOwner, 'org-default', { isDefault: true });
+      await addVar(orgProfileId, 'SOURCE', 'org');
+
+      const result = await mergeProfileConfiguration(db, {
+        owner: orgOwner,
+        userId: user.id,
+      });
+
       expect(result.envVars).toEqual({ SOURCE: 'org' });
     });
 
-    test('falls back to personal default when org has no default', async () => {
+    test('member can select a personal profile in org context via profileId', async () => {
       const user = await insertTestUser();
       const org = await createTestOrganization('test-org', user.id, 0);
       const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
       const userOwner: ProfileOwner = { type: 'user', id: user.id };
 
-      // Personal default only
-      const personalProfileId = await createProfile(userOwner, 'personal-default', {
-        isDefault: true,
-      });
-      await addVar(personalProfileId, 'SOURCE', 'personal');
-
-      const result = await mergeProfileConfiguration({
-        owner: orgOwner,
-        userId: user.id,
-      });
-
-      expect(result.envVars).toEqual({ SOURCE: 'personal' });
-    });
-
-    test('named profile resolves from org first, then falls back to personal', async () => {
-      const user = await insertTestUser();
-      const org = await createTestOrganization('test-org', user.id, 0);
-      const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
-      const userOwner: ProfileOwner = { type: 'user', id: user.id };
-
-      // Only exists as a personal profile
       const personalProfileId = await createProfile(userOwner, 'my-profile');
       await addVar(personalProfileId, 'SOURCE', 'personal');
 
-      const result = await mergeProfileConfiguration({
+      const result = await mergeProfileConfiguration(db, {
         owner: orgOwner,
         userId: user.id,
-        profileName: 'my-profile',
+        profileId: personalProfileId,
       });
 
       expect(result.envVars).toEqual({ SOURCE: 'personal' });
     });
 
-    test('named profile prefers org when both org and personal have same name', async () => {
+    test('member can select an org profile in org context via profileId', async () => {
       const user = await insertTestUser();
       const org = await createTestOrganization('test-org', user.id, 0);
       const orgOwner: ProfileOwner = { type: 'organization', id: org.id };
-      const userOwner: ProfileOwner = { type: 'user', id: user.id };
 
-      await createProfile(userOwner, 'shared-name');
       const orgProfileId = await createProfile(orgOwner, 'shared-name');
       await addVar(orgProfileId, 'SOURCE', 'org');
 
-      const result = await mergeProfileConfiguration({
+      const result = await mergeProfileConfiguration(db, {
         owner: orgOwner,
         userId: user.id,
-        profileName: 'shared-name',
+        profileId: orgProfileId,
       });
 
       expect(result.envVars).toEqual({ SOURCE: 'org' });
@@ -389,7 +487,7 @@ describe('mergeProfileConfiguration', () => {
     await bindRepo(owner, 'org/repo', 'github', profileId);
 
     // repoFullName without platform => no repo binding lookup
-    const result = await mergeProfileConfiguration({
+    const result = await mergeProfileConfiguration(db, {
       owner,
       repoFullName: 'org/repo',
     });
@@ -404,9 +502,141 @@ describe('mergeProfileConfiguration', () => {
     const profileId = await createProfile(owner, 'commands-only', { isDefault: true });
     await addCommands(profileId, ['setup.sh']);
 
-    const result = await mergeProfileConfiguration({ owner });
+    const result = await mergeProfileConfiguration(db, { owner });
 
     expect(result.envVars).toBeUndefined();
     expect(result.setupCommands).toEqual(['setup.sh']);
+  });
+
+  test('resolves profile by profileId', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+    const profileId = await createProfile(owner, 'by-id');
+    await addVar(profileId, 'KEY', 'value');
+
+    const result = await mergeProfileConfiguration(db, { owner, profileId });
+
+    expect(result.envVars).toEqual({ KEY: 'value' });
+  });
+
+  test('throws ProfileNotFoundError when profileId is not owned by the caller', async () => {
+    const user = await insertTestUser();
+    const other = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+    const otherProfileId = await createProfile({ type: 'user', id: other.id }, 'others');
+
+    await expect(
+      mergeProfileConfiguration(db, { owner, profileId: otherProfileId })
+    ).rejects.toThrow(ProfileNotFoundError);
+  });
+
+  test('includes MCP servers from the selected profile with encrypted env values', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+    const profileId = await createProfile(owner, 'with-mcp', { isDefault: true });
+    await addMcpLocal(profileId, 'demo', ['node', 'server.js'], {
+      environment: { PORT: fakeEnvelopeObject },
+    });
+
+    const result = await mergeProfileConfiguration(db, { owner });
+
+    expect(result.mcpServers).toHaveLength(1);
+    const [server] = result.mcpServers ?? [];
+    expect(server).toMatchObject({
+      name: 'demo',
+      type: 'local',
+      enabled: true,
+      command: ['node', 'server.js'],
+    });
+    expect(server?.environment?.PORT).toMatchObject({ algorithm: 'rsa-aes-256-gcm', version: 1 });
+  });
+
+  test('omits disabled MCP servers from merged result', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+    const profileId = await createProfile(owner, 'with-disabled', { isDefault: true });
+    await addMcpLocal(profileId, 'off', ['node', 'off.js'], { enabled: false });
+
+    const result = await mergeProfileConfiguration(db, { owner });
+
+    expect(result.mcpServers).toBeUndefined();
+  });
+
+  test('merges MCP servers across profile layers — later wins by name', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+
+    const baseProfileId = await createProfile(owner, 'base');
+    await addMcpLocal(baseProfileId, 'shared', ['node', 'base.js']);
+    await addMcpLocal(baseProfileId, 'base-only', ['node', 'base-only.js']);
+    await bindRepo(owner, 'org/repo', 'github', baseProfileId);
+
+    const overrideId = await createProfile(owner, 'override');
+    await addMcpLocal(overrideId, 'shared', ['node', 'override.js']);
+    await addMcpLocal(overrideId, 'override-only', ['node', 'override-only.js']);
+
+    const result = await mergeProfileConfiguration(db, {
+      owner,
+      profileId: overrideId,
+      repoFullName: 'org/repo',
+      platform: 'github',
+    });
+
+    expect(result.mcpServers?.map(s => s.name).sort()).toEqual([
+      'base-only',
+      'override-only',
+      'shared',
+    ]);
+    const shared = result.mcpServers?.find(s => s.name === 'shared');
+    expect(shared).toMatchObject({ type: 'local', command: ['node', 'override.js'] });
+  });
+
+  test('includes only enabled skills, merged by name across profile layers', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+
+    const baseProfileId = await createProfile(owner, 'base');
+    await addSkill(baseProfileId, 'alpha', '---\nname: alpha\n---\nbase body');
+    await addSkill(baseProfileId, 'disabled', '---\nname: disabled\n---\nbody', { enabled: false });
+    await bindRepo(owner, 'org/repo', 'github', baseProfileId);
+
+    const overrideId = await createProfile(owner, 'override');
+    await addSkill(overrideId, 'alpha', '---\nname: alpha\n---\noverride body');
+    await addSkill(overrideId, 'beta', '---\nname: beta\n---\nbody');
+
+    const result = await mergeProfileConfiguration(db, {
+      owner,
+      profileId: overrideId,
+      repoFullName: 'org/repo',
+      platform: 'github',
+    });
+
+    expect(result.skills?.map(s => s.name).sort()).toEqual(['alpha', 'beta']);
+    expect(result.skills?.find(s => s.name === 'alpha')?.rawMarkdown).toContain('override body');
+  });
+
+  test('MCP env values travel as encrypted envelopes in the client record', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+    const profileId = await createProfile(owner, 'with-secrets', { isDefault: true });
+    await addMcpLocal(profileId, 'demo', ['node', 'server.js'], {
+      environment: { API_KEY: fakeEnvelopeObject },
+    });
+
+    const result = await mergeProfileConfiguration(db, { owner });
+    const record = profileMcpServersToClientRecord(result.mcpServers);
+
+    expect(record).toBeDefined();
+    const demo = record?.demo;
+    expect(demo).toBeDefined();
+    if (demo && demo.type === 'local') {
+      expect(demo.environment).toBeDefined();
+      expect(demo.environment?.API_KEY).toMatchObject({
+        algorithm: 'rsa-aes-256-gcm',
+        version: 1,
+      });
+    } else {
+      throw new Error('Expected local MCP server in record');
+    }
   });
 });

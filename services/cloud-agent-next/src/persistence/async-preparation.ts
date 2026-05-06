@@ -19,10 +19,12 @@ import {
   determineBranchName,
   runSetupCommands,
   writeAuthFile,
+  writeGlobalRules,
 } from '../session-service.js';
 import { WrapperClient } from '../kilo/wrapper-client.js';
 import type { PreparingStep } from '../shared/protocol.js';
 import type { PreparationInput } from './schemas.js';
+import { readProfileBundle } from '../session-profile.js';
 import type { Env as WorkerEnv, SandboxId, SessionId as AgentSessionId } from '../types.js';
 
 type EmitProgress = (step: PreparingStep, message: string) => void;
@@ -147,18 +149,17 @@ export async function executePreparationSteps(
     botId: input.botId,
   });
 
-  const session = await sessionService.getOrCreateSession(
+  const session = await sessionService.getOrCreateSession({
     sandbox,
     context,
     env,
-    input.authToken,
-    input.model,
-    input.orgId,
-    input.encryptedSecrets,
-    input.createdOnPlatform,
-    input.appendSystemPrompt,
-    input.mcpServers
-  );
+    originalToken: input.authToken,
+    kilocodeModel: input.model,
+    originalOrgId: input.orgId,
+    createdOnPlatform: input.createdOnPlatform,
+    appendSystemPrompt: input.appendSystemPrompt,
+    profile: readProfileBundle(input),
+  });
 
   const cloneOptions = input.shallow ? { shallow: true } : undefined;
   if (input.gitUrl) {
@@ -189,13 +190,15 @@ export async function executePreparationSteps(
   await manageBranch(session, workspacePath, branchName, !!input.upstreamBranch);
 
   // 6. Setup commands
-  if (input.setupCommands && input.setupCommands.length > 0) {
+  const inputSetupCommands = readProfileBundle(input).setupCommands;
+  if (inputSetupCommands && inputSetupCommands.length > 0) {
     emitProgress('setup_commands', 'Running setup commands…');
-    await runSetupCommands(session, context, input.setupCommands, true);
+    await runSetupCommands(session, context, inputSetupCommands, true);
   }
 
-  // 7. Write auth file
+  // 7. Write auth file and global rules (runtime skills are written by getOrCreateSession above)
   await writeAuthFile(sandbox, sessionHome, input.authToken);
+  await writeGlobalRules(sandbox, sessionHome, input.sessionId);
 
   // 8. Import pre-generated session into CLI's SQLite so the wrapper picks it up
   if (input.kiloSessionId) {

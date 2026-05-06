@@ -49,6 +49,9 @@ import {
   user_push_tokens,
   security_advisor_scans,
   credit_campaigns,
+  agent_environment_profiles,
+  agent_environment_profile_mcp_servers,
+  agent_environment_profile_skills,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -1126,6 +1129,66 @@ describe('User', () => {
       expect(pms[0].address_city).toBeNull();
       // stripe_fingerprint preserved for fraud detection
       expect(pms[0].stripe_fingerprint).toBe(pm.stripe_fingerprint);
+    });
+
+    it('should cascade-delete agent environment profile MCPs and skills', async () => {
+      const user = await insertTestUser();
+
+      const [profile] = await db
+        .insert(agent_environment_profiles)
+        .values({
+          owned_by_user_id: user.id,
+          name: 'test-profile',
+        })
+        .returning();
+
+      const [mcpServer] = await db
+        .insert(agent_environment_profile_mcp_servers)
+        .values({
+          profile_id: profile.id,
+          name: 'demo',
+          type: 'local',
+          enabled: true,
+          config: {
+            command: ['node', 'server.js'],
+            environment: {
+              API_KEY: {
+                encryptedData: 'ciphertext',
+                encryptedDEK: 'key',
+                algorithm: 'rsa-aes-256-gcm',
+                version: 1,
+              },
+            },
+          },
+        })
+        .returning();
+
+      await db.insert(agent_environment_profile_skills).values({
+        profile_id: profile.id,
+        name: 'test-skill',
+        source_type: 'custom',
+        raw_markdown: '---\nname: test-skill\n---\nBody',
+      });
+
+      await softDeleteUser(user.id);
+
+      const profiles = await db
+        .select()
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.owned_by_user_id, user.id));
+      expect(profiles).toHaveLength(0);
+
+      const mcpServers = await db
+        .select()
+        .from(agent_environment_profile_mcp_servers)
+        .where(eq(agent_environment_profile_mcp_servers.id, mcpServer.id));
+      expect(mcpServers).toHaveLength(0);
+
+      const skills = await db
+        .select()
+        .from(agent_environment_profile_skills)
+        .where(eq(agent_environment_profile_skills.profile_id, profile.id));
+      expect(skills).toHaveLength(0);
     });
 
     it('should nullify user_feedback FK', async () => {

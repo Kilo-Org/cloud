@@ -1,5 +1,4 @@
-import 'server-only';
-import { db } from '@/lib/drizzle';
+import type { WorkerDb } from '@kilocode/db';
 import {
   agent_environment_profiles,
   agent_environment_profile_repo_bindings,
@@ -30,6 +29,7 @@ function ownerColumns(owner: ProfileOwner) {
  * Uses ON CONFLICT on the partial unique index to atomically resolve races.
  */
 export async function upsertBinding(
+  db: WorkerDb,
   owner: ProfileOwner,
   repoFullName: string,
   platform: 'github' | 'gitlab',
@@ -72,6 +72,7 @@ export async function upsertBinding(
  * Find a binding by repo+platform+owner.
  */
 export async function findBinding(
+  db: WorkerDb,
   owner: ProfileOwner,
   repoFullName: string,
   platform: 'github' | 'gitlab'
@@ -97,7 +98,7 @@ export async function findBinding(
 /**
  * Delete a binding by ID.
  */
-export async function deleteBinding(bindingId: string): Promise<void> {
+export async function deleteBinding(db: WorkerDb, bindingId: string): Promise<void> {
   await db
     .delete(agent_environment_profile_repo_bindings)
     .where(eq(agent_environment_profile_repo_bindings.id, bindingId));
@@ -106,7 +107,7 @@ export async function deleteBinding(bindingId: string): Promise<void> {
 /**
  * List all bindings for an owner, joined with profile names.
  */
-export async function selectBindingsWithProfiles(owner: ProfileOwner) {
+export async function selectBindingsWithProfiles(db: WorkerDb, owner: ProfileOwner) {
   return db
     .select({
       repoFullName: agent_environment_profile_repo_bindings.repo_full_name,

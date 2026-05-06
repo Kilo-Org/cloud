@@ -12,11 +12,6 @@ import {
 } from '@/lib/cloud-agent/github-integration-helpers';
 import { createCloudAgentClient } from '@/lib/cloud-agent/cloud-agent-client';
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
-import {
-  mergeProfileConfiguration,
-  ProfileNotFoundError,
-  type MergeProfileConfigurationResult,
-} from '@/lib/agent/profile-session-config';
 import type { User } from '@kilocode/db/schema';
 
 jest.mock('@/lib/user.server');
@@ -24,10 +19,6 @@ jest.mock('@/routers/organizations/utils');
 jest.mock('@/lib/cloud-agent/github-integration-helpers');
 jest.mock('@/lib/cloud-agent/cloud-agent-client');
 jest.mock('@/lib/cloud-agent/stream-ticket');
-jest.mock('@/lib/agent/profile-session-config', () => ({
-  mergeProfileConfiguration: jest.fn(),
-  ProfileNotFoundError: class ProfileNotFoundError extends Error {},
-}));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
@@ -41,7 +32,6 @@ const mockedValidateGitHubRepoAccessForOrganization = jest.mocked(
 );
 const mockedCreateCloudAgentClient = jest.mocked(createCloudAgentClient);
 const mockedSignStreamTicket = jest.mocked(signStreamTicket);
-const mockedMergeProfileConfiguration = jest.mocked(mergeProfileConfiguration);
 
 function makeRequest(body: unknown) {
   return new Request('http://localhost:3000/api/cloud-agent/sessions/prepare', {
@@ -132,11 +122,6 @@ describe('POST /api/cloud-agent/sessions/prepare', () => {
     jest.resetAllMocks();
     mockedValidateGitHubRepoAccessForUser.mockResolvedValue(true);
     mockedValidateGitHubRepoAccessForOrganization.mockResolvedValue(true);
-    mockedMergeProfileConfiguration.mockResolvedValue({
-      envVars: undefined,
-      setupCommands: undefined,
-      encryptedSecrets: undefined,
-    });
     mockedSignStreamTicket.mockReturnValue({ ticket: 'test-ticket', expiresAt: 1234567890 });
   });
 
@@ -183,13 +168,14 @@ describe('POST /api/cloud-agent/sessions/prepare', () => {
       expect(body.details).toContainEqual(expect.objectContaining({ path: 'prompt' }));
     });
 
-    test('returns 400 when mode is invalid', async () => {
+    test('returns 400 when mode is not a valid slug', async () => {
       setUserAuth();
 
       const response = await POST(
         makeRequest({
           ...validInput,
-          mode: 'invalid-mode',
+          // Uppercase + space — not a valid slug shape.
+          mode: 'Invalid Mode!',
         })
       );
 
@@ -554,12 +540,6 @@ describe('POST /api/cloud-agent/sessions/prepare', () => {
         autoCommit: true,
       };
 
-      mockedMergeProfileConfiguration.mockResolvedValueOnce({
-        envVars: inputWithOptionals.envVars,
-        setupCommands: inputWithOptionals.setupCommands,
-        encryptedSecrets: undefined,
-      });
-
       await POST(makeRequest(inputWithOptionals));
 
       expect(mockPrepareSession).toHaveBeenCalledWith(
@@ -578,9 +558,11 @@ describe('POST /api/cloud-agent/sessions/prepare', () => {
     });
   });
 
-  describe('profileName integration', () => {
-    test('merges profile configuration before calling cloud-agent', async () => {
-      const user = setUserAuth();
+  describe('profile forwarding', () => {
+    const profileId = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
+
+    test('forwards profileId and inline overrides to cloud-agent-next unchanged', async () => {
+      setUserAuth();
       mockedGetGitHubInstallationIdForUser.mockResolvedValue('12345');
       const mockPrepareSession = jest.fn().mockResolvedValue({
         kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
@@ -588,48 +570,37 @@ describe('POST /api/cloud-agent/sessions/prepare', () => {
       });
       mockedCreateCloudAgentClient.mockReturnValue(createMockCloudAgentClient(mockPrepareSession));
 
-      const mergedConfig: MergeProfileConfigurationResult = {
-        envVars: { FROM_PROFILE: 'value' },
-        setupCommands: ['pnpm install'],
-        encryptedSecrets: undefined,
-      };
-      mockedMergeProfileConfiguration.mockResolvedValueOnce(mergedConfig);
-
       await POST(
         makeRequest({
           ...validInput,
-          profileName: 'My Default',
+          profileId,
           envVars: { INLINE: 'value' },
           setupCommands: ['echo inline'],
         })
       );
 
-      expect(mockedMergeProfileConfiguration).toHaveBeenCalledWith({
-        profileName: 'My Default',
-        owner: { type: 'user', id: user.id },
-        userId: undefined,
-        repoFullName: 'owner/repo',
-        platform: 'github',
-        envVars: { INLINE: 'value' },
-        setupCommands: ['echo inline'],
-      });
-
       expect(mockPrepareSession).toHaveBeenCalledWith(
         expect.objectContaining({
-          envVars: mergedConfig.envVars,
-          setupCommands: mergedConfig.setupCommands,
+          profileId,
+          envVars: { INLINE: 'value' },
+          setupCommands: ['echo inline'],
         })
       );
     });
 
-    test('returns 404 when the profile cannot be found', async () => {
+    test('returns 404 when cloud-agent reports the profile is not found', async () => {
       setUserAuth();
-      mockedMergeProfileConfiguration.mockRejectedValueOnce(new ProfileNotFoundError('Missing'));
+      mockedGetGitHubInstallationIdForUser.mockResolvedValue('12345');
+      mockedCreateCloudAgentClient.mockReturnValue(
+        createMockCloudAgentClient(
+          jest.fn().mockRejectedValue(new Error(`Profile '${profileId}' not found`))
+        )
+      );
 
       const response = await POST(
         makeRequest({
           ...validInput,
-          profileName: 'Missing',
+          profileId,
         })
       );
 
@@ -638,46 +609,7 @@ describe('POST /api/cloud-agent/sessions/prepare', () => {
       expect(body.error).toBe('Profile not found');
       expect(body.details).toContainEqual(
         expect.objectContaining({
-          path: 'profileName',
-        })
-      );
-    });
-
-    test('passes encryptedSecrets from profile to cloud-agent worker', async () => {
-      setUserAuth();
-      mockedGetGitHubInstallationIdForUser.mockResolvedValue('12345');
-      const mockPrepareSession = jest.fn().mockResolvedValue({
-        kiloSessionId: '123e4567-e89b-12d3-a456-426614174000',
-        cloudAgentSessionId: 'cloud-session-123',
-      });
-      mockedCreateCloudAgentClient.mockReturnValue(createMockCloudAgentClient(mockPrepareSession));
-
-      const encryptedEnvelope = {
-        encryptedData: 'base64-encrypted-data',
-        encryptedDEK: 'base64-encrypted-dek',
-        algorithm: 'rsa-aes-256-gcm' as const,
-        version: 1 as const,
-      };
-
-      const mergedConfig: MergeProfileConfigurationResult = {
-        envVars: { PUBLIC_VAR: 'value' },
-        setupCommands: ['npm install'],
-        encryptedSecrets: { SECRET_KEY: encryptedEnvelope },
-      };
-      mockedMergeProfileConfiguration.mockResolvedValueOnce(mergedConfig);
-
-      await POST(
-        makeRequest({
-          ...validInput,
-          profileName: 'production',
-        })
-      );
-
-      expect(mockPrepareSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          envVars: { PUBLIC_VAR: 'value' },
-          encryptedSecrets: { SECRET_KEY: encryptedEnvelope },
-          setupCommands: ['npm install'],
+          path: 'profileId',
         })
       );
     });

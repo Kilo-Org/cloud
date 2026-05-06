@@ -497,6 +497,9 @@ importers:
       '@emoji-mart/react':
         specifier: ^1.1.1
         version: 1.1.1(emoji-mart@5.6.0)(react@19.2.4)
+      '@kilocode/cloud-agent-profile':
+        specifier: workspace:*
+        version: link:../../packages/cloud-agent-profile
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -919,6 +922,37 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
+  packages/cloud-agent-profile:
+    dependencies:
+      '@kilocode/db':
+        specifier: workspace:*
+        version: link:../db
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../encryption
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.1(@cloudflare/workers-types@4.20260430.1)(@opentelemetry/api@1.9.0)(@types/pg@8.18.0)(bun-types@1.3.13)(pg@8.20.0)
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
+    devDependencies:
+      '@trpc/server':
+        specifier: 'catalog:'
+        version: 11.13.0(typescript@5.9.3)
+      '@types/node':
+        specifier: '>=24 <25'
+        version: 24.12.0
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260319.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: ~3.2.4
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(@vitest/ui@3.2.4)(esbuild@0.27.4)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/db:
     dependencies:
       drizzle-orm:
@@ -1081,6 +1115,9 @@ importers:
         specifier: 'catalog:'
         version: 4.3.6
     devDependencies:
+      '@kilocode/cloud-agent-profile':
+        specifier: workspace:*
+        version: link:../cloud-agent-profile
       '@kilocode/db':
         specifier: workspace:*
         version: link:../db
@@ -1351,6 +1388,12 @@ importers:
       '@hono/trpc-server':
         specifier: ^0.4.2
         version: 0.4.2(@trpc/server@11.13.0(typescript@5.9.3))(hono@4.12.8)
+      '@kilocode/cloud-agent-profile':
+        specifier: workspace:*
+        version: link:../../packages/cloud-agent-profile
+      '@kilocode/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../../packages/encryption

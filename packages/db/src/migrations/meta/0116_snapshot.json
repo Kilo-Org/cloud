@@ -1,6 +1,6 @@
 {
-  "id": "b5dec53e-5f7f-46a2-9620-afadcf3f6acc",
-  "prevId": "4c1ec3c4-df75-4028-a0ab-68a0ad3c1c4d",
+  "id": "77e54b52-7043-45fc-9f33-4db6d18e08ed",
+  "prevId": "70ee6c69-9e0a-45f9-b7ba-bec85b66ca81",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -205,6 +205,104 @@
       },
       "isRLSEnabled": false
     },
+    "public.agent_environment_profile_agents": {
+      "name": "agent_environment_profile_agents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_agents_profile_id": {
+          "name": "IDX_agent_env_profile_agents_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_agents_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_agents_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_agents",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_agents_profile_slug": {
+          "name": "UQ_agent_env_profile_agents_profile_slug",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.agent_environment_profile_commands": {
       "name": "agent_environment_profile_commands",
       "schema": "",
@@ -282,6 +380,116 @@
           "columns": [
             "profile_id",
             "sequence"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_mcp_servers": {
+      "name": "agent_environment_profile_mcp_servers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "timeout": {
+          "name": "timeout",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_mcp_servers_profile_id": {
+          "name": "IDX_agent_env_profile_mcp_servers_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_mcp_servers_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_mcp_servers_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_mcp_servers",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_mcp_servers_profile_name": {
+          "name": "UQ_agent_env_profile_mcp_servers_profile_name",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "name"
           ]
         }
       },
@@ -449,6 +657,129 @@
       },
       "isRLSEnabled": false
     },
+    "public.agent_environment_profile_skills": {
+      "name": "agent_environment_profile_skills",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_type": {
+          "name": "source_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw_markdown": {
+          "name": "raw_markdown",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "files": {
+          "name": "files",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_skills_profile_id": {
+          "name": "IDX_agent_env_profile_skills_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_skills_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_skills_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_skills",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_skills_profile_name": {
+          "name": "UQ_agent_env_profile_skills_profile_name",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.agent_environment_profile_vars": {
       "name": "agent_environment_profile_vars",
       "schema": "",
@@ -566,6 +897,12 @@
         },
         "owned_by_user_id": {
           "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -701,6 +1038,21 @@
           "columns": [
             {
               "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_agent_env_profiles_created_by_user_id": {
+          "name": "IDX_agent_env_profiles_created_by_user_id",
+          "columns": [
+            {
+              "expression": "created_by_user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1083,7 +1435,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'v1'"
+          "default": "'v2'"
         }
       },
       "indexes": {
@@ -3216,67 +3568,6 @@
           "value": "(\n        (\"byok_api_keys\".\"kilo_user_id\" IS NOT NULL AND \"byok_api_keys\".\"organization_id\" IS NULL) OR\n        (\"byok_api_keys\".\"kilo_user_id\" IS NULL AND \"byok_api_keys\".\"organization_id\" IS NOT NULL)\n      )"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.channel_badge_counts": {
-      "name": "channel_badge_counts",
-      "schema": "",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "channel_id": {
-          "name": "channel_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "badge_count": {
-          "name": "badge_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "channel_badge_counts_user_id_kilocode_users_id_fk": {
-          "name": "channel_badge_counts_user_id_kilocode_users_id_fk",
-          "tableFrom": "channel_badge_counts",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "channel_badge_counts_user_id_channel_id_pk": {
-          "name": "channel_badge_counts_user_id_channel_id_pk",
-          "columns": [
-            "user_id",
-            "channel_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.cli_sessions": {
@@ -9020,6 +9311,13 @@
           "primaryKey": false,
           "notNull": true
         },
+        "period_start": {
+          "name": "period_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'epoch'"
+        },
         "sent_at": {
           "name": "sent_at",
           "type": "timestamp with time zone",
@@ -9051,8 +9349,8 @@
           "method": "btree",
           "with": {}
         },
-        "UQ_kiloclaw_email_log_user_instance_type": {
-          "name": "UQ_kiloclaw_email_log_user_instance_type",
+        "UQ_kiloclaw_email_log_user_instance_type_period": {
+          "name": "UQ_kiloclaw_email_log_user_instance_type_period",
           "columns": [
             {
               "expression": "user_id",
@@ -9068,6 +9366,12 @@
             },
             {
               "expression": "email_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "period_start",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -17036,8 +17340,8 @@
           "method": "btree",
           "with": {}
         },
-        "idx_reasons": {
-          "name": "idx_reasons",
+        "idx_stytch_fingerprints_reasons_gin": {
+          "name": "idx_stytch_fingerprints_reasons_gin",
           "columns": [
             {
               "expression": "reasons",
@@ -17048,7 +17352,7 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
+          "method": "gin",
           "with": {}
         },
         "idx_verdict_action": {
@@ -17124,6 +17428,102 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.transactional_email_log": {
+      "name": "transactional_email_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email_type": {
+          "name": "email_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_transactional_email_log_type_idempotency_key": {
+          "name": "UQ_transactional_email_log_type_idempotency_key",
+          "columns": [
+            {
+              "expression": "email_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_transactional_email_log_user_id": {
+          "name": "IDX_transactional_email_log_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "transactional_email_log_user_id_kilocode_users_id_fk": {
+          "name": "transactional_email_log_user_id_kilocode_users_id_fk",
+          "tableFrom": "transactional_email_log",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},

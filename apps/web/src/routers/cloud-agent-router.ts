@@ -7,10 +7,6 @@ import {
 } from '@/lib/cloud-agent/cloud-agent-client';
 import { generateCloudAgentToken } from '@/lib/tokens';
 import {
-  mergeProfileConfiguration,
-  ProfileNotFoundError,
-} from '@/lib/agent/profile-session-config';
-import {
   getGitHubTokenForUser,
   fetchGitHubRepositoriesForUser,
   checkDemoRepositoryFork,
@@ -122,62 +118,39 @@ export const cloudAgentRouter = createTRPCRouter({
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudChatClient(authToken);
 
-      const { envVars, setupCommands, profileName, gitlabProject, githubRepo, ...restInput } =
-        input;
+      const { gitlabProject, githubRepo, ...restInput } = input;
 
-      try {
-        const repoFullName = githubRepo ?? gitlabProject;
-        const platform = gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB;
+      // Determine git source: GitLab uses gitUrl/gitToken, GitHub uses githubRepo/githubToken.
+      // Profile resolution happens inside cloud-agent-next; we just forward profileId
+      // together with inline envVars/setupCommands/mcpServers overrides.
+      let gitParams: {
+        githubRepo?: string;
+        githubToken?: string;
+        gitUrl?: string;
+        gitToken?: string;
+        platform?: 'github' | 'gitlab';
+      };
 
-        const merged = await mergeProfileConfiguration({
-          profileName,
-          owner: { type: 'user', id: ctx.user.id },
-          repoFullName,
-          platform,
-          envVars,
-          setupCommands,
-        });
-
-        // Determine git source: GitLab uses gitUrl/gitToken, GitHub uses githubRepo/githubToken
-        let gitParams: {
-          githubRepo?: string;
-          githubToken?: string;
-          gitUrl?: string;
-          gitToken?: string;
-          platform?: 'github' | 'gitlab';
-        };
-
-        if (gitlabProject) {
-          // GitLab flow: convert gitlabProject to gitUrl + gitToken
-          const gitToken = await getGitLabTokenForUser(ctx.user.id);
-          if (!gitToken) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'No GitLab integration found. Please connect your GitLab account first.',
-            });
-          }
-          const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
-          const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
-        } else {
-          // GitHub flow: use githubRepo + githubToken
-          const githubToken = await getGitHubTokenForUser(ctx.user.id);
-          gitParams = { githubRepo, githubToken, platform: PLATFORM.GITHUB };
+      if (gitlabProject) {
+        const gitToken = await getGitLabTokenForUser(ctx.user.id);
+        if (!gitToken) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'No GitLab integration found. Please connect your GitLab account first.',
+          });
         }
-
-        return await client.prepareSession({
-          ...restInput,
-          ...gitParams,
-          envVars: merged.envVars,
-          encryptedSecrets: merged.encryptedSecrets,
-          setupCommands: merged.setupCommands,
-        });
-      } catch (error) {
-        if (error instanceof ProfileNotFoundError) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: error.message });
-        }
-        throw error;
+        const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
+        const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
+        gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
+      } else {
+        const githubToken = await getGitHubTokenForUser(ctx.user.id);
+        gitParams = { githubRepo, githubToken, platform: PLATFORM.GITHUB };
       }
+
+      return await client.prepareSession({
+        ...restInput,
+        ...gitParams,
+      });
     }),
 
   /**
@@ -193,59 +166,36 @@ export const cloudAgentRouter = createTRPCRouter({
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudChatClient(authToken);
 
-      const { envVars, setupCommands, profileName, gitlabProject, githubRepo, ...restInput } =
-        input;
+      const { gitlabProject, githubRepo, ...restInput } = input;
 
-      try {
-        const repoFullName = githubRepo ?? gitlabProject;
-        const platform = gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB;
+      let gitParams: {
+        githubRepo?: string;
+        githubToken?: string;
+        gitUrl?: string;
+        gitToken?: string;
+        platform?: 'github' | 'gitlab';
+      };
 
-        const merged = await mergeProfileConfiguration({
-          profileName,
-          owner: { type: 'user', id: ctx.user.id },
-          repoFullName,
-          platform,
-          envVars,
-          setupCommands,
-        });
-
-        let gitParams: {
-          githubRepo?: string;
-          githubToken?: string;
-          gitUrl?: string;
-          gitToken?: string;
-          platform?: 'github' | 'gitlab';
-        };
-
-        if (gitlabProject) {
-          const gitToken = await getGitLabTokenForUser(ctx.user.id);
-          if (!gitToken) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'No GitLab integration found. Please connect your GitLab account first.',
-            });
-          }
-          const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
-          const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
-        } else {
-          const githubToken = await getGitHubTokenForUser(ctx.user.id);
-          gitParams = { githubRepo, githubToken, platform: PLATFORM.GITHUB };
+      if (gitlabProject) {
+        const gitToken = await getGitLabTokenForUser(ctx.user.id);
+        if (!gitToken) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'No GitLab integration found. Please connect your GitLab account first.',
+          });
         }
-
-        return await client.prepareLegacySession({
-          ...restInput,
-          ...gitParams,
-          envVars: merged.envVars,
-          encryptedSecrets: merged.encryptedSecrets,
-          setupCommands: merged.setupCommands,
-        });
-      } catch (error) {
-        if (error instanceof ProfileNotFoundError) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: error.message });
-        }
-        throw error;
+        const instanceUrl = await getGitLabInstanceUrlForUser(ctx.user.id);
+        const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
+        gitParams = { gitUrl, gitToken, platform: PLATFORM.GITLAB };
+      } else {
+        const githubToken = await getGitHubTokenForUser(ctx.user.id);
+        gitParams = { githubRepo, githubToken, platform: PLATFORM.GITHUB };
       }
+
+      return await client.prepareLegacySession({
+        ...restInput,
+        ...gitParams,
+      });
     }),
 
   /**

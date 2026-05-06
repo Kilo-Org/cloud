@@ -6,7 +6,7 @@ import { platform_integrations } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
-export function getSlackTeamId(message: Message<SlackEvent>): string {
+function getSlackTeamId(message: Message<SlackEvent>): string {
   const teamId = message.raw.team_id ?? message.raw.team;
   if (!teamId) throw new Error('Expected a teamId in message.raw');
   return teamId;

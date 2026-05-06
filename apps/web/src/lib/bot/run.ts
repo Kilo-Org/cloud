@@ -32,7 +32,7 @@ export async function processLinkedMessage({
   await processMessage({ thread, message, platformIntegration, user, botRequestId });
 }
 
-export async function processMessage({
+async function processMessage({
   thread,
   message,
   platformIntegration,

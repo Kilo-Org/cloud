@@ -156,7 +156,7 @@ async function summarizePrompt(
   return result.text.trim();
 }
 
-export async function postSessionLinkEphemeral(params: {
+async function postSessionLinkEphemeral(params: {
   thread: Thread;
   message: BotAgentMessageLike;
   sessionUrl: string;

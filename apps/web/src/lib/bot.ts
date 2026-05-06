@@ -157,7 +157,7 @@ function cloneSlackRequest(request: Request, body: BodyInit): Request {
   });
 }
 
-export function buildSlackAppHomeView() {
+function buildSlackAppHomeView() {
   return {
     type: 'home',
     blocks: [

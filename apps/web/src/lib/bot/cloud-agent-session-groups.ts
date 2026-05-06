@@ -12,7 +12,7 @@ export type TerminalBotRequestCloudAgentSessionStatus = Extract<
   'completed' | 'failed' | 'interrupted'
 >;
 
-export function isTerminalBotRequestCloudAgentSessionStatus(
+function isTerminalBotRequestCloudAgentSessionStatus(
   status: BotRequestCloudAgentSessionStatus
 ): status is TerminalBotRequestCloudAgentSessionStatus {
   return status === 'completed' || status === 'failed' || status === 'interrupted';

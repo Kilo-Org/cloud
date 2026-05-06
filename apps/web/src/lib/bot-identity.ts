@@ -207,7 +207,7 @@ function hmacSign(data: string): string {
 }
 
 /** Create a signed, time-limited token encoding a PlatformIdentity. */
-export function createLinkToken(payload: LinkTokenPayload): string {
+function createLinkToken(payload: LinkTokenPayload): string {
   const iat = Math.floor(Date.now() / 1000);
   const nonce = crypto.randomBytes(NONCE_BYTES).toString('base64url');
   const encodedPayload = Buffer.from(JSON.stringify({ ...payload, iat, nonce })).toString(

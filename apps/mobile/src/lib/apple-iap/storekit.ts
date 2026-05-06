@@ -1,6 +1,7 @@
 import {
   fetchProducts,
   finishTransaction,
+  getAvailablePurchases,
   initConnection,
   type Purchase,
   purchaseErrorListener,
@@ -117,6 +118,24 @@ export async function purchaseStoreKitProduct(productId: string): Promise<StoreK
         rejectOnce(error);
       }
     })();
+  });
+}
+
+export async function getUnfinishedStoreKitPurchases(
+  productIds: string[]
+): Promise<StoreKitPurchaseResult[]> {
+  await initConnection();
+  const productIdSet = new Set(productIds);
+  const purchases = await getAvailablePurchases({
+    alsoPublishToEventListenerIOS: false,
+    onlyIncludeActiveItemsIOS: false,
+  });
+
+  return purchases.flatMap(purchase => {
+    if (!productIdSet.has(purchase.productId)) {
+      return [];
+    }
+    return [toStoreKitPurchaseResult(purchase.productId, purchase)];
   });
 }
 

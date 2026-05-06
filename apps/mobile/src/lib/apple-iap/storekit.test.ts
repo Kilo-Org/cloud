@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   finishTransaction,
+  getAvailablePurchases,
   initConnection,
   type Purchase,
   type PurchaseError,
@@ -11,6 +12,7 @@ import {
 
 import {
   finishStoreKitTransaction,
+  getUnfinishedStoreKitPurchases,
   purchaseStoreKitProduct,
   STOREKIT_PURCHASE_TIMEOUT_MS,
 } from './storekit';
@@ -39,6 +41,7 @@ function makePurchase(overrides: Partial<Purchase> = {}): Purchase {
 
 vi.mock('expo-iap', () => ({
   finishTransaction: vi.fn(),
+  getAvailablePurchases: vi.fn(),
   initConnection: vi.fn(),
   purchaseErrorListener: vi.fn((listener: (error: PurchaseError) => void) => {
     listenerState.onPurchaseError = listener;
@@ -66,6 +69,7 @@ beforeEach(() => {
     })
   );
   vi.mocked(finishTransaction).mockResolvedValue(undefined);
+  vi.mocked(getAvailablePurchases).mockResolvedValue([]);
 });
 
 describe('purchaseStoreKitProduct', () => {
@@ -176,5 +180,38 @@ describe('finishStoreKitTransaction', () => {
       purchase,
       isConsumable: true,
     });
+  });
+});
+
+describe('getUnfinishedStoreKitPurchases', () => {
+  it('returns unfinished purchases for requested products with signed transaction JWS values', async () => {
+    vi.mocked(getAvailablePurchases).mockResolvedValue([
+      makePurchase({
+        productId: 'com.kilocode.kiloapp.credits.small.999',
+        purchaseToken: 'small-pending-transaction',
+      }),
+      makePurchase({
+        productId: 'com.kilocode.kiloapp.credits.large.4999',
+        purchaseToken: 'large-pending-transaction',
+      }),
+    ]);
+
+    const purchases = await getUnfinishedStoreKitPurchases([
+      'com.kilocode.kiloapp.credits.small.999',
+    ]);
+
+    expect(getAvailablePurchases).toHaveBeenCalledWith({
+      alsoPublishToEventListenerIOS: false,
+      onlyIncludeActiveItemsIOS: false,
+    });
+    expect(purchases).toEqual([
+      {
+        productId: 'com.kilocode.kiloapp.credits.small.999',
+        transactionJws: 'small-pending-transaction',
+        nativeTransaction: expect.objectContaining({
+          productId: 'com.kilocode.kiloapp.credits.small.999',
+        }),
+      },
+    ]);
   });
 });

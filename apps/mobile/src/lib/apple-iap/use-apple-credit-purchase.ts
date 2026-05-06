@@ -1,7 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useTRPC } from '@/lib/trpc';
-import { finishStoreKitTransaction, purchaseStoreKitProduct } from './storekit';
+import {
+  finishStoreKitTransaction,
+  getUnfinishedStoreKitPurchases,
+  purchaseStoreKitProduct,
+  type StoreKitPurchaseResult,
+} from './storekit';
 
 export function useAppleCreditPurchase() {
   const trpc = useTRPC();
@@ -10,8 +15,7 @@ export function useAppleCreditPurchase() {
     trpc.user.completeAppleCreditPurchase.mutationOptions()
   );
 
-  const purchaseProduct = async (productId: string) => {
-    const purchase = await purchaseStoreKitProduct(productId);
+  const completePurchase = async (purchase: StoreKitPurchaseResult) => {
     const result = await completeAppleCreditPurchase.mutateAsync({
       transactionJws: purchase.transactionJws,
     });
@@ -21,9 +25,24 @@ export function useAppleCreditPurchase() {
     return result;
   };
 
+  const purchaseProduct = async (productId: string) => {
+    const purchase = await purchaseStoreKitProduct(productId);
+    return completePurchase(purchase);
+  };
+
+  const recoverUnfinishedPurchases = async (productIds: string[]) => {
+    const purchases = await getUnfinishedStoreKitPurchases(productIds);
+    const completionPromises = [];
+    for (const purchase of purchases) {
+      completionPromises.push(completePurchase(purchase));
+    }
+    return Promise.all(completionPromises);
+  };
+
   return {
-    purchaseProduct,
     isPending: completeAppleCreditPurchase.isPending,
     error: completeAppleCreditPurchase.error,
+    purchaseProduct,
+    recoverUnfinishedPurchases,
   };
 }

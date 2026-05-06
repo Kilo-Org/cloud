@@ -1,5 +1,5 @@
 import { ShoppingBag, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -27,9 +27,70 @@ export function AppleCreditPurchaseSheet({
 }: Readonly<AppleCreditPurchaseSheetProps>) {
   const colors = useThemeColors();
   const { products, isLoading, isError, refetch } = useAppleCreditProducts();
-  const { purchaseProduct, isPending } = useAppleCreditPurchase();
+  const { purchaseProduct, recoverUnfinishedPurchases, isPending } = useAppleCreditPurchase();
   const [activeProductId, setActiveProductId] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [recoveryProductIdsKey, setRecoveryProductIdsKey] = useState<string | null>(null);
+  const recoveryRunRef = useRef(0);
+  const productIds = useMemo(() => products.map(product => product.id), [products]);
+  const productIdsKey = productIds.join('\u0000');
+
+  useEffect(() => {
+    if (!visible) {
+      setRecoveryProductIdsKey(null);
+      recoveryRunRef.current += 1;
+      return undefined;
+    }
+    if (
+      isLoading ||
+      isError ||
+      productIds.length === 0 ||
+      recoveryProductIdsKey === productIdsKey
+    ) {
+      return undefined;
+    }
+
+    const recoveryRunId = recoveryRunRef.current + 1;
+    recoveryRunRef.current = recoveryRunId;
+    const isCurrentRecoveryRun = () => recoveryRunRef.current === recoveryRunId;
+    setRecoveryProductIdsKey(productIdsKey);
+    setIsRecovering(true);
+    setPurchaseError(null);
+
+    void (async () => {
+      try {
+        const recoveredPurchases = await recoverUnfinishedPurchases(productIds);
+        if (isCurrentRecoveryRun() && recoveredPurchases.length > 0) {
+          toast.success('Previous purchase completed');
+          onPurchaseSuccess();
+        }
+      } catch (error) {
+        if (isCurrentRecoveryRun()) {
+          setPurchaseError(
+            error instanceof Error ? error.message : 'Failed to complete previous purchase.'
+          );
+        }
+      } finally {
+        if (isCurrentRecoveryRun()) {
+          setIsRecovering(false);
+        }
+      }
+    })();
+
+    return () => {
+      recoveryRunRef.current += 1;
+    };
+  }, [
+    isError,
+    isLoading,
+    onPurchaseSuccess,
+    productIds,
+    productIdsKey,
+    recoverUnfinishedPurchases,
+    recoveryProductIdsKey,
+    visible,
+  ]);
 
   const handlePurchase = async (product: AppleCreditDisplayProduct) => {
     setActiveProductId(product.id);
@@ -94,7 +155,7 @@ export function AppleCreditPurchaseSheet({
                     key={product.id}
                     variant="secondary"
                     className="h-auto items-start justify-between px-4 py-3"
-                    disabled={isPending || activeProductId !== null}
+                    disabled={isPending || isRecovering || activeProductId !== null}
                     onPress={() => {
                       void handlePurchase(product);
                     }}

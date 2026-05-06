@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAppleCreditProducts } from './use-apple-credit-products';
 import { useAppleCreditPurchase } from './use-apple-credit-purchase';
-import { finishStoreKitTransaction, purchaseStoreKitProduct } from './storekit';
+import {
+  finishStoreKitTransaction,
+  getUnfinishedStoreKitPurchases,
+  purchaseStoreKitProduct,
+} from './storekit';
 
 const testState = vi.hoisted(() => ({
   backendProducts: [
@@ -14,6 +18,7 @@ const testState = vi.hoisted(() => ({
     },
   ],
   invalidations: [] as unknown[],
+  mutationInputs: [] as unknown[],
   mutationResult: {
     creditedCents: 699,
     creditedMicrodollars: 6_990_000,
@@ -33,6 +38,7 @@ const testState = vi.hoisted(() => ({
 const mocks = vi.hoisted(() => ({
   finishStoreKitTransaction: vi.fn(),
   fetchStoreKitProducts: vi.fn(),
+  getUnfinishedStoreKitPurchases: vi.fn(),
   purchaseStoreKitProduct: vi.fn(),
 }));
 
@@ -50,7 +56,8 @@ vi.mock('@tanstack/react-query', () => ({
   useMutation: () => ({
     error: null,
     isPending: false,
-    mutateAsync: async () => {
+    mutateAsync: async (input: unknown) => {
+      testState.mutationInputs.push(input);
       if (testState.mutationShouldReject) {
         await Promise.resolve();
         throw new Error('Backend rejected purchase');
@@ -98,6 +105,7 @@ vi.mock('@/lib/trpc', () => ({
 
 beforeEach(() => {
   testState.invalidations = [];
+  testState.mutationInputs = [];
   testState.mutationShouldReject = false;
   testState.mutationResult = {
     creditedCents: 699,
@@ -107,6 +115,7 @@ beforeEach(() => {
   testState.platform = 'ios';
   vi.clearAllMocks();
   mocks.fetchStoreKitProducts.mockResolvedValue(testState.storeKitProducts);
+  mocks.getUnfinishedStoreKitPurchases.mockResolvedValue([]);
   mocks.purchaseStoreKitProduct.mockResolvedValue({
     productId: 'com.kilocode.kiloapp.credits.small.999',
     transactionJws: 'signed-transaction',
@@ -161,5 +170,32 @@ describe('useAppleCreditPurchase', () => {
     ).rejects.toThrow('Backend rejected purchase');
 
     expect(finishStoreKitTransaction).not.toHaveBeenCalled();
+  });
+
+  it('completes and finishes recovered unfinished StoreKit purchases', async () => {
+    mocks.getUnfinishedStoreKitPurchases.mockResolvedValue([
+      {
+        productId: 'com.kilocode.kiloapp.credits.small.999',
+        transactionJws: 'pending-signed-transaction',
+        nativeTransaction: { id: 'pending-native-transaction' },
+      },
+    ]);
+
+    const results = await useAppleCreditPurchase().recoverUnfinishedPurchases([
+      'com.kilocode.kiloapp.credits.small.999',
+    ]);
+
+    expect(getUnfinishedStoreKitPurchases).toHaveBeenCalledWith([
+      'com.kilocode.kiloapp.credits.small.999',
+    ]);
+    expect(testState.mutationInputs).toEqual([{ transactionJws: 'pending-signed-transaction' }]);
+    expect(results).toEqual([
+      {
+        creditedCents: 699,
+        creditedMicrodollars: 6_990_000,
+        alreadyProcessed: false,
+      },
+    ]);
+    expect(finishStoreKitTransaction).toHaveBeenCalledWith({ id: 'pending-native-transaction' });
   });
 });

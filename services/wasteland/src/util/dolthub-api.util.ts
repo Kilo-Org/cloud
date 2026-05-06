@@ -250,8 +250,13 @@ export async function mergePull(
     );
   }
   const parsed = MergeResponse.safeParse(data);
+  // DoltHub returns PR states with inconsistent casing across endpoints
+  // (`Merged` from list/detail, `merged`/`merging` from this merge endpoint).
+  // Normalize to lowercase so callers can compare against a single canonical
+  // value regardless of which sync/async path the API chose.
+  const rawState = parsed.success && parsed.data.state ? parsed.data.state : 'merging';
   return {
-    state: parsed.success && parsed.data.state ? parsed.data.state : 'merging',
+    state: rawState.toLowerCase(),
     operationName: parsed.success ? (parsed.data.operation_name ?? null) : null,
   };
 }

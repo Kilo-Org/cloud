@@ -11,6 +11,7 @@ import {
 
 import { trackEvent } from '@/lib/appsflyer';
 import { queryClient } from '@/lib/query-client';
+import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import {
   AUTH_TOKEN_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
@@ -61,6 +62,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     queryClient.clear();
     setToken(undefined);
   }, []);
+
+  useEffect(() => setTrpcUnauthorizedHandler(signOut), [signOut]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ token, isLoading, signIn, signOut }),

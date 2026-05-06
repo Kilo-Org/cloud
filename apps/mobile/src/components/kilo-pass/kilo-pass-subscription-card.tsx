@@ -26,7 +26,7 @@ export function KiloPassSubscriptionCard() {
   const title = subscription ? 'Kilo Pass active' : 'Kilo Pass';
   const description = subscription
     ? `$${subscription.currentPeriodBaseCreditsUsd.toFixed(0)} monthly credits`
-    : 'Subscribe with your App Store account';
+    : 'Monthly credits with bonus progress';
 
   return (
     <>

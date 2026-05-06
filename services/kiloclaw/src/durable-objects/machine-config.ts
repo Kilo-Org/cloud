@@ -70,6 +70,22 @@ export function guestFromSize(machineSize: MachineSize | null): FlyMachineConfig
   };
 }
 
+/**
+ * Hardware that should drive the runtime spec for this instance right now.
+ *
+ * Returns `adminMachineSizeOverride` if set (admin temporary CPU/RAM bump
+ * for support workflows), otherwise the tier-derived `machineSize`. The
+ * billable tier (`instanceType`/`volumeSizeGb`) and any tier comparisons
+ * must continue reading `state.machineSize` directly — `effectiveMachineSize`
+ * is for runtime spec / Fly guest construction only.
+ */
+export function effectiveMachineSize(state: {
+  machineSize: MachineSize | null;
+  adminMachineSizeOverride: MachineSize | null;
+}): MachineSize | null {
+  return state.adminMachineSizeOverride ?? state.machineSize;
+}
+
 // ============================================================================
 // Volume name helper
 // ============================================================================

@@ -71,7 +71,7 @@ import {
   type InstanceType,
 } from '@kilocode/kiloclaw-instance-tiers';
 import * as regionHelpers from '../regions';
-import { buildRuntimeSpec } from '../machine-config';
+import { buildRuntimeSpec, effectiveMachineSize } from '../machine-config';
 import type { GatewayProcessStatus } from '../gateway-controller-types';
 
 // Domain modules
@@ -107,6 +107,7 @@ import {
 import {
   restoreFromPostgres,
   markDestroyedInPostgresHelper,
+  syncAdminSizeOverrideToPostgresHelper,
   syncInstanceTypeToPostgresHelper,
   syncTrackedImageTagToPostgresHelper,
 } from './postgres';
@@ -2075,7 +2076,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       resolveRuntimeImageRef(this.s, this.env),
       envVars,
       bootstrapEnv,
-      this.s.machineSize,
+      effectiveMachineSize(this.s),
       identity,
       this.s.provider
     );
@@ -2637,6 +2638,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     imageVariant: string | null;
     trackedImageTag: string | null;
     trackedImageDigest: string | null;
+    adminMachineSizeOverride: MachineSize | null;
+    adminMachineSizeOverrideMetadata: InstanceMutableState['adminMachineSizeOverrideMetadata'];
     googleConnected: boolean;
     googleOAuthConnected: boolean;
     googleOAuthStatus: GoogleOAuthConnection['status'];
@@ -2722,6 +2725,8 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       machineSize: this.s.machineSize,
       instanceType: resolveInstanceTypeFromState(this.s),
       volumeSizeGb: this.s.volumeSizeGb,
+      adminMachineSizeOverride: this.s.adminMachineSizeOverride,
+      adminMachineSizeOverrideMetadata: this.s.adminMachineSizeOverrideMetadata,
       openclawVersion: this.s.openclawVersion,
       imageVariant: this.s.imageVariant,
       trackedImageTag: this.s.trackedImageTag,
@@ -2943,32 +2948,17 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     previousVolumeSizeGb: number | null;
     newVolumeSizeGb: number;
     machineSize: MachineSize;
+    clearedOverride: {
+      size: MachineSize;
+      metadata: NonNullable<InstanceMutableState['adminMachineSizeOverrideMetadata']>;
+    } | null;
   }> {
     await this.loadState();
-
-    if (!this.s.userId) {
-      throw new Error('Instance is not provisioned');
-    }
-    if (this.s.status === 'destroying') {
-      throw new Error('Cannot resize: instance is being destroyed');
-    }
-    if (this.s.status === 'restoring') {
-      throw new Error('Cannot resize: instance is restoring from snapshot');
-    }
-    if (this.s.status === 'recovering') {
-      throw new Error('Cannot resize: instance is recovering from an unexpected stop');
-    }
-    if (this.s.status === 'starting' || this.s.status === 'restarting') {
-      throw new Error(`Cannot resize: instance is busy (${this.s.status})`);
-    }
-    if (this.s.status !== 'stopped' && getRuntimeId(this.s)) {
-      throw Object.assign(new Error('Instance must be stopped before resizing machine tier'), {
-        status: 409,
-      });
-    }
-    if (this.s.provider === 'northflank') {
-      throw new Error('Instance tier resize is not yet supported on Northflank instances');
-    }
+    this.assertAdminSizeChangeAllowed({
+      cannotPrefix: 'resize',
+      beforePhrase: 'resizing machine tier',
+      notSupportedSubject: 'Instance tier resize',
+    });
 
     const targetTier = getTier(targetTierKey);
     if (targetTier.status !== 'offered') {
@@ -3007,25 +2997,52 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       await this.persist({ volumeSizeGb: targetTier.volumeSizeGb });
     }
 
+    // Capture and clear any active admin override before applying the tier
+    // change. The customer is now paying for the new tier; carrying a
+    // pre-existing override would either silently downgrade them (override
+    // smaller than new tier) or upgrade them for free (override larger).
+    const clearedOverrideSize = this.s.adminMachineSizeOverride;
+    const clearedOverrideMetadata = this.s.adminMachineSizeOverrideMetadata;
+    const clearedOverride =
+      clearedOverrideSize !== null && clearedOverrideMetadata !== null
+        ? { size: clearedOverrideSize, metadata: clearedOverrideMetadata }
+        : null;
+
     this.s.instanceType = targetTier.key;
     this.s.machineSize = targetTier.machineSize;
     this.s.volumeSizeGb = targetTier.volumeSizeGb;
+    this.s.adminMachineSizeOverride = null;
+    this.s.adminMachineSizeOverrideMetadata = null;
     await this.persist({
       instanceType: targetTier.key,
       machineSize: targetTier.machineSize,
       volumeSizeGb: targetTier.volumeSizeGb,
+      adminMachineSizeOverride: null,
+      adminMachineSizeOverrideMetadata: null,
     });
 
-    if (this.s.sandboxId) {
-      this.ctx.waitUntil(
-        syncInstanceTypeToPostgresHelper(this.env, this.s, this.s.userId, this.s.sandboxId)
-      );
+    if (this.s.userId && this.s.sandboxId) {
+      const userId = this.s.userId;
+      const sandboxId = this.s.sandboxId;
+      this.ctx.waitUntil(syncInstanceTypeToPostgresHelper(this.env, this.s, userId, sandboxId));
+      // Sync override clear to Postgres if EITHER field was populated, not just
+      // when both are. A skewed legacy state (one column populated, one null)
+      // would otherwise leave Postgres stale because we just nulled DO state.
+      // The sync helper is idempotent via `IS DISTINCT FROM`.
+      if (clearedOverrideSize !== null || clearedOverrideMetadata !== null) {
+        this.ctx.waitUntil(
+          syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+        );
+      }
     }
 
     console.log(
       `[admin-machine-resize] userId=${this.s.userId} ` +
         `previousTier=${previousTier ?? 'unknown'} newTier=${targetTier.key} ` +
-        `previousVolume=${previousVolumeSizeGb ?? 'unknown'} newVolume=${targetTier.volumeSizeGb}`
+        `previousVolume=${previousVolumeSizeGb ?? 'unknown'} newVolume=${targetTier.volumeSizeGb}` +
+        (clearedOverride
+          ? ` clearedOverride=${clearedOverride.size.cpus}/${clearedOverride.size.memory_mb}MB`
+          : '')
     );
 
     return {
@@ -3034,7 +3051,174 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       previousVolumeSizeGb,
       newVolumeSizeGb: targetTier.volumeSizeGb,
       machineSize: targetTier.machineSize,
+      clearedOverride,
     };
+  }
+
+  /**
+   * Shared guard for admin operations that mutate hardware-related state
+   * (`resizeMachine`, `setAdminMachineSizeOverride`, `clearAdminMachineSizeOverride`).
+   *
+   * Operations are allowed only when the instance is provisioned, not in
+   * a transitional/destroying state, the runtime is stopped (or doesn't
+   * exist yet), and the provider is not Northflank.
+   *
+   * Takes three message fragments so each call site reads naturally:
+   * - `cannotPrefix` slots into "Cannot {prefix}: ..."
+   * - `beforePhrase` slots into "Instance must be stopped before {phrase}"
+   * - `notSupportedSubject` slots into "{subject} is not yet supported on Northflank instances"
+   */
+  private assertAdminSizeChangeAllowed(args: {
+    cannotPrefix: string;
+    beforePhrase: string;
+    notSupportedSubject: string;
+  }): void {
+    if (!this.s.userId) {
+      throw new Error('Instance is not provisioned');
+    }
+    if (this.s.status === 'destroying') {
+      throw new Error(`Cannot ${args.cannotPrefix}: instance is being destroyed`);
+    }
+    if (this.s.status === 'restoring') {
+      throw new Error(`Cannot ${args.cannotPrefix}: instance is restoring from snapshot`);
+    }
+    if (this.s.status === 'recovering') {
+      throw new Error(
+        `Cannot ${args.cannotPrefix}: instance is recovering from an unexpected stop`
+      );
+    }
+    if (this.s.status === 'starting' || this.s.status === 'restarting') {
+      throw new Error(`Cannot ${args.cannotPrefix}: instance is busy (${this.s.status})`);
+    }
+    if (this.s.status !== 'stopped' && getRuntimeId(this.s)) {
+      throw Object.assign(new Error(`Instance must be stopped before ${args.beforePhrase}`), {
+        status: 409,
+      });
+    }
+    if (this.s.provider === 'northflank') {
+      throw new Error(`${args.notSupportedSubject} is not yet supported on Northflank instances`);
+    }
+  }
+
+  // ── Admin temporary CPU/RAM override ──────────────────────────────
+
+  /**
+   * Set a temporary admin override for the machine's CPU/RAM. Wins over
+   * the tier-derived `machineSize` for runtime spec construction without
+   * touching `instanceType` or `volumeSizeGb` (so billing stays on the
+   * customer's tier). Stopped-machine-only; Fly + docker-local only.
+   *
+   * Override is sticky until cleared explicitly or until a tier resize
+   * auto-clears it. See `~/fd-plans/kiloclaw/admin-machine-size-override.md`.
+   */
+  async setAdminMachineSizeOverride(input: {
+    size: MachineSize;
+    reason: string;
+    actorId: string;
+    actorEmail: string;
+  }): Promise<{
+    previousOverride: MachineSize | null;
+    newOverride: MachineSize;
+  }> {
+    await this.loadState();
+    this.assertAdminSizeChangeAllowed({
+      cannotPrefix: 'set admin size override',
+      beforePhrase: 'setting an admin size override',
+      notSupportedSubject: 'Admin size override',
+    });
+    if (this.s.machineSize === null) {
+      throw new Error(
+        'Cannot set admin size override: machineSize has not been observed yet ' +
+          '(legacy instance — wait for backfill or run a tier resize first)'
+      );
+    }
+
+    const previousOverride = this.s.adminMachineSizeOverride;
+    const metadata = {
+      reason: input.reason,
+      actorId: input.actorId,
+      actorEmail: input.actorEmail,
+      setAt: Date.now(),
+    };
+
+    this.s.adminMachineSizeOverride = input.size;
+    this.s.adminMachineSizeOverrideMetadata = metadata;
+    await this.persist({
+      adminMachineSizeOverride: input.size,
+      adminMachineSizeOverrideMetadata: metadata,
+    });
+
+    if (this.s.userId && this.s.sandboxId) {
+      const userId = this.s.userId;
+      const sandboxId = this.s.sandboxId;
+      this.ctx.waitUntil(
+        syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+      );
+    }
+
+    console.log(
+      `[admin-size-override] set userId=${this.s.userId} actor=${input.actorEmail} ` +
+        `previous=${
+          previousOverride ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB` : 'none'
+        } ` +
+        `new=${input.size.cpus}/${input.size.memory_mb}MB cpu_kind=${input.size.cpu_kind ?? 'shared'} ` +
+        `reason="${input.reason.replace(/"/g, '\\"')}"`
+    );
+
+    return { previousOverride, newOverride: input.size };
+  }
+
+  async clearAdminMachineSizeOverride(input: {
+    reason: string;
+    actorId: string;
+    actorEmail: string;
+  }): Promise<{ previousOverride: MachineSize | null }> {
+    await this.loadState();
+
+    // Short-circuit BEFORE the guard. Clearing nothing is a true no-op, and
+    // admins triaging incidents shouldn't get an error for it when the
+    // instance happens to be in a transitional state (destroying / starting /
+    // recovering / Northflank). The set path still runs the guard — it
+    // mutates hardware-shaping state and needs the protection.
+    const previousOverride = this.s.adminMachineSizeOverride;
+    if (previousOverride === null && this.s.adminMachineSizeOverrideMetadata === null) {
+      console.log(
+        `[admin-size-override] clear (no-op) userId=${this.s.userId} actor=${input.actorEmail} ` +
+          `reason="${input.reason.replace(/"/g, '\\"')}"`
+      );
+      return { previousOverride: null };
+    }
+
+    this.assertAdminSizeChangeAllowed({
+      cannotPrefix: 'clear admin size override',
+      beforePhrase: 'clearing an admin size override',
+      notSupportedSubject: 'Admin size override',
+    });
+
+    this.s.adminMachineSizeOverride = null;
+    this.s.adminMachineSizeOverrideMetadata = null;
+    await this.persist({
+      adminMachineSizeOverride: null,
+      adminMachineSizeOverrideMetadata: null,
+    });
+
+    if (this.s.userId && this.s.sandboxId) {
+      const userId = this.s.userId;
+      const sandboxId = this.s.sandboxId;
+      this.ctx.waitUntil(
+        syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+      );
+    }
+
+    const previousLabel = previousOverride
+      ? `${previousOverride.cpus}/${previousOverride.memory_mb}MB`
+      : 'metadata-only (skewed state)';
+    console.log(
+      `[admin-size-override] clear userId=${this.s.userId} actor=${input.actorEmail} ` +
+        `previous=${previousLabel} reason="${input.reason.replace(/"/g, '\\"')}"`
+    );
+
+    return { previousOverride };
   }
 
   /**
@@ -3596,7 +3780,7 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         resolveRuntimeImageRef(this.s, this.env),
         envVars,
         bootstrapEnv,
-        this.s.machineSize,
+        effectiveMachineSize(this.s),
         identity,
         this.s.provider
       );

@@ -792,6 +792,10 @@ async function backfillMachineSizeFromFlyConfig(
   source: string
 ): Promise<void> {
   if (state.machineSize !== null) return;
+  // Skip backfill when an admin override is active. The live Fly guest
+  // reflects the override, not the billable tier hardware, so writing it
+  // back to `machineSize` would silently re-label the instance.
+  if (state.adminMachineSizeOverride !== null) return;
   const guest = machine.config?.guest;
   if (!guest) return;
   const { cpus, memory_mb, cpu_kind } = guest;

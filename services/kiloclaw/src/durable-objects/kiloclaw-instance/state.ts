@@ -292,6 +292,8 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.machineSize = d.machineSize;
     s.instanceType = d.instanceType;
     s.volumeSizeGb = d.volumeSizeGb;
+    s.adminMachineSizeOverride = d.adminMachineSizeOverride;
+    s.adminMachineSizeOverrideMetadata = d.adminMachineSizeOverrideMetadata;
     s.healthCheckFailCount = d.healthCheckFailCount;
     s.pendingDestroyMachineId = d.pendingDestroyMachineId;
     s.pendingDestroyVolumeId = d.pendingDestroyVolumeId;
@@ -398,6 +400,8 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.machineSize = null;
   s.instanceType = null;
   s.volumeSizeGb = null;
+  s.adminMachineSizeOverride = null;
+  s.adminMachineSizeOverrideMetadata = null;
   s.healthCheckFailCount = 0;
   s.pendingDestroyMachineId = null;
   s.pendingDestroyVolumeId = null;
@@ -490,6 +494,8 @@ export function createMutableState(): InstanceMutableState {
     machineSize: null,
     instanceType: null,
     volumeSizeGb: null,
+    adminMachineSizeOverride: null,
+    adminMachineSizeOverrideMetadata: null,
     healthCheckFailCount: 0,
     pendingDestroyMachineId: null,
     pendingDestroyVolumeId: null,

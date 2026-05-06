@@ -3,7 +3,12 @@ import type { KiloClawEnv } from '../../types';
 import * as fly from '../../fly/client';
 import { PREVIOUS_VOLUME_RETENTION_MS, WORKER_CONTROLLER_CAPABILITIES_VERSION } from '../../config';
 import * as regionHelpers from '../regions';
-import { buildRuntimeSpec, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
+import {
+  buildRuntimeSpec,
+  effectiveMachineSize,
+  guestFromSize,
+  volumeNameFromSandboxId,
+} from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
 import {
@@ -380,7 +385,7 @@ export async function runUnexpectedStopRecoveryInBackground(
         {
           name: volumeNameFromSandboxId(state.sandboxId),
           source_volume_id: oldVolumeId,
-          compute: guestFromSize(state.machineSize),
+          compute: guestFromSize(effectiveMachineSize(state)),
         },
         regions,
         {
@@ -408,7 +413,7 @@ export async function runUnexpectedStopRecoveryInBackground(
       resolveRuntimeImageRef(state, env),
       envVars,
       bootstrapEnv,
-      state.machineSize,
+      effectiveMachineSize(state),
       identity,
       state.provider
     );

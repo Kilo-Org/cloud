@@ -252,6 +252,43 @@ export async function syncInstanceType(
     );
 }
 
+/**
+ * Sync `admin_size_override` from DO state. Pass `null` to clear, or the
+ * full payload (override size + metadata) to set. Conditional UPDATE — the
+ * SQL `IS DISTINCT FROM` guards against churning rows when nothing changed.
+ *
+ * Called from the DO RPC paths that explicitly mutate the override
+ * (`setAdminMachineSizeOverride` / `clearAdminMachineSizeOverride`) and as
+ * part of tier resize when the override is auto-cleared. NOT called from
+ * the alarm tick — there's no "observed override" to derive.
+ */
+export type AdminSizeOverridePayload = {
+  size: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' };
+  reason: string;
+  actorId: string;
+  actorEmail: string;
+  setAt: number;
+};
+
+export async function syncAdminSizeOverride(
+  db: WorkerDb,
+  userId: string,
+  sandboxId: string,
+  payload: AdminSizeOverridePayload | null
+) {
+  await db
+    .update(kiloclaw_instances)
+    .set({ admin_size_override: payload })
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.destroyed_at),
+        sql`${kiloclaw_instances.admin_size_override} IS DISTINCT FROM ${payload}::jsonb`
+      )
+    );
+}
+
 export async function getGoogleOAuthConnectionByInstanceId(db: WorkerDb, instanceId: string) {
   return await db
     .select()

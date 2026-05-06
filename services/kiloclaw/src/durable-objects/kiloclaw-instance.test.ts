@@ -101,6 +101,7 @@ vi.mock('../db', () => ({
   }),
   markInstanceDestroyed: vi.fn().mockResolvedValue(undefined),
   syncInstanceType: vi.fn().mockResolvedValue(undefined),
+  syncAdminSizeOverride: vi.fn().mockResolvedValue(undefined),
 }));
 
 // -- Mock gateway/env --
@@ -8849,6 +8850,42 @@ describe('instanceType alarm-driven backfill', () => {
     );
   });
 
+  it('skips backfill when an admin override is active even on a legacy null-machineSize instance', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'override active',
+        actorId: 'admin-1',
+        actorEmail: 'a@e.com',
+        setAt: 1,
+      },
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      // Live Fly guest reflects the override, not the (unobserved) tier hardware.
+      config: { guest: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
+
+    // machineSize / instanceType remain null — backfill correctly refused to
+    // mistake the override-shape for tier hardware.
+    expect(storage._store.get('machineSize')).toBeNull();
+    expect(storage._store.get('instanceType')).toBeNull();
+    expect(dbModule.syncInstanceType).not.toHaveBeenCalled();
+  });
+
   it('does not touch DO state or Postgres when machineSize is already populated', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
     await seedRunning(storage, {
@@ -9203,6 +9240,277 @@ describe('resizeMachine', () => {
       'Instance tier resize is not yet supported on Northflank instances'
     );
     expect(storage._store.get('instanceType')).toBe('perf-1-3');
+  });
+
+  it('clears any active admin size override and reports it in the response', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: 'vol-1',
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'OOM ticket #1',
+        actorId: 'admin-1',
+        actorEmail: 'alice@example.com',
+        setAt: 1234567890,
+      },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.resizeMachine('perf-4-8');
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.clearedOverride).toEqual({
+      size: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+      metadata: {
+        reason: 'OOM ticket #1',
+        actorId: 'admin-1',
+        actorEmail: 'alice@example.com',
+        setAt: 1234567890,
+      },
+    });
+    expect(storage._store.get('adminMachineSizeOverride')).toBeNull();
+    expect(storage._store.get('adminMachineSizeOverrideMetadata')).toBeNull();
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      null
+    );
+  });
+});
+
+// ============================================================================
+// adminMachineSizeOverride
+// ============================================================================
+
+describe('setAdminMachineSizeOverride', () => {
+  const overrideArgs = {
+    size: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' as const },
+    reason: 'OOM recovery for ticket #1234',
+    actorId: 'admin-1',
+    actorEmail: 'alice@example.com',
+  };
+
+  it('persists the override and metadata, syncs Postgres', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.setAdminMachineSizeOverride(overrideArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toBeNull();
+    expect(result.newOverride).toEqual(overrideArgs.size);
+    expect(storage._store.get('adminMachineSizeOverride')).toEqual(overrideArgs.size);
+    const stored = storage._store.get('adminMachineSizeOverrideMetadata') as Record<
+      string,
+      unknown
+    >;
+    expect(stored).toMatchObject({
+      reason: overrideArgs.reason,
+      actorId: 'admin-1',
+      actorEmail: 'alice@example.com',
+    });
+    expect(typeof stored.setAt).toBe('number');
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      expect.objectContaining({
+        size: overrideArgs.size,
+        reason: overrideArgs.reason,
+      })
+    );
+    // Tier hardware untouched.
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(storage._store.get('volumeSizeGb')).toBe(10);
+  });
+
+  it('rejects when instance is running', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    await expect(instance.setAdminMachineSizeOverride(overrideArgs)).rejects.toThrow(
+      'Instance must be stopped before setting an admin size override'
+    );
+  });
+
+  it('rejects on Northflank instances', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      provider: 'northflank',
+      providerState: { provider: 'northflank' },
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    await expect(instance.setAdminMachineSizeOverride(overrideArgs)).rejects.toThrow(
+      'Admin size override is not yet supported on Northflank instances'
+    );
+  });
+
+  it('rejects when machineSize is null (legacy instance — wait for backfill first)', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: null,
+      machineSize: null,
+      volumeSizeGb: null,
+    });
+
+    await expect(instance.setAdminMachineSizeOverride(overrideArgs)).rejects.toThrow(
+      'machineSize has not been observed yet'
+    );
+  });
+
+  it('overwrites a prior override and reports the previous value', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'previous reason xx',
+        actorId: 'admin-0',
+        actorEmail: 'bob@example.com',
+        setAt: 1,
+      },
+    });
+
+    const result = await instance.setAdminMachineSizeOverride({
+      ...overrideArgs,
+      size: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+    });
+
+    expect(result.previousOverride).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
+    expect(result.newOverride).toEqual({ cpus: 4, memory_mb: 16384, cpu_kind: 'performance' });
+    expect(storage._store.get('adminMachineSizeOverride')).toEqual({
+      cpus: 4,
+      memory_mb: 16384,
+      cpu_kind: 'performance',
+    });
+  });
+});
+
+describe('clearAdminMachineSizeOverride', () => {
+  const clearArgs = {
+    reason: 'cleanup after recovery',
+    actorId: 'admin-1',
+    actorEmail: 'alice@example.com',
+  };
+
+  it('clears persisted override and metadata, syncs Postgres', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'OOM ticket #1',
+        actorId: 'admin-2',
+        actorEmail: 'bob@example.com',
+        setAt: 1,
+      },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toEqual({
+      cpus: 4,
+      memory_mb: 8192,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('adminMachineSizeOverride')).toBeNull();
+    expect(storage._store.get('adminMachineSizeOverrideMetadata')).toBeNull();
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      null
+    );
+  });
+
+  it('is a no-op when no override is active', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toBeNull();
+    expect(dbModule.syncAdminSizeOverride).not.toHaveBeenCalled();
+  });
+
+  it('rejects when instance is running and an override is active', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'reason xx',
+        actorId: 'admin-0',
+        actorEmail: 'b@e.com',
+        setAt: 1,
+      },
+    });
+
+    await expect(instance.clearAdminMachineSizeOverride(clearArgs)).rejects.toThrow(
+      'Instance must be stopped before clearing an admin size override'
+    );
+  });
+
+  it('is a no-op even on a destroying instance when no override is active', async () => {
+    // Idempotent clear bypasses the guard so admins triaging incidents
+    // can fire it from a list-page action without inspecting status first.
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+
+    expect(result.previousOverride).toBeNull();
   });
 });
 

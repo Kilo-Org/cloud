@@ -60,6 +60,7 @@ import {
   Stethoscope,
   CheckCircle2,
   XCircle,
+  Shield,
   ShieldAlert,
   Activity,
   Copy,
@@ -83,11 +84,16 @@ import {
   DEFAULT_INSTANCE_TIER,
   formatTierHardware,
   getTier,
+  INSTANCE_TIERS,
   InstanceTierKeySchema,
   OFFERED_TIERS,
   type InstanceTierKey,
   type InstanceType,
 } from '@kilocode/kiloclaw-instance-tiers';
+import {
+  ADMIN_SIZE_OVERRIDE_PRESETS,
+  type AdminSizeOverridePreset,
+} from '@/lib/kiloclaw/admin-size-override';
 import {
   defaultScheduledAt,
   defaultNotifyFormState,
@@ -1320,6 +1326,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [cleanupRecoveryVolumeDialogOpen, setCleanupRecoveryVolumeDialogOpen] = useState(false);
   const [inboundEmailCycleDialogOpen, setInboundEmailCycleDialogOpen] = useState(false);
   const [awaitingRestoreCompletion, setAwaitingRestoreCompletion] = useState(false);
+  const [sizeOverrideDialogOpen, setSizeOverrideDialogOpen] = useState(false);
+  const [sizeOverrideMode, setSizeOverrideMode] = useState<'set' | 'clear'>('set');
+  const [sizeOverridePreset, setSizeOverridePreset] = useState<AdminSizeOverridePreset>('perf-4-8');
+  const [sizeOverrideReason, setSizeOverrideReason] = useState('');
 
   const { data, isLoading, error } = useQuery({
     ...trpc.admin.kiloclawInstances.get.queryOptions({ id: instanceId }),
@@ -1768,6 +1778,60 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const { mutateAsync: resizeMachineMutation } = useMutation(
     trpc.admin.kiloclawInstances.resizeMachine.mutationOptions()
   );
+
+  const { mutateAsync: setSizeOverrideMutation, isPending: isSettingSizeOverride } = useMutation(
+    trpc.admin.kiloclawInstances.setAdminMachineSizeOverride.mutationOptions({
+      onSuccess: result => {
+        toast.success(
+          `Admin override set: ${result.newOverride.cpus}× ${result.newOverride.cpu_kind ?? 'shared'}, ${result.newOverride.memory_mb}MB`
+        );
+        invalidateMachineQueries();
+        setSizeOverrideDialogOpen(false);
+        setSizeOverrideReason('');
+      },
+      onError: err => {
+        toast.error(`Failed to set admin override: ${err.message}`);
+      },
+    })
+  );
+
+  const { mutateAsync: clearSizeOverrideMutation, isPending: isClearingSizeOverride } = useMutation(
+    trpc.admin.kiloclawInstances.clearAdminMachineSizeOverride.mutationOptions({
+      onSuccess: () => {
+        toast.success('Admin override cleared');
+        invalidateMachineQueries();
+        setSizeOverrideDialogOpen(false);
+        setSizeOverrideReason('');
+      },
+      onError: err => {
+        toast.error(`Failed to clear admin override: ${err.message}`);
+      },
+    })
+  );
+
+  const isMutatingSizeOverride = isSettingSizeOverride || isClearingSizeOverride;
+
+  const handleSizeOverrideSubmit = async () => {
+    if (!data || !userId) return;
+    if (sizeOverrideReason.trim().length < 10) {
+      toast.error('Reason must be at least 10 characters');
+      return;
+    }
+    if (sizeOverrideMode === 'set') {
+      await setSizeOverrideMutation({
+        userId,
+        instanceId,
+        preset: sizeOverridePreset,
+        reason: sizeOverrideReason.trim(),
+      });
+    } else {
+      await clearSizeOverrideMutation({
+        userId,
+        instanceId,
+        reason: sizeOverrideReason.trim(),
+      });
+    }
+  };
 
   const isResizingMachine =
     resizePhase !== 'idle' && resizePhase !== 'done' && resizePhase !== 'error';
@@ -2579,7 +2643,23 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <div className="flex items-center gap-2">
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />
                   <DetailField label="Instance Tier">
-                    <InstanceTypeBadge instanceType={data.workerStatus.instanceType ?? null} />
+                    <span className="flex items-center gap-2">
+                      <InstanceTypeBadge instanceType={data.workerStatus.instanceType ?? null} />
+                      {data.workerStatus.adminMachineSizeOverride && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          title={
+                            data.workerStatus.adminMachineSizeOverrideMetadata
+                              ? `Set by ${data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail} — ${data.workerStatus.adminMachineSizeOverrideMetadata.reason}`
+                              : 'Admin override active'
+                          }
+                        >
+                          <Shield className="mr-1 h-3 w-3" />
+                          Override
+                        </Badge>
+                      )}
+                    </span>
                   </DetailField>
                 </div>
 
@@ -2599,6 +2679,37 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     )}
                   </DetailField>
                 </div>
+
+                {data.workerStatus.adminMachineSizeOverride && (
+                  <Alert className="border-amber-500/30 bg-amber-500/10">
+                    <Shield className="h-4 w-4 text-amber-500" />
+                    <AlertDescription className="text-amber-700 dark:text-amber-300">
+                      <div className="font-medium">
+                        Admin size override active:{' '}
+                        {data.workerStatus.adminMachineSizeOverride.cpus}×{' '}
+                        {data.workerStatus.adminMachineSizeOverride.cpu_kind ?? 'shared'},{' '}
+                        {data.workerStatus.adminMachineSizeOverride.memory_mb}MB
+                      </div>
+                      {data.workerStatus.adminMachineSizeOverrideMetadata && (
+                        <div className="mt-1 text-xs">
+                          Set by{' '}
+                          <strong>
+                            {data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail}
+                          </strong>{' '}
+                          {formatEpochRelativeTime(
+                            data.workerStatus.adminMachineSizeOverrideMetadata.setAt
+                          )}{' '}
+                          — reason:{' '}
+                          <em>{data.workerStatus.adminMachineSizeOverrideMetadata.reason}</em>
+                        </div>
+                      )}
+                      <div className="mt-1 text-xs">
+                        Billing stays on the customer's tier; this override is invisible to the
+                        customer dashboard.
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
 
                 <div className="flex items-center gap-2">
                   <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
@@ -3059,6 +3170,38 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   <ArrowUpDown className="mr-1 h-4 w-4" />
                   Resize Runtime
                 </Button>
+                {(isFlyProvider || data?.workerStatus?.provider === 'docker-local') && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={
+                      data?.workerStatus?.adminMachineSizeOverride
+                        ? 'border-amber-500 text-amber-500 hover:bg-amber-500/10'
+                        : ''
+                    }
+                    disabled={
+                      machineActionPending ||
+                      isResizingMachine ||
+                      isMutatingSizeOverride ||
+                      !hasRuntime ||
+                      !!data?.destroyed_at ||
+                      currentStatus !== 'stopped'
+                    }
+                    onClick={() => {
+                      setSizeOverrideMode(
+                        data?.workerStatus?.adminMachineSizeOverride ? 'clear' : 'set'
+                      );
+                      setSizeOverrideReason('');
+                      setSizeOverridePreset('perf-4-8');
+                      setSizeOverrideDialogOpen(true);
+                    }}
+                  >
+                    <Shield className="mr-1 h-4 w-4" />
+                    {data?.workerStatus?.adminMachineSizeOverride
+                      ? 'Clear Size Override'
+                      : 'Size Override…'}
+                  </Button>
+                )}
                 {isFlyProvider && (
                   <Button
                     size="sm"
@@ -3346,6 +3489,118 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 onClick={() => void handleResize()}
               >
                 Confirm Resize
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Admin Size Override Dialog */}
+        <Dialog
+          open={sizeOverrideDialogOpen}
+          onOpenChange={open => {
+            if (isMutatingSizeOverride) return;
+            setSizeOverrideDialogOpen(open);
+            if (!open) setSizeOverrideReason('');
+          }}
+        >
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-500">
+                <Shield className="h-5 w-5" />
+                {sizeOverrideMode === 'set' ? 'Set Temporary Size Override' : 'Clear Size Override'}
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                {sizeOverrideMode === 'set' ? (
+                  <>
+                    Override CPU/RAM without changing the billed tier. Use for OOM recovery and
+                    incident response. Volume size is not affected; the customer continues to be
+                    billed on the original tier.
+                  </>
+                ) : (
+                  <>
+                    This clears the active admin size override. The instance will revert to its tier
+                    hardware on the next start.
+                  </>
+                )}
+                <span className="text-foreground mt-2 block font-medium">
+                  User: {data?.user_email ?? data?.user_id}
+                </span>
+                {data?.workerStatus?.adminMachineSizeOverride && (
+                  <span className="text-foreground mt-2 block">
+                    Current override:{' '}
+                    <code className="text-xs">
+                      {data.workerStatus.adminMachineSizeOverride.cpus}×{' '}
+                      {data.workerStatus.adminMachineSizeOverride.cpu_kind ?? 'shared'},{' '}
+                      {data.workerStatus.adminMachineSizeOverride.memory_mb}MB
+                    </code>
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {sizeOverrideMode === 'set' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Override hardware</label>
+                  <div className="space-y-2">
+                    {ADMIN_SIZE_OVERRIDE_PRESETS.map(preset => {
+                      const tier = INSTANCE_TIERS[preset];
+                      return (
+                        <label
+                          key={preset}
+                          className="hover:bg-muted/40 flex cursor-pointer items-start gap-2 rounded-md border p-3"
+                        >
+                          <input
+                            type="radio"
+                            name="size-override-preset"
+                            value={preset}
+                            checked={sizeOverridePreset === preset}
+                            onChange={() => setSizeOverridePreset(preset)}
+                            disabled={isMutatingSizeOverride}
+                            className="mt-1"
+                          />
+                          <span>
+                            <span className="font-medium">{preset} hardware</span>
+                            <span className="text-muted-foreground block text-xs">
+                              {tier.machineSize.cpus}× {tier.machineSize.cpu_kind ?? 'shared'},{' '}
+                              {(tier.machineSize.memory_mb / 1024).toFixed(0)} GB RAM
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium">
+                  Reason{' '}
+                  <span className="text-muted-foreground text-xs">
+                    (10–500 chars, e.g. "OOM recovery for ticket #1234")
+                  </span>
+                </label>
+                <Textarea
+                  className="mt-1"
+                  rows={3}
+                  value={sizeOverrideReason}
+                  onChange={e => setSizeOverrideReason(e.target.value)}
+                  disabled={isMutatingSizeOverride}
+                  placeholder="OOM recovery — ticket #…"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isMutatingSizeOverride}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant={sizeOverrideMode === 'set' ? 'default' : 'destructive'}
+                disabled={isMutatingSizeOverride || sizeOverrideReason.trim().length < 10}
+                onClick={() => void handleSizeOverrideSubmit()}
+              >
+                {isMutatingSizeOverride ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                {sizeOverrideMode === 'set' ? 'Set Override' : 'Clear Override'}
               </Button>
             </DialogFooter>
           </DialogContent>

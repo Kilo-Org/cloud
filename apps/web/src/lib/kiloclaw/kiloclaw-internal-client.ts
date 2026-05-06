@@ -48,6 +48,8 @@ import type {
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
   ResizeMachineResponse,
+  SetAdminMachineSizeOverrideResponse,
+  ClearAdminMachineSizeOverrideResponse,
   RestoreVolumeSnapshotResponse,
   CleanupRecoveryPreviousVolumeResponse,
   RegionsResponse,
@@ -984,6 +986,43 @@ export class KiloClawInternalClient {
       {
         method: 'POST',
         body: JSON.stringify({ userId, instanceType }),
+      },
+      { userId }
+    );
+  }
+
+  async setAdminMachineSizeOverride(
+    userId: string,
+    payload: {
+      size: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' };
+      reason: string;
+      actorId: string;
+      actorEmail: string;
+    },
+    instanceId?: string
+  ): Promise<SetAdminMachineSizeOverrideResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/admin-size-override/set${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...payload }),
+      },
+      { userId }
+    );
+  }
+
+  async clearAdminMachineSizeOverride(
+    userId: string,
+    payload: { reason: string; actorId: string; actorEmail: string },
+    instanceId?: string
+  ): Promise<ClearAdminMachineSizeOverrideResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/admin-size-override/clear${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...payload }),
       },
       { userId }
     );

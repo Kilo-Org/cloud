@@ -3799,6 +3799,13 @@ export const kiloclaw_instances = pgTable(
     // Denormalized copy of the DO's instanceType. Source of truth remains the DO;
     // this column exists so admin tooling and future billing work can filter by tier.
     instance_type: text(),
+    // Denormalized copy of the DO's `adminMachineSizeOverride` + metadata. Non-null
+    // means the instance is currently running with admin-supplied CPU/RAM that
+    // diverge from its billable tier hardware (`machineSize` / `instance_type`).
+    // Source of truth is the DO; written by the worker on explicit admin
+    // set/clear, plus auto-cleared as part of a tier resize.
+    // Shape: { size: { cpus, memory_mb, cpu_kind? }, reason, actorId, actorEmail, setAt }.
+    admin_size_override: jsonb(),
   },
   table => [
     // One active instance per user+sandbox combination.
@@ -3825,6 +3832,11 @@ export const kiloclaw_instances = pgTable(
         sql.raw(', ')
       )})`
     ),
+    // Powers the admin "outstanding overrides" filter. Partial (active rows
+    // only) so the index stays small.
+    index('IDX_kiloclaw_instances_admin_size_override')
+      .on(table.id)
+      .where(sql`${table.admin_size_override} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
   ]
 );
 

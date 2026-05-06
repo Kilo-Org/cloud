@@ -327,6 +327,24 @@ export const PersistedStateSchema = z.object({
   machineSize: MachineSizeSchema.nullable().default(null),
   instanceType: InstanceTypeSchema.nullable().default(null),
   volumeSizeGb: z.number().int().min(1).max(500).nullable().default(null),
+  /**
+   * Admin-only temporary CPU/RAM override. When non-null, wins over
+   * `machineSize` for runtime-spec construction (Fly guest, docker
+   * Memory/NanoCpus). Does NOT touch `instanceType` or `volumeSizeGb` —
+   * billing reality stays on the tier. Cleared by an explicit admin
+   * action or by a tier resize. See
+   * `~/fd-plans/kiloclaw/admin-machine-size-override.md`.
+   */
+  adminMachineSizeOverride: MachineSizeSchema.nullable().default(null),
+  adminMachineSizeOverrideMetadata: z
+    .object({
+      reason: z.string().min(1).max(500),
+      actorId: z.string().min(1),
+      actorEmail: z.string().email(),
+      setAt: z.number().int(),
+    })
+    .nullable()
+    .default(null),
   // Health check tracking
   healthCheckFailCount: z.number().default(0),
   // Two-phase destroy: IDs pending deletion on Fly. Cleared once Fly confirms.

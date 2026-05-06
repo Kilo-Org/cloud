@@ -1,5 +1,5 @@
 {
-  "id": "1db92c2e-fa15-4d83-afa7-7b6be108fba3",
+  "id": "46e0c796-be42-4a9d-83d8-b3a786a7f91a",
   "prevId": "9c901b82-6430-4697-a63e-854fa715c930",
   "version": "7",
   "dialect": "postgresql",
@@ -9652,6 +9652,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "admin_size_override": {
+          "name": "admin_size_override",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -9743,6 +9749,22 @@
           ],
           "isUnique": false,
           "where": "\"kiloclaw_instances\".\"destroyed_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_kiloclaw_instances_admin_size_override": {
+          "name": "IDX_kiloclaw_instances_admin_size_override",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kiloclaw_instances\".\"admin_size_override\" IS NOT NULL AND \"kiloclaw_instances\".\"destroyed_at\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

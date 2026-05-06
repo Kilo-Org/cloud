@@ -91,6 +91,13 @@ export type InstanceMutableState = {
   machineSize: MachineSize | null;
   instanceType: PersistedState['instanceType'];
   volumeSizeGb: number | null;
+  /**
+   * Admin-only temporary CPU/RAM override. When non-null,
+   * `effectiveMachineSize(state)` returns this instead of `machineSize`.
+   * Does NOT change billable tier (`instanceType`/`volumeSizeGb`).
+   */
+  adminMachineSizeOverride: MachineSize | null;
+  adminMachineSizeOverrideMetadata: PersistedState['adminMachineSizeOverrideMetadata'];
   healthCheckFailCount: number;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;

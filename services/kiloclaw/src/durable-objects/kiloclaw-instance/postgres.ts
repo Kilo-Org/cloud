@@ -11,9 +11,11 @@ import {
   getInstanceById,
   getInstanceBySandboxId,
   markInstanceDestroyed,
+  syncAdminSizeOverride,
   syncInstanceType,
   syncTrackedImageTag,
 } from '../../db';
+import type { AdminSizeOverridePayload } from '../../db';
 import { appNameFromUserId, appNameFromInstanceId } from '../../fly/apps';
 import type { InstanceMutableState } from './types';
 import { getAppKey, getFlyConfig } from './types';
@@ -314,6 +316,51 @@ export async function syncInstanceTypeToPostgresHelper(
     await syncInstanceType(db, userId, sandboxId, state.instanceType);
   } catch (err) {
     doWarn(state, 'Failed to sync instance_type to Postgres', {
+      error: toLoggable(err),
+    });
+  }
+}
+
+/**
+ * Best-effort sync of `state.adminMachineSizeOverride` (+ metadata) to the
+ * `kiloclaw_instances.admin_size_override` JSONB column.
+ *
+ * Called only from sites that explicitly mutate the override
+ * (`setAdminMachineSizeOverride` / `clearAdminMachineSizeOverride` / tier-resize
+ * auto-clear). Not part of the alarm tick — there's no observation path; the
+ * override is admin-set state, not derived state.
+ *
+ * Failures are logged and swallowed; the DO state is authoritative and the
+ * column is a denormalized read cache for the admin "outstanding overrides"
+ * list. If the write fails, the next admin set/clear/resize will try again.
+ */
+export async function syncAdminSizeOverrideToPostgresHelper(
+  env: KiloClawEnv,
+  state: InstanceMutableState,
+  userId: string,
+  sandboxId: string
+): Promise<void> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return;
+
+  const override = state.adminMachineSizeOverride;
+  const metadata = state.adminMachineSizeOverrideMetadata;
+  const payload: AdminSizeOverridePayload | null =
+    override && metadata
+      ? {
+          size: override,
+          reason: metadata.reason,
+          actorId: metadata.actorId,
+          actorEmail: metadata.actorEmail,
+          setAt: metadata.setAt,
+        }
+      : null;
+
+  try {
+    const db = getWorkerDb(connectionString);
+    await syncAdminSizeOverride(db, userId, sandboxId, payload);
+  } catch (err) {
+    doWarn(state, 'Failed to sync admin_size_override to Postgres', {
       error: toLoggable(err),
     });
   }

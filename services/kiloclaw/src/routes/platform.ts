@@ -15,6 +15,7 @@ import {
   ChannelsPatchSchema,
   GoogleCredentialsSchema,
   GoogleOAuthConnectionSchema,
+  MachineSizeSchema,
   SecretsPatchSchema,
   InstanceIdParam,
 } from '../schemas/instance-config';
@@ -3279,6 +3280,81 @@ platform.post('/resize-machine', async c => {
     return c.json(response);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'resize-machine');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/admin-size-override/set
+// Admin-only: set a temporary CPU/RAM override that wins over the
+// tier-derived machineSize until cleared. Does NOT change instanceType
+// or volumeSizeGb (billing stays on the tier). Stopped-machine-only.
+const SetAdminSizeOverrideSchema = z.object({
+  userId: z.string().min(1),
+  size: MachineSizeSchema,
+  reason: z.string().min(10).max(500),
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
+});
+
+platform.post('/admin-size-override/set', async c => {
+  const result = await parseBody(c, SetAdminSizeOverrideSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub =>
+        stub.setAdminMachineSizeOverride({
+          size: result.data.size,
+          reason: result.data.reason,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
+      'setAdminMachineSizeOverride'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'admin-size-override-set');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/admin-size-override/clear
+const ClearAdminSizeOverrideSchema = z.object({
+  userId: z.string().min(1),
+  reason: z.string().min(10).max(500),
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
+});
+
+platform.post('/admin-size-override/clear', async c => {
+  const result = await parseBody(c, ClearAdminSizeOverrideSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub =>
+        stub.clearAdminMachineSizeOverride({
+          reason: result.data.reason,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
+      'clearAdminMachineSizeOverride'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'admin-size-override-clear');
     return jsonError(message, status);
   }
 });

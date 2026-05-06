@@ -45,6 +45,7 @@ import {
   resolveManagedGitLabToken,
 } from '../../services/git-token-service-client.js';
 import { getPgDb } from '../../db/pg.js';
+import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
@@ -59,26 +60,11 @@ const CLOUD_AGENT_WEB_PLATFORM = 'cloud-agent-web';
 
 type PrepareInput = z.infer<typeof PrepareSessionInput>;
 
-/**
- * Derive a GitLab project path (e.g. "group/subgroup/project") from a clone
- * URL produced by `buildGitLabCloneUrl`. Returns `undefined` when the URL is
- * malformed so callers fall back to "no repo binding" gracefully.
- */
-function deriveRepoFullNameFromGitUrl(gitUrl: string): string | undefined {
-  try {
-    const url = new URL(gitUrl);
-    const path = url.pathname.replace(/^\/+/, '').replace(/\.git$/i, '');
-    return path || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 /** Pick a stable `repoFullName` for repo-binding lookup across platforms. */
 function repoFullNameForBindingLookup(input: PrepareInput): string | undefined {
   if (input.githubRepo) return input.githubRepo;
   if (input.platform === 'gitlab' && input.gitUrl) {
-    return deriveRepoFullNameFromGitUrl(input.gitUrl);
+    return repoFullNameFromGitUrl(input.gitUrl);
   }
   return undefined;
 }

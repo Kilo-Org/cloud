@@ -6,14 +6,13 @@
  */
 
 import { z } from 'zod';
+import { parseGitUrl } from '@kilocode/worker-utils/git-url';
 
-// -- Git URL parsing --
-
-export type RepoCoordinates = {
-  platform: 'github' | 'gitlab';
-  owner: string;
-  repo: string;
-};
+// Re-export the shared git URL helpers so existing imports
+// (`import { parseGitUrl } from '../../util/platform-pr.util'`) continue to
+// resolve. New call sites should import directly from `@kilocode/worker-utils/git-url`.
+export { parseGitUrl };
+export type { RepoCoordinates } from '@kilocode/worker-utils/git-url';
 
 /**
  * Parse the hostname from a URL string, returning null on failure.
@@ -24,92 +23,6 @@ function hostnameOf(urlStr: string): string | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Check whether a host is a known GitLab host (gitlab.com or matches
- * the configured instance URL by exact hostname comparison).
- */
-function isGitLabHost(host: string, gitlabInstanceUrl?: string): boolean {
-  if (host === 'gitlab.com') return true;
-  if (gitlabInstanceUrl && hostnameOf(gitlabInstanceUrl) === host) return true;
-  return false;
-}
-
-/**
- * Extract owner/repo from a git URL.
- * Supports https and git@ formats:
- *   https://github.com/org/repo.git
- *   git@github.com:org/repo.git
- *   https://gitlab.example.com/org/repo.git
- *   https://gitlab.com/group/subgroup/project.git  (GitLab subgroups)
- */
-export function parseGitUrl(gitUrl: string, gitlabInstanceUrl?: string): RepoCoordinates | null {
-  // Normalize: strip trailing .git and embedded credentials (e.g. https://token@github.com/...)
-  const url = gitUrl.replace(/\.git$/, '').replace(/\/\/[^@]+@/, '//');
-
-  // HTTPS format: https://host/path...
-  const httpsMatch = url.match(/^https?:\/\/([^/]+)\/(.+)/);
-  if (httpsMatch) {
-    const host = httpsMatch[1];
-    const fullPath = httpsMatch[2];
-
-    if (host === 'github.com') {
-      // GitHub: always owner/repo (two segments)
-      const parts = fullPath.split('/');
-      if (parts.length >= 2) {
-        return { platform: 'github', owner: parts[0], repo: parts[1] };
-      }
-      return null;
-    }
-
-    if (isGitLabHost(host, gitlabInstanceUrl)) {
-      // GitLab: supports subgroups — owner is everything except the last
-      // segment, repo is the last segment.
-      const lastSlash = fullPath.lastIndexOf('/');
-      if (lastSlash > 0) {
-        return {
-          platform: 'gitlab',
-          owner: fullPath.slice(0, lastSlash),
-          repo: fullPath.slice(lastSlash + 1),
-        };
-      }
-      return null;
-    }
-
-    return null;
-  }
-
-  // SSH format: git@host:path
-  const sshMatch = url.match(/^git@([^:]+):(.+)/);
-  if (sshMatch) {
-    const host = sshMatch[1];
-    const fullPath = sshMatch[2];
-
-    if (host === 'github.com') {
-      const parts = fullPath.split('/');
-      if (parts.length >= 2) {
-        return { platform: 'github', owner: parts[0], repo: parts[1] };
-      }
-      return null;
-    }
-
-    if (isGitLabHost(host, gitlabInstanceUrl)) {
-      const lastSlash = fullPath.lastIndexOf('/');
-      if (lastSlash > 0) {
-        return {
-          platform: 'gitlab',
-          owner: fullPath.slice(0, lastSlash),
-          repo: fullPath.slice(lastSlash + 1),
-        };
-      }
-      return null;
-    }
-
-    return null;
-  }
-
-  return null;
 }
 
 // -- PR body template --

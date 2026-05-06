@@ -1,33 +1,18 @@
 /**
  * V1 Streaming Module
  *
- * Coordinates V1 WebSocket-based streaming for App Builder sessions.
- * This module wraps the V1 WebSocket streaming coordinator and provides
- * methods for sending messages, interrupting, and managing session lifecycle.
- *
- * This is purely V1 — no V2 or auto-upgrade logic.
- * Session changes (upgrade or GitHub migration) are signaled via the
- * onSessionChanged callback, allowing ProjectManager to handle them externally.
+ * V1 App Builder sessions are legacy. Historical messages are loaded from R2,
+ * while any new message is sent through the App Builder upgrade path so the
+ * backend creates a cloud-agent-next session.
  */
 
-import {
-  createV1WebSocketStreamingCoordinator,
-  type V1WebSocketStreamingConfig,
-  type V1WebSocketStreamingCoordinator,
-} from './websocket-streaming';
 import type { V1SessionStore } from './store';
 import type { AppTRPCClient } from '../../types';
 import type { Images } from '@/lib/images-schema';
-import type { WorkerVersion } from '@/lib/app-builder/types';
-import {
-  addUserMessage,
-  addErrorMessage,
-  removeLastUserMessage,
-  completePartialMessages,
-} from './messages';
+import { addUserMessage, addErrorMessage, removeLastUserMessage } from './messages';
 import { formatStreamError, createLogger } from '../../logging';
 
-type SendMessageResponse = { sessionId: string; workerVersion: WorkerVersion };
+type SendMessageResponse = { sessionId: string; workerVersion: 'v2' };
 
 export type SessionChangedUserMessage = { text: string; images?: Images };
 
@@ -36,17 +21,8 @@ export type V1StreamingConfig = {
   organizationId: string | null;
   trpcClient: AppTRPCClient;
   store: V1SessionStore;
-  /** The cloud agent session ID from the project (if already initiated) */
   cloudAgentSessionId: string | null;
-  /** Whether the session has been prepared (false for legacy sessions) */
-  sessionPrepared: boolean | null;
-  onStreamComplete?: () => void;
-  /** Called when the backend creates a new session (upgrade or GitHub migration) */
-  onSessionChanged?: (
-    newSessionId: string,
-    workerVersion: WorkerVersion,
-    userMessage: SessionChangedUserMessage
-  ) => void;
+  onSessionChanged?: (newSessionId: string, userMessage: SessionChangedUserMessage) => void;
 };
 
 export type V1StreamingCoordinator = {
@@ -57,91 +33,14 @@ export type V1StreamingCoordinator = {
   destroy: () => void;
 };
 
-/**
- * Creates a V1 streaming coordinator for managing WebSocket-based streaming.
- *
- * The flow:
- * 1. Call tRPC mutation (startSession or sendMessage) — returns cloudAgentSessionId
- * 2. Connect to WebSocket with the session ID to receive events
- *
- * For legacy (unprepared) sessions, uses prepareLegacySession mutation instead.
- */
 export function createV1StreamingCoordinator(config: V1StreamingConfig): V1StreamingCoordinator {
-  const { projectId, organizationId, trpcClient, store, onStreamComplete, onSessionChanged } =
+  const { projectId, organizationId, trpcClient, store, cloudAgentSessionId, onSessionChanged } =
     config;
-
   const logger = createLogger(projectId);
 
-  // Internal state
   let destroyed = false;
-  let wsCoordinator: V1WebSocketStreamingCoordinator | null = null;
-  let isSessionPrepared = config.sessionPrepared ?? true;
-  let legacyPreparationInProgress = false;
   let currentAbortController: AbortController | null = null;
 
-  /**
-   * Creates and initializes the V1 WebSocket coordinator lazily.
-   */
-  function getOrCreateWsCoordinator(): V1WebSocketStreamingCoordinator {
-    if (destroyed) {
-      throw new Error('Cannot create V1 WebSocket coordinator: streaming coordinator is destroyed');
-    }
-    if (wsCoordinator) {
-      return wsCoordinator;
-    }
-
-    const wsConfig: V1WebSocketStreamingConfig = {
-      projectId,
-      store,
-      onStreamComplete,
-      fetchStreamTicket: async (cloudAgentSessionId: string) => {
-        const response = await fetch('/api/cloud-agent/sessions/stream-ticket', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            cloudAgentSessionId,
-            ...(organizationId ? { organizationId } : {}),
-          }),
-        });
-
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({ error: 'Unknown error' }));
-          throw new Error(
-            (error as { error?: string }).error ?? `Failed to get stream ticket: ${response.status}`
-          );
-        }
-
-        return (await response.json()) as { ticket: string; expiresAt: number };
-      },
-    };
-
-    wsCoordinator = createV1WebSocketStreamingCoordinator(wsConfig);
-    return wsCoordinator;
-  }
-
-  /**
-   * Calls the appropriate mutation to start a session.
-   */
-  async function callStartSession(): Promise<string> {
-    if (organizationId) {
-      const result = await trpcClient.organizations.appBuilder.startSession.mutate({
-        projectId,
-        organizationId,
-      });
-      return result.cloudAgentSessionId;
-    } else {
-      const result = await trpcClient.appBuilder.startSession.mutate({
-        projectId,
-      });
-      return result.cloudAgentSessionId;
-    }
-  }
-
-  /**
-   * Calls the appropriate mutation to send a message.
-   */
   async function callSendMessage(
     message: string,
     images?: Images,
@@ -156,242 +55,114 @@ export function createV1StreamingCoordinator(config: V1StreamingConfig): V1Strea
         model,
       });
       return { sessionId: result.cloudAgentSessionId, workerVersion: result.workerVersion };
-    } else {
-      const result = await trpcClient.appBuilder.sendMessage.mutate({
-        projectId,
-        message,
-        images,
-        model,
-      });
-      return { sessionId: result.cloudAgentSessionId, workerVersion: result.workerVersion };
     }
+
+    const result = await trpcClient.appBuilder.sendMessage.mutate({
+      projectId,
+      message,
+      images,
+      model,
+    });
+    return { sessionId: result.cloudAgentSessionId, workerVersion: result.workerVersion };
   }
 
-  /**
-   * Calls prepareLegacySession mutation for legacy sessions.
-   * This:
-   * 1. Backfills the Durable Object with session metadata
-   * 2. Initiates the session to execute the first message
-   */
-  async function callPrepareLegacySession(model: string, prompt: string): Promise<string> {
-    logger.log('Preparing legacy session', { model, promptLength: prompt.length });
-    let sessionId: string;
-    if (organizationId) {
-      const result = await trpcClient.organizations.appBuilder.prepareLegacySession.mutate({
-        projectId,
-        organizationId,
-        model,
-        prompt,
-      });
-      sessionId = result.cloudAgentSessionId;
-    } else {
-      const result = await trpcClient.appBuilder.prepareLegacySession.mutate({
-        projectId,
-        model,
-        prompt,
-      });
-      sessionId = result.cloudAgentSessionId;
-    }
-    isSessionPrepared = true;
-    return sessionId;
-  }
-
-  /**
-   * Sends a user message.
-   *
-   * Flow for prepared sessions:
-   * 1. Add user message to store immediately for optimistic UI
-   * 2. Call sendMessage mutation — returns cloudAgentSessionId
-   * 3. Connect to WebSocket to receive response events
-   *
-   * Flow for legacy sessions:
-   * 1. Add user message to store immediately for optimistic UI
-   * 2. Call prepareLegacySession mutation — prepares DO and initiates session with the message
-   * 3. Connect to WebSocket to receive response events
-   */
   function sendMessage(message: string, images?: Images, model?: string): void {
     if (destroyed) {
       logger.logWarn('Cannot send message: V1 streaming coordinator is destroyed');
       return;
     }
 
-    if (!isSessionPrepared && legacyPreparationInProgress) {
-      logger.logWarn('Cannot send message: Legacy session preparation already in progress');
-      return;
-    }
-
-    logger.log('V1 sending message', {
+    logger.log('Sending legacy App Builder message through upgrade path', {
       messageLength: message.length,
       hasImages: !!images,
       model,
-      isSessionPrepared,
     });
 
-    // Abort any in-flight operation
     currentAbortController?.abort();
     currentAbortController = new AbortController();
     const abortSignal = currentAbortController.signal;
 
     store.setState({ isStreaming: true });
-
-    // Add user message to state immediately (optimistic update)
     addUserMessage(store, message, images);
 
     void (async () => {
       try {
-        let sessionId: string;
-        let workerVersion: WorkerVersion = 'v1';
-
-        if (!isSessionPrepared) {
-          legacyPreparationInProgress = true;
-          try {
-            // For legacy sessions: prepareLegacySession both prepares the DO and initiates the session
-            // NOTE: Legacy session preparation doesn't support images
-            sessionId = await callPrepareLegacySession(
-              model ?? 'anthropic/claude-sonnet-4',
-              message
-            );
-            logger.log('prepareLegacySession returned', { sessionId });
-          } finally {
-            legacyPreparationInProgress = false;
-          }
-        } else {
-          const response = await callSendMessage(message, images, model);
-          sessionId = response.sessionId;
-          workerVersion = response.workerVersion;
-          logger.log('sendMessage returned', { sessionId, workerVersion });
-        }
+        const { sessionId, workerVersion } = await callSendMessage(message, images, model);
+        logger.log('sendMessage returned', { sessionId, workerVersion });
 
         if (destroyed || abortSignal.aborted) {
           logger.log('Operation cancelled during message send');
           return;
         }
 
-        // Detect session change: backend created a new session (upgrade or GitHub migration).
-        // Remove the optimistic user message from this (old) session and pass it to the
-        // new session so it appears there immediately (before WS replay arrives).
-        if (sessionId !== config.cloudAgentSessionId && onSessionChanged) {
-          removeLastUserMessage(store);
+        // The backend always upgrades legacy (v1) sessions to cloud-agent-next, so
+        // the returned sessionId must differ from the v1 sessionId we sent from, and
+        // the ProjectManager-provided onSessionChanged handler must be wired up so
+        // the optimistic user message can be moved to the new session.
+        if (!onSessionChanged) {
+          logger.logError('Legacy v1 session sent message without an onSessionChanged handler', {
+            sessionId,
+            workerVersion,
+          });
           store.setState({ isStreaming: false });
-          onSessionChanged(sessionId, workerVersion, { text: message, images });
+          addErrorMessage(store, formatStreamError(new Error('Session upgrade misconfigured')));
           return;
         }
 
-        const coordinator = getOrCreateWsCoordinator();
-        await coordinator.connectToStream(sessionId);
-      } catch (err) {
-        if (abortSignal.aborted) {
+        if (sessionId === cloudAgentSessionId) {
+          logger.logError('Backend did not upgrade legacy v1 session as expected', {
+            sessionId,
+            workerVersion,
+          });
+          store.setState({ isStreaming: false });
+          addErrorMessage(store, formatStreamError(new Error('Session upgrade failed')));
           return;
         }
-        logger.logError('Failed to send V1 message', err);
+
+        removeLastUserMessage(store);
+        store.setState({ isStreaming: false });
+        onSessionChanged(sessionId, { text: message, images });
+      } catch (err) {
+        if (abortSignal.aborted) return;
+        logger.logError('Failed to send legacy App Builder message', err);
         store.setState({ isStreaming: false });
         addErrorMessage(store, formatStreamError(err));
       }
     })();
   }
 
-  /**
-   * Starts the initial streaming session for a new project.
-   */
   function startInitialStreaming(): void {
     if (destroyed) {
       logger.logWarn('Cannot start initial streaming: V1 streaming coordinator is destroyed');
       return;
     }
 
-    if (!isSessionPrepared) {
-      logger.logWarn('Cannot start initial streaming: Session is not prepared');
-      return;
-    }
-
-    logger.log('Starting V1 initial streaming');
-
-    currentAbortController?.abort();
-    currentAbortController = new AbortController();
-    const abortSignal = currentAbortController.signal;
-
-    store.setState({ isStreaming: true });
-
-    void (async () => {
-      try {
-        const sessionId = await callStartSession();
-        logger.log('startSession returned', { sessionId });
-
-        if (destroyed || abortSignal.aborted) {
-          logger.log('Operation cancelled during initial streaming start');
-          return;
-        }
-
-        const coordinator = getOrCreateWsCoordinator();
-        await coordinator.connectToStream(sessionId);
-      } catch (err) {
-        if (abortSignal.aborted) {
-          return;
-        }
-        logger.logError('Failed to start V1 initial streaming', err);
-        store.setState({ isStreaming: false });
-        addErrorMessage(store, formatStreamError(err));
-      }
-    })();
+    logger.logWarn('Cannot start initial streaming for legacy App Builder session');
   }
 
-  /**
-   * Connects to an existing session to replay events.
-   */
   function connectToExistingSession(sessionId: string): void {
     if (destroyed) {
       logger.logWarn('Cannot connect to existing session: V1 streaming coordinator is destroyed');
       return;
     }
 
-    logger.log('Connecting to existing V1 session', { sessionId });
-    store.setState({ isStreaming: true });
-
-    void (async () => {
-      try {
-        const coordinator = getOrCreateWsCoordinator();
-        await coordinator.connectToStream(sessionId);
-      } catch (err) {
-        logger.logError('Failed to connect to existing V1 session', err);
-        store.setState({ isStreaming: false });
-        addErrorMessage(store, formatStreamError(err));
-      }
-    })();
+    logger.log('Skipping legacy V1 WebSocket replay; messages are loaded from R2', { sessionId });
   }
 
-  /**
-   * Interrupts the current stream.
-   * Only disconnects WebSocket and updates local state.
-   * The tRPC interruptSession call is handled by ProjectManager.
-   */
   function interrupt(): void {
-    if (destroyed) {
-      return;
-    }
+    if (destroyed) return;
 
     logger.log('Interrupting V1 session');
-
-    wsCoordinator?.interrupt();
-
-    completePartialMessages(store);
+    currentAbortController?.abort();
     store.setState({ isStreaming: false });
   }
 
-  /**
-   * Destroys the coordinator and cleans up resources.
-   */
   function destroy(): void {
-    if (destroyed) {
-      return;
-    }
+    if (destroyed) return;
 
     destroyed = true;
-
     currentAbortController?.abort();
     currentAbortController = null;
-
-    wsCoordinator?.destroy();
-    wsCoordinator = null;
   }
 
   return {

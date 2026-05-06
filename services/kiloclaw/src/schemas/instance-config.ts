@@ -425,12 +425,6 @@ export const PersistedStateSchema = z.object({
   // Metadata for custom (non-catalog) secrets: env var name → { configPath? }.
   // configPath is a JSON dot-notation path for patching into openclaw.json at boot.
   customSecretMeta: z.record(z.string(), CustomSecretMetaSchema).nullable().default(null),
-  // Stream Chat default channel (auto-provisioned on first instance creation).
-  // Null on existing instances (pre-Stream Chat) and when STREAM_CHAT_API_KEY is not set.
-  streamChatApiKey: z.string().nullable().default(null),
-  streamChatBotUserId: z.string().nullable().default(null),
-  streamChatBotUserToken: z.string().nullable().default(null),
-  streamChatChannelId: z.string().nullable().default(null),
   // Vector memory: whether the builtin embedding-backed memory search is enabled.
   vectorMemoryEnabled: z.boolean().default(false),
   // Vector memory: embedding model ID (e.g. "mistralai/mistral-embed-2312").

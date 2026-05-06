@@ -34,6 +34,7 @@ import { decryptByokRow } from '@/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
+import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
@@ -106,6 +107,7 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
   result['codestral'] = ['Codestral (mistralai/codestral-2508)'];
 
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
+    if (isKiloExclusiveModel(openRouterModel.id)) continue;
     const vercelModel = vercelModelMetadata[mapModelIdToVercel(openRouterModel.id, false)];
     if (!vercelModel) continue;
     if (isCodestralModel(vercelModel.id)) continue;

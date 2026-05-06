@@ -72,10 +72,9 @@ export const DEBOUNCE_DELAY_MS = 2_000;
 
 export const FAILURE_RETRY_BASE_MS = 30_000;
 export const FAILURE_RETRY_MAX_MS = 300_000;
-// TEMPORARY: bumped from 45_000 to 180_000 because openclaw 2026.4.15 CLI
-// startup takes ~65s (CPU profile shows ~55% in jiti normalizeAliases/createJiti
-// from per-plugin loader churn). Revert to 45_000 once openclaw upstream
-// reduces startup time. Tracking: <openclaw issue link TBD>.
+// TEMPORARY: bumped from 45_000 to 180_000 because OpenClaw CLI startup can
+// exceed 60s on shared-cpu instances. Revert to 45_000 once upstream startup
+// is consistently below the old timeout on full KiloClaw images.
 export const APPROVE_TIMEOUT_MS = 180_000;
 export const CONFIG_PATH = '/root/.openclaw/openclaw.json';
 

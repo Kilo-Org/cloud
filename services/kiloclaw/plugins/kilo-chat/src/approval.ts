@@ -108,17 +108,11 @@ function buildResolvedBlocks(view: ResolvedApprovalView): ContentBlock[] {
 
 function buildExpiredBlocks(view: ExpiredApprovalView): ContentBlock[] {
   const textBlock: ContentBlock = { type: 'text', text: buildMetadataText(view) + '\n\n_Expired_' };
-  const actionsBlock: ActionsBlock = {
-    type: 'actions',
-    groupId: view.approvalId,
-    actions: [],
-    resolved: {
-      value: 'expired',
-      resolvedBy: 'system',
-      resolvedAt: Date.now(),
-    },
-  };
-  return [textBlock, actionsBlock];
+  return [textBlock];
+}
+
+function hasResolvedActionsBlock(payload: ContentBlock[]): boolean {
+  return payload.some(block => block.type === 'actions' && block.resolved !== undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +187,10 @@ const nativeRuntime: ChannelApprovalNativeRuntimeAdapter<
     },
 
     updateEntry: async ({ entry, payload }) => {
+      // Resolved action blocks are output-only: create/edit routes reject
+      // `resolved` actions, and /execute-action owns the state transition.
+      if (hasResolvedActionsBlock(payload)) return;
+
       const client = makeClient();
       const result = await client.editMessage({
         conversationId: entry.conversationId,
@@ -216,12 +214,11 @@ export function createKiloChatApprovalCapability(): ChannelApprovalCapability {
     // Authorization is enforced by the kilo-chat Worker's execute-action
     // endpoint: callerId is derived from the JWT and the DO checks membership.
     // This callback is intentionally permissive because the Worker is the trust
-    // boundary.
-    //
-    // IMPORTANT: the Worker currently checks *membership*, not *session
-    // ownership*. If multi-party conversations ship (additionalMembers), any
-    // member could approve exec actions running on the conversation-owner's Fly
-    // machine. Gate on session ownership before enabling multi-party.
+    // boundary, and KiloClaw currently keeps bot-created approval conversations
+    // owner-only by not forwarding additionalMembers.
+    // If kilo-chat ever supports more than the owner plus the bot in a
+    // conversation, gate this on session ownership before relaxing those
+    // owner-only conversation constraints.
     authorizeActorAction: () => ({ authorized: true }),
     getActionAvailabilityState: () => ({ kind: 'enabled' as const }),
 

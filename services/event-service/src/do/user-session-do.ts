@@ -53,11 +53,11 @@ export class UserSessionDO extends DurableObject<Env> {
         }
         this.saveState(ws, state);
         if (overflowed) {
-          const errorMsg: ServerMessage = {
+          const errorMsg = {
             type: 'error',
             code: 'too_many_contexts',
             max: MAX_CONTEXTS,
-          };
+          } satisfies ServerMessage;
           try {
             ws.send(JSON.stringify(errorMsg));
           } catch {
@@ -95,7 +95,7 @@ export class UserSessionDO extends DurableObject<Env> {
       logger.setTags({ userId: this.ctx.id.name, context, event });
 
       const sockets = this.ctx.getWebSockets();
-      const message: ServerMessage = { type: 'event', context, event, payload };
+      const message = { type: 'event', context, event, payload } satisfies ServerMessage;
       const text = JSON.stringify(message);
       let delivered = false;
 
@@ -110,6 +110,17 @@ export class UserSessionDO extends DurableObject<Env> {
         }
       }
       return delivered;
+    });
+  }
+
+  async hasContext(context: string): Promise<boolean> {
+    return withLogTags({ source: 'UserSessionDO.hasContext' }, () => {
+      logger.setTags({ userId: this.ctx.id.name, context });
+      for (const ws of this.ctx.getWebSockets()) {
+        const state = this.getState(ws);
+        if (state.contexts.has(context)) return true;
+      }
+      return false;
     });
   }
 

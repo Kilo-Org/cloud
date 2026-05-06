@@ -60,9 +60,20 @@ class MockWebSocket {
 
 let lastMockWs: MockWebSocket;
 let allMockWs: MockWebSocket[];
+let ticketCounter: number;
 
 beforeEach(() => {
   allMockWs = [];
+  ticketCounter = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      ticketCounter += 1;
+      return new Response(JSON.stringify({ ticket: `ticket-${ticketCounter}` }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    })
+  );
   const WebSocketMock = function (url: string, protocols?: string | string[]) {
     lastMockWs = new MockWebSocket(url, protocols);
     allMockWs.push(lastMockWs);
@@ -87,20 +98,27 @@ function makeClient(url = 'ws://localhost:8080') {
   });
 }
 
-// Mirrors the base64url encoding used inside the client.
-function encodeBase64Url(input: string): string {
-  const base64 = btoa(input);
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function expectNonSecretProtocol(protocols: string | string[] | undefined): void {
+  expect(protocols).toEqual(['kilo.events.v1']);
+  expect(JSON.stringify(protocols)).not.toContain('header.payload.sig');
+  expect(JSON.stringify(protocols)).not.toContain('kilo.jwt.');
+  expect(JSON.stringify(protocols)).not.toMatch(
+    /eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/
+  );
 }
 
 describe('EventServiceClient', () => {
-  it('passes the JWT as a subprotocol and targets /connect', async () => {
+  it('mints a connection ticket and uses a non-secret subprotocol for /connect', async () => {
     const client = makeClient();
     client.subscribe(['room:123', 'user:456']);
     await client.connect();
 
-    expect(lastMockWs.url).toBe('ws://localhost:8080/connect');
-    expect(lastMockWs.protocols).toEqual([`kilo.jwt.${encodeBase64Url('header.payload.sig')}`]);
+    expect(fetch).toHaveBeenCalledWith('http://localhost:8080/connect-ticket', {
+      method: 'POST',
+      headers: { authorization: 'Bearer header.payload.sig' },
+    });
+    expect(lastMockWs.url).toBe('ws://localhost:8080/connect?ticket=ticket-1');
+    expectNonSecretProtocol(lastMockWs.protocols);
     expect(client.isConnected()).toBe(true);
 
     const messages = lastMockWs.sent.map(s => JSON.parse(s) as unknown);
@@ -210,18 +228,142 @@ describe('EventServiceClient', () => {
     expect(allMockWs).toHaveLength(2);
   });
 
-  it('error before open calls onUnauthorized and stops reconnecting', async () => {
+  it('reconnects after a pre-open error without refreshing auth', async () => {
     vi.useFakeTimers();
     try {
-      const onUnauthorized = vi.fn();
+      const tokens = ['stale.token.sig', 'fresh.token.sig'];
+      const getToken = vi.fn(async () => tokens.shift() ?? 'fresh.token.sig');
+      const retryAuth = (): 'retry' => 'retry';
+      const onUnauthorized = vi.fn(retryAuth);
+      let wsCount = 0;
       const WebSocketMock = function (url: string, protocols?: string | string[]) {
         lastMockWs = new MockWebSocket(url, protocols);
         allMockWs.push(lastMockWs);
-        lastMockWs.readyState = 0; // CONNECTING
-        void Promise.resolve().then(() => {
-          lastMockWs.triggerError();
-          lastMockWs.triggerClose();
-        });
+        wsCount++;
+        if (wsCount === 1) {
+          lastMockWs.readyState = 0; // CONNECTING
+          void Promise.resolve().then(() => {
+            lastMockWs.triggerError();
+            lastMockWs.triggerClose();
+          });
+        } else {
+          void Promise.resolve().then(() => lastMockWs.triggerOpen());
+        }
+        return lastMockWs;
+      };
+      WebSocketMock.OPEN = 1;
+      WebSocketMock.CLOSING = 2;
+      WebSocketMock.CLOSED = 3;
+      vi.stubGlobal('WebSocket', WebSocketMock);
+
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken,
+        onUnauthorized,
+      });
+
+      await client.connect();
+
+      expect(onUnauthorized).not.toHaveBeenCalled();
+      expect(client.isConnected()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(allMockWs).toHaveLength(2);
+      expect(getToken).toHaveBeenCalledTimes(2);
+      expect(fetch).toHaveBeenLastCalledWith('http://localhost:8080/connect-ticket', {
+        method: 'POST',
+        headers: { authorization: 'Bearer fresh.token.sig' },
+      });
+      expect(allMockWs[1]?.url).toBe('ws://localhost:8080/connect?ticket=ticket-2');
+      expectNonSecretProtocol(allMockWs[1]?.protocols);
+      expect(client.isConnected()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops after an explicit unauthorized stop decision from connect-ticket', async () => {
+    vi.useFakeTimers();
+    try {
+      const stopAuth = (): 'stop' => 'stop';
+      const onUnauthorized = vi.fn(stopAuth);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(null, { status: 401 }))
+      );
+
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken: () => Promise.resolve('h.p.s'),
+        onUnauthorized,
+      });
+
+      await client.connect();
+
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(allMockWs).toHaveLength(0);
+      expect(client.isConnected()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(allMockWs).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops after the single unauthorized retry is exhausted', async () => {
+    vi.useFakeTimers();
+    try {
+      const retryAuth = (): 'retry' => 'retry';
+      const onUnauthorized = vi.fn(retryAuth);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => new Response(null, { status: 401 }))
+      );
+
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken: () => Promise.resolve('h.p.s'),
+        onUnauthorized,
+      });
+
+      await client.connect();
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(onUnauthorized).toHaveBeenCalledTimes(1);
+      expect(allMockWs).toHaveLength(0);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(allMockWs).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps reconnecting after repeated pre-open failures', async () => {
+    vi.useFakeTimers();
+    const reconnectDelay = vi.spyOn(Math, 'random').mockReturnValue(1);
+    try {
+      const retryAuth = (): 'retry' => 'retry';
+      const onUnauthorized = vi.fn(retryAuth);
+      let wsCount = 0;
+      const WebSocketMock = function (url: string, protocols?: string | string[]) {
+        lastMockWs = new MockWebSocket(url, protocols);
+        allMockWs.push(lastMockWs);
+        wsCount++;
+        if (wsCount <= 2) {
+          lastMockWs.readyState = 0; // CONNECTING
+          void Promise.resolve().then(() => {
+            lastMockWs.triggerError();
+            lastMockWs.triggerClose();
+          });
+        } else {
+          void Promise.resolve().then(() => lastMockWs.triggerOpen());
+        }
         return lastMockWs;
       };
       WebSocketMock.OPEN = 1;
@@ -234,15 +376,64 @@ describe('EventServiceClient', () => {
         getToken: () => Promise.resolve('h.p.s'),
         onUnauthorized,
       });
+      client.subscribe(['room:configured']);
 
       await client.connect();
-
-      expect(onUnauthorized).toHaveBeenCalledTimes(1);
       expect(client.isConnected()).toBe(false);
 
-      // No reconnect should be scheduled — advancing time keeps the count at 1.
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(allMockWs).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(allMockWs).toHaveLength(2);
+      expect(client.isConnected()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(allMockWs).toHaveLength(3);
+      expect(client.isConnected()).toBe(true);
+      expect(onUnauthorized).not.toHaveBeenCalled();
+      expect(allMockWs[2]?.sent.map(s => JSON.parse(s) as unknown)).toContainEqual({
+        type: 'context.subscribe',
+        contexts: ['room:configured'],
+      });
+    } finally {
+      reconnectDelay.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries non-auth pre-open failures with normal backoff', async () => {
+    vi.useFakeTimers();
+    try {
+      let wsCount = 0;
+      const WebSocketMock = function (url: string, protocols?: string | string[]) {
+        lastMockWs = new MockWebSocket(url, protocols);
+        allMockWs.push(lastMockWs);
+        wsCount++;
+        if (wsCount === 1) {
+          lastMockWs.readyState = 0; // CONNECTING
+          void Promise.resolve().then(() => {
+            lastMockWs.triggerError();
+            lastMockWs.triggerClose();
+          });
+        } else {
+          void Promise.resolve().then(() => lastMockWs.triggerOpen());
+        }
+        return lastMockWs;
+      };
+      WebSocketMock.OPEN = 1;
+      WebSocketMock.CLOSING = 2;
+      WebSocketMock.CLOSED = 3;
+      vi.stubGlobal('WebSocket', WebSocketMock);
+
+      const client = new EventServiceClient({
+        url: 'ws://localhost:8080',
+        getToken: () => Promise.resolve('h.p.s'),
+      });
+
+      await client.connect();
+      expect(client.isConnected()).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(allMockWs).toHaveLength(2);
+      expect(client.isConnected()).toBe(true);
     } finally {
       vi.useRealTimers();
     }
@@ -386,5 +577,103 @@ describe('EventServiceClient', () => {
     const err = new HandshakeTimeoutError();
     expect(err).toBeInstanceOf(Error);
     expect(err.name).toBe('HandshakeTimeoutError');
+  });
+
+  describe('subscribe/unsubscribe refcounting', () => {
+    function sentMessages() {
+      return lastMockWs.sent.map(s => JSON.parse(s) as unknown);
+    }
+
+    it('only sends one wire context.subscribe when two consumers subscribe to the same context', async () => {
+      const client = makeClient();
+      await client.connect();
+      lastMockWs.sent = [];
+
+      client.subscribe(['room:1']);
+      client.subscribe(['room:1']);
+
+      expect(sentMessages()).toEqual([{ type: 'context.subscribe', contexts: ['room:1'] }]);
+    });
+
+    it('keeps the subscription alive when one of two consumers unsubscribes', async () => {
+      const client = makeClient();
+      await client.connect();
+      lastMockWs.sent = [];
+
+      client.subscribe(['room:1']);
+      client.subscribe(['room:1']);
+      client.unsubscribe(['room:1']);
+
+      // Only the initial 0→1 subscribe should have been sent. No unsubscribe yet
+      // because the second consumer is still holding a ref.
+      expect(sentMessages()).toEqual([{ type: 'context.subscribe', contexts: ['room:1'] }]);
+    });
+
+    it('sends context.unsubscribe only when the last consumer drops the ref (1→0)', async () => {
+      const client = makeClient();
+      await client.connect();
+      lastMockWs.sent = [];
+
+      client.subscribe(['room:1']);
+      client.subscribe(['room:1']);
+      client.unsubscribe(['room:1']);
+      client.unsubscribe(['room:1']);
+
+      expect(sentMessages()).toEqual([
+        { type: 'context.subscribe', contexts: ['room:1'] },
+        { type: 'context.unsubscribe', contexts: ['room:1'] },
+      ]);
+    });
+
+    it('handles a mixed batch: only newly-active contexts get sent', async () => {
+      const client = makeClient();
+      await client.connect();
+      client.subscribe(['room:1']);
+      lastMockWs.sent = [];
+
+      // room:1 already at refcount 1, room:2 is new. Only room:2 should hit the wire.
+      client.subscribe(['room:1', 'room:2']);
+
+      expect(sentMessages()).toEqual([{ type: 'context.subscribe', contexts: ['room:2'] }]);
+    });
+
+    it('extra unsubscribes for an unknown context are no-ops', async () => {
+      const client = makeClient();
+      await client.connect();
+      lastMockWs.sent = [];
+
+      // Never subscribed — must not crash and must not emit a wire message.
+      client.unsubscribe(['ghost']);
+
+      expect(sentMessages()).toEqual([]);
+    });
+
+    it('resubscribe-on-reconnect deduplicates by context (one entry per active context)', async () => {
+      vi.useFakeTimers();
+      const client = makeClient();
+      await client.connect();
+
+      // Two consumers hold the same context.
+      client.subscribe(['room:1']);
+      client.subscribe(['room:1']);
+
+      // Drop the connection — auto-reconnect kicks in.
+      lastMockWs.triggerClose();
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(allMockWs.length).toBe(2);
+      // The second mock socket also auto-triggers open via the global stub.
+      await vi.advanceTimersByTimeAsync(0);
+
+      const resubMessages = allMockWs[1].sent
+        .map(s => JSON.parse(s) as { type: string; contexts?: string[] })
+        .filter(m => m.type === 'context.subscribe');
+
+      // Exactly one resubscribe message containing the context exactly once,
+      // regardless of how many consumers hold the ref.
+      expect(resubMessages).toHaveLength(1);
+      expect(resubMessages[0]?.contexts).toEqual(['room:1']);
+
+      vi.useRealTimers();
+    });
   });
 });

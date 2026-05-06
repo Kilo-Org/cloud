@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { Chat, type ActionEvent, type Message, type Thread, type WebhookOptions } from 'chat';
+import { createGitHubAdapter, type GitHubAdapter } from '@chat-adapter/github';
 import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
 import type { HomeView } from '@slack/types';
@@ -7,16 +8,21 @@ import { resolveKiloUserId, unlinkKiloUser, unlinkTeamKiloUsers } from '@/lib/bo
 import { isSlackMissingScopeError, postSlackReinstallInstruction } from '@/lib/bot/helpers';
 import { deleteInstallationByTeamId } from '@/lib/integrations/slack-service';
 import {
+  canKiloUserAccessPlatformIntegration,
+  getGitHubRepositoryReference,
   getPlatformIdentity,
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
+  isGitHubBotEnabled,
+  isGitHubRepositoryLinked,
 } from '@/lib/bot/platform-helpers';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-account';
-import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { findUserById } from '@/lib/user';
-import { processMessage } from '@/lib/bot/run';
+import { processLinkedMessage } from '@/lib/bot/run';
 import { createChatState } from '@/lib/bot/state';
 import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET } from '@/lib/config.server';
+import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
 
 const SLACK_ASSISTANT_SUGGESTED_PROMPTS = [
   {
@@ -158,7 +164,7 @@ function cloneSlackRequest(request: Request, body: BodyInit): Request {
   });
 }
 
-export function buildSlackAppHomeView() {
+function buildSlackAppHomeView() {
   return {
     type: 'home',
     blocks: [
@@ -243,13 +249,18 @@ export function buildSlackAppHomeView() {
   } satisfies HomeView;
 }
 
-function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
+function createKiloBot(
+  slackAdapter: ReturnType<typeof createSlackAdapter>,
+  githubAdapter: GitHubAdapter
+) {
   const chatBot = new Chat({
     userName: process.env.NODE_ENV === 'production' ? 'Kilo' : 'Henk',
     adapters: {
+      github: githubAdapter,
       slack: slackAdapter,
     },
     state: createChatState(),
+    logger: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   });
 
   chatBot.webhooks.slack = (request, options) =>
@@ -259,7 +270,9 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
     thread: Thread,
     message: Message
   ): Promise<void> {
-    const identity = getPlatformIdentity(thread, message);
+    const identity = await getPlatformIdentity(thread, message, githubThread =>
+      githubAdapter.getInstallationId(githubThread)
+    );
     const [platformIntegration, kiloUserId] = await Promise.all([
       getPlatformIntegration(identity),
       resolveKiloUserId(chatBot.getState(), identity),
@@ -272,8 +285,23 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
       return;
     }
 
+    // Canary gate: the GitHub bot path is opt-in per integration via
+    // `metadata.bot_enabled`. Webhooks still arrive at the adapter so this
+    // handler runs, but we drop out before any user-visible side effects
+    // (no link prompt, no agent run, no GitHub API calls).
+    if (identity.platform === PLATFORM.GITHUB && !isGitHubBotEnabled(platformIntegration)) {
+      return;
+    }
+
+    if (
+      identity.platform === PLATFORM.GITHUB &&
+      !isGitHubRepositoryLinked(platformIntegration, getGitHubRepositoryReference(thread, message))
+    ) {
+      return;
+    }
+
     if (!kiloUserId) {
-      await promptLinkAccount(thread, message, identity);
+      await promptLinkAccount(thread, message, identity, platformIntegration, chatBot.getState());
       return;
     }
 
@@ -281,37 +309,22 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
 
     if (!user) {
       await unlinkKiloUser(chatBot.getState(), identity);
-      await promptLinkAccount(thread, message, identity);
+      await promptLinkAccount(thread, message, identity, platformIntegration, chatBot.getState());
       return;
     }
 
-    const platform = thread.id.split(':')[0];
-    const botRequestId = await createBotRequest({
-      createdBy: user.id,
-      organizationId: platformIntegration.owned_by_organization_id ?? null,
-      platformIntegrationId: platformIntegration.id,
-      platform,
-      platformThreadId: thread.id,
-      platformMessageId: message.id,
-      userMessage: message.text,
-      modelUsed: undefined,
-    });
+    if (!(await canKiloUserAccessPlatformIntegration(platformIntegration, user.id))) {
+      await unlinkKiloUser(chatBot.getState(), identity);
+      await promptLinkAccount(thread, message, identity, platformIntegration, chatBot.getState());
+      return;
+    }
 
     chatBot.registerSingleton();
 
-    await thread.startTyping('Thinking...');
-
     try {
-      await processMessage({ thread, message, platformIntegration, user, botRequestId });
+      await processLinkedMessage({ thread, message, platformIntegration, user });
     } catch (error) {
       console.error('[Bot] Unhandled error in message handler:', error);
-      if (botRequestId) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        updateBotRequest(botRequestId, {
-          status: 'error',
-          errorMessage: errMsg.slice(0, 2000),
-        });
-      }
       await thread.post({ markdown: 'Sorry, something went wrong while processing your message.' });
     }
   });
@@ -407,4 +420,12 @@ const slackAdapter = createSlackAdapter({
   signingSecret: SLACK_SIGNING_SECRET,
 });
 
-export const bot = createKiloBot(slackAdapter);
+const githubAppCredentials = getGitHubAppCredentials('standard');
+const githubAdapter = createGitHubAdapter({
+  appId: githubAppCredentials.appId,
+  privateKey: githubAppCredentials.privateKey,
+  webhookSecret: githubAppCredentials.webhookSecret,
+  userName: process.env.NODE_ENV === 'development' ? 'kilocode-dev' : 'kilocode-bot',
+});
+
+export const bot = createKiloBot(slackAdapter, githubAdapter);

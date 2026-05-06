@@ -134,11 +134,6 @@ export type InstanceMutableState = {
   instanceReadyEmailSent: boolean;
   startFailurePushSentForAttempt: boolean;
   customSecretMeta: PersistedState['customSecretMeta'];
-  // Stream Chat default channel (auto-provisioned)
-  streamChatApiKey: string | null;
-  streamChatBotUserId: string | null;
-  streamChatBotUserToken: string | null;
-  streamChatChannelId: string | null;
   vectorMemoryEnabled: boolean;
   vectorMemoryModel: string | null;
   dreamingEnabled: boolean;

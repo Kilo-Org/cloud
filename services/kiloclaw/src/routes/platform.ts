@@ -29,6 +29,7 @@ import {
 } from '../lib/version-rollout';
 import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
+import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
 import {
   KiloclawStartReasonSchema,
@@ -49,7 +50,6 @@ import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
-import { sendMessage } from '../stream-chat/client';
 import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
 import {
@@ -2747,31 +2747,6 @@ platform.get('/status', async c => {
   }
 });
 
-// GET /api/platform/stream-chat-credentials?userId=...&instanceId=...
-platform.get('/stream-chat-credentials', async c => {
-  const userId = setValidatedQueryUserId(c);
-  if (!userId) {
-    return c.json({ error: 'userId query parameter is required' }, 400);
-  }
-  const iidResult = parseInstanceIdQuery(c);
-  if ('error' in iidResult) return iidResult.error;
-  const { instanceId } = iidResult;
-
-  try {
-    const creds = await withResolvedDORetry(
-      c.env,
-      userId,
-      instanceId,
-      stub => stub.getStreamChatCredentials(),
-      'getStreamChatCredentials'
-    );
-    return c.json(creds);
-  } catch (err) {
-    const { message, status } = sanitizeError(err, 'stream-chat-credentials');
-    return jsonError(message, status);
-  }
-});
-
 const MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH = 80;
 
 const InboundEmailSchema = z.object({
@@ -3048,74 +3023,6 @@ platform.post('/inbound-email', async c => {
     });
     const { message, status } = sanitizeError(err, 'inbound-email');
     return jsonError(message, status);
-  }
-});
-
-// POST /api/platform/send-chat-message
-// Send a message to a KiloClaw instance's Stream Chat channel as the human user.
-// The OpenClaw bot picks it up and responds as if the user typed it.
-const SendChatMessageSchema = z.object({
-  userId: z.string().min(1),
-  instanceId: z.string().uuid().optional(),
-  message: z.string().min(1).max(32_000),
-});
-
-platform.post('/send-chat-message', async c => {
-  const body: unknown = await c.req.json().catch(() => null);
-  const parsed = SendChatMessageSchema.safeParse(body);
-  if (!parsed.success) {
-    return jsonError('Invalid request body: userId and message are required', 400);
-  }
-
-  const { userId, instanceId, message } = parsed.data;
-  c.set('userId', userId);
-
-  const apiKey = c.env.STREAM_CHAT_API_KEY;
-  const apiSecret = c.env.STREAM_CHAT_API_SECRET;
-  if (!apiKey || !apiSecret) {
-    return jsonError('Stream Chat is not configured', 503);
-  }
-
-  try {
-    // Use instanceId as the DO key when available (matches how other endpoints resolve DOs).
-    // Falls back to userId for backward compatibility with triggers that predate instanceId.
-    const creds = await withResolvedDORetry(
-      c.env,
-      userId,
-      instanceId,
-      stub => stub.getStreamChatCredentials(),
-      'getStreamChatCredentials'
-    );
-
-    if (!creds) {
-      return jsonError('Stream Chat is not set up for this instance', 404);
-    }
-
-    await sendMessage(apiKey, apiSecret, creds.channelId, creds.userId, message);
-
-    writeEvent(c.env, {
-      event: 'instance.webhook_chat_message_sent',
-      delivery: 'http',
-      route: '/api/platform/send-chat-message',
-      userId,
-      instanceId: instanceId ?? undefined,
-      channelId: creds.channelId,
-    });
-
-    return c.json({ success: true, channelId: creds.channelId });
-  } catch (err) {
-    const { message: errMsg, status } = sanitizeError(err, 'send-chat-message');
-
-    writeEvent(c.env, {
-      event: 'instance.webhook_chat_message_failed',
-      delivery: 'http',
-      route: '/api/platform/send-chat-message',
-      userId,
-      instanceId: instanceId ?? undefined,
-      error: errMsg,
-    });
-
-    return jsonError(errMsg, status);
   }
 });
 
@@ -3945,6 +3852,62 @@ platform.post('/extend-volume', async c => {
     return c.json({ ok: true as const, needsRestart });
   } catch (err) {
     const { message, status } = sanitizeError(err, 'extend-volume');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/scheduled-action/wake
+//
+// Called by the web's scheduleAction tRPC right after persisting a new
+// scheduled-action row in Postgres. Resolves the target instance's DO
+// and calls notifyScheduledActionPending() — which just re-arms the
+// existing reconcile alarm so the next alarm tick picks up the new
+// row via the existing wedge in alarm().
+//
+// In production this is belt-and-suspenders (the platform proactively
+// fires past-due alarms anyway). In `wrangler dev`, stale alarm
+// timestamps don't auto-fire — this route is what prevents the dev
+// scheduler from sitting forever with a never-firing pre-existing
+// alarm.
+const ScheduledActionWakeSchema = z.object({
+  userId: z.string().min(1),
+  instanceId: z.string().uuid(),
+});
+
+platform.post('/scheduled-action/wake', async c => {
+  const result = await parseBody(c, ScheduledActionWakeSchema);
+  if ('error' in result) return result.error;
+
+  const { userId, instanceId } = result.data;
+
+  try {
+    const woken = await withResolvedDORetry(
+      c.env,
+      userId,
+      instanceId,
+      stub => stub.notifyScheduledActionPending(),
+      'notifyScheduledActionPending'
+    );
+    return c.json(woken);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-wake');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/scheduled-action/run-notice-sweep
+//
+// Synchronously runs the notice sweep that the cron normally drives.
+// Useful for local dev (where wrangler does not fire scheduled() on
+// the cron cadence) and for ad-hoc admin testing in production. The
+// sweep is idempotent and bounded (MAX_NOTIFICATIONS_PER_TICK), so
+// invoking it on demand is safe.
+platform.post('/scheduled-action/run-notice-sweep', async c => {
+  try {
+    const result = await runScheduledActionNoticesSweep(c.env);
+    return c.json(result);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-run-notice-sweep');
     return jsonError(message, status);
   }
 });

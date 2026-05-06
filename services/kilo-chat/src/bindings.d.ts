@@ -1,5 +1,11 @@
 import type { z } from 'zod';
-import type { chatWebhookRpcSchema, KiloChatEventName } from '@kilocode/kilo-chat';
+import type { chatWebhookRpcSchema, KiloChatEventName, KiloChatEventOf } from '@kilocode/kilo-chat';
+import type {
+  ClearBadgeBucketForUserInput,
+  ClearBadgeBucketForUserOutput,
+  SendPushForConversationInput,
+  SendPushForConversationOutput,
+} from '@kilocode/notifications';
 
 // Augment the wrangler-generated Env with RPC method signatures for service
 // bindings. `worker-configuration.d.ts` types these as plain Fetcher; this
@@ -16,12 +22,20 @@ declare global {
       deliverChatWebhook(payload: z.infer<typeof chatWebhookRpcSchema>): Promise<void>;
     };
     EVENT_SERVICE: Fetcher & {
-      pushEvent(
+      pushEvent<N extends KiloChatEventName>(
         userId: string,
         context: string,
-        event: KiloChatEventName,
-        payload: unknown
+        event: N,
+        payload: KiloChatEventOf<N>
       ): Promise<boolean>;
+    };
+    NOTIFICATIONS: Fetcher & {
+      sendPushForConversation(
+        input: SendPushForConversationInput
+      ): Promise<SendPushForConversationOutput>;
+      clearBadgeBucketForUser(
+        input: ClearBadgeBucketForUserInput
+      ): Promise<ClearBadgeBucketForUserOutput>;
     };
   }
 }

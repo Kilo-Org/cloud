@@ -3,14 +3,14 @@ import os from 'os';
 /**
  * Check if the app is running in a nodenv dev environment
  */
-export function isDevEnvironment(): boolean {
+function isDevEnvironment(): boolean {
   return process.env.NODE_ENV === 'development';
 }
 
 /**
  * Get the local Linux username
  */
-export function getLocalUsername(): string {
+function getLocalUsername(): string {
   try {
     return os.userInfo().username;
   } catch (error) {

@@ -4,6 +4,7 @@ import type {
   CreateConversationResponse,
   ConversationListResponse,
   ConversationDetailResponse,
+  MarkConversationReadResponse,
   OkResponse,
 } from '@kilocode/kilo-chat';
 import { withDORetry } from '@kilocode/worker-utils';
@@ -13,10 +14,12 @@ import {
   leaveConversationFor,
   markReadFor,
 } from '../services/conversations';
+import { resolveUserDisplayInfo, type UserDisplayInfo } from '../services/user-lookup';
 import {
   ulidSchema,
   createConversationRequestSchema,
   listConversationsQuerySchema,
+  markConversationReadRequestSchema,
   renameConversationRequestSchema,
   decodeConversationCursor,
 } from '@kilocode/kilo-chat';
@@ -53,7 +56,10 @@ export function registerConversationRoutes(
     }
 
     return c.json(
-      { conversationId: result.conversationId } satisfies CreateConversationResponse,
+      {
+        conversationId: result.conversationId,
+        conversation: result.conversation,
+      } satisfies CreateConversationResponse,
       201
     );
   });
@@ -102,7 +108,20 @@ export function registerConversationRoutes(
     if (!info || !info.members.some(m => m.id === callerId)) {
       return c.json({ error: 'Forbidden' }, 403);
     }
-    return c.json(info satisfies ConversationDetailResponse);
+    const userIds = info.members.filter(m => m.kind === 'user').map(m => m.id);
+    const displayInfo =
+      userIds.length > 0
+        ? await resolveUserDisplayInfo(c.env.HYPERDRIVE.connectionString, userIds)
+        : new Map<string, UserDisplayInfo>();
+    const enrichedInfo = {
+      ...info,
+      members: info.members.map(member => ({
+        ...member,
+        displayName: displayInfo.get(member.id)?.displayName ?? null,
+        avatarUrl: displayInfo.get(member.id)?.avatarUrl ?? null,
+      })),
+    };
+    return c.json(enrichedInfo satisfies ConversationDetailResponse);
   });
 
   // PATCH /v1/conversations/:id — rename
@@ -161,7 +180,7 @@ export function registerConversationRoutes(
       return c.json({ error: result.error }, 403);
     }
 
-    return c.body(null, 204);
+    return c.json({ ok: true } satisfies OkResponse);
   });
 
   // POST /v1/conversations/:id/mark-read — mark conversation as read
@@ -172,12 +191,37 @@ export function registerConversationRoutes(
     }
     const conversationId = idParam.data;
 
+    let rawBody: unknown;
+    try {
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON' }, 400);
+    }
+
+    const body = markConversationReadRequestSchema.safeParse(rawBody);
+    if (!body.success) {
+      return c.json({ error: 'Invalid request', issues: body.error.issues }, 400);
+    }
+
     const callerId = c.get('callerId');
-    const result = await markReadFor(c.env, callerId, { conversationId }, makeSchedule(c));
+    const result = await markReadFor(
+      c.env,
+      callerId,
+      { conversationId, lastSeenMessageId: body.data.lastSeenMessageId },
+      makeSchedule(c)
+    );
     if (!result.ok) {
+      if (result.code === 'invalid') return c.json({ error: result.error }, 400);
+      if (result.code === 'badge_clear_failed') return c.json({ error: result.error }, 503);
       return c.json({ error: result.error }, 403);
     }
 
-    return c.body(null, 204);
+    const response = {
+      ok: result.ok,
+      applied: result.applied,
+      lastReadAt: result.lastReadAt,
+      badgeClear: result.badgeClear,
+    } satisfies MarkConversationReadResponse;
+    return c.json(response);
   });
 }

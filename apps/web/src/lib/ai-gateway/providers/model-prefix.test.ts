@@ -1,4 +1,3 @@
-import { modelStartsWith, stripModelTilde } from './model-prefix';
 import { isClaudeModel, isHaikuModel, isOpusModel } from './anthropic.constants';
 import { isOpenAiModel, isGptOssModel } from './openai';
 import { isGeminiModel, isGemmaModel, isGemini3Model } from './google';
@@ -9,31 +8,6 @@ import { isMinimaxModel } from './minimax';
 import { isStepModel } from './stepfun';
 import { isCodestralModel, isMistralModel } from './mistral';
 import { inferVercelFirstPartyInferenceProviderForModel } from './openrouter/inference-provider-id';
-
-describe('modelStartsWith', () => {
-  test('matches the bare prefix', () => {
-    expect(modelStartsWith('anthropic/claude-sonnet-4.5', 'anthropic/')).toBe(true);
-  });
-
-  test('matches the tilde-prefixed variant', () => {
-    expect(modelStartsWith('~anthropic/claude-sonnet-4.5', 'anthropic/')).toBe(true);
-  });
-
-  test('rejects unrelated prefixes', () => {
-    expect(modelStartsWith('openai/gpt-5', 'anthropic/')).toBe(false);
-    expect(modelStartsWith('~openai/gpt-5', 'anthropic/')).toBe(false);
-  });
-});
-
-describe('stripModelTilde', () => {
-  test('removes a leading tilde', () => {
-    expect(stripModelTilde('~anthropic/claude-sonnet-4.5')).toBe('anthropic/claude-sonnet-4.5');
-  });
-
-  test('leaves untilded ids alone', () => {
-    expect(stripModelTilde('anthropic/claude-sonnet-4.5')).toBe('anthropic/claude-sonnet-4.5');
-  });
-});
 
 describe('provider predicates match substrings, regardless of prefix', () => {
   test('isClaudeModel / isHaikuModel / isOpusModel', () => {
@@ -102,11 +76,11 @@ describe('provider predicates match substrings, regardless of prefix', () => {
     expect(isCodestralModel('mistralai/devstral-2')).toBe(false);
   });
 
-  test('inferVercelFirstPartyInferenceProviderForModel strips tilde', () => {
-    expect(inferVercelFirstPartyInferenceProviderForModel('~anthropic/claude-sonnet-4.5')).toBe(
+  test('inferVercelFirstPartyInferenceProviderForModel', () => {
+    expect(inferVercelFirstPartyInferenceProviderForModel('anthropic/claude-sonnet-4.5')).toBe(
       'anthropic'
     );
-    expect(inferVercelFirstPartyInferenceProviderForModel('~openai/gpt-5-nano')).toBe('openai');
-    expect(inferVercelFirstPartyInferenceProviderForModel('~openai/gpt-oss')).toBe(null);
+    expect(inferVercelFirstPartyInferenceProviderForModel('openai/gpt-5-nano')).toBe('openai');
+    expect(inferVercelFirstPartyInferenceProviderForModel('openai/gpt-oss')).toBe(null);
   });
 });

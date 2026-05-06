@@ -135,13 +135,12 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     url: 'https://llm.chutes.ai/v1/models',
   }),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
+  modelsDevFetcher('ollama-cloud', 'ollama-cloud'),
 ];
 
 function modelIdToDisplayName(id: string) {
   const slash = id.lastIndexOf('/');
-  const withoutVendor = slash >= 0 ? id.slice(slash + 1) : id;
-  const colon = withoutVendor.indexOf(':');
-  return colon >= 0 ? withoutVendor.slice(0, colon) : withoutVendor;
+  return slash >= 0 ? id.slice(slash + 1) : id;
 }
 
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {

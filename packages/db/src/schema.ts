@@ -50,7 +50,16 @@ import {
   AffiliateEventType,
   AffiliateEventDeliveryState,
 } from './schema-types';
-import type { CustomLlmDefinition, KiloClawAdminAuditAction } from './schema-types';
+import type {
+  CustomLlmDefinition,
+  KiloClawAdminAuditAction,
+  KiloClawScheduledActionStatus,
+  KiloClawScheduledActionStageStatus,
+  KiloClawScheduledActionTargetStatus,
+  KiloClawScheduledActionNotificationStatus,
+  KiloClawScheduledActionNotificationChannel,
+  KiloClawScheduledActionNotificationKind,
+} from './schema-types';
 import type {
   OrganizationModeConfig,
   OrganizationPlan,
@@ -1241,7 +1250,7 @@ export const stytch_fingerprints = pgTable(
     index('idx_fingerprint_data').on(table.fingerprint_data),
     index('idx_hardware_fingerprint').on(table.hardware_fingerprint),
     index('idx_kilo_user_id').on(table.kilo_user_id),
-    index('idx_reasons').on(table.reasons),
+    index('idx_stytch_fingerprints_reasons_gin').using('gin', table.reasons),
     index('idx_verdict_action').on(table.verdict_action),
     index('idx_visitor_fingerprint').on(table.visitor_fingerprint),
   ]
@@ -2764,7 +2773,7 @@ export const app_builder_project_sessions = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     ended_at: timestamp({ withTimezone: true, mode: 'string' }), // null = current/active session
     reason: text().notNull(), // 'initial', 'github_migration', 'upgrade', etc.
-    worker_version: text().notNull().default('v1'), // 'v1' (old cloud-agent) or 'v2' (cloud-agent-next)
+    worker_version: text().notNull().default('v2'), // 'v1' (legacy/R2 only) or 'v2' (cloud-agent-next)
   },
   table => [
     index('IDX_app_builder_project_sessions_project_id').on(table.project_id),
@@ -4063,6 +4072,229 @@ export const kiloclaw_version_pins = pgTable('kiloclaw_version_pins', {
 
 export type KiloClawVersionPin = typeof kiloclaw_version_pins.$inferSelect;
 
+// ─── Scheduled Admin Actions ───────────────────────────────────────────
+//
+// Generic scheduled-action framework with `action_type` discriminator.
+// First action type is `scheduled_restart` (no-op redeploy at a chosen
+// time). `version_change` lands in a follow-on PR. The discriminator lets
+// future action types drop in without a schema rebuild.
+//
+// Boundary: this scheduler is kiloclaw-scoped. Other domains build their
+// own. Don't extract into shared infrastructure until at least three
+// domains have shipped their own implementations.
+
+export const kiloclaw_scheduled_actions = pgTable(
+  'kiloclaw_scheduled_actions',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+
+    // Discriminator. PR 1 emits 'scheduled_restart'. PR 3 adds
+    // 'version_change'. Future types add new values; type-specific
+    // columns below stay nullable so unrelated types ignore them.
+    action_type: text().$type<'scheduled_restart' | 'version_change'>().notNull(),
+
+    // version_change-specific fields. Nullable; ignored by other action
+    // types. Live on the parent for v1 (one populated type at a time);
+    // migrate to a JSON payload column or sibling table if a future
+    // action type has very different fields.
+    target_image_tag: text().references(() => kiloclaw_image_catalog.image_tag, {
+      onDelete: 'restrict',
+    }),
+    override_pins: boolean().notNull().default(false),
+
+    // Notice config. Populated for any action type that triggers user
+    // notification in PR 2+; PR 1 leaves these as empty strings since
+    // scheduled_restart in PR 1 doesn't notify.
+    notice_lead_hours: integer().notNull().default(24), // 0..168
+    notice_subject: text().notNull().default(''),
+    notice_body: text().notNull().default(''),
+
+    reason: text(), // optional admin-facing label
+
+    status: text().$type<KiloClawScheduledActionStatus>().notNull().default('scheduled'),
+
+    created_by: text()
+      .notNull()
+      .references(() => kilocode_users.id),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    cancelled_at: timestamp({ withTimezone: true, mode: 'string' }),
+
+    total_count: integer().notNull().default(0),
+    applied_count: integer().notNull().default(0),
+    skipped_count: integer().notNull().default(0),
+    failed_count: integer().notNull().default(0),
+  },
+  table => [
+    index('IDX_kiloclaw_scheduled_actions_status').on(table.status),
+    index('IDX_kiloclaw_scheduled_actions_action_type').on(table.action_type),
+    index('IDX_kiloclaw_scheduled_actions_created_by').on(table.created_by),
+  ]
+);
+
+export type KiloClawScheduledAction = typeof kiloclaw_scheduled_actions.$inferSelect;
+export type NewKiloClawScheduledAction = typeof kiloclaw_scheduled_actions.$inferInsert;
+
+export const kiloclaw_scheduled_action_stages = pgTable(
+  'kiloclaw_scheduled_action_stages',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    scheduled_action_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_scheduled_actions.id, { onDelete: 'cascade' }),
+
+    stage_index: integer().notNull(), // 0-based per parent
+    scheduled_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+
+    status: text().$type<KiloClawScheduledActionStageStatus>().notNull().default('pending'),
+
+    notice_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+
+    applied_count: integer().notNull().default(0),
+    skipped_count: integer().notNull().default(0),
+    failed_count: integer().notNull().default(0),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_scheduled_action_stages_parent_index').on(
+      table.scheduled_action_id,
+      table.stage_index
+    ),
+    // Notice-tick lookup (used in PR 2): stages whose notice window has
+    // opened. Partial index for cheap sweep.
+    index('IDX_kiloclaw_scheduled_action_stages_notice_due')
+      .on(table.scheduled_at)
+      .where(sql`${table.notice_sent_at} IS NULL AND ${table.status} = 'pending'`),
+  ]
+);
+
+export type KiloClawScheduledActionStage = typeof kiloclaw_scheduled_action_stages.$inferSelect;
+export type NewKiloClawScheduledActionStage = typeof kiloclaw_scheduled_action_stages.$inferInsert;
+
+export const kiloclaw_scheduled_action_targets = pgTable(
+  'kiloclaw_scheduled_action_targets',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    scheduled_action_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_scheduled_actions.id, { onDelete: 'cascade' }),
+    stage_id: uuid().references(() => kiloclaw_scheduled_action_stages.id, {
+      onDelete: 'set null',
+    }),
+    instance_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_instances.id, { onDelete: 'cascade' }),
+
+    // Captured at schedule time so a deleted catalog row can't lose
+    // history. Informational only in v1 (no rollback).
+    source_image_tag: text(),
+    target_image_tag: text(), // null for non-version-change action types
+
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id),
+
+    applied_at: timestamp({ withTimezone: true, mode: 'string' }),
+
+    // 'running' is a transient claim state set by the DO apply path
+    // immediately before it dispatches the side effect (restartMachine).
+    // Without it, two concurrent waitUntil passes can both find the
+    // same pending row and both fire the side effect — only one wins
+    // the final CAS but both restarts have already been kicked off.
+    // The claim CAS (pending → running) makes the dispatch
+    // single-writer without needing a row lock.
+    status: text().$type<KiloClawScheduledActionTargetStatus>().notNull().default('pending'),
+    skip_reason: text(),
+    error_message: text(),
+  },
+  table => [
+    uniqueIndex('UQ_kiloclaw_scheduled_action_targets_parent_instance').on(
+      table.scheduled_action_id,
+      table.instance_id
+    ),
+    index('IDX_kiloclaw_scheduled_action_targets_stage').on(table.stage_id),
+    // DO apply path lookup: pending targets for an instance whose stage
+    // has fired. Partial index keeps the lookup cheap on large fleets.
+    index('IDX_kiloclaw_scheduled_action_targets_pending_by_instance')
+      .on(table.instance_id)
+      .where(sql`${table.status} = 'pending'`),
+  ]
+);
+
+export type KiloClawScheduledActionTarget = typeof kiloclaw_scheduled_action_targets.$inferSelect;
+export type NewKiloClawScheduledActionTarget =
+  typeof kiloclaw_scheduled_action_targets.$inferInsert;
+
+// Per-target, per-channel notification rows. Channels dispatch and
+// persist independently — knowing email succeeded but mobile push
+// failed matters for retry and debug. Adding a new channel later is a
+// new value in the enum, not a schema change.
+//
+// kind='notice' is the heads-up dispatched ahead of the scheduled time;
+// kind='cancelled' is the follow-up emitted when an admin cancels the
+// action AFTER a notice was already sent for that (target, channel).
+// We never insert a 'cancelled' row for a (target, channel) that has
+// no prior sent 'notice' — surfacing a cancellation to a user who
+// never got the original heads-up would be confusing.
+export const kiloclaw_scheduled_action_notifications = pgTable(
+  'kiloclaw_scheduled_action_notifications',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    target_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_scheduled_action_targets.id, { onDelete: 'cascade' }),
+
+    channel: text().$type<KiloClawScheduledActionNotificationChannel>().notNull(),
+
+    kind: text().$type<KiloClawScheduledActionNotificationKind>().notNull().default('notice'),
+
+    status: text().$type<KiloClawScheduledActionNotificationStatus>().notNull().default('pending'),
+
+    // Set when the sweep CAS-claims the row (pending → sending). Used
+    // by the next tick to detect and recover stuck claims left behind
+    // by a sweep that crashed mid-dispatch.
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    error_message: text(),
+  },
+  table => [
+    // One notification per (target, kind, channel). A target may have
+    // both kinds (notice sent, then cancellation queued).
+    uniqueIndex('UQ_kiloclaw_scheduled_action_notifications_target_kind_channel').on(
+      table.target_id,
+      table.kind,
+      table.channel
+    ),
+    // Sweep lookup: notifications still pending dispatch. The partial
+    // predicate keeps the index small (only pending rows). Keyed on
+    // target_id so the sweep's join into kiloclaw_scheduled_action_targets
+    // can use it for the inner-join lookup. Point lookups by id (markSent,
+    // markFailed) hit the primary key index directly.
+    index('IDX_kiloclaw_scheduled_action_notifications_pending')
+      .on(table.target_id)
+      .where(sql`${table.status} = 'pending'`),
+  ]
+);
+
+export type KiloClawScheduledActionNotification =
+  typeof kiloclaw_scheduled_action_notifications.$inferSelect;
+export type NewKiloClawScheduledActionNotification =
+  typeof kiloclaw_scheduled_action_notifications.$inferInsert;
+
 // KiloClaw Early Bird Purchases — records one-time earlybird payments.
 // Unique on user_id enforces at most one purchase per user.
 // Unique on stripe_charge_id provides webhook idempotency.
@@ -4204,6 +4436,13 @@ export const kiloclaw_subscription_change_log = pgTable(
 export type KiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferSelect;
 export type NewKiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferInsert;
 
+// KiloClaw subscription-started emails are per paid activation, not per
+// instance lifetime. Cancel+resubscribe reuses the same subscription row (we
+// UPDATE the existing row in place), so only `period_start` — which advances
+// on every fresh activation — distinguishes activation events. `period_start`
+// defaults to the Unix epoch so the unique-index math works for any future
+// per-instance email type that has no natural per-activation boundary: those
+// callers pass no value and collapse to one row per (user, instance, type).
 export const kiloclaw_email_log = pgTable(
   'kiloclaw_email_log',
   {
@@ -4216,14 +4455,17 @@ export const kiloclaw_email_log = pgTable(
       .references(() => kilocode_users.id),
     instance_id: uuid().references(() => kiloclaw_instances.id),
     email_type: text().notNull(),
+    period_start: timestamp({ withTimezone: true, mode: 'string' })
+      .notNull()
+      .default(sql`'epoch'`),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
     uniqueIndex('UQ_kiloclaw_email_log_user_type_global')
       .on(table.user_id, table.email_type)
       .where(isNull(table.instance_id)),
-    uniqueIndex('UQ_kiloclaw_email_log_user_instance_type')
-      .on(table.user_id, table.instance_id, table.email_type)
+    uniqueIndex('UQ_kiloclaw_email_log_user_instance_type_period')
+      .on(table.user_id, table.instance_id, table.email_type, table.period_start)
       .where(isNotNull(table.instance_id)),
     index('IDX_kiloclaw_email_log_type_sent_instance')
       .on(table.email_type, table.sent_at, table.instance_id, table.user_id)
@@ -4232,6 +4474,36 @@ export const kiloclaw_email_log = pgTable(
 );
 
 export type KiloClawEmailLog = typeof kiloclaw_email_log.$inferSelect;
+
+// Outbox marker for transactional emails that need durable idempotency beyond
+// their triggering side effect. For top-up confirmations, `processTopUp`
+// commits the credit_transactions row before firing the email via `after()`;
+// if the process exits between those steps, a webhook retry can observe that
+// the transactional email marker is missing and recover the email exactly once.
+export const transactional_email_log = pgTable(
+  'transactional_email_log',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id),
+    email_type: text().notNull(),
+    idempotency_key: text().notNull(),
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_transactional_email_log_type_idempotency_key').on(
+      table.email_type,
+      table.idempotency_key
+    ),
+    index('IDX_transactional_email_log_user_id').on(table.user_id),
+  ]
+);
+
+export type TransactionalEmailLog = typeof transactional_email_log.$inferSelect;
 
 // Bot Request Logs — tracks each message handled by the new bot (src/lib/bot.ts).
 // Rows are created as 'pending' on receipt and updated as processing progresses.
@@ -4610,29 +4882,4 @@ export const security_advisor_content = pgTable('security_advisor_content', {
 export type SecurityAdvisorContent = typeof security_advisor_content.$inferSelect;
 export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferInsert;
 
-// ============ CHANNEL BADGE COUNTS ============
-// Per-user per-channel unread notification counts for mobile app badge display.
-// (user_id, channel_id) is the composite PK — one row per user per chat channel.
-// Keyed by channel rather than instance to support multiple channels per instance
-// in future. The notification service increments badge_count on each push and sums
-// across all channels to get the total badge count to include in the push payload.
-// The mobile client resets a channel's count (to 0) when the user views that chat.
-
-export const channel_badge_counts = pgTable(
-  'channel_badge_counts',
-  {
-    user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    channel_id: text().notNull(),
-    badge_count: integer().notNull().default(0),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [primaryKey({ columns: [table.user_id, table.channel_id] })]
-);
-
-export type ChannelBadgeCount = typeof channel_badge_counts.$inferSelect;
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

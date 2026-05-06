@@ -12,7 +12,7 @@
 #
 # Values you may need to set manually:
 #   AGENT_ENV_VARS_PRIVATE_KEY            (get from 1Password)
-#   FLY_IMAGE_TAG / FLY_IMAGE_DIGEST / OPENCLAW_VERSION
+#   FLY_IMAGE_TAG / FLY_IMAGE_DIGEST / FLY_IMAGE_CONTENT_MODE / OPENCLAW_VERSION
 #                                         (set by scripts/push-dev.sh,
 #                                          or ask a team member for values)
 
@@ -115,11 +115,14 @@ FLY_IMAGE_TAG=latest
 # Docker image digest (sha256:...) for immutable image references.
 # Set automatically by scripts/push-dev.sh when pushing images.
 FLY_IMAGE_DIGEST=
+# Image content hash mode: "production" for Dockerfile or "local" for
+# Dockerfile.local plus openclaw-build/openclaw-*.tgz.
+FLY_IMAGE_CONTENT_MODE=production
 # OpenClaw version (must match the openclaw@x.x.x version in the Dockerfile).
 # Used by the worker to self-register the version → image tag mapping in KV,
 # enabling per-user version tracking. Without this, version tracking fields
 # will be null and instances fall back to FLY_IMAGE_TAG directly.
-OPENCLAW_VERSION=2026.4.15
+OPENCLAW_VERSION=2026.4.23
 
 # Legacy fallback for existing instances without per-user apps.
 # New instances get per-user apps (acct-{hash}) created automatically.
@@ -130,6 +133,25 @@ FLY_APP_NAME=kiloclaw-dev
 # NOTE: wrangler dev rewrites the Origin header to match the custom domain route
 # (claw.kilosessions.ai), so that origin must be included for local dev.
 OPENCLAW_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8795,http://claw.kilosessions.ai
+
+# Per-instance host suffix + scheme. The worker uses these for (1) injecting
+# `<scheme>://<label><suffix>` into each machine's OPENCLAW_ALLOWED_ORIGINS
+# and (2) recognising `<label><suffix>` as an instance selector in the
+# catch-all proxy. Both are required — the worker refuses to start without
+# them, and there is no silent fallback.
+#
+# Dev default mirrors production routing on loopback:
+# `.kiloclaw.localhost` auto-resolves to 127.0.0.1 on modern browsers/OSes
+# per RFC 6761, so no /etc/hosts edit is needed. Open e.g.
+# http://i-<32hex>.kiloclaw.localhost:8795/ to route through the host
+# branch in dev. Hitting http://localhost:8795 directly still works —
+# that host doesn't match the suffix, so traffic falls through to the
+# existing path-based flow and the cookie-based catch-all.
+#
+# If wrangler dev is running on a port other than 8795, update the port
+# here to match.
+KILOCLAW_INSTANCE_HOST_SUFFIX=.kiloclaw.localhost:8795
+KILOCLAW_INSTANCE_URL_SCHEME=http
 
 # PostHog product telemetry (public project token, same as .env).
 NEXT_PUBLIC_POSTHOG_KEY=phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z
@@ -142,7 +164,3 @@ NEXT_PUBLIC_POSTHOG_KEY=phc_GK2Pxl0HPj5ZPfwhLRjXrtdz8eD7e9MKnXiFrOqnB6z
 # In wrangler dev, it connects to the remote Postgres via the Hyperdrive service.
 # To use a local Postgres instead, add "localConnectionString" to the hyperdrive
 # config in wrangler.jsonc (see https://developers.cloudflare.com/hyperdrive/configuration/local-development/).
-
-# StreamChat API Key
-STREAM_CHAT_API_KEY=...
-STREAM_CHAT_API_SECRET=...

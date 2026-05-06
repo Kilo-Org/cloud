@@ -17,7 +17,8 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { KILOCLAW_API_URL, KILOCLAW_INSTANCE_URL_TEMPLATE } from '@/lib/config.server';
+import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
 import { sentryLogger } from '@/lib/utils.server';
 import { db } from '@/lib/drizzle';
 import {
@@ -309,7 +310,7 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
   getStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-    const workerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
+    const legacyWorkerUrl = KILOCLAW_API_URL || 'https://claw.kilo.ai';
 
     // No org instance → return a "no instance" sentinel so the frontend
     // renders setup entry points. Without this guard, workerInstanceId(null)
@@ -351,11 +352,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
         botNature: null,
         botVibe: null,
         botEmoji: null,
-        workerUrl,
+        workerUrl: legacyWorkerUrl,
+        controllerCapabilitiesVersion: null,
         name: null,
         instanceId: null,
         inboundEmailAddress: null,
         inboundEmailEnabled: false,
+        scheduledAction: null,
       } satisfies KiloClawDashboardStatus;
     }
 
@@ -365,6 +368,13 @@ export const organizationKiloclawRouter = createTRPCRouter({
       getInboundEmailAddressForInstance(instance.id),
     ]);
 
+    const workerUrl = workerUrlForInstance({
+      sandboxId: status.sandboxId,
+      controllerCapabilitiesVersion: status.controllerCapabilitiesVersion,
+      template: KILOCLAW_INSTANCE_URL_TEMPLATE,
+      fallback: legacyWorkerUrl,
+    });
+
     return {
       ...status,
       name: instance.name ?? null,
@@ -372,6 +382,11 @@ export const organizationKiloclawRouter = createTRPCRouter({
       instanceId: instance.id,
       inboundEmailAddress,
       inboundEmailEnabled: instance.inboundEmailEnabled,
+      // Org instances don't surface scheduled actions yet — the
+      // banner reads from kiloclaw.getStatus on the personal path,
+      // not org. Set null to satisfy the type. Lighting up the org
+      // banner is a follow-up.
+      scheduledAction: null,
     } satisfies KiloClawDashboardStatus;
   }),
 
@@ -1167,39 +1182,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
     return { success: true, deleted: !!deleted, worker_sync: workerSync };
   }),
-
-  // ── Stream Chat ────────────────────────────────────────────────
-
-  getStreamChatCredentials: organizationMemberProcedure.query(async ({ ctx, input }) => {
-    const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
-    const client = new KiloClawInternalClient();
-    return client.getStreamChatCredentials(ctx.user.id, workerInstanceId(instance));
-  }),
-
-  sendChatMessage: organizationMemberMutationProcedure
-    .input(z.object({ organizationId: z.uuid(), message: z.string().min(1).max(32_000) }))
-    .mutation(async ({ ctx, input }) => {
-      const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
-      const client = new KiloClawInternalClient();
-      try {
-        return await client.sendChatMessage(ctx.user.id, input.message, instance.id);
-      } catch (err) {
-        if (err instanceof KiloClawApiError) {
-          const { message } = getKiloClawApiErrorPayload(err);
-          const code =
-            err.statusCode === 404
-              ? 'NOT_FOUND'
-              : err.statusCode === 503
-                ? 'PRECONDITION_FAILED'
-                : 'INTERNAL_SERVER_ERROR';
-          throw new TRPCError({
-            code,
-            message: message ?? 'Failed to send chat message',
-          });
-        }
-        throw err;
-      }
-    }),
 
   getMorningBriefingStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);

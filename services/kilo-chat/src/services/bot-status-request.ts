@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
+import type { z } from 'zod';
 import type { AuthContext } from '../auth';
-import { sandboxIdSchema } from '@kilocode/kilo-chat';
+import { sandboxIdSchema, type OkResponse, type chatWebhookRpcSchema } from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import { userOwnsSandbox } from './sandbox-ownership';
@@ -45,11 +46,11 @@ export async function handleRequestBotStatus(c: HonoCtx): Promise<Response> {
     // The fan-out already pushed the event to all of this user's connections;
     // skipping here keeps webhook QPS at ~1 per 15s per sandbox regardless of
     // how many clients are subscribed.
-    return c.json({ ok: true, dedupe: 'fresh' });
+    return c.json({ ok: true } satisfies OkResponse);
   }
 
   c.executionCtx.waitUntil(triggerBotStatusWebhook(c.env, sandboxId));
-  return c.json({ ok: true });
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 /**
@@ -59,10 +60,11 @@ export async function handleRequestBotStatus(c: HonoCtx): Promise<Response> {
  */
 async function triggerBotStatusWebhook(env: Env, sandboxId: string): Promise<void> {
   try {
-    await env.KILOCLAW.deliverChatWebhook({
+    const payload = {
       type: 'bot.status_request',
       targetBotId: `bot:kiloclaw:${sandboxId}`,
-    });
+    } satisfies z.infer<typeof chatWebhookRpcSchema>;
+    await env.KILOCLAW.deliverChatWebhook(payload);
   } catch (err) {
     if (isDefiniteUnreachable(err)) {
       logger.warn('bot.status_request: bot unreachable, publishing offline', {

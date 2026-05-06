@@ -1,6 +1,6 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveModel, kiloExclusiveModels } from '@/lib/ai-gateway/models';
 import {
   getBYOKforOrganization,
   getBYOKforUser,
@@ -132,6 +132,13 @@ async function checkVercelBYOK(
   organizationId: string | undefined
 ): Promise<BYOKResult[] | null> {
   if (isAnonymousContext(user)) return null;
+  // Kilo-exclusive models are not routable through Vercel BYOK. Reasoning in particular
+  // breaks: the Vercel AI Gateway normalizes reasoning to each provider's upstream-native
+  // shape, whereas our Kilo-exclusive models are served through generic OpenAI-compatible
+  // endpoints (Martian, direct Alibaba, etc.) where that normalization doesn't apply and the
+  // response ends up corrupted. Skip the Vercel BYOK lookup entirely and let the caller fall
+  // through to the model's declared gateway.
+  if (isKiloExclusiveModel(requestedModel)) return null;
   const modelProviders = await getModelUserByokProviders(requestedModel);
   if (modelProviders.length === 0) return null;
   return organizationId
@@ -168,19 +175,20 @@ export async function getProvider(
   }
 
   const kiloExclusiveModel = kiloExclusiveModels.find(m => m.public_id === requestedModel);
-  const defaultProvider =
-    Object.values(PROVIDERS).find(p => p.id === kiloExclusiveModel?.gateway) ??
-    PROVIDERS.OPENROUTER;
+  const eligibleForVercelRouting =
+    !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
 
   if (
-    defaultProvider.id === 'openrouter' &&
+    eligibleForVercelRouting &&
     (await shouldRouteToVercel(requestedModel, request, taskId || user.id))
   ) {
     return { provider: PROVIDERS.VERCEL_AI_GATEWAY, userByok: null, bypassAccessCheck: false };
   }
 
   return {
-    provider: defaultProvider,
+    provider:
+      Object.values(PROVIDERS).find(p => p.id === kiloExclusiveModel?.gateway) ??
+      PROVIDERS.OPENROUTER,
     userByok: null,
     bypassAccessCheck: false,
   };

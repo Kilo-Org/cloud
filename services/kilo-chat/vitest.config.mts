@@ -20,6 +20,7 @@ export default defineWorkersConfig({
           serviceBindings: {
             KILOCLAW: 'kiloclaw-stub',
             EVENT_SERVICE: 'event-service-stub',
+            NOTIFICATIONS: 'notifications-stub',
             KILO_CHAT_SELF: kCurrentWorker as unknown as string,
           },
           workers: [
@@ -55,6 +56,46 @@ export default defineWorkersConfig({
                   }
                   async pushEvent(userId, context, event, payload) {
                     return false;
+                  }
+                }
+              `,
+            },
+            {
+              name: 'notifications-stub',
+              modules: true,
+              script: `
+                import { WorkerEntrypoint } from 'cloudflare:workers';
+                const bucketsByUser = new Map();
+                const bucketKey = ({ userId, badgeBucket }) => \`\${userId}:\${badgeBucket}\`;
+                const listForUser = userId =>
+                  Array.from(bucketsByUser.entries())
+                    .filter(([key, badgeCount]) => key.startsWith(\`\${userId}:\`) && badgeCount > 0)
+                    .map(([key, badgeCount]) => ({
+                      badgeBucket: key.slice(userId.length + 1),
+                      badgeCount,
+                    }));
+                export default class NotificationsStub extends WorkerEntrypoint {
+                  async fetch(request) {
+                    return new Response('ok');
+                  }
+                  async sendPushForConversation(input) {
+                    return { perRecipient: [] };
+                  }
+                  async clearBadgeBucketForUser(input) {
+                    const key = bucketKey(input);
+                    bucketsByUser.delete(key);
+                    const badgeCount = listForUser(input.userId).reduce(
+                      (total, bucket) => total + bucket.badgeCount,
+                      0
+                    );
+                    return { badgeCount };
+                  }
+                  async __incrementBadgeBucket(input) {
+                    const key = bucketKey(input);
+                    bucketsByUser.set(key, (bucketsByUser.get(key) ?? 0) + input.delta);
+                  }
+                  async __listNonZeroBuckets(userId) {
+                    return listForUser(userId);
                   }
                 }
               `,

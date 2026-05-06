@@ -13,7 +13,6 @@ import {
   claude_sonnet_clawsetup_model,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { trinity_large_thinking_free_model } from '@/lib/ai-gateway/providers/arcee';
 import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
@@ -22,7 +21,10 @@ import {
 } from '@/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
+import {
+  GEMINI_PRO_CURRENT_MODEL_ID,
+  gemma_4_26b_a4b_it_free_model,
+} from '@/lib/ai-gateway/providers/google';
 import { alibabaDirectModels, qwen36_plus_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_35_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import {
@@ -30,7 +32,8 @@ import {
   isGrok4Model,
 } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
+import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
+import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
@@ -52,11 +55,11 @@ export const preferredModels = [
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-  'openai/gpt-5.5',
-  'google/gemini-3.1-pro-preview',
+  GPT_CURRENT_MODEL_ID,
+  GEMINI_PRO_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
   qwen36_plus_model.public_id,
-  'z-ai/glm-5.1',
+  GLM_CURRENT_MODEL_ID,
 ];
 
 export function isFreeModel(model: string): boolean {
@@ -79,6 +82,10 @@ export function isKiloExclusiveFreeModel(model: string): boolean {
   );
 }
 
+export function isKiloExclusiveModel(model: string): boolean {
+  return kiloExclusiveModels.some(m => m.public_id === model && m.status !== 'disabled');
+}
+
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
   minimax_m25_free_model,
@@ -86,7 +93,6 @@ export const kiloExclusiveModels = [
   grok_code_fast_1_optimized_free_model,
   seed_20_code_free_model,
   ...alibabaDirectModels,
-  trinity_large_thinking_free_model,
   claude_sonnet_clawsetup_model,
   stepfun_35_flash_free_model,
 ] as KiloExclusiveModel[];

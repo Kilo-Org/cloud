@@ -1,4 +1,4 @@
-import { WebClient, type SlackEvent } from '@slack/web-api';
+import type { WebClient, SlackEvent } from '@slack/web-api';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -36,57 +36,6 @@ export async function getSlackUserDisplayAndRealName(
   } catch {
     return undefined;
   }
-}
-
-/**
- * Get a Slack user's email address.
- * Requires the `users:read.email` scope on the Slack app.
- *
- * @param client - The Slack WebClient initialized with the workspace access token
- * @param userId - The Slack user ID (e.g., "U1234567890")
- * @returns The user's email address, or undefined if not available
- */
-export async function getSlackUserEmail(
-  client: WebClient,
-  userId: string
-): Promise<string | undefined> {
-  try {
-    const result = await client.users.info({ user: userId });
-
-    if (!result.ok || !result.user) {
-      return undefined;
-    }
-
-    return result.user.profile?.email;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * Get a Slack user's email using an installation's access token.
- * Requires the `users:read.email` scope on the Slack app.
- *
- * @param installation - The Slack installation with metadata containing access_token
- * @param userId - The Slack user ID (e.g., "U1234567890")
- * @returns The user's email address, or undefined if not available
- */
-export async function getSlackUserEmailFromInstallation(
-  installation: { metadata: unknown } | null,
-  userId: string
-): Promise<string | undefined> {
-  const metadata = installation?.metadata;
-  if (!isRecord(metadata)) {
-    return undefined;
-  }
-
-  const accessToken = metadata['access_token'];
-  if (typeof accessToken !== 'string') {
-    return undefined;
-  }
-
-  const client = new WebClient(accessToken);
-  return getSlackUserEmail(client, userId);
 }
 
 export function formatSlackUserDisplayAndRealName(

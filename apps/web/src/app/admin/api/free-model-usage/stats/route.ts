@@ -2,13 +2,21 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { db } from '@/lib/drizzle';
-import { free_model_usage } from '@kilocode/db/schema';
+import { free_model_usage, kilocode_users } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
   ADMIN_RATE_LIMIT_TEST_MODEL,
 } from '@/lib/constants';
+
+export type UserAtLimit = {
+  kiloUserId: string;
+  requestCount: number;
+  googleUserName: string | null;
+  googleUserEmail: string | null;
+  googleUserImageUrl: string | null;
+};
 
 export type FreeModelUsageStatsResponse = {
   // Current window stats
@@ -19,6 +27,7 @@ export type FreeModelUsageStatsResponse = {
   windowAnonymousIpsAtRequestLimit: number;
   // Authenticated users whose per-user request count has reached the limit.
   windowUsersAtRequestLimit: number;
+  windowUsersAtLimitList: UserAtLimit[];
   windowAnonymousRequests: number;
   windowAuthenticatedRequests: number;
 
@@ -74,21 +83,31 @@ export async function GET(
     );
 
   // Authenticated users at the per-user limit (matching checkFreeModelRateLimitByUser).
-  const usersAtLimitResult = await db
+  // Returns the actual user rows (joined with kilocode_users for display) ordered by
+  // request count desc; the count of all such users is the length of this array.
+  const usersAtLimitRows = await db
     .select({
-      count: sql<number>`COUNT(*)`,
+      kiloUserId: free_model_usage.kilo_user_id,
+      requestCount: sql<number>`COUNT(*)`.as('request_count'),
+      googleUserName: kilocode_users.google_user_name,
+      googleUserEmail: kilocode_users.google_user_email,
+      googleUserImageUrl: kilocode_users.google_user_image_url,
     })
-    .from(
-      sql`(
-        SELECT ${free_model_usage.kilo_user_id}
-        FROM ${free_model_usage}
-        WHERE ${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours'
-          AND ${TEST_ROW_FILTER}
-          AND ${free_model_usage.kilo_user_id} IS NOT NULL
-        GROUP BY ${free_model_usage.kilo_user_id}
-        HAVING COUNT(*) >= ${FREE_MODEL_MAX_REQUESTS_PER_WINDOW}
-      ) sub`
-    );
+    .from(free_model_usage)
+    .leftJoin(kilocode_users, sql`${kilocode_users.id} = ${free_model_usage.kilo_user_id}`)
+    .where(
+      sql`${free_model_usage.created_at} >= NOW() - INTERVAL '${sql.raw(String(FREE_MODEL_RATE_LIMIT_WINDOW_HOURS))} hours'
+        AND ${TEST_ROW_FILTER}
+        AND ${free_model_usage.kilo_user_id} IS NOT NULL`
+    )
+    .groupBy(
+      free_model_usage.kilo_user_id,
+      kilocode_users.google_user_name,
+      kilocode_users.google_user_email,
+      kilocode_users.google_user_image_url
+    )
+    .having(sql`COUNT(*) >= ${FREE_MODEL_MAX_REQUESTS_PER_WINDOW}`)
+    .orderBy(sql`request_count DESC`);
 
   // Get stats for the last 24 hours
   const dailyResult = await db
@@ -123,7 +142,14 @@ export async function GET(
     windowAvgRequestsPerIp:
       windowUniqueIps > 0 ? Math.round(windowTotalRequests / windowUniqueIps) : 0,
     windowAnonymousIpsAtRequestLimit: bigIntToNumber(anonymousIpsAtLimitResult[0]?.count ?? 0),
-    windowUsersAtRequestLimit: bigIntToNumber(usersAtLimitResult[0]?.count ?? 0),
+    windowUsersAtRequestLimit: usersAtLimitRows.length,
+    windowUsersAtLimitList: usersAtLimitRows.map(row => ({
+      kiloUserId: row.kiloUserId ?? '',
+      requestCount: bigIntToNumber(row.requestCount),
+      googleUserName: row.googleUserName,
+      googleUserEmail: row.googleUserEmail,
+      googleUserImageUrl: row.googleUserImageUrl,
+    })),
     windowAnonymousRequests: bigIntToNumber(windowStats.anonymous_requests),
     windowAuthenticatedRequests: bigIntToNumber(windowStats.authenticated_requests),
 

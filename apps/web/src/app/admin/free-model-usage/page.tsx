@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { FreeModelUsageStats } from '../components/FreeModelUsageStats';
 import { PromotedModelUsageStats } from '../components/PromotedModelUsageStats';
 import { RateLimitTesting } from '../components/RateLimitTesting';
+import { UserRateLimitStats } from '../components/UserRateLimitStats';
 import AdminPage from '../components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 
@@ -65,6 +66,19 @@ export default function FreeModelUsagePage() {
 
         <Suspense fallback={<div>Loading free model usage statistics...</div>}>
           <FreeModelUsageStats />
+        </Suspense>
+
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Authenticated User Rate Limit</h2>
+        </div>
+
+        <p className="text-muted-foreground">
+          Authenticated requests are rate-limited per Kilo user id. The list below shows users
+          currently at the per-window limit.
+        </p>
+
+        <Suspense fallback={<div>Loading user rate limit statistics...</div>}>
+          <UserRateLimitStats />
         </Suspense>
 
         <div className="flex items-center justify-between">

@@ -128,33 +128,6 @@ export function FreeModelUsageStats() {
             </div>
           </CardContent>
         </Card>
-
-        <Card
-          className={
-            (data?.windowUsersAtRequestLimit ?? 0) > 0
-              ? 'border-destructive bg-destructive/5'
-              : 'border-primary/40'
-          }
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Users at Limit</CardTitle>
-            <CardDescription>
-              Authenticated users that have reached {formatNumber(data?.maxRequestsPerWindow ?? 0)}{' '}
-              requests
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={
-                (data?.windowUsersAtRequestLimit ?? 0) > 0
-                  ? 'text-destructive text-3xl font-bold'
-                  : 'text-3xl font-bold'
-              }
-            >
-              {formatNumber(data?.windowUsersAtRequestLimit ?? 0)}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Anonymous vs Authenticated Breakdown */}

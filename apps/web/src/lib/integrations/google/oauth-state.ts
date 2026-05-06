@@ -6,6 +6,13 @@ import { GoogleCapabilitySchema } from './capabilities';
 
 const GOOGLE_OAUTH_STATE_PREFIX = 'google:';
 
+// Constrain returnTo to a relative path so it can never be hijacked into an
+// open-redirect to an external host. Must start with `/`, may contain a
+// non-protocol-style path, optionally followed by a query string and/or
+// fragment. Disallows `//` after the leading slash so we don't accidentally
+// accept protocol-relative URLs like `//evil.example.com`.
+const RETURN_TO_REGEX = /^\/(?!\/)[^?#]*(\?[^#]*)?(#.*)?$/;
+
 const GoogleOAuthStatePayloadSchema = z.object({
   owner: z.discriminatedUnion('type', [
     z.object({ type: z.literal('user'), id: z.string().min(1) }),
@@ -13,7 +20,10 @@ const GoogleOAuthStatePayloadSchema = z.object({
   ]),
   instanceId: z.string().uuid(),
   capabilities: z.array(GoogleCapabilitySchema).min(1),
+  returnTo: z.string().regex(RETURN_TO_REGEX).max(2048).optional(),
 });
+
+export const GOOGLE_OAUTH_RETURN_TO_REGEX = RETURN_TO_REGEX;
 
 export type GoogleOAuthStatePayload = z.infer<typeof GoogleOAuthStatePayloadSchema>;
 

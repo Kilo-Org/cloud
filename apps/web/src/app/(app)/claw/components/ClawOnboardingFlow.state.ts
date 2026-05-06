@@ -6,10 +6,17 @@ export type PopulatedClawStatus = KiloClawDashboardStatus & {
 
 export type ClawOnboardingMode = 'create-first' | 'post-provisioning';
 
-export type OnboardingStep = 'identity' | 'channels' | 'provisioning' | 'pairing' | 'done';
+export type OnboardingStep =
+  | 'identity'
+  | 'calendar'
+  | 'channels'
+  | 'provisioning'
+  | 'pairing'
+  | 'done';
 
 export const CLAW_ONBOARDING_WIZARD_STEPS = [
   'identity',
+  'calendar',
   'channels',
   'provisioning',
   'pairing',
@@ -19,6 +26,7 @@ export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[num
 
 export type ClawOnboardingRenderStep =
   | 'identity'
+  | 'calendar'
   | 'channels'
   | 'provisioning'
   | 'pairing'
@@ -31,6 +39,7 @@ export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 
 export const CLAW_ONBOARDING_FAKE_STEPS = [
   'identity',
+  'calendar',
   'channels',
   'provisioning',
   'pairing',
@@ -277,6 +286,13 @@ function getRenderStepDecision({
       reason: !hasBotIdentity
         ? 'bot identity is missing, so identity is the earliest safe step'
         : 'stored onboarding step is identity',
+    };
+  }
+
+  if (onboardingStep === 'calendar') {
+    return {
+      renderStep: 'calendar',
+      reason: 'stored onboarding step is calendar',
     };
   }
 

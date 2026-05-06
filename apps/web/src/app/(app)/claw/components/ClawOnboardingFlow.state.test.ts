@@ -125,6 +125,15 @@ describe('ClawOnboardingFlow state machine', () => {
       getClawOnboardingFlowState(
         createInput({
           createSetupStarted: true,
+          onboardingStep: 'calendar',
+          hasBotIdentity: true,
+        })
+      ).renderStep
+    ).toBe('calendar');
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
           onboardingStep: 'channels',
           hasBotIdentity: true,
         })
@@ -159,60 +168,68 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('complete');
   });
 
-  test('uses four steps only when the selected channel requires pairing', () => {
+  test('uses five steps only when the selected channel requires pairing', () => {
     const pairingTelegram = getClawOnboardingFlowState(
       createInput({ selectedChannelId: 'telegram' })
     );
-    expect(pairingTelegram.totalSteps).toBe(4);
+    expect(pairingTelegram.totalSteps).toBe(5);
     expect(pairingTelegram.currentStep).toBe(1);
 
     const pairingDiscord = getClawOnboardingFlowState(
       createInput({ selectedChannelId: 'discord' })
     );
-    expect(pairingDiscord.totalSteps).toBe(4);
+    expect(pairingDiscord.totalSteps).toBe(5);
     expect(pairingDiscord.currentStep).toBe(1);
 
     const noPairingSlack = getClawOnboardingFlowState(createInput({ selectedChannelId: 'slack' }));
-    expect(noPairingSlack.totalSteps).toBe(3);
+    expect(noPairingSlack.totalSteps).toBe(4);
     expect(noPairingSlack.currentStep).toBe(1);
 
     const defaultState = getClawOnboardingFlowState(createInput());
-    expect(defaultState.totalSteps).toBe(3);
+    expect(defaultState.totalSteps).toBe(4);
     expect(defaultState.currentStep).toBe(1);
   });
 
   test('getClawOnboardingStepProgress returns correct live current and total steps', () => {
     expect(getClawOnboardingStepProgress('identity', false)).toEqual({
       currentStep: 1,
-      totalSteps: 3,
+      totalSteps: 4,
+    });
+    expect(getClawOnboardingStepProgress('calendar', false)).toEqual({
+      currentStep: 2,
+      totalSteps: 4,
     });
     expect(getClawOnboardingStepProgress('channels', false)).toEqual({
-      currentStep: 2,
-      totalSteps: 3,
+      currentStep: 3,
+      totalSteps: 4,
     });
     expect(getClawOnboardingStepProgress('provisioning', false)).toEqual({
-      currentStep: 3,
-      totalSteps: 3,
-    });
-    expect(getClawOnboardingStepProgress('done', false)).toEqual({ currentStep: 3, totalSteps: 3 });
-
-    expect(getClawOnboardingStepProgress('identity', true)).toEqual({
-      currentStep: 1,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('channels', true)).toEqual({
-      currentStep: 2,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('provisioning', true)).toEqual({
-      currentStep: 3,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('pairing', true)).toEqual({
       currentStep: 4,
       totalSteps: 4,
     });
-    expect(getClawOnboardingStepProgress('done', true)).toEqual({ currentStep: 4, totalSteps: 4 });
+    expect(getClawOnboardingStepProgress('done', false)).toEqual({ currentStep: 4, totalSteps: 4 });
+
+    expect(getClawOnboardingStepProgress('identity', true)).toEqual({
+      currentStep: 1,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('calendar', true)).toEqual({
+      currentStep: 2,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('channels', true)).toEqual({
+      currentStep: 3,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('provisioning', true)).toEqual({
+      currentStep: 4,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('pairing', true)).toEqual({
+      currentStep: 5,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('done', true)).toEqual({ currentStep: 5, totalSteps: 5 });
   });
 
   test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(

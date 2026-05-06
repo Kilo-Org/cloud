@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { Loader2, TriangleAlert, X } from 'lucide-react';
@@ -18,13 +18,14 @@ import { useOnboardingSaves } from '../hooks/useOnboardingSaves';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { BotIdentityStep } from './BotIdentityStep';
+import { CalendarConnectStepView } from './CalendarConnectStep';
 import { ChannelPairingStep } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { ProvisioningStep, ProvisioningStepView } from './ProvisioningStep';
-import { DEFAULT_ONBOARDING_EXEC_PRESET } from './claw.types';
+import { DEFAULT_BOT_IDENTITY, DEFAULT_ONBOARDING_EXEC_PRESET } from './claw.types';
 import type { BotIdentity, ExecPreset } from './claw.types';
 import {
   getClawOnboardingFlowState,
@@ -159,6 +160,8 @@ function ClawOnboardingFlowInner({
   useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // Save bot identity, exec preset, and channel tokens as soon as the instance
   // row exists. This closes the tab-close window where customizations entered
@@ -216,6 +219,55 @@ function ClawOnboardingFlowInner({
   }, [onCreateFlowFailed, resetWizardSelections]);
 
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
+
+  // Hydrate local bot-identity state from the persisted instance status when
+  // the page reloads mid-onboarding (e.g. after the OAuth round-trip on the
+  // calendar step). useOnboardingSaves writes the user's identity selections
+  // to the backend; without this, a remount would force the user back to the
+  // identity step even though their picks were already saved.
+  useEffect(() => {
+    if (botIdentity !== null) return;
+    const persisted = flowState.instanceStatus;
+    if (!persisted?.botName) return;
+    setBotIdentity({
+      botName: persisted.botName,
+      botNature: persisted.botNature ?? DEFAULT_BOT_IDENTITY.botNature,
+      botVibe: persisted.botVibe ?? DEFAULT_BOT_IDENTITY.botVibe,
+      botEmoji: persisted.botEmoji ?? DEFAULT_BOT_IDENTITY.botEmoji,
+    });
+  }, [flowState.instanceStatus, botIdentity]);
+
+  // Resume the wizard at a specific step when returning from a flow that
+  // leaves the page (e.g. the Google OAuth round-trip on the calendar step
+  // posts the user back to /claw/new?step=calendar). The effect waits until
+  // botIdentity has been hydrated before consuming `step`, otherwise the
+  // state machine would override us with the identity step.
+  const hasResumedFromQuery = useRef(false);
+  useEffect(() => {
+    if (hasResumedFromQuery.current) return;
+    const stepParam = searchParams?.get('step');
+    const successParam = searchParams?.get('success');
+    const errorParam = searchParams?.get('error');
+    if (!stepParam && !successParam && !errorParam) return;
+    if (stepParam === 'calendar' && botIdentity === null) return;
+    hasResumedFromQuery.current = true;
+    if (stepParam === 'calendar') {
+      setOnboardingStep('calendar');
+    }
+    if (successParam === 'google_connected') {
+      toast.success('Calendar connected');
+    } else if (errorParam) {
+      toast.error('Could not connect calendar — please try again or skip for now.');
+    }
+    // Strip the consumed query params so the URL stays clean and the resume
+    // logic doesn't fire again on a future re-render.
+    const next = new URLSearchParams(searchParams?.toString() ?? '');
+    next.delete('step');
+    next.delete('success');
+    next.delete('error');
+    const nextSearch = next.toString();
+    router.replace(nextSearch ? `${pathname}?${nextSearch}` : (pathname ?? '/claw/new'));
+  }, [searchParams, router, pathname, botIdentity]);
 
   // NOTE: When mode === 'post-provisioning' (i.e. an existing instance is
   // already running) and the gateway is ready, renderStep is 'complete' on
@@ -295,9 +347,49 @@ function ClawOnboardingFlowInner({
             preset: DEFAULT_ONBOARDING_EXEC_PRESET,
             defaulted: true,
           });
-          posthog?.capture('claw_setup_channels_viewed');
+          posthog?.capture('claw_setup_calendar_viewed');
           setBotIdentity(identity);
-          setOnboardingStep('channels');
+          setOnboardingStep('calendar');
+        }}
+      />
+    );
+  }
+
+  function renderCalendarStep() {
+    const returnTo = `${basePath}/new?step=calendar`;
+    const connectParams = new URLSearchParams({
+      capabilities: 'calendar_read',
+      returnTo,
+    });
+    if (organizationId) {
+      connectParams.set('organizationId', organizationId);
+    }
+    const connectUrl = `/api/integrations/google/connect?${connectParams.toString()}`;
+    const isConnected = Boolean(flowState.instanceStatus?.googleOAuthConnected);
+    const connectedEmail = flowState.instanceStatus?.googleOAuthAccountEmail ?? null;
+
+    function advanceToChannels() {
+      posthog?.capture('claw_setup_channels_viewed');
+      setOnboardingStep('channels');
+    }
+
+    return (
+      <CalendarConnectStepView
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
+        connectUrl={connectUrl}
+        isConnected={isConnected}
+        connectedAccountEmail={connectedEmail}
+        onConnectClick={() => {
+          posthog?.capture('claw_setup_calendar_connect_clicked', { skipped: false });
+        }}
+        onSkip={() => {
+          posthog?.capture('claw_setup_calendar_completed', { connected: false, skipped: true });
+          advanceToChannels();
+        }}
+        onContinue={() => {
+          posthog?.capture('claw_setup_calendar_completed', { connected: true, skipped: false });
+          advanceToChannels();
         }}
       />
     );
@@ -402,6 +494,8 @@ function ClawOnboardingFlowInner({
     switch (renderStep) {
       case 'identity':
         return renderIdentityStep();
+      case 'calendar':
+        return renderCalendarStep();
       case 'channels':
         return renderChannelsStep();
       case 'provisioning':

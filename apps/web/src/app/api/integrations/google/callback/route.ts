@@ -15,18 +15,25 @@ import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
 function buildGoogleRedirectPath(
-  owner: VerifiedGoogleOAuthState['owner'] | null | undefined,
+  state: { owner: VerifiedGoogleOAuthState['owner']; returnTo?: string } | null | undefined,
   queryParam: string
 ): string {
+  if (state?.returnTo) {
+    const separator = state.returnTo.includes('?') ? '&' : '?';
+    return `${state.returnTo}${separator}${queryParam}`;
+  }
+
+  const owner = state?.owner;
   if (owner?.type === 'org') {
     return `/organizations/${owner.id}/claw/settings?${queryParam}`;
   }
 
-  if (owner?.type === 'user') {
-    return `/claw/settings?${queryParam}`;
-  }
-
   return `/claw/settings?${queryParam}`;
+}
+
+function appendQueryParam(path: string, key: string, value: string): string {
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
 }
 
 function sanitizeOAuthProviderError(
@@ -127,7 +134,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(verifiedState.owner, `error=${oauthErrorCode}`), APP_URL)
+        new URL(buildGoogleRedirectPath(verifiedState, `error=${oauthErrorCode}`), APP_URL)
       );
     }
 
@@ -140,7 +147,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(verifiedState.owner, 'error=missing_code'), APP_URL)
+        new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_code'), APP_URL)
       );
     }
 
@@ -157,7 +164,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(verifiedState.owner, 'error=missing_instance'), APP_URL)
+        new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_instance'), APP_URL)
       );
     }
 
@@ -211,8 +218,9 @@ export async function GET(request: NextRequest) {
       verifiedState.instanceId
     );
 
-    const successPath =
-      verifiedState.owner.type === 'org'
+    const successPath = verifiedState.returnTo
+      ? appendQueryParam(verifiedState.returnTo, 'success', 'google_connected')
+      : verifiedState.owner.type === 'org'
         ? `/organizations/${verifiedState.owner.id}/claw/settings?success=google_connected`
         : '/claw/settings?success=google_connected';
 
@@ -232,7 +240,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(
       new URL(
-        buildGoogleRedirectPath(verifyGoogleOAuthState(state)?.owner, 'error=connection_failed'),
+        buildGoogleRedirectPath(verifyGoogleOAuthState(state), 'error=connection_failed'),
         APP_URL
       )
     );

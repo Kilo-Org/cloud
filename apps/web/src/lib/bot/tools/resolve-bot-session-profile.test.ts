@@ -215,10 +215,10 @@ describe('resolveBotSessionProfile', () => {
     expect(result.envVars).toEqual({ SOURCE: 'org' });
   });
 
-  test('repo binding suppresses the default: only the binding applies', async () => {
-    // A repo binding claims the automatic slot; the default is a fallback and
-    // does not co-layer once a binding exists. The bot flow never supplies a
-    // `profileId`, so there is no explicit override to merge on top either.
+  test('repo binding (base) layers under the effective default (top)', async () => {
+    // A repo binding claims the base slot; the effective default fills the
+    // top slot and layers over it. The bot flow never supplies a `profileId`,
+    // so there is no explicit override — the default is the top layer.
     const user = await insertTestUser();
     const owner: ProfileOwner = { type: 'user', id: user.id };
 
@@ -241,9 +241,10 @@ describe('resolveBotSessionProfile', () => {
 
     expect(result.envVars).toEqual({
       BASE_ONLY: 'base-val',
-      SHARED: 'from-base',
+      DEFAULT_ONLY: 'default-val',
+      SHARED: 'from-default',
     });
-    expect(result.setupCommands).toEqual(['base-cmd']);
+    expect(result.setupCommands).toEqual(['base-cmd', 'default-cmd']);
   });
 
   test('gitlabProject: uses platform=gitlab when resolving repo binding', async () => {

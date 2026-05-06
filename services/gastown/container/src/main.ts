@@ -33,7 +33,7 @@ process.on('unhandledRejection', (reason, promise) => {
     townId: TOWN_ID,
     uptimeMs: getUptime(),
     activeAgents: activeAgentCount(),
-    promise: String(promise),
+    event: 'unhandled_rejection',
   });
 });
 

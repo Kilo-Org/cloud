@@ -47,11 +47,7 @@ import { agent_metadata } from '../db/tables/agent-metadata.table';
 import { escalation_metadata } from '../db/tables/escalation-metadata.table';
 import { convoy_metadata } from '../db/tables/convoy-metadata.table';
 import { bead_dependencies } from '../db/tables/bead-dependencies.table';
-import {
-  town_events,
-  TownEventRecord,
-  type TownEventType,
-} from '../db/tables/town-events.table';
+import { town_events, TownEventRecord, type TownEventType } from '../db/tables/town-events.table';
 import {
   agent_nudges,
   AgentNudgeRecord,
@@ -3905,8 +3901,7 @@ export class TownDO extends DurableObject<Env> {
           // succeed on retry — mark them processed so the drain loop
           // stops re-running them every alarm tick.
           const isMissingEntity =
-            err instanceof Error &&
-            /\b(Bead|Agent) [0-9a-f-]{36} not found\b/.test(err.message);
+            err instanceof Error && /\b(Bead|Agent) [0-9a-f-]{36} not found\b/.test(err.message);
           if (isMissingEntity) {
             logger.warn('reconciler: applyEvent skipped (missing entity)', {
               eventId: event.event_id,

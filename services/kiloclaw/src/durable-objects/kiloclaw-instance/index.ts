@@ -3175,13 +3175,31 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }): Promise<{ previousOverride: MachineSize | null }> {
     await this.loadState();
 
-    // Short-circuit BEFORE the guard. Clearing nothing is a true no-op, and
-    // admins triaging incidents shouldn't get an error for it when the
-    // instance happens to be in a transitional state (destroying / starting /
-    // recovering / Northflank). The set path still runs the guard — it
-    // mutates hardware-shaping state and needs the protection.
+    // Short-circuit BEFORE the guard. Clearing nothing is a true no-op from
+    // the DO's perspective, and admins triaging incidents shouldn't get an
+    // error for it when the instance happens to be in a transitional state
+    // (destroying / starting / recovering / Northflank). The set path still
+    // runs the guard — it mutates hardware-shaping state and needs the
+    // protection.
+    //
+    // Even when the DO has no override, still fire the Postgres sync. The
+    // `admin_size_override` column is a denormalized read cache for the
+    // admin "Has size override" filter and badge; if a prior clear's
+    // best-effort sync failed or the DO was restored without an override
+    // while Postgres still holds a stale payload, the list page would show
+    // a phantom override forever. An admin firing "Clear Size Override"
+    // expects that affordance to repair the cache. The sync is idempotent
+    // via `IS DISTINCT FROM` — when Postgres already matches DO state
+    // (both null), this is a SQL no-op.
     const previousOverride = this.s.adminMachineSizeOverride;
     if (previousOverride === null && this.s.adminMachineSizeOverrideMetadata === null) {
+      if (this.s.userId && this.s.sandboxId) {
+        const userId = this.s.userId;
+        const sandboxId = this.s.sandboxId;
+        this.ctx.waitUntil(
+          syncAdminSizeOverrideToPostgresHelper(this.env, this.s, userId, sandboxId)
+        );
+      }
       console.log(
         `[admin-size-override] clear (no-op) userId=${this.s.userId} actor=${input.actorEmail} ` +
           `reason="${input.reason.replace(/"/g, '\\"')}"`

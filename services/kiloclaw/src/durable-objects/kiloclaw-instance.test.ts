@@ -9459,7 +9459,13 @@ describe('clearAdminMachineSizeOverride', () => {
     );
   });
 
-  it('is a no-op when no override is active', async () => {
+  it('is a DO no-op when no override is active but still fires Postgres sync to repair the denormalized cache', async () => {
+    // The Postgres `admin_size_override` column is a best-effort denormalized
+    // read cache for the admin "Has size override" list filter. If a prior
+    // best-effort sync failed (or DO state was restored without an override
+    // while Postgres held a stale payload), the admin list would show a
+    // phantom override forever. An admin firing "Clear Size Override" must
+    // repair the cache even when the DO is already null.
     const { instance, storage, waitUntilPromises } = createInstance();
     await seedProvisioned(storage, {
       status: 'stopped',
@@ -9474,7 +9480,14 @@ describe('clearAdminMachineSizeOverride', () => {
     await Promise.allSettled(waitUntilPromises);
 
     expect(result.previousOverride).toBeNull();
-    expect(dbModule.syncAdminSizeOverride).not.toHaveBeenCalled();
+    // Postgres sync still fires with null payload (idempotent via IS DISTINCT FROM
+    // — SQL no-op when the column is already null, repair when stale).
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      null
+    );
   });
 
   it('rejects when instance is running and an override is active', async () => {

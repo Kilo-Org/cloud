@@ -4635,6 +4635,7 @@ export const transactional_email_log = pgTable(
     user_id: text()
       .notNull()
       .references(() => kilocode_users.id),
+    organization_id: uuid().references(() => organizations.id),
     email_type: text().notNull(),
     idempotency_key: text().notNull(),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -4645,6 +4646,7 @@ export const transactional_email_log = pgTable(
       table.idempotency_key
     ),
     index('IDX_transactional_email_log_user_id').on(table.user_id),
+    index('IDX_transactional_email_log_organization_id').on(table.organization_id),
   ]
 );
 

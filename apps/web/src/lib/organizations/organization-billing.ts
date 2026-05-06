@@ -1,18 +1,20 @@
 import type { Organization, User } from '@kilocode/db/schema';
-import { organizations, credit_transactions } from '@kilocode/db/schema';
+import { organizations, credit_transactions, transactional_email_log } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
 import { getOrganizationById, getOrganizationMembers } from '@/lib/organizations/organizations';
 import { createStripeCustomer } from '@/lib/stripe-client';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import type { StripeConfig } from '@/lib/credits';
+import { resolveStripeReceiptUrl, type StripeConfig } from '@/lib/credits';
 import { toMicrodollars } from '@/lib/utils';
 import { logExceptInTest } from '@/lib/utils.server';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
 import { findUserById } from '@/lib/user';
 import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@/lib/autoTopUpConstants';
+import { captureException, captureMessage } from '@sentry/nextjs';
+import { sendCreditsTopUpEmail } from '@/lib/email';
 
 export async function getOrCreateStripeCustomerIdForOrganization(
   organizationId: Organization['id'],
@@ -73,23 +75,177 @@ export async function getOrCreateStripeCustomerIdForOrganization(
 }
 
 type Config = StripeConfig;
+const ORGANIZATION_CREDITS_TOP_UP_CONFIRMATION_EMAIL_TYPE =
+  'organization_credits_top_up_confirmation';
 
 export async function getTopUpConfirmationRecipientsForOrganization(
   organizationId: Organization['id']
 ): Promise<string[]> {
+  const members = await getTopUpConfirmationRecipientMembersForOrganization(organizationId);
+  return members.map(member => member.email);
+}
+
+async function getTopUpConfirmationRecipientMembersForOrganization(
+  organizationId: Organization['id']
+): Promise<Array<{ id: User['id']; email: string }>> {
   const members = await getOrganizationMembers(organizationId);
-  const recipientEmails = new Set<string>();
+  const recipientsByEmail = new Map<string, { id: User['id']; email: string }>();
 
   for (const member of members) {
     if (
       member.status === 'active' &&
       (member.role === 'owner' || member.role === 'billing_manager')
     ) {
-      recipientEmails.add(member.email);
+      recipientsByEmail.set(member.email, { id: member.id, email: member.email });
     }
   }
 
-  return [...recipientEmails];
+  return [...recipientsByEmail.values()];
+}
+
+export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
+  userId: User['id'];
+  organization: Organization;
+  amountInCents: number;
+  stripeChargeOrInvoiceId: string;
+  isAutoTopUp: boolean;
+  purchaseDate?: Date;
+}): Promise<void> {
+  const {
+    userId,
+    organization,
+    amountInCents,
+    stripeChargeOrInvoiceId,
+    isAutoTopUp,
+    purchaseDate,
+  } = params;
+  const recipients = await getTopUpConfirmationRecipientMembersForOrganization(organization.id);
+
+  if (recipients.length === 0) {
+    captureMessage('Organization top-up confirmation email skipped: no eligible recipients', {
+      level: 'warning',
+      tags: { source: 'organization_credits_topup_email' },
+      extra: { user_id: userId, organization_id: organization.id, stripeChargeOrInvoiceId },
+    });
+    return;
+  }
+
+  let insertedMarker = false;
+
+  try {
+    const insertResult = await db
+      .insert(transactional_email_log)
+      .values({
+        user_id: userId === SYSTEM_AUTO_TOP_UP_USER_ID ? recipients[0].id : userId,
+        organization_id: organization.id,
+        email_type: ORGANIZATION_CREDITS_TOP_UP_CONFIRMATION_EMAIL_TYPE,
+        idempotency_key: stripeChargeOrInvoiceId,
+      })
+      .onConflictDoNothing();
+
+    insertedMarker = (insertResult.rowCount ?? 0) > 0;
+    if (!insertedMarker) return;
+
+    const receiptUrl = await resolveStripeReceiptUrl(stripeChargeOrInvoiceId);
+    let sentEmails = 0;
+    let terminalFailures = 0;
+    let retryableFailures = 0;
+
+    for (const recipient of recipients) {
+      try {
+        const sendResult = await sendCreditsTopUpEmail({
+          to: recipient.email,
+          variant: isAutoTopUp ? 'org_auto' : 'org_manual',
+          amountCents: amountInCents,
+          creditsCents: amountInCents,
+          purchaseDate: purchaseDate ?? new Date(),
+          receiptUrl,
+          organizationId: organization.id,
+          organizationName: organization.name,
+        });
+
+        if (sendResult.sent) {
+          sentEmails += 1;
+        } else if (sendResult.reason === 'neverbounce_rejected') {
+          terminalFailures += 1;
+          captureMessage('Organization top-up confirmation email recipient rejected', {
+            level: 'warning',
+            tags: {
+              source: 'organization_credits_topup_email',
+              reason: sendResult.reason,
+            },
+            extra: {
+              user_id: userId,
+              organization_id: organization.id,
+              stripeChargeOrInvoiceId,
+              isAutoTopUp,
+              recipient: recipient.email,
+            },
+          });
+        } else {
+          retryableFailures += 1;
+          captureMessage('Organization top-up confirmation email send failed', {
+            level: 'warning',
+            tags: {
+              source: 'organization_credits_topup_email',
+              reason: sendResult.reason,
+            },
+            extra: {
+              user_id: userId,
+              organization_id: organization.id,
+              stripeChargeOrInvoiceId,
+              isAutoTopUp,
+              recipient: recipient.email,
+            },
+          });
+        }
+      } catch (error) {
+        retryableFailures += 1;
+        captureException(error, {
+          tags: { source: 'organization_credits_topup_email' },
+          extra: {
+            user_id: userId,
+            organization_id: organization.id,
+            stripeChargeOrInvoiceId,
+            isAutoTopUp,
+            recipient: recipient.email,
+          },
+        });
+      }
+    }
+
+    if (sentEmails === 0 && retryableFailures > 0 && terminalFailures === 0) {
+      await deleteOrganizationTopUpEmailMarker(stripeChargeOrInvoiceId);
+    }
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'organization_credits_topup_email' },
+      extra: {
+        user_id: userId,
+        organization_id: organization.id,
+        stripeChargeOrInvoiceId,
+        isAutoTopUp,
+      },
+    });
+    if (insertedMarker) {
+      try {
+        await deleteOrganizationTopUpEmailMarker(stripeChargeOrInvoiceId);
+      } catch {
+        // Leave the marker in place; we prefer missing one email over duplicate sends.
+      }
+    }
+  }
+}
+
+async function deleteOrganizationTopUpEmailMarker(stripeChargeOrInvoiceId: string): Promise<void> {
+  await db
+    .delete(transactional_email_log)
+    .where(
+      and(
+        eq(transactional_email_log.email_type, ORGANIZATION_CREDITS_TOP_UP_CONFIRMATION_EMAIL_TYPE),
+        eq(transactional_email_log.idempotency_key, stripeChargeOrInvoiceId)
+      )
+    );
 }
 
 export async function processTopupForOrganization(

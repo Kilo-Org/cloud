@@ -38,6 +38,8 @@ import { getCreditBlocks } from '@/lib/getCreditBlocks';
 import { getBalanceForUser } from '@/lib/user.balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
+import { getEnabledAppleCreditProducts } from '@/lib/apple-iap/products';
+import { processAppleCreditPurchase } from '@/lib/apple-iap/purchases';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
@@ -352,6 +354,19 @@ export const userRouter = createTRPCRouter({
       }
       const { balance } = await getBalanceAndOrgSettings(input.organizationId, ctx.user);
       return { balance, isDepleted: balance <= 0 };
+    }),
+
+  getAppleCreditProducts: baseProcedure.query(() => {
+    return { products: getEnabledAppleCreditProducts() };
+  }),
+
+  completeAppleCreditPurchase: baseProcedure
+    .input(z.object({ transactionJws: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      return processAppleCreditPurchase({
+        user: ctx.user,
+        transactionJws: input.transactionJws,
+      });
     }),
 
   getAutocompleteMetrics: baseProcedure

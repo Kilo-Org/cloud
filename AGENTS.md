@@ -38,7 +38,10 @@ Target a specific test file: `pnpm test -- <path>`. Run tests for a specific ser
 ## Coding Standards
 
 - Prefer `type` over `interface`.
-- **Avoid** `as` casts and `!` non-null assertions — use `satisfies` or flow-sensitive typing.
+- Use `as` casts sparingly, but do not ban them outright. Prefer `satisfies`, discriminated unions, generics, or flow-sensitive narrowing when TypeScript can be made to understand the type naturally.
+- A targeted `as` cast is acceptable when code is at a known boundary where TypeScript has lost information that the surrounding control flow guarantees. For example, inside a platform switch, casting `message` to `Message<SlackEvent>` or `Message<GitHubRawMessage>` is preferable to adding generic `Record<string, unknown>` property helpers just to read known adapter fields.
+- Avoid broad casts that hide real uncertainty, especially `as any`, double casts through `unknown`, or casting external/untrusted data without validation. Use runtime validation when the data shape is genuinely unknown, user-controlled, persisted, or coming from an API contract we do not own.
+- Avoid `!` non-null assertions; prefer explicit checks or flow-sensitive typing.
 - Avoid mocks in tests; assert on results or check the database for side effects.
 - Prefer clear names over comments. Only comment things not obvious in context.
 - When the linter flags an unused variable, investigate the root cause — do not blindly prefix with `_`.

@@ -1,4 +1,4 @@
-import type { Purchase } from 'expo-iap';
+import { type Purchase } from 'expo-iap';
 
 export type StoreKitProduct = {
   id: string;

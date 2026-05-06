@@ -52,9 +52,11 @@ vi.mock('@tanstack/react-query', () => ({
     isPending: false,
     mutateAsync: async () => {
       if (testState.mutationShouldReject) {
+        await Promise.resolve();
         throw new Error('Backend rejected purchase');
       }
-      return testState.mutationResult;
+      const result = await Promise.resolve(testState.mutationResult);
+      return result;
     },
   }),
   useQuery: (options: { queryKey?: unknown[] }) => {
@@ -70,6 +72,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
     invalidateQueries: async (filter: unknown) => {
       testState.invalidations.push(filter);
+      await Promise.resolve();
     },
   }),
 }));

@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 import { useTRPC } from '@/lib/trpc';
 import { fetchStoreKitProducts } from './storekit';
-import type { AppleCreditDisplayProduct, BackendAppleCreditProduct } from './types';
+import { type AppleCreditDisplayProduct, type BackendAppleCreditProduct } from './types';
 
 export function joinAppleCreditProducts(
   backendProducts: BackendAppleCreditProduct[] | undefined,
@@ -12,7 +12,9 @@ export function joinAppleCreditProducts(
   const storeKitById = new Map((storeKitProducts ?? []).map(product => [product.id, product]));
   return (backendProducts ?? []).flatMap(product => {
     const storeKitProduct = storeKitById.get(product.id);
-    if (!storeKitProduct) return [];
+    if (!storeKitProduct) {
+      return [];
+    }
     return [
       {
         ...product,
@@ -37,7 +39,10 @@ export function useAppleCreditProducts() {
 
   const storeKitProducts = useQuery({
     queryKey: ['apple-credit-storekit-products', productIds],
-    queryFn: () => fetchStoreKitProducts(productIds),
+    queryFn: async () => {
+      const products = await fetchStoreKitProducts(productIds);
+      return products;
+    },
     enabled: isIos && productIds.length > 0,
     staleTime: 5 * 60_000,
   });

@@ -10,6 +10,12 @@ import { isOrganizationMember } from '@/lib/organizations/organizations';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_CALLBACK_PATH = '/api/integrations/github/callback';
+// In production the redirect_uri must exactly match the URL registered with
+// the GitHub OAuth app (app.kilocode.ai), regardless of which host the user
+// hit. APP_URL points to app.kilo.ai in production, so we override it here.
+// In development we keep using APP_URL so localhost works.
+const GITHUB_CALLBACK_BASE_URL =
+  process.env.NODE_ENV === 'production' ? 'https://app.kilocode.ai' : APP_URL;
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -78,7 +84,10 @@ export async function GET(request: NextRequest) {
   const credentials = getGitHubAppCredentials(appType);
   const authorizeUrl = new URL(GITHUB_AUTHORIZE_URL);
   authorizeUrl.searchParams.set('client_id', credentials.clientId);
-  authorizeUrl.searchParams.set('redirect_uri', new URL(GITHUB_CALLBACK_PATH, APP_URL).toString());
+  authorizeUrl.searchParams.set(
+    'redirect_uri',
+    new URL(GITHUB_CALLBACK_PATH, GITHUB_CALLBACK_BASE_URL).toString()
+  );
   authorizeUrl.searchParams.set(
     'state',
     createGitHubBotLinkState(user.id, verifiedToken.installationId)

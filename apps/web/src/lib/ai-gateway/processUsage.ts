@@ -54,6 +54,7 @@ import {
   parseMessagesMicrodollarUsageFromString,
 } from '@/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
+import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
   drainSseStream,
@@ -785,7 +786,7 @@ export async function parseMicrodollarUsageFromStream(
   const coreProps = {
     kiloUserId,
     messageId,
-    hasError: reportedError || wasAborted,
+    hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
     model,
     responseContent,
     inference_provider,
@@ -822,10 +823,11 @@ export function parseMicrodollarUsageFromString(
     });
   }
   const choice = responseJson?.choices?.[0];
+  const finish_reason = choice?.finish_reason ?? null;
   const coreProps = {
     kiloUserId,
     messageId: responseJson?.id ?? null,
-    hasError: !responseJson?.model || statusCode >= 400,
+    hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
     model: responseJson?.model ?? null,
     responseContent: choice?.message.content ?? '',
     inference_provider:
@@ -833,7 +835,7 @@ export function parseMicrodollarUsageFromString(
       choice?.message?.provider_metadata?.gateway?.routing?.finalProvider ??
       null,
     upstream_id: null,
-    finish_reason: choice?.finish_reason ?? null,
+    finish_reason,
     latency: null,
     moderation_latency: null,
     generation_time: null,

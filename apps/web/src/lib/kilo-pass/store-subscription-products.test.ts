@@ -11,6 +11,14 @@ describe('mobile Kilo Pass store products', () => {
     const products = getAllMobileStoreKiloPassProducts();
 
     expect(products).toHaveLength(6);
+    expect(products.map(product => product.appleProductId)).toEqual([
+      'kilopass.tier199.yearly.v1',
+      'kilopass.tier199.monthly.v1',
+      'kilopass.tier49.yearly.v1',
+      'kilopass.tier49.monthly.v1',
+      'kilopass.tier19.yearly.v1',
+      'kilopass.tier19.monthly.v1',
+    ]);
     for (const tier of Object.values(KiloPassTier)) {
       for (const cadence of Object.values(KiloPassCadence)) {
         const product = getMobileStoreKiloPassProduct({ tier, cadence });

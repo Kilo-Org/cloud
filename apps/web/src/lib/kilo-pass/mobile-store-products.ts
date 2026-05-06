@@ -60,6 +60,15 @@ const PRODUCT_IDS = {
   >
 >;
 
+const STORE_PRODUCT_ORDER = [
+  { tier: KiloPassTier.Tier199, cadence: KiloPassCadence.Yearly },
+  { tier: KiloPassTier.Tier199, cadence: KiloPassCadence.Monthly },
+  { tier: KiloPassTier.Tier49, cadence: KiloPassCadence.Yearly },
+  { tier: KiloPassTier.Tier49, cadence: KiloPassCadence.Monthly },
+  { tier: KiloPassTier.Tier19, cadence: KiloPassCadence.Yearly },
+  { tier: KiloPassTier.Tier19, cadence: KiloPassCadence.Monthly },
+] satisfies { tier: KiloPassTier; cadence: KiloPassCadence }[];
+
 function roundStoreMonthlyPrice(webMonthlyPriceUsd: number): number {
   const gross = webMonthlyPriceUsd * 1.3;
   return Math.round(gross * 100) / 100;
@@ -82,8 +91,8 @@ export function getMobileStoreKiloPassProduct(params: {
 }
 
 export function getAllMobileStoreKiloPassProducts(): MobileStoreKiloPassProduct[] {
-  return Object.values(KiloPassTier).flatMap(tier =>
-    Object.values(KiloPassCadence).map(cadence => getMobileStoreKiloPassProduct({ tier, cadence }))
+  return STORE_PRODUCT_ORDER.map(product =>
+    getMobileStoreKiloPassProduct({ tier: product.tier, cadence: product.cadence })
   );
 }
 

@@ -12,16 +12,33 @@ import {
 } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
-import { organizations, credit_transactions } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import {
+  organizations,
+  credit_transactions,
+  organization_audit_logs,
+  transactional_email_log,
+} from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
+import type { sendCreditsTopUpEmail } from '@/lib/email';
+
+const sendCreditsTopUpEmailMock = jest.fn<
+  ReturnType<typeof sendCreditsTopUpEmail>,
+  Parameters<typeof sendCreditsTopUpEmail>
+>(async () => ({ sent: true as const }));
+
+jest.mock('@/lib/email', () => ({
+  sendCreditsTopUpEmail: (params: Parameters<typeof sendCreditsTopUpEmailMock>[0]) =>
+    sendCreditsTopUpEmailMock(params),
+}));
 
 describe('getOrCreateStripeCustomerIdForOrganization', () => {
   let testUser: User;
   let testOrganization: Organization;
 
   beforeEach(async () => {
+    sendCreditsTopUpEmailMock.mockClear();
     // Create test user and organization
     testUser = await insertTestUser();
     testOrganization = await createOrganization('Test Organization', testUser.id);
@@ -482,6 +499,7 @@ describe('processTopupForOrganization', () => {
   let testOrganization: Organization;
 
   beforeEach(async () => {
+    sendCreditsTopUpEmailMock.mockClear();
     // Create test user and organization
     testUser = await insertTestUser();
     testOrganization = await createOrganization('Test Organization', testUser.id);
@@ -522,6 +540,208 @@ describe('processTopupForOrganization', () => {
     expect(creditTransaction?.is_free).toBe(false);
     expect(creditTransaction?.description).toBe('Organization top-up via stripe');
     expect(creditTransaction?.stripe_payment_id).toBe(stripePaymentId);
+
+    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: testUser.google_user_email,
+        variant: 'org_manual',
+        amountCents: amountInCents,
+        creditsCents: amountInCents,
+        organizationId: testOrganization.id,
+        organizationName: testOrganization.name,
+      })
+    );
+  });
+
+  test('sends org auto top-up email variant when requested', async () => {
+    const amountInCents = 2500;
+
+    await processTopupForOrganization(
+      testUser.id,
+      testOrganization.id,
+      amountInCents,
+      {
+        type: 'stripe',
+        stripe_payment_id: 'ch_test_org_auto_topup',
+      },
+      { isAutoTopUp: true }
+    );
+
+    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: testUser.google_user_email,
+        variant: 'org_auto',
+        amountCents: amountInCents,
+        organizationId: testOrganization.id,
+      })
+    );
+  });
+
+  test('does not duplicate balance, audit log, or email marker for repeated payment id', async () => {
+    const amountInCents = 5000;
+    const stripePaymentId = 'pi_test_duplicate_org_topup';
+    const expectedBalanceIncrease = amountInCents * 10_000;
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    sendCreditsTopUpEmailMock.mockClear();
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+
+    const updatedOrg = await db.query.organizations.findFirst({
+      where: eq(organizations.id, testOrganization.id),
+    });
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired + expectedBalanceIncrease
+    );
+
+    const transactions = await db.query.credit_transactions.findMany({
+      where: and(
+        eq(credit_transactions.organization_id, testOrganization.id),
+        eq(credit_transactions.stripe_payment_id, stripePaymentId)
+      ),
+    });
+    expect(transactions).toHaveLength(1);
+
+    const auditLogs = await db.query.organization_audit_logs.findMany({
+      where: and(
+        eq(organization_audit_logs.organization_id, testOrganization.id),
+        eq(organization_audit_logs.action, 'organization.purchase_credits')
+      ),
+    });
+    expect(auditLogs).toHaveLength(1);
+
+    const emailMarkers = await db.query.transactional_email_log.findMany({
+      where: and(
+        eq(transactional_email_log.email_type, 'organization_credits_top_up_confirmation'),
+        eq(transactional_email_log.idempotency_key, stripePaymentId)
+      ),
+    });
+    expect(emailMarkers).toHaveLength(1);
+    expect(sendCreditsTopUpEmailMock).not.toHaveBeenCalled();
+  });
+
+  test('duplicate payment id recovers missing org top-up email marker using original purchase date', async () => {
+    const amountInCents = 5000;
+    const stripePaymentId = 'pi_test_org_topup_email_recovery';
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    const [creditTransaction] = await db
+      .select({ createdAt: credit_transactions.created_at })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.stripe_payment_id, stripePaymentId))
+      .limit(1);
+    expect(creditTransaction).toBeDefined();
+    if (!creditTransaction) throw new Error('Expected credit transaction to be created');
+
+    await db
+      .delete(transactional_email_log)
+      .where(eq(transactional_email_log.idempotency_key, stripePaymentId));
+    sendCreditsTopUpEmailMock.mockClear();
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+
+    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: 'org_manual',
+        purchaseDate: new Date(creditTransaction.createdAt),
+      })
+    );
+
+    const emailMarkers = await db.query.transactional_email_log.findMany({
+      where: and(
+        eq(transactional_email_log.email_type, 'organization_credits_top_up_confirmation'),
+        eq(transactional_email_log.idempotency_key, stripePaymentId)
+      ),
+    });
+    expect(emailMarkers).toHaveLength(1);
+
+    const updatedOrg = await db.query.organizations.findFirst({
+      where: eq(organizations.id, testOrganization.id),
+    });
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired + amountInCents * 10_000
+    );
+  });
+
+  test('duplicate payment id skips email for a different organization when no matching credit transaction exists', async () => {
+    const otherUser = await insertTestUser();
+    const otherOrganization = await createOrganization('Other Organization', otherUser.id);
+    const amountInCents = 5000;
+    const stripePaymentId = 'pi_test_cross_org_duplicate_payment';
+
+    await processTopupForOrganization(otherUser.id, otherOrganization.id, amountInCents, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    await db
+      .delete(transactional_email_log)
+      .where(eq(transactional_email_log.idempotency_key, stripePaymentId));
+    sendCreditsTopUpEmailMock.mockClear();
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+
+    const updatedOrg = await db.query.organizations.findFirst({
+      where: eq(organizations.id, testOrganization.id),
+    });
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired
+    );
+    expect(sendCreditsTopUpEmailMock).not.toHaveBeenCalled();
+
+    const emailMarkers = await db.query.transactional_email_log.findMany({
+      where: eq(transactional_email_log.idempotency_key, stripePaymentId),
+    });
+    expect(emailMarkers).toHaveLength(0);
+  });
+
+  test('duplicate payment id skips email for same organization when amount does not match existing credit transaction', async () => {
+    const amountInCents = 5000;
+    const stripePaymentId = 'pi_test_org_duplicate_amount_mismatch';
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+    await db
+      .delete(transactional_email_log)
+      .where(eq(transactional_email_log.idempotency_key, stripePaymentId));
+    sendCreditsTopUpEmailMock.mockClear();
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents + 100, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+
+    const updatedOrg = await db.query.organizations.findFirst({
+      where: eq(organizations.id, testOrganization.id),
+    });
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired + amountInCents * 10_000
+    );
+    expect(sendCreditsTopUpEmailMock).not.toHaveBeenCalled();
+
+    const emailMarkers = await db.query.transactional_email_log.findMany({
+      where: eq(transactional_email_log.idempotency_key, stripePaymentId),
+    });
+    expect(emailMarkers).toHaveLength(0);
   });
 
   test('should handle multiple topups correctly', async () => {

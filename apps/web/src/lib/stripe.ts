@@ -743,7 +743,8 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
               autoTopUpConfig?.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID,
               organizationId,
               invoice.amount_paid,
-              config
+              config,
+              { isAutoTopUp: true }
             );
 
             processedSuccessfully = true;

@@ -15,6 +15,8 @@ import { findUserById } from '@/lib/user';
 import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@/lib/autoTopUpConstants';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { sendCreditsTopUpEmail } from '@/lib/email';
+import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
+import { after } from 'next/server';
 
 export async function getOrCreateStripeCustomerIdForOrganization(
   organizationId: Organization['id'],
@@ -75,6 +77,9 @@ export async function getOrCreateStripeCustomerIdForOrganization(
 }
 
 type Config = StripeConfig;
+type ProcessTopupForOrganizationOptions = {
+  isAutoTopUp?: boolean;
+};
 const ORGANIZATION_CREDITS_TOP_UP_CONFIRMATION_EMAIL_TYPE =
   'organization_credits_top_up_confirmation';
 
@@ -252,8 +257,10 @@ export async function processTopupForOrganization(
   kiloUserId: User['id'],
   organizationId: Organization['id'],
   amountInCents: number,
-  config: Config
+  config: Config,
+  options: ProcessTopupForOrganizationOptions = {}
 ) {
+  const { isAutoTopUp = false } = options;
   const organization = await getOrganizationById(organizationId);
   if (!organization) throw new Error('Organization not found: ' + organizationId);
 
@@ -268,7 +275,7 @@ export async function processTopupForOrganization(
   const creditDescription = `Organization top-up via ${config.type}`;
   const creditAmountInMicrodollars = toMicrodollars(amountInCents / 100);
 
-  await db.transaction(async (tx: DrizzleTransaction) => {
+  const didInsertCreditTransaction = await db.transaction(async (tx: DrizzleTransaction) => {
     logExceptInTest(
       `processing topup for ${organization.id} - ${amountInCents} in transaction with payment id ${config.stripe_payment_id}`
     );
@@ -290,7 +297,7 @@ export async function processTopupForOrganization(
       logExceptInTest(
         `Skipping duplicate topup for ${organization.id} - payment id ${config.stripe_payment_id} already processed`
       );
-      return;
+      return false;
     }
 
     // Update organization balance
@@ -301,15 +308,41 @@ export async function processTopupForOrganization(
         microdollars_balance: sql`${organizations.microdollars_balance} + ${Math.round(creditAmountInMicrodollars)}`,
       })
       .where(eq(organizations.id, organization.id));
+
+    await createAuditLog({
+      action: 'organization.purchase_credits',
+      actor_id: kiloUserId,
+      actor_email: user?.google_user_email || 'unknown',
+      actor_name: user?.google_user_name || 'unknown',
+      organization_id: organization.id,
+      message: `Purchased $${(amountInCents / 100).toFixed(2)} credit via ${config.type}`,
+      tx,
+    });
+
+    return true;
   });
-  await createAuditLog({
-    action: 'organization.purchase_credits',
-    actor_id: kiloUserId,
-    actor_email: user?.google_user_email || 'unknown',
-    actor_name: user?.google_user_name || 'unknown',
-    organization_id: organization.id,
-    message: `Purchased $${(amountInCents / 100).toFixed(2)} credit via ${config.type}`,
-  });
+
+  if (!didInsertCreditTransaction) {
+    const existingCreditTransaction = await getExistingOrganizationTopUpCreditTransaction({
+      organizationId: organization.id,
+      stripeChargeOrInvoiceId: config.stripe_payment_id,
+      expectedAmountMicrodollars: creditAmountInMicrodollars,
+    });
+
+    if (!existingCreditTransaction) {
+      return;
+    }
+
+    await recoverOrganizationTopUpConfirmationEmailIfMissing({
+      userId: kiloUserId,
+      organization,
+      amountInCents,
+      stripeChargeOrInvoiceId: config.stripe_payment_id,
+      isAutoTopUp,
+      purchaseDate: new Date(existingCreditTransaction.createdAt),
+    });
+    return;
+  }
 
   if (process.env.NODE_ENV === 'test') {
     // 2025-12-03: temporarily disable this promo until devrel decides it's time to go live with it.
@@ -320,4 +353,76 @@ export async function processTopupForOrganization(
       );
     }
   }
+
+  await scheduleOrganizationTopUpConfirmationEmail({
+    userId: kiloUserId,
+    organization,
+    amountInCents,
+    stripeChargeOrInvoiceId: config.stripe_payment_id,
+    isAutoTopUp,
+  });
+}
+
+async function recoverOrganizationTopUpConfirmationEmailIfMissing(params: {
+  userId: User['id'];
+  organization: Organization;
+  amountInCents: number;
+  stripeChargeOrInvoiceId: string;
+  isAutoTopUp: boolean;
+  purchaseDate: Date;
+}): Promise<void> {
+  await scheduleOrganizationTopUpConfirmationEmail(params);
+}
+
+async function getExistingOrganizationTopUpCreditTransaction(params: {
+  organizationId: Organization['id'];
+  stripeChargeOrInvoiceId: string;
+  expectedAmountMicrodollars: number;
+}): Promise<{ createdAt: string } | undefined> {
+  const [creditTransaction] = await db
+    .select({
+      organizationId: credit_transactions.organization_id,
+      amountMicrodollars: credit_transactions.amount_microdollars,
+      createdAt: credit_transactions.created_at,
+    })
+    .from(credit_transactions)
+    .where(eq(credit_transactions.stripe_payment_id, params.stripeChargeOrInvoiceId))
+    .limit(1);
+
+  if (
+    !creditTransaction ||
+    creditTransaction.organizationId !== params.organizationId ||
+    creditTransaction.amountMicrodollars !== params.expectedAmountMicrodollars
+  ) {
+    captureMessage('Organization top-up duplicate payment id mismatch', {
+      level: 'error',
+      tags: { source: 'organization_credits_topup_email' },
+      extra: {
+        organization_id: params.organizationId,
+        stripeChargeOrInvoiceId: params.stripeChargeOrInvoiceId,
+        existing_organization_id: creditTransaction?.organizationId,
+        existing_amount_microdollars: creditTransaction?.amountMicrodollars,
+        expected_amount_microdollars: params.expectedAmountMicrodollars,
+      },
+    });
+    return undefined;
+  }
+
+  return { createdAt: creditTransaction.createdAt };
+}
+
+async function scheduleOrganizationTopUpConfirmationEmail(params: {
+  userId: User['id'];
+  organization: Organization;
+  amountInCents: number;
+  stripeChargeOrInvoiceId: string;
+  isAutoTopUp: boolean;
+  purchaseDate?: Date;
+}): Promise<void> {
+  if (IS_IN_AUTOMATED_TEST) {
+    await maybeSendOrganizationTopUpConfirmationEmail(params);
+    return;
+  }
+
+  after(() => maybeSendOrganizationTopUpConfirmationEmail(params));
 }

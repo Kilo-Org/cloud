@@ -19,7 +19,9 @@ import {
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
   getPlatformIntegrationById,
+  isGitHubBotEnabled,
 } from './platform-helpers';
+import type { PlatformIntegration } from '@kilocode/db';
 import type { Thread, Message } from 'chat';
 
 const mockGetInstallationId = jest.fn();
@@ -142,6 +144,32 @@ describe('platform helpers', () => {
         mockGetInstallationId
       )
     ).rejects.toThrow('Could not find GitHub installation ID for thread github:acme/widgets:42');
+  });
+
+  describe('isGitHubBotEnabled', () => {
+    function integrationWithMetadata(
+      metadata: PlatformIntegration['metadata']
+    ): PlatformIntegration {
+      return { metadata } as PlatformIntegration;
+    }
+
+    it('returns true only when metadata.bot_enabled is the boolean true', () => {
+      expect(isGitHubBotEnabled(integrationWithMetadata({ bot_enabled: true }))).toBe(true);
+    });
+
+    it('returns false when metadata is missing the flag', () => {
+      expect(isGitHubBotEnabled(integrationWithMetadata({}))).toBe(false);
+      expect(isGitHubBotEnabled(integrationWithMetadata(null))).toBe(false);
+    });
+
+    it('returns false for truthy non-boolean values to avoid accidental enables', () => {
+      expect(isGitHubBotEnabled(integrationWithMetadata({ bot_enabled: 'true' }))).toBe(false);
+      expect(isGitHubBotEnabled(integrationWithMetadata({ bot_enabled: 1 }))).toBe(false);
+    });
+
+    it('returns false when explicitly disabled', () => {
+      expect(isGitHubBotEnabled(integrationWithMetadata({ bot_enabled: false }))).toBe(false);
+    });
   });
 
   it('returns platform-specific bot documentation URLs', () => {

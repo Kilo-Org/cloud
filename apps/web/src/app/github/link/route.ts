@@ -5,7 +5,7 @@ import { APP_URL } from '@/lib/constants';
 import { createGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { verifyGitHubLinkToken } from '@/lib/bot/github-link-token';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
-import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
+import { getPlatformIntegrationById, isGitHubBotEnabled } from '@/lib/bot/platform-helpers';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
@@ -51,6 +51,14 @@ export async function GET(request: NextRequest) {
 
   if (!integration) {
     return errorPage('Link Failed', 'No matching GitHub integration was found.', 404);
+  }
+
+  if (!isGitHubBotEnabled(integration)) {
+    return errorPage(
+      'Link Unavailable',
+      'GitHub linking is not enabled for this integration.',
+      404
+    );
   }
 
   if (integration.owned_by_organization_id) {

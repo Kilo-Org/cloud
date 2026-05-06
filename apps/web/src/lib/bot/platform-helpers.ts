@@ -1,7 +1,7 @@
 import { type PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
 import { eq, and, sql } from 'drizzle-orm';
-import { platform_integrations } from '@kilocode/db';
+import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { type SlackEvent } from '@chat-adapter/slack';
@@ -101,6 +101,17 @@ export async function getPlatformIntegrationByBotUserId(
     .limit(1);
 
   return integration ?? null;
+}
+
+/**
+ * Canary gate for the GitHub bot path. Driven by `metadata.bot_enabled` on the
+ * platform integration row so we can enable the bot per-installation without a
+ * schema migration. Defaults to false: existing GitHub integrations are not
+ * affected until an operator opts them in by setting the flag to true.
+ */
+export function isGitHubBotEnabled(integration: PlatformIntegration): boolean {
+  const metadata = (integration.metadata ?? {}) as { bot_enabled?: unknown };
+  return metadata.bot_enabled === true;
 }
 
 export function getBotDocumentationUrl(platform: string): string {

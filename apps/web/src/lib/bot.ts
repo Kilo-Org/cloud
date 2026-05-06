@@ -11,7 +11,9 @@ import {
   getPlatformIdentity,
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
+  isGitHubBotEnabled,
 } from '@/lib/bot/platform-helpers';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-account';
 import { findUserById } from '@/lib/user';
 import { processLinkedMessage } from '@/lib/bot/run';
@@ -277,6 +279,14 @@ function createKiloBot(
       captureException(new Error('No active platform integration found'), {
         extra: { platform: identity.platform, teamId: identity.teamId },
       });
+      return;
+    }
+
+    // Canary gate: the GitHub bot path is opt-in per integration via
+    // `metadata.bot_enabled`. Webhooks still arrive at the adapter so this
+    // handler runs, but we drop out before any user-visible side effects
+    // (no link prompt, no agent run, no GitHub API calls).
+    if (identity.platform === PLATFORM.GITHUB && !isGitHubBotEnabled(platformIntegration)) {
       return;
     }
 

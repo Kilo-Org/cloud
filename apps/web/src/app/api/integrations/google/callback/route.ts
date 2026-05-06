@@ -23,19 +23,19 @@ import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client'
  */
 function buildGoogleRedirectPath(
   state: { owner: VerifiedGoogleOAuthState['owner']; returnTo?: string } | null | undefined,
-  encodedQueryParam: string
+  preEncodedQueryFragment: string
 ): string {
   if (state?.returnTo) {
     const separator = state.returnTo.includes('?') ? '&' : '?';
-    return `${state.returnTo}${separator}${encodedQueryParam}`;
+    return `${state.returnTo}${separator}${preEncodedQueryFragment}`;
   }
 
   const owner = state?.owner;
   if (owner?.type === 'org') {
-    return `/organizations/${owner.id}/claw/settings?${encodedQueryParam}`;
+    return `/organizations/${owner.id}/claw/settings?${preEncodedQueryFragment}`;
   }
 
-  return `/claw/settings?${encodedQueryParam}`;
+  return `/claw/settings?${preEncodedQueryFragment}`;
 }
 
 /**

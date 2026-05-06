@@ -256,34 +256,73 @@ function ClawOnboardingFlowInner({
   // screen. Also waits until botIdentity has been hydrated before consuming
   // `step`, otherwise the state machine would override us with identity.
   const hasResumedFromQuery = useRef(false);
-  useEffect(() => {
-    if (hasResumedFromQuery.current) return;
-    const stepParam = searchParams?.get('step');
-    if (stepParam !== 'calendar') return;
-    if (botIdentity === null) return;
-    const successParam = searchParams?.get('success');
-    const errorParam = searchParams?.get('error');
-    hasResumedFromQuery.current = true;
-    setOnboardingStep('calendar');
-    posthog?.capture('claw_setup_calendar_resumed', {
-      outcome: successParam === 'google_connected' ? 'connected' : errorParam ? 'error' : 'unknown',
-    });
-    if (successParam === 'google_connected') {
-      posthog?.capture('claw_setup_calendar_oauth_completed');
-      toast.success('Calendar connected');
-    } else if (errorParam) {
-      posthog?.capture('claw_setup_calendar_oauth_failed', { reason: errorParam });
-      toast.error('Could not connect calendar — please try again or skip for now.');
-    }
-    // Strip the consumed query params so the URL stays clean and the resume
-    // logic doesn't fire again on a future re-render.
+
+  // Allowlist of known OAuth error codes that the callback route can emit.
+  // Anything else from `?error=` is bucketed as 'unknown' before going to
+  // PostHog so an attacker can't pollute analytics with arbitrary strings.
+  const KNOWN_OAUTH_ERROR_CODES = [
+    'access_denied',
+    'oauth_error',
+    'missing_code',
+    'missing_instance',
+    'connection_failed',
+    'invalid_state',
+    'unauthorized',
+  ];
+  const cleanupResumeQueryParams = useCallback(() => {
     const next = new URLSearchParams(searchParams?.toString() ?? '');
     next.delete('step');
     next.delete('success');
     next.delete('error');
     const nextSearch = next.toString();
     router.replace(nextSearch ? `${pathname}?${nextSearch}` : (pathname ?? '/claw/new'));
-  }, [searchParams, router, pathname, botIdentity, posthog]);
+  }, [pathname, router, searchParams]);
+
+  useEffect(() => {
+    if (hasResumedFromQuery.current) return;
+    const stepParam = searchParams?.get('step');
+    if (stepParam !== 'calendar') return;
+    if (botIdentity === null) return;
+    const successParam = searchParams?.get('success');
+    const errorParamRaw = searchParams?.get('error');
+    const errorReason = errorParamRaw
+      ? KNOWN_OAUTH_ERROR_CODES.includes(errorParamRaw)
+        ? errorParamRaw
+        : 'unknown'
+      : null;
+    hasResumedFromQuery.current = true;
+    setOnboardingStep('calendar');
+    posthog?.capture('claw_setup_calendar_resumed', {
+      outcome:
+        successParam === 'google_connected' ? 'connected' : errorParamRaw ? 'error' : 'unknown',
+    });
+    if (successParam === 'google_connected') {
+      posthog?.capture('claw_setup_calendar_oauth_completed');
+      toast.success('Calendar connected');
+    } else if (errorParamRaw) {
+      posthog?.capture('claw_setup_calendar_oauth_failed', { reason: errorReason });
+      toast.error('Could not connect calendar — please try again or skip for now.');
+    }
+    cleanupResumeQueryParams();
+  }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams]);
+
+  // Watchdog: if `?step=calendar` is in the URL but botIdentity hydration
+  // never completes (e.g. patchBotIdentity hadn't propagated to the DB
+  // before the OAuth round-trip), don't silently strand the user on the
+  // identity step with stale params lingering in the URL. After a short
+  // grace period, clean the URL and surface a soft warning.
+  useEffect(() => {
+    if (hasResumedFromQuery.current) return;
+    if (searchParams?.get('step') !== 'calendar') return;
+    const timeoutId = window.setTimeout(() => {
+      if (hasResumedFromQuery.current) return;
+      if (botIdentity !== null) return;
+      hasResumedFromQuery.current = true;
+      toast.error("Couldn't restore your onboarding progress — continuing from here.");
+      cleanupResumeQueryParams();
+    }, 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchParams, botIdentity, cleanupResumeQueryParams]);
 
   // NOTE: When mode === 'post-provisioning' (i.e. an existing instance is
   // already running) and the gateway is ready, renderStep is 'complete' on

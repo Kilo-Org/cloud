@@ -194,8 +194,13 @@ export function KiloChatLayout({
 
   // First-run auto-create: when a user lands on the chat root with zero
   // conversations (e.g. straight after onboarding), kick off a fresh
-  // conversation so they never sit on a blank index page.
+  // conversation so they never sit on a blank index page. Reset the guard
+  // when sandboxId changes so switching between instances (e.g. between
+  // organizations) re-evaluates without remounting.
   const hasAutoCreatedConversation = useRef(false);
+  useEffect(() => {
+    hasAutoCreatedConversation.current = false;
+  }, [sandboxId]);
   useEffect(() => {
     if (
       hasAutoCreatedConversation.current ||

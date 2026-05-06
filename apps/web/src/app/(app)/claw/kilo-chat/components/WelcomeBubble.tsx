@@ -12,7 +12,7 @@ export function WelcomeBubble({ assistantName, assistantEmoji }: WelcomeBubblePr
 
   return (
     <div className="flex flex-1 items-start gap-3 px-4 py-6">
-      <div className="bg-muted text-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg leading-none">
+      <div className="bg-muted text-foreground flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-lg leading-none">
         {assistantEmoji ? <span>{assistantEmoji}</span> : <Sparkles className="h-4 w-4" />}
       </div>
       <div className="flex flex-col gap-1">

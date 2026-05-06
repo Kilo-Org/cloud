@@ -385,23 +385,21 @@ function ClawOnboardingFlowInner({
   }
 
   function renderCompleteStep() {
-    // While the gateway is still warming up, keep the user on a simple
-    // "almost ready" card instead of redirecting them to a chat page whose
-    // conversation requests would hang. Once gatewayReady flips true, the
-    // auto-redirect effect above takes over and pushes to /chat.
-    if (!flowState.gatewayReady) {
-      return (
-        <Card className="mt-6 overflow-hidden">
-          <CardContent className="flex flex-col items-center justify-center gap-4 pt-12">
-            <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
-            <p className="text-muted-foreground text-sm">
-              Almost ready &mdash; finishing up your instance&hellip;
-            </p>
-          </CardContent>
-        </Card>
-      );
-    }
-    return null;
+    // Keep showing the spinner through both the gateway-warming-up phase and
+    // the brief window between gatewayReady flipping true and router.push
+    // completing. Otherwise the screen flashes blank during navigation.
+    return (
+      <Card className="mt-6 overflow-hidden">
+        <CardContent className="flex flex-col items-center justify-center gap-4 pt-12">
+          <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground text-sm">
+            {flowState.gatewayReady
+              ? 'Opening chat…'
+              : 'Almost ready — finishing up your instance…'}
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   function renderErrorStep() {

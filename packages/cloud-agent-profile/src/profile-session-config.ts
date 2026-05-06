@@ -7,7 +7,11 @@ import { getEffectiveDefaultProfileId, getDefaultProfile } from './profile-servi
 import { getBindingForRepo } from './repo-binding-service';
 import { getVarsForSession } from './profile-vars-service';
 import { getCommandsForSession } from './profile-commands-service';
-import { getMcpServersForSession, type McpServerForSession } from './profile-mcp-service';
+import {
+  getMcpServersForSession,
+  type McpServerForSession,
+  type StoredMcpSecretValue,
+} from './profile-mcp-service';
 import { getSkillsForSession, type SkillForSession } from './profile-skills-service';
 import { getAgentsForSession, type AgentForSession } from './profile-agents-service';
 import { resolveProfileLayers } from './profile-resolution';
@@ -117,15 +121,15 @@ export async function mergeProfileConfiguration(
     explicitOverrideProfileId = profileId;
   }
 
-  // Default is a fallback — only fetch it when there's nothing else to apply.
-  const effectiveDefaultProfileId =
-    !repoBindingProfileId && !explicitOverrideProfileId
-      ? owner.type === 'organization' && userId
-        ? await getEffectiveDefaultProfileId(db, userId, owner.id)
-        : ((await getDefaultProfile(db, owner))?.id ?? null)
-      : null;
+  // Default fills the top slot when no explicit pick is made — even if a
+  // repo binding is also present, in which case the default layers on top.
+  const effectiveDefaultProfileId = explicitOverrideProfileId
+    ? null
+    : owner.type === 'organization' && userId
+      ? await getEffectiveDefaultProfileId(db, userId, owner.id)
+      : ((await getDefaultProfile(db, owner))?.id ?? null);
 
-  const { automatic, explicit } = resolveProfileLayers({
+  const { base, top } = resolveProfileLayers({
     repoBindingProfileId,
     effectiveDefaultProfileId,
     explicitOverrideProfileId,
@@ -133,8 +137,8 @@ export async function mergeProfileConfiguration(
 
   // Load profile data for the resolved layers in parallel.
   const profilesToLoad: string[] = [];
-  if (automatic) profilesToLoad.push(automatic.profileId);
-  if (explicit) profilesToLoad.push(explicit);
+  if (base) profilesToLoad.push(base.profileId);
+  if (top) profilesToLoad.push(top.profileId);
 
   const profileData = await Promise.all(
     profilesToLoad.map(async id => {
@@ -149,21 +153,19 @@ export async function mergeProfileConfiguration(
     })
   );
 
-  const automaticData = automatic
-    ? profileData.find(d => d.profileId === automatic.profileId)
-    : null;
-  const overrideData = explicit ? profileData.find(d => d.profileId === explicit) : null;
+  const baseData = base ? profileData.find(d => d.profileId === base.profileId) : null;
+  const topData = top ? profileData.find(d => d.profileId === top.profileId) : null;
 
-  // Process the automatic (base) layer.
+  // Process the base layer (repo binding).
   const baseEnvVars: Record<string, string> = {};
   const baseSecrets: Record<string, EncryptedEnvelope> = {};
   const baseCommands: string[] = [];
-  const baseMcpServers: McpServerForSession[] = automaticData?.mcpServers ?? [];
-  const baseSkills: SkillForSession[] = automaticData?.skills ?? [];
-  const baseAgents: AgentForSession[] = automaticData?.agents ?? [];
+  const baseMcpServers: McpServerForSession[] = baseData?.mcpServers ?? [];
+  const baseSkills: SkillForSession[] = baseData?.skills ?? [];
+  const baseAgents: AgentForSession[] = baseData?.agents ?? [];
 
-  if (automaticData) {
-    for (const variable of automaticData.vars) {
+  if (baseData) {
+    for (const variable of baseData.vars) {
       if (variable.isSecret) {
         const parsed = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
         baseSecrets[variable.key] = parsed;
@@ -171,35 +173,35 @@ export async function mergeProfileConfiguration(
         baseEnvVars[variable.key] = variable.value;
       }
     }
-    baseCommands.push(...automaticData.commands);
+    baseCommands.push(...baseData.commands);
   }
 
-  // Process override profile
-  const overrideEnvVars: Record<string, string> = {};
-  const overrideSecrets: Record<string, EncryptedEnvelope> = {};
-  const overrideCommands: string[] = [];
-  const overrideMcpServers: McpServerForSession[] = overrideData?.mcpServers ?? [];
-  const overrideSkills: SkillForSession[] = overrideData?.skills ?? [];
-  const overrideAgents: AgentForSession[] = overrideData?.agents ?? [];
+  // Process the top layer (explicit pick or default).
+  const topEnvVars: Record<string, string> = {};
+  const topSecrets: Record<string, EncryptedEnvelope> = {};
+  const topCommands: string[] = [];
+  const topMcpServers: McpServerForSession[] = topData?.mcpServers ?? [];
+  const topSkills: SkillForSession[] = topData?.skills ?? [];
+  const topAgents: AgentForSession[] = topData?.agents ?? [];
 
-  if (overrideData) {
-    for (const variable of overrideData.vars) {
+  if (topData) {
+    for (const variable of topData.vars) {
       if (variable.isSecret) {
         const parsed = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
-        overrideSecrets[variable.key] = parsed;
+        topSecrets[variable.key] = parsed;
       } else {
-        overrideEnvVars[variable.key] = variable.value;
+        topEnvVars[variable.key] = variable.value;
       }
     }
-    overrideCommands.push(...overrideData.commands);
+    topCommands.push(...topData.commands);
   }
 
-  // Merge env vars: base < override < manual
-  mergedEnvVars = { ...baseEnvVars, ...overrideEnvVars, ...envVars };
-  // Merge commands: base, then override, then manual
-  mergedSetupCommands = [...baseCommands, ...overrideCommands, ...setupCommands];
-  // Merge secrets: base < override (override wins on key collision)
-  const allSecrets = { ...baseSecrets, ...overrideSecrets };
+  // Merge env vars: base < top < manual
+  mergedEnvVars = { ...baseEnvVars, ...topEnvVars, ...envVars };
+  // Merge commands: base, then top, then manual
+  mergedSetupCommands = [...baseCommands, ...topCommands, ...setupCommands];
+  // Merge secrets: base < top (top wins on key collision)
+  const allSecrets = { ...baseSecrets, ...topSecrets };
   if (Object.keys(allSecrets).length > 0) {
     encryptedSecrets = allSecrets;
   }
@@ -207,7 +209,7 @@ export async function mergeProfileConfiguration(
   // MCP servers: merge by name across profile layers only (later wins).
   // Skips disabled servers entirely.
   const mcpByName = new Map<string, McpServerForSession>();
-  for (const server of [...baseMcpServers, ...overrideMcpServers]) {
+  for (const server of [...baseMcpServers, ...topMcpServers]) {
     if (!server.enabled) continue;
     mcpByName.set(server.name, server);
   }
@@ -216,7 +218,7 @@ export async function mergeProfileConfiguration(
   // Skills: merge by name across profile layers only (later wins).
   // Disabled skills are already filtered out in getSkillsForSession.
   const skillByName = new Map<string, MergedSkillForSession>();
-  for (const skill of [...baseSkills, ...overrideSkills]) {
+  for (const skill of [...baseSkills, ...topSkills]) {
     skillByName.set(skill.name, {
       name: skill.name,
       rawMarkdown: skill.rawMarkdown,
@@ -228,7 +230,7 @@ export async function mergeProfileConfiguration(
   // Agents: merge by slug across profile layers only (later wins).
   // Disabled agents are already filtered out in getAgentsForSession.
   const agentBySlug = new Map<string, MergedAgentForSession>();
-  for (const agent of [...baseAgents, ...overrideAgents]) {
+  for (const agent of [...baseAgents, ...topAgents]) {
     agentBySlug.set(agent.slug, agent);
   }
   const agents = agentBySlug.size > 0 ? Array.from(agentBySlug.values()) : undefined;
@@ -245,21 +247,22 @@ export async function mergeProfileConfiguration(
 
 /**
  * Shape the cloud-agent-next client accepts for each MCP server in the
- * `mcpServers` record. Env/header values travel as encrypted envelopes;
- * the worker decrypts them per-value just before writing KILO_CONFIG_CONTENT.
+ * `mcpServers` record. Each env/header value is either a plain string or an
+ * encrypted envelope; the worker decrypts envelope-shaped entries per key
+ * just before writing KILO_CONFIG_CONTENT.
  */
 export type ClientMcpServerValue =
   | {
       type: 'local';
       command: string[];
-      environment?: Record<string, EncryptedEnvelope>;
+      environment?: Record<string, StoredMcpSecretValue>;
       enabled?: boolean;
       timeout?: number;
     }
   | {
       type: 'remote';
       url: string;
-      headers?: Record<string, EncryptedEnvelope>;
+      headers?: Record<string, StoredMcpSecretValue>;
       enabled?: boolean;
       timeout?: number;
     };

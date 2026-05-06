@@ -56,25 +56,28 @@ const encryptedEnvelopeInputSchema = z.object({
   version: z.literal(1),
 });
 
+// MCP env / remote-header value: plain string or encrypted envelope. Plain
+// strings pass straight through to the sandbox; envelopes are decrypted
+// per key by the worker before materializing KILO_CONFIG_CONTENT.mcp.
+const mcpSecretValueSchema = z.union([z.string().max(4096), encryptedEnvelopeInputSchema]);
+
 // Local MCP server configuration (runs a command).
-// Env values are encrypted envelopes that the worker decrypts per-value.
 const mcpLocalServerConfigSchema = z
   .object({
     type: z.literal('local'),
     command: z.string().array().min(1, 'Command array must have at least one element'),
-    environment: z.record(z.string(), encryptedEnvelopeInputSchema).optional(),
+    environment: z.record(z.string(), mcpSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
   .strict();
 
 // Remote MCP server configuration (connects to a URL).
-// Header values are encrypted envelopes that the worker decrypts per-value.
 const mcpRemoteServerConfigSchema = z
   .object({
     type: z.literal('remote'),
     url: z.string().url('URL must be a valid URL format'),
-    headers: z.record(z.string(), encryptedEnvelopeInputSchema).optional(),
+    headers: z.record(z.string(), mcpSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
@@ -299,11 +302,6 @@ export const baseGetSessionNextOutputSchema = z.object({
   autoCommit: z.boolean().optional(),
   upstreamBranch: z.string().optional(),
 
-  // Configuration metadata (counts only, no values)
-  envVarCount: z.number().optional(),
-  setupCommandCount: z.number().optional(),
-  mcpServerCount: z.number().optional(),
-  skillCount: z.number().optional(),
   /** Custom agents stored on this session (shown in the chat picker). */
   runtimeAgents: z
     .array(

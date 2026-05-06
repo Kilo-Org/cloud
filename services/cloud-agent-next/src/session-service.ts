@@ -32,8 +32,8 @@ import type {
 } from './persistence/types.js';
 import { MetadataSchema } from './persistence/schemas.js';
 import { withDORetry } from './utils/do-retry.js';
-import { decryptSecrets, mergeEnvVarsWithSecrets } from './utils/encryption.js';
-import type { EncryptedSecretEnvelope } from './router/schemas.js';
+import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
+import type { MCPSecretValue } from './router/schemas.js';
 import type { SessionProfileBundle } from './session-profile.js';
 import { readProfileBundle } from './session-profile.js';
 
@@ -383,10 +383,11 @@ type CliMcpServer =
     };
 
 /**
- * Decrypt each encrypted env/header envelope into its plaintext value,
- * returning the CLI-native shape the runtime consumes.
- *
- * Throws if any envelope is present but AGENT_ENV_VARS_PRIVATE_KEY is missing.
+ * Materialize each MCP env/header value into its plaintext form for the CLI.
+ * Plain strings pass through verbatim; encrypted envelopes are decrypted
+ * per key. Throws only if at least one envelope is present and
+ * AGENT_ENV_VARS_PRIVATE_KEY is missing — records of pure plain strings
+ * never require the key.
  */
 function materializeMcpServers(
   mcpServers: Record<string, MCPServerConfig>,
@@ -395,7 +396,7 @@ function materializeMcpServers(
   const out: Record<string, CliMcpServer> = {};
   for (const [name, server] of Object.entries(mcpServers)) {
     if (server.type === 'local') {
-      const environment = decryptEnvelopeRecord(
+      const environment = materializeSecretValueRecord(
         server.environment,
         privateKey,
         `MCP server "${name}" environment`
@@ -408,7 +409,7 @@ function materializeMcpServers(
         ...(server.timeout !== undefined && { timeout: server.timeout }),
       };
     } else {
-      const headers = decryptEnvelopeRecord(
+      const headers = materializeSecretValueRecord(
         server.headers,
         privateKey,
         `MCP server "${name}" headers`
@@ -425,18 +426,26 @@ function materializeMcpServers(
   return out;
 }
 
-function decryptEnvelopeRecord(
-  envelopes: Record<string, EncryptedSecretEnvelope> | undefined,
+function materializeSecretValueRecord(
+  values: Record<string, MCPSecretValue> | undefined,
   privateKey: string | undefined,
   label: string
 ): Record<string, string> | undefined {
-  if (!envelopes || Object.keys(envelopes).length === 0) return undefined;
-  if (!privateKey) {
-    throw new Error(
-      `${label} contains encrypted values but AGENT_ENV_VARS_PRIVATE_KEY is not configured on the worker`
-    );
+  if (!values || Object.keys(values).length === 0) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (typeof value === 'string') {
+      out[key] = value;
+      continue;
+    }
+    if (!privateKey) {
+      throw new Error(
+        `${label} contains encrypted values but AGENT_ENV_VARS_PRIVATE_KEY is not configured on the worker`
+      );
+    }
+    out[key] = decryptWithPrivateKey(value, privateKey);
   }
-  return decryptSecrets(envelopes, privateKey);
+  return out;
 }
 
 // Write global rules file so the CLI injects cloud-agent-specific instructions.

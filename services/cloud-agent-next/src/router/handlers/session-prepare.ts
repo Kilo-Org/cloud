@@ -44,7 +44,7 @@ import {
   resolveGitHubTokenForRepo,
   resolveManagedGitLabToken,
 } from '../../services/git-token-service-client.js';
-import { getCanPgDb } from '../../db/pg.js';
+import { getPgDb } from '../../db/pg.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
@@ -103,7 +103,7 @@ async function resolveProfileForInput(
   // In org context we also allow the user's personal profile to apply.
   const userId = input.kilocodeOrganizationId ? ctx.userId : undefined;
 
-  const db = getCanPgDb(ctx.env);
+  const db = getPgDb(ctx.env);
 
   try {
     return await mergeProfileConfiguration(db, {

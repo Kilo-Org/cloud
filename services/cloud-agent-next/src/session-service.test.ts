@@ -2341,6 +2341,70 @@ describe('SessionService', () => {
         timeout: 30000,
       });
     });
+
+    it('passes plain-string MCP env values straight through without requiring a private key', async () => {
+      const fakeSession = {
+        exec: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        gitCheckout: vi.fn().mockResolvedValue({ success: true, exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        deleteFile: vi.fn().mockResolvedValue(undefined),
+      };
+      const sandboxCreateSession = vi.fn().mockResolvedValue(fakeSession);
+      const sandbox = {
+        createSession: sandboxCreateSession,
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        exec: vi.fn().mockResolvedValue({ exitCode: 0 }),
+        writeFile: vi.fn().mockResolvedValue(undefined),
+      } as unknown as SandboxInstance;
+      const sessionId: SessionId = 'agent_mcp_plain_env';
+      mockedSetupWorkspace.mockResolvedValue({
+        workspacePath: `/workspace/org/user/sessions/${sessionId}`,
+        sessionHome: `/home/${sessionId}`,
+      });
+
+      const service = new SessionService();
+      const mcpServers = {
+        config: {
+          type: 'local' as const,
+          command: ['node', 'server.js'],
+          environment: { LOCALE: 'en-US', PORT: '4000' },
+        },
+        publicRemote: {
+          type: 'remote' as const,
+          url: 'https://example.com/mcp',
+          headers: { 'X-Region': 'eu-west-1' },
+        },
+      };
+
+      // No AGENT_ENV_VARS_PRIVATE_KEY in env — must still succeed because no envelopes are present.
+      await service.initiate({
+        sandbox,
+        sandboxId: 'org__user',
+        orgId: 'org',
+        userId: 'user',
+        sessionId,
+        kilocodeToken: 'token',
+        kilocodeModel: 'test-model',
+        githubRepo: 'acme/repo',
+        env: mockEnv,
+        profile: { mcpServers },
+      });
+
+      const callArgs = sandboxCreateSession.mock.calls[0][0] as { env: Record<string, string> };
+      const configContent = JSON.parse(callArgs.env.KILO_CONFIG_CONTENT) as {
+        mcp: Record<string, unknown>;
+      };
+      expect(configContent.mcp.config).toEqual({
+        type: 'local',
+        command: ['node', 'server.js'],
+        environment: { LOCALE: 'en-US', PORT: '4000' },
+      });
+      expect(configContent.mcp.publicRemote).toEqual({
+        type: 'remote',
+        url: 'https://example.com/mcp',
+        headers: { 'X-Region': 'eu-west-1' },
+      });
+    });
   });
 
   describe('Metadata Persistence', () => {

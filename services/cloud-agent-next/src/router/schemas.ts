@@ -2,6 +2,7 @@ import * as z from 'zod';
 import { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema } from '../types.js';
 import {
   MCPServerConfigSchema,
+  MCPSecretValueSchema,
   branchNameSchema,
   modelIdSchema,
   EncryptedSecretEnvelopeSchema,
@@ -17,7 +18,7 @@ import { AgentModeSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 
 // Re-export schemas from types.ts and persistence/schemas.ts for convenience
 export { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema };
-export { MCPServerConfigSchema, branchNameSchema, modelIdSchema };
+export { MCPServerConfigSchema, MCPSecretValueSchema, branchNameSchema, modelIdSchema };
 export { AgentModeSchema, Limits };
 export {
   EncryptedSecretEnvelopeSchema,
@@ -31,7 +32,11 @@ export {
 };
 
 // Re-export types
-export type { EncryptedSecretEnvelope, EncryptedSecrets } from '../persistence/schemas.js';
+export type {
+  EncryptedSecretEnvelope,
+  EncryptedSecrets,
+  MCPSecretValue,
+} from '../persistence/schemas.js';
 export type { RuntimeSkillInput, RuntimeAgentInput } from '../persistence/schemas.js';
 
 /**
@@ -447,11 +452,6 @@ export const GetSessionOutput = z.object({
   autoCommit: z.boolean().optional().describe('Auto-commit setting'),
   upstreamBranch: z.string().optional().describe('Upstream branch name'),
 
-  // Configuration metadata (counts only, no values)
-  envVarCount: z.number().optional().describe('Number of environment variables configured'),
-  setupCommandCount: z.number().optional().describe('Number of setup commands configured'),
-  mcpServerCount: z.number().optional().describe('Number of MCP servers configured'),
-  skillCount: z.number().optional().describe('Number of runtime skills configured'),
   runtimeAgents: z
     .array(
       z.object({

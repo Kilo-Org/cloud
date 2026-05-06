@@ -8,6 +8,6 @@ import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
  * cache the returned client per-request (inside a handler), not at module
  * scope, to match the Workers isolate lifecycle.
  */
-export function getCanPgDb(env: Pick<Env, 'HYPERDRIVE'>): WorkerDb {
+export function getPgDb(env: Pick<Env, 'HYPERDRIVE'>): WorkerDb {
   return getWorkerDb(env.HYPERDRIVE.connectionString);
 }

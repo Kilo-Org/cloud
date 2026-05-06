@@ -91,37 +91,33 @@ export function ProfilePickerPopover({
   );
 
   const baseProfile = useMemo(
-    () =>
-      layers.automatic
-        ? (allProfiles.find(p => p.id === layers.automatic?.profileId) ?? null)
-        : null,
-    [allProfiles, layers.automatic]
-  );
-  const baseSource = layers.automatic?.source ?? null;
-
-  const overrideProfile = useMemo(
-    () => (layers.explicit ? (allProfiles.find(p => p.id === layers.explicit) ?? null) : null),
-    [allProfiles, layers.explicit]
+    () => (layers.base ? (allProfiles.find(p => p.id === layers.base?.profileId) ?? null) : null),
+    [allProfiles, layers.base]
   );
 
-  // Profiles offered as override candidates. The automatic profile is omitted
-  // because picking it as override would be a no-op (deduped in
-  // resolveProfileLayers).
+  const topProfile = useMemo(
+    () => (layers.top ? (allProfiles.find(p => p.id === layers.top?.profileId) ?? null) : null),
+    [allProfiles, layers.top]
+  );
+  const topSource = layers.top?.source ?? null;
+
+  // Profiles offered as override candidates. The base profile is omitted
+  // because picking it would dedupe to a no-op in `resolveProfileLayers`.
   const overrideCandidates = useMemo(
-    () => allProfiles.filter(p => p.id !== layers.automatic?.profileId),
-    [allProfiles, layers.automatic]
+    () => allProfiles.filter(p => p.id !== layers.base?.profileId),
+    [allProfiles, layers.base]
   );
 
-  const chipName = overrideProfile?.name ?? baseProfile?.name ?? null;
+  const chipName = topProfile?.name ?? baseProfile?.name ?? null;
 
   const chipCounts = useMemo(() => {
-    const vars = Math.max(baseProfile?.varCount ?? 0, overrideProfile?.varCount ?? 0);
-    const mcps = (baseProfile?.mcpServerCount ?? 0) + (overrideProfile?.mcpServerCount ?? 0);
-    const skills = (baseProfile?.skillCount ?? 0) + (overrideProfile?.skillCount ?? 0);
+    const vars = Math.max(baseProfile?.varCount ?? 0, topProfile?.varCount ?? 0);
+    const mcps = (baseProfile?.mcpServerCount ?? 0) + (topProfile?.mcpServerCount ?? 0);
+    const skills = (baseProfile?.skillCount ?? 0) + (topProfile?.skillCount ?? 0);
     return [vars > 0 && `${vars} vars`, mcps > 0 && `${mcps} MCP`, skills > 0 && `${skills} skills`]
       .filter(Boolean)
       .join(' · ');
-  }, [baseProfile, overrideProfile]);
+  }, [baseProfile, topProfile]);
 
   function formatCounts(profile: ProfileSummaryWithOwner) {
     return [
@@ -133,7 +129,10 @@ export function ProfilePickerPopover({
       .join(' · ');
   }
 
-  const hasOverride = !!overrideProfile;
+  // Two layers are present (repo + something on top). Used for the "+1" hint
+  // and the "on top of …" affordance regardless of whether the top is an
+  // explicit pick or just the default.
+  const hasTwoLayers = !!topProfile && !!baseProfile;
 
   return (
     <>
@@ -152,7 +151,7 @@ export function ProfilePickerPopover({
               <>
                 <span className="font-medium">{chipName}</span>
                 {chipCounts && <span className="opacity-60">· {chipCounts}</span>}
-                {hasOverride && baseProfile && <span className="text-primary/80 ml-0.5">+1</span>}
+                {hasTwoLayers && <span className="text-primary/80 ml-0.5">+1</span>}
               </>
             ) : (
               <span>No profile</span>
@@ -176,8 +175,8 @@ export function ProfilePickerPopover({
           ) : (
             <ActiveProfileView
               baseProfile={baseProfile}
-              baseSource={baseSource}
-              overrideProfile={overrideProfile}
+              topProfile={topProfile}
+              topSource={topSource}
               allProfiles={allProfiles}
               overrideCandidatesCount={overrideCandidates.length}
               formatCounts={formatCounts}
@@ -271,8 +270,8 @@ function PickerRow({ label, meta, isSelected, onClick }: PickerRowProps) {
 
 type ActiveProfileViewProps = {
   baseProfile: ProfileSummaryWithOwner | null;
-  baseSource: 'repo-binding' | 'default' | null;
-  overrideProfile: ProfileSummaryWithOwner | null;
+  topProfile: ProfileSummaryWithOwner | null;
+  topSource: 'repo-binding' | 'default' | 'explicit' | null;
   allProfiles: ProfileSummaryWithOwner[];
   overrideCandidatesCount: number;
   formatCounts: (p: ProfileSummaryWithOwner) => string;
@@ -284,8 +283,8 @@ type ActiveProfileViewProps = {
 
 function ActiveProfileView({
   baseProfile,
-  baseSource,
-  overrideProfile,
+  topProfile,
+  topSource,
   allProfiles,
   overrideCandidatesCount,
   formatCounts,
@@ -295,7 +294,7 @@ function ActiveProfileView({
   onSelectProfile,
 }: ActiveProfileViewProps) {
   // Nothing selected at all and no profiles exist.
-  if (!baseProfile && !overrideProfile && allProfiles.length === 0) {
+  if (!baseProfile && !topProfile && allProfiles.length === 0) {
     return (
       <p className="text-muted-foreground text-xs">
         No profiles yet. Create one to add environment variables, MCP servers, and skills.
@@ -303,9 +302,9 @@ function ActiveProfileView({
     );
   }
 
-  // No base and no override, but profiles exist — show the picker list directly
-  // so the user can select one with a single click.
-  if (!baseProfile && !overrideProfile) {
+  // No base and no top, but profiles exist — show the picker list directly so
+  // the user can select one with a single click.
+  if (!baseProfile && !topProfile) {
     return (
       <>
         <p className="text-muted-foreground mb-2 text-[10px] font-semibold uppercase tracking-wider">
@@ -326,16 +325,17 @@ function ActiveProfileView({
     );
   }
 
-  // The profile the user sees as "active" — override takes precedence over base.
-  const active = overrideProfile ?? baseProfile;
+  // The profile the user sees as "active" — top takes precedence over base.
+  const active = topProfile ?? baseProfile;
   if (!active) return null;
 
-  const isOverride = !!overrideProfile;
-  // An explicit selection is only truly an "override" when there's also a base
-  // profile being overridden; otherwise it's simply the active profile.
-  const isOverridingBase = isOverride && !!baseProfile;
-  // Only badge non-default sources — default is the expected case.
-  const badgeLabel = isOverridingBase ? 'override' : baseSource === 'repo-binding' ? 'repo' : null;
+  // An explicit pick is what the user can change/remove for this task.
+  const isExplicit = topSource === 'explicit';
+  // Show "override" badge only when the explicit pick is layered on a base.
+  const isOverridingBase = isExplicit && !!baseProfile;
+  // When only the base is showing (no top), badge it as "repo" — distinct from
+  // the default case which is the expected baseline and unbadged.
+  const badgeLabel = isOverridingBase ? 'override' : !topProfile && baseProfile ? 'repo' : null;
 
   return (
     <>
@@ -362,7 +362,7 @@ function ActiveProfileView({
               {badgeLabel}
             </span>
           )}
-          {isOverride && (
+          {isExplicit && (
             <button
               type="button"
               onClick={onRemoveOverride}
@@ -374,9 +374,10 @@ function ActiveProfileView({
           )}
         </div>
 
-        {/* Show the base profile underneath when an override is active, so the
-            user knows what it's layered on top of. */}
-        {isOverride && baseProfile && (
+        {/* When two layers are active, show the base underneath so the user
+            knows what the top is layered on top of. The base is always the
+            repo binding in the new model. */}
+        {topProfile && baseProfile && (
           <button
             type="button"
             onClick={() => onEditProfile(baseProfile.id)}
@@ -386,15 +387,13 @@ function ActiveProfileView({
             <div className="text-muted-foreground flex items-center gap-2 text-xs">
               <span className="opacity-60">on top of</span>
               <span className="truncate font-medium">{baseProfile.name}</span>
-              {baseSource === 'repo-binding' && (
-                <span className="ml-auto shrink-0 text-[10px] opacity-60">repo</span>
-              )}
+              <span className="ml-auto shrink-0 text-[10px] opacity-60">repo</span>
             </div>
           </button>
         )}
       </div>
 
-      {!isOverride && overrideCandidatesCount > 0 && (
+      {!isExplicit && overrideCandidatesCount > 0 && (
         <div className="mt-3">
           <button
             type="button"

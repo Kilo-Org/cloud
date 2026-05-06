@@ -426,17 +426,6 @@ export function createSessionManagementHandlers() {
             autoCommit: metadata.autoCommit,
             upstreamBranch: metadata.upstreamBranch,
 
-            // Counts only, no actual values
-            envVarCount:
-              metadataProfile.envVars === undefined
-                ? undefined
-                : Object.keys(metadataProfile.envVars).length,
-            setupCommandCount: metadataProfile.setupCommands?.length,
-            mcpServerCount:
-              metadataProfile.mcpServers === undefined
-                ? undefined
-                : Object.keys(metadataProfile.mcpServers).length,
-            skillCount: metadataProfile.runtimeSkills?.length,
             // Only surface agents that would appear in the chat picker: not
             // subagent-only, not hidden, not disabled. Matches the extension's
             // `available = agents.filter(a => a.mode !== 'subagent' && !a.hidden)`.

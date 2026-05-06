@@ -87,19 +87,6 @@ export const skillFilesSchema = z
     }
   });
 
-/** Input for creating a skill from the marketplace (URL that returns SKILL.md). */
-export const skillMarketplaceInputSchema = z.object({
-  name: skillNameSchema,
-  description: z.string().max(MAX_SKILL_DESCRIPTION_LENGTH).optional(),
-  sourceUrl: z.string().url().max(2048),
-  rawMarkdown: z
-    .string()
-    .min(1)
-    .max(MAX_SKILL_MARKDOWN_LENGTH, `Skill markdown exceeds ${MAX_SKILL_MARKDOWN_LENGTH} bytes`),
-  files: skillFilesSchema.optional(),
-  enabled: z.boolean().optional(),
-});
-
 /** Input for creating a custom skill by pasting SKILL.md directly. */
 export const skillCustomInputSchema = z.object({
   name: skillNameSchema,
@@ -125,7 +112,6 @@ export const skillUpdateInputSchema = z.object({
   enabled: z.boolean().optional(),
 });
 
-export type SkillMarketplaceInput = z.infer<typeof skillMarketplaceInputSchema>;
 export type SkillCustomInput = z.infer<typeof skillCustomInputSchema>;
 export type SkillUpdateInput = z.infer<typeof skillUpdateInputSchema>;
 
@@ -223,32 +209,6 @@ export async function listSkillsForProfile(
     .where(eq(agent_environment_profile_skills.profile_id, profileId))
     .orderBy(agent_environment_profile_skills.name);
   return skills.map(toResponse);
-}
-
-export async function createMarketplaceSkill(
-  db: WorkerDb,
-  profileId: string,
-  input: SkillMarketplaceInput,
-  owner: ProfileOwner
-): Promise<{ id: string }> {
-  await verifyProfileOwnership(db, profileId, owner);
-  await assertSkillLimit(db, profileId);
-
-  const [row] = await db
-    .insert(agent_environment_profile_skills)
-    .values({
-      profile_id: profileId,
-      name: input.name,
-      description: input.description ?? null,
-      source_type: 'marketplace',
-      source_url: input.sourceUrl,
-      raw_markdown: input.rawMarkdown,
-      files: input.files ?? {},
-      enabled: input.enabled ?? true,
-    })
-    .returning({ id: agent_environment_profile_skills.id });
-
-  return { id: row.id };
 }
 
 export async function createCustomSkill(

@@ -752,7 +752,7 @@ describe('MetadataSchema', () => {
   });
 });
 
-describe('MCPServerConfigSchema with per-value encrypted envelopes', () => {
+describe('MCPServerConfigSchema with mixed plain-string and envelope values', () => {
   const envelope = {
     encryptedData: 'ciphertext',
     encryptedDEK: 'dek',
@@ -770,7 +770,9 @@ describe('MCPServerConfigSchema with per-value encrypted envelopes', () => {
     const result = MCPServerConfigSchema.parse(config);
     expect(result.type).toBe('local');
     if (result.type === 'local') {
-      expect(result.environment?.API_KEY.algorithm).toBe('rsa-aes-256-gcm');
+      const v = result.environment?.API_KEY;
+      expect(typeof v).toBe('object');
+      if (v && typeof v !== 'string') expect(v.algorithm).toBe('rsa-aes-256-gcm');
     }
   });
 
@@ -784,25 +786,68 @@ describe('MCPServerConfigSchema with per-value encrypted envelopes', () => {
     const result = MCPServerConfigSchema.parse(config);
     expect(result.type).toBe('remote');
     if (result.type === 'remote') {
-      expect(result.headers?.Authorization.algorithm).toBe('rsa-aes-256-gcm');
+      const v = result.headers?.Authorization;
+      expect(typeof v).toBe('object');
+      if (v && typeof v !== 'string') expect(v.algorithm).toBe('rsa-aes-256-gcm');
     }
   });
 
-  it('rejects plain-string environment values', () => {
+  it('accepts plain-string environment values', () => {
+    const config = {
+      type: 'local' as const,
+      command: ['node'],
+      environment: { LOCALE: 'en-US', PORT: '4000' },
+    };
+    const result = MCPServerConfigSchema.parse(config);
+    expect(result.type).toBe('local');
+    if (result.type === 'local') {
+      expect(result.environment?.LOCALE).toBe('en-US');
+      expect(result.environment?.PORT).toBe('4000');
+    }
+  });
+
+  it('accepts plain-string header values', () => {
+    const config = {
+      type: 'remote' as const,
+      url: 'https://example.com/mcp',
+      headers: { 'X-Region': 'eu-west-1' },
+    };
+    const result = MCPServerConfigSchema.parse(config);
+    expect(result.type).toBe('remote');
+    if (result.type === 'remote') {
+      expect(result.headers?.['X-Region']).toBe('eu-west-1');
+    }
+  });
+
+  it('accepts mixed plain-string and envelope environment values per key', () => {
+    const config = {
+      type: 'local' as const,
+      command: ['node'],
+      environment: { LOCALE: 'en-US', API_KEY: envelope },
+    };
+    const result = MCPServerConfigSchema.parse(config);
+    if (result.type === 'local') {
+      expect(result.environment?.LOCALE).toBe('en-US');
+      const apiKey = result.environment?.API_KEY;
+      expect(typeof apiKey).toBe('object');
+    }
+  });
+
+  it('rejects environment values that are neither strings nor envelopes', () => {
     const bad = {
       type: 'local' as const,
       command: ['node'],
-      environment: { API_KEY: 'plaintext' },
+      environment: { API_KEY: { not: 'an envelope' } },
     };
     const result = MCPServerConfigSchema.safeParse(bad);
     expect(result.success).toBe(false);
   });
 
-  it('rejects plain-string header values', () => {
+  it('rejects header values that are neither strings nor envelopes', () => {
     const bad = {
       type: 'remote' as const,
       url: 'https://example.com/mcp',
-      headers: { Authorization: 'Bearer plaintext' },
+      headers: { Authorization: 12345 },
     };
     const result = MCPServerConfigSchema.safeParse(bad);
     expect(result.success).toBe(false);

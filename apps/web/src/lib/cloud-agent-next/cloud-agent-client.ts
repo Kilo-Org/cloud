@@ -21,12 +21,16 @@ import { INTERNAL_API_SECRET } from '@/lib/config.server';
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
 
 // MCP server config types — CLI-native local/remote format.
-// Env/header values are RSA+AES envelopes that the cloud-agent-next worker
-// decrypts per-value when materializing `KILO_CONFIG_CONTENT.mcp`.
+// Each env/header value is either a plain string (passed through verbatim)
+// or an RSA+AES envelope (decrypted per-value by the worker when
+// materializing `KILO_CONFIG_CONTENT.mcp`). Callers mix the two per key:
+// secrets travel as envelopes, non-sensitive config as plain strings.
+type MCPSecretValue = string | EncryptedEnvelope;
+
 type MCPLocalServerConfig = {
   type: 'local';
   command: string[];
-  environment?: Record<string, EncryptedEnvelope>;
+  environment?: Record<string, MCPSecretValue>;
   enabled?: boolean;
   timeout?: number;
 };
@@ -34,7 +38,7 @@ type MCPLocalServerConfig = {
 type MCPRemoteServerConfig = {
   type: 'remote';
   url: string;
-  headers?: Record<string, EncryptedEnvelope>;
+  headers?: Record<string, MCPSecretValue>;
   enabled?: boolean;
   timeout?: number;
 };
@@ -217,11 +221,6 @@ export type GetSessionOutput = {
   autoCommit?: boolean;
   upstreamBranch?: string;
 
-  // Configuration metadata (counts only, no values)
-  envVarCount?: number;
-  setupCommandCount?: number;
-  mcpServerCount?: number;
-  skillCount?: number;
   /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
 

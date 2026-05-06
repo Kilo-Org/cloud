@@ -472,28 +472,6 @@ export const agentProfilesRouter = createTRPCRouter({
     }),
 
   /**
-   * Create an MCP server from a marketplace entry (marketplace YAML shape).
-   * Normalizes `command` + `args` + `env`/`headers` into the CLI-native shape;
-   * env/header values are encrypted inline.
-   */
-  createMcpFromMarketplace: baseProcedure
-    .input(
-      ProfileIdSchema.extend({
-        organizationId: z.uuid().optional(),
-        marketplace: profileMcpService.mcpMarketplaceInputSchema,
-      })
-    )
-    .output(z.object({ id: z.uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
-      }
-      const owner = getOwner(input.organizationId, ctx.user.id);
-      const normalized = profileMcpService.normalizeMarketplaceMcp(input.marketplace);
-      return profileMcpService.createMcpServer(db, publicKey, input.profileId, normalized, owner);
-    }),
-
-  /**
    * Update an MCP server (replaces its config). Env/header values in the
    * input are plaintext; they are encrypted before write.
    */
@@ -570,38 +548,6 @@ export const agentProfilesRouter = createTRPCRouter({
     }),
 
   // ============ SKILLS ============
-
-  /**
-   * Create a skill on a profile from a marketplace URL. The caller passes the
-   * already-fetched SKILL.md content so that credentials and rate-limits stay
-   * on the browser side.
-   */
-  createSkillFromMarketplace: baseProcedure
-    .input(
-      ProfileIdSchema.extend({
-        organizationId: z.uuid().optional(),
-      }).merge(profileSkillsService.skillMarketplaceInputSchema)
-    )
-    .output(z.object({ id: z.uuid() }))
-    .mutation(async ({ ctx, input }) => {
-      if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
-      }
-      const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileSkillsService.createMarketplaceSkill(
-        db,
-        input.profileId,
-        {
-          name: input.name,
-          description: input.description,
-          sourceUrl: input.sourceUrl,
-          rawMarkdown: input.rawMarkdown,
-          files: input.files,
-          enabled: input.enabled,
-        },
-        owner
-      );
-    }),
 
   /**
    * Create a custom skill by pasting SKILL.md directly (optionally with

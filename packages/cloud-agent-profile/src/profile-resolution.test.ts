@@ -14,10 +14,10 @@ describe('resolveProfileLayers', () => {
         effectiveDefaultProfileId: null,
         explicitOverrideProfileId: null,
       })
-    ).toEqual({ automatic: null, explicit: null });
+    ).toEqual({ base: null, top: null });
   });
 
-  test('only effective default: default fills the automatic slot', () => {
+  test('only effective default: default fills the top slot', () => {
     expect(
       resolveProfileLayers({
         repoBindingProfileId: null,
@@ -25,12 +25,12 @@ describe('resolveProfileLayers', () => {
         explicitOverrideProfileId: null,
       })
     ).toEqual({
-      automatic: { profileId: DEFAULT_P, source: 'default' },
-      explicit: null,
+      base: null,
+      top: { profileId: DEFAULT_P, source: 'default' },
     });
   });
 
-  test('only repo binding: repo binding fills the automatic slot', () => {
+  test('only repo binding: repo binding fills the base slot', () => {
     expect(
       resolveProfileLayers({
         repoBindingProfileId: REPO_P,
@@ -38,12 +38,12 @@ describe('resolveProfileLayers', () => {
         explicitOverrideProfileId: null,
       })
     ).toEqual({
-      automatic: { profileId: REPO_P, source: 'repo-binding' },
-      explicit: null,
+      base: { profileId: REPO_P, source: 'repo-binding' },
+      top: null,
     });
   });
 
-  test('repo binding beats effective default in the automatic slot', () => {
+  test('repo binding + effective default: both apply (default on top of repo)', () => {
     expect(
       resolveProfileLayers({
         repoBindingProfileId: REPO_P,
@@ -51,12 +51,12 @@ describe('resolveProfileLayers', () => {
         explicitOverrideProfileId: null,
       })
     ).toEqual({
-      automatic: { profileId: REPO_P, source: 'repo-binding' },
-      explicit: null,
+      base: { profileId: REPO_P, source: 'repo-binding' },
+      top: { profileId: DEFAULT_P, source: 'default' },
     });
   });
 
-  test('repo binding coexists with an explicit override: base + override', () => {
+  test('repo binding + explicit override: both apply (override on top of repo)', () => {
     expect(
       resolveProfileLayers({
         repoBindingProfileId: REPO_P,
@@ -64,12 +64,25 @@ describe('resolveProfileLayers', () => {
         explicitOverrideProfileId: EXPLICIT_P,
       })
     ).toEqual({
-      automatic: { profileId: REPO_P, source: 'repo-binding' },
-      explicit: EXPLICIT_P,
+      base: { profileId: REPO_P, source: 'repo-binding' },
+      top: { profileId: EXPLICIT_P, source: 'explicit' },
     });
   });
 
-  test('explicit pick suppresses the default (default is a fallback, not a co-layer)', () => {
+  test('repo binding + default + explicit: explicit replaces default in the top slot', () => {
+    expect(
+      resolveProfileLayers({
+        repoBindingProfileId: REPO_P,
+        effectiveDefaultProfileId: DEFAULT_P,
+        explicitOverrideProfileId: EXPLICIT_P,
+      })
+    ).toEqual({
+      base: { profileId: REPO_P, source: 'repo-binding' },
+      top: { profileId: EXPLICIT_P, source: 'explicit' },
+    });
+  });
+
+  test('explicit pick replaces the default in the top slot (no repo binding)', () => {
     expect(
       resolveProfileLayers({
         repoBindingProfileId: null,
@@ -77,12 +90,12 @@ describe('resolveProfileLayers', () => {
         explicitOverrideProfileId: EXPLICIT_P,
       })
     ).toEqual({
-      automatic: null,
-      explicit: EXPLICIT_P,
+      base: null,
+      top: { profileId: EXPLICIT_P, source: 'explicit' },
     });
   });
 
-  test('explicit pick equal to the repo binding is deduped to a no-op override', () => {
+  test('explicit pick equal to the repo binding is deduped to a no-op top', () => {
     expect(
       resolveProfileLayers({
         repoBindingProfileId: REPO_P,
@@ -90,13 +103,25 @@ describe('resolveProfileLayers', () => {
         explicitOverrideProfileId: REPO_P,
       })
     ).toEqual({
-      automatic: { profileId: REPO_P, source: 'repo-binding' },
-      explicit: null,
+      base: { profileId: REPO_P, source: 'repo-binding' },
+      top: null,
     });
   });
 
-  test('explicit pick equal to the effective default: no default fallback; explicit alone', () => {
-    // The default is not pulled into `automatic` because an explicit pick was made.
+  test('default equal to the repo binding is deduped to a no-op top', () => {
+    expect(
+      resolveProfileLayers({
+        repoBindingProfileId: REPO_P,
+        effectiveDefaultProfileId: REPO_P,
+        explicitOverrideProfileId: null,
+      })
+    ).toEqual({
+      base: { profileId: REPO_P, source: 'repo-binding' },
+      top: null,
+    });
+  });
+
+  test('explicit pick equal to the effective default: explicit alone in top slot', () => {
     expect(
       resolveProfileLayers({
         repoBindingProfileId: null,
@@ -104,12 +129,12 @@ describe('resolveProfileLayers', () => {
         explicitOverrideProfileId: DEFAULT_P,
       })
     ).toEqual({
-      automatic: null,
-      explicit: DEFAULT_P,
+      base: null,
+      top: { profileId: DEFAULT_P, source: 'explicit' },
     });
   });
 
-  test('explicit pick with no repo binding and no default: explicit alone', () => {
+  test('explicit pick with no repo binding and no default: explicit alone in top slot', () => {
     expect(
       resolveProfileLayers({
         repoBindingProfileId: null,
@@ -117,8 +142,8 @@ describe('resolveProfileLayers', () => {
         explicitOverrideProfileId: EXPLICIT_P,
       })
     ).toEqual({
-      automatic: null,
-      explicit: EXPLICIT_P,
+      base: null,
+      top: { profileId: EXPLICIT_P, source: 'explicit' },
     });
   });
 });

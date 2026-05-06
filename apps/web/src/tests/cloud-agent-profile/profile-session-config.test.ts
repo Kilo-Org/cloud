@@ -100,8 +100,11 @@ async function addMcpLocal(
   command: string[],
   opts: {
     enabled?: boolean;
-    /** Encrypted env envelopes keyed by env var name. */
-    environment?: Record<string, typeof fakeEnvelopeObject>;
+    /**
+     * Stored env values keyed by env var name. Each value is either a plain
+     * string (for non-secret config) or an encrypted envelope (for secrets).
+     */
+    environment?: Record<string, string | typeof fakeEnvelopeObject>;
   } = {}
 ): Promise<string> {
   const [server] = await db
@@ -284,15 +287,16 @@ describe('mergeProfileConfiguration', () => {
     expect(result.setupCommands).toEqual(['base-cmd', 'override-cmd', 'manual-cmd']);
   });
 
-  test('repo binding suppresses the effective default (default is a fallback, not a co-layer)', async () => {
+  test('repo binding (base) and effective default (top) are co-applied; default wins on collision', async () => {
     const user = await insertTestUser();
     const owner: ProfileOwner = { type: 'user', id: user.id };
 
     const repoProfileId = await createProfile(owner, 'repo-profile');
     await addVar(repoProfileId, 'FROM', 'repo');
+    await addVar(repoProfileId, 'REPO_ONLY', 'repo-val');
     await bindRepo(owner, 'org/repo', 'github', repoProfileId);
 
-    // Also have a default, which should NOT be layered when a repo binding applies.
+    // Default layers on top of the repo binding.
     const defaultProfileId = await createProfile(owner, 'default-profile', { isDefault: true });
     await addVar(defaultProfileId, 'FROM', 'default');
     await addVar(defaultProfileId, 'DEFAULT_ONLY', 'default-val');
@@ -303,8 +307,11 @@ describe('mergeProfileConfiguration', () => {
       platform: 'github',
     });
 
-    // Only repo profile applies; default is not co-applied.
-    expect(result.envVars).toEqual({ FROM: 'repo' });
+    expect(result.envVars).toEqual({
+      REPO_ONLY: 'repo-val',
+      DEFAULT_ONLY: 'default-val',
+      FROM: 'default',
+    });
   });
 
   test('explicit pick suppresses the default (default is only a fallback)', async () => {
@@ -631,6 +638,29 @@ describe('mergeProfileConfiguration', () => {
     expect(demo).toBeDefined();
     if (demo && demo.type === 'local') {
       expect(demo.environment).toBeDefined();
+      expect(demo.environment?.API_KEY).toMatchObject({
+        algorithm: 'rsa-aes-256-gcm',
+        version: 1,
+      });
+    } else {
+      throw new Error('Expected local MCP server in record');
+    }
+  });
+
+  test('plain-string MCP env values round-trip through the client record verbatim', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+    const profileId = await createProfile(owner, 'with-mixed', { isDefault: true });
+    await addMcpLocal(profileId, 'demo', ['node', 'server.js'], {
+      environment: { LOCALE: 'en-US', API_KEY: fakeEnvelopeObject },
+    });
+
+    const result = await mergeProfileConfiguration(db, { owner });
+    const record = profileMcpServersToClientRecord(result.mcpServers);
+
+    const demo = record?.demo;
+    if (demo && demo.type === 'local') {
+      expect(demo.environment?.LOCALE).toBe('en-US');
       expect(demo.environment?.API_KEY).toMatchObject({
         algorithm: 'rsa-aes-256-gcm',
         version: 1,

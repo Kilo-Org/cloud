@@ -19,7 +19,8 @@ export { MASKED_SECRET_VALUE } from './types';
 // Pure resolution helpers
 export {
   resolveProfileLayers,
-  type AutomaticProfileSource,
+  type ProfileLayer,
+  type ProfileLayerSource,
   type ResolvedProfileLayers,
   type ResolveProfileLayersInput,
 } from './profile-resolution';
@@ -77,8 +78,6 @@ export {
   mcpLocalServerInputSchema,
   mcpRemoteServerInputSchema,
   mcpServerFullInputSchema,
-  mcpMarketplaceInputSchema,
-  normalizeMarketplaceMcp,
   listMcpServersForProfile,
   createMcpServer,
   updateMcpServer,
@@ -86,7 +85,6 @@ export {
   setMcpEnabled,
   getMcpServersForSession,
   type McpServerInput,
-  type McpMarketplaceInput,
   type McpServerForSession,
 } from './profile-mcp-service';
 
@@ -102,18 +100,15 @@ export {
   MAX_SKILL_COMPANION_PATH_LENGTH,
   skillNameSchema,
   skillFilesSchema,
-  skillMarketplaceInputSchema,
   skillCustomInputSchema,
   skillUpdateInputSchema,
   parseSkillFrontmatter,
   listSkillsForProfile,
-  createMarketplaceSkill,
   createCustomSkill,
   updateSkill,
   deleteSkill,
   setSkillEnabled,
   getSkillsForSession,
-  type SkillMarketplaceInput,
   type SkillCustomInput,
   type SkillUpdateInput,
   type SkillForSession,

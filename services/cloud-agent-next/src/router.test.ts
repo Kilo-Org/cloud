@@ -744,11 +744,6 @@ describe('router sessionId validation', () => {
           expect(result.timestamp).toBe(123456789);
           expect(result.version).toBe(123456789);
 
-          // Verify counts are returned, not actual values
-          expect(result.envVarCount).toBe(2);
-          expect(result.setupCommandCount).toBe(2);
-          expect(result.mcpServerCount).toBe(1);
-
           // Verify secrets are NOT returned
           expect(result).not.toHaveProperty('githubToken');
           expect(result).not.toHaveProperty('gitToken');
@@ -805,9 +800,6 @@ describe('router sessionId validation', () => {
           expect(result.autoCommit).toBeUndefined();
           expect(result.preparedAt).toBeUndefined();
           expect(result.initiatedAt).toBeUndefined();
-          expect(result.envVarCount).toBeUndefined();
-          expect(result.setupCommandCount).toBeUndefined();
-          expect(result.mcpServerCount).toBeUndefined();
         });
       });
 

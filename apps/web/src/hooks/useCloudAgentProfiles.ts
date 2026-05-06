@@ -251,13 +251,6 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
       },
     })
   );
-  const createMcpFromMarketplace = useMutation(
-    trpc.agentProfiles.createMcpFromMarketplace.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        await invalidateProfile(variables.profileId);
-      },
-    })
-  );
   const updateMcp = useMutation(
     trpc.agentProfiles.updateMcp.mutationOptions({
       onSuccess: async (_data, variables) => {
@@ -282,13 +275,6 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
 
   const createCustomSkill = useMutation(
     trpc.agentProfiles.createCustomSkill.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        await invalidateProfile(variables.profileId);
-      },
-    })
-  );
-  const createSkillFromMarketplace = useMutation(
-    trpc.agentProfiles.createSkillFromMarketplace.mutationOptions({
       onSuccess: async (_data, variables) => {
         await invalidateProfile(variables.profileId);
       },
@@ -348,12 +334,10 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     deleteVar,
     setCommands,
     createMcp,
-    createMcpFromMarketplace,
     updateMcp,
     deleteMcp,
     setMcpEnabled,
     createCustomSkill,
-    createSkillFromMarketplace,
     updateSkill,
     deleteSkill,
     setSkillEnabled,
@@ -522,13 +506,6 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
       },
     })
   );
-  const createMcpFromMarketplace = useMutation(
-    trpc.agentProfiles.createMcpFromMarketplace.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        await invalidateProfile(variables.profileId, variables.organizationId);
-      },
-    })
-  );
   const updateMcp = useMutation(
     trpc.agentProfiles.updateMcp.mutationOptions({
       onSuccess: async (_data, variables) => {
@@ -553,13 +530,6 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
 
   const createCustomSkill = useMutation(
     trpc.agentProfiles.createCustomSkill.mutationOptions({
-      onSuccess: async (_data, variables) => {
-        await invalidateProfile(variables.profileId, variables.organizationId);
-      },
-    })
-  );
-  const createSkillFromMarketplace = useMutation(
-    trpc.agentProfiles.createSkillFromMarketplace.mutationOptions({
       onSuccess: async (_data, variables) => {
         await invalidateProfile(variables.profileId, variables.organizationId);
       },
@@ -619,12 +589,10 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     deleteVar,
     setCommands,
     createMcp,
-    createMcpFromMarketplace,
     updateMcp,
     deleteMcp,
     setMcpEnabled,
     createCustomSkill,
-    createSkillFromMarketplace,
     updateSkill,
     deleteSkill,
     setSkillEnabled,

@@ -1,22 +1,23 @@
 import type { SandboxId, SessionId, SessionContext, ExecutionSession } from '../types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './CloudAgentSession.js';
-import type { EncryptedSecrets, EncryptedSecretEnvelope } from '../router/schemas.js';
+import type { EncryptedSecrets, MCPSecretValue } from '../router/schemas.js';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type { Images, SessionProfileBundle } from './schemas.js';
 import type { SessionIngestBinding } from '../session-ingest-binding.js';
 
 /**
  * Local MCP server configuration (runs a command).
- * Env values are encrypted envelopes; the worker decrypts each value when
- * materializing `KILO_CONFIG_CONTENT.mcp` for the sandbox session.
+ * Each env value is a plain string or an encrypted envelope; the worker
+ * decrypts envelope-shaped values per key when materializing
+ * `KILO_CONFIG_CONTENT.mcp` for the sandbox session.
  */
 export type MCPLocalServerConfig = {
   type: 'local';
   /** Command to execute — first element is the binary, rest are args */
   command: string[];
-  /** Encrypted env values (decrypted per-value when materializing the CLI config). */
-  environment?: Record<string, EncryptedSecretEnvelope>;
+  /** Env values: plain strings pass through, envelopes are decrypted per key. */
+  environment?: Record<string, MCPSecretValue>;
   /** Whether this server is enabled (default true) */
   enabled?: boolean;
   /** Timeout in milliseconds */
@@ -25,15 +26,16 @@ export type MCPLocalServerConfig = {
 
 /**
  * Remote MCP server configuration (connects to a URL).
- * Header values are encrypted envelopes; the worker decrypts each value when
- * materializing `KILO_CONFIG_CONTENT.mcp` for the sandbox session.
+ * Each header value is a plain string or an encrypted envelope; the worker
+ * decrypts envelope-shaped values per key when materializing
+ * `KILO_CONFIG_CONTENT.mcp` for the sandbox session.
  */
 export type MCPRemoteServerConfig = {
   type: 'remote';
   /** Server URL */
   url: string;
-  /** Encrypted header values (decrypted per-value when materializing the CLI config). */
-  headers?: Record<string, EncryptedSecretEnvelope>;
+  /** Header values: plain strings pass through, envelopes are decrypted per key. */
+  headers?: Record<string, MCPSecretValue>;
   /** Whether this server is enabled (default true) */
   enabled?: boolean;
   /** Timeout in milliseconds */

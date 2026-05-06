@@ -55,6 +55,20 @@ export const EncryptedSecretEnvelopeSchema = z.object({
 export type EncryptedSecretEnvelope = z.infer<typeof EncryptedSecretEnvelopeSchema>;
 
 /**
+ * A single MCP env value or remote header value. Plain strings are passed
+ * through verbatim; encrypted envelopes are decrypted by the worker just
+ * before materializing `KILO_CONFIG_CONTENT.mcp`. Callers mix the two per
+ * key: secrets travel as envelopes, non-sensitive config (locale, paths,
+ * public IDs, …) travels as plain strings.
+ */
+export const MCPSecretValueSchema = z.union([
+  z.string().max(Limits.MAX_ENV_VAR_VALUE_LENGTH),
+  EncryptedSecretEnvelopeSchema,
+]);
+
+export type MCPSecretValue = z.infer<typeof MCPSecretValueSchema>;
+
+/**
  * Schema for encrypted secrets - a record of key names to encrypted envelopes.
  * Used to pass profile secrets securely from backend to cloud-agent worker.
  */
@@ -86,14 +100,15 @@ export const modelIdSchema = z
 
 /**
  * Local MCP server configuration schema (runs a command).
- * Env values are encrypted envelopes; the worker decrypts each value when
- * materializing the `KILO_CONFIG_CONTENT.mcp` block for the sandbox session.
+ * Each env value is either a plain string or an encrypted envelope; the
+ * worker decrypts envelope-shaped values per key when materializing the
+ * `KILO_CONFIG_CONTENT.mcp` block for the sandbox session.
  */
 const MCPLocalServerConfigSchema = z
   .object({
     type: z.literal('local'),
     command: z.string().array().min(1, 'Command array must have at least one element'),
-    environment: z.record(z.string(), EncryptedSecretEnvelopeSchema).optional(),
+    environment: z.record(z.string(), MCPSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
@@ -101,14 +116,15 @@ const MCPLocalServerConfigSchema = z
 
 /**
  * Remote MCP server configuration schema (connects to a URL).
- * Header values are encrypted envelopes; the worker decrypts each value when
- * materializing the `KILO_CONFIG_CONTENT.mcp` block for the sandbox session.
+ * Each header value is either a plain string or an encrypted envelope; the
+ * worker decrypts envelope-shaped values per key when materializing the
+ * `KILO_CONFIG_CONTENT.mcp` block for the sandbox session.
  */
 const MCPRemoteServerConfigSchema = z
   .object({
     type: z.literal('remote'),
     url: z.string().url('URL must be a valid URL format'),
-    headers: z.record(z.string(), EncryptedSecretEnvelopeSchema).optional(),
+    headers: z.record(z.string(), MCPSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })

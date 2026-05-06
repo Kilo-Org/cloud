@@ -7,6 +7,7 @@ import {
   canKiloUserAccessPlatformIntegration,
   getPlatformIntegration,
 } from '@/lib/bot/platform-helpers';
+import { botPlatforms } from '@/lib/bot/platforms';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { SerializedMessage } from 'chat';
 
@@ -32,11 +33,19 @@ jest.mock('@/lib/bot-identity', () => ({
 }));
 jest.mock('@/lib/user.server');
 jest.mock('@/lib/bot/platform-helpers');
+jest.mock('@/lib/bot/platforms', () => ({
+  botPlatforms: {
+    require: jest.fn(() => ({
+      usesGenericLinkAccountRoute: true,
+      withAuthContext: async ({ fn }: { fn: () => Promise<unknown> }) => await fn(),
+    })),
+  },
+}));
+jest.mock('@/lib/organizations/organizations', () => ({
+  isOrganizationMember: jest.fn(async () => true),
+}));
 jest.mock('@/lib/bot/run', () => ({
   processLinkedMessage: jest.fn(async () => undefined),
-}));
-jest.mock('@/lib/bot/platform-auth-context', () => ({
-  withBotPlatformAuthContext: jest.fn(async (_integration, callback) => callback()),
 }));
 jest.mock(
   'chat',
@@ -62,6 +71,7 @@ const mockedGetPlatformIntegration = jest.mocked(getPlatformIntegration);
 const mockedCanKiloUserAccessPlatformIntegration = jest.mocked(
   canKiloUserAccessPlatformIntegration
 );
+const mockedBotPlatforms = jest.mocked(botPlatforms);
 
 function makeRequest(pathWithQuery: string) {
   return new NextRequest(`http://localhost:3000${pathWithQuery}`);
@@ -70,6 +80,11 @@ function makeRequest(pathWithQuery: string) {
 describe('GET /api/chat/link-account', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    mockedBotPlatforms.require.mockReturnValue({
+      usesGenericLinkAccountRoute: true,
+      withAuthContext: async ({ fn }: { fn: () => Promise<unknown> }) => await fn(),
+    } as never);
 
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: 'kilo-user-id' },
@@ -83,6 +98,10 @@ describe('GET /api/chat/link-account', () => {
   });
 
   test('rejects GitHub link token payloads before linking', async () => {
+    mockedBotPlatforms.require.mockReturnValue({
+      usesGenericLinkAccountRoute: false,
+      withAuthContext: async ({ fn }: { fn: () => Promise<unknown> }) => await fn(),
+    } as never);
     mockedVerifyLinkToken.mockResolvedValue({
       contextKey: 'context-key',
       identity: { platform: PLATFORM.GITHUB, teamId: '98765', userId: '12345' },
@@ -119,7 +138,9 @@ describe('GET /api/chat/link-account', () => {
     const response = await GET(makeRequest('/api/chat/link-account?token=signed') as never);
 
     expect(response.status).toBe(400);
-    await expect(response.text()).resolves.toContain('GitHub account links must be created');
+    await expect(response.text()).resolves.toContain(
+      'github account links must be created from the platform-specific link page'
+    );
     expect(mockedBot.initialize).toHaveBeenCalled();
     expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
     expect(mockedGetPlatformIntegration).not.toHaveBeenCalled();

@@ -28,6 +28,19 @@ function getMockGithubAdapter() {
   };
 }
 
+const mockSlackBotPlatform = {
+  platform: 'slack',
+  documentationUrl: 'https://kilo.ai/docs/code-with-ai/platforms/slack',
+  usesGenericLinkAccountRoute: true,
+  getIdentity: jest.fn(),
+  isEnabledForBot: jest.fn(() => true),
+  canHandleMessage: jest.fn(() => true),
+  promptLinkAccount: jest.fn(async () => undefined),
+  withAuthContext: jest.fn(async ({ fn }: { fn: () => Promise<unknown> }) => await fn()),
+  getConversationContext: jest.fn(async () => ''),
+  getRequesterInfo: jest.fn(),
+};
+
 jest.mock(
   'chat',
   () => ({
@@ -87,15 +100,21 @@ jest.mock('@/lib/bot-identity', () => ({
 
 jest.mock('@/lib/bot/platform-helpers', () => ({
   canKiloUserAccessPlatformIntegration: jest.fn(),
-  getPlatformIdentity: jest.fn(),
   getPlatformIntegration: jest.fn(),
   getPlatformIntegrationByBotUserId: jest.fn(),
-  isGitHubBotEnabled: jest.fn(() => true),
 }));
 
-jest.mock('@/lib/bot/link-account', () => ({
-  LINK_ACCOUNT_ACTION_PREFIX: 'link-account:',
-  promptLinkAccount: jest.fn(async () => undefined),
+jest.mock('@/lib/bot/platforms', () => ({
+  botPlatforms: {
+    get: jest.fn(() => mockSlackBotPlatform),
+    getByAdapter: jest.fn(() => mockSlackBotPlatform),
+    require: jest.fn(() => mockSlackBotPlatform),
+    requireByAdapter: jest.fn(() => mockSlackBotPlatform),
+  },
+}));
+
+jest.mock('@/lib/bot/platforms/slack-webhook', () => ({
+  createSlackWebhookHandler: jest.fn(() => async () => new Response('ok')),
 }));
 
 jest.mock('@/lib/user', () => ({
@@ -126,10 +145,8 @@ jest.mock('@sentry/nextjs', () => ({
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
 import {
   canKiloUserAccessPlatformIntegration,
-  getPlatformIdentity,
   getPlatformIntegration,
 } from '@/lib/bot/platform-helpers';
-import { promptLinkAccount } from '@/lib/bot/link-account';
 import { findUserById } from '@/lib/user';
 import { processLinkedMessage } from '@/lib/bot/run';
 import { bot } from './bot';
@@ -139,9 +156,7 @@ const mockedUnlinkKiloUser = jest.mocked(unlinkKiloUser);
 const mockedCanKiloUserAccessPlatformIntegration = jest.mocked(
   canKiloUserAccessPlatformIntegration
 );
-const mockedGetPlatformIdentity = jest.mocked(getPlatformIdentity);
 const mockedGetPlatformIntegration = jest.mocked(getPlatformIntegration);
-const mockedPromptLinkAccount = jest.mocked(promptLinkAccount);
 const mockedFindUserById = jest.mocked(findUserById);
 const mockedProcessLinkedMessage = jest.mocked(processLinkedMessage);
 const mockState = getMockState();
@@ -163,13 +178,17 @@ function getMentionHandler() {
 describe('bot mention authorization', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSlackBotPlatform.getIdentity.mockReset();
+    mockSlackBotPlatform.isEnabledForBot.mockReturnValue(true);
+    mockSlackBotPlatform.canHandleMessage.mockReturnValue(true);
+    mockSlackBotPlatform.promptLinkAccount.mockResolvedValue(undefined as never);
   });
 
   it('unlinks and prompts again when the linked user no longer has integration access', async () => {
     const identity = { platform: 'slack', teamId: 'T123', userId: 'U123' };
     const integration = { id: 'pi-slack', owned_by_organization_id: 'org-1' };
     const user = { id: 'kilo-user-1' };
-    mockedGetPlatformIdentity.mockResolvedValue(identity as never);
+    mockSlackBotPlatform.getIdentity.mockResolvedValue(identity as never);
     mockedGetPlatformIntegration.mockResolvedValue(integration as never);
     mockedResolveKiloUserId.mockResolvedValue('kilo-user-1');
     mockedFindUserById.mockResolvedValue(user as never);
@@ -178,12 +197,14 @@ describe('bot mention authorization', () => {
     await getMentionHandler()(makeThread(), makeMessage());
 
     expect(mockedUnlinkKiloUser).toHaveBeenCalledWith(mockState, identity);
-    expect(mockedPromptLinkAccount).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'thread-1' }),
-      expect.objectContaining({ author: { userId: 'U123' } }),
-      identity,
-      integration,
-      mockState
+    expect(mockSlackBotPlatform.promptLinkAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        thread: expect.objectContaining({ id: 'thread-1' }),
+        message: expect.objectContaining({ author: { userId: 'U123' } }),
+        identity,
+        platformIntegration: integration,
+        state: mockState,
+      })
     );
     expect(mockedProcessLinkedMessage).not.toHaveBeenCalled();
   });
@@ -194,7 +215,7 @@ describe('bot mention authorization', () => {
     const identity = { platform: 'slack', teamId: 'T123', userId: 'U123' };
     const integration = { id: 'pi-slack', owned_by_organization_id: 'org-1' };
     const user = { id: 'kilo-user-1' };
-    mockedGetPlatformIdentity.mockResolvedValue(identity as never);
+    mockSlackBotPlatform.getIdentity.mockResolvedValue(identity as never);
     mockedGetPlatformIntegration.mockResolvedValue(integration as never);
     mockedResolveKiloUserId.mockResolvedValue('kilo-user-1');
     mockedFindUserById.mockResolvedValue(user as never);
@@ -203,7 +224,7 @@ describe('bot mention authorization', () => {
     await getMentionHandler()(thread, message);
 
     expect(mockedUnlinkKiloUser).not.toHaveBeenCalled();
-    expect(mockedPromptLinkAccount).not.toHaveBeenCalled();
+    expect(mockSlackBotPlatform.promptLinkAccount).not.toHaveBeenCalled();
     expect(mockedProcessLinkedMessage).toHaveBeenCalledWith({
       thread,
       message,

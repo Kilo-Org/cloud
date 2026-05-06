@@ -59,9 +59,9 @@ describe('town_events cleanup on bead deletion (#fix-1)', () => {
       bead_id: string | null;
       agent_id: string | null;
     }>;
-    expect(
-      pendingAfter.some(e => e.bead_id === bead.bead_id || e.agent_id === bead.bead_id)
-    ).toBe(false);
+    expect(pendingAfter.some(e => e.bead_id === bead.bead_id || e.agent_id === bead.bead_id)).toBe(
+      false
+    );
   });
 
   it('deleteBead also removes events referencing the bead as agent_id (agents are beads)', async () => {

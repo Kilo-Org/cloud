@@ -20,7 +20,10 @@ export default async function OrgAppBuilderProjectPage({ params }: Props) {
     redirect('/profile');
   }
 
-  const isAppBuilderEnabled = await isFeatureFlagEnabled('app-builder-feature', organizationId);
+  const isAppBuilderEnabled = await isFeatureFlagEnabled(
+    'app-builder-feature',
+    result.data.user.id
+  );
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   if (!isAppBuilderEnabled && !isDevelopment) {

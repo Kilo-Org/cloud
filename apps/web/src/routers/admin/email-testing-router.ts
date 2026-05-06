@@ -6,8 +6,9 @@ import { verifyEmail } from '@/lib/email-neverbounce';
 import {
   subjects,
   creditsVars,
+  buildCreditsTopUpReceiptSection,
+  RawHtml,
   renderTemplate,
-  type RawHtml,
   type TemplateName,
 } from '@/lib/email';
 import * as z from 'zod';
@@ -90,6 +91,28 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
     case 'clawInstanceReady':
     case 'clawInstanceDestroyed':
       return { claw_url: `${NEXTAUTH_URL}/claw` };
+    case 'clawScheduledRestartNotice':
+    case 'clawScheduledRestartCancelled':
+      return {
+        user_first_name: 'Alice',
+        instance_name: 'Research Claw',
+        scheduled_at_display: 'Sep 26, 2026, 4:30 PM UTC',
+        admin_message_section: new RawHtml(
+          '<p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
+        ),
+      };
+    case 'clawScheduledVersionChangeNotice':
+    case 'clawScheduledVersionChangeCancelled':
+      return {
+        user_first_name: 'Alice',
+        instance_name: 'Research Claw',
+        scheduled_at_display: 'Sep 26, 2026, 4:30 PM UTC',
+        admin_message_section: new RawHtml(
+          '<p style="background-color: #f5f5f5; padding: 12px 16px; border-radius: 6px; font-style: italic">We are applying routine maintenance.</p>'
+        ),
+        version_change_section:
+          'Upgrading from v1.2.3 (OpenClaw 0.9.0) to v1.2.4 (OpenClaw 0.9.1).',
+      };
     case 'clawSuspendedTrial':
     case 'clawSuspendedSubscription':
     case 'clawSuspendedPayment':
@@ -114,6 +137,25 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
       return { claw_url: `${NEXTAUTH_URL}/claw` };
     case 'accountDeletionRequest':
       return { email: 'user@example.com' };
+    case 'creditsTopUp':
+      return {
+        heading: 'Thanks for your top-up',
+        intro:
+          'Your Kilo credit top-up has been processed and the credits are now available on your account.',
+        amount_usd: '10.00',
+        credits_usd: '10.00',
+        purchase_date: formatDate(new Date()),
+        credits_url: `${NEXTAUTH_URL}/credits`,
+        receipt_section: buildCreditsTopUpReceiptSection('https://pay.stripe.com/receipts/test'),
+      };
+    case 'kiloClawSubscriptionStarted':
+      return {
+        plan_name: 'KiloClaw Standard',
+        price_usd: '9.00',
+        billing_period: 'May 1, 2026 - June 1, 2026',
+        next_billing_date: formatDate(new Date(Date.now() + 30 * 86_400_000)),
+        manage_url: `${NEXTAUTH_URL}/claw/subscription`,
+      };
   }
   throw new Error(`Unknown template: ${template}`);
 }

@@ -62,6 +62,29 @@ export function computeVercelCostMicrodollars(
 }
 
 /**
+ * Extracts whether the Vercel AI Gateway served the request with BYOK credentials.
+ *
+ * The gateway reports per-attempt `credentialType` ("byok" | "system") in
+ * `provider_metadata.gateway.routing.modelAttempts[].providerAttempts[]`. We look
+ * at the successful provider attempt within the successful model attempt. Returns
+ * `null` when credentialType is absent or no successful attempt is found.
+ */
+export function extractVercelIsByok(
+  vercelGateway: NonNullable<VercelProviderMetaData['gateway']> | undefined | null
+): boolean | null {
+  const modelAttempts = vercelGateway?.routing?.modelAttempts;
+  if (!modelAttempts) return null;
+  const successfulModel = modelAttempts.find(m => m.success) ?? modelAttempts.at(-1);
+  const providerAttempts = successfulModel?.providerAttempts;
+  if (!providerAttempts) return null;
+  const successfulProvider = providerAttempts.find(p => p.success) ?? providerAttempts.at(-1);
+  const credentialType = successfulProvider?.credentialType;
+  if (credentialType === 'byok') return true;
+  if (credentialType === 'system') return false;
+  return null;
+}
+
+/**
  * Drains a ReadableStream of binary chunks, calling `onTextChunk` for each
  * decoded piece of text. Handles client-abort (`ResponseAborted`) gracefully
  * and always releases the reader lock and ends `streamProcessingSpan`.

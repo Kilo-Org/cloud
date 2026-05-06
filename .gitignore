@@ -107,4 +107,5 @@ supabase/.temp
 TMP_CI_commit_msg.txt
 *.csv
 run-milvus-test.sh
-.env*.local
+
+.beads/

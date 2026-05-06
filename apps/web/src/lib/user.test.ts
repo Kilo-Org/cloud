@@ -38,6 +38,7 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_email_log,
+  transactional_email_log,
   kiloclaw_cli_runs,
   bot_requests,
   bot_request_cloud_agent_sessions,
@@ -116,6 +117,7 @@ describe('User', () => {
     await db.delete(stytch_fingerprints);
     await db.delete(kiloclaw_cli_runs);
     await db.delete(kiloclaw_email_log);
+    await db.delete(transactional_email_log);
     await db.delete(kiloclaw_version_pins);
     await db.delete(kiloclaw_image_catalog);
     await db.delete(kiloclaw_subscriptions);
@@ -1711,6 +1713,26 @@ describe('User', () => {
           .select({ count: count() })
           .from(kiloclaw_email_log)
           .where(eq(kiloclaw_email_log.user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should retain transactional_email_log rows for the user', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(transactional_email_log).values({
+        user_id: user.id,
+        email_type: 'credits_top_up_confirmation',
+        idempotency_key: `ch_retain_${randomUUID()}`,
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(transactional_email_log)
+          .where(eq(transactional_email_log.user_id, user.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

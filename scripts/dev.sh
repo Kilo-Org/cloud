@@ -69,7 +69,11 @@ export PORT
 APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-$(read_env_value APP_URL_OVERRIDE)}"
 NEXTAUTH_URL="${NEXTAUTH_URL:-$(read_env_value NEXTAUTH_URL)}"
 NEXT_DEV_HOSTNAME="${NEXT_DEV_HOSTNAME:-0.0.0.0}"
-export APP_URL_OVERRIDE
+# Only export APP_URL_OVERRIDE when set; an empty export becomes "" in
+# process.env and defeats the `??` fallback in apps/web/src/lib/constants.ts.
+if [ -n "$APP_URL_OVERRIDE" ]; then
+  export APP_URL_OVERRIDE
+fi
 export NEXT_DEV_HOSTNAME
 export NEXTAUTH_URL="${NEXTAUTH_URL:-${APP_URL_OVERRIDE:-http://localhost:$PORT}}"
 exec next dev -H "$NEXT_DEV_HOSTNAME" -p "$PORT" "$@"

@@ -11,6 +11,13 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-05-05',
+    description:
+      "Fixed a bug where many KiloClaw instances could not use Auto models (Auto Frontier, Auto Balanced, Auto Free). Agent requests failed with an 'Unknown model' error. Redeploy your instance to pick up image img-b9e5dac9115d.",
+    category: 'bugfix',
+    deployHint: 'redeploy_required',
+  },
+  {
     date: '2026-05-01',
     description: 'Updated OpenClaw to 2026.4.23.',
     category: 'feature',

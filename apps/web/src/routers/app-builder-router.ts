@@ -7,7 +7,7 @@ import {
   projectIdBaseSchema,
   sendMessageBaseSchema,
   getImageUploadUrlSchema,
-  prepareLegacySessionBaseSchema,
+  legacySessionMessagesBaseSchema,
   migrateToGitHubSchema,
 } from '@/routers/app-builder/schemas';
 import { getBalanceForUser } from '@/lib/user.balance';
@@ -64,6 +64,22 @@ export const appBuilderRouter = createTRPCRouter({
       authToken
     );
   }),
+
+  /**
+   * Fetch historical messages for an ended legacy (v1) session belonging to the project.
+   * Loaded lazily when the user expands a past session in the UI.
+   */
+  getLegacySessionMessages: baseProcedure
+    .input(legacySessionMessagesBaseSchema)
+    .query(async ({ ctx, input }) => {
+      const owner = { type: 'user' as const, id: ctx.user.id };
+      const messages = await appBuilderService.getLegacySessionMessages(
+        input.projectId,
+        input.cloudAgentSessionId,
+        owner
+      );
+      return { messages };
+    }),
 
   /**
    * List all projects for the current user (personal context only)
@@ -162,7 +178,7 @@ export const appBuilderRouter = createTRPCRouter({
    *
    * This is a mutation (not subscription) - it triggers the action and returns immediately.
    * The client should then:
-   * 1. Fetch a stream ticket from /api/cloud-agent/sessions/stream-ticket
+   * 1. Fetch a stream ticket from /api/cloud-agent-next/sessions/stream-ticket
    * 2. Connect to the WebSocket URL with the ticket
    */
   startSession: baseProcedure.input(projectIdBaseSchema).mutation(async ({ ctx, input }) => {
@@ -184,7 +200,7 @@ export const appBuilderRouter = createTRPCRouter({
    *
    * This is a mutation (not subscription) - it triggers the action and returns immediately.
    * The client should then:
-   * 1. Fetch a stream ticket from /api/cloud-agent/sessions/stream-ticket
+   * 1. Fetch a stream ticket from /api/cloud-agent-next/sessions/stream-ticket
    * 2. Connect to the WebSocket URL with the ticket
    */
   sendMessage: baseProcedure.input(sendMessageBaseSchema).mutation(async ({ ctx, input }) => {
@@ -206,34 +222,6 @@ export const appBuilderRouter = createTRPCRouter({
       workerVersion: result.workerVersion,
     };
   }),
-
-  /**
-   * Prepare a legacy session and initiate it for WebSocket-based streaming.
-   *
-   * Legacy sessions (created before the prepare flow) don't have session state stored
-   * in the Durable Object, which means WebSocket replay doesn't work. This endpoint:
-   * 1. Backfills the DO with session metadata
-   * 2. Initiates the session to execute the first message
-   *
-   * Returns the cloudAgentSessionId for WebSocket connection.
-   * The client should connect to the WebSocket to receive the response.
-   */
-  prepareLegacySession: baseProcedure
-    .input(prepareLegacySessionBaseSchema)
-    .mutation(async ({ ctx, input }) => {
-      const owner = { type: 'user' as const, id: ctx.user.id };
-      const authToken = generateApiToken(ctx.user);
-
-      const result = await appBuilderService.prepareLegacySession(
-        input.projectId,
-        owner,
-        authToken,
-        input.model,
-        input.prompt
-      );
-
-      return { cloudAgentSessionId: result.cloudAgentSessionId };
-    }),
 
   // ============================================================================
   // GitHub Migration

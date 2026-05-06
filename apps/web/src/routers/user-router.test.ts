@@ -274,36 +274,6 @@ describe('user router - submitCustomerSource', () => {
   });
 });
 
-describe('user router - Apple IAP credits', () => {
-  it('returns enabled Apple credit products', async () => {
-    const user = await insertTestUser();
-    const caller = await createCallerForUser(user.id);
-
-    await expect(caller.user.getAppleCreditProducts()).resolves.toEqual({
-      products: [
-        {
-          id: 'com.kilocode.kiloapp.credits.small.999',
-          tier: 'small',
-          creditedCents: 699,
-          creditedMicrodollars: 6_990_000,
-        },
-        {
-          id: 'com.kilocode.kiloapp.credits.medium.1999',
-          tier: 'medium',
-          creditedCents: 1399,
-          creditedMicrodollars: 13_990_000,
-        },
-        {
-          id: 'com.kilocode.kiloapp.credits.large.4999',
-          tier: 'large',
-          creditedCents: 3499,
-          creditedMicrodollars: 34_990_000,
-        },
-      ],
-    });
-  });
-});
-
 describe('user router - skipCustomerSource', () => {
   beforeAll(async () => {
     skipTestUser = await insertTestUser({

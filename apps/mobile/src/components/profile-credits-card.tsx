@@ -1,14 +1,10 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ChevronDown, ShoppingBag } from 'lucide-react-native';
-import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
+import { ChevronDown } from 'lucide-react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
-import { AppleCreditPurchaseSheet } from '@/components/apple-credit-purchase-sheet';
-import { shouldShowAppleCreditPurchaseEntry } from '@/components/apple-credit-purchase-utils';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -27,7 +23,6 @@ export function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
   const { bottom } = useSafeAreaInsets();
   const { organizationId, setOrganizationId } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
-  const [purchaseSheetVisible, setPurchaseSheetVisible] = useState(false);
 
   const {
     data: balance,
@@ -68,10 +63,6 @@ export function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
     : 'Personal';
 
   const hasOrgs = orgs && orgs.length > 0;
-  const showAppleCreditPurchase = shouldShowAppleCreditPurchaseEntry({
-    platform: Platform.OS,
-    selectedOrgId,
-  });
 
   const openPicker = () => {
     if (!orgs || orgs.length === 0) {
@@ -155,31 +146,6 @@ export function CreditsCard({ orgs }: Readonly<CreditsCardProps>) {
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}
-
-      {showAppleCreditPurchase && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="self-start flex-row gap-2"
-          onPress={() => {
-            setPurchaseSheetVisible(true);
-          }}
-          accessibilityLabel="Buy credits"
-        >
-          <ShoppingBag size={15} color={colors.foreground} />
-          <Text>Buy Credits</Text>
-        </Button>
-      )}
-
-      <AppleCreditPurchaseSheet
-        visible={purchaseSheetVisible}
-        onClose={() => {
-          setPurchaseSheetVisible(false);
-        }}
-        onPurchaseSuccess={() => {
-          void refetchBalance();
-        }}
-      />
     </View>
   );
 }

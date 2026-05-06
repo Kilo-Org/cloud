@@ -6,11 +6,6 @@ import * as schema from './schema';
 import { SCHEMA_CHECK_ENUMS } from './schema';
 
 describe('database schema', () => {
-  it('includes Apple IAP purchase and notification tables', () => {
-    expect(Object.hasOwn(schema, 'apple_iap_purchases')).toBe(true);
-    expect(Object.hasOwn(schema, 'apple_iap_notifications')).toBe(true);
-  });
-
   it("should be up to date with migrations (run 'pnpm drizzle generate' if this fails)", async () => {
     const migrationsDir = './packages/db/src/migrations';
 

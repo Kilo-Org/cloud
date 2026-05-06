@@ -1,11 +1,14 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import {
   getOrCreateStripeCustomerIdForOrganization,
+  getTopUpConfirmationRecipientsForOrganization,
   processTopupForOrganization,
 } from '@/lib/organizations/organization-billing';
 import {
+  addUserToOrganization,
   createOrganization,
   findOrganizationByStripeCustomerId,
+  inviteUserToOrganization,
 } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
@@ -432,6 +435,45 @@ describe('findOrganizationByStripeCustomerId', () => {
     expect(result?.auto_top_up_enabled).toBe(false);
     expect(result?.created_at).toBeDefined();
     expect(result?.updated_at).toBeDefined();
+  });
+});
+
+describe('getTopUpConfirmationRecipientsForOrganization', () => {
+  test('returns active owner and billing manager emails', async () => {
+    const owner = await insertTestUser({ google_user_email: 'owner@example.com' });
+    const billingManager = await insertTestUser({
+      google_user_email: 'billing-manager@example.com',
+    });
+    const member = await insertTestUser({ google_user_email: 'member@example.com' });
+    const duplicateBillingManager = await insertTestUser({
+      google_user_email: 'duplicate-billing-manager@example.com',
+    });
+    const botOwner = await insertTestUser({
+      google_user_email: 'bot-owner@example.com',
+      is_bot: true,
+    });
+    const organization = await createOrganization('Test Organization', owner.id);
+
+    await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
+    await addUserToOrganization(organization.id, duplicateBillingManager.id, 'billing_manager');
+    await addUserToOrganization(organization.id, member.id, 'member');
+    await addUserToOrganization(organization.id, botOwner.id, 'owner');
+    await inviteUserToOrganization(
+      organization.id,
+      owner.id,
+      'invited-billing-manager@example.com',
+      'billing_manager'
+    );
+    await inviteUserToOrganization(organization.id, owner.id, 'invited-owner@example.com', 'owner');
+
+    const recipients = await getTopUpConfirmationRecipientsForOrganization(organization.id);
+
+    expect(recipients.sort()).toEqual([
+      'billing-manager@example.com',
+      'duplicate-billing-manager@example.com',
+      'owner@example.com',
+    ]);
+    expect(new Set(recipients).size).toBe(recipients.length);
   });
 });
 

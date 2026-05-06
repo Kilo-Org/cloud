@@ -2,7 +2,7 @@ import type { Organization, User } from '@kilocode/db/schema';
 import { organizations, credit_transactions } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
-import { getOrganizationById } from '@/lib/organizations/organizations';
+import { getOrganizationById, getOrganizationMembers } from '@/lib/organizations/organizations';
 import { createStripeCustomer } from '@/lib/stripe-client';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
@@ -73,6 +73,24 @@ export async function getOrCreateStripeCustomerIdForOrganization(
 }
 
 type Config = StripeConfig;
+
+export async function getTopUpConfirmationRecipientsForOrganization(
+  organizationId: Organization['id']
+): Promise<string[]> {
+  const members = await getOrganizationMembers(organizationId);
+  const recipientEmails = new Set<string>();
+
+  for (const member of members) {
+    if (
+      member.status === 'active' &&
+      (member.role === 'owner' || member.role === 'billing_manager')
+    ) {
+      recipientEmails.add(member.email);
+    }
+  }
+
+  return [...recipientEmails];
+}
 
 export async function processTopupForOrganization(
   kiloUserId: User['id'],

@@ -424,6 +424,35 @@ rules resolve conflicts.
    date six calendar months from enrollment, consistent with Commit
    Plan Lifecycle rule 2.
 
+### Apple In-App Credit Purchases
+
+1. The system MAY allow iOS users to purchase personal credits through
+   Apple in-app purchases. Apple in-app purchases are a credit
+   acquisition mechanism only; they MUST NOT create Apple-funded
+   KiloClaw subscription rows.
+2. Apple in-app credit purchases MUST be personal-only. They MUST NOT
+   credit an organization balance.
+3. Apple in-app credit products MUST be server-allowlisted by product
+   ID. The backend MUST determine the credited amount from server
+   configuration, not from client-provided price or product data.
+4. The backend MUST verify Apple-signed transaction data before
+   granting credits. A transaction with the wrong bundle ID,
+   environment, product ID, owning account, or revocation state MUST
+   NOT grant credits.
+5. Each Apple transaction MUST grant credits at most once. Replays of
+   an already-granted transaction MUST return an idempotent success
+   for the owning user and MUST NOT create duplicate credit
+   transactions.
+6. Apple refund or revocation events MUST append a negative paid credit
+   transaction for the full credited amount and decrement acquired
+   credits by the same amount. The user's computed balance MAY become
+   negative.
+7. Apple-purchased credits MUST NOT receive first-top-up or
+   promotional bonus grants in the initial Apple IAP implementation.
+8. User-facing purchase UI MUST describe the credits granted and MUST
+   NOT describe store commission, provider deductions, or internal
+   pricing math.
+
 ### Kilo Pass Upsell Checkout
 
 Kilo Pass is the RECOMMENDED checkout path for KiloClaw hosting. The

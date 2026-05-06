@@ -2586,6 +2586,35 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <AlertDescription>{data.workerStatusError}</AlertDescription>
               </Alert>
             )}
+            {data.workerStatus?.adminMachineSizeOverride && (
+              <Alert className="mb-4 border-amber-500/30 bg-amber-500/10">
+                <Shield className="h-4 w-4 text-amber-500" />
+                <AlertDescription className="text-amber-700 dark:text-amber-300">
+                  <span className="font-medium">
+                    Admin size override: {data.workerStatus.adminMachineSizeOverride.cpus}×{' '}
+                    {data.workerStatus.adminMachineSizeOverride.cpu_kind ?? 'shared'},{' '}
+                    {data.workerStatus.adminMachineSizeOverride.memory_mb}MB
+                  </span>
+                  {data.workerStatus.adminMachineSizeOverrideMetadata && (
+                    <>
+                      {' · set by '}
+                      <strong>
+                        {data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail}
+                      </strong>{' '}
+                      {formatEpochRelativeTime(
+                        data.workerStatus.adminMachineSizeOverrideMetadata.setAt
+                      )}
+                      {' — '}
+                      <em>{data.workerStatus.adminMachineSizeOverrideMetadata.reason}</em>
+                    </>
+                  )}
+                  <span className="mt-1 block text-xs opacity-80">
+                    Billing stays on the customer's tier; this override is invisible to the customer
+                    dashboard.
+                  </span>
+                </AlertDescription>
+              </Alert>
+            )}
             {data.workerStatus ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <DetailField label="DO Status">
@@ -2679,37 +2708,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     )}
                   </DetailField>
                 </div>
-
-                {data.workerStatus.adminMachineSizeOverride && (
-                  <Alert className="border-amber-500/30 bg-amber-500/10">
-                    <Shield className="h-4 w-4 text-amber-500" />
-                    <AlertDescription className="text-amber-700 dark:text-amber-300">
-                      <div className="font-medium">
-                        Admin size override active:{' '}
-                        {data.workerStatus.adminMachineSizeOverride.cpus}×{' '}
-                        {data.workerStatus.adminMachineSizeOverride.cpu_kind ?? 'shared'},{' '}
-                        {data.workerStatus.adminMachineSizeOverride.memory_mb}MB
-                      </div>
-                      {data.workerStatus.adminMachineSizeOverrideMetadata && (
-                        <div className="mt-1 text-xs">
-                          Set by{' '}
-                          <strong>
-                            {data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail}
-                          </strong>{' '}
-                          {formatEpochRelativeTime(
-                            data.workerStatus.adminMachineSizeOverrideMetadata.setAt
-                          )}{' '}
-                          — reason:{' '}
-                          <em>{data.workerStatus.adminMachineSizeOverrideMetadata.reason}</em>
-                        </div>
-                      )}
-                      <div className="mt-1 text-xs">
-                        Billing stays on the customer's tier; this override is invisible to the
-                        customer dashboard.
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                )}
 
                 <div className="flex items-center gap-2">
                   <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />

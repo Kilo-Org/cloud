@@ -8,6 +8,60 @@ import { type SlackEvent } from '@chat-adapter/slack';
 
 type GetGitHubInstallationId = (thread: Thread) => Promise<string | number | null | undefined>;
 
+export type GitHubRepositoryReference = {
+  id: number | null;
+  fullName: string | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getStringProperty(value: Record<string, unknown>, key: string): string | null {
+  const property = value[key];
+  return typeof property === 'string' && property.length > 0 ? property : null;
+}
+
+function getNumberProperty(value: Record<string, unknown>, key: string): number | null {
+  const property = value[key];
+  return typeof property === 'number' && Number.isFinite(property) ? property : null;
+}
+
+function parseGitHubRepositoryFullName(id: string | undefined): string | null {
+  if (!id) return null;
+
+  const match = id.match(/^github:([^/]+\/[^:]+)(?::|$)/);
+  if (!match) return null;
+
+  return match[1] ?? null;
+}
+
+function getGitHubRepositoryReferenceFromRaw(raw: unknown): GitHubRepositoryReference {
+  if (!isRecord(raw)) return { id: null, fullName: null };
+
+  const repository = raw.repository;
+  if (!isRecord(repository)) return { id: null, fullName: null };
+
+  return {
+    id: getNumberProperty(repository, 'id'),
+    fullName: getStringProperty(repository, 'full_name'),
+  };
+}
+
+export function getGitHubRepositoryReference(
+  thread: Thread,
+  message: Message
+): GitHubRepositoryReference {
+  const rawReference = getGitHubRepositoryReferenceFromRaw(message.raw);
+  return {
+    id: rawReference.id,
+    fullName:
+      rawReference.fullName ??
+      parseGitHubRepositoryFullName(thread.id) ??
+      parseGitHubRepositoryFullName(thread.channelId),
+  };
+}
+
 function getSlackTeamId(message: Message<SlackEvent>): string {
   const teamId = message.raw.team_id ?? message.raw.team;
 
@@ -112,6 +166,26 @@ export async function getPlatformIntegrationByBotUserId(
 export function isGitHubBotEnabled(integration: PlatformIntegration): boolean {
   const metadata = (integration.metadata ?? {}) as { bot_enabled?: unknown };
   return metadata.bot_enabled === true;
+}
+
+export function isGitHubRepositoryLinked(
+  integration: PlatformIntegration,
+  repository: GitHubRepositoryReference
+): boolean {
+  if (repository.id === null && repository.fullName === null) return false;
+
+  if (integration.repository_access === 'all') return true;
+  if (integration.repository_access !== 'selected') return false;
+
+  const repositories = integration.repositories ?? [];
+  return repositories.some(linkedRepository => {
+    if (repository.id !== null && linkedRepository.id === repository.id) return true;
+
+    return (
+      repository.fullName !== null &&
+      linkedRepository.full_name.toLowerCase() === repository.fullName.toLowerCase()
+    );
+  });
 }
 
 export function getBotDocumentationUrl(platform: string): string {

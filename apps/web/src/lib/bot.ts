@@ -8,10 +8,12 @@ import { resolveKiloUserId, unlinkKiloUser, unlinkTeamKiloUsers } from '@/lib/bo
 import { isSlackMissingScopeError, postSlackReinstallInstruction } from '@/lib/bot/helpers';
 import { deleteInstallationByTeamId } from '@/lib/integrations/slack-service';
 import {
+  getGitHubRepositoryReference,
   getPlatformIdentity,
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
   isGitHubBotEnabled,
+  isGitHubRepositoryLinked,
 } from '@/lib/bot/platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-account';
@@ -287,6 +289,13 @@ function createKiloBot(
     // handler runs, but we drop out before any user-visible side effects
     // (no link prompt, no agent run, no GitHub API calls).
     if (identity.platform === PLATFORM.GITHUB && !isGitHubBotEnabled(platformIntegration)) {
+      return;
+    }
+
+    if (
+      identity.platform === PLATFORM.GITHUB &&
+      !isGitHubRepositoryLinked(platformIntegration, getGitHubRepositoryReference(thread, message))
+    ) {
       return;
     }
 

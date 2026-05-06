@@ -189,6 +189,28 @@ describe('GET /api/integrations/google/connect', () => {
     );
   });
 
+  test('passes organizationId and returnTo through to the OAuth state for org flow', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/google/connect?organizationId=${ORG_ID}&returnTo=%2Forganizations%2F${ORG_ID}%2Fclaw%2Fnew%3Fstep%3Dcalendar`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedGetActiveOrgInstance).toHaveBeenCalledWith(USER_ID, ORG_ID);
+    expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: { type: 'org', id: ORG_ID },
+        instanceId: INSTANCE_ID,
+        capabilities: ['calendar_read'],
+        returnTo: `/organizations/${ORG_ID}/claw/new?step=calendar`,
+      }),
+      USER_ID
+    );
+  });
+
   test('drops protocol-relative returnTo values to prevent open redirects', async () => {
     const { GET } = await import('./route');
     const response = await GET(

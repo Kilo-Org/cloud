@@ -14,23 +14,35 @@ import {
 import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
+/**
+ * Build the post-OAuth redirect path. The query-string fragment is appended
+ * verbatim — callers MUST pass an already-URL-safe `key=value` string. Static
+ * literals (e.g. `'error=missing_code'`) are safe; dynamic values must come
+ * from `sanitizeOAuthProviderError` (which encodes) or be similarly
+ * pre-encoded. For raw key/value pairs use `appendQueryParam` instead.
+ */
 function buildGoogleRedirectPath(
   state: { owner: VerifiedGoogleOAuthState['owner']; returnTo?: string } | null | undefined,
-  queryParam: string
+  encodedQueryParam: string
 ): string {
   if (state?.returnTo) {
     const separator = state.returnTo.includes('?') ? '&' : '?';
-    return `${state.returnTo}${separator}${queryParam}`;
+    return `${state.returnTo}${separator}${encodedQueryParam}`;
   }
 
   const owner = state?.owner;
   if (owner?.type === 'org') {
-    return `/organizations/${owner.id}/claw/settings?${queryParam}`;
+    return `/organizations/${owner.id}/claw/settings?${encodedQueryParam}`;
   }
 
-  return `/claw/settings?${queryParam}`;
+  return `/claw/settings?${encodedQueryParam}`;
 }
 
+/**
+ * Append a key=value query param to the given path, URL-encoding both. Use
+ * this when the value is raw / unencoded. For pre-encoded `key=value`
+ * fragments, use `buildGoogleRedirectPath` instead.
+ */
 function appendQueryParam(path: string, key: string, value: string): string {
   const separator = path.includes('?') ? '&' : '?';
   return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;

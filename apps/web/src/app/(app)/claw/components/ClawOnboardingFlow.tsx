@@ -239,25 +239,24 @@ function ClawOnboardingFlowInner({
 
   // Resume the wizard at a specific step when returning from a flow that
   // leaves the page (e.g. the Google OAuth round-trip on the calendar step
-  // posts the user back to /claw/new?step=calendar). The effect waits until
-  // botIdentity has been hydrated before consuming `step`, otherwise the
-  // state machine would override us with the identity step.
+  // posts the user back to /claw/new?step=calendar). The effect only acts
+  // when stepParam === 'calendar' — otherwise stale `?error=` or `?success=`
+  // params from elsewhere would fire calendar-specific toasts on the wrong
+  // screen. Also waits until botIdentity has been hydrated before consuming
+  // `step`, otherwise the state machine would override us with identity.
   const hasResumedFromQuery = useRef(false);
   useEffect(() => {
     if (hasResumedFromQuery.current) return;
     const stepParam = searchParams?.get('step');
+    if (stepParam !== 'calendar') return;
+    if (botIdentity === null) return;
     const successParam = searchParams?.get('success');
     const errorParam = searchParams?.get('error');
-    if (!stepParam && !successParam && !errorParam) return;
-    if (stepParam === 'calendar' && botIdentity === null) return;
     hasResumedFromQuery.current = true;
-    if (stepParam === 'calendar') {
-      setOnboardingStep('calendar');
-      posthog?.capture('claw_setup_calendar_resumed', {
-        outcome:
-          successParam === 'google_connected' ? 'connected' : errorParam ? 'error' : 'unknown',
-      });
-    }
+    setOnboardingStep('calendar');
+    posthog?.capture('claw_setup_calendar_resumed', {
+      outcome: successParam === 'google_connected' ? 'connected' : errorParam ? 'error' : 'unknown',
+    });
     if (successParam === 'google_connected') {
       posthog?.capture('claw_setup_calendar_oauth_completed');
       toast.success('Calendar connected');

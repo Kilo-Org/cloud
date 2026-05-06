@@ -3959,10 +3959,25 @@ platform.post('/extend-volume', async c => {
         'recordVolumeExtend'
       );
     } catch (err) {
-      // Don't fail the whole request — Fly is already extended; alarm/live-check
-      // will eventually re-observe and self-heal DO state.
+      // Don't fail the whole request — Fly is already extended; the request
+      // would have to be retried anyway and the Fly extend is idempotent
+      // (re-extending to the same size is a no-op on Fly).
+      //
+      // RECOVERY: there is no alarm-driven volume-size observation today
+      // (the alarm reconciles `machineSize` from `getMachine` but does not
+      // call `getVolume`), so this divergence does NOT auto-heal. The
+      // admin re-runs `/extend-volume` with the same target size — both
+      // calls are idempotent on retry. The "Has size override" / list
+      // tooling is not affected because volumeSizeGb is not surfaced in
+      // those filters.
+      //
+      // FOLLOW-UP: a later PR could add `getVolume`-driven volume-size
+      // reconciliation to `backfillMachineSizeFromFlyConfig` so this
+      // self-heals on the next alarm tick.
       console.error(
-        `[platform] extend-volume succeeded on Fly but DO recordVolumeExtend failed for volume=${volumeId}:`,
+        `[platform] extend-volume: Fly extended succeeded but DO recordVolumeExtend failed for ` +
+          `volume=${volumeId} targetSizeGb=${targetSizeGb}. ` +
+          `DO state will lag until admin re-runs this route.`,
         err
       );
     }

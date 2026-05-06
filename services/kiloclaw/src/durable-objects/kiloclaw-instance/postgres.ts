@@ -4,7 +4,7 @@ import type {
   FlyProviderState,
   NorthflankProviderState,
 } from '../../schemas/instance-config';
-import { InstanceTypeSchema } from '@kilocode/kiloclaw-instance-tiers';
+import { getTier, InstanceTypeSchema } from '@kilocode/kiloclaw-instance-tiers';
 import {
   getWorkerDb,
   getActivePersonalInstance,
@@ -172,6 +172,20 @@ export async function restoreFromPostgres(
         : await recoverFlyProviderState(env, restoredUserId, instance.sandboxId);
     const recoveredAppName = providerState.provider === 'fly' ? providerState.appName : null;
     const restoredInstanceType = InstanceTypeSchema.nullable().parse(instance.instanceType ?? null);
+    // Derive hardware/storage from the catalog when the persisted tier is a
+    // known offered/legacy key. Without this, a restored instance starts with
+    // null `machineSize`/`volumeSizeGb` despite a non-null tier label —
+    // the next live-check observes whatever Fly reports and could relabel
+    // the instance incorrectly (e.g. mark a `perf-4-16` as `'custom'` if the
+    // Fly machine hasn't yet been re-created with the right guest). For
+    // 'custom' or null tier, leave hardware nulls; the existing live-check
+    // backfill handles those.
+    const restoredTier =
+      restoredInstanceType && restoredInstanceType !== 'custom'
+        ? getTier(restoredInstanceType)
+        : null;
+    const restoredMachineSize = restoredTier?.machineSize ?? null;
+    const restoredVolumeSizeGb = restoredTier?.volumeSizeGb ?? null;
 
     await ctx.storage.put(
       storageUpdate({
@@ -192,9 +206,9 @@ export async function restoreFromPostgres(
         flyMachineId: null,
         flyVolumeId: null,
         flyRegion: null,
-        machineSize: null,
+        machineSize: restoredMachineSize,
         instanceType: restoredInstanceType,
-        volumeSizeGb: null,
+        volumeSizeGb: restoredVolumeSizeGb,
         healthCheckFailCount: 0,
         pendingDestroyMachineId: null,
         pendingDestroyVolumeId: null,
@@ -218,9 +232,9 @@ export async function restoreFromPostgres(
     state.provisionedAt = Date.now();
     state.lastStartedAt = null;
     state.lastStoppedAt = null;
-    state.machineSize = null;
+    state.machineSize = restoredMachineSize;
     state.instanceType = restoredInstanceType;
-    state.volumeSizeGb = null;
+    state.volumeSizeGb = restoredVolumeSizeGb;
     state.healthCheckFailCount = 0;
     state.pendingDestroyMachineId = null;
     state.pendingDestroyVolumeId = null;

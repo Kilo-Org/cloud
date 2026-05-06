@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
-type BannerColor = 'emerald' | 'amber' | 'blue' | 'red';
+type BannerColor = 'emerald' | 'amber' | 'yellow' | 'blue' | 'red';
 
 const colorMap: Record<BannerColor, { border: string; bg: string; text: string; button: string }> =
   {
@@ -20,6 +20,12 @@ const colorMap: Record<BannerColor, { border: string; bg: string; text: string; 
       bg: 'bg-amber-500/10',
       text: 'text-amber-400',
       button: 'bg-amber-500 text-primary-foreground hover:bg-amber-500/90',
+    },
+    yellow: {
+      border: 'border-yellow-500/30',
+      bg: 'bg-yellow-500/10',
+      text: 'text-yellow-400',
+      button: 'bg-yellow-500 text-primary-foreground hover:bg-yellow-500/90',
     },
     blue: {
       border: 'border-blue-500/30',

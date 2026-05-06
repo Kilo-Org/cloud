@@ -11,12 +11,44 @@ ARG KILOCODE_CLI_VERSION="7.1.23"
 #
 # This builds kilo-cli from source and copies the linux-x64 binary here.
 
-# Install CLI tools and generate locales to suppress setlocale warnings
-RUN apt-get update && apt-get install -y --no-install-recommends git-lfs jq locales ripgrep openssh-client && \
-	   sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
-	   locale-gen && \
-	   apt-get clean && \
-	   rm -rf /var/lib/apt/lists/*
+# Install latest stable git + git-lfs from the git-core PPA, plus supporting CLI tools,
+# and generate locales to suppress setlocale warnings.
+#
+# The default Ubuntu git (2.34.1 on 22.04) does not support `merge.conflictStyle=zdiff3`,
+# which Cloud Agent Next relies on. The git-core PPA ships the latest stable git
+# (>= 2.45), which adds zdiff3 support. git-lfs is installed from the same PPA so it
+# stays in lockstep with git, and `git lfs install --system` enables LFS filters
+# globally.
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		ca-certificates \
+		gnupg \
+		software-properties-common; \
+	add-apt-repository -y ppa:git-core/ppa; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		git \
+		git-lfs \
+		jq \
+		locales \
+		openssh-client \
+		ripgrep; \
+	git lfs install --system --skip-repo; \
+	git --version; \
+	git_version="$(git --version | awk '{print $3}')"; \
+	major="$(echo "$git_version" | cut -d. -f1)"; \
+	minor="$(echo "$git_version" | cut -d. -f2)"; \
+	if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 45 ]; }; then \
+		echo "ERROR: git $git_version is older than required 2.45 (zdiff3 support)" >&2; \
+		exit 1; \
+	fi; \
+	git config --system merge.conflictStyle zdiff3; \
+	git config --system --get merge.conflictStyle | grep -q '^zdiff3$'; \
+	sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen; \
+	locale-gen; \
+	apt-get clean; \
+	rm -rf /var/lib/apt/lists/*
 ENV LC_ALL=en_US.UTF-8
 ENV LANG=en_US.UTF-8
 

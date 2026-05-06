@@ -5,14 +5,49 @@ ARG BUILD_DATE=""
 ARG VCS_REF=""
 ARG KILOCODE_CLI_VERSION="7.1.23"
 
-RUN mkdir -p -m 755 /etc/apt/keyrings \
-	&& out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-	&& cat $out | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
-	&& chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
-	&& mkdir -p -m 755 /etc/apt/sources.list.d \
-	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-	&& apt update \
-	&& apt install gh git-lfs jq openssh-client -y
+# Install latest stable git + git-lfs from the git-core PPA, GitHub CLI, and supporting tools.
+# The default Ubuntu git (2.34.1 on 22.04) does not support `merge.conflictStyle=zdiff3`,
+# which Cloud Agent Next relies on for clearer merge conflict markers. The git-core PPA
+# ships the latest stable git (>= 2.45 at time of writing), which adds zdiff3 support.
+# git-lfs from the same PPA is kept in lockstep with git, and `git lfs install --system`
+# enables LFS smudge/clean filters globally so cloned repos with LFS objects work out of
+# the box.
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		ca-certificates \
+		gnupg \
+		software-properties-common \
+		wget; \
+	add-apt-repository -y ppa:git-core/ppa; \
+	mkdir -p -m 755 /etc/apt/keyrings; \
+	out=$(mktemp); \
+	wget -nv -O "$out" https://cli.github.com/packages/githubcli-archive-keyring.gpg; \
+	cat "$out" | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null; \
+	chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg; \
+	mkdir -p -m 755 /etc/apt/sources.list.d; \
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+		| tee /etc/apt/sources.list.d/github-cli.list > /dev/null; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		git \
+		git-lfs \
+		gh \
+		jq \
+		openssh-client; \
+	git lfs install --system --skip-repo; \
+	git --version; \
+	git_version="$(git --version | awk '{print $3}')"; \
+	major="$(echo "$git_version" | cut -d. -f1)"; \
+	minor="$(echo "$git_version" | cut -d. -f2)"; \
+	if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 45 ]; }; then \
+		echo "ERROR: git $git_version is older than required 2.45 (zdiff3 support)" >&2; \
+		exit 1; \
+	fi; \
+	git config --system merge.conflictStyle zdiff3; \
+	git config --system --get merge.conflictStyle | grep -q '^zdiff3$'; \
+	apt-get clean; \
+	rm -rf /var/lib/apt/lists/*
 
 # Install GitLab CLI (glab) - download official .deb from GitLab releases.
 # Version 1.82.0+ is required so OAuth2 access tokens sent via GITLAB_TOKEN are

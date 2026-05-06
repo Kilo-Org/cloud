@@ -165,9 +165,9 @@ grants billing access without consuming a seat.
    type values in subscription metadata.
 8. When an organization transitions from Enterprise to Teams, the
    system MUST persist Enterprise-only settings (e.g., model deny
-   lists, provider deny lists) in storage, MUST exclude them from
-   enforcement logic, and MUST NOT expose them in the organization
-   settings UI while the plan is Teams.
+   lists, provider deny lists, KiloClaw opt-out) in storage, MUST
+   exclude them from enforcement logic, and MUST NOT expose them in
+   the organization settings UI while the plan is Teams.
 9. If the organization later transitions back to Enterprise, the
    system MUST reactivate the previously stored Enterprise-only
    settings without requiring reconfiguration.
@@ -438,6 +438,36 @@ grants billing access without consuming a seat.
 5. The system MUST classify an organization's status as "incomplete"
    when it has require-seats enabled AND has no active subscription.
 
+### Organization KiloClaw Add-On
+
+1. KiloClaw is an organization add-on whose access is subordinate to
+   the organization subscription or trial entitlement.
+2. Organization KiloClaw MUST NOT create, modify, or extend the
+   organization seat subscription.
+3. Organization KiloClaw MUST NOT appear as a direct Stripe add-on line
+   item on the organization seat subscription.
+4. When the organization subscription entitlement ends because the
+   organization subscription is canceled, ended, or otherwise no longer
+   recoverable as the same entitlement, organization KiloClaw
+   subscriptions MUST be canceled by the KiloClaw billing system.
+5. Organization KiloClaw availability MUST follow the organization's
+   active, trial, and hard-expired access state. Active or trialing
+   organization states MAY allow KiloClaw, subject to KiloClaw-specific
+   rules. Hard-expired organization trial states MUST block KiloClaw
+   access but MUST NOT by themselves immediately cancel organization
+   KiloClaw subscriptions. Ended organization entitlement MUST block
+   KiloClaw access.
+6. Enterprise organizations MUST support an admin-controlled KiloClaw
+   opt-out setting.
+7. This setting MUST be persisted like other Enterprise-only settings.
+8. The setting MUST be hidden or non-configurable while the
+   organization is Teams.
+9. The setting MUST NOT be enforced while the organization is Teams.
+10. If the organization returns to Enterprise, the persisted setting
+    MUST again be enforceable.
+11. When enforced, the setting MUST block organization KiloClaw
+    provisioning and access.
+
 ### Free Trial
 
 1. The system MUST place organizations without an active
@@ -559,6 +589,13 @@ in the current codebase:
    purchase records. (Currently records gross only.)
 
 ## Changelog
+
+### 2026-05-06 -- Organization KiloClaw add-on
+
+- Added organization KiloClaw as a credits-funded add-on subordinate to
+  organization entitlement, not a Stripe seat-subscription line item.
+- Added Enterprise-only KiloClaw opt-out persistence and enforcement
+  rules aligned with other Enterprise-only settings.
 
 ### 2026-05-05 -- Mixed subscription line-item filtering
 

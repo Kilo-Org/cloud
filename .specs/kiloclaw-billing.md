@@ -73,14 +73,31 @@ capitals, as shown here.
   credit spend. Stripe-funded settlement deductions are NOT credit
   spend; they are balance-neutral bookkeeping entries. Credit spend
   counts toward the Kilo Pass bonus unlock threshold.
+- **Organization KiloClaw subscription**: A KiloClaw subscription tied
+  to an organizational instance. It is associated with a user, owned by
+  an organization, and funded only by the organization credit balance.
+- **Associated user**: The organization member whose org KiloClaw
+  instance is provisioned for their use. The associated user is not
+  necessarily authorized to view billing details.
+- **Parent organization entitlement**: The organization-level
+  subscription or trial state that controls whether organization
+  features are available. Organization KiloClaw access is subordinate
+  to this state.
+- **Organization KiloClaw opt-out**: An Enterprise-only organization
+  admin setting that disables organization KiloClaw access and
+  provisioning while enforced.
+- **Organization KiloClaw billing launch date**: The date from which
+  existing organization KiloClaw instances receive their one-time
+  30-day free billing-launch trial.
 
 ## Overview
 
 KiloClaw Billing manages the subscription lifecycle for KiloClaw hosted
 instances. Every KiloClaw subscription is funded by credits: a
 subscription is a recurring credit deduction tied to a specific
-instance. Users access the service through one of two hosting plans: a
-discounted six-month commit plan or a month-to-month standard plan.
+instance. Personal users access the service through one of two hosting
+plans: a discounted six-month commit plan or a month-to-month standard
+plan.
 
 The recommended checkout path is Kilo Pass, which adds credits to the
 user's balance via a Stripe subscription. Those credits fund both
@@ -100,7 +117,10 @@ between plans at any time.
 
 Each subscription is scoped to a specific instance. A user MAY have
 multiple instances, each with its own subscription and renewal cycle.
-All subscriptions deduct from the same user credit balance.
+Personal subscriptions deduct from the same user credit balance.
+Organization subscriptions deduct from the owning organization's credit
+balance, are associated with a user, and remain subordinate to the
+organization's parent entitlement.
 
 New users who provision an instance without subscribing first
 automatically receive a 7-day free trial. Legacy
@@ -116,10 +136,13 @@ notifications at each stage.
 
 ### Plans
 
-1. The system MUST support exactly two user-facing subscription plans:
-   commit and standard. A trial plan exists internally but is created
-   automatically at provisioning time, not selected by the user.
-2. A trial plan MUST last 7 calendar days from the moment it is created.
+1. For personal subscriptions, the system MUST support exactly two
+   user-facing subscription plans: commit and standard. A trial plan
+   exists internally but is created automatically at provisioning time,
+   not selected by the user.
+2. A personal bootstrap trial plan MUST last 7 calendar days from the
+   moment it is created. Organization KiloClaw trial duration is
+   governed by the Organization Trials rules.
 3. A commit plan MUST cover a six-calendar-month billing period.
 4. A standard plan MUST bill on a monthly recurring cycle.
 5. The system MUST enforce at most one subscription record per
@@ -150,11 +173,9 @@ notifications at each stage.
 
 The rules in this section govern paid self-service KiloClaw
 subscription rows. Trial rows are temporary bootstrap rows and are
-exempt from the paid funding invariants in rules 2 and 3. Current
-organizational bootstrap rows that grant temporary `managed-active`
-access before org billing launches are also outside these funding
-invariants; they remain a temporary carveout until org billing
-integration ships.
+exempt from the paid funding invariants in rules 2 and 3. Organization
+KiloClaw paid rows MUST be pure credit rows funded by organization
+credits and MUST NOT have a payment provider subscription ID.
 
 1. The system MUST record a payment source for each subscription. The
    value MUST be either `stripe` or `credits`.
@@ -232,16 +253,17 @@ rules resolve conflicts.
    event-handling and sweep behaviors MUST remain unchanged. The
    ownership rules in this section apply ONLY to hybrid rows.
 
-### Trial Eligibility and Creation
+### Personal Trial Eligibility and Creation
 
-1. A trial MUST only be created automatically when a user provisions an
-   instance for the first time. There is no user-facing "start trial"
-   action; the trial is bootstrapped during provisioning.
-2. The system MUST create a trial only if the user has no existing
-   subscription record. The instance-record check is not needed at
-   provisioning time because provisioning itself creates the instance,
-   but the billing status endpoint includes the instance check as
-   defense in depth.
+1. A personal trial MUST only be created automatically when a user
+   provisions a personal instance for the first time. There is no
+   user-facing "start trial" action; the trial is bootstrapped during
+   provisioning.
+2. The system MUST create a personal trial only if the user has no
+   existing personal subscription record. The instance-record check is
+   not needed at provisioning time because provisioning itself creates
+   the instance, but the billing status endpoint includes the instance
+   check as defense in depth.
 3. When a trial is created, the system MUST record the trial start
    timestamp and an end timestamp exactly 7 days later.
 4. The system MUST NOT require a credit card to start a trial.
@@ -280,6 +302,171 @@ rules resolve conflicts.
 5. Personal paid flows MUST always carry an instance billing anchor.
    The system MUST NOT create new detached personal subscription rows.
 
+### Organization KiloClaw Billing
+
+#### Organization Funding and Plans
+
+1. Organization KiloClaw subscriptions MUST be pure credit
+   subscriptions funded by organization credits.
+2. Organization KiloClaw subscriptions MUST NOT use direct Stripe
+   hosting subscriptions.
+3. Organization KiloClaw subscriptions MUST NOT be represented as
+   Stripe add-on line items on the organization seat subscription.
+4. Each organization KiloClaw instance MUST have its own canonical
+   KiloClaw subscription row.
+5. Organization KiloClaw subscriptions MUST be scoped to an
+   organization-owned instance and associated with the user for whom
+   the instance was created.
+6. Organization KiloClaw purchases MUST be month-to-month.
+7. Organization KiloClaw pricing MUST match the individual standard
+   month-to-month KiloClaw price until changed by a later pricing rule.
+8. Organization KiloClaw MUST NOT expose a user-visible commit plan or
+   plan-switching flow.
+9. Internal plan fields MAY remain future-compatible, but org KiloClaw
+   UI/API behavior MUST expose only the month-to-month organization
+   plan.
+10. Creating an organization KiloClaw subscription, including a trialing
+    subscription, MUST require sufficient organization credits for the
+    first paid billing period, except for existing-instance launch
+    backfill.
+11. If organization credits are insufficient at creation, the system
+    MUST NOT create or activate the subscription.
+12. When creation fails for insufficient credits, organization owners
+    and billing managers MUST be prompted to top up organization
+    credits, and non-billing-admin users MUST be prompted to contact a
+    billing admin.
+13. Organization KiloClaw renewals MUST use the existing pure-credit
+    renewal lifecycle, with deductions from organization credits
+    instead of user credits.
+14. If organization auto top-up is enabled and organization credits are
+    insufficient at renewal, the renewal flow SHOULD trigger
+    organization auto top-up using the existing one-attempt-per-period
+    semantics.
+15. If auto top-up is unavailable, disabled, declined, or already
+    attempted for the renewal period, the subscription MUST enter the
+    existing past-due grace, suspension, and destruction lifecycle.
+16. Renewal failure prompts and notifications MUST be role-aware:
+    billing admins and owners receive top-up actions, while
+    non-billing-admin associated users receive contact-admin messaging.
+
+#### Organization Parent Entitlement
+
+1. Organization KiloClaw access MUST be subordinate to parent
+   organization entitlement.
+2. KiloClaw subscription state MUST NOT keep an org KiloClaw accessible
+   when the parent organization subscription or trial state blocks
+   organization access, including hard-expired organization trial
+   states.
+3. A parent organization entitlement that blocks access but can be
+   recovered without creating a new organization subscription, such as a
+   hard-expired organization trial, MUST block organization KiloClaw
+   access but MUST NOT by itself immediately cancel organization
+   KiloClaw subscriptions.
+4. If the parent organization entitlement ends because the organization
+   subscription is canceled, ended, or otherwise no longer recoverable
+   as the same entitlement, all organization KiloClaw subscriptions for
+   that organization MUST be immediately canceled and MUST NOT renew.
+5. Parent entitlement checks MUST remain enforced independently of the
+   local KiloClaw subscription status.
+6. Organization KiloClaw state MUST NOT affect, extend, or recover the
+   parent organization subscription state.
+
+#### Organization Trials
+
+1. A user receives at most one 7-day organization KiloClaw trial per
+   organization.
+2. Trial eligibility MUST be based on historical organization KiloClaw
+   records for that user/org pair; destroyed or canceled prior
+   instances still count.
+3. Destroying and recreating an org KiloClaw instance MUST NOT reset
+   7-day trial eligibility.
+4. If an organization KiloClaw is created while the organization is
+   trialing, the KiloClaw trial end MUST be the later of the
+   organization trial end and the associated user's 7-day org KiloClaw
+   trial end.
+5. Organization-trial time MAY consume the user's 7-day KiloClaw trial.
+6. If the organization becomes active after the user's 7-day KiloClaw
+   trial has elapsed, KiloClaw billing MAY begin immediately, subject to
+   credit sufficiency and parent entitlement.
+7. Existing organization KiloClaw instances at billing launch MUST be
+   backfilled as trialing subscriptions ending 30 days after the
+   organization KiloClaw billing launch date.
+8. Existing organization KiloClaw launch-trial backfill MUST NOT deduct
+   organization credits at creation.
+9. The 30-day billing-launch trial is migration-granted access and
+   SHOULD NOT create reusable trial eligibility for future
+   destroy/recreate cycles.
+
+#### Enterprise KiloClaw Opt-Out
+
+1. Enterprise organizations MUST have an admin setting that disables
+   organization KiloClaw access.
+2. The opt-out setting MUST be configurable and enforced only while the
+   organization is on Enterprise.
+3. When enforced, the opt-out setting MUST block new organization
+   KiloClaw provisioning, block access to existing organization KiloClaw
+   instances, and prevent future organization KiloClaw renewals.
+4. When an Enterprise org with opt-out enabled transitions to Teams, the
+   setting MAY persist in storage but MUST NOT be enforced while the
+   organization is Teams.
+5. If the organization later transitions back to Enterprise, the
+   persisted opt-out setting MUST become enforceable again unless
+   changed by an authorized admin.
+
+#### Organization Availability
+
+1. Organization KiloClaw MUST be available to both Teams and Enterprise
+   organizations.
+2. Teams organizations MUST NOT be blocked from organization KiloClaw
+   solely because the Enterprise-only opt-out setting exists.
+3. Access remains subject to parent organization entitlement, credits,
+   permissions, and any enforced Enterprise opt-out setting.
+
+#### Organization Permissions and Visibility
+
+1. Any organization member MAY create their own organization KiloClaw
+   instance when organization KiloClaw is enabled, parent organization
+   entitlement allows access, the per-user-per-org instance limit allows
+   provisioning, and trial or credit rules allow subscription creation.
+2. The associated user MAY manage their own organization KiloClaw
+   lifecycle.
+3. Organization owners and billing managers MAY manage any organization
+   KiloClaw instance in the organization.
+4. Members who are neither the associated user nor an owner or billing
+   manager MUST NOT manage another user's organization KiloClaw
+   instance.
+5. Non-billing-admin associated users MUST NOT see subscription details,
+   including price, organization credit balance, invoices, billing
+   period dates, renewal dates, or subscription identifiers.
+6. Non-billing-admin associated users MAY see operational access state,
+   including available, trialing, blocked, past-due, and needs billing
+   admin action.
+7. Owners and billing managers MAY see full organization KiloClaw
+   billing details and organization credit actions.
+
+#### Organization Instance Destruction and Cancellation
+
+1. User-initiated destruction of an organization KiloClaw instance MUST
+   tear down infrastructure immediately.
+2. The instance record MUST be marked destroyed.
+3. The subscription MUST be set to cancel at the end of the current
+   billing period.
+4. The system MUST NOT issue prorated credits or refunds for
+   user-initiated destruction.
+5. At the period boundary, the subscription MUST transition to canceled
+   and MUST NOT renew.
+6. Parent organization entitlement loss remains separate: when the
+   organization subscription is canceled, ended, or otherwise no longer
+   recoverable as the same entitlement, organization KiloClaw
+   subscriptions are canceled immediately rather than at KiloClaw period
+   end.
+
+#### Organization UI Limit
+
+1. The product MUST continue to limit organization KiloClaw provisioning
+   to one active instance per user per organization in the UI/router
+   layer. This MUST NOT be enforced as a database constraint.
+
 ### Access Control
 
 1. The system MUST grant access when the subscription status is active.
@@ -296,7 +483,8 @@ rules resolve conflicts.
    the above conditions are met.
 7. All instance lifecycle operations (start, stop, destroy, provision,
    configuration changes) MUST be gated behind the access check, except
-   for provisioning which uses the trial-bootstrap flow.
+   for provisioning which uses the applicable subscription-bootstrap
+   flow.
 
 ### Subscription Checkout (Stripe)
 
@@ -1039,6 +1227,13 @@ rows renew.
 9. The billing status MUST include instance data (whether an
    undestroyed instance exists, suspension timestamp, destruction
    deadline, and destroyed flag) when any instance record exists.
+10. For organization KiloClaw, billing status reporting MUST enforce
+    role-based visibility. Non-billing-admin associated users MAY see
+    operational access state and contact-admin prompts, but MUST NOT
+    receive price, organization credit balance, invoices, billing
+    period dates, renewal dates, or subscription identifiers. Owners
+    and billing managers MAY receive full organization KiloClaw billing
+    details and organization credit actions.
 
 ### Billing Portal
 
@@ -1074,6 +1269,16 @@ rows renew.
 
 ### Changelog
 
+#### 2026-05-06 -- Organization KiloClaw billing
+
+- Added organization KiloClaw subscription definitions and rules.
+- Defined org-funded pure-credit billing, parent entitlement gating,
+  Enterprise opt-out, org trial behavior, launch backfill, role-aware
+  visibility, lifecycle permissions, organization auto top-up, and
+  period-end cancellation on user destruction.
+- Clarified that personal plan and trial rules apply to personal
+  subscriptions, while org KiloClaw exposes month-to-month billing only.
+
 #### 2026-03-27 -- Credit spend model, subscription reassignment
 
 - Added definitions for credit balance, credit spend, and the
@@ -1087,9 +1292,10 @@ rows renew.
   count toward the Kilo Pass bonus unlock threshold.
 - Clarified Credit Enrollment rule 6: "cumulative credit spend"
   explicitly includes the hosting deduction just committed.
-- Added Trial Eligibility and Creation rule 5: when a user provisions
-  a new instance and the existing subscription references a destroyed
-  instance, the system reassigns the subscription to the new instance.
+- Added Personal Trial Eligibility and Creation rule 5: when a user
+  provisions a new instance and the existing subscription references a
+  destroyed instance, the system reassigns the subscription to the new
+  instance.
   This fixes a bug where destroying and re-creating an instance left
   the subscription orphaned on the old destroyed instance.
 

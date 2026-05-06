@@ -54,6 +54,10 @@ capitals, as shown here.
   _organizational_ (associated with a specific organization). A user
   has one personal context and one organizational context per
   organization they belong to.
+- **Associated user**: For an organizational instance, the organization
+  member whose KiloClaw instance is provisioned for their use. The
+  associated user is the user-facing operational owner, while the
+  organization is the billing owner.
 - **Active instance**: An instance record that has not been marked
   as destroyed.
 - **Mutation**: Any database write (INSERT or UPDATE) to a
@@ -100,16 +104,21 @@ on application logs that may be rotated or incomplete.
 2. A subscription record MUST NOT be deleted from
    `kiloclaw_subscription`. Subscription lifecycle transitions
    (cancellation, expiry, etc.) MUST be represented as status changes
-   on the existing record, never as row deletion.
+   on the existing record, never as row deletion. Historical
+   organization KiloClaw instance and subscription records MUST be
+   retained and MUST be usable to determine whether a user has already
+   consumed their one 7-day org KiloClaw trial in that organization.
 3. When a user account is deleted (e.g., GDPR right-to-erasure),
    instance and subscription records MUST be retained. Ownership
-   references MUST be anonymized rather than cascaded or removed.
-   Subscription change log rows MUST also be retained as canonical
-   audit history. Any directly identifying fields in those rows MUST
-   be anonymized under the GDPR exception in Subscription Change Log
-   rule 14.
-   Foreign key constraints on these tables MUST NOT cascade deletes
-   from parent tables.
+   references, including associated-user references on organizational
+   instances, MUST be anonymized rather than cascaded or removed.
+   Organization ownership references MAY be retained when they are not
+   directly identifying user data. Subscription change log rows MUST
+   also be retained as canonical audit history. Any directly
+   identifying fields in those rows MUST be anonymized under the GDPR
+   exception in Subscription Change Log rule 14. Foreign key
+   constraints on these tables MUST NOT cascade deletes from parent
+   tables.
 
 ### Instance–Subscription Relationship
 
@@ -142,13 +151,21 @@ on application logs that may be rotated or incomplete.
 
 7. The data model MUST accommodate multiple instances per user or
    organization. No schema-level constraint SHALL restrict a user or
-   organization to a single instance.
+   organization to a single instance. Organizational instance records
+   MUST identify the owning organization, associated user, and
+   organizational context. The associated user is the user-facing owner
+   for operational workflows, but the organization is the billing
+   owner.
 8. The system MUST limit provisioning to one active instance per
    user per context. A user MAY have one active instance in their
    personal context and one active instance in each organization
    they belong to, simultaneously. The limit is per context, not
    per user globally. This limit MUST be enforced at the UI and
-   router layer, not at the database layer.
+   router layer, not at the database layer. Runtime and UI rules MUST
+   limit active organization KiloClaw provisioning to one active
+   instance per user per organization until this product limit is
+   explicitly relaxed, but no schema-level constraint SHALL enforce only
+   one organization KiloClaw instance per organization.
 9. When the single-instance limit is relaxed in the future, no
    schema migration SHALL be required.
 
@@ -259,21 +276,22 @@ complete).
 22. After the instance record has been committed to the database,
     the kiloclaw CF worker service MUST call the kiloclaw-billing
     service to create the corresponding `kiloclaw_subscription`
-    record. Subscription creation MUST NOT be attempted before the
-    instance record is persisted. This call MUST occur as part of
-    the same provisioning request — the window between instance
-    commit and subscription creation (see rule 4) MUST be bounded
-    to the duration of that request. If the primary subscription
-    bootstrap path fails after the instance row is persisted, the
-    provisioning service MUST retry or run a fallback path that
-    still creates canonical subscription state before the request
-    exits. The request MUST NOT complete successfully while leaving
-    a silently unpaired instance row. If both primary and fallback
-    bootstrap fail, the provisioning request MUST fail and the
-    instance MUST be explicitly quarantined for remediation rather
-    than left as an unnoticed orphan. This quarantine state is the
-    sole temporary exception to rule 4 and MUST NOT be surfaced as a
-    successful provisioned instance.
+    record. For organization context provisioning, this bootstrap MUST
+    create the corresponding organization-funded subscription row.
+    Subscription creation MUST NOT be attempted before the instance
+    record is persisted. This call MUST occur as part of the same
+    provisioning request — the window between instance commit and
+    subscription creation (see rule 4) MUST be bounded to the duration
+    of that request. If the primary subscription bootstrap path fails
+    after the instance row is persisted, the provisioning service MUST
+    retry or run a fallback path that still creates canonical
+    subscription state before the request exits. The request MUST NOT
+    complete successfully while leaving a silently unpaired instance
+    row. If both primary and fallback bootstrap fail, the provisioning
+    request MUST fail and the instance MUST be explicitly quarantined
+    for remediation rather than left as an unnoticed orphan. This
+    quarantine state is the sole temporary exception to rule 4 and MUST
+    NOT be surfaced as a successful provisioned instance.
 23. The onboarding flow MUST NOT be considered complete (and MUST NOT
     play the completion "ding" sound) until both the instance record
     and the subscription record have been persisted to the database.
@@ -310,6 +328,14 @@ not yet enforced in the current codebase:
    reconstructed from application logs.)
 
 ## Changelog
+
+### 2026-05-06 -- Organization KiloClaw ownership
+
+- Added associated-user terminology for organizational instances.
+- Clarified organizational instance ownership, billing ownership,
+  per-user-per-org active-instance limits, organization-funded
+  subscription bootstrap, and GDPR handling for associated-user
+  references.
 
 ### 2026-04-15 -- Initial spec
 

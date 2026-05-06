@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
-import { Check, Sparkles, TriangleAlert, X } from 'lucide-react';
+import { Check, Loader2, Sparkles, TriangleAlert, X } from 'lucide-react';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
@@ -158,6 +159,7 @@ function ClawOnboardingFlowInner({
   const { data: isServiceDegraded } = useClawServiceDegraded();
   useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
+  const router = useRouter();
 
   // Save bot identity, exec preset, and channel tokens as soon as the instance
   // row exists. This closes the tab-close window where customizations entered
@@ -215,6 +217,23 @@ function ClawOnboardingFlowInner({
   }, [onCreateFlowFailed, resetWizardSelections]);
 
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
+
+  const hasRedirectedToChat = useRef(false);
+  useEffect(() => {
+    // Wait for the gateway to actually be ready before redirecting; the chat
+    // page's conversation requests will hang indefinitely if the gateway is
+    // still warming up.
+    if (
+      flowState.renderStep !== 'complete' ||
+      !flowState.gatewayReady ||
+      hasRedirectedToChat.current
+    ) {
+      return;
+    }
+    hasRedirectedToChat.current = true;
+    posthog?.capture('claw_setup_open_chat_clicked', { auto_redirect: true });
+    router.push(`${basePath}/chat`);
+  }, [flowState.renderStep, flowState.gatewayReady, basePath, router, posthog]);
 
   function provisionInstance(userLocation?: string) {
     handleCreateFlowStarted();
@@ -366,13 +385,23 @@ function ClawOnboardingFlowInner({
   }
 
   function renderCompleteStep() {
-    return (
-      <ClawSetupCompleteStep
-        status={flowState.instanceStatus}
-        gatewayReady={flowState.gatewayReady}
-        basePath={basePath}
-      />
-    );
+    // While the gateway is still warming up, keep the user on a simple
+    // "almost ready" card instead of redirecting them to a chat page whose
+    // conversation requests would hang. Once gatewayReady flips true, the
+    // auto-redirect effect above takes over and pushes to /chat.
+    if (!flowState.gatewayReady) {
+      return (
+        <Card className="mt-6 overflow-hidden">
+          <CardContent className="flex flex-col items-center justify-center gap-4 pt-12">
+            <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+            <p className="text-muted-foreground text-sm">
+              Almost ready &mdash; finishing up your instance&hellip;
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
+    return null;
   }
 
   function renderErrorStep() {

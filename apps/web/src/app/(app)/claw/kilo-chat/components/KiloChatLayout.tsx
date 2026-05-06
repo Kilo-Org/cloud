@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -32,6 +32,7 @@ type KiloChatLayoutProps = {
   onRetryInstanceStatus: () => void;
   instanceStatus: string | null;
   assistantName: string | null;
+  assistantEmoji?: string | null;
   className?: string;
   children: React.ReactNode;
 };
@@ -47,6 +48,7 @@ export function KiloChatLayout({
   onRetryInstanceStatus,
   instanceStatus,
   assistantName,
+  assistantEmoji = null,
   className,
   children,
 }: KiloChatLayoutProps) {
@@ -161,6 +163,7 @@ export function KiloChatLayout({
       instanceStatus,
       leavingConversationId,
       assistantName,
+      assistantEmoji,
       sandboxId,
       basePath,
       noInstanceRedirect,
@@ -176,6 +179,7 @@ export function KiloChatLayout({
       instanceStatus,
       leavingConversationId,
       assistantName,
+      assistantEmoji,
       sandboxId,
       basePath,
       noInstanceRedirect,
@@ -187,6 +191,33 @@ export function KiloChatLayout({
       kiloChatClient,
     ]
   );
+
+  // First-run auto-create: when a user lands on the chat root with zero
+  // conversations (e.g. straight after onboarding), kick off a fresh
+  // conversation so they never sit on a blank index page.
+  const hasAutoCreatedConversation = useRef(false);
+  useEffect(() => {
+    if (
+      hasAutoCreatedConversation.current ||
+      params?.conversationId ||
+      isLoading ||
+      !sandboxId ||
+      createConversation.isPending ||
+      !data ||
+      (data.conversations?.length ?? 0) > 0
+    ) {
+      return;
+    }
+    hasAutoCreatedConversation.current = true;
+    handleNewConversation();
+  }, [
+    params?.conversationId,
+    isLoading,
+    sandboxId,
+    createConversation.isPending,
+    data,
+    handleNewConversation,
+  ]);
 
   return (
     <KiloChatContext.Provider value={contextValue}>

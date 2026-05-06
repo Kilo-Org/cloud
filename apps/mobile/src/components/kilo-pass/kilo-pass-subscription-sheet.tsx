@@ -1,13 +1,15 @@
 import { Portal } from '@rn-primitives/portal';
 import { Check, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
+
+const KILO_PASS_INFO_URL = 'https://kilo.ai/features/kilo-pass';
 
 type KiloPassSubscriptionSheetProps = {
   visible: boolean;
@@ -67,6 +69,16 @@ export function KiloPassSubscriptionSheet({
           <View className="mb-4 flex-row items-start justify-between gap-3">
             <View className="flex-1 gap-1">
               <Text className="text-xl font-semibold text-foreground">Kilo Pass</Text>
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="How Kilo Pass works"
+                hitSlop={8}
+                onPress={() => {
+                  void Linking.openURL(KILO_PASS_INFO_URL);
+                }}
+              >
+                <Text className="text-sm font-medium text-primary">How Kilo Pass works</Text>
+              </Pressable>
               <Text className="text-sm text-muted-foreground">App Store subscription</Text>
             </View>
             <Pressable

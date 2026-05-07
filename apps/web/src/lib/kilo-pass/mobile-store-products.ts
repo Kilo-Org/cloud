@@ -61,11 +61,12 @@ const PRODUCT_IDS = {
 >;
 
 const STORE_PRODUCT_ORDER = [
-  { tier: KiloPassTier.Tier199, cadence: KiloPassCadence.Yearly },
+  // App Store subscriptions are monthly-only for now.
+  // { tier: KiloPassTier.Tier199, cadence: KiloPassCadence.Yearly },
   { tier: KiloPassTier.Tier199, cadence: KiloPassCadence.Monthly },
-  { tier: KiloPassTier.Tier49, cadence: KiloPassCadence.Yearly },
+  // { tier: KiloPassTier.Tier49, cadence: KiloPassCadence.Yearly },
   { tier: KiloPassTier.Tier49, cadence: KiloPassCadence.Monthly },
-  { tier: KiloPassTier.Tier19, cadence: KiloPassCadence.Yearly },
+  // { tier: KiloPassTier.Tier19, cadence: KiloPassCadence.Yearly },
   { tier: KiloPassTier.Tier19, cadence: KiloPassCadence.Monthly },
 ] satisfies { tier: KiloPassTier; cadence: KiloPassCadence }[];
 

@@ -7,28 +7,23 @@ import {
 } from './mobile-store-products';
 
 describe('mobile Kilo Pass store products', () => {
-  it('maps every tier and cadence to Apple and Google product identifiers', () => {
+  it('exposes monthly store products for every tier', () => {
     const products = getAllMobileStoreKiloPassProducts();
 
-    expect(products).toHaveLength(6);
+    expect(products).toHaveLength(3);
     expect(products.map(product => product.appleProductId)).toEqual([
-      'kilopass.tier199.yearly.v1',
       'kilopass.tier199.monthly.v1',
-      'kilopass.tier49.yearly.v1',
       'kilopass.tier49.monthly.v1',
-      'kilopass.tier19.yearly.v1',
       'kilopass.tier19.monthly.v1',
     ]);
     for (const tier of Object.values(KiloPassTier)) {
-      for (const cadence of Object.values(KiloPassCadence)) {
-        const product = getMobileStoreKiloPassProduct({ tier, cadence });
-        expect(product).toMatchObject({ tier, cadence });
-        expect(product.appleProductId).toMatch(/^kilopass\./);
-        expect(product.googleProductId).toMatch(/^kilopass_tier/);
-        expect(product.googleBasePlanId).toMatch(/^(monthly|yearly)-v1$/);
-        expect(product.webMonthlyPriceUsd).toBeGreaterThan(0);
-        expect(product.suggestedStoreMonthlyPriceUsd).toBeGreaterThan(product.webMonthlyPriceUsd);
-      }
+      const product = getMobileStoreKiloPassProduct({ tier, cadence: KiloPassCadence.Monthly });
+      expect(product).toMatchObject({ tier, cadence: KiloPassCadence.Monthly });
+      expect(product.appleProductId).toMatch(/^kilopass\./);
+      expect(product.googleProductId).toMatch(/^kilopass_tier/);
+      expect(product.googleBasePlanId).toBe('monthly-v1');
+      expect(product.webMonthlyPriceUsd).toBeGreaterThan(0);
+      expect(product.suggestedStoreMonthlyPriceUsd).toBeGreaterThan(product.webMonthlyPriceUsd);
     }
   });
 });

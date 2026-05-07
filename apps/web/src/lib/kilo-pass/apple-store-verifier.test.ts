@@ -11,7 +11,7 @@ function transaction(
     transactionId: 'tx-1',
     originalTransactionId: 'orig-1',
     bundleId: 'com.kilocode.kiloapp',
-    productId: 'kilopass.tier19.yearly.v1',
+    productId: 'kilopass.tier19.monthly.v1',
     purchaseDate: 1_777_626_000_000,
     environment: 'Sandbox',
     rawPayload: { transactionId: 'tx-1' },
@@ -23,14 +23,20 @@ describe('mapAppleKiloPassTransaction', () => {
   it('maps a valid App Store transaction to a validated Kilo Pass purchase', () => {
     expect(mapAppleKiloPassTransaction(transaction())).toMatchObject({
       paymentProvider: KiloPassPaymentProvider.AppStore,
-      productId: 'kilopass.tier19.yearly.v1',
+      productId: 'kilopass.tier19.monthly.v1',
       providerTransactionId: 'tx-1',
       providerSubscriptionId: 'orig-1',
       providerOriginalTransactionId: 'orig-1',
       environment: 'Sandbox',
       tier: KiloPassTier.Tier19,
-      cadence: KiloPassCadence.Yearly,
+      cadence: KiloPassCadence.Monthly,
     });
+  });
+
+  it('rejects yearly App Store products while the app only supports monthly subscriptions', () => {
+    expect(() =>
+      mapAppleKiloPassTransaction(transaction({ productId: 'kilopass.tier19.yearly.v1' }))
+    ).toThrow('Apple Kilo Pass product is not enabled');
   });
 
   it('rejects the wrong bundle id', () => {

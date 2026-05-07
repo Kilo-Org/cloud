@@ -3167,11 +3167,82 @@ export const cli_sessions_v2 = pgTable(
     index('IDX_cli_sessions_v2_kilo_user_id').on(table.kilo_user_id),
     index('IDX_cli_sessions_v2_created_at').on(table.created_at),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    // Supports joins from github_branch_pull_requests on (git_url, git_branch).
+    index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
   ]
 );
 
 export type CliSessionV2 = typeof cli_sessions_v2.$inferSelect;
 export type NewCliSessionV2 = typeof cli_sessions_v2.$inferInsert;
+
+/**
+ * Per-tenant cache of the latest GitHub pull request observed for a
+ * `(repo, branch)` pair. Written by the `pull_request` webhook handler
+ * and the manual `refreshAssociatedPullRequest` mutation; read by the
+ * cli-sessions-v2 router to attach `associatedPr` to a session.
+ *
+ * Tenancy: XOR ownership columns mirror `platform_integrations`. A webhook
+ * delivery from an org installation writes a row under that org; a user
+ * installation writes under the user. Different tenants caching the same
+ * `(git_url, git_branch)` produce separate rows and never contaminate
+ * each other's reads.
+ *
+ * `git_url` is always stored in normalized form (see `normalizeGitUrl` in
+ * `@kilocode/worker-utils`). Session rows must store `git_url` in the same
+ * normalized shape for the join to match — the session-ingest queue consumer
+ * enforces this on write for new sessions.
+ */
+export const github_branch_pull_requests = pgTable(
+  'github_branch_pull_requests',
+  {
+    git_url: text().notNull(),
+    git_branch: text().notNull(),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    // pr_url/pr_number/pr_state are nullable so we can persist a "no PR exists
+    // for this branch" sentinel row: pr_last_synced_at then throttles repeated
+    // refresh attempts even when GitHub has no matching PR.
+    pr_url: text(),
+    pr_number: integer(),
+    pr_state: text(),
+    pr_title: text(),
+    pr_head_sha: text(),
+    pr_review_decision: text(),
+    review_decision_pending: boolean().notNull().default(false),
+    review_decision_fetching_at: timestamp({ withTimezone: true, mode: 'string' }),
+    pr_last_synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // Partial unique indexes serve as ON CONFLICT targets for the webhook
+    // upsert. Identity columns (git_url, git_branch) lead; tenant column
+    // trails since all hot-path reads supply every column anyway.
+    uniqueIndex('UQ_github_branch_prs_org')
+      .on(table.git_url, table.git_branch, table.owned_by_organization_id)
+      .where(isNotNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_github_branch_prs_user')
+      .on(table.git_url, table.git_branch, table.owned_by_user_id)
+      .where(isNotNull(table.owned_by_user_id)),
+    check(
+      'github_branch_pull_requests_owner_check',
+      sql`(
+        (${table.owned_by_organization_id} IS NOT NULL AND ${table.owned_by_user_id} IS NULL) OR
+        (${table.owned_by_organization_id} IS NULL AND ${table.owned_by_user_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'github_branch_pull_requests_review_decision_check',
+      sql`${table.pr_review_decision} IS NULL OR ${table.pr_review_decision} IN ('approved', 'changes_requested', 'review_required')`
+    ),
+  ]
+);
+
+export type GithubBranchPullRequest = typeof github_branch_pull_requests.$inferSelect;
+export type NewGithubBranchPullRequest = typeof github_branch_pull_requests.$inferInsert;
 
 export const device_auth_requests = pgTable(
   'device_auth_requests',

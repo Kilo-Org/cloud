@@ -10,6 +10,7 @@
     "./sandbox-id": "./src/sandbox-id.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./redact-headers": "./src/redact-headers.ts",
+    "./normalize-git-url": "./src/normalize-git-url.ts",
     "./kiloclaw-billing-observability": "./src/kiloclaw-billing-observability.ts",
     "./git-url": "./src/git-url.ts"
   },

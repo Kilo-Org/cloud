@@ -72,6 +72,7 @@ import {
   kiloclaw_referral_reward_applications,
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
+  github_branch_pull_requests,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from './constants';
@@ -980,6 +981,9 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(kilo_pass_scheduled_changes)
       .where(eq(kilo_pass_scheduled_changes.kilo_user_id, userId));
+    await tx
+      .delete(github_branch_pull_requests)
+      .where(eq(github_branch_pull_requests.owned_by_user_id, userId));
 
     // Code indexing data
     await tx.delete(source_embeddings).where(eq(source_embeddings.kilo_user_id, userId));

@@ -63,6 +63,7 @@ import {
   kiloclaw_referral_reward_applications,
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
+  github_branch_pull_requests,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -152,6 +153,7 @@ describe('User', () => {
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
     await db.delete(agent_environment_profiles);
+    await db.delete(github_branch_pull_requests);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -1517,6 +1519,24 @@ describe('User', () => {
         .from(user_push_tokens)
         .where(eq(user_push_tokens.user_id, user.id));
       expect(tokens).toHaveLength(0);
+    });
+
+    it('should delete github_branch_pull_requests owned by user', async () => {
+      const user = await insertTestUser();
+      await db.insert(github_branch_pull_requests).values({
+        git_url: 'https://github.com/acme/repo',
+        git_branch: 'main',
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+      });
+
+      await softDeleteUser(user.id);
+
+      const rows = await db
+        .select()
+        .from(github_branch_pull_requests)
+        .where(eq(github_branch_pull_requests.owned_by_user_id, user.id));
+      expect(rows).toHaveLength(0);
     });
 
     it('should nullify free_model_usage FK', async () => {

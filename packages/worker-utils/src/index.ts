@@ -57,6 +57,8 @@ export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
 
 export { redactSensitiveHeaders } from './redact-headers.js';
 
+export { normalizeGitUrl } from './normalize-git-url.js';
+
 export {
   BILLING_FLOW,
   BILLING_HEADER_NAMES,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -32,6 +32,7 @@ type KiloChatLayoutProps = {
   onRetryInstanceStatus: () => void;
   instanceStatus: string | null;
   assistantName: string | null;
+  assistantEmoji: string | null;
   className?: string;
   children: React.ReactNode;
 };
@@ -47,6 +48,7 @@ export function KiloChatLayout({
   onRetryInstanceStatus,
   instanceStatus,
   assistantName,
+  assistantEmoji,
   className,
   children,
 }: KiloChatLayoutProps) {
@@ -161,6 +163,7 @@ export function KiloChatLayout({
       instanceStatus,
       leavingConversationId,
       assistantName,
+      assistantEmoji,
       sandboxId,
       basePath,
       noInstanceRedirect,
@@ -176,6 +179,7 @@ export function KiloChatLayout({
       instanceStatus,
       leavingConversationId,
       assistantName,
+      assistantEmoji,
       sandboxId,
       basePath,
       noInstanceRedirect,
@@ -187,6 +191,43 @@ export function KiloChatLayout({
       kiloChatClient,
     ]
   );
+
+  // First-run auto-create: when a user lands on the chat root with zero
+  // conversations (e.g. straight after onboarding), kick off a fresh
+  // conversation so they never sit on a blank index page. Reset the guard
+  // when sandboxId changes so switching between instances (e.g. between
+  // organizations) re-evaluates without remounting.
+  //
+  // The ref intentionally stays set even after a failed mutation: if the
+  // server-side create fails, retrying via this effect would loop on
+  // persistent errors. The manual "+ New conversation" button in
+  // ConversationList is the recovery path.
+  const hasAutoCreatedConversation = useRef(false);
+  useEffect(() => {
+    hasAutoCreatedConversation.current = false;
+  }, [sandboxId]);
+  useEffect(() => {
+    if (
+      hasAutoCreatedConversation.current ||
+      params?.conversationId ||
+      isLoading ||
+      !sandboxId ||
+      createConversation.isPending ||
+      !data ||
+      data.conversations.length > 0
+    ) {
+      return;
+    }
+    hasAutoCreatedConversation.current = true;
+    handleNewConversation();
+  }, [
+    params?.conversationId,
+    isLoading,
+    sandboxId,
+    createConversation.isPending,
+    data,
+    handleNewConversation,
+  ]);
 
   return (
     <KiloChatContext.Provider value={contextValue}>

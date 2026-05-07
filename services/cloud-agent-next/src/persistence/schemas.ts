@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { AgentModeSchema, Limits } from '../schema.js';
+import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 import type { SandboxId } from '../types.js';
 
 /**
@@ -55,6 +55,20 @@ export const EncryptedSecretEnvelopeSchema = z.object({
 export type EncryptedSecretEnvelope = z.infer<typeof EncryptedSecretEnvelopeSchema>;
 
 /**
+ * A single MCP env value or remote header value. Plain strings are passed
+ * through verbatim; encrypted envelopes are decrypted by the worker just
+ * before materializing `KILO_CONFIG_CONTENT.mcp`. Callers mix the two per
+ * key: secrets travel as envelopes, non-sensitive config (locale, paths,
+ * public IDs, …) travels as plain strings.
+ */
+export const MCPSecretValueSchema = z.union([
+  z.string().max(Limits.MAX_ENV_VAR_VALUE_LENGTH),
+  EncryptedSecretEnvelopeSchema,
+]);
+
+export type MCPSecretValue = z.infer<typeof MCPSecretValueSchema>;
+
+/**
  * Schema for encrypted secrets - a record of key names to encrypted envelopes.
  * Used to pass profile secrets securely from backend to cloud-agent worker.
  */
@@ -86,12 +100,15 @@ export const modelIdSchema = z
 
 /**
  * Local MCP server configuration schema (runs a command).
+ * Each env value is either a plain string or an encrypted envelope; the
+ * worker decrypts envelope-shaped values per key when materializing the
+ * `KILO_CONFIG_CONTENT.mcp` block for the sandbox session.
  */
 const MCPLocalServerConfigSchema = z
   .object({
     type: z.literal('local'),
     command: z.string().array().min(1, 'Command array must have at least one element'),
-    environment: z.record(z.string(), z.string()).optional(),
+    environment: z.record(z.string(), MCPSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
@@ -99,12 +116,15 @@ const MCPLocalServerConfigSchema = z
 
 /**
  * Remote MCP server configuration schema (connects to a URL).
+ * Each header value is either a plain string or an encrypted envelope; the
+ * worker decrypts envelope-shaped values per key when materializing the
+ * `KILO_CONFIG_CONTENT.mcp` block for the sandbox session.
  */
 const MCPRemoteServerConfigSchema = z
   .object({
     type: z.literal('remote'),
     url: z.string().url('URL must be a valid URL format'),
-    headers: z.record(z.string(), z.string()).optional(),
+    headers: z.record(z.string(), MCPSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
@@ -117,6 +137,161 @@ export const MCPServerConfigSchema = z.discriminatedUnion('type', [
   MCPLocalServerConfigSchema,
   MCPRemoteServerConfigSchema,
 ]);
+
+const SKILL_FILE_PATH_PATTERN = /^[a-zA-Z0-9._\-/]+$/;
+
+/** Validate a map of companion files bundled with a skill. */
+const RuntimeSkillFilesSchema = z
+  .record(
+    z.string().min(1).max(Limits.MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH),
+    z.string().max(Limits.MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE)
+  )
+  .refine(
+    files => Object.keys(files).length <= Limits.MAX_RUNTIME_SKILL_COMPANION_FILES,
+    `A skill may have at most ${Limits.MAX_RUNTIME_SKILL_COMPANION_FILES} companion files`
+  )
+  .superRefine((files, ctx) => {
+    let total = 0;
+    for (const [path, content] of Object.entries(files)) {
+      if (!SKILL_FILE_PATH_PATTERN.test(path)) {
+        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
+        return;
+      }
+      if (path.startsWith('/') || path.includes('..') || path.includes('//')) {
+        ctx.addIssue({ code: 'custom', message: `Skill file path rejected: ${path}` });
+        return;
+      }
+      if (path === 'SKILL.md' || path.toLowerCase() === 'skill.md') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'SKILL.md must be passed as rawMarkdown, not inside files',
+        });
+        return;
+      }
+      total += content.length;
+    }
+    if (total > Limits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `Skill companion files total ${total} bytes, exceeds ${Limits.MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL}`,
+      });
+    }
+  });
+
+/**
+ * Runtime skill schema. Each entry is materialized to
+ * `${SESSION_HOME}/.kilocode/skills/<name>/` at preparation time — `rawMarkdown`
+ * is written to `SKILL.md`, and each `files[path]` is written under the same
+ * directory.
+ */
+export const RuntimeSkillSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(Limits.MAX_RUNTIME_SKILL_NAME_LENGTH)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug'),
+  rawMarkdown: z.string().min(1).max(Limits.MAX_RUNTIME_SKILL_MARKDOWN),
+  files: RuntimeSkillFilesSchema.optional(),
+});
+
+export const RuntimeSkillsSchema = z
+  .array(RuntimeSkillSchema)
+  .max(Limits.MAX_RUNTIME_SKILLS, `Maximum ${Limits.MAX_RUNTIME_SKILLS} runtime skills allowed`);
+
+export type RuntimeSkillInput = z.infer<typeof RuntimeSkillSchema>;
+
+// --- Runtime agents ---
+
+const PermissionActionSchema = z.enum(['allow', 'ask', 'deny']);
+// Flat permissive shape — the runtime tolerates any shape the CLI accepts
+// (bare action string, per-tool map with per-pattern maps, null sentinels).
+// Schema-level typing kept loose so the zod inference used by MetadataSchema
+// stays tractable; tighter validation lives at the web-app boundary.
+const PermissionConfigSchema = z.union([PermissionActionSchema, z.record(z.string(), z.unknown())]);
+
+/**
+ * Runtime agent schema. Each entry is materialized into
+ * `KILO_CONFIG_CONTENT.agent.<slug>` at session preparation time. Mirrors the
+ * CLI's AgentConfig shape so we pass through verbatim.
+ *
+ * Reserved built-in slugs (`code`, `plan`, `architect`, `custom`, …) are
+ * rejected here so an inline or persisted runtime agent cannot override a
+ * built-in agent's prompt or permissions inside the sandbox. The web-side
+ * profile service applies the same rule when persisting agents.
+ */
+export const RuntimeAgentSchema = z.object({
+  slug: z
+    .string()
+    .min(1)
+    .max(Limits.MAX_RUNTIME_AGENT_SLUG_LENGTH)
+    .regex(/^[a-z][a-z0-9-]*$/, 'Agent slug must start with a letter')
+    .refine(slug => !BUILTIN_AGENT_MODES.has(slug), {
+      message: 'Slug conflicts with a built-in agent; choose a different slug',
+    }),
+  name: z.string().min(1).max(Limits.MAX_RUNTIME_AGENT_NAME_LENGTH),
+  config: z
+    .object({
+      prompt: z.string().max(Limits.MAX_RUNTIME_AGENT_PROMPT).optional(),
+      description: z.string().max(Limits.MAX_RUNTIME_AGENT_DESCRIPTION).optional(),
+      mode: z.enum(['subagent', 'primary', 'all']).optional(),
+      model: z.string().max(Limits.MAX_RUNTIME_AGENT_MODEL_LENGTH).nullable().optional(),
+      variant: z.string().max(50).optional(),
+      temperature: z.number().optional(),
+      top_p: z.number().optional(),
+      steps: z.number().int().positive().optional(),
+      hidden: z.boolean().optional(),
+      disable: z.boolean().optional(),
+      color: z.string().max(50).optional(),
+      permission: PermissionConfigSchema.optional(),
+      options: z.record(z.string(), z.unknown()).optional(),
+    })
+    // Variant keys are model-specific, so a `variant` without a `model`
+    // has no anchor — mirror the web-side AgentConfigSchema invariant.
+    .refine(c => !c.variant || (typeof c.model === 'string' && c.model.length > 0), {
+      message: 'variant requires a model — variants are model-specific',
+      path: ['variant'],
+    }),
+});
+
+export const RuntimeAgentsSchema = z
+  .array(RuntimeAgentSchema)
+  .max(Limits.MAX_RUNTIME_AGENTS, `Maximum ${Limits.MAX_RUNTIME_AGENTS} runtime agents allowed`);
+
+export type RuntimeAgentInput = z.infer<typeof RuntimeAgentSchema>;
+
+// --- Profile bundle ---
+
+/**
+ * Schema for the profile-derived configuration bundle persisted with a
+ * session. Writers always emit this nested shape; readers prefer it but
+ * fall back to the legacy flat fields (`envVars`, `encryptedSecrets`, …)
+ * co-located on the same record for backwards compatibility with sessions
+ * stored before the nesting landed.
+ *
+ * The flat read-fallback can be deleted once all live sessions have been
+ * rewritten with the nested `profile` key (typically a few weeks of
+ * session TTL after deploy).
+ */
+export const SessionProfileBundleSchema = z.object({
+  envVars: z
+    .record(z.string().max(256), z.string().max(256))
+    .refine(obj => Object.keys(obj).length <= 50, {
+      message: 'Maximum 50 environment variables allowed',
+    })
+    .optional(),
+  encryptedSecrets: EncryptedSecretsSchema.optional(),
+  setupCommands: z.array(z.string().max(500)).max(Limits.MAX_SETUP_COMMANDS).optional(),
+  mcpServers: z
+    .record(z.string().max(100), MCPServerConfigSchema)
+    .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
+      message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
+    })
+    .optional(),
+  runtimeSkills: RuntimeSkillsSchema.optional(),
+  runtimeAgents: RuntimeAgentsSchema.optional(),
+});
+
+export type SessionProfileBundle = z.infer<typeof SessionProfileBundleSchema>;
 
 /**
  * Zod schema for CloudAgentSession metadata validation.
@@ -138,15 +313,21 @@ export const MetadataSchema = z.object({
   gitToken: z.string().optional(),
   platform: z.enum(['github', 'gitlab']).optional(),
   gitlabTokenManaged: z.boolean().optional(),
+  /**
+   * Profile-derived configuration (envVars, encryptedSecrets, MCP servers,
+   * setup commands, runtime skills/agents). This nested form is what
+   * writers emit; the flat fields below are kept optional so that records
+   * written before this key existed still parse. Readers must go through
+   * `readProfileBundle` so the fallback stays in one place.
+   */
+  profile: SessionProfileBundleSchema.optional(),
+  // --- Legacy flat profile fields (read-only fallback, no longer written) ---
   envVars: z
     .record(z.string().max(256), z.string().max(256))
     .refine(obj => Object.keys(obj).length <= 50, {
       message: 'Maximum 50 environment variables allowed',
     })
     .optional(),
-  // Encrypted secrets from agent environment profiles.
-  // Keys are env var names, values are encrypted envelopes.
-  // Stored encrypted, decrypted only at execution time.
   encryptedSecrets: EncryptedSecretsSchema.optional(),
   setupCommands: z.array(z.string().max(500)).max(Limits.MAX_SETUP_COMMANDS).optional(),
   mcpServers: z
@@ -155,13 +336,16 @@ export const MetadataSchema = z.object({
       message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
     })
     .optional(),
+  runtimeSkills: RuntimeSkillsSchema.optional(),
+  runtimeAgents: RuntimeAgentsSchema.optional(),
   upstreamBranch: branchNameSchema.optional(),
   kiloSessionId: z.string().optional(),
   createdOnPlatform: z.string().max(100).optional(),
 
   // Execution params
   prompt: z.string().max(Limits.MAX_PROMPT_LENGTH).optional(),
-  mode: AgentModeSchema.optional(),
+  // Mode accepts built-in slugs plus any custom slug from runtimeAgents.
+  mode: z.string().max(Limits.MAX_RUNTIME_AGENT_SLUG_LENGTH).optional(),
   model: z.string().optional(),
   variant: z
     .string()
@@ -233,11 +417,15 @@ export const PreparationInputSchema = z.object({
   mode: z.string(),
   model: z.string(),
   variant: z.string().optional(),
-  // Configuration
+  // Profile-derived configuration (nested form — what writers emit).
+  profile: SessionProfileBundleSchema.optional(),
+  // Legacy flat profile fields (read-only fallback, no longer written).
   envVars: z.record(z.string(), z.string()).optional(),
   encryptedSecrets: EncryptedSecretsSchema.optional(),
   setupCommands: z.array(z.string()).optional(),
   mcpServers: z.record(z.string(), MCPServerConfigSchema).optional(),
+  runtimeSkills: RuntimeSkillsSchema.optional(),
+  runtimeAgents: RuntimeAgentsSchema.optional(),
   upstreamBranch: z.string().optional(),
   autoCommit: z.boolean().optional(),
   condenseOnComplete: z.boolean().optional(),

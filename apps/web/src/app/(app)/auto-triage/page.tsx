@@ -1,3 +1,5 @@
+import { notFound } from 'next/navigation';
+import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
 import { AutoTriagePageClient } from './AutoTriagePageClient';
 
@@ -8,6 +10,13 @@ type AutoTriagePageProps = {
 export default async function PersonalAutoTriagePage({ searchParams }: AutoTriagePageProps) {
   const search = await searchParams;
   const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/auto-triage');
+
+  const isAutoTriageFeatureEnabled = await isFeatureFlagEnabled('auto-triage-feature', user.id);
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  if (!isAutoTriageFeatureEnabled && !isDevelopment) {
+    return notFound();
+  }
 
   return (
     <AutoTriagePageClient

@@ -11,7 +11,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../drizzle/migrations';
 import git from '@ashishkumar472/cf-git';
 import http from '@ashishkumar472/cf-git/http/web';
-import { sanitizeGitUrl } from './utils/git-url';
+import { sanitizeGitUrl } from '@kilocode/worker-utils/git-url';
 import { SqliteFS } from './git/fs-adapter';
 import { MemFS } from './git/memfs';
 import { logger, withLogTags, formatError } from './utils/logger';

@@ -132,6 +132,17 @@ function extractPromptInfo(requestBodyParsed: GatewayRequest): PromptInfo {
   return extractChatCompletionsPromptInfo(requestBodyParsed.body);
 }
 
+function determineFallbackFeature(requestBodyParsed: GatewayRequest): 'direct-gateway' | '' {
+  const { system_prompt_prefix } = extractPromptInfo(requestBodyParsed);
+  if (
+    system_prompt_prefix.includes('You are Kilo') ||
+    system_prompt_prefix.includes('You are a personal assistant running inside OpenClaw')
+  ) {
+    return '';
+  }
+  return 'direct-gateway';
+}
+
 async function resolveRateLimit(
   feature: FeatureValue | null,
   ipAddress: string,
@@ -217,10 +228,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
-  const isLegacyOpenRouterPath = url.pathname.includes('/openrouter');
 
   const feature = validateFeatureHeader(
-    request.headers.get(FEATURE_HEADER) || (isLegacyOpenRouterPath ? '' : 'direct-gateway')
+    request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
   );
 
   const authPromise = getUserFromAuth({ adminOnly: false });

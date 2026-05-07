@@ -995,6 +995,40 @@ describe('createSessionManager', () => {
       const sc = atomValue<{ variant?: string | null }>(config.store, mgr.atoms.sessionConfig);
       expect(sc?.variant).toBe(null);
     });
+
+    it('updates sessionConfig.mode from assistant agent slug, not visibility mode', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      const mockedCreate = jest.mocked(createCloudAgentSession);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = mockedCreate.mock.calls[0][0];
+
+      // Custom agents always carry `mode: 'primary' | 'subagent' | 'all'` as
+      // visibility; the slug lives on `agent`. The picker must track the slug.
+      sessionConfig.onEvent?.({
+        type: 'message.updated',
+        info: {
+          id: 'msg-1',
+          sessionID: 'ses-1',
+          role: 'assistant',
+          modelID: 'claude-3-5-sonnet',
+          providerID: 'test',
+          mode: 'primary',
+          time: { created: 1 },
+          agent: 'e-code',
+          cost: 0,
+          parentID: '',
+          path: { cwd: '', root: '' },
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+      });
+
+      const sc = atomValue<{ mode?: string }>(config.store, mgr.atoms.sessionConfig);
+      expect(sc?.mode).toBe('e-code');
+    });
   });
 
   // -------------------------------------------------------------------------

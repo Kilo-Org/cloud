@@ -501,6 +501,7 @@ function MorningBriefingCard({
   fallbackReadiness,
   isRunning,
   actionsReady,
+  onRequestUpgrade,
 }: {
   mutations: ClawMutations;
   briefingStatus: MorningBriefingStatusLite | undefined;
@@ -511,6 +512,8 @@ function MorningBriefingCard({
   };
   isRunning: boolean;
   actionsReady: boolean;
+  /** Callback that opens the focused upgrade confirmation flow. */
+  onRequestUpgrade?: () => void;
 }) {
   const [requestedDay, setRequestedDay] = useState<'today' | 'yesterday' | null>(null);
   const { data: readData, isFetching: isReading } = useClawReadMorningBriefing(requestedDay, true);
@@ -539,12 +542,17 @@ function MorningBriefingCard({
     } as const);
 
   const hasSchedule = Boolean(briefingStatus?.cron && briefingStatus?.timezone);
-  const { desiredEnabled, observedEnabled, hasResolvedBriefingToggleState, isWarmupState } =
-    deriveMorningBriefingCardState({
-      isRunning,
-      actionsReady,
-      briefingStatus,
-    });
+  const {
+    desiredEnabled,
+    observedEnabled,
+    hasResolvedBriefingToggleState,
+    isWarmupState,
+    isControllerOutOfDate,
+  } = deriveMorningBriefingCardState({
+    isRunning,
+    actionsReady,
+    briefingStatus,
+  });
   const reconcileState = briefingStatus?.reconcileState ?? 'idle';
   const lastReconcileAction = briefingStatus?.lastReconcileAction ?? null;
   const isTransitioning =
@@ -553,6 +561,10 @@ function MorningBriefingCard({
     mutations.disableMorningBriefing.isPending;
 
   const statusLabel = (() => {
+    if (isControllerOutOfDate) {
+      return 'Upgrade Required';
+    }
+
     if (isWarmupState) {
       return 'Instance Warming Up';
     }
@@ -585,13 +597,14 @@ function MorningBriefingCard({
 
     return observedEnabled ? 'Enabled' : 'Disabled';
   })();
-  const statusVariant = isWarmupState
-    ? 'secondary'
-    : statusLabel === 'Instance Stopped'
+  const statusVariant =
+    isControllerOutOfDate || isWarmupState
       ? 'secondary'
-      : observedEnabled || (isTransitioning && desiredEnabled)
-        ? 'default'
-        : 'secondary';
+      : statusLabel === 'Instance Stopped'
+        ? 'secondary'
+        : observedEnabled || (isTransitioning && desiredEnabled)
+          ? 'default'
+          : 'secondary';
 
   const readySources = [
     sourceReadiness.github.configured ? 'GitHub' : null,
@@ -610,12 +623,17 @@ function MorningBriefingCard({
       : readySources.length === 0
         ? 'No sources are connected yet. Configure GitHub, Linear, or Web Search to generate richer briefings.'
         : `Connected sources: ${joinFriendlyList(readySources)}. Disconnected sources: ${joinFriendlyList(missingSources)}.`;
-  const showScheduleDetails = !isWarmupState && hasSchedule && desiredEnabled;
-  const controlsEnabled = actionsReady && !isWarmupState;
+  const showScheduleDetails =
+    !isWarmupState && !isControllerOutOfDate && hasSchedule && desiredEnabled;
+  const controlsEnabled = actionsReady && !isWarmupState && !isControllerOutOfDate;
   const canUseBriefingControls = controlsEnabled && desiredEnabled;
   const lastDelivery = briefingStatus?.lastDelivery ?? [];
   const showLastDelivery =
-    !isWarmupState && actionsReady && hasResolvedBriefingToggleState && lastDelivery.length > 0;
+    !isWarmupState &&
+    !isControllerOutOfDate &&
+    actionsReady &&
+    hasResolvedBriefingToggleState &&
+    lastDelivery.length > 0;
   const deliveryChannelLabel = {
     telegram: 'Telegram',
     discord: 'Discord',
@@ -635,6 +653,28 @@ function MorningBriefingCard({
 
   return (
     <div className="rounded-lg border px-4 py-3">
+      {isControllerOutOfDate && (
+        <div className="mb-3 flex items-start gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-amber-200">Upgrade required</p>
+            <p className="text-muted-foreground text-xs">
+              Morning Briefing requires a newer KiloClaw version. Upgrade to enable scheduling and
+              delivery.
+            </p>
+          </div>
+          {onRequestUpgrade && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300"
+              onClick={onRequestUpgrade}
+            >
+              Upgrade
+            </Button>
+          )}
+        </div>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <Newspaper className="text-muted-foreground h-5 w-5 shrink-0" />
@@ -1925,6 +1965,7 @@ export function SettingsTab({
               briefingStatus={morningBriefingStatus}
               isRunning={isRunning}
               actionsReady={morningBriefingActionsReady}
+              onRequestUpgrade={onRequestUpgrade}
               fallbackReadiness={{
                 githubConfigured: configuredSecrets.github ?? false,
                 linearConfigured: configuredSecrets.linear ?? false,

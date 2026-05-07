@@ -102,6 +102,27 @@ describe('platform morning-briefing warm-up handling', () => {
     });
   });
 
+  it('returns graceful unavailable payload at 200 when controller predates the status route', async () => {
+    // The DO returns null when the controller route is missing (controller
+    // predates the morning-briefing route). The dashboard polls this endpoint
+    // every 30s, so 404 here would generate continuous user-facing errors.
+    const getMorningBriefingStatus = vi.fn<() => Promise<unknown>>().mockResolvedValue(null);
+    const env = baseEnv({ getMorningBriefingStatus });
+
+    const response = await platform.request('/morning-briefing/status?userId=user-1', {}, env);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      enabled: false,
+      desiredEnabled: false,
+      observedEnabled: false,
+      reconcileState: 'idle',
+      code: 'controller_route_unavailable',
+      error: 'Morning Briefing unavailable (controller too old)',
+    });
+  });
+
   it('does not treat 401 as warm-up for enable retries', async () => {
     const enableMorningBriefing = vi
       .fn<() => Promise<{ ok: boolean; enabled: boolean }>>()

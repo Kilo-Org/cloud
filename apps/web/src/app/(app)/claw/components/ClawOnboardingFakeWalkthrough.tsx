@@ -271,7 +271,7 @@ function renderFakeStep({
       );
     }
     case 'complete':
-      return <ClawSetupCompleteStep status={fakeStatus} gatewayReady basePath={basePath} />;
+      return <ClawSetupCompleteStep gatewayReady />;
     case 'error':
       return <ClawSetupErrorStep basePath={basePath} />;
   }

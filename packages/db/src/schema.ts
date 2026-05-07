@@ -3560,6 +3560,7 @@ export const agent_environment_profiles = pgTable(
     // Ownership: exactly one must be set (org OR user) - matches platform_integrations pattern
     owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    created_by_user_id: text(), // Audit trail: the user who created this profile (useful for org-owned profiles)
 
     name: text().notNull(),
     description: text(),
@@ -3589,6 +3590,7 @@ export const agent_environment_profiles = pgTable(
     // Indexes
     index('IDX_agent_env_profiles_org_id').on(table.owned_by_organization_id),
     index('IDX_agent_env_profiles_user_id').on(table.owned_by_user_id),
+    index('IDX_agent_env_profiles_created_by_user_id').on(table.created_by_user_id),
     // Owner check constraint (exactly one must be set)
     check(
       'agent_env_profiles_owner_check',
@@ -3698,6 +3700,123 @@ export type AgentEnvironmentProfileRepoBinding =
   typeof agent_environment_profile_repo_bindings.$inferSelect;
 export type NewAgentEnvironmentProfileRepoBinding =
   typeof agent_environment_profile_repo_bindings.$inferInsert;
+
+// ============ AGENT ENVIRONMENT PROFILE MCP SERVERS ============
+// MCP servers configured on an environment profile. Materialized into the
+// CLI-native KILO_CONFIG_CONTENT.mcp block at session preparation time.
+
+export const agent_environment_profile_mcp_servers = pgTable(
+  'agent_environment_profile_mcp_servers',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    type: text({ enum: ['local', 'remote'] }).notNull(),
+    enabled: boolean().notNull().default(true),
+    timeout: integer(),
+    // CLI-native MCP config as jsonb. Non-secret fields (command, args, url, env/header keys)
+    // are stored as plain values. Each env/header *value* is stored as an RSA+AES envelope
+    // object ({ encryptedData, encryptedDEK, algorithm, version }) using the same format as
+    // agent_environment_profile_vars. Decryption happens only on the cloud-agent-next worker
+    // at session preparation time.
+    config: jsonb().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_mcp_servers_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_mcp_servers_profile_name').on(table.profile_id, table.name),
+  ]
+);
+
+export type AgentEnvironmentProfileMcpServer =
+  typeof agent_environment_profile_mcp_servers.$inferSelect;
+
+// ============ AGENT ENVIRONMENT PROFILE SKILLS ============
+// Kilo Code skills attached to an environment profile. Materialized into
+// ${SESSION_HOME}/.kilocode/skills/<name>/SKILL.md at session preparation time.
+
+export const agent_environment_profile_skills = pgTable(
+  'agent_environment_profile_skills',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    // Skill slug — must match the frontmatter `name` and is used as the directory name
+    name: text().notNull(),
+    description: text(),
+    source_type: text({ enum: ['marketplace', 'custom'] }).notNull(),
+    // URL the skill was imported from (marketplace entry URL, or null for 'custom')
+    source_url: text(),
+    raw_markdown: text().notNull(),
+    // Companion files for a multi-file skill. Map of relative path → file
+    // contents (text). Excludes SKILL.md itself (lives in raw_markdown).
+    // Materialized under ${sessionHome}/.kilocode/skills/<name>/<relativePath>.
+    files: jsonb().$type<Record<string, string>>().notNull().default({}),
+    enabled: boolean().notNull().default(true),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_skills_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_skills_profile_name').on(table.profile_id, table.name),
+  ]
+);
+
+export type AgentEnvironmentProfileSkill = typeof agent_environment_profile_skills.$inferSelect;
+
+// ============ AGENT ENVIRONMENT PROFILE AGENTS ============
+// Kilo "agents" (the modern successor to legacy custom modes) attached to an
+// environment profile. Materialized into KILO_CONFIG_CONTENT.agent.<slug> at
+// session preparation time; the stored `config` jsonb already matches the
+// CLI's AgentConfig shape so we pass through untransformed.
+
+export const agent_environment_profile_agents = pgTable(
+  'agent_environment_profile_agents',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    // Agent slug — used as KILO_CONFIG_CONTENT.agent.<slug>.
+    slug: text().notNull(),
+    // Display name shown in the picker.
+    name: text().notNull(),
+    // AgentConfig shape: prompt, description, mode, model, temperature, top_p,
+    // steps, hidden, disable, color, variant, permission, options. See
+    // AgentConfigSchema in schema-types.ts for the authoritative validator.
+    config: jsonb().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_agents_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_agents_profile_slug').on(table.profile_id, table.slug),
+  ]
+);
+
+export type AgentEnvironmentProfileAgent = typeof agent_environment_profile_agents.$inferSelect;
 
 // ============ APP BUILDER FEEDBACK ============
 

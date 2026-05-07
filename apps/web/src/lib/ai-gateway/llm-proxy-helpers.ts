@@ -384,11 +384,7 @@ export function checkOrganizationModelRestrictions(params: {
     }
   }
 
-  const providerAllowList =
-    params.settings.provider_policy_mode === 'allow'
-      ? params.settings.provider_allow_list
-      : undefined;
-  const providerDenyList = params.settings.provider_deny_list;
+  const providerAllowList = params.settings.provider_allow_list;
   const dataCollection = params.settings.data_collection;
 
   const providerConfig: OpenRouterProviderConfig = {};
@@ -396,8 +392,6 @@ export function checkOrganizationModelRestrictions(params: {
   if (params.organizationPlan === 'enterprise') {
     if (providerAllowList !== undefined) {
       providerConfig.only = providerAllowList;
-    } else if (providerDenyList && providerDenyList.length > 0) {
-      providerConfig.ignore = providerDenyList;
     }
   }
 

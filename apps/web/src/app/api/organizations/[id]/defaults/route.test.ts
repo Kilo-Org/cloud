@@ -179,7 +179,6 @@ describe('GET /api/organizations/[id]/defaults', () => {
           ...organization,
           plan: 'enterprise' as const,
           settings: {
-            provider_policy_mode: 'allow',
             provider_allow_list: [],
           },
         },

@@ -590,6 +590,16 @@ describe('disk space checking', () => {
       );
       expect(mockTimeoutWarn).toHaveBeenCalledWith('Sandbox operation timed out');
     });
+
+    it('preserves sandbox 500 errors for recovery handling', async () => {
+      const error = new Error('HTTP error! status: 500');
+      Object.assign(error, { name: 'SandboxError' });
+      mockGitCheckout.mockRejectedValueOnce(error);
+
+      await expect(
+        cloneGitRepo(fakeSession, '/workspace', 'https://example.com/repo.git')
+      ).rejects.toBe(error);
+    });
   });
 
   describe('updateGitRemoteToken', () => {

@@ -1993,10 +1993,21 @@ platform.get('/morning-briefing/status', async c => {
       'getMorningBriefingStatus'
     );
     if (!result) {
-      return jsonError(
-        'Morning Briefing unavailable (controller too old)',
-        404,
-        'controller_route_unavailable'
+      // Controller predates this route. The dashboard polls status every 30s,
+      // so a 404 here would generate continuous user-facing errors. Return a
+      // typed "unavailable" payload at 200 instead — same shape pattern as
+      // the gateway_warming_up branch below.
+      return c.json(
+        {
+          ok: false,
+          enabled: false,
+          desiredEnabled: false,
+          observedEnabled: false,
+          reconcileState: 'idle',
+          code: 'controller_route_unavailable',
+          error: 'Morning Briefing unavailable (controller too old)',
+        },
+        200
       );
     }
     return c.json(result, 200);

@@ -1,15 +1,6 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import {
-  kilocode_users,
-  organizations,
-  organization_memberships,
-  agent_environment_profiles,
-  agent_environment_profile_vars,
-  agent_environment_profile_commands,
-} from '@kilocode/db/schema';
-import { eq, and, isNull, asc } from 'drizzle-orm';
-import * as z from 'zod';
-import { logger } from '../util/logger.js';
+import { kilocode_users, organizations, organization_memberships } from '@kilocode/db/schema';
+import { eq, and, isNull } from 'drizzle-orm';
 
 export { getWorkerDb, type WorkerDb };
 
@@ -21,19 +12,6 @@ export type UserForToken = Pick<
 export type BotUserForToken = {
   id: string;
   api_token_pepper: string;
-};
-
-const encryptedSecretSchema = z.object({
-  encryptedData: z.string(),
-  encryptedDEK: z.string(),
-  algorithm: z.literal('rsa-aes-256-gcm'),
-  version: z.literal(1),
-});
-
-export type ResolvedProfileConfig = {
-  envVars: Record<string, string>;
-  encryptedSecrets: Record<string, z.infer<typeof encryptedSecretSchema>>;
-  setupCommands: string[];
 };
 
 // Bot user constants — must match kilocode-backend's src/lib/bot-users/types.ts
@@ -163,75 +141,4 @@ async function ensureBotIsOrgMember(db: WorkerDb, botUserId: string, orgId: stri
     kilo_user_id: botUserId,
     role: 'member',
   });
-}
-
-export async function resolveProfile(
-  db: WorkerDb,
-  profileId: string,
-  ownerUserId?: string | null,
-  ownerOrgId?: string | null
-): Promise<ResolvedProfileConfig | null> {
-  const profiles = await db
-    .select({
-      id: agent_environment_profiles.id,
-      owned_by_organization_id: agent_environment_profiles.owned_by_organization_id,
-      owned_by_user_id: agent_environment_profiles.owned_by_user_id,
-    })
-    .from(agent_environment_profiles)
-    .where(eq(agent_environment_profiles.id, profileId))
-    .limit(1);
-
-  const profile = profiles[0];
-  if (!profile) return null;
-
-  // Validate ownership
-  if (ownerOrgId) {
-    if (profile.owned_by_organization_id !== ownerOrgId) return null;
-  } else if (ownerUserId) {
-    if (profile.owned_by_user_id !== ownerUserId) return null;
-  }
-
-  const [vars, commands] = await Promise.all([
-    db
-      .select({
-        key: agent_environment_profile_vars.key,
-        value: agent_environment_profile_vars.value,
-        is_secret: agent_environment_profile_vars.is_secret,
-      })
-      .from(agent_environment_profile_vars)
-      .where(eq(agent_environment_profile_vars.profile_id, profileId)),
-
-    db
-      .select({
-        command: agent_environment_profile_commands.command,
-      })
-      .from(agent_environment_profile_commands)
-      .where(eq(agent_environment_profile_commands.profile_id, profileId))
-      .orderBy(asc(agent_environment_profile_commands.sequence)),
-  ]);
-
-  const envVars: Record<string, string> = {};
-  const encryptedSecrets: ResolvedProfileConfig['encryptedSecrets'] = {};
-
-  for (const variable of vars) {
-    if (variable.is_secret) {
-      try {
-        encryptedSecrets[variable.key] = encryptedSecretSchema.parse(JSON.parse(variable.value));
-      } catch {
-        // Skip malformed secrets
-        logger.error('Failed to parse encrypted secret', {
-          profileId,
-          key: variable.key,
-        });
-      }
-    } else {
-      envVars[variable.key] = variable.value;
-    }
-  }
-
-  return {
-    envVars,
-    encryptedSecrets,
-    setupCommands: commands.map(c => c.command),
-  };
 }

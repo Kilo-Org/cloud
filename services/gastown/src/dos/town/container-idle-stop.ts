@@ -33,8 +33,8 @@ export async function stopContainerIfIdle(deps: IdleStopDeps): Promise<void> {
   const mayorAlive = mayor && (mayor.status === 'working' || mayor.status === 'stalled');
   if (mayorAlive) return;
 
-  if (mayor) {
-    const lastActivity = new Date(mayor.last_activity_at!).getTime();
+  if (mayor && mayor.last_activity_at != null) {
+    const lastActivity = new Date(mayor.last_activity_at).getTime();
     if (deps.now() - lastActivity <= CONTAINER_IDLE_STOP_THRESHOLD_MS) return;
   }
 
@@ -58,8 +58,8 @@ export async function stopContainerIfIdle(deps: IdleStopDeps): Promise<void> {
 
   if (state.status !== 'running') return;
 
-  const idleMinutes = mayor
-    ? Math.round((deps.now() - new Date(mayor.last_activity_at!).getTime()) / 60_000)
+  const idleMinutes = mayor?.last_activity_at != null
+    ? Math.round((deps.now() - new Date(mayor.last_activity_at).getTime()) / 60_000)
     : 0;
   const reason = mayor ? `mayor_idle_${idleMinutes}m` : 'no_active_work';
 

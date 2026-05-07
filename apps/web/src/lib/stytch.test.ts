@@ -133,7 +133,7 @@ describe('Stytch Fingerprint Functions', () => {
       expect(result.kilo_free_tier_allowed).toBe(true);
 
       // Verify data was saved to database
-      const savedFingerprint = await db.query.stytch_fingerprints.findFirst({
+      const savedFingerprint = await db._query.stytch_fingerprints.findFirst({
         where: eq(stytch_fingerprints.kilo_user_id, user.id),
       });
 
@@ -165,7 +165,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       expect(result.kilo_free_tier_allowed).toBe(false);
 
-      const savedFingerprint = await db.query.stytch_fingerprints.findFirst({
+      const savedFingerprint = await db._query.stytch_fingerprints.findFirst({
         where: eq(stytch_fingerprints.kilo_user_id, user.id),
       });
 
@@ -183,7 +183,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       expect(result.kilo_free_tier_allowed).toBe(false);
 
-      const savedFingerprint = await db.query.stytch_fingerprints.findFirst({
+      const savedFingerprint = await db._query.stytch_fingerprints.findFirst({
         where: eq(stytch_fingerprints.kilo_user_id, user2.id),
       });
 
@@ -201,7 +201,7 @@ describe('Stytch Fingerprint Functions', () => {
       await handleSignupPromotion(user, kilo_free_tier_allowed);
 
       // Check if credit was granted
-      const creditTransaction = await db.query.credit_transactions.findFirst({
+      const creditTransaction = await db._query.credit_transactions.findFirst({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
 
@@ -234,7 +234,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       await saveFingerprints(user, fingerprintData, createMockHeaders());
 
-      const updatedUser = await db.query.kilocode_users.findFirst({
+      const updatedUser = await db._query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, user.id),
         columns: { blocked_reason: true },
       });
@@ -261,7 +261,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       await saveFingerprints(user, fingerprintData, createMockHeaders());
 
-      const updatedUser = await db.query.kilocode_users.findFirst({
+      const updatedUser = await db._query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, user.id),
         columns: { blocked_reason: true },
       });
@@ -283,7 +283,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       await saveFingerprints(user, fingerprintData, createMockHeaders());
 
-      const updatedUser = await db.query.kilocode_users.findFirst({
+      const updatedUser = await db._query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, user.id),
         columns: { blocked_reason: true },
       });
@@ -318,7 +318,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       await handleSignupPromotion(user, true, { kind: 'openclaw-security-advisor' });
 
-      const grants = await db.query.credit_transactions.findMany({
+      const grants = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
 
@@ -342,7 +342,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       await handleSignupPromotion(user, true, null);
 
-      const grants = await db.query.credit_transactions.findMany({
+      const grants = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
 
@@ -356,7 +356,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       await handleSignupPromotion(user, false, { kind: 'openclaw-security-advisor' });
 
-      const grants = await db.query.credit_transactions.findMany({
+      const grants = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
 
@@ -371,7 +371,7 @@ describe('Stytch Fingerprint Functions', () => {
       await handleSignupPromotion(user, true, { kind: 'openclaw-security-advisor' });
       await handleSignupPromotion(user, true, { kind: 'openclaw-security-advisor' });
 
-      const bonusRows = await db.query.credit_transactions.findMany({
+      const bonusRows = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
 
@@ -423,7 +423,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       await handleSignupPromotion(user, true, { kind: 'credit-campaign', slug });
 
-      const grants = await db.query.credit_transactions.findMany({
+      const grants = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
       const byCategory = new Map(grants.map(g => [g.credit_category, g]));
@@ -452,7 +452,7 @@ describe('Stytch Fingerprint Functions', () => {
         slug: `never-created-${Date.now()}`,
       });
 
-      const grants = await db.query.credit_transactions.findMany({
+      const grants = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
       expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
@@ -467,7 +467,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       await handleSignupPromotion(user, true, { kind: 'credit-campaign', slug });
 
-      const grants = await db.query.credit_transactions.findMany({
+      const grants = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
       expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
@@ -487,7 +487,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       await handleSignupPromotion(user, true, { kind: 'credit-campaign', slug });
 
-      const grants = await db.query.credit_transactions.findMany({
+      const grants = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
       expect(grants.map(g => g.credit_category).sort()).toEqual(['automatic-welcome-credits']);
@@ -511,7 +511,7 @@ describe('Stytch Fingerprint Functions', () => {
       });
       await handleSignupPromotion(secondUser, true, { kind: 'credit-campaign', slug });
 
-      const secondGrants = await db.query.credit_transactions.findMany({
+      const secondGrants = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, secondUser.id),
       });
       expect(secondGrants.map(g => g.credit_category).sort()).toEqual([
@@ -529,7 +529,7 @@ describe('Stytch Fingerprint Functions', () => {
       await handleSignupPromotion(user, true, { kind: 'credit-campaign', slug });
       await handleSignupPromotion(user, true, { kind: 'credit-campaign', slug });
 
-      const rows = await db.query.credit_transactions.findMany({
+      const rows = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
       const campaignOnly = rows.filter(g => g.credit_category === `c-${slug}`);
@@ -545,7 +545,7 @@ describe('Stytch Fingerprint Functions', () => {
 
       await handleSignupPromotion(user, false, { kind: 'credit-campaign', slug });
 
-      const grants = await db.query.credit_transactions.findMany({
+      const grants = await db._query.credit_transactions.findMany({
         where: eq(credit_transactions.kilo_user_id, user.id),
       });
       expect(grants).toHaveLength(0);

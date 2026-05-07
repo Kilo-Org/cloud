@@ -496,7 +496,7 @@ describe('tryDispatchPendingReviews', () => {
       userId: testUser.id,
     });
 
-    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+    const storedReview = await db._query.cloud_agent_code_reviews.findFirst({
       where: eq(cloud_agent_code_reviews.id, review.id),
     });
 
@@ -538,7 +538,7 @@ describe('tryDispatchPendingReviews', () => {
       userId: testUser.id,
     });
 
-    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+    const storedReview = await db._query.cloud_agent_code_reviews.findFirst({
       where: eq(cloud_agent_code_reviews.id, review.id),
     });
 
@@ -580,7 +580,7 @@ describe('tryDispatchPendingReviews', () => {
       userId: testUser.id,
     });
 
-    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+    const storedReview = await db._query.cloud_agent_code_reviews.findFirst({
       where: eq(cloud_agent_code_reviews.id, review.id),
     });
 

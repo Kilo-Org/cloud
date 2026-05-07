@@ -24,7 +24,7 @@ export async function POST(
     return warnAndCreateErrorResponse('Invalid email parameter');
   }
 
-  const user = await db.query.kilocode_users.findFirst({
+  const user = await db._query.kilocode_users.findFirst({
     where: eq(kilocode_users.google_user_email, email),
   });
 

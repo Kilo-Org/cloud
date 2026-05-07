@@ -26,7 +26,7 @@ describe('web session revocation', () => {
 
     await revokeWebSessions(user.id);
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
 
@@ -44,7 +44,7 @@ describe('web session revocation', () => {
       await revokeWebSessions(user.id, tx);
     });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
 

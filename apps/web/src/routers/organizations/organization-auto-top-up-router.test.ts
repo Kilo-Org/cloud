@@ -142,7 +142,7 @@ describe('organization auto-top-up router', () => {
       expect(result).toEqual({ enabled: false });
 
       // Verify DB was updated
-      const org = await db.query.organizations.findFirst({
+      const org = await db._query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
       expect(org?.auto_top_up_enabled).toBe(false);
@@ -167,13 +167,13 @@ describe('organization auto-top-up router', () => {
       expect(result).toEqual({ enabled: true });
 
       // Verify DB was updated
-      const org = await db.query.organizations.findFirst({
+      const org = await db._query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
       expect(org?.auto_top_up_enabled).toBe(true);
 
       // Verify disabled_reason was cleared
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config?.disabled_reason).toBeNull();
@@ -222,7 +222,7 @@ describe('organization auto-top-up router', () => {
       expect(result.success).toBe(true);
 
       // Verify DB was updated
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config?.amount_cents).toBe(10000);
@@ -251,13 +251,13 @@ describe('organization auto-top-up router', () => {
       expect(result.success).toBe(true);
 
       // Verify config was deleted
-      const config = await db.query.auto_top_up_configs.findFirst({
+      const config = await db._query.auto_top_up_configs.findFirst({
         where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
       });
       expect(config).toBeUndefined();
 
       // Verify auto_top_up_enabled was set to false
-      const org = await db.query.organizations.findFirst({
+      const org = await db._query.organizations.findFirst({
         where: eq(organizations.id, testOrg.id),
       });
       expect(org?.auto_top_up_enabled).toBe(false);

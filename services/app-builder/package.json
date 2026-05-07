@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@ashishkumar472/cf-git": "1.0.5",
+    "@kilocode/drizzle-shims": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "diff": "^8.0.3",
     "drizzle-orm": "catalog:",

@@ -69,7 +69,7 @@ async function run() {
   // Process users with cursor-based pagination to avoid loading all 400k into memory
   while (hasMore) {
     // Fetch next batch of users from database
-    const users: User[] = await db.query.kilocode_users.findMany({
+    const users: User[] = await db._query.kilocode_users.findMany({
       where: lastUserId
         ? and(isNull(kilocode_users.blocked_reason), gt(kilocode_users.id, lastUserId))
         : isNull(kilocode_users.blocked_reason),

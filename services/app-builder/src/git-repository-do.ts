@@ -5,6 +5,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
+import '@kilocode/drizzle-shims/query-alias';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';

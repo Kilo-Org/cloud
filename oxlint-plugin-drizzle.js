@@ -135,9 +135,63 @@ function createRule(method, messageId) {
   };
 }
 
+// Prefer `db._query` over `db.query` in preparation for the drizzle v1
+// migration where the RQB namespace is being renamed. `_query` is aliased to
+// `query` at runtime by `@kilocode/drizzle-shims/query-alias`.
+//
+// oxlint plugins are AST-only (no type info), so the rule is gated on a
+// drizzleObjectName allowlist like the other two rules in this file. Known
+// receivers in this repo: `db`, `ctx.db`, `this.db`, and transaction callback
+// params (`tx`, `trx`). The type-aware ts-morph verifier in
+// `scripts/verify-drizzle-underscore-query.ts` is the authoritative check.
+const preferUnderscoreQueryRule = {
+  meta: {
+    type: 'problem',
+    fixable: 'code',
+    messages: {
+      preferUnderscoreQuery:
+        'Read the drizzle RQB namespace via `_query`, not `query`. Drizzle v1 renames this namespace; the alias lets both work for now.',
+    },
+    schema: [
+      {
+        type: 'object',
+        properties: {
+          drizzleObjectName: { type: ['string', 'array'] },
+        },
+        additionalProperties: false,
+      },
+    ],
+  },
+  create(context) {
+    const drizzleObjectName = (context.options[0] && context.options[0].drizzleObjectName) || [];
+    return {
+      MemberExpression(node) {
+        if (
+          node.property.type !== 'Identifier' ||
+          node.property.name !== 'query' ||
+          node.computed
+        ) {
+          return;
+        }
+        if (!isDrizzleObj(node, drizzleObjectName)) {
+          return;
+        }
+        context.report({
+          node: node.property,
+          messageId: 'preferUnderscoreQuery',
+          fix(fixer) {
+            return fixer.replaceText(node.property, '_query');
+          },
+        });
+      },
+    };
+  },
+};
+
 module.exports = {
   rules: {
     'enforce-delete-with-where': createRule('delete', 'enforceDeleteWithWhere'),
     'enforce-update-with-where': createRule('update', 'enforceUpdateWithWhere'),
+    'prefer-underscore-query': preferUnderscoreQueryRule,
   },
 };

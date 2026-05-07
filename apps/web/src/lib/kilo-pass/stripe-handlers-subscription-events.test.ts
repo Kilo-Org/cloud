@@ -141,7 +141,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
 
     await handleKiloPassSubscriptionEvent({ eventId, eventType, subscription });
 
-    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+    const subRow = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(subRow).toBeTruthy();
@@ -153,7 +153,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
     expect(toIso(subRow?.started_at)).toBe(new Date(startDateSeconds * 1000).toISOString());
     expect(subRow?.ended_at).toBeNull();
 
-    const auditRow = await db.query.kilo_pass_audit_log.findFirst({
+    const auditRow = await db._query.kilo_pass_audit_log.findFirst({
       where: and(
         eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.StripeWebhookReceived),
         eq(kilo_pass_audit_log.stripe_event_id, eventId)
@@ -192,7 +192,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
       subscription,
     });
 
-    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+    const subRow = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(subRow?.status).toBe('active');
@@ -238,7 +238,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
       subscription,
     });
 
-    const updated = await db.query.kilo_pass_subscriptions.findFirst({
+    const updated = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
 
@@ -274,7 +274,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
       subscription: subWithCanceledAt,
     });
 
-    const updatedWithCanceledAt = await db.query.kilo_pass_subscriptions.findFirst({
+    const updatedWithCanceledAt = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubIdCanceledAt),
     });
     expect(updatedWithCanceledAt?.status).toBe('canceled');
@@ -306,7 +306,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
 
     const afterSeconds = Math.floor(Date.now() / 1000);
 
-    const updatedWithNow = await db.query.kilo_pass_subscriptions.findFirst({
+    const updatedWithNow = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubIdNow),
     });
     expect(updatedWithNow?.status).toBe('unpaid');
@@ -356,7 +356,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
       subscription,
     });
 
-    const updated = await db.query.kilo_pass_subscriptions.findFirst({
+    const updated = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(updated?.status).toBe('active');
@@ -395,7 +395,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
       subscription,
     });
 
-    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+    const subRow = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(subRow).toBeTruthy();
@@ -444,7 +444,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
 
     // DB stores Stripe's reported status (active), not 'paused'.
     // The state query derives paused from the open pause event.
-    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+    const subRow = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(subRow).toBeTruthy();
@@ -488,7 +488,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
       subscription: pausedSubscription,
     });
 
-    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+    const subRow = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(subRow).toBeTruthy();

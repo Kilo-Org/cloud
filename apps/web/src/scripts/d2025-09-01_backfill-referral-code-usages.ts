@@ -170,7 +170,7 @@ async function parseReferredUserNotLoggedEvents(): Promise<ReferredUserNotLogged
 const applyMode = process.argv.includes('--apply');
 async function getReferrerUserFromDb(cand?: AttemptedReferralUsageEvent | null) {
   if (!cand) return null;
-  const refCodeRecord = await db.query.referral_codes.findFirst({
+  const refCodeRecord = await db._query.referral_codes.findFirst({
     where: eq(referral_codes.code, cand.referralCode),
     columns: { kilo_user_id: true },
   });

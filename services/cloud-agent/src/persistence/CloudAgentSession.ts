@@ -6,6 +6,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { TRPCError } from '@trpc/server';
+import '@kilocode/drizzle-shims/query-alias';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';

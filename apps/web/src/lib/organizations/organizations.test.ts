@@ -721,7 +721,7 @@ describe('Organizations', () => {
       );
 
       // Verify invitation exists in database
-      const storedInvitation = await db.query.organization_invitations.findFirst({
+      const storedInvitation = await db._query.organization_invitations.findFirst({
         where: eq(organization_invitations.id, invitation.id),
       });
 
@@ -1365,7 +1365,7 @@ describe('Organizations', () => {
         expect(userOrgs[0].role).toBe('member');
 
         // Verify invitation is marked as accepted in database
-        const storedInvitation = await db.query.organization_invitations.findFirst({
+        const storedInvitation = await db._query.organization_invitations.findFirst({
           where: eq(organization_invitations.token, invitation.token),
         });
         expect(storedInvitation?.accepted_at).toBeDefined();
@@ -1517,7 +1517,7 @@ describe('Organizations', () => {
         await acceptOrganizationInvite(invitee.id, invitation.token);
 
         // Verify membership has correct invited_by information
-        const membership = await db.query.organization_memberships.findFirst({
+        const membership = await db._query.organization_memberships.findFirst({
           where: and(
             eq(organization_memberships.organization_id, organization.id),
             eq(organization_memberships.kilo_user_id, invitee.id)
@@ -1605,13 +1605,13 @@ describe('Organizations', () => {
         }
 
         // Verify invitation is marked as accepted
-        const storedInvitation = await db.query.organization_invitations.findFirst({
+        const storedInvitation = await db._query.organization_invitations.findFirst({
           where: eq(organization_invitations.token, invitation.token),
         });
         expect(storedInvitation?.accepted_at).not.toBeNull();
 
         // Verify membership was created
-        const membership = await db.query.organization_memberships.findFirst({
+        const membership = await db._query.organization_memberships.findFirst({
           where: and(
             eq(organization_memberships.organization_id, organization.id),
             eq(organization_memberships.kilo_user_id, invitee.id)
@@ -1646,13 +1646,13 @@ describe('Organizations', () => {
         await acceptOrganizationInvite(invitee1.id, invitation1.token);
 
         // Verify first invitation is accepted
-        const storedInvitation1 = await db.query.organization_invitations.findFirst({
+        const storedInvitation1 = await db._query.organization_invitations.findFirst({
           where: eq(organization_invitations.token, invitation1.token),
         });
         expect(storedInvitation1?.accepted_at).not.toBeNull();
 
         // Verify second invitation is still pending
-        const storedInvitation2 = await db.query.organization_invitations.findFirst({
+        const storedInvitation2 = await db._query.organization_invitations.findFirst({
           where: eq(organization_invitations.token, invitation2.token),
         });
         expect(storedInvitation2?.accepted_at).toBeNull();
@@ -1726,7 +1726,7 @@ describe('Organizations', () => {
         expect(result.success).toBe(true);
 
         // Verify no usage limit was set for require_seats organization
-        const userLimit = await db.query.organization_user_limits.findFirst({
+        const userLimit = await db._query.organization_user_limits.findFirst({
           where: and(
             eq(organization_user_limits.organization_id, organization.id),
             eq(organization_user_limits.kilo_user_id, invitee.id),
@@ -1756,7 +1756,7 @@ describe('Organizations', () => {
         expect(result.success).toBe(true);
 
         // Verify no usage limit was set for require_seats organization
-        const userLimit = await db.query.organization_user_limits.findFirst({
+        const userLimit = await db._query.organization_user_limits.findFirst({
           where: and(
             eq(organization_user_limits.organization_id, organization.id),
             eq(organization_user_limits.kilo_user_id, invitee.id),
@@ -1785,7 +1785,7 @@ describe('Organizations', () => {
         expect(result.success).toBe(true);
 
         // Verify no usage limit was set for owner
-        const userLimit = await db.query.organization_user_limits.findFirst({
+        const userLimit = await db._query.organization_user_limits.findFirst({
           where: and(
             eq(organization_user_limits.organization_id, organization.id),
             eq(organization_user_limits.kilo_user_id, invitee.id),
@@ -1815,7 +1815,7 @@ describe('Organizations', () => {
         expect(userOrgs[0].role).toBe('owner');
 
         // Verify no usage limit was set
-        const userLimit = await db.query.organization_user_limits.findFirst({
+        const userLimit = await db._query.organization_user_limits.findFirst({
           where: and(
             eq(organization_user_limits.organization_id, organization.id),
             eq(organization_user_limits.kilo_user_id, invitee.id),
@@ -1845,7 +1845,7 @@ describe('Organizations', () => {
         expect(result.success).toBe(true);
 
         // Verify no usage limit was set for require_seats organization
-        const userLimit = await db.query.organization_user_limits.findFirst({
+        const userLimit = await db._query.organization_user_limits.findFirst({
           where: and(
             eq(organization_user_limits.organization_id, organization.id),
             eq(organization_user_limits.kilo_user_id, invitee.id),
@@ -1875,7 +1875,7 @@ describe('Organizations', () => {
         expect(result.success).toBe(true);
 
         // Verify no usage limit was set for require_seats organization
-        const userLimit = await db.query.organization_user_limits.findFirst({
+        const userLimit = await db._query.organization_user_limits.findFirst({
           where: and(
             eq(organization_user_limits.organization_id, organization.id),
             eq(organization_user_limits.kilo_user_id, invitee.id),
@@ -1921,7 +1921,7 @@ describe('Organizations', () => {
         expect(result.success).toBe(true);
 
         // Verify usage limit was set for non-require_seats organization
-        const userLimit = await db.query.organization_user_limits.findFirst({
+        const userLimit = await db._query.organization_user_limits.findFirst({
           where: and(
             eq(organization_user_limits.organization_id, organization.id),
             eq(organization_user_limits.kilo_user_id, invitee.id),
@@ -1968,7 +1968,7 @@ describe('Organizations', () => {
         expect(result.success).toBe(true);
 
         // Verify usage limit was set for non-require_seats organization
-        const userLimit = await db.query.organization_user_limits.findFirst({
+        const userLimit = await db._query.organization_user_limits.findFirst({
           where: and(
             eq(organization_user_limits.organization_id, organization.id),
             eq(organization_user_limits.kilo_user_id, invitee.id),

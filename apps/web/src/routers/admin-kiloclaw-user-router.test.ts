@@ -775,7 +775,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updatedSubscription = await db.query.kiloclaw_subscriptions.findFirst({
+    const updatedSubscription = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.user_id, targetUser.id),
     });
     expectSameInstant(updatedSubscription?.trial_ends_at, newTrialEndsAt);
@@ -887,7 +887,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
       'Transferred KiloClaw subscriptions are historical and cannot be modified. Edit the current subscription instead.'
     );
 
-    const unchanged = await db.query.kiloclaw_subscriptions.findFirst({
+    const unchanged = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, transferredSub.id),
     });
     expect(unchanged?.status).toBe('trialing');
@@ -939,7 +939,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
       'Transferred KiloClaw subscriptions are historical and cannot be modified. Edit the current subscription instead.'
     );
 
-    const unchanged = await db.query.kiloclaw_subscriptions.findFirst({
+    const unchanged = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, transferredSub.id),
     });
     expect(unchanged?.status).toBe('canceled');
@@ -979,7 +979,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updatedSubscription = await db.query.kiloclaw_subscriptions.findFirst({
+    const updatedSubscription = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.user_id, targetUser.id),
     });
     expect(updatedSubscription?.status).toBe('trialing');
@@ -1057,7 +1057,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
       reason: 'admin_request',
     });
 
-    const updatedInstance = await db.query.kiloclaw_instances.findFirst({
+    const updatedInstance = await db._query.kiloclaw_instances.findFirst({
       where: eq(kiloclaw_instances.id, instance.id),
     });
     expect(updatedInstance?.inactive_trial_stopped_at).toBeNull();
@@ -1105,7 +1105,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updatedInstance = await db.query.kiloclaw_instances.findFirst({
+    const updatedInstance = await db._query.kiloclaw_instances.findFirst({
       where: eq(kiloclaw_instances.id, instance.id),
     });
     expect(new Date(String(updatedInstance?.inactive_trial_stopped_at)).toISOString()).toBe(
@@ -1137,7 +1137,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
     expect(result).toEqual({ success: true });
 
     // DB updated
-    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+    const updated = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, sub.id),
     });
     expect(updated?.cancel_at_period_end).toBe(true);
@@ -1167,7 +1167,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
     expect(result).toEqual({ success: true });
 
     // DB updated — immediate cancel sets terminal state
-    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+    const updated = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, sub.id),
     });
     expect(updated?.status).toBe('canceled');
@@ -1214,7 +1214,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+    const updated = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, sub.id),
     });
     expect(updated?.status).toBe('canceled');
@@ -1256,7 +1256,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       'Transferred KiloClaw subscriptions are historical and cannot be modified. Edit the current subscription instead.'
     );
 
-    const unchanged = await db.query.kiloclaw_subscriptions.findFirst({
+    const unchanged = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, transferredSub.id),
     });
     expect(unchanged?.status).toBe('trialing');
@@ -1364,7 +1364,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       cancel_at_period_end: true,
     });
 
-    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+    const updated = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, sub.id),
     });
     expect(updated?.cancel_at_period_end).toBe(true);
@@ -1427,7 +1427,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
     ).rejects.toThrow('Stripe cancellation was applied');
 
-    const changed = await db.query.kiloclaw_subscriptions.findFirst({
+    const changed = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, sub.id),
     });
     expect(changed?.transferred_to_subscription_id).toBe(successorSub.id);
@@ -1561,7 +1561,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       mode: 'immediate',
     });
 
-    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+    const updated = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, sub.id),
     });
     expect(updated?.status).toBe('canceled');
@@ -1606,7 +1606,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
       })
     ).rejects.toThrow('Stripe cancellation was applied');
 
-    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+    const updated = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, sub.id),
     });
     expect(updated?.status).toBe('canceled');
@@ -1649,7 +1649,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
     });
 
     // DB cleared schedule fields
-    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+    const updated = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, sub.id),
     });
     expect(updated?.stripe_schedule_id).toBeNull();
@@ -1725,7 +1725,7 @@ describe('admin.users.cancelKiloClawSubscription', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updated = await db.query.kiloclaw_subscriptions.findFirst({
+    const updated = await db._query.kiloclaw_subscriptions.findFirst({
       where: eq(kiloclaw_subscriptions.id, sub.id),
     });
     expect(updated?.status).toBe('canceled');

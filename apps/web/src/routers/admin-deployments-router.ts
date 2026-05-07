@@ -218,7 +218,7 @@ export const adminDeploymentsRouter = createTRPCRouter({
     const { id: deploymentId } = input;
 
     // Get owner from deployment
-    const deployment = await db.query.deployments.findFirst({
+    const deployment = await db._query.deployments.findFirst({
       where: eq(deployments.id, deploymentId),
       columns: {
         owned_by_user_id: true,

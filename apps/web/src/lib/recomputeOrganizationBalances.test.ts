@@ -19,7 +19,7 @@ async function createTestOrg(
   if (Object.keys(overrides).length > 0) {
     await db.update(organizations).set(overrides).where(eq(organizations.id, org.id));
   }
-  return (await db.query.organizations.findFirst({ where: eq(organizations.id, org.id) }))!;
+  return (await db._query.organizations.findFirst({ where: eq(organizations.id, org.id) }))!;
 }
 
 describe('recomputeOrganizationBalances', () => {
@@ -100,7 +100,7 @@ describe('recomputeOrganizationBalances', () => {
     const result = await recomputeOrganizationBalances({ organizationId: orgId });
     expect(result.success).toBe(true);
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, orgId),
     });
     expect(updatedOrg!.microdollars_used).toBe(3_000_000);
@@ -122,7 +122,7 @@ describe('recomputeOrganizationBalances', () => {
     const result = await recomputeOrganizationBalances({ organizationId: orgId });
     expect(result.success).toBe(true);
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, orgId),
     });
     expect(updatedOrg!.microdollars_used).toBe(0);
@@ -155,7 +155,7 @@ describe('recomputeOrganizationBalances', () => {
     }
 
     // Org should NOT be updated
-    const unchangedOrg = await db.query.organizations.findFirst({
+    const unchangedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, orgId),
     });
     expect(unchangedOrg!.microdollars_used).toBe(999);
@@ -268,7 +268,7 @@ describe('recomputeOrganizationBalances', () => {
     const result = await recomputeOrganizationBalances({ organizationId: orgId });
     expect(result.success).toBe(true);
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, orgId),
     });
     // microdollars_used corrected to 3M
@@ -299,7 +299,7 @@ describe('recomputeOrganizationBalances', () => {
 
     await recomputeOrganizationBalances({ organizationId: orgId });
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, orgId),
     });
     expect(updatedOrg!.microdollars_balance).toBe(
@@ -359,7 +359,7 @@ describe('recomputeOrganizationBalances', () => {
     const result = await recomputeOrganizationBalances({ organizationId: orgId });
     expect(result.success).toBe(true);
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, orgId),
     });
     // Recomputed microdollars_used should be LLM ($2) + Exa ($3) = $5

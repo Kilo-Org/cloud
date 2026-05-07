@@ -33,7 +33,7 @@ describe('user router - updateProfile', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, testUser.id),
     });
     expect(updated?.linkedin_url).toBe('https://linkedin.com/in/testuser');
@@ -48,7 +48,7 @@ describe('user router - updateProfile', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, testUser.id),
     });
     expect(updated?.github_url).toBe('https://github.com/testuser');
@@ -64,7 +64,7 @@ describe('user router - updateProfile', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, testUser.id),
     });
     expect(updated?.linkedin_url).toBe('https://linkedin.com/in/testuser');
@@ -85,7 +85,7 @@ describe('user router - updateProfile', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, testUser.id),
     });
     expect(updated?.linkedin_url).toBeNull();
@@ -152,7 +152,7 @@ describe('user router - submitCustomerSource', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, surveyTestUser.id),
     });
     expect(updated?.customer_source).toBe('A YouTube video');
@@ -164,7 +164,7 @@ describe('user router - submitCustomerSource', () => {
     await caller.user.submitCustomerSource({ source: 'First answer' });
     await caller.user.submitCustomerSource({ source: 'Updated answer' });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, surveyTestUser.id),
     });
     expect(updated?.customer_source).toBe('Updated answer');
@@ -190,7 +190,7 @@ describe('user router - submitCustomerSource', () => {
     const result = await caller.user.submitCustomerSource({ source: maxString });
     expect(result).toEqual({ success: true });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, surveyTestUser.id),
     });
     expect(updated?.customer_source).toBe(maxString);
@@ -202,7 +202,7 @@ describe('user router - submitCustomerSource', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, surveyTestUser.id),
     });
     expect(updated?.customer_source).toBe('X');
@@ -215,7 +215,7 @@ describe('user router - submitCustomerSource', () => {
 
     expect(result).toEqual({ success: true });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, surveyTestUser.id),
     });
     expect(updated?.customer_source).toBe(content);
@@ -254,7 +254,7 @@ describe('user router - submitCustomerSource', () => {
 
       expect(result).toEqual({ success: true });
 
-      const updated = await db.query.kilocode_users.findFirst({
+      const updated = await db._query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, surveyTestUser.id),
       });
       expect(updated?.customer_source).toBe('hello');
@@ -266,7 +266,7 @@ describe('user router - submitCustomerSource', () => {
 
       expect(result).toEqual({ success: true });
 
-      const updated = await db.query.kilocode_users.findFirst({
+      const updated = await db._query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, surveyTestUser.id),
       });
       expect(updated?.customer_source).toBe('a YouTube video');
@@ -300,7 +300,7 @@ describe('user router - skipCustomerSource', () => {
     const caller = await createCallerForUser(skipTestUser.id);
     await caller.user.skipCustomerSource();
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, skipTestUser.id),
     });
     expect(updated?.customer_source).toBe('');
@@ -315,7 +315,7 @@ describe('user router - skipCustomerSource', () => {
     const result2 = await caller.user.skipCustomerSource();
     expect(result2).toEqual({ success: true });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, skipTestUser.id),
     });
     expect(updated?.customer_source).toBe('');
@@ -327,7 +327,7 @@ describe('user router - skipCustomerSource', () => {
     await caller.user.submitCustomerSource({ source: 'Found it on Hacker News' });
     await caller.user.skipCustomerSource();
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, skipTestUser.id),
     });
     expect(updated?.customer_source).toBe('Found it on Hacker News');
@@ -338,7 +338,7 @@ describe('user router - skipCustomerSource', () => {
     await caller.user.skipCustomerSource();
     await caller.user.submitCustomerSource({ source: 'Changed my mind — Reddit' });
 
-    const updated = await db.query.kilocode_users.findFirst({
+    const updated = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, skipTestUser.id),
     });
     expect(updated?.customer_source).toBe('Changed my mind — Reddit');
@@ -347,7 +347,7 @@ describe('user router - skipCustomerSource', () => {
 
 describe('session and API token reset mutations', () => {
   async function findRequiredUser(userId: string): Promise<User> {
-    const user = await db.query.kilocode_users.findFirst({
+    const user = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, userId),
     });
     if (!user) throw new Error(`Expected test user to exist: ${userId}`);

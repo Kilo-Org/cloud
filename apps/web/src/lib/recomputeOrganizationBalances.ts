@@ -43,7 +43,7 @@ export async function recomputeOrganizationBalances(args: {
   organizationId: string;
   dryRun?: boolean;
 }): Promise<Result<OrganizationBalanceUpdates, string>> {
-  const org = await db.query.organizations.findFirst({
+  const org = await db._query.organizations.findFirst({
     where: eq(organizations.id, args.organizationId),
     columns: {
       id: true,

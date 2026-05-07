@@ -1078,7 +1078,7 @@ describe('kiloPassRouter', () => {
         cancel_at_period_end: true,
       });
 
-      const updated = await db.query.kilo_pass_subscriptions.findFirst({
+      const updated = await db._query.kilo_pass_subscriptions.findFirst({
         columns: { status: true, cancel_at_period_end: true },
         where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_test_cancel_me'),
       });
@@ -1137,7 +1137,7 @@ describe('kiloPassRouter', () => {
         cancel_at_period_end: false,
       });
 
-      const updated = await db.query.kilo_pass_subscriptions.findFirst({
+      const updated = await db._query.kilo_pass_subscriptions.findFirst({
         columns: { status: true, cancel_at_period_end: true, ended_at: true },
         where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_test_resume_me'),
       });
@@ -1290,7 +1290,7 @@ describe('kiloPassRouter', () => {
         })
       );
 
-      const rows = await db.query.kilo_pass_scheduled_changes.findMany({
+      const rows = await db._query.kilo_pass_scheduled_changes.findMany({
         where: eq(
           kilo_pass_scheduled_changes.stripe_subscription_id,
           'sub_test_schedule_change_monthly'
@@ -1477,14 +1477,14 @@ describe('kiloPassRouter', () => {
 
       expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith(oldScheduleId);
 
-      const oldRow = await db.query.kilo_pass_scheduled_changes.findFirst({
+      const oldRow = await db._query.kilo_pass_scheduled_changes.findFirst({
         where: eq(kilo_pass_scheduled_changes.id, existing.id),
       });
       expect(oldRow).toBeTruthy();
       expect(oldRow?.deleted_at).not.toBeNull();
       expect(oldRow?.status).toBe(KiloPassScheduledChangeStatus.Released);
 
-      const rows = await db.query.kilo_pass_scheduled_changes.findMany({
+      const rows = await db._query.kilo_pass_scheduled_changes.findMany({
         where: eq(
           kilo_pass_scheduled_changes.stripe_subscription_id,
           'sub_test_schedule_change_replace'
@@ -1663,7 +1663,7 @@ describe('kiloPassRouter', () => {
 
       expect(stripeMock.subscriptionSchedules.release).toHaveBeenCalledWith(scheduleId);
 
-      const updated = await db.query.kilo_pass_scheduled_changes.findFirst({
+      const updated = await db._query.kilo_pass_scheduled_changes.findFirst({
         where: eq(kilo_pass_scheduled_changes.id, pending.id),
       });
 

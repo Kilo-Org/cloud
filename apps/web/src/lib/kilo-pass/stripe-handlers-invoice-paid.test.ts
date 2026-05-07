@@ -354,12 +354,12 @@ describe('handleKiloPassInvoicePaid', () => {
       stripe: stripe as unknown as Stripe,
     });
 
-    const userRow = await db.query.kilocode_users.findFirst({
+    const userRow = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(userRow?.kilo_pass_threshold).toBe(7_000_000 + 1_900 * 10_000);
 
-    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+    const subRow = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(subRow).toBeTruthy();
@@ -369,7 +369,7 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(subRow?.status).toBe('active');
     expect(subRow?.current_streak_months).toBe(1);
 
-    const issuance = await db.query.kilo_pass_issuances.findFirst({
+    const issuance = await db._query.kilo_pass_issuances.findFirst({
       where: and(
         eq(kilo_pass_issuances.kilo_pass_subscription_id, subRow?.id ?? ''),
         eq(kilo_pass_issuances.stripe_invoice_id, invoiceId)
@@ -473,7 +473,7 @@ describe('handleKiloPassInvoicePaid', () => {
       stripe: stripe as unknown as Stripe,
     });
 
-    const issuance = await db.query.kilo_pass_issuances.findFirst({
+    const issuance = await db._query.kilo_pass_issuances.findFirst({
       where: eq(kilo_pass_issuances.stripe_invoice_id, invoiceId),
     });
     expect(issuance).toBeTruthy();
@@ -557,12 +557,12 @@ describe('handleKiloPassInvoicePaid', () => {
       stripe: stripe as unknown as Stripe,
     });
 
-    const updatedSub = await db.query.kilo_pass_subscriptions.findFirst({
+    const updatedSub = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.id, subscriptionId),
     });
     expect(updatedSub?.current_streak_months).toBe(2);
 
-    const issuance = await db.query.kilo_pass_issuances.findFirst({
+    const issuance = await db._query.kilo_pass_issuances.findFirst({
       where: eq(kilo_pass_issuances.stripe_invoice_id, invoiceId),
     });
     expect(issuance).toBeTruthy();
@@ -635,12 +635,12 @@ describe('handleKiloPassInvoicePaid', () => {
       stripe: stripe as unknown as Stripe,
     });
 
-    const userRow = await db.query.kilocode_users.findFirst({
+    const userRow = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(userRow?.kilo_pass_threshold).toBe(3_000_000 + 4_900 * 10_000);
 
-    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+    const subRow = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(subRow).toBeTruthy();
@@ -652,7 +652,7 @@ describe('handleKiloPassInvoicePaid', () => {
     if (!nextYearlyIssueAt) throw new Error('Expected next_yearly_issue_at to be set');
     expect(new Date(nextYearlyIssueAt).toISOString()).toBe('2026-02-08T00:00:00.000Z');
 
-    const issuance = await db.query.kilo_pass_issuances.findFirst({
+    const issuance = await db._query.kilo_pass_issuances.findFirst({
       where: eq(kilo_pass_issuances.stripe_invoice_id, invoiceId),
     });
     expect(issuance).toBeTruthy();
@@ -796,7 +796,7 @@ describe('handleKiloPassInvoicePaid', () => {
 
     expect(release).toHaveBeenCalledWith(stripeScheduleId);
 
-    const scheduledChangeRow = await db.query.kilo_pass_scheduled_changes.findFirst({
+    const scheduledChangeRow = await db._query.kilo_pass_scheduled_changes.findFirst({
       where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
     });
     expect(scheduledChangeRow).toBeTruthy();
@@ -804,13 +804,13 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(scheduledChangeRow?.deleted_at).not.toBeNull();
 
     const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
-    const remainingTx = await db.query.credit_transactions.findFirst({
+    const remainingTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
     });
     expect(remainingTx).toBeTruthy();
     expect(remainingTx?.amount_microdollars).toBe(171_000_000);
 
-    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+    const remainingAuditLog = await db._query.kilo_pass_audit_log.findFirst({
       where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
     });
     expect(remainingAuditLog?.action).toBe(KiloPassAuditLogAction.IssueYearlyRemainingCredits);
@@ -968,7 +968,7 @@ describe('handleKiloPassInvoicePaid', () => {
     });
 
     const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
-    const remainingTx = await db.query.credit_transactions.findFirst({
+    const remainingTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
     });
     expect(remainingTx).toBeTruthy();
@@ -977,7 +977,7 @@ describe('handleKiloPassInvoicePaid', () => {
     // elapsed and 12 remaining × $19 = $228 (wrong).
     expect(remainingTx?.amount_microdollars).toBe(171_000_000);
 
-    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+    const remainingAuditLog = await db._query.kilo_pass_audit_log.findFirst({
       where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
     });
     expect(remainingAuditLog?.payload_json).toEqual(
@@ -1099,14 +1099,14 @@ describe('handleKiloPassInvoicePaid', () => {
     });
 
     const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
-    const remainingTx = await db.query.credit_transactions.findFirst({
+    const remainingTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
     });
     expect(remainingTx).toBeTruthy();
     // Only 1 month was used (Apr). 11 remaining × $19 = $209.
     expect(remainingTx?.amount_microdollars).toBe(209_000_000);
 
-    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+    const remainingAuditLog = await db._query.kilo_pass_audit_log.findFirst({
       where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
     });
     expect(remainingAuditLog?.payload_json).toEqual(
@@ -1235,7 +1235,7 @@ describe('handleKiloPassInvoicePaid', () => {
     });
 
     const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
-    const remainingTx = await db.query.credit_transactions.findFirst({
+    const remainingTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
     });
     expect(remainingTx).toBeTruthy();
@@ -1243,7 +1243,7 @@ describe('handleKiloPassInvoicePaid', () => {
     // The old monthly issuances (Jan, Feb) must NOT count.
     expect(remainingTx?.amount_microdollars).toBe(190_000_000);
 
-    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+    const remainingAuditLog = await db._query.kilo_pass_audit_log.findFirst({
       where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
     });
     expect(remainingAuditLog?.payload_json).toEqual(
@@ -1350,7 +1350,7 @@ describe('handleKiloPassInvoicePaid', () => {
 
     // No remaining credits should be issued — full year was used.
     const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
-    const remainingTx = await db.query.credit_transactions.findFirst({
+    const remainingTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
     });
     expect(remainingTx).toBeUndefined();
@@ -1456,14 +1456,14 @@ describe('handleKiloPassInvoicePaid', () => {
     });
 
     const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
-    const remainingTx = await db.query.credit_transactions.findFirst({
+    const remainingTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
     });
     expect(remainingTx).toBeTruthy();
     // 1 month used, 11 remaining × $19 = $209
     expect(remainingTx?.amount_microdollars).toBe(209_000_000);
 
-    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+    const remainingAuditLog = await db._query.kilo_pass_audit_log.findFirst({
       where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
     });
     expect(remainingAuditLog?.payload_json).toEqual(
@@ -1564,7 +1564,7 @@ describe('handleKiloPassInvoicePaid', () => {
     // remaining = 0, so no credits issued.
     // This is conservative — better to under-issue than over-issue in the fallback.
     const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
-    const remainingTx = await db.query.credit_transactions.findFirst({
+    const remainingTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
     });
     expect(remainingTx).toBeUndefined();
@@ -1668,14 +1668,14 @@ describe('handleKiloPassInvoicePaid', () => {
     });
 
     const syntheticInvoiceId = `kilo-pass-yearly-remaining:${scheduledChangeId}`;
-    const remainingTx = await db.query.credit_transactions.findFirst({
+    const remainingTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, syntheticInvoiceId),
     });
     expect(remainingTx).toBeTruthy();
     // 2 months used (Mar, Apr) in the tier_49 cycle. 10 remaining × $49 = $490.
     expect(remainingTx?.amount_microdollars).toBe(490_000_000);
 
-    const remainingAuditLog = await db.query.kilo_pass_audit_log.findFirst({
+    const remainingAuditLog = await db._query.kilo_pass_audit_log.findFirst({
       where: eq(kilo_pass_audit_log.stripe_invoice_id, syntheticInvoiceId),
     });
     expect(remainingAuditLog?.payload_json).toEqual(
@@ -1764,7 +1764,7 @@ describe('handleKiloPassInvoicePaid', () => {
 
     expect(release).toHaveBeenCalledWith(stripeScheduleId);
 
-    const scheduledChangeRow = await db.query.kilo_pass_scheduled_changes.findFirst({
+    const scheduledChangeRow = await db._query.kilo_pass_scheduled_changes.findFirst({
       where: eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
     });
     expect(scheduledChangeRow).toBeTruthy();
@@ -1858,7 +1858,7 @@ describe('handleKiloPassInvoicePaid', () => {
     });
 
     // Verify the subscription row was NOT resurrected to 'active'
-    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+    const subRow = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
     expect(subRow).toBeTruthy();
@@ -1985,7 +1985,7 @@ describe('handleKiloPassInvoicePaid', () => {
         stripe: stripe as unknown as Stripe,
       });
 
-      const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+      const subRow = await db._query.kilo_pass_subscriptions.findFirst({
         where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
       });
       // months 1, 2, 3 (issuances) + month 6 (current) = 4
@@ -2063,7 +2063,7 @@ describe('handleKiloPassInvoicePaid', () => {
         stripe: stripe as unknown as Stripe,
       });
 
-      const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+      const subRow = await db._query.kilo_pass_subscriptions.findFirst({
         where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
       });
       // months 1-5 (issuances) + month 9 (current) = 6; months 6, 7, 8 paused (skipped)
@@ -2122,7 +2122,7 @@ describe('handleKiloPassInvoicePaid', () => {
         stripe: stripe as unknown as Stripe,
       });
 
-      const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+      const subRow = await db._query.kilo_pass_subscriptions.findFirst({
         where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
       });
       // month 4 has no issuance and no pause → streak resets to 1
@@ -2181,7 +2181,7 @@ describe('handleKiloPassInvoicePaid', () => {
         stripe: stripe as unknown as Stripe,
       });
 
-      const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+      const subRow = await db._query.kilo_pass_subscriptions.findFirst({
         where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
       });
       // months 1, 2, 3, 4 = streak of 4

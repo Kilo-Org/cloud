@@ -21,6 +21,7 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@kilocode/drizzle-shims": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",

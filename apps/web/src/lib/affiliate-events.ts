@@ -263,7 +263,7 @@ async function getEventByDedupeKey(
   database: DatabaseClient,
   dedupeKey: string
 ): Promise<AffiliateEventRow> {
-  const event = await database.query.user_affiliate_events.findFirst({
+  const event = await database._query.user_affiliate_events.findFirst({
     where: eq(user_affiliate_events.dedupe_key, dedupeKey),
   });
 
@@ -701,7 +701,7 @@ async function getAffiliateEventById(
   database: DatabaseClient,
   eventId: string
 ): Promise<AffiliateEventRow | null> {
-  const event = await database.query.user_affiliate_events.findFirst({
+  const event = await database._query.user_affiliate_events.findFirst({
     where: eq(user_affiliate_events.id, eventId),
   });
 
@@ -1054,7 +1054,7 @@ async function persistPendingSaleReversal(
 async function reconcilePendingSaleReversals(
   database: DatabaseClient
 ): Promise<{ materialized: number }> {
-  const pendingRows = await database.query.pending_impact_sale_reversals.findMany();
+  const pendingRows = await database._query.pending_impact_sale_reversals.findMany();
   let materialized = 0;
 
   for (const pending of pendingRows) {

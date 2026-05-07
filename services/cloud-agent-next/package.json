@@ -31,6 +31,7 @@
     "@hono/trpc-server": "^0.4.2",
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/db": "workspace:*",
+    "@kilocode/drizzle-shims": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@trpc/server": "catalog:",

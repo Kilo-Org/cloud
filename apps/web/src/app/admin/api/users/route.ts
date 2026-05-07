@@ -176,7 +176,7 @@ export async function GET(
     const orderFunction = sortOrder === 'asc' ? asc : desc;
     const orderCondition = orderFunction(kilocode_users[sortField]);
 
-    const users = await db.query.kilocode_users.findMany({
+    const users = await db._query.kilocode_users.findMany({
       where: whereCondition,
       orderBy: orderCondition,
       limit: limit,
@@ -196,7 +196,7 @@ export async function GET(
     const notes =
       userIds.length <= 0
         ? []
-        : await db.query.user_admin_notes.findMany({
+        : await db._query.user_admin_notes.findMany({
             where: inArray(user_admin_notes.kilo_user_id, userIds),
             orderBy: desc(user_admin_notes.created_at),
           });

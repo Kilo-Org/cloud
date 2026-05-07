@@ -88,7 +88,7 @@ export async function run(...args: string[]) {
   console.log(`Seeding fake usage data for organization: ${orgId}`);
 
   // 1. Verify organization exists
-  const org = await localDb.query.organizations.findFirst({
+  const org = await localDb._query.organizations.findFirst({
     where: eq(organizations.id, orgId),
   });
 

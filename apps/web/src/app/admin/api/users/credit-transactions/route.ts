@@ -20,7 +20,7 @@ export async function GET(
 
   if (!kilo_user_id) throw new Error('kilo_user_id is required');
 
-  const transactions = await db.query.credit_transactions.findMany({
+  const transactions = await db._query.credit_transactions.findMany({
     where: and(
       eq(credit_transactions.kilo_user_id, kilo_user_id),
       isNull(credit_transactions.organization_id)

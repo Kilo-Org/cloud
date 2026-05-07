@@ -159,7 +159,7 @@ async function validateReferralForRedemption(kiloUserId: string) {
 
   const { code, referring_kilo_user_id } = referralUsage;
   // Get the referral code record to check max_redemptions
-  const referralCodeRecord = await db.query.referral_codes.findFirst({
+  const referralCodeRecord = await db._query.referral_codes.findFirst({
     where: eq(referral_codes.code, code),
   });
 

@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 async function createStripeCustomerForUser(kiloUserId: string) {
   console.log(`Looking up user with ID: ${kiloUserId}`);
 
-  const user = await db.query.kilocode_users.findFirst({
+  const user = await db._query.kilocode_users.findFirst({
     where: eq(kilocode_users.id, kiloUserId),
   });
 

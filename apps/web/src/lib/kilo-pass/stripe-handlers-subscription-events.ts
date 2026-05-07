@@ -48,7 +48,7 @@ export async function handleKiloPassSubscriptionEvent(params: {
     const stripeStatus = subscription.status;
     const cancelAtPeriodEnd = subscription.cancel_at_period_end;
 
-    const existing = await tx.query.kilo_pass_subscriptions.findFirst({
+    const existing = await tx._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, subscription.id),
     });
 

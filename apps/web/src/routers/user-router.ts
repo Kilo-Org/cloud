@@ -314,7 +314,7 @@ export const userRouter = createTRPCRouter({
     .query(async ({ ctx }) => {
       const now = new Date();
 
-      const transactions = await db.query.credit_transactions.findMany({
+      const transactions = await db._query.credit_transactions.findMany({
         where: and(
           eq(credit_transactions.kilo_user_id, ctx.user.id),
           isNull(credit_transactions.organization_id)
@@ -432,7 +432,7 @@ export const userRouter = createTRPCRouter({
         return { enabled: false } as const;
       } else {
         // Enabling auto-top-up
-        const config = await db.query.auto_top_up_configs.findFirst({
+        const config = await db._query.auto_top_up_configs.findFirst({
           where: eq(auto_top_up_configs.owned_by_user_id, ctx.user.id),
         });
 
@@ -491,7 +491,7 @@ export const userRouter = createTRPCRouter({
     }),
 
   getAutoTopUpPaymentMethod: baseProcedure.query(async ({ ctx }) => {
-    const config = await db.query.auto_top_up_configs.findFirst({
+    const config = await db._query.auto_top_up_configs.findFirst({
       where: eq(auto_top_up_configs.owned_by_user_id, ctx.user.id),
     });
     const paymentMethod = await retrievePaymentMethodInfo(config?.stripe_payment_method_id);
@@ -587,14 +587,14 @@ export const userRouter = createTRPCRouter({
     }),
 
   getDiscordGuildStatus: baseProcedure.query(async ({ ctx }) => {
-    const discordProvider = await db.query.user_auth_provider.findFirst({
+    const discordProvider = await db._query.user_auth_provider.findFirst({
       where: and(
         eq(user_auth_provider.kilo_user_id, ctx.user.id),
         eq(user_auth_provider.provider, 'discord')
       ),
     });
 
-    const user = await db.query.kilocode_users.findFirst({
+    const user = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, ctx.user.id),
       columns: {
         discord_server_membership_verified_at: true,
@@ -610,7 +610,7 @@ export const userRouter = createTRPCRouter({
   }),
 
   verifyDiscordGuildMembership: baseProcedure.mutation(async ({ ctx }) => {
-    const discordProvider = await db.query.user_auth_provider.findFirst({
+    const discordProvider = await db._query.user_auth_provider.findFirst({
       where: and(
         eq(user_auth_provider.kilo_user_id, ctx.user.id),
         eq(user_auth_provider.provider, 'discord')

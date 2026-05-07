@@ -25,7 +25,7 @@ export const describePaymentMethods = (
 };
 
 export async function getPaymentStatusByUserIds(userIds: string[]) {
-  const paymentMethodsData = await db.query.payment_methods.findMany({
+  const paymentMethodsData = await db._query.payment_methods.findMany({
     where: inArray(payment_methods.user_id, userIds),
   });
 
@@ -33,7 +33,7 @@ export async function getPaymentStatusByUserIds(userIds: string[]) {
 }
 
 export async function hasPaymentMethod(userId: string): Promise<boolean> {
-  const result = await db.query.payment_methods.findFirst({
+  const result = await db._query.payment_methods.findFirst({
     columns: { id: true },
     where: and(eq(payment_methods.user_id, userId), isNull(payment_methods.deleted_at)),
   });

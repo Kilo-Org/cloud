@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import '@kilocode/drizzle-shims/query-alias';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, isNull, and } from 'drizzle-orm';

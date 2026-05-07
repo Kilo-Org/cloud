@@ -94,7 +94,7 @@ export async function isCardFingerprintEligibleForFreeCredits(
 ): Promise<boolean> {
   return (
     !!fingerprint &&
-    (await db.query.payment_methods.findFirst({
+    (await db._query.payment_methods.findFirst({
       columns: { id: true },
       where: and(
         eq(payment_methods.stripe_fingerprint, fingerprint),
@@ -142,7 +142,7 @@ export async function ensurePaymentMethodStored(
 ): Promise<PaymentMethod | null> {
   const { http_user_agent: _http_user_agent, ...headersWithoutUserAgent } = headers;
 
-  const currentPaymentMethod = await db.query.payment_methods.findFirst({
+  const currentPaymentMethod = await db._query.payment_methods.findFirst({
     where: and(
       eq(payment_methods.user_id, kiloUserId),
       eq(payment_methods.stripe_id, paymentMethod.id),
@@ -251,7 +251,7 @@ async function findUserByStripeCustomer(
   }
 
   return (
-    (await db.query.kilocode_users.findFirst({
+    (await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.stripe_customer_id, customer),
     })) || null
   );
@@ -678,7 +678,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
           const kiloUserId = invoice.metadata?.kiloUserId;
           if (!kiloUserId) break;
 
-          const user = await db.query.kilocode_users.findFirst({
+          const user = await db._query.kilocode_users.findFirst({
             where: eq(kilocode_users.id, kiloUserId),
           });
           if (!user) break;
@@ -744,7 +744,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
               traceId,
             });
 
-            const autoTopUpConfig = await db.query.auto_top_up_configs.findFirst({
+            const autoTopUpConfig = await db._query.auto_top_up_configs.findFirst({
               where: eq(auto_top_up_configs.owned_by_organization_id, organizationId),
               columns: { created_by_user_id: true },
             });

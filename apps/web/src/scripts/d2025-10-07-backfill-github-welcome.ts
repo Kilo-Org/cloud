@@ -70,7 +70,7 @@ async function run() {
 
     try {
       // Find the user
-      const user = await db.query.kilocode_users.findFirst({
+      const user = await db._query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, userId),
       });
 

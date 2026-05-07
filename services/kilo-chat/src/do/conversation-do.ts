@@ -31,6 +31,7 @@ function parseStoredContent(rawContent: string, messageId: string): ContentBlock
     return [];
   }
 }
+import '@kilocode/drizzle-shims/query-alias';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { eq, lt, desc, and, sql, inArray } from 'drizzle-orm';

@@ -243,7 +243,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(result.results[0].status).toBe('cancelled_and_refunded');
     expect(result.results[0].refundedAmountCents).toBeNull();
 
-    const row = await db.query.kilo_pass_subscriptions.findFirst({
+    const row = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_already_refunded'),
     });
     expect(row?.status).toBe('canceled');
@@ -281,14 +281,14 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(row.alreadyBlocked).toBe(false);
 
     // Subscription updated
-    const subRow = await db.query.kilo_pass_subscriptions.findFirst({
+    const subRow = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_happy_path'),
     });
     expect(subRow?.status).toBe('canceled');
     expect(subRow?.current_streak_months).toBe(0);
 
     // User blocked
-    const userRow = await db.query.kilocode_users.findFirst({
+    const userRow = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, target.id),
     });
     expect(userRow?.blocked_reason).toBe('fraud-ring');
@@ -296,7 +296,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(userRow?.total_microdollars_acquired).toBe(1_000_000);
 
     // Balance-zero credit transaction inserted
-    const txnRows = await db.query.credit_transactions.findMany({
+    const txnRows = await db._query.credit_transactions.findMany({
       where: eq(credit_transactions.kilo_user_id, target.id),
     });
     expect(txnRows).toHaveLength(1);
@@ -304,7 +304,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(txnRows[0].credit_category).toBe('admin-cancel-refund-kilo-pass');
 
     // Admin note inserted with [bulk] suffix
-    const noteRows = await db.query.user_admin_notes.findMany({
+    const noteRows = await db._query.user_admin_notes.findMany({
       where: eq(user_admin_notes.kilo_user_id, target.id),
     });
     expect(noteRows).toHaveLength(1);
@@ -375,13 +375,13 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(byEmail.get('bulk-seq-3@example.com')?.status).toBe('cancelled_and_refunded');
 
     // u1 and u3 are committed (blocked); u2 is NOT blocked (rolled back before tx)
-    const u1Row = await db.query.kilocode_users.findFirst({
+    const u1Row = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, u1.id),
     });
-    const u2Row = await db.query.kilocode_users.findFirst({
+    const u2Row = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, u2.id),
     });
-    const u3Row = await db.query.kilocode_users.findFirst({
+    const u3Row = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, u3.id),
     });
     expect(u1Row?.blocked_reason).toBe('mixed-batch');
@@ -389,13 +389,13 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(u3Row?.blocked_reason).toBe('mixed-batch');
 
     // Subscriptions for successful users are canceled; the failed user's sub is unchanged
-    const sub1 = await db.query.kilo_pass_subscriptions.findFirst({
+    const sub1 = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_seq_1'),
     });
-    const sub2 = await db.query.kilo_pass_subscriptions.findFirst({
+    const sub2 = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_seq_2'),
     });
-    const sub3 = await db.query.kilo_pass_subscriptions.findFirst({
+    const sub3 = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_seq_3'),
     });
     expect(sub1?.status).toBe('canceled');
@@ -441,7 +441,7 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(result.results[0].status).toBe('cancelled_and_refunded');
     expect(result.results[0].alreadyBlocked).toBe(true);
 
-    const userRow = await db.query.kilocode_users.findFirst({
+    const userRow = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, target.id),
     });
     expect(userRow?.blocked_reason).toBe('previous-block');
@@ -493,10 +493,10 @@ describe('admin.kiloPass.cancelAndRefundKiloPassBulk', () => {
     expect(result.results[0].error).toContain('Multiple accounts match');
 
     // Neither subscription was canceled
-    const sub1 = await db.query.kilo_pass_subscriptions.findFirst({
+    const sub1 = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_ambig_1'),
     });
-    const sub2 = await db.query.kilo_pass_subscriptions.findFirst({
+    const sub2 = await db._query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, 'sub_ambig_2'),
     });
     expect(sub1?.status).toBe('active');

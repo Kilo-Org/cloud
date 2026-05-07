@@ -65,7 +65,7 @@ export async function cancelAndRefundKiloPassForUser({
   adminKiloUserId,
   noteSuffix,
 }: CancelAndRefundKiloPassParams): Promise<CancelAndRefundKiloPassResult> {
-  const user = await db.query.kilocode_users.findFirst({
+  const user = await db._query.kilocode_users.findFirst({
     columns: {
       id: true,
       stripe_customer_id: true,
@@ -87,7 +87,7 @@ export async function cancelAndRefundKiloPassForUser({
     return { status: 'skipped', reason: { kind: 'already_canceled' } };
   }
 
-  const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
+  const scheduledChange = await db._query.kilo_pass_scheduled_changes.findFirst({
     columns: { stripe_schedule_id: true },
     where: and(
       eq(kilo_pass_scheduled_changes.stripe_subscription_id, subscription.stripeSubscriptionId),

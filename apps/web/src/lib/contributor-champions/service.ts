@@ -259,7 +259,7 @@ async function mapWithConcurrencyLimit<T, TResult>(
 }
 
 async function getCurrentSyncCheckpoint(): Promise<string | null> {
-  const row = await db.query.contributor_champion_sync_state.findFirst({
+  const row = await db._query.contributor_champion_sync_state.findFirst({
     where: eq(contributor_champion_sync_state.repo_full_name, REPO_FULL_NAME),
     columns: {
       last_merged_at: true,

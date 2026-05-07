@@ -1,0 +1,20 @@
+{
+  "name": "@kilocode/drizzle-shims",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./query-alias": "./src/query-alias.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/drizzle-shims/src"
+  },
+  "dependencies": {
+    "drizzle-orm": "catalog:"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:"
+  }
+}

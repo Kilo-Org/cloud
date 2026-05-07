@@ -65,7 +65,7 @@ export async function releaseScheduledChangeForSubscription(params: {
     reason,
   } = params;
 
-  const row = await dbOrTx.query.kilo_pass_scheduled_changes.findFirst({
+  const row = await dbOrTx._query.kilo_pass_scheduled_changes.findFirst({
     columns: {
       id: true,
       kilo_user_id: true,

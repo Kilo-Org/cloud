@@ -12,7 +12,7 @@ export async function GET(): Promise<
     recentAIActivity: false,
   };
   try {
-    const db_usage_shows_recent_llm_usage = await db.query.microdollar_usage.findFirst({
+    const db_usage_shows_recent_llm_usage = await db._query.microdollar_usage.findFirst({
       columns: { id: true },
       where: and(
         gte(microdollar_usage.created_at, sql`NOW() - INTERVAL '5 minutes'`),

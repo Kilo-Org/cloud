@@ -434,7 +434,7 @@ export const adminRouter = createTRPCRouter({
     }),
 
     checkKiloPass: adminProcedure.input(CheckKiloPassSchema).mutation(async ({ input }) => {
-      const before = await db.query.kilocode_users.findFirst({
+      const before = await db._query.kilocode_users.findFirst({
         columns: {
           microdollars_used: true,
           kilo_pass_threshold: true,
@@ -451,7 +451,7 @@ export const adminRouter = createTRPCRouter({
         nowIso: new Date().toISOString(),
       });
 
-      const after = await db.query.kilocode_users.findFirst({
+      const after = await db._query.kilocode_users.findFirst({
         columns: {
           microdollars_used: true,
           kilo_pass_threshold: true,
@@ -466,7 +466,7 @@ export const adminRouter = createTRPCRouter({
       .input(ResetToMagicLinkLoginSchema)
       .mutation(async ({ input }) => {
         // Check if user has SSO (workos) provider - forbid reset for SSO users
-        const ssoProvider = await db.query.user_auth_provider.findFirst({
+        const ssoProvider = await db._query.user_auth_provider.findFirst({
           where: and(
             eq(user_auth_provider.kilo_user_id, input.userId),
             eq(user_auth_provider.provider, 'workos')
@@ -581,7 +581,7 @@ export const adminRouter = createTRPCRouter({
     getKiloPassState: adminProcedure
       .input(z.object({ userId: z.string() }))
       .query(async ({ input }) => {
-        const user = await db.query.kilocode_users.findFirst({
+        const user = await db._query.kilocode_users.findFirst({
           columns: {
             microdollars_used: true,
             total_microdollars_acquired: true,
@@ -675,7 +675,7 @@ export const adminRouter = createTRPCRouter({
       }),
 
     getKiloClawState: adminProcedure.input(GetKiloClawStateSchema).query(async ({ input }) => {
-      const user = await db.query.kilocode_users.findFirst({
+      const user = await db._query.kilocode_users.findFirst({
         columns: { id: true, kiloclaw_early_access: true },
         where: eq(kilocode_users.id, input.userId),
       });
@@ -692,7 +692,7 @@ export const adminRouter = createTRPCRouter({
           .where(eq(kiloclaw_subscriptions.user_id, input.userId))
           .orderBy(desc(kiloclaw_subscriptions.created_at)),
         getKiloClawEarlybirdStateForUser(input.userId, now),
-        db.query.kiloclaw_instances.findFirst({
+        db._query.kiloclaw_instances.findFirst({
           columns: { id: true },
           where: and(
             eq(kiloclaw_instances.user_id, input.userId),
@@ -788,7 +788,7 @@ export const adminRouter = createTRPCRouter({
     getKiloClawSubscriptionChangeLogs: adminProcedure
       .input(GetKiloClawSubscriptionChangeLogsSchema)
       .query(async ({ input }) => {
-        const subscription = await db.query.kiloclaw_subscriptions.findFirst({
+        const subscription = await db._query.kiloclaw_subscriptions.findFirst({
           columns: { id: true },
           where: and(
             eq(kiloclaw_subscriptions.id, input.subscriptionId),
@@ -819,7 +819,7 @@ export const adminRouter = createTRPCRouter({
     updateKiloClawTrialEndAt: adminProcedure
       .input(UpdateKiloClawTrialEndAtSchema)
       .mutation(async ({ input, ctx }) => {
-        const user = await db.query.kilocode_users.findFirst({
+        const user = await db._query.kilocode_users.findFirst({
           columns: { id: true },
           where: eq(kilocode_users.id, input.userId),
         });
@@ -1337,7 +1337,7 @@ export const adminRouter = createTRPCRouter({
     cancelAndRefundKiloPass: adminProcedure
       .input(CancelAndRefundKiloPassSchema)
       .mutation(async ({ input, ctx }) => {
-        const userExists = await db.query.kilocode_users.findFirst({
+        const userExists = await db._query.kilocode_users.findFirst({
           columns: { id: true },
           where: eq(kilocode_users.id, input.userId),
         });
@@ -1380,7 +1380,7 @@ export const adminRouter = createTRPCRouter({
       const { user_id, github_enrichment_data, linkedin_enrichment_data, clay_enrichment_data } =
         input;
 
-      const user = await db.query.kilocode_users.findFirst({
+      const user = await db._query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, user_id),
       });
 
@@ -1391,7 +1391,7 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
-      const existingData = await db.query.enrichment_data.findFirst({
+      const existingData = await db._query.enrichment_data.findFirst({
         where: eq(enrichment_data.user_id, user_id),
       });
 

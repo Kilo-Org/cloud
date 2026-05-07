@@ -56,7 +56,7 @@ async function maybeIssueYearlyRemainingCredits(params: {
 }): Promise<boolean> {
   const { tx, stripe, stripeEventId, stripeInvoiceId, scheduledChangeId } = params;
 
-  const row = await tx.query.kilo_pass_scheduled_changes.findFirst({
+  const row = await tx._query.kilo_pass_scheduled_changes.findFirst({
     where: and(
       eq(kilo_pass_scheduled_changes.id, scheduledChangeId),
       isNull(kilo_pass_scheduled_changes.deleted_at)
@@ -74,7 +74,7 @@ async function maybeIssueYearlyRemainingCredits(params: {
 
   if (!isYearly || toPrice < fromPrice) return false;
 
-  const subscription = await tx.query.kilo_pass_subscriptions.findFirst({
+  const subscription = await tx._query.kilo_pass_subscriptions.findFirst({
     columns: {
       id: true,
     },
@@ -290,7 +290,7 @@ export async function handleKiloPassInvoicePaid(params: {
 
       const issueMonth = getInvoiceIssueMonth(invoice);
 
-      const existingSubscription = await tx.query.kilo_pass_subscriptions.findFirst({
+      const existingSubscription = await tx._query.kilo_pass_subscriptions.findFirst({
         where: eq(kilo_pass_subscriptions.stripe_subscription_id, subscription.id),
       });
 

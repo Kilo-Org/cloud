@@ -220,7 +220,7 @@ describe('contributor champions service', () => {
     const enrollmentResult = await enrollContributorChampion({ contributorId, tier: null });
     expect(enrollmentResult.enrolledTier).toBe('champion');
 
-    const membership = await db.query.contributor_champion_memberships.findFirst({
+    const membership = await db._query.contributor_champion_memberships.findFirst({
       where: eq(contributor_champion_memberships.contributor_id, contributorId),
     });
     expect(membership?.selected_tier).toBe('champion');
@@ -500,17 +500,17 @@ describe('contributor champions service', () => {
     expect(result.upgrades[0]?.fromTier).toBe('contributor');
     expect(result.upgrades[0]?.toTier).toBe('ambassador');
 
-    const membership = await db.query.contributor_champion_memberships.findFirst({
+    const membership = await db._query.contributor_champion_memberships.findFirst({
       where: eq(contributor_champion_memberships.contributor_id, contributorId),
     });
     expect(membership?.enrolled_tier).toBe('ambassador');
 
-    const championMembership = await db.query.contributor_champion_memberships.findFirst({
+    const championMembership = await db._query.contributor_champion_memberships.findFirst({
       where: eq(contributor_champion_memberships.contributor_id, alreadyChampionId),
     });
     expect(championMembership?.enrolled_tier).toBe('champion');
 
-    const staysMembership = await db.query.contributor_champion_memberships.findFirst({
+    const staysMembership = await db._query.contributor_champion_memberships.findFirst({
       where: eq(contributor_champion_memberships.contributor_id, staysContributorId),
     });
     expect(staysMembership?.enrolled_tier).toBe('contributor');
@@ -561,7 +561,7 @@ describe('contributor champions service', () => {
       })
     );
 
-    const membership = await db.query.contributor_champion_memberships.findFirst({
+    const membership = await db._query.contributor_champion_memberships.findFirst({
       where: eq(contributor_champion_memberships.contributor_id, contributorId),
     });
     expect(membership?.credits_last_granted_at).not.toBeNull();
@@ -633,7 +633,7 @@ describe('contributor champions service', () => {
       })
     );
 
-    const contributor = await db.query.contributor_champion_contributors.findFirst({
+    const contributor = await db._query.contributor_champion_contributors.findFirst({
       where: eq(contributor_champion_contributors.github_login, 'manual-user'),
     });
     expect(contributor).toBeTruthy();
@@ -657,7 +657,7 @@ describe('contributor champions service', () => {
       kiloUserId: user.id,
     });
 
-    const contributor = await db.query.contributor_champion_contributors.findFirst({
+    const contributor = await db._query.contributor_champion_contributors.findFirst({
       where: eq(contributor_champion_contributors.github_login, 'remanual-user'),
     });
     const grantedAt = daysAgo(10);
@@ -675,7 +675,7 @@ describe('contributor champions service', () => {
       kiloUserId: user.id,
     });
 
-    const membership = await db.query.contributor_champion_memberships.findFirst({
+    const membership = await db._query.contributor_champion_memberships.findFirst({
       where: eq(contributor_champion_memberships.contributor_id, contributor!.id),
     });
     expect(membership?.enrolled_tier).toBe('contributor');

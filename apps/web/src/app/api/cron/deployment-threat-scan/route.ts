@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 
   // Get deployments pending scan, oldest first (by last_deployed_at)
   // Uses partial index idx_deployments_threat_status_pending for efficient queries
-  const pendingDeployments = await db.query.deployments.findMany({
+  const pendingDeployments = await db._query.deployments.findMany({
     where: eq(deployments.threat_status, 'pending_scan'),
     orderBy: asc(deployments.last_deployed_at),
     limit: 25,

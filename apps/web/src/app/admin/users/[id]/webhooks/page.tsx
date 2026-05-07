@@ -18,7 +18,7 @@ export default async function AdminUserWebhooksPage({
   const { id } = await params;
   const userId = decodeURIComponent(id);
 
-  const user = await db.query.kilocode_users.findFirst({
+  const user = await db._query.kilocode_users.findFirst({
     columns: {
       id: true,
       google_user_email: true,

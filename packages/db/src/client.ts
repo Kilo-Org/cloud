@@ -1,3 +1,4 @@
+import '@kilocode/drizzle-shims/query-alias';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg, { types } from 'pg';
 import * as schema from './schema';

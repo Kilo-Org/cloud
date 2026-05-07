@@ -131,7 +131,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       db,
     });
 
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+    const bonusItem = await db._query.kilo_pass_issuance_items.findFirst({
       where: and(
         eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
         eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
@@ -139,14 +139,14 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     });
     expect(bonusItem).toBeTruthy();
 
-    const bonusTx = await db.query.credit_transactions.findFirst({
+    const bonusTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
     });
     expect(bonusTx?.is_free).toBe(true);
     // tier_19 at streak=2 => base 5% + step 5% * 1 = 10% of $19.00 = $1.90.
     expect(bonusTx?.amount_microdollars).toBe(1_900_000);
 
-    const userRow = await db.query.kilocode_users.findFirst({
+    const userRow = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(userRow?.kilo_pass_threshold).toBeNull();
@@ -175,7 +175,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       db,
     });
 
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+    const bonusItem = await db._query.kilo_pass_issuance_items.findFirst({
       where: and(
         eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
         eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
@@ -183,7 +183,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     });
     expect(bonusItem).toBeTruthy();
 
-    const bonusTx = await db.query.credit_transactions.findFirst({
+    const bonusTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
     });
     // tier_49 monthly price is $49, 50% => $24.50.
@@ -237,7 +237,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       db,
     });
 
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+    const bonusItem = await db._query.kilo_pass_issuance_items.findFirst({
       where: and(
         eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
         eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
@@ -245,7 +245,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     });
     expect(bonusItem).toBeTruthy();
 
-    const bonusTx = await db.query.credit_transactions.findFirst({
+    const bonusTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
     });
     // tier_49 at streak=2 => base 5% + step 5% * 1 = 10% of $49.00 = $4.90.
@@ -281,7 +281,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       db,
     });
 
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+    const bonusItem = await db._query.kilo_pass_issuance_items.findFirst({
       where: and(
         eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
         eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
@@ -289,7 +289,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     });
     expect(bonusItem).toBeTruthy();
 
-    const bonusTx = await db.query.credit_transactions.findFirst({
+    const bonusTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
     });
 
@@ -355,7 +355,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       db,
     });
 
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+    const bonusItem = await db._query.kilo_pass_issuance_items.findFirst({
       where: and(
         eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
         eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
@@ -363,7 +363,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     });
     expect(bonusItem).toBeTruthy();
 
-    const bonusTx = await db.query.credit_transactions.findFirst({
+    const bonusTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
     });
     // tier_49 at streak=3 => base 5% + step 5% * 2 = 15% of $49.00 = $7.35.
@@ -392,7 +392,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       db,
     });
 
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+    const bonusItem = await db._query.kilo_pass_issuance_items.findFirst({
       where: and(
         eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
         eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
@@ -400,7 +400,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     });
     expect(bonusItem).toBeTruthy();
 
-    const bonusTx = await db.query.credit_transactions.findFirst({
+    const bonusTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
     });
     expect(bonusTx?.is_free).toBe(true);
@@ -423,7 +423,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       throw new Error('Expected bonus issuance audit payload to be an object');
     expect(payload.bonusKind).toBe('promo-50pct');
 
-    const userRow = await db.query.kilocode_users.findFirst({
+    const userRow = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(userRow?.kilo_pass_threshold).toBeNull();
@@ -465,7 +465,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       db,
     });
 
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+    const bonusItem = await db._query.kilo_pass_issuance_items.findFirst({
       where: and(
         eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
         eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
@@ -473,7 +473,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     });
     expect(bonusItem).toBeTruthy();
 
-    const bonusTx = await db.query.credit_transactions.findFirst({
+    const bonusTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
     });
     // tier_19 at streak=1 => 5% of $19.00 = $0.95.
@@ -490,7 +490,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       );
     expect(promoItems).toHaveLength(0);
 
-    const userRow = await db.query.kilocode_users.findFirst({
+    const userRow = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(userRow?.kilo_pass_threshold).toBeNull();
@@ -518,7 +518,7 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       db,
     });
 
-    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+    const bonusItem = await db._query.kilo_pass_issuance_items.findFirst({
       where: and(
         eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
         eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
@@ -526,13 +526,13 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
     });
     expect(bonusItem).toBeTruthy();
 
-    const bonusTx = await db.query.credit_transactions.findFirst({
+    const bonusTx = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
     });
     expect(bonusTx?.is_free).toBe(true);
     expect(bonusTx?.amount_microdollars).toBe(24_500_000);
 
-    const userRow = await db.query.kilocode_users.findFirst({
+    const userRow = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(userRow?.kilo_pass_threshold).toBeNull();

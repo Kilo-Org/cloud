@@ -119,7 +119,11 @@
     "@next/next/no-head-import-in-document": "error",
     "@next/next/no-script-component-in-head": "error",
     "drizzle/enforce-delete-with-where": ["error", { "drizzleObjectName": ["db", "ctx.db"] }],
-    "drizzle/enforce-update-with-where": ["error", { "drizzleObjectName": ["db", "ctx.db"] }]
+    "drizzle/enforce-update-with-where": ["error", { "drizzleObjectName": ["db", "ctx.db"] }],
+    "drizzle/prefer-underscore-query": [
+      "error",
+      { "drizzleObjectName": ["db", "ctx.db", "this.db", "tx", "trx"] }
+    ]
   },
   "overrides": [
     {

@@ -60,7 +60,7 @@ const eventIDs = [
 export async function fixFailedTopUps() {
   const uniqueCustomerIDs = new Set<string>();
 
-  const adminUser = await db.query.kilocode_users.findFirst({
+  const adminUser = await db._query.kilocode_users.findFirst({
     where: eq(kilocode_users.google_user_email, 'remon@kilocode.ai'),
   });
 

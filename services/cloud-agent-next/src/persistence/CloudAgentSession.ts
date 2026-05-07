@@ -23,6 +23,7 @@ import {
 import { readProfileBundle } from '../session-profile.js';
 import type { EncryptedSecrets } from '../router/schemas.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
+import '@kilocode/drizzle-shims/query-alias';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { logger } from '../logger.js';
 import { Limits, BUILTIN_AGENT_MODES } from '../schema.js';

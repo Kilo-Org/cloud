@@ -402,12 +402,12 @@ describe('logMicrodollarUsage', () => {
     const updatedUser = await findUserById('test-log-user-1');
     expect(updatedUser?.microdollars_used).toBe(1500); // 1000 + 500
 
-    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+    const metadataRecord = await db._query.microdollar_usage_metadata.findFirst({
       where: eq(microdollar_usage_metadata.message_id, 'test-msg-123'),
     });
     expect(metadataRecord).toBeTruthy();
 
-    const usageRecord = await db.query.microdollar_usage.findFirst({
+    const usageRecord = await db._query.microdollar_usage.findFirst({
       where: eq(microdollar_usage.id, metadataRecord!.id),
     });
     expect(usageRecord).toBeTruthy();
@@ -448,7 +448,7 @@ describe('logMicrodollarUsage', () => {
 
     await logMicrodollarUsage(usageStats, usageContext);
 
-    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+    const metadataRecord = await db._query.microdollar_usage_metadata.findFirst({
       where: eq(microdollar_usage_metadata.message_id, 'test-msg-session'),
     });
     expect(metadataRecord).toBeTruthy();
@@ -488,12 +488,12 @@ describe('logMicrodollarUsage', () => {
     const updatedUser = await findUserById('test-log-user-2');
     expect(updatedUser?.microdollars_used).toBe(2000); // unchanged
 
-    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+    const metadataRecord = await db._query.microdollar_usage_metadata.findFirst({
       where: eq(microdollar_usage_metadata.message_id, 'test-msg-456'),
     });
     expect(metadataRecord).toBeTruthy();
 
-    const usageRecord = await db.query.microdollar_usage.findFirst({
+    const usageRecord = await db._query.microdollar_usage.findFirst({
       where: eq(microdollar_usage.id, metadataRecord!.id),
     });
     expect(usageRecord).toBeTruthy();
@@ -578,7 +578,7 @@ describe('logMicrodollarUsage', () => {
     expect(updatedUser?.microdollars_used).toBe(4200); // 3000 + 300 + 400 + 500
 
     // Verify all 3 usage records exist
-    const usageRecords = await db.query.microdollar_usage.findMany({
+    const usageRecords = await db._query.microdollar_usage.findMany({
       where: eq(microdollar_usage.kilo_user_id, 'test-dedup-user'),
     });
     expect(usageRecords).toHaveLength(3);
@@ -650,13 +650,13 @@ describe('logMicrodollarUsage', () => {
 
     await logMicrodollarUsage(usageStats, usageContext);
 
-    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+    const metadataRecord = await db._query.microdollar_usage_metadata.findFirst({
       where: eq(microdollar_usage_metadata.message_id, 'test-org-msg-123'),
     });
 
     expect(metadataRecord).toBeTruthy();
 
-    const usageRecord = await db.query.microdollar_usage.findFirst({
+    const usageRecord = await db._query.microdollar_usage.findFirst({
       where: eq(microdollar_usage.id, metadataRecord!.id),
     });
 

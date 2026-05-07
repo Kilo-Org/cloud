@@ -539,7 +539,7 @@ describe('processLocalExpirations', () => {
     await processLocalExpirations(user, now);
 
     // Get updated next_credit_expiration_at
-    const updatedUser = await db.query.kilocode_users.findFirst({
+    const updatedUser = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
       columns: { next_credit_expiration_at: true },
     });
@@ -644,7 +644,7 @@ describe('processLocalExpirations', () => {
       credit_expiry_date: expiry1,
     });
 
-    const userAfter1 = await db.query.kilocode_users.findFirst({
+    const userAfter1 = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(new Date(userAfter1!.next_credit_expiration_at!).getTime()).toBe(expiry1.getTime());
@@ -659,7 +659,7 @@ describe('processLocalExpirations', () => {
       credit_expiry_date: expiry2,
     });
 
-    const userAfter2 = await db.query.kilocode_users.findFirst({
+    const userAfter2 = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(new Date(userAfter2!.next_credit_expiration_at!).getTime()).toBe(expiry2.getTime());
@@ -674,7 +674,7 @@ describe('processLocalExpirations', () => {
       credit_expiry_date: expiry3,
     });
 
-    const userAfter3 = await db.query.kilocode_users.findFirst({
+    const userAfter3 = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(new Date(userAfter3!.next_credit_expiration_at!).getTime()).toBe(expiry2.getTime());
@@ -711,13 +711,13 @@ describe('processLocalExpirations', () => {
     expect(resultA.success).toBe(true);
 
     // Verify grantCreditForCategory set next_credit_expiration_at
-    const userAfterA = await db.query.kilocode_users.findFirst({
+    const userAfterA = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     expect(new Date(userAfterA!.next_credit_expiration_at!).getTime()).toBe(expiryA.getTime());
 
     // Verify A was created with correct original_baseline
-    const txnA = await db.query.credit_transactions.findFirst({
+    const txnA = await db._query.credit_transactions.findFirst({
       where: eq(creditTransactionsTable.description, 'Credits A'),
     });
     expect(txnA).toBeDefined();
@@ -731,7 +731,7 @@ describe('processLocalExpirations', () => {
       .where(eq(kilocode_users.id, user.id));
 
     // Refetch user for next grant
-    const userAfterUsage1 = await db.query.kilocode_users.findFirst({
+    const userAfterUsage1 = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
 
@@ -747,7 +747,7 @@ describe('processLocalExpirations', () => {
     expect(resultB.success).toBe(true);
 
     // Verify B was created with correct original_baseline
-    const txnB = await db.query.credit_transactions.findFirst({
+    const txnB = await db._query.credit_transactions.findFirst({
       where: eq(creditTransactionsTable.description, 'Credits B'),
     });
     expect(txnB).toBeDefined();
@@ -761,7 +761,7 @@ describe('processLocalExpirations', () => {
       .where(eq(kilocode_users.id, user.id));
 
     // Step 6: Process expiration at Jan 15 (A expires)
-    const userAtJan15 = await db.query.kilocode_users.findFirst({
+    const userAtJan15 = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     const jan15 = new Date('2024-01-15T00:00:00Z');
@@ -799,7 +799,7 @@ describe('processLocalExpirations', () => {
       .where(eq(kilocode_users.id, user.id));
 
     // Step 8: Process expiration at Jan 25 (B expires)
-    const userAtJan25 = await db.query.kilocode_users.findFirst({
+    const userAtJan25 = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
     // Verify next_credit_expiration_at was updated to B's expiry after A expired
@@ -873,7 +873,7 @@ describe('processLocalExpirations', () => {
     expect(expirationTxns[0].original_transaction_id).toBe(initialId);
 
     // Verify user balance is unchanged (zero-amount expiration)
-    const updatedUser = await db.query.kilocode_users.findFirst({
+    const updatedUser = await db._query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
 

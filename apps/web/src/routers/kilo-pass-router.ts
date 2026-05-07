@@ -180,7 +180,7 @@ async function getIsBonusUnlockedForSubscriptionId(subscriptionId: string): Prom
   const issuanceId = lastIssuance[0]?.id;
   if (!issuanceId) return false;
 
-  const unlockedItem = await db.query.kilo_pass_issuance_items.findFirst({
+  const unlockedItem = await db._query.kilo_pass_issuance_items.findFirst({
     columns: { id: true },
     where: and(
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
@@ -640,7 +640,7 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
-      const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
+      const scheduledChange = await db._query.kilo_pass_scheduled_changes.findFirst({
         columns: {
           stripe_schedule_id: true,
         },
@@ -776,7 +776,7 @@ export const kiloPassRouter = createTRPCRouter({
         return { scheduledChange: null };
       }
 
-      const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
+      const scheduledChange = await db._query.kilo_pass_scheduled_changes.findFirst({
         columns: {
           id: true,
           from_tier: true,
@@ -1018,7 +1018,7 @@ export const kiloPassRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'No Kilo Pass subscription found.' });
       }
 
-      const scheduledChange = await db.query.kilo_pass_scheduled_changes.findFirst({
+      const scheduledChange = await db._query.kilo_pass_scheduled_changes.findFirst({
         columns: { id: true, stripe_schedule_id: true },
         where: and(
           eq(kilo_pass_scheduled_changes.stripe_subscription_id, subscription.stripeSubscriptionId),

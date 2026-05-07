@@ -28,6 +28,7 @@
   "dependencies": {
     "@cloudflare/sandbox": "0.6.7",
     "@kilocode/db": "workspace:*",
+    "@kilocode/drizzle-shims": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@octokit/auth-app": "catalog:",

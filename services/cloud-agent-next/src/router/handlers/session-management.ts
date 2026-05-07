@@ -475,7 +475,7 @@ export function createSessionManagementHandlers() {
     getSessionHealth: protectedProcedure
       .input(GetSessionHealthInput)
       .output(GetSessionHealthOutput)
-      .query(async ({ input, ctx }) => {
+      .mutation(async ({ input, ctx }) => {
         return withLogTags({ source: 'getSessionHealth' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
           const { userId, env } = ctx;

@@ -29,6 +29,7 @@ import * as dispatch from './town/container-dispatch';
 import * as patrol from './town/patrol';
 import * as scheduling from './town/scheduling';
 import * as events from './town/events';
+import { stopContainerIfIdle as _stopContainerIfIdle } from './town/container-idle-stop';
 import * as scm from './town/town-scm';
 import * as reconciler from './town/reconciler';
 import { applyAction } from './town/actions';
@@ -4104,6 +4105,12 @@ export class TownDO extends DurableObject<Env> {
       }),
     ]);
 
+    await this.stopContainerIfIdle().catch(err =>
+      logger.warn('alarm: stopContainerIfIdle failed', {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    );
+
     // Re-arm: fast when active, slow when idle
     const interval = activeWork ? ACTIVE_ALARM_INTERVAL_MS : IDLE_ALARM_INTERVAL_MS;
     await this.ctx.storage.setAlarm(Date.now() + interval);
@@ -4162,6 +4169,27 @@ export class TownDO extends DurableObject<Env> {
     // Only mark as refreshed after success — failed refreshes should
     // be retried on the next alarm tick, not throttled for an hour.
     await this.ctx.storage.put('container:lastTokenRefreshAt', now);
+  }
+
+  /**
+   * Proactively stop the town container when the town is idle.
+   *
+   * Cloudflare's sleepAfter timer resets on any port-8080 traffic (including
+   * long-lived PTY WebSockets), so containers can stay awake for hours after
+   * all real work finishes. Delegates to container-idle-stop sub-module.
+   */
+  private async stopContainerIfIdle(): Promise<void> {
+    await _stopContainerIfIdle({
+      hasActiveWork: () => this.hasActiveWork(),
+      isDraining: () => this._draining,
+      getMayor: () => agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null,
+      getTownId: () => this.townId,
+      getLastIdleStopAt: () => this.ctx.storage.get<number>('container:lastIdleStopAt'),
+      setLastIdleStopAt: (value) => this.ctx.storage.put('container:lastIdleStopAt', value),
+      getContainerStub: (townId) => getTownContainerStub(this.env, townId),
+      writeEventFn: (data) => writeEvent(this.env, data),
+      now: () => Date.now(),
+    });
   }
 
   /**

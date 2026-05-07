@@ -604,15 +604,16 @@ describe('processTopupForOrganization', () => {
 
   test('sends org auto top-up email variant when requested', async () => {
     const amountInCents = 2500;
+    const stripePaymentId = 'ch_test_org_auto_topup';
     mockResolveStripeReceiptUrl.mockResolvedValueOnce('https://pay.stripe.test/receipts/ch');
 
     await processTopupForOrganization(
-      testUser.id,
+      SYSTEM_AUTO_TOP_UP_USER_ID,
       testOrganization.id,
       amountInCents,
       {
         type: 'stripe',
-        stripe_payment_id: 'ch_test_org_auto_topup',
+        stripe_payment_id: stripePaymentId,
       },
       { isAutoTopUp: true }
     );
@@ -629,6 +630,15 @@ describe('processTopupForOrganization', () => {
     );
     expect(topUpEmail.html).toContain(`/organizations/${testOrganization.id}/payment-details`);
     expect(topUpEmail.html).toContain('https://pay.stripe.test/receipts/ch');
+
+    const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);
+    expect(emailMarkers).toHaveLength(1);
+    expect(emailMarkers[0]).toMatchObject({
+      email_type: 'organization_credits_top_up_confirmation',
+      idempotency_key: stripePaymentId,
+      user_id: null,
+      organization_id: testOrganization.id,
+    });
   });
 
   test('sends org top-up confirmation to active owners and billing managers only', async () => {

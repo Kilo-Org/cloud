@@ -4632,9 +4632,7 @@ export const transactional_email_log = pgTable(
       .default(sql`gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id),
+    user_id: text().references(() => kilocode_users.id),
     organization_id: uuid().references(() => organizations.id),
     email_type: text().notNull(),
     idempotency_key: text().notNull(),

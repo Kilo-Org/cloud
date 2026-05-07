@@ -141,7 +141,7 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
     const insertResult = await db
       .insert(transactional_email_log)
       .values({
-        user_id: userId === SYSTEM_AUTO_TOP_UP_USER_ID ? recipients[0].id : userId,
+        user_id: userId === SYSTEM_AUTO_TOP_UP_USER_ID ? null : userId,
         organization_id: organization.id,
         email_type: ORGANIZATION_CREDITS_TOP_UP_CONFIRMATION_EMAIL_TYPE,
         idempotency_key: stripeChargeOrInvoiceId,

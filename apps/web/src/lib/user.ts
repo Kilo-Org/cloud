@@ -594,9 +594,9 @@ export class SoftDeletePreconditionError extends Error {
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
  * - kiloclaw_scheduled_action_targets (retained operational records;
- * - transactional_email_log (retained outbox marker, financial record)
- *   user_id FK references the anonymized kilocode_users row — no PII
- *   stored directly on the target row)
+ * - transactional_email_log (retained outbox marker, financial record;
+ *   user_id FK references the anonymized kilocode_users row and optional
+ *   organization_id references the organization — no direct PII)
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)

@@ -1870,22 +1870,30 @@ describe('User', () => {
 
     it('should retain transactional_email_log rows for the user', async () => {
       const user = await insertTestUser();
+      const orgId = randomUUID();
+
+      await db.insert(organizations).values({
+        id: orgId,
+        name: 'Transactional Email Retention Org',
+        stripe_customer_id: `stripe-org-${orgId}`,
+        plan: 'teams',
+      });
 
       await db.insert(transactional_email_log).values({
         user_id: user.id,
-        email_type: 'credits_top_up_confirmation',
+        organization_id: orgId,
+        email_type: 'organization_credits_top_up_confirmation',
         idempotency_key: `ch_retain_${randomUUID()}`,
       });
 
       await softDeleteUser(user.id);
 
-      expect(
-        await db
-          .select({ count: count() })
-          .from(transactional_email_log)
-          .where(eq(transactional_email_log.user_id, user.id))
-          .then(r => r[0].count)
-      ).toBe(1);
+      const retainedLogs = await db
+        .select()
+        .from(transactional_email_log)
+        .where(eq(transactional_email_log.user_id, user.id));
+      expect(retainedLogs).toHaveLength(1);
+      expect(retainedLogs[0].organization_id).toBe(orgId);
     });
 
     it('should throw SoftDeletePreconditionError for active KiloClaw subscription', async () => {

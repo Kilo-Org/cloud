@@ -34,7 +34,7 @@ pnpm dev:start
 
 ## Acknowledgments
 
-Special thanks to **Marius** for his hard work and contributions to the Kilo Code cloud platform.
+Special thanks to **Marius** and **Mark** for their hard work and contributions to the Kilo Code cloud platform.
 
 ## External resources
 

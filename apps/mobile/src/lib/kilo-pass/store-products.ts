@@ -1,5 +1,4 @@
 import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
-import { type ProductSubscription } from 'expo-iap';
 
 type RouterOutputs = inferRouterOutputs<RootRouter>;
 
@@ -14,21 +13,23 @@ export type BackendStoreKiloPassProduct = Omit<
   cadence: `${BackendStoreKiloPassProductOutput['cadence']}`;
 };
 
-type MinimalStoreProduct = Pick<
-  ProductSubscription,
-  'id' | 'displayPrice' | 'title' | 'description'
->;
+export type StoreKiloPassProduct = {
+  id: string;
+  displayPrice: string;
+  title: string;
+  description: string;
+};
 
 export type AppStoreKiloPassProduct = BackendStoreKiloPassProduct & {
   displayPrice: string;
   title: string;
   description: string;
-  storeProduct: ProductSubscription | MinimalStoreProduct;
+  storeProduct: StoreKiloPassProduct;
 };
 
 export function joinAppStoreKiloPassProducts(params: {
   backendProducts: readonly BackendStoreKiloPassProduct[];
-  storeProducts: readonly (ProductSubscription | MinimalStoreProduct)[];
+  storeProducts: readonly StoreKiloPassProduct[];
 }): AppStoreKiloPassProduct[] {
   const storeById = new Map(params.storeProducts.map(product => [product.id, product]));
 

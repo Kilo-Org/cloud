@@ -21,24 +21,55 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
-import type { sendCreditsTopUpEmail } from '@/lib/email';
+import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@/lib/autoTopUpConstants';
 
-const sendCreditsTopUpEmailMock = jest.fn<
-  ReturnType<typeof sendCreditsTopUpEmail>,
-  Parameters<typeof sendCreditsTopUpEmail>
->(async () => ({ sent: true as const }));
+type SendViaMailgunParams = { to: string; subject: string; html: string; replyTo?: string };
+const sendViaMailgunMock = jest.fn<Promise<boolean>, [SendViaMailgunParams]>(async () => true);
+const verifyEmailMock = jest.fn<Promise<boolean>, [string]>(async () => true);
+const mockResolveStripeReceiptUrl = jest.fn<
+  Promise<string | null>,
+  [string, { skipInAutomatedTest?: boolean }?]
+>(async () => null);
 
-jest.mock('@/lib/email', () => ({
-  sendCreditsTopUpEmail: (params: Parameters<typeof sendCreditsTopUpEmailMock>[0]) =>
-    sendCreditsTopUpEmailMock(params),
+jest.mock('@/lib/email-mailgun', () => ({
+  sendViaMailgun: (params: SendViaMailgunParams) => sendViaMailgunMock(params),
 }));
+
+jest.mock('@/lib/email-neverbounce', () => ({
+  verifyEmail: (email: string) => verifyEmailMock(email),
+}));
+
+jest.mock('@/lib/credits', () => ({
+  resolveStripeReceiptUrl: (...args: [string, { skipInAutomatedTest?: boolean }?]) =>
+    mockResolveStripeReceiptUrl(...args),
+}));
+
+function getOrganizationTopUpEmailMarkers(stripePaymentId: string) {
+  return db.query.transactional_email_log.findMany({
+    where: and(
+      eq(transactional_email_log.email_type, 'organization_credits_top_up_confirmation'),
+      eq(transactional_email_log.idempotency_key, stripePaymentId)
+    ),
+  });
+}
+
+function formatUtcDate(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
 
 describe('getOrCreateStripeCustomerIdForOrganization', () => {
   let testUser: User;
   let testOrganization: Organization;
 
   beforeEach(async () => {
-    sendCreditsTopUpEmailMock.mockClear();
+    sendViaMailgunMock.mockClear().mockResolvedValue(true);
+    verifyEmailMock.mockClear().mockResolvedValue(true);
+    mockResolveStripeReceiptUrl.mockClear().mockResolvedValue(null);
     // Create test user and organization
     testUser = await insertTestUser();
     testOrganization = await createOrganization('Test Organization', testUser.id);
@@ -333,6 +364,9 @@ describe('findOrganizationByStripeCustomerId', () => {
   let testOrganization: Organization;
 
   beforeEach(async () => {
+    sendViaMailgunMock.mockClear().mockResolvedValue(true);
+    verifyEmailMock.mockClear().mockResolvedValue(true);
+    mockResolveStripeReceiptUrl.mockClear().mockResolvedValue(null);
     // Create test user and organization
     testUser = await insertTestUser();
     testOrganization = await createOrganization('Test Organization', testUser.id);
@@ -499,7 +533,9 @@ describe('processTopupForOrganization', () => {
   let testOrganization: Organization;
 
   beforeEach(async () => {
-    sendCreditsTopUpEmailMock.mockClear();
+    sendViaMailgunMock.mockClear().mockResolvedValue(true);
+    verifyEmailMock.mockClear().mockResolvedValue(true);
+    mockResolveStripeReceiptUrl.mockClear().mockResolvedValue(null);
     // Create test user and organization
     testUser = await insertTestUser();
     testOrganization = await createOrganization('Test Organization', testUser.id);
@@ -509,6 +545,7 @@ describe('processTopupForOrganization', () => {
     const amountInCents = 5000; // $50
     const stripePaymentId = 'pi_test_stripe_123';
     const config = { type: 'stripe' as const, stripe_payment_id: stripePaymentId };
+    mockResolveStripeReceiptUrl.mockResolvedValueOnce('https://pay.stripe.test/receipts/pi');
 
     const initialBalance =
       testOrganization.total_microdollars_acquired - testOrganization.microdollars_used;
@@ -541,21 +578,33 @@ describe('processTopupForOrganization', () => {
     expect(creditTransaction?.description).toBe('Organization top-up via stripe');
     expect(creditTransaction?.stripe_payment_id).toBe(stripePaymentId);
 
-    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledTimes(1);
-    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: testUser.google_user_email,
-        variant: 'org_manual',
-        amountCents: amountInCents,
-        creditsCents: amountInCents,
-        organizationId: testOrganization.id,
-        organizationName: testOrganization.name,
-      })
+    expect(mockResolveStripeReceiptUrl).toHaveBeenCalledWith(stripePaymentId);
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+    const [topUpEmail] = sendViaMailgunMock.mock.calls[0];
+    expect(topUpEmail.to).toBe(testUser.google_user_email);
+    expect(topUpEmail.subject).toBe('Your Kilo org credit top-up');
+    expect(topUpEmail.html).toContain('Team credits added');
+    expect(topUpEmail.html).toContain('Amount:</strong> $50.00 USD');
+    expect(topUpEmail.html).toContain('Credits:</strong> $50.00 USD');
+    expect(topUpEmail.html).toContain(
+      'A Kilo credit top-up has been processed for Test Organization. The credits are now available to the organization.'
     );
+    expect(topUpEmail.html).toContain(`/organizations/${testOrganization.id}/payment-details`);
+    expect(topUpEmail.html).toContain('https://pay.stripe.test/receipts/pi');
+
+    const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);
+    expect(emailMarkers).toHaveLength(1);
+    expect(emailMarkers[0]).toMatchObject({
+      email_type: 'organization_credits_top_up_confirmation',
+      idempotency_key: stripePaymentId,
+      user_id: testUser.id,
+      organization_id: testOrganization.id,
+    });
   });
 
   test('sends org auto top-up email variant when requested', async () => {
     const amountInCents = 2500;
+    mockResolveStripeReceiptUrl.mockResolvedValueOnce('https://pay.stripe.test/receipts/ch');
 
     await processTopupForOrganization(
       testUser.id,
@@ -568,15 +617,171 @@ describe('processTopupForOrganization', () => {
       { isAutoTopUp: true }
     );
 
-    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledTimes(1);
-    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: testUser.google_user_email,
-        variant: 'org_auto',
-        amountCents: amountInCents,
-        organizationId: testOrganization.id,
-      })
+    expect(mockResolveStripeReceiptUrl).toHaveBeenCalledWith('ch_test_org_auto_topup');
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+    const [topUpEmail] = sendViaMailgunMock.mock.calls[0];
+    expect(topUpEmail.to).toBe(testUser.google_user_email);
+    expect(topUpEmail.subject).toBe('Kilo team auto top-up successful');
+    expect(topUpEmail.html).toContain('Team auto top-up was successful');
+    expect(topUpEmail.html).toContain('$25.00 USD');
+    expect(topUpEmail.html).toContain(
+      'Test Organization was automatically topped up so your team can keep using Kilo without interruption. The new credits are available now.'
     );
+    expect(topUpEmail.html).toContain(`/organizations/${testOrganization.id}/payment-details`);
+    expect(topUpEmail.html).toContain('https://pay.stripe.test/receipts/ch');
+  });
+
+  test('sends org top-up confirmation to active owners and billing managers only', async () => {
+    const billingManager = await insertTestUser({
+      google_user_email: 'billing-manager-send@example.com',
+    });
+    const member = await insertTestUser({ google_user_email: 'member-send@example.com' });
+    await addUserToOrganization(testOrganization.id, billingManager.id, 'billing_manager');
+    await addUserToOrganization(testOrganization.id, member.id, 'member');
+    await inviteUserToOrganization(
+      testOrganization.id,
+      testUser.id,
+      'invited-owner-send@example.com',
+      'owner'
+    );
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, 1200, {
+      type: 'stripe',
+      stripe_payment_id: 'pi_test_recipient_policy',
+    });
+
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(2);
+    expect(sendViaMailgunMock.mock.calls.map(([params]) => params.to).sort()).toEqual([
+      'billing-manager-send@example.com',
+      testUser.google_user_email,
+    ]);
+  });
+
+  test('keeps org top-up marker when at least one recipient succeeds', async () => {
+    const billingManager = await insertTestUser({
+      google_user_email: 'billing-manager-partial-success@example.com',
+    });
+    await addUserToOrganization(testOrganization.id, billingManager.id, 'billing_manager');
+    const stripePaymentId = 'pi_test_partial_success_keeps_marker';
+    sendViaMailgunMock.mockImplementation(async params =>
+      params.to === testUser.google_user_email ? false : true
+    );
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, 1200, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(2);
+    expect(sendViaMailgunMock.mock.calls.map(([params]) => params.to).sort()).toEqual([
+      'billing-manager-partial-success@example.com',
+      testUser.google_user_email,
+    ]);
+    expect(await getOrganizationTopUpEmailMarkers(stripePaymentId)).toHaveLength(1);
+  });
+
+  test('clears org top-up marker when all recipient failures are retryable', async () => {
+    const billingManager = await insertTestUser({
+      google_user_email: 'billing-manager-total-failure@example.com',
+    });
+    await addUserToOrganization(testOrganization.id, billingManager.id, 'billing_manager');
+    const stripePaymentId = 'pi_test_total_retryable_failure_clears_marker';
+    sendViaMailgunMock.mockResolvedValue(false);
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, 1200, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(2);
+    expect(await getOrganizationTopUpEmailMarkers(stripePaymentId)).toHaveLength(0);
+  });
+
+  test('keeps org top-up marker for terminal NeverBounce failures and continues to later recipients', async () => {
+    const billingManager = await insertTestUser({
+      google_user_email: 'billing-manager-neverbounce-continues@example.com',
+    });
+    await addUserToOrganization(testOrganization.id, billingManager.id, 'billing_manager');
+    const stripePaymentId = 'pi_test_neverbounce_keeps_marker_and_continues';
+    verifyEmailMock.mockImplementation(async email => email !== testUser.google_user_email);
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, 1200, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+
+    expect(verifyEmailMock).toHaveBeenCalledTimes(2);
+    expect(verifyEmailMock.mock.calls.map(([email]) => email).sort()).toEqual([
+      'billing-manager-neverbounce-continues@example.com',
+      testUser.google_user_email,
+    ]);
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+    expect(sendViaMailgunMock.mock.calls[0][0].to).toBe(
+      'billing-manager-neverbounce-continues@example.com'
+    );
+    expect(await getOrganizationTopUpEmailMarkers(stripePaymentId)).toHaveLength(1);
+  });
+
+  test('keeps org top-up marker when all recipient failures are terminal NeverBounce rejections', async () => {
+    const stripePaymentId = 'pi_test_neverbounce_terminal_marker';
+    verifyEmailMock.mockResolvedValue(false);
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, 1200, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
+    expect(await getOrganizationTopUpEmailMarkers(stripePaymentId)).toHaveLength(1);
+  });
+
+  test('clears org top-up marker when terminal and retryable failures both occur without a successful send', async () => {
+    const billingManager = await insertTestUser({
+      google_user_email: 'billing-manager-mixed-failure@example.com',
+    });
+    await addUserToOrganization(testOrganization.id, billingManager.id, 'billing_manager');
+    const stripePaymentId = 'pi_test_mixed_terminal_retryable_failure_clears_marker';
+    verifyEmailMock.mockImplementation(async email => email !== testUser.google_user_email);
+    sendViaMailgunMock.mockImplementation(async params =>
+      params.to === 'billing-manager-mixed-failure@example.com' ? false : true
+    );
+
+    await processTopupForOrganization(testUser.id, testOrganization.id, 1200, {
+      type: 'stripe',
+      stripe_payment_id: stripePaymentId,
+    });
+
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+    expect(verifyEmailMock.mock.calls.map(([email]) => email).sort()).toEqual([
+      'billing-manager-mixed-failure@example.com',
+      testUser.google_user_email,
+    ]);
+    expect(sendViaMailgunMock.mock.calls[0][0].to).toBe(
+      'billing-manager-mixed-failure@example.com'
+    );
+    expect(await getOrganizationTopUpEmailMarkers(stripePaymentId)).toHaveLength(0);
+  });
+
+  test('processes org top-up without email when there are no eligible recipients', async () => {
+    const organizationWithoutRecipients = await createOrganization('No Recipients', null);
+    const stripePaymentId = 'pi_test_no_eligible_org_recipients';
+
+    await processTopupForOrganization(
+      SYSTEM_AUTO_TOP_UP_USER_ID,
+      organizationWithoutRecipients.id,
+      1200,
+      {
+        type: 'stripe',
+        stripe_payment_id: stripePaymentId,
+      }
+    );
+
+    const creditTransaction = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.stripe_payment_id, stripePaymentId),
+    });
+    expect(creditTransaction?.organization_id).toBe(organizationWithoutRecipients.id);
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
+    expect(await getOrganizationTopUpEmailMarkers(stripePaymentId)).toHaveLength(0);
   });
 
   test('does not duplicate balance, audit log, or email marker for repeated payment id', async () => {
@@ -588,7 +793,7 @@ describe('processTopupForOrganization', () => {
       type: 'stripe',
       stripe_payment_id: stripePaymentId,
     });
-    sendCreditsTopUpEmailMock.mockClear();
+    sendViaMailgunMock.mockClear();
 
     await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
       type: 'stripe',
@@ -618,14 +823,9 @@ describe('processTopupForOrganization', () => {
     });
     expect(auditLogs).toHaveLength(1);
 
-    const emailMarkers = await db.query.transactional_email_log.findMany({
-      where: and(
-        eq(transactional_email_log.email_type, 'organization_credits_top_up_confirmation'),
-        eq(transactional_email_log.idempotency_key, stripePaymentId)
-      ),
-    });
+    const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);
     expect(emailMarkers).toHaveLength(1);
-    expect(sendCreditsTopUpEmailMock).not.toHaveBeenCalled();
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
   });
 
   test('duplicate payment id recovers missing org top-up email marker using original purchase date', async () => {
@@ -637,37 +837,35 @@ describe('processTopupForOrganization', () => {
       stripe_payment_id: stripePaymentId,
     });
     const [creditTransaction] = await db
+      .update(credit_transactions)
+      .set({ created_at: '2026-01-07T08:30:00.000Z' })
+      .where(eq(credit_transactions.stripe_payment_id, stripePaymentId))
+      .returning({ createdAt: credit_transactions.created_at });
+
+    const [storedCreditTransaction] = await db
       .select({ createdAt: credit_transactions.created_at })
       .from(credit_transactions)
       .where(eq(credit_transactions.stripe_payment_id, stripePaymentId))
       .limit(1);
-    expect(creditTransaction).toBeDefined();
+    expect(creditTransaction).toEqual(storedCreditTransaction);
     if (!creditTransaction) throw new Error('Expected credit transaction to be created');
 
     await db
       .delete(transactional_email_log)
       .where(eq(transactional_email_log.idempotency_key, stripePaymentId));
-    sendCreditsTopUpEmailMock.mockClear();
+    sendViaMailgunMock.mockClear();
 
     await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
       type: 'stripe',
       stripe_payment_id: stripePaymentId,
     });
 
-    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledTimes(1);
-    expect(sendCreditsTopUpEmailMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        variant: 'org_manual',
-        purchaseDate: new Date(creditTransaction.createdAt),
-      })
-    );
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+    const [topUpEmail] = sendViaMailgunMock.mock.calls[0];
+    expect(topUpEmail.subject).toBe('Your Kilo org credit top-up');
+    expect(topUpEmail.html).toContain(formatUtcDate(new Date(creditTransaction.createdAt)));
 
-    const emailMarkers = await db.query.transactional_email_log.findMany({
-      where: and(
-        eq(transactional_email_log.email_type, 'organization_credits_top_up_confirmation'),
-        eq(transactional_email_log.idempotency_key, stripePaymentId)
-      ),
-    });
+    const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);
     expect(emailMarkers).toHaveLength(1);
 
     const updatedOrg = await db.query.organizations.findFirst({
@@ -691,7 +889,7 @@ describe('processTopupForOrganization', () => {
     await db
       .delete(transactional_email_log)
       .where(eq(transactional_email_log.idempotency_key, stripePaymentId));
-    sendCreditsTopUpEmailMock.mockClear();
+    sendViaMailgunMock.mockClear();
 
     await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
       type: 'stripe',
@@ -704,7 +902,7 @@ describe('processTopupForOrganization', () => {
     expect(updatedOrg?.total_microdollars_acquired).toBe(
       testOrganization.total_microdollars_acquired
     );
-    expect(sendCreditsTopUpEmailMock).not.toHaveBeenCalled();
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
 
     const emailMarkers = await db.query.transactional_email_log.findMany({
       where: eq(transactional_email_log.idempotency_key, stripePaymentId),
@@ -723,7 +921,7 @@ describe('processTopupForOrganization', () => {
     await db
       .delete(transactional_email_log)
       .where(eq(transactional_email_log.idempotency_key, stripePaymentId));
-    sendCreditsTopUpEmailMock.mockClear();
+    sendViaMailgunMock.mockClear();
 
     await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents + 100, {
       type: 'stripe',
@@ -736,7 +934,7 @@ describe('processTopupForOrganization', () => {
     expect(updatedOrg?.total_microdollars_acquired).toBe(
       testOrganization.total_microdollars_acquired + amountInCents * 10_000
     );
-    expect(sendCreditsTopUpEmailMock).not.toHaveBeenCalled();
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
 
     const emailMarkers = await db.query.transactional_email_log.findMany({
       where: eq(transactional_email_log.idempotency_key, stripePaymentId),

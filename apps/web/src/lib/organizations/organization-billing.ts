@@ -219,7 +219,7 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
       }
     }
 
-    if (sentEmails === 0 && retryableFailures > 0 && terminalFailures === 0) {
+    if (sentEmails === 0 && retryableFailures > 0) {
       await deleteOrganizationTopUpEmailMarker(stripeChargeOrInvoiceId);
     }
   } catch (error) {

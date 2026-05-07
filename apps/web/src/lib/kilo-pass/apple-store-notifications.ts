@@ -1,4 +1,8 @@
-import { type ResponseBodyV2DecodedPayload } from '@apple/app-store-server-library';
+import {
+  NotificationTypeV2,
+  type ResponseBodyV2DecodedPayload,
+  Subtype,
+} from '@apple/app-store-server-library';
 import { and, eq } from 'drizzle-orm';
 import * as z from 'zod';
 
@@ -31,11 +35,19 @@ export type AppleStoreDecodedNotification = {
 type DecodeNotification = (signedPayload: string) => Promise<AppleStoreDecodedNotification>;
 type DecodeTransaction = (signedTransactionJws: string) => Promise<AppleStoreDecodedTransaction>;
 
-const RENEWAL_TYPES = new Set(['DID_RENEW', 'SUBSCRIBED']);
-const EXPIRED_TYPES = new Set(['EXPIRED', 'DID_FAIL_TO_RENEW']);
-const REFUND_TYPES = new Set(['REFUND', 'REVOKE', 'CONSUMPTION_REQUEST']);
-const AUTO_RENEW_DISABLED_TYPE = 'DID_CHANGE_RENEWAL_STATUS';
-const AUTO_RENEW_DISABLED_SUBTYPE = 'AUTO_RENEW_DISABLED';
+const RENEWAL_TYPES = new Set<string>([
+  NotificationTypeV2.DID_RENEW,
+  NotificationTypeV2.SUBSCRIBED,
+]);
+const EXPIRED_TYPES = new Set<string>([
+  NotificationTypeV2.EXPIRED,
+  NotificationTypeV2.DID_FAIL_TO_RENEW,
+]);
+const REFUND_TYPES = new Set<string>([
+  NotificationTypeV2.REFUND,
+  NotificationTypeV2.REVOKE,
+  NotificationTypeV2.CONSUMPTION_REQUEST,
+]);
 
 const AppleStoreNotificationPayloadSchema = z
   .object({
@@ -204,7 +216,7 @@ export async function processAppStoreKiloPassNotification(params: {
       fallbackUser: params.userForRenewal,
     });
     if (!user) {
-      if (notification.notificationType !== 'SUBSCRIBED') {
+      if (notification.notificationType !== NotificationTypeV2.SUBSCRIBED) {
         throw new Error(
           'App Store renewal notification cannot create a subscription without a user'
         );
@@ -237,8 +249,8 @@ export async function processAppStoreKiloPassNotification(params: {
 
   if (
     transaction &&
-    notification.notificationType === AUTO_RENEW_DISABLED_TYPE &&
-    notification.subtype === AUTO_RENEW_DISABLED_SUBTYPE
+    notification.notificationType === NotificationTypeV2.DID_CHANGE_RENEWAL_STATUS &&
+    notification.subtype === Subtype.AUTO_RENEW_DISABLED
   ) {
     await markStoreSubscriptionCancelingAtPeriodEnd(transaction);
     await appendKiloPassAuditLog(db, {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
+import { NotificationTypeV2, Subtype } from '@apple/app-store-server-library';
 import { eq } from 'drizzle-orm';
 
 import { kilo_pass_store_events, kilo_pass_subscriptions } from '@kilocode/db/schema';
@@ -14,7 +15,7 @@ function notification(
 ): AppleStoreDecodedNotification {
   return {
     notificationUUID: `note-${crypto.randomUUID()}`,
-    notificationType: 'DID_RENEW',
+    notificationType: NotificationTypeV2.DID_RENEW,
     environment: 'Sandbox',
     signedTransactionInfo: 'signed-transaction',
     ...overrides,
@@ -84,8 +85,8 @@ describe('processAppStoreKiloPassNotification', () => {
 
   it('records initial buy notifications before the app attaches a user', async () => {
     const decodedNotification = notification({
-      notificationType: 'SUBSCRIBED',
-      subtype: 'INITIAL_BUY',
+      notificationType: NotificationTypeV2.SUBSCRIBED,
+      subtype: Subtype.INITIAL_BUY,
     });
     const decodedTransaction = transaction();
 
@@ -118,8 +119,8 @@ describe('processAppStoreKiloPassNotification', () => {
   it('creates the initial subscription from the App Store account token', async () => {
     const user = await insertTestUser();
     const decodedNotification = notification({
-      notificationType: 'SUBSCRIBED',
-      subtype: 'INITIAL_BUY',
+      notificationType: NotificationTypeV2.SUBSCRIBED,
+      subtype: Subtype.INITIAL_BUY,
     });
     const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
 
@@ -143,8 +144,8 @@ describe('processAppStoreKiloPassNotification', () => {
 
   it('reprocesses notification rows left unprocessed by an earlier failure', async () => {
     const decodedNotification = notification({
-      notificationType: 'SUBSCRIBED',
-      subtype: 'INITIAL_BUY',
+      notificationType: NotificationTypeV2.SUBSCRIBED,
+      subtype: Subtype.INITIAL_BUY,
     });
     const decodedTransaction = transaction();
     await db.insert(kilo_pass_store_events).values({
@@ -190,7 +191,7 @@ describe('processAppStoreKiloPassNotification', () => {
       decodeNotification: async () =>
         notification({
           notificationUUID: 'expired',
-          notificationType: 'EXPIRED',
+          notificationType: NotificationTypeV2.EXPIRED,
           signedTransactionInfo: 'expired-transaction',
         }),
       decodeTransaction: async () => decodedTransaction,
@@ -214,8 +215,8 @@ describe('processAppStoreKiloPassNotification', () => {
       decodeNotification: async () =>
         notification({
           notificationUUID: 'initial-buy',
-          notificationType: 'SUBSCRIBED',
-          subtype: 'INITIAL_BUY',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
         }),
       decodeTransaction: async () => decodedTransaction,
     });
@@ -225,8 +226,8 @@ describe('processAppStoreKiloPassNotification', () => {
       decodeNotification: async () =>
         notification({
           notificationUUID: 'auto-renew-disabled',
-          notificationType: 'DID_CHANGE_RENEWAL_STATUS',
-          subtype: 'AUTO_RENEW_DISABLED',
+          notificationType: NotificationTypeV2.DID_CHANGE_RENEWAL_STATUS,
+          subtype: Subtype.AUTO_RENEW_DISABLED,
         }),
       decodeTransaction: async () => decodedTransaction,
     });

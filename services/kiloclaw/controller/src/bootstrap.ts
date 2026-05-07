@@ -803,21 +803,20 @@ export function provisionClawMetrySync(env: EnvLike, deps: BootstrapDeps = defau
   deps.writeFileSync(CLAWMETRY_CONFIG_PATH, JSON.stringify(config, null, 2));
   deps.chmodSync(CLAWMETRY_CONFIG_PATH, 0o600);
 
-  // Self-decrypting dashboard URL via the /d/<dashboard_id> redirect, which
-  // resolves server-side to /cloud?token=cm_xxx so the dashboard JS sees a
-  // CLOUD_TOKEN to namespace the localStorage enc_key under. The browser
-  // preserves the `#fragment` across the 302 → ends up at
-  // /cloud?token=cm_xxx#key=<enc>&node=<id>, where the dashboard's bridge
-  // script reads the fragment, stashes the enc_key in localStorage, and
-  // strips the fragment from the URL. The fragment is never sent to any
-  // server (browsers strip fragments from outgoing requests).
-  const dashboardId = registered.dashboard_id;
-  const dashboardUrl = dashboardId
-    ? `${apiBase}/d/${dashboardId}#key=${encodeURIComponent(encryptionKey)}&node=${encodeURIComponent(nodeId)}`
-    : // Fallback if /api/register didn't return a dashboard_id (older cloud
-      // versions). The user will land on /cloud unauthenticated and have to
-      // sign in via OTP, which is suboptimal but doesn't break anything.
-      `${apiBase}/cloud#key=${encodeURIComponent(encryptionKey)}&node=${encodeURIComponent(nodeId)}`;
+  // Self-decrypting dashboard URL pointing at the per-node detail page —
+  // /cloud/node/<id>?token=cm_xxx#key=<enc>&node=<id>. This is the page
+  // users actually want when they click "View Observability" (their
+  // KiloClaw runtime's Brain feed, sessions, tools, etc.), and it's the
+  // only page that contains the cm-setup-bridge script that reads the
+  // fragment and stashes the enc_key in localStorage.
+  //
+  // The fragment is never sent to any server (browsers strip fragments
+  // from outgoing requests). The dashboard JS reads it client-side and
+  // uses it to decrypt event blobs. Putting ?token= in the URL is the
+  // standard ClawMetry auth pattern (every /d/<id> redirect does the
+  // same thing) — anyone with this URL can view this user's KiloClaw
+  // observability data, which is the whole point of the integration.
+  const dashboardUrl = `${apiBase}/cloud/node/${encodeURIComponent(nodeId)}?token=${encodeURIComponent(registered.api_key)}#key=${encodeURIComponent(encryptionKey)}&node=${encodeURIComponent(nodeId)}`;
   deps.writeFileSync(CLAWMETRY_DASHBOARD_URL_PATH, dashboardUrl + '\n');
   deps.chmodSync(CLAWMETRY_DASHBOARD_URL_PATH, 0o600);
 

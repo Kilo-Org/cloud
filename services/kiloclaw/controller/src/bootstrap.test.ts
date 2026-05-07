@@ -645,12 +645,12 @@ describe('provisionClawMetrySync', () => {
     expect(config.encryption_key).toHaveLength(44);
     expect(typeof config.connected_at).toBe('string');
 
-    // dashboard URL goes through /d/<dashboard_id> so the redirect adds
-    // ?token= server-side, then the browser preserves the #fragment
+    // dashboard URL points at /cloud/node/<id> — the only page that has the
+    // bridge script that reads the #fragment and stashes the enc_key
     const urlWrite = writeCalls.find(w => w.path === '/root/.clawmetry/dashboard-url.txt');
     expect(urlWrite).toBeDefined();
     expect(urlWrite!.data).toMatch(
-      /^https:\/\/app\.clawmetry\.com\/d\/dash-uuid-1#key=[^&]+&node=agent-vivek-fly\n$/
+      /^https:\/\/app\.clawmetry\.com\/cloud\/node\/agent-vivek-fly\?token=cm_abc123#key=[^&]+&node=agent-vivek-fly\n$/
     );
 
     // Both files written 0600

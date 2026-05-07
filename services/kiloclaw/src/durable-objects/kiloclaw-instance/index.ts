@@ -2962,8 +2962,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       cannotPrefix: 'resize',
       beforePhrase: 'resizing machine tier',
       notSupportedSubject: 'Instance tier resize',
-      // Tier resize calls fly.extendVolume on storage growth; Fly volume
-      // extends require the machine to be stopped.
+      // Fly tier resize calls fly.extendVolume on storage growth, which
+      // requires the machine to be stopped. Northflank uses deployment
+      // rollout semantics and does not require a stopped instance.
       requireStopped: this.s.provider !== 'northflank',
       allowNorthflank: true,
     });

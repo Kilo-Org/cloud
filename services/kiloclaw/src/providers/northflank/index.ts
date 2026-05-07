@@ -851,6 +851,11 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       if (!providerState.volumeId) {
         throw new Error('Northflank resize requires an existing volume when storage grows');
       }
+      // Northflank's documented update-volume endpoint returns only an
+      // empty success response and does not expose a separate completion
+      // status to poll. Treat a successful 200 as the provider's accepted
+      // storage update; the DO still persists the larger volumeSizeGb only
+      // after the subsequent deployment rollout completes.
       await updateVolume(config, providerState.projectId, providerState.volumeId, {
         storageSizeMb: tier.volumeSizeGb * 1024,
       });

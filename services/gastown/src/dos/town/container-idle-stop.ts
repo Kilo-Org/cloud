@@ -56,7 +56,7 @@ export async function stopContainerIfIdle(deps: IdleStopDeps): Promise<void> {
     return;
   }
 
-  if (state.status !== 'running') return;
+  if (state.status !== 'running' && state.status !== 'healthy') return;
 
   const idleMinutes = mayor?.last_activity_at != null
     ? Math.round((deps.now() - new Date(mayor.last_activity_at).getTime()) / 60_000)

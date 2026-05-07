@@ -118,6 +118,20 @@ describe('stopContainerIfIdle', () => {
     expect(deps._events[0].reason).toBe('no_active_work');
   });
 
+  it('stops container when container is healthy', async () => {
+    const stopFn = vi.fn().mockResolvedValue(undefined);
+    const deps = makeDeps({
+      getMayor: () => null,
+      getContainerStub: () => ({
+        getState: vi.fn().mockResolvedValue({ status: 'healthy' }),
+        stop: stopFn,
+      }),
+    });
+    await stopContainerIfIdle(deps);
+    expect(stopFn).toHaveBeenCalledTimes(1);
+    expect(deps._events[0].reason).toBe('no_active_work');
+  });
+
   it('does not stop when container is already stopped', async () => {
     const stopFn = vi.fn().mockResolvedValue(undefined);
     const deps = makeDeps({

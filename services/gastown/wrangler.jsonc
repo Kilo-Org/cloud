@@ -119,12 +119,12 @@
         "ENVIRONMENT": "development",
         "CF_ACCESS_TEAM": "engineering-e11",
         "CF_ACCESS_AUD": "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be",
-        // Wrangler's workerd-network doesn't get Docker Desktop's
-        // host.docker.internal → host proxy mapping. Use the Docker
-        // Desktop VM host gateway IP directly so containers can reach
-        // the host's dev servers.
-        "KILO_API_URL": "http://192.168.65.254:3000",
-        "GASTOWN_API_URL": "http://192.168.65.254:8803",
+        // Cloudflare Sandbox containers run via Docker Desktop and
+        // resolve `host.docker.internal` to the host. Use it so dev
+        // containers can reach the host's dev servers (Next.js on
+        // :3000, gastown worker on :8803).
+        "KILO_API_URL": "http://host.docker.internal:3000",
+        "GASTOWN_API_URL": "http://host.docker.internal:8803",
       },
       "containers": [
         {

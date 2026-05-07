@@ -20,16 +20,16 @@ INTERNAL_API_SECRET=your-internal-api-secret-here
 
 # Kilocode backend base URL for API calls and session environment variables
 # Defaults to https://kilo.ai if not set
-# For local development, point to your local kilocode-backend
-# Note: you wanna use your actual privatenet address here and not "localhost"
-# pnpm run dev of kilocode-backend usually gives you both addrs on boot.
+# For local development, point to your local kilocode-backend.
+# Sandbox containers run under Docker Desktop, so `host.docker.internal`
+# resolves to the host where Next.js is listening.
 # @url nextjs
-KILOCODE_BACKEND_BASE_URL=http://192.168.200.70:3000
+KILOCODE_BACKEND_BASE_URL=http://host.docker.internal:3000
 
 # Worker base URL used by the wrapper to connect to /ingest.
-# Use a host-reachable IP (not localhost) so sandbox containers can connect back.
+# Sandbox containers reach the host via `host.docker.internal`.
 # @url cloud-agent
-WORKER_URL=http://192.168.200.72:8788
+WORKER_URL=http://host.docker.internal:8788
 
 # Timeout overrides (optional)
 WRAPPER_IDLE_TIMEOUT_MS=120000

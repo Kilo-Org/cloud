@@ -30,8 +30,8 @@ declare namespace Cloudflare {
 		ENVIRONMENT: "development";
 		CF_ACCESS_TEAM: "engineering-e11";
 		CF_ACCESS_AUD: "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be";
-		KILO_API_URL: "http://192.168.65.254:3000";
-		GASTOWN_API_URL: "http://192.168.65.254:8787";
+		KILO_API_URL: "http://host.docker.internal:3000";
+		GASTOWN_API_URL: "http://host.docker.internal:8803";
 		GASTOWN_USER: DurableObjectNamespace<import("./src/gastown.worker").GastownUserDO>;
 		GASTOWN_ORG: DurableObjectNamespace<import("./src/gastown.worker").GastownOrgDO>;
 		AGENT_IDENTITY: DurableObjectNamespace<import("./src/gastown.worker").AgentIdentityDO>;
@@ -49,8 +49,8 @@ declare namespace Cloudflare {
 		ENVIRONMENT: "development" | "production";
 		CF_ACCESS_TEAM: "engineering-e11";
 		CF_ACCESS_AUD: "7f6eda4c0714f6ea2afb74a3f055db65659b67571a913eab42468636a9b8c8be";
-		KILO_API_URL: "http://192.168.65.254:3000" | "https://api.kilo.ai";
-		GASTOWN_API_URL: "http://192.168.65.254:8787" | "https://gastown.kiloapps.io";
+		KILO_API_URL: "http://host.docker.internal:3000" | "https://api.kilo.ai";
+		GASTOWN_API_URL: "http://host.docker.internal:8803" | "https://gastown.kiloapps.io";
 		GASTOWN_USER: DurableObjectNamespace<import("./src/gastown.worker").GastownUserDO>;
 		GASTOWN_ORG: DurableObjectNamespace<import("./src/gastown.worker").GastownOrgDO>;
 		AGENT_IDENTITY: DurableObjectNamespace<import("./src/gastown.worker").AgentIdentityDO>;

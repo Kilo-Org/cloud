@@ -231,7 +231,7 @@
         "STALE_THRESHOLD_MS": "600000",
         "PENDING_START_TIMEOUT_MS": "300000",
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
-        "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://192.168.200.174:3000",
+        "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
       },
       "r2_buckets": [
         {

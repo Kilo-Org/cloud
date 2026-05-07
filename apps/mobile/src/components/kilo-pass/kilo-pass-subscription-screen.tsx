@@ -16,12 +16,8 @@ function formatTier(product: AppStoreKiloPassProduct): string {
   return `$${product.webMonthlyPriceUsd} credits`;
 }
 
-function formatCadence(product: AppStoreKiloPassProduct): string {
-  return product.cadence === 'yearly' ? 'Yearly' : 'Monthly';
-}
-
 function formatStorePrice(product: AppStoreKiloPassProduct): string {
-  return `${product.displayPrice}/${product.cadence === 'yearly' ? 'yr' : 'mo'}`;
+  return `${product.displayPrice}/mo`;
 }
 
 export function KiloPassSubscriptionScreen() {
@@ -84,11 +80,9 @@ export function KiloPassSubscriptionScreen() {
               >
                 <View className="flex-row items-start justify-between gap-4">
                   <View className="flex-1 gap-1.5">
-                    <Text className="font-semibold text-foreground">
-                      {formatTier(product)} · {formatCadence(product)}
-                    </Text>
+                    <Text className="font-semibold text-foreground">{formatTier(product)}</Text>
                     <Text className="text-xs text-muted-foreground">
-                      Base credits plus monthly bonus progress.
+                      Monthly Kilo Pass with bonus progress.
                     </Text>
                   </View>
                   <Text className="text-base font-semibold text-foreground tabular-nums">

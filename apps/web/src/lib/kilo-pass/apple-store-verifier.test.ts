@@ -33,12 +33,6 @@ describe('mapAppleKiloPassTransaction', () => {
     });
   });
 
-  it('rejects yearly App Store products while the app only supports monthly subscriptions', () => {
-    expect(() =>
-      mapAppleKiloPassTransaction(transaction({ productId: 'kilopass.tier19.yearly.v1' }))
-    ).toThrow('Apple Kilo Pass product is not enabled');
-  });
-
   it('rejects the wrong bundle id', () => {
     expect(() => mapAppleKiloPassTransaction(transaction({ bundleId: 'com.example.bad' }))).toThrow(
       'Apple transaction bundle mismatch'

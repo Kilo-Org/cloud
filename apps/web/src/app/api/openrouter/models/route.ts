@@ -8,6 +8,7 @@ import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-by
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/ai-gateway/models';
+import { SupportedOutputModalitySchema } from '@/lib/ai-gateway/output-modalities';
 
 async function tryGetUserFromAuth() {
   try {
@@ -27,7 +28,11 @@ export async function GET(
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
   const rawOutputModalities = request.nextUrl.searchParams.get('output_modalities');
-  if (rawOutputModalities !== null && rawOutputModalities !== 'embeddings') {
+  const parsedOutputModalities =
+    rawOutputModalities === null
+      ? { success: true as const, data: undefined }
+      : SupportedOutputModalitySchema.safeParse(rawOutputModalities);
+  if (!parsedOutputModalities.success) {
     return NextResponse.json(
       {
         error: 'Invalid output_modalities',
@@ -36,7 +41,7 @@ export async function GET(
       { status: 400 }
     );
   }
-  const outputModalities = rawOutputModalities ?? undefined;
+  const outputModalities = parsedOutputModalities.data;
   const auth = await tryGetUserFromAuth();
   try {
     const result = auth?.organizationId

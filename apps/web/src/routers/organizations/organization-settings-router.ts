@@ -17,6 +17,7 @@ import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { SupportedOutputModalitySchema } from '@/lib/ai-gateway/output-modalities';
 
 /**
  * Allowlist of organization IDs that are allowed to modify experimental settings
@@ -149,7 +150,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
   listAvailableModels: organizationMemberProcedure
     .input(
       OrganizationIdInputSchema.extend({
-        outputModalities: z.literal('embeddings').optional(),
+        outputModalities: SupportedOutputModalitySchema.optional(),
       })
     )
     .output(z.custom<OpenRouterModelsResponse>())

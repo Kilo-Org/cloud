@@ -20,6 +20,7 @@ import {
 } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/kilo-auto';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
+import type { SupportedOutputModality } from '@/lib/ai-gateway/output-modalities';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -136,7 +137,7 @@ function enhancedModelList(models: OpenRouterModel[], includeKiloModels: boolean
  * Use this for syncing model stats where you need complete data including :free variants
  */
 export async function getRawOpenRouterModels(
-  options: { outputModalities?: string } = {}
+  options: { outputModalities?: SupportedOutputModality } = {}
 ): Promise<OpenRouterModelsResponse> {
   const url = new URL(`${PROVIDERS.OPENROUTER.apiUrl}/models`);
   if (options.outputModalities) {
@@ -189,7 +190,7 @@ export async function getRawOpenRouterModels(
  * Use this for user-facing model selection where you want filtered, sorted models
  */
 export async function getEnhancedOpenRouterModels(
-  options: { outputModalities?: string } = {}
+  options: { outputModalities?: SupportedOutputModality } = {}
 ): Promise<OpenRouterModelsResponse> {
   const rawResponse = await getRawOpenRouterModels(options);
 

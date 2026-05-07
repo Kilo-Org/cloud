@@ -9,10 +9,11 @@ import { listAvailableCustomLlms } from '@/lib/ai-gateway/custom-llm/listAvailab
 import { getDirectByokModelsForOrganization } from '@/lib/ai-gateway/providers/direct-byok';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
+import type { SupportedOutputModality } from '@/lib/ai-gateway/output-modalities';
 
 export async function getAvailableModelsForOrganization(
   organizationId: string,
-  options: { outputModalities?: string } = {}
+  options: { outputModalities?: SupportedOutputModality } = {}
 ): Promise<OpenRouterModelsResponse | null> {
   const organization = await getOrganizationById(organizationId);
   if (!organization) {

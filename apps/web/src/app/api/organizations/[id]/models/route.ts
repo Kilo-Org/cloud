@@ -4,12 +4,17 @@ import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/ai-gateway/models';
+import { SupportedOutputModalitySchema } from '@/lib/ai-gateway/output-modalities';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const organizationId = (await params).id;
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
   const rawOutputModalities = request.nextUrl.searchParams.get('output_modalities');
-  if (rawOutputModalities !== null && rawOutputModalities !== 'embeddings') {
+  const parsedOutputModalities =
+    rawOutputModalities === null
+      ? { success: true as const, data: undefined }
+      : SupportedOutputModalitySchema.safeParse(rawOutputModalities);
+  if (!parsedOutputModalities.success) {
     return NextResponse.json(
       {
         error: 'Invalid output_modalities',
@@ -18,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       { status: 400 }
     );
   }
-  const outputModalities = rawOutputModalities ?? undefined;
+  const outputModalities = parsedOutputModalities.data;
 
   return handleTRPCRequest<OpenRouterModelsResponse>(request, async caller => {
     const result = await caller.organizations.settings.listAvailableModels({

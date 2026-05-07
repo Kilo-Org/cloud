@@ -4,12 +4,15 @@ import { randomUUID } from 'crypto';
 test.describe('/get-started dashboard escape hatch', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('shows the dashboard link to signed-out users', async ({ page }) => {
+  test('hides the dashboard link for signed-out users', async ({ page }) => {
     await page.goto('/get-started');
 
     const skipLink = page.getByRole('link', { name: /skip to dashboard/i });
-    await expect(skipLink).toBeVisible();
-    await expect(skipLink).toHaveAttribute('href', '/profile');
+    await expect(skipLink).toHaveCount(0);
+
+    const signInLink = page.getByRole('link', { name: /sign in/i });
+    await expect(signInLink).toBeVisible();
+    await expect(signInLink).toHaveAttribute('href', '/users/sign_in?callbackPath=/get-started');
   });
 
   test('shows the dashboard link after fake login and survey skip', async ({ page }) => {

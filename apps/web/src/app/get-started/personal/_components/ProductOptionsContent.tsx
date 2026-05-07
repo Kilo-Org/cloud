@@ -225,17 +225,19 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
           style={{ animationDelay: '540ms' }}
           className="text-muted-foreground kilo-fade-up pt-1 text-center text-xs"
         >
-          Not ready to choose?{' '}
-          <Link
-            href="/profile"
-            className="inline-flex items-center gap-1 rounded font-semibold text-white outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
-          >
-            Skip to dashboard
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-          {!isAuthenticated ? (
+          {isAuthenticated ? (
             <>
-              <span className="mx-2 text-muted-foreground/60">·</span>
+              Not ready to choose?{' '}
+              <Link
+                href="/profile"
+                className="inline-flex items-center gap-1 rounded font-semibold text-white outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
+              >
+                Skip to dashboard
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </>
+          ) : (
+            <>
               Already have an account?{' '}
               <Link
                 href={signInHref}
@@ -244,7 +246,7 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
                 Sign in
               </Link>
             </>
-          ) : null}
+          )}
         </p>
       </section>
     </div>

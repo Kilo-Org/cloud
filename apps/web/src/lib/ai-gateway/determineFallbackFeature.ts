@@ -1,9 +1,7 @@
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
 
-export function determineFallbackFeature(
-  requestBodyParsed: GatewayRequest
-): 'direct-gateway' | '' {
+export function determineFallbackFeature(requestBodyParsed: GatewayRequest): 'direct-gateway' | '' {
   const { system_prompt_prefix } = extractPromptInfo(requestBodyParsed);
   if (
     system_prompt_prefix.includes('You are Kilo') ||

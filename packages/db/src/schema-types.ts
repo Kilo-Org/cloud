@@ -360,16 +360,8 @@ export type OrganizationPlan = z.infer<typeof OrganizationPlanSchema>;
 
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
-  /**
-   * Migration marker for provider restrictions.
-   * Existing provider_allow_list values can be stale from the pre-deny-list era,
-   * so only trust provider_allow_list when this is set.
-   */
-  provider_policy_mode: z.enum(['allow']).optional(),
 
   model_deny_list: z.array(z.string()).optional(),
-  /** Legacy fallback for orgs that have not saved explicit allow lists yet. */
-  provider_deny_list: z.array(z.string()).optional(),
 
   default_model: z.string().optional(),
   data_collection: z.enum(['allow', 'deny']).nullable().optional(),

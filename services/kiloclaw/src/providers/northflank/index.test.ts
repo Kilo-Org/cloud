@@ -157,6 +157,63 @@ describe('northflankProviderAdapter', () => {
     );
   });
 
+  it('sizes the provisioning volume from state.volumeSizeGb when set (perf-4-8 -> 20 GB)', async () => {
+    // Mirrors the deployment-plan path: a fresh perf-4-8 instance must
+    // get a 20 GB Northflank volume (matching the catalog's volumeSizeGb)
+    // and not the global NF_VOLUME_SIZE_MB default. Without this the DO
+    // and customer dashboard advertise 20 GB while the real volume is
+    // 10 GB, leading to silent disk-full errors past 10 GB used.
+    vi.mocked(findProjectByName).mockResolvedValue(null);
+    vi.mocked(createProject).mockResolvedValue({ id: 'project-1', name: 'kc-ki-123' });
+    vi.mocked(findVolumeByName).mockResolvedValue(null);
+    vi.mocked(createVolume).mockResolvedValue({ id: 'volume-1', name: 'kc-ki-123' });
+
+    await northflankProviderAdapter.ensureProvisioningResources({
+      env: env as never,
+      state: {
+        sandboxId: 'ki_123',
+        providerState: null,
+        status: null,
+        instanceType: 'perf-4-8',
+        volumeSizeGb: 20,
+      } as never,
+      orgId: null,
+      machineSize: null,
+    });
+
+    expect(createVolume).toHaveBeenCalledWith(
+      expect.objectContaining({ apiToken: 'nf-token' }),
+      'project-1',
+      expect.objectContaining({ storageSizeMb: 20 * 1024 })
+    );
+  });
+
+  it('falls back to NF_VOLUME_SIZE_MB when state.volumeSizeGb is null (legacy / pre-tier)', async () => {
+    vi.mocked(findProjectByName).mockResolvedValue(null);
+    vi.mocked(createProject).mockResolvedValue({ id: 'project-1', name: 'kc-ki-123' });
+    vi.mocked(findVolumeByName).mockResolvedValue(null);
+    vi.mocked(createVolume).mockResolvedValue({ id: 'volume-1', name: 'kc-ki-123' });
+
+    await northflankProviderAdapter.ensureProvisioningResources({
+      env: env as never,
+      state: {
+        sandboxId: 'ki_123',
+        providerState: null,
+        status: null,
+        instanceType: null,
+        volumeSizeGb: null,
+      } as never,
+      orgId: null,
+      machineSize: null,
+    });
+
+    expect(createVolume).toHaveBeenCalledWith(
+      expect.objectContaining({ apiToken: 'nf-token' }),
+      'project-1',
+      expect.objectContaining({ storageSizeMb: 10240 })
+    );
+  });
+
   it('creates service at zero instances, writes restricted secret, then patches to one instance', async () => {
     vi.mocked(findServiceByName).mockResolvedValue(null);
     vi.mocked(createDeploymentService).mockResolvedValue({

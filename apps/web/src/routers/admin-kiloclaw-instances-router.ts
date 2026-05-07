@@ -2728,6 +2728,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} targetSizeGb=${input.targetSizeGb}`
       );
       const instance = await resolveInstance(input.userId, input.instanceId);
+      // Same ownership-check pattern as resizeMachine /
+      // setAdminMachineSizeOverride / clearAdminMachineSizeOverride.
+      // resolveInstance(userId, instanceId) does NOT filter by user_id when
+      // instanceId is supplied — without this assert, an admin passing
+      // userId=A + instanceId=B (B owned by user C) would extend C's
+      // volume while the audit log records target_user_id=A. Fly volumes
+      // can grow but cannot shrink, so the storage change is permanent.
+      assertInstanceBelongsToUser(instance, input.userId);
       const client = new KiloClawInternalClient();
       const instanceId = workerInstanceId(instance);
 

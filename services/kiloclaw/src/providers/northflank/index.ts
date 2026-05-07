@@ -51,6 +51,36 @@ function logNorthflank(message: string, details: Record<string, unknown>): void 
   console.info(`[northflank] ${message}`, details);
 }
 
+/**
+ * Resolve the storage size to provision for this instance, in MB.
+ *
+ * Mirrors the deployment-plan path: when the DO has a tier-derived
+ * `volumeSizeGb` (set by the provision flow from `INSTANCE_TIERS`), use
+ * it so the actual Northflank volume matches what the DO and customer
+ * dashboard advertise. Without this, a fresh `perf-4-8` Northflank
+ * instance gets DO state `volumeSizeGb=20` but a 10 GB
+ * (`NF_VOLUME_SIZE_MB`) volume — the customer fills past 10 GB and
+ * hits disk-full errors with no signal that the persisted state and
+ * reality have diverged.
+ *
+ * Falls back to `config.volumeSizeMb` when `state.volumeSizeGb` is null
+ * (legacy / pre-tier instances) so existing deployments keep their
+ * current size.
+ */
+function storageSizeMbForState(
+  state: InstanceMutableState,
+  config: NorthflankClientConfig
+): number {
+  // `state.volumeSizeGb` is typed `number | null`, but the existing tests
+  // (and any state that hasn't been migrated through `loadState`) may pass
+  // `undefined`. Treat both as "no tier-derived size" and fall back to the
+  // global default — preserves legacy behaviour without surfacing NaN.
+  if (typeof state.volumeSizeGb === 'number' && state.volumeSizeGb > 0) {
+    return state.volumeSizeGb * 1024;
+  }
+  return config.volumeSizeMb;
+}
+
 function resolveNorthflankDeploymentPlan(
   config: NorthflankClientConfig,
   instanceType: InstanceMutableState['instanceType'],
@@ -516,7 +546,7 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     const targetRegion = region ?? providerState.region ?? config.region;
     const project = await ensureProject(config, providerState, names, targetRegion);
     const volume = await ensureVolumeResource(config, project.id, providerState, names, {
-      storageSizeMb: config.volumeSizeMb,
+      storageSizeMb: storageSizeMbForState(state, config),
       storageClassName: config.storageClassName,
       accessMode: config.storageAccessMode,
     });
@@ -559,7 +589,7 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     const volume =
       existingVolume ??
       (await ensureVolumeResource(config, project.id, providerState, names, {
-        storageSizeMb: config.volumeSizeMb,
+        storageSizeMb: storageSizeMbForState(state, config),
         storageClassName: config.storageClassName,
         accessMode: config.storageAccessMode,
       }));

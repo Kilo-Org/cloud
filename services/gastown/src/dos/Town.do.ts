@@ -2699,6 +2699,13 @@ export class TownDO extends DurableObject<Env> {
     if (sdkAlive) {
       const isActive =
         mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting';
+      writeEvent(this.env, {
+        event: 'mayor.ensure_decision',
+        townId,
+        agentId: mayor.id,
+        role: 'mayor',
+        label: isActive ? 'short_circuit_warm' : 'short_circuit_idle',
+      });
       return { agentId: mayor.id, sessionStatus: isActive ? 'active' : 'idle' };
     }
 
@@ -2711,6 +2718,13 @@ export class TownDO extends DurableObject<Env> {
         containerStatus: containerStatus.status,
         serverPort: containerStatus.serverPort,
         sessionId: containerStatus.sessionId,
+      });
+      writeEvent(this.env, {
+        event: 'mayor.ensure_decision',
+        townId,
+        agentId: mayor.id,
+        role: 'mayor',
+        label: 'sdk_dead_redispatch',
       });
     }
 
@@ -2730,6 +2744,14 @@ export class TownDO extends DurableObject<Env> {
       });
       return { agentId: mayor.id, sessionStatus: 'idle' };
     }
+
+    writeEvent(this.env, {
+      event: 'mayor.ensure_decision',
+      townId,
+      agentId: mayor.id,
+      role: 'mayor',
+      label: 'fresh_dispatch',
+    });
 
     try {
       const containerStub = getTownContainerStub(this.env, townId);

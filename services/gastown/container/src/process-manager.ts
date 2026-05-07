@@ -1134,6 +1134,12 @@ async function startAgentImpl(
       phase: 'db_hydrated',
       elapsedMs: tDbDone - t0,
     });
+    postEventToWorker('agent.startup_phase', {
+      agentId: request.agentId,
+      role: request.role,
+      label: 'db_hydrated',
+      elapsedMs: tDbDone - t0,
+    });
 
     // 1. Ensure SDK server is running for this workdir
     const sdkExistedBefore = sdkInstances.has(workdir);
@@ -1146,6 +1152,13 @@ async function startAgentImpl(
       elapsedMs: tSdkDone - t0,
       phaseMs: sdkExistedBefore ? 0 : tSdkDone - tDbDone,
       prewarmed: sdkExistedBefore,
+    });
+    postEventToWorker('agent.startup_phase', {
+      agentId: request.agentId,
+      role: request.role,
+      label: 'sdk_ready',
+      elapsedMs: tSdkDone - t0,
+      phaseMs: sdkExistedBefore ? 0 : tSdkDone - tDbDone,
     });
 
     // Check if startup was cancelled while waiting for the SDK server
@@ -1201,6 +1214,13 @@ async function startAgentImpl(
       elapsedMs: tSessionDone - t0,
       phaseMs: tSessionDone - tSdkDone,
       resumed,
+    });
+    postEventToWorker('agent.startup_phase', {
+      agentId: request.agentId,
+      role: request.role,
+      label: 'session_created',
+      elapsedMs: tSessionDone - t0,
+      phaseMs: tSessionDone - tSdkDone,
     });
 
     // Now check if startup was cancelled while creating the session.
@@ -2544,6 +2564,27 @@ export async function stopAll(): Promise<void> {
   sdkInstances.clear();
 }
 
+function postEventToWorker(
+  event: string,
+  data: Record<string, unknown>
+): void {
+  const apiUrl = process.env.GASTOWN_API_URL;
+  const townId = process.env.GASTOWN_TOWN_ID;
+  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+  if (!apiUrl || !townId || !token) return;
+
+  fetch(`${apiUrl}/api/towns/${townId}/container-events`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ event, townId, ...data }),
+  }).catch(err => {
+    console.warn(`${MANAGER_LOG} postEventToWorker failed for ${event}:`, err);
+  });
+}
+
 async function fetchMayorAgentId(
   townId: string,
   apiUrl: string,
@@ -2617,24 +2658,36 @@ async function prewarmMayorSDK(
 
   const existing = sdkInstances.get(workdir);
   if (existing) {
+    const durationMs = Date.now() - t0;
     log.info('mayor.prewarm_complete', {
       agentId: mayorAgentId,
       townId,
       port: parseInt(new URL(existing.server.url).port),
-      durationMs: Date.now() - t0,
+      durationMs,
       alreadyRunning: true,
+    });
+    postEventToWorker('mayor.prewarm_complete', {
+      agentId: mayorAgentId,
+      role: 'mayor',
+      durationMs,
     });
     return;
   }
 
   const { port } = await ensureSDKServer(workdir, env);
 
+  const durationMs = Date.now() - t0;
   log.info('mayor.prewarm_complete', {
     agentId: mayorAgentId,
     townId,
     port,
-    durationMs: Date.now() - t0,
+    durationMs,
     alreadyRunning: false,
+  });
+  postEventToWorker('mayor.prewarm_complete', {
+    agentId: mayorAgentId,
+    role: 'mayor',
+    durationMs,
   });
 }
 

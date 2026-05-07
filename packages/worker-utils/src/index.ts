@@ -37,6 +37,11 @@ export type {
   CloudAgentUpdateSessionInput,
   CloudAgentSendMessageInput,
   CloudAgentSendMessageOutput,
+  CloudAgentSessionHealthInput,
+  CloudAgentSessionHealthOutput,
+  CloudAgentSandboxStatus,
+  CloudAgentSessionExecutionHealth,
+  CloudAgentActiveExecutionStatus,
   CloudAgentInterruptInput,
   CloudAgentInterruptOutput,
 } from './cloud-agent-next-client.js';

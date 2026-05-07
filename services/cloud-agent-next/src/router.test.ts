@@ -897,6 +897,155 @@ describe('router sessionId validation', () => {
       });
     });
 
+    describe('getSessionHealth procedure', () => {
+      let mockContext: TRPCContext;
+      let caller: ReturnType<typeof appRouter.createCaller>;
+      let cloudAgentSession: MockCAS;
+      let mockGetMetadata: ReturnType<typeof vi.fn>;
+      let mockGetActiveExecutionId: ReturnType<typeof vi.fn>;
+      let mockGetExecution: ReturnType<typeof vi.fn>;
+      let mockListProcesses: ReturnType<typeof vi.fn>;
+
+      beforeEach(() => {
+        vi.clearAllMocks();
+
+        mockGetMetadata = vi.fn();
+        mockGetActiveExecutionId = vi.fn().mockResolvedValue(null);
+        mockGetExecution = vi.fn().mockResolvedValue(null);
+        mockListProcesses = vi.fn().mockResolvedValue([]);
+
+        mockContext = {
+          userId: 'test-user-123',
+          authToken: 'test-token',
+          botId: undefined,
+          request: {} as Request,
+          env: {
+            Sandbox: {} as TRPCContext['env']['Sandbox'],
+            SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
+            CLOUD_AGENT_SESSION: {
+              idFromName: vi.fn((id: string) => ({ id })),
+              get: vi.fn(() => ({
+                getMetadata: mockGetMetadata,
+                getActiveExecutionId: mockGetActiveExecutionId,
+                getExecution: mockGetExecution,
+              })),
+            } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
+            SESSION_INGEST: {
+              fetch: vi.fn(),
+            } as unknown as TRPCContext['env']['SESSION_INGEST'],
+            R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+            GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
+            NEXTAUTH_SECRET: 'test-secret',
+            INTERNAL_API_SECRET_PROD: {
+              get: vi.fn().mockResolvedValue('test-secret'),
+            } as unknown as TRPCContext['env']['INTERNAL_API_SECRET_PROD'],
+            HYPERDRIVE: {
+              connectionString: 'postgresql://test',
+            } as unknown as TRPCContext['env']['HYPERDRIVE'],
+          },
+        };
+        cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
+        vi.mocked(getSandbox).mockReturnValue({
+          listProcesses: mockListProcesses,
+        } as unknown as ReturnType<typeof getSandbox>);
+        caller = appRouter.createCaller(mockContext);
+      });
+
+      it('returns healthy sandbox and none execution health when no execution is active', async () => {
+        const sessionId: SessionId = 'agent_88888888-8888-8888-8888-888888888888';
+        const sandboxId = 'ses-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6';
+        mockGetMetadata.mockResolvedValue({
+          version: 123456789,
+          sessionId,
+          userId: 'test-user-123',
+          timestamp: 123456789,
+          sandboxId,
+        } satisfies CloudAgentSessionState);
+
+        const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
+
+        expect(result).toEqual({
+          cloudAgentSessionId: sessionId,
+          sandboxId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+          activeExecutionId: undefined,
+          activeExecutionStatus: undefined,
+        });
+        expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
+        expect(getSandbox).toHaveBeenCalledWith(mockContext.env.SandboxSmall, sandboxId);
+        expect(mockListProcesses).toHaveBeenCalled();
+      });
+
+      it('returns stale execution health for a stale running execution', async () => {
+        const sessionId: SessionId = 'agent_99999999-9999-9999-9999-999999999999';
+        const activeExecutionId = 'exc_stale_execution';
+        mockGetMetadata.mockResolvedValue({
+          version: 123456789,
+          sessionId,
+          orgId: 'org-123',
+          userId: 'test-user-123',
+          timestamp: 123456789,
+        } satisfies CloudAgentSessionState);
+        mockGetActiveExecutionId.mockResolvedValue(activeExecutionId);
+        mockGetExecution.mockResolvedValue({
+          executionId: activeExecutionId,
+          status: 'running',
+          startedAt: Date.now() - 20 * 60 * 1000,
+          mode: 'code',
+          streamingMode: 'websocket',
+          lastHeartbeat: Date.now() - 11 * 60 * 1000,
+        });
+
+        const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
+
+        expect(result).toMatchObject({
+          cloudAgentSessionId: sessionId,
+          sandboxStatus: 'healthy',
+          executionHealth: 'stale',
+          activeExecutionId,
+          activeExecutionStatus: 'running',
+        });
+        expect(mockGetExecution).toHaveBeenCalledWith(activeExecutionId);
+      });
+
+      it('returns NOT_FOUND for missing session metadata', async () => {
+        const sessionId: SessionId = 'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+        mockGetMetadata.mockResolvedValue(null);
+
+        await expect(caller.getSessionHealth({ cloudAgentSessionId: sessionId })).rejects.toThrow(
+          'Session not found'
+        );
+        expect(getSandbox).not.toHaveBeenCalled();
+      });
+
+      it('returns unreachable when sandbox process listing fails', async () => {
+        const sessionId: SessionId = 'agent_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+        const sandboxId = 'ses-b1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6';
+        mockGetMetadata.mockResolvedValue({
+          version: 123456789,
+          sessionId,
+          userId: 'test-user-123',
+          timestamp: 123456789,
+          sandboxId,
+          githubToken: 'secret-token-should-not-be-returned',
+        } satisfies CloudAgentSessionState);
+        mockListProcesses.mockRejectedValue(new Error('sandbox unavailable'));
+
+        const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
+
+        expect(result).toEqual({
+          cloudAgentSessionId: sessionId,
+          sandboxId,
+          sandboxStatus: 'unreachable',
+          executionHealth: 'none',
+          activeExecutionId: undefined,
+          activeExecutionStatus: undefined,
+        });
+        expect(result).not.toHaveProperty('githubToken');
+      });
+    });
+
     describe('getLatestAssistantMessage procedure', () => {
       let mockContext: TRPCContext;
       let caller: ReturnType<typeof appRouter.createCaller>;

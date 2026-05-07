@@ -2,7 +2,8 @@ import { NextResponse, type NextResponse as NextResponseType } from 'next/server
 import { type NextRequest } from 'next/server';
 import { isOpenCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
-import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/ai-gateway/processUsage';
+import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
+import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
 import {
   validateFeatureHeader,
   FEATURE_HEADER,
@@ -84,9 +85,7 @@ import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
-import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
-import { extractResponsesPromptInfo } from '@/lib/ai-gateway/processUsage.responses';
-import { extractMessagesPromptInfo } from '@/lib/ai-gateway/processUsage.messages';
+import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import {
   enableReasoningSummaries,
   fixResponsesRequest,
@@ -120,27 +119,6 @@ function validatePath(
     return { path: pathSuffix };
   }
   return { errorResponse: invalidPathResponse() };
-}
-
-function extractPromptInfo(requestBodyParsed: GatewayRequest): PromptInfo {
-  if (requestBodyParsed.kind === 'messages') {
-    return extractMessagesPromptInfo(requestBodyParsed.body);
-  }
-  if (requestBodyParsed.kind === 'responses') {
-    return extractResponsesPromptInfo(requestBodyParsed.body);
-  }
-  return extractChatCompletionsPromptInfo(requestBodyParsed.body);
-}
-
-function determineFallbackFeature(requestBodyParsed: GatewayRequest): 'direct-gateway' | '' {
-  const { system_prompt_prefix } = extractPromptInfo(requestBodyParsed);
-  if (
-    system_prompt_prefix.includes('You are Kilo') ||
-    system_prompt_prefix.includes('You are a personal assistant running inside OpenClaw')
-  ) {
-    return '';
-  }
-  return 'direct-gateway';
 }
 
 async function resolveRateLimit(

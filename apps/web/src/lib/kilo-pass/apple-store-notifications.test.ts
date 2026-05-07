@@ -2,10 +2,14 @@ import { describe, expect, it } from '@jest/globals';
 import { NotificationTypeV2, Subtype } from '@apple/app-store-server-library';
 import { eq } from 'drizzle-orm';
 
-import { kilo_pass_store_events, kilo_pass_subscriptions } from '@kilocode/db/schema';
+import {
+  kilo_pass_audit_log,
+  kilo_pass_store_events,
+  kilo_pass_subscriptions,
+} from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { KiloPassPaymentProvider } from './enums';
+import { KiloPassAuditLogAction, KiloPassPaymentProvider } from './enums';
 import { processAppStoreKiloPassNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
@@ -241,6 +245,52 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.status).toBe('active');
     expect(subscription?.cancel_at_period_end).toBe(true);
     expect(subscription?.ended_at).toBeNull();
+  });
+
+  it('records failed-renewal notifications without ending the subscription', async () => {
+    const user = await insertTestUser();
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'failed-renewal-initial-buy',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'failed-renewal',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'failed-renewal',
+          notificationType: NotificationTypeV2.DID_FAIL_TO_RENEW,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(
+        kilo_pass_subscriptions.provider_subscription_id,
+        decodedTransaction.originalTransactionId
+      ),
+    });
+    expect(subscription?.status).toBe('active');
+    expect(subscription?.cancel_at_period_end).toBe(false);
+    expect(subscription?.ended_at).toBeNull();
+
+    const auditRow = await db.query.kilo_pass_audit_log.findFirst({
+      where: eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.StoreNotificationReceived),
+    });
+    expect(auditRow?.payload_json).toMatchObject({
+      notificationUUID: 'failed-renewal',
+      notificationType: NotificationTypeV2.DID_FAIL_TO_RENEW,
+      providerSubscriptionId: decodedTransaction.originalTransactionId,
+    });
   });
 
   it('records consumption request notifications without ending the subscription', async () => {

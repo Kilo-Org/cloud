@@ -39,10 +39,7 @@ const RENEWAL_TYPES = new Set<string>([
   NotificationTypeV2.DID_RENEW,
   NotificationTypeV2.SUBSCRIBED,
 ]);
-const EXPIRED_TYPES = new Set<string>([
-  NotificationTypeV2.EXPIRED,
-  NotificationTypeV2.DID_FAIL_TO_RENEW,
-]);
+const EXPIRED_TYPES = new Set<string>([NotificationTypeV2.EXPIRED]);
 const REFUND_TYPES = new Set<string>([NotificationTypeV2.REFUND, NotificationTypeV2.REVOKE]);
 
 const AppleStoreNotificationPayloadSchema = z
@@ -238,6 +235,18 @@ export async function processAppStoreKiloPassNotification(params: {
       result: KiloPassAuditLogResult.Success,
       payload: {
         notificationUUID: notification.notificationUUID,
+        providerSubscriptionId: transaction.originalTransactionId,
+      },
+    });
+  }
+
+  if (transaction && notification.notificationType === NotificationTypeV2.DID_FAIL_TO_RENEW) {
+    await appendKiloPassAuditLog(db, {
+      action: KiloPassAuditLogAction.StoreNotificationReceived,
+      result: KiloPassAuditLogResult.Success,
+      payload: {
+        notificationUUID: notification.notificationUUID,
+        notificationType: notification.notificationType,
         providerSubscriptionId: transaction.originalTransactionId,
       },
     });

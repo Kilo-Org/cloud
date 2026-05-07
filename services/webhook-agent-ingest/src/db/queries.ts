@@ -1,5 +1,10 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { kilocode_users, organizations, organization_memberships } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  kiloclaw_instances,
+  organizations,
+  organization_memberships,
+} from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 
 export { getWorkerDb, type WorkerDb };
@@ -43,6 +48,24 @@ function generateBotStripeCustomerId(): string {
   return `bot_stripe_${Array.from(bytes)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('')}`;
+}
+
+/**
+ * Resolve a kiloclaw_instances.id to its sandbox_id, returning null if the
+ * instance is missing or destroyed. Used by the webhook-to-chat delivery
+ * path to translate a stored trigger config (which holds the instance UUID)
+ * into the sandboxId expected by kilo-chat.
+ */
+export async function findActiveSandboxIdForInstance(
+  db: WorkerDb,
+  instanceId: string
+): Promise<string | null> {
+  const rows = await db
+    .select({ sandbox_id: kiloclaw_instances.sandbox_id })
+    .from(kiloclaw_instances)
+    .where(and(eq(kiloclaw_instances.id, instanceId), isNull(kiloclaw_instances.destroyed_at)))
+    .limit(1);
+  return rows[0]?.sandbox_id ?? null;
 }
 
 export async function findUserForToken(db: WorkerDb, userId: string): Promise<UserForToken | null> {

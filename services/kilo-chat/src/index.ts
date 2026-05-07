@@ -25,6 +25,11 @@ import {
 } from './routes/handler';
 import { registerBotRoutes } from './routes/bot-messages';
 import { registerSandboxReadRoutes } from './routes/sandbox-reads';
+import {
+  postMessageAsUser,
+  type PostMessageAsUserParams,
+  type PostMessageAsUserResult,
+} from './services/post-message-as-user';
 export { MembershipDO } from './do/membership-do';
 export { ConversationDO } from './do/conversation-do';
 export { SandboxStatusDO } from './do/sandbox-status-do';
@@ -97,6 +102,18 @@ registerBotRoutes(app);
 export class KiloChatService extends WorkerEntrypoint<Env> {
   async fetch(request: Request): Promise<Response> {
     return app.fetch(request, this.env, this.ctx);
+  }
+
+  /**
+   * Internal RPC: post a message into the user-bot conversation on behalf
+   * of the user. Used by webhook-agent-ingest for webhook-to-chat delivery
+   * and reusable for other internal flows (e.g. onboarding warmup).
+   *
+   * Auto-creates the conversation by default if the user has never opened
+   * one. Pass `autoCreateConversation: false` to fail when none exists.
+   */
+  async postMessageAsUser(params: PostMessageAsUserParams): Promise<PostMessageAsUserResult> {
+    return await postMessageAsUser(this.env, { waitUntil: p => this.ctx.waitUntil(p) }, params);
   }
 
   async destroySandboxData(

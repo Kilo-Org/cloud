@@ -19,6 +19,7 @@ import type {
   IntegrationPermissions,
   Owner,
 } from '@/lib/integrations/core/types';
+import { parseStateReturn } from '@/lib/integrations/validate-return-path';
 import { captureException, captureMessage } from '@sentry/nextjs';
 
 /**
@@ -40,23 +41,25 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const installationId = searchParams.get('installation_id') ?? '';
     const setupAction = searchParams.get('setup_action');
-    const state = searchParams.get('state'); // Contains owner info (org_ID or user_ID)
+    const rawState = searchParams.get('state');
 
-    // 3. Parse owner from state
+    // 3. Parse owner from state (with optional |return=<path> suffix)
+    const { ownerToken, returnTo } = parseStateReturn(rawState);
+
     let owner: Owner;
     let ownerId: string;
 
-    if (state?.startsWith('org_')) {
-      ownerId = state.replace('org_', '');
+    if (ownerToken.startsWith('org_')) {
+      ownerId = ownerToken.slice(4);
       owner = { type: 'org', id: ownerId };
-    } else if (state?.startsWith('user_')) {
-      ownerId = state.replace('user_', '');
+    } else if (ownerToken.startsWith('user_')) {
+      ownerId = ownerToken.slice(5);
       owner = { type: 'user', id: ownerId };
     } else {
       captureMessage('GitHub callback missing or invalid owner in state', {
         level: 'warning',
         tags: { endpoint: 'github/callback', source: 'github_app_installation' },
-        extra: { installationId, state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: { installationId, rawState, allParams: Object.fromEntries(searchParams.entries()) },
       });
       return NextResponse.redirect(new URL('/', request.url));
     }
@@ -172,7 +175,7 @@ export async function GET(request: NextRequest) {
       captureMessage('GitHub callback missing installation_id', {
         level: 'warning',
         tags: { endpoint: 'github/callback', source: 'github_app_installation' },
-        extra: { setupAction, state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: { setupAction, rawState, allParams: Object.fromEntries(searchParams.entries()) },
       });
 
       const redirectPath =
@@ -291,8 +294,9 @@ export async function GET(request: NextRequest) {
     }
 
     // 9. Redirect to success page
-    const successPath =
-      owner.type === 'org'
+    const successPath = returnTo
+      ? `${returnTo}${returnTo.includes('?') ? '&' : '?'}github_install=success`
+      : owner.type === 'org'
         ? `/organizations/${owner.id}/integrations/github?success=installed`
         : `/integrations/github?success=installed`;
 
@@ -302,7 +306,7 @@ export async function GET(request: NextRequest) {
 
     // Capture error to Sentry with context for debugging
     const searchParams = request.nextUrl.searchParams;
-    const state = searchParams.get('state');
+    const rawState = searchParams.get('state');
 
     captureException(error, {
       tags: {
@@ -312,17 +316,16 @@ export async function GET(request: NextRequest) {
       extra: {
         installationId: searchParams.get('installation_id'),
         setupAction: searchParams.get('setup_action'),
-        state,
+        rawState,
       },
     });
 
-    // Determine redirect path based on state parameter
     let redirectPath = '/?error=installation_failed';
 
-    if (state?.startsWith('org_')) {
-      const orgId = state.replace('org_', '');
+    if (rawState?.startsWith('org_')) {
+      const orgId = rawState.replace('org_', '');
       redirectPath = `/organizations/${orgId}/integrations/github?error=installation_failed`;
-    } else if (state?.startsWith('user_')) {
+    } else if (rawState?.startsWith('user_')) {
       redirectPath = `/integrations/github?error=installation_failed`;
     }
 

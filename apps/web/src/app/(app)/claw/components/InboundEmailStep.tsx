@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,20 @@ export function InboundEmailStepView({
   const ready = Boolean(address) && enabled;
   const canContinue = !loading;
 
+  // Track the "reset Copied state after 2s" timer so we can clear it on
+  // unmount (or when the user clicks Copy again before the previous timer
+  // fires). Without this, navigating away within the 2s window leaves a
+  // pending setCopied(false) call against an unmounted component.
+  const copyResetTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current);
+        copyResetTimerRef.current = null;
+      }
+    };
+  }, []);
+
   async function handleCopy() {
     if (!address) return;
     if (!navigator.clipboard?.writeText) {
@@ -48,7 +62,13 @@ export function InboundEmailStepView({
       toast.success('Inbound email address copied');
       onCopyClick?.();
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+      copyResetTimerRef.current = window.setTimeout(() => {
+        setCopied(false);
+        copyResetTimerRef.current = null;
+      }, 2000);
     } catch {
       toast.error('Failed to copy inbound email address');
     }

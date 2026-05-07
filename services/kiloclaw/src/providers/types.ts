@@ -1,4 +1,5 @@
 import type { KiloClawEnv } from '../types';
+import type { InstanceTierKey } from '@kilocode/kiloclaw-instance-tiers';
 import type {
   MachineSize,
   PersistedState,
@@ -80,6 +81,10 @@ export type DestroyRuntimeArgs = ProviderContext;
 
 export type DestroyStorageArgs = ProviderContext;
 
+export type ResizeRuntimeArgs = ProviderContext & {
+  targetTier: InstanceTierKey;
+};
+
 export type InstanceProviderAdapter = {
   readonly id: ProviderId;
   readonly capabilities: ProviderCapabilities;
@@ -89,6 +94,7 @@ export type InstanceProviderAdapter = {
   startRuntime(args: StartRuntimeArgs): Promise<ProviderResult>;
   stopRuntime(args: StopRuntimeArgs): Promise<ProviderResult>;
   restartRuntime(args: RestartRuntimeArgs): Promise<ProviderResult>;
+  resizeRuntime?(args: ResizeRuntimeArgs): Promise<ProviderResult>;
   inspectRuntime(args: ProviderContext): Promise<ProviderResult>;
   destroyRuntime(args: DestroyRuntimeArgs): Promise<ProviderResult>;
   destroyStorage(args: DestroyStorageArgs): Promise<ProviderResult>;

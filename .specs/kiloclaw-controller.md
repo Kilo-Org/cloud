@@ -583,6 +583,36 @@ Other values MUST return 400.
 4. If the shutdown sequence itself fails, the controller MUST exit
    with code 1.
 
+## Provider Tier Resize
+
+Tier resize changes the runtime hardware contract associated with an
+instance's persisted `instanceType`, `machineSize`, and `volumeSizeGb`.
+The implementation details are provider-specific, but the following
+invariants apply to all providers.
+
+1. A resize operation MUST NOT persist a new `instanceType`,
+   `machineSize`, or `volumeSizeGb` until the backing provider has
+   accepted and confirmed the corresponding runtime and storage change.
+2. If the provider resize fails or times out, the Durable Object tier
+   state MUST remain unchanged. A provider may still complete an
+   already-accepted operation later; the persisted KiloClaw state MUST
+   prefer not claiming success prematurely over guessing provider state.
+3. Fly resize MUST grow storage before tier persistence when the target
+   tier requires a larger volume. Fly resize MAY require the machine to
+   be stopped before the operation.
+4. docker-local resize MAY persist tier state without a provider storage
+   call because docker-local storage is not capped by KiloClaw. CPU and
+   memory limits apply on the next container recreation.
+5. Northflank resize MUST use deployment rollout semantics: patch the
+   deployment service compute plan, wait until Northflank reports the
+   deployment completed, then persist tier state. When storage grows,
+   the Northflank volume MUST be updated before persisting the larger
+   `volumeSizeGb`.
+6. Runtime tier state and billing state are separate until tier-aware
+   billing is specified. Resizing runtime hardware MUST NOT mutate
+   subscription or payment records unless a billing spec explicitly
+   requires it.
+
 ## Error Handling
 
 1. All degraded-state error strings exposed on the unauthenticated

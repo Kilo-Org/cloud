@@ -2731,7 +2731,7 @@ export const kiloclawRouter = createTRPCRouter({
     }
 
     if (isFakeSeedInstance(instance)) {
-      return createFakeSeedInstanceStatus(instance, workerUrl);
+      return createFakeSeedInstanceStatus(instance, legacyWorkerUrl);
     }
 
     const client = new KiloClawInternalClient();

@@ -1,8 +1,9 @@
 import {
   mergeProfileConfiguration,
   type MergeProfileConfigurationResult,
-} from '@/lib/agent/profile-session-config';
-import type { ProfileOwner } from '@/lib/agent/types';
+  type ProfileOwner,
+} from '@kilocode/cloud-agent-profile';
+import { db } from '@/lib/drizzle';
 import type { Owner } from '@/lib/integrations/core/types';
 
 export type BotSessionProfileArgs = {
@@ -18,8 +19,8 @@ export type BotSessionProfileArgs = {
  *   - Layer 1: repo-binding profile (if any)
  *   - Layer 2: owner's default profile (effective default for orgs)
  *
- * The bot never supplies a `profileName`, so the explicit-name resolution path
- * in `mergeProfileConfiguration` is not used.
+ * The bot never supplies a `profileId`, so the caller always gets the
+ * default-resolution path.
  */
 export async function resolveBotSessionProfile(
   owner: Owner,
@@ -33,7 +34,7 @@ export async function resolveBotSessionProfile(
   const repoFullName = args.gitlabProject ?? args.githubRepo;
   const platform: 'github' | 'gitlab' = args.gitlabProject ? 'gitlab' : 'github';
 
-  return mergeProfileConfiguration({
+  return mergeProfileConfiguration(db, {
     owner: profileOwner,
     userId: userIdForMerge,
     repoFullName,

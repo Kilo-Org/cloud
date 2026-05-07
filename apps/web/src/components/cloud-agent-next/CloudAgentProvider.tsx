@@ -14,21 +14,9 @@ import {
   type CloudAgentSessionId,
 } from '@/lib/cloud-agent-sdk';
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
-import type { AgentMode } from './types';
 import { usePostHog } from 'posthog-js/react';
 
 const ManagerContext = createContext<SessionManager | null>(null);
-const CLOUD_AGENT_NEXT_MODES = [
-  'code',
-  'plan',
-  'debug',
-  'orchestrator',
-  'ask',
-] satisfies AgentMode[];
-
-function isCloudAgentNextMode(mode: string | undefined): mode is AgentMode {
-  return CLOUD_AGENT_NEXT_MODES.some(validMode => validMode === mode);
-}
 
 type CloudAgentProviderProps = {
   children: ReactNode;
@@ -122,7 +110,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
 
       api: {
         send: async payload => {
-          const mode = isCloudAgentNextMode(payload.mode) ? payload.mode : 'code';
+          const mode = payload.mode ?? 'code';
           if (payload.model === undefined) {
             throw new Error('Cloud Agent model is required');
           }
@@ -282,6 +270,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           isPreparingAsync: Boolean(rs && !rs.preparedAt),
           prompt: rs?.prompt ?? null,
           initialMessageId: rs?.initialMessageId ?? null,
+          runtimeAgents: rs?.runtimeAgents,
         };
       },
 

@@ -1,5 +1,4 @@
-import 'server-only';
-import { db } from '@/lib/drizzle';
+import type { WorkerDb } from '@kilocode/db';
 import { agent_environment_profile_commands } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { ProfileOwner, ProfileCommandResponse } from './types';
@@ -10,11 +9,12 @@ import { verifyProfileOwnership } from './profile-utils';
  * Replaces all existing commands with the new list.
  */
 export async function setCommands(
+  db: WorkerDb,
   profileId: string,
   commands: string[],
   owner: ProfileOwner
 ): Promise<void> {
-  await verifyProfileOwnership(profileId, owner);
+  await verifyProfileOwnership(db, profileId, owner);
 
   await db.transaction(async tx => {
     // Delete existing commands
@@ -39,10 +39,11 @@ export async function setCommands(
  * List commands for a profile in order.
  */
 export async function listCommands(
+  db: WorkerDb,
   profileId: string,
   owner: ProfileOwner
 ): Promise<ProfileCommandResponse[]> {
-  await verifyProfileOwnership(profileId, owner);
+  await verifyProfileOwnership(db, profileId, owner);
 
   const commands = await db
     .select({
@@ -61,7 +62,7 @@ export async function listCommands(
  * Returns just the command strings in order.
  * This is an internal function - no ownership check.
  */
-export async function getCommandsForSession(profileId: string): Promise<string[]> {
+export async function getCommandsForSession(db: WorkerDb, profileId: string): Promise<string[]> {
   const commands = await db
     .select({
       command: agent_environment_profile_commands.command,

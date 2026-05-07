@@ -1,5 +1,4 @@
-import 'server-only';
-import { db } from '@/lib/drizzle';
+import type { WorkerDb } from '@kilocode/db';
 import { agent_environment_profiles } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -18,7 +17,7 @@ export function buildOwnershipCondition(owner: ProfileOwner) {
  * Verify that a profile exists and is owned by the specified owner.
  * @throws TRPCError with NOT_FOUND if profile doesn't exist or isn't owned by the owner
  */
-export async function verifyProfileOwnership(profileId: string, owner: ProfileOwner) {
+export async function verifyProfileOwnership(db: WorkerDb, profileId: string, owner: ProfileOwner) {
   const [profile] = await db
     .select()
     .from(agent_environment_profiles)

@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
-import { Check, Sparkles, TriangleAlert, X } from 'lucide-react';
+import { Loader2, TriangleAlert, X } from 'lucide-react';
 import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
@@ -30,7 +31,6 @@ import {
   isPairingChannel,
   type ClawOnboardingMode,
   type OnboardingStep,
-  type PopulatedClawStatus,
 } from './ClawOnboardingFlow.state';
 
 function MaybeBillingWrapper({
@@ -158,6 +158,7 @@ function ClawOnboardingFlowInner({
   const { data: isServiceDegraded } = useClawServiceDegraded();
   useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
+  const router = useRouter();
 
   // Save bot identity, exec preset, and channel tokens as soon as the instance
   // row exists. This closes the tab-close window where customizations entered
@@ -215,6 +216,28 @@ function ClawOnboardingFlowInner({
   }, [onCreateFlowFailed, resetWizardSelections]);
 
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
+
+  // NOTE: When mode === 'post-provisioning' (i.e. an existing instance is
+  // already running) and the gateway is ready, renderStep is 'complete' on
+  // first render and the redirect below fires immediately. This is intentional:
+  // the onboarding wizard is for new users; returning users with a working
+  // instance go straight to chat rather than seeing a wizard surface.
+  const hasRedirectedToChat = useRef(false);
+  useEffect(() => {
+    // Wait for the gateway to actually be ready before redirecting; the chat
+    // page's conversation requests will hang indefinitely if the gateway is
+    // still warming up.
+    if (
+      flowState.renderStep !== 'complete' ||
+      !flowState.gatewayReady ||
+      hasRedirectedToChat.current
+    ) {
+      return;
+    }
+    hasRedirectedToChat.current = true;
+    posthog?.capture('claw_setup_open_chat_clicked', { auto_redirect: true });
+    router.push(`${basePath}/chat`);
+  }, [flowState.renderStep, flowState.gatewayReady, basePath, router, posthog]);
 
   function provisionInstance(userLocation?: string) {
     handleCreateFlowStarted();
@@ -366,13 +389,7 @@ function ClawOnboardingFlowInner({
   }
 
   function renderCompleteStep() {
-    return (
-      <ClawSetupCompleteStep
-        status={flowState.instanceStatus}
-        gatewayReady={flowState.gatewayReady}
-        basePath={basePath}
-      />
-    );
+    return <ClawSetupCompleteStep gatewayReady={flowState.gatewayReady} />;
   }
 
   function renderErrorStep() {
@@ -476,73 +493,19 @@ export function ClawSetupErrorStep({ basePath }: { basePath: string }) {
   );
 }
 
-export function ClawSetupCompleteStep({
-  status,
-  gatewayReady,
-  basePath,
-}: {
-  status: PopulatedClawStatus | null;
-  gatewayReady: boolean;
-  basePath: string;
-}) {
-  const posthog = usePostHog();
-
+// Renders the "complete" step in the onboarding flow. Production use is brief:
+// it shows during the warmup window after provisioning finishes, then the
+// auto-redirect effect in ClawOnboardingFlowInner pushes the user to /chat as
+// soon as gatewayReady flips true. Also rendered by ClawOnboardingFakeWalkthrough
+// so designers can preview this state.
+export function ClawSetupCompleteStep({ gatewayReady }: { gatewayReady: boolean }) {
   return (
     <Card className="mt-6 overflow-hidden">
-      <CardContent className="flex flex-col items-center justify-center gap-6 pt-12">
-        <div className="relative">
-          <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-emerald-700/30 bg-emerald-900/50">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-emerald-500">
-              <Check className="h-6 w-6 text-emerald-500" />
-            </div>
-          </div>
-          <div className="absolute -top-3 -right-3 flex h-6 w-6 items-center justify-center rounded-full bg-[#09090b] text-amber-400">
-            <Sparkles className="h-4 w-4" />
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-2">
-          <h2 className="text-2xl font-bold">Your instance is ready!</h2>
-          <p className="text-muted-foreground max-w-md text-center">
-            KiloClaw has been provisioned and configured with your settings. You&apos;re all set to
-            start.
-          </p>
-        </div>
-
-        {status?.flyRegion && (
-          <div className="border-border/50 flex items-center gap-2 rounded-full border px-4 py-2">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            </span>
-            <span className="text-muted-foreground flex items-center gap-2 text-sm">
-              Active ·{' '}
-              <span className="text-foreground font-bold">{status.flyRegion.toUpperCase()}</span>{' '}
-              region
-            </span>
-          </div>
-        )}
-        <div className="flex w-full flex-col gap-3">
-          {gatewayReady && (
-            <Button
-              asChild
-              variant="primary"
-              className="w-full min-w-[180px] bg-emerald-600 py-6 text-base text-white hover:bg-emerald-700"
-              onClick={() => posthog?.capture('claw_setup_open_chat_clicked')}
-            >
-              <Link href={`${basePath}/chat`}>Open KiloClaw</Link>
-            </Button>
-          )}
-          <Button asChild className="w-full py-6 text-base" variant="outline">
-            <Link
-              href={basePath}
-              onClick={() => posthog?.capture('claw_setup_close_wizard_clicked')}
-            >
-              <X className="mr-2 h-4 w-4" />
-              Close Wizard
-            </Link>
-          </Button>
-        </div>
+      <CardContent className="flex flex-col items-center justify-center gap-4 pt-12">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+        <p className="text-muted-foreground text-sm">
+          {gatewayReady ? 'Opening chat…' : 'Almost ready — finishing up your instance…'}
+        </p>
       </CardContent>
     </Card>
   );

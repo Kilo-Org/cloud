@@ -55,7 +55,7 @@ type RunBotAgentParams = {
   rawMessage?: Message;
   platformIntegration: PlatformIntegration;
   user: User;
-  botRequestId: string | undefined;
+  botRequestId: string;
   prompt: string;
   /** Pre-uploaded image attachments from the user's message (already in R2). */
   images?: Images;
@@ -238,13 +238,11 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
   const initialSteps = params.initialSteps ?? [];
   const completedStepCount = Math.max(params.completedStepCount ?? 0, initialSteps.length);
   const remainingIterations = getRemainingBotIterations(completedStepCount);
-  const spawnGroupId = params.botRequestId ? randomUUID() : undefined;
+  const spawnGroupId = randomUUID();
   const collectedSteps: BotRequestStep[] = [];
   let startedCloudAgentSession = false;
 
-  if (params.botRequestId) {
-    updateBotRequest(params.botRequestId, { modelUsed: modelSlug });
-  }
+  updateBotRequest(params.botRequestId, { modelUsed: modelSlug });
 
   if (remainingIterations <= 0) {
     return {
@@ -315,11 +313,9 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
 
           // Persist the session link synchronously so callbacks can
           // correlate immediately — must complete before we return.
-          if (params.botRequestId && resolvedCloudAgentSessionId) {
+          if (resolvedCloudAgentSessionId) {
             await linkBotRequestToSession(params.botRequestId, resolvedCloudAgentSessionId);
-          }
 
-          if (params.botRequestId && spawnGroupId && resolvedCloudAgentSessionId) {
             await recordBotRequestCloudAgentSession({
               botRequestId: params.botRequestId,
               spawnGroupId,
@@ -338,9 +334,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
     },
     onStepFinish: step => {
       collectedSteps.push(serializeStep(step, completedStepCount));
-      if (params.botRequestId) {
-        updateBotRequest(params.botRequestId, { steps: [...initialSteps, ...collectedSteps] });
-      }
+      updateBotRequest(params.botRequestId, { steps: [...initialSteps, ...collectedSteps] });
     },
   });
 

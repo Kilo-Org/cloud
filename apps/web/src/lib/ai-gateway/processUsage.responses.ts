@@ -18,6 +18,7 @@ import {
   drainSseStream,
   extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
+import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
@@ -204,7 +205,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
 
   const coreProps = {
     messageId,
-    hasError: reportedError || wasAborted,
+    hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
     model,
     responseContent,
     inference_provider,

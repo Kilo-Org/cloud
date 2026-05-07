@@ -28,6 +28,7 @@ export function OrgChatRootLayoutClient({
       instanceErrorMessage={instanceErrorMessage}
       onRetryInstanceStatus={() => void refetch()}
       assistantName={status?.botName ?? null}
+      assistantEmoji={status?.botEmoji ?? null}
     >
       {children}
     </KiloChatLayout>

@@ -16,7 +16,11 @@ function resolveDts(base) {
 }
 
 export default {
-  external: ['pg', '@tanstack/react-query', '@trpc/client', 'next/server'],
+  // @kilocode/encryption is type-only and never exposed in router I/O, so we
+  // externalize it to avoid relying on tsgo emitting its transitive d.ts files
+  // (which has been flaky in CI). Any unused imports get pruned by rollup's
+  // tree-shaking, so the final bundle is unchanged.
+  external: ['pg', '@tanstack/react-query', '@trpc/client', 'next/server', '@kilocode/encryption'],
   input: './dist/tsc/packages/trpc/src/index.d.ts',
   output: {
     file: './dist/index.d.ts',
@@ -35,10 +39,6 @@ export default {
         if (source === '@kilocode/db' || source.startsWith('@kilocode/db/')) {
           const subpath = source === '@kilocode/db' ? 'index' : source.replace('@kilocode/db/', '');
           return resolveDts(path.resolve(tscOut, 'packages/db/src', subpath));
-        }
-        // Resolve @kilocode/encryption
-        if (source === '@kilocode/encryption') {
-          return resolveDts(path.resolve(tscOut, 'packages/encryption/src/index'));
         }
         return null;
       },

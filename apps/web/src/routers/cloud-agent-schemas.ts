@@ -4,8 +4,19 @@ import * as z from 'zod';
  * Shared schemas for cloud agent routers
  */
 
-// Agent mode enum
-export const agentModeSchema = z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']);
+/**
+ * Agent mode slug accepted by session endpoints.
+ *
+ * Built-in slugs (code, ask, architect, debug, orchestrator, build, plan, custom)
+ * or any custom agent slug defined on the session's profile. cloud-agent-next
+ * cross-validates custom slugs against the session's stored `runtimeAgents`, so
+ * we accept any slug-shaped string here.
+ */
+export const agentModeSchema = z
+  .string()
+  .min(1)
+  .max(50)
+  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug');
 
 // Base configuration shared by all MCP server types
 const mcpServerBaseConfigSchema = z.object({
@@ -149,8 +160,11 @@ export const basePrepareSessionSchema = z
       .regex(/^[a-zA-Z]+$/)
       .optional(),
 
-    // Optional environment profile name (resolved server-side)
-    profileName: z.string().max(100).optional(),
+    /**
+     * Optional environment profile id. When omitted, the effective default
+     * profile (personal default wins over org default) is used.
+     */
+    profileId: z.uuid().optional(),
 
     // Optional configuration
     envVars: z.record(z.string().max(256), z.string().max(256)).optional(),

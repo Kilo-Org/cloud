@@ -246,6 +246,9 @@ export const ManyProfiles: Story = {
       updatedAt: '2025-01-01T00:00:00Z',
       varCount: Math.floor(Math.random() * 10),
       commandCount: Math.floor(Math.random() * 5),
+      mcpServerCount: Math.floor(Math.random() * 3),
+      skillCount: Math.floor(Math.random() * 3),
+      agentCount: Math.floor(Math.random() * 2),
     }));
     return <ProfileSelectorWrapper profiles={manyProfiles} />;
   },

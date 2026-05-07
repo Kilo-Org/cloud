@@ -12,6 +12,7 @@ import { useManager } from './CloudAgentProvider';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
+import type { ModeOption } from '@/components/shared/ModeCombobox';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { MessageBubble } from './MessageBubble';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
@@ -275,11 +276,24 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const handleSendMessage = useCallback(
     async (prompt: string, images?: Images) => {
       setChatUI({ shouldAutoScroll: true });
+      const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
+        a => a.slug === sessionConfig?.mode
+      );
+      const agentModelOverrideForSend = selectedRuntimeAgentForSend?.model?.trim() || undefined;
+      // An agent's variant only applies when it also pins a model — variants
+      // are model-specific (validated at write time in AgentConfigSchema). When
+      // an agent pins a model, its variant (if any) wins; otherwise the
+      // user-selected session variant applies.
+      const agentVariantOverrideForSend = agentModelOverrideForSend
+        ? selectedRuntimeAgentForSend?.variant?.trim() || undefined
+        : undefined;
       const acceptedPromise = manager.send({
         prompt,
         mode: sessionConfig?.mode ?? 'code',
-        model: sessionConfig?.model ?? '',
-        variant: sessionConfig?.variant ?? undefined,
+        model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
+        variant: agentModelOverrideForSend
+          ? agentVariantOverrideForSend
+          : (sessionConfig?.variant ?? undefined),
         images,
       });
       scheduleScrollToBottom();
@@ -328,6 +342,36 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     [manager]
   );
 
+  // Expose the session's custom agents to the chat picker. Slug + name only;
+  // the full config stays server-side. `GetSessionOutput.runtimeAgents`
+  // already filters to enabled & non-hidden at send time, so we just pass
+  // through.
+  const customModeOptions: ModeOption<AgentMode>[] | undefined = sessionConfig?.runtimeAgents
+    ?.length
+    ? sessionConfig.runtimeAgents.map(a => ({
+        value: a.slug as AgentMode,
+        label: a.name,
+        description: '',
+      }))
+    : undefined;
+
+  // If the selected custom agent pins a model, the chat model picker must
+  // reflect + lock that value. The agent's `variant` is only meaningful when
+  // it also pins a model (variants are model-specific, validated at write
+  // time in AgentConfigSchema), so we surface it alongside the locked model.
+  const selectedRuntimeAgent = sessionConfig?.runtimeAgents?.find(
+    a => a.slug === sessionConfig?.mode
+  );
+  const agentModelOverride = selectedRuntimeAgent?.model?.trim() || undefined;
+  const agentVariantOverride = agentModelOverride
+    ? selectedRuntimeAgent?.variant?.trim() || undefined
+    : undefined;
+  const displayModel = agentModelOverride ?? sessionConfig?.model;
+  const modelPickerLocked = !!agentModelOverride;
+  const lockTooltip = modelPickerLocked
+    ? `Locked by agent "${selectedRuntimeAgent?.name}"`
+    : undefined;
+
   const handleModeChange = useCallback(
     (mode: AgentMode) => {
       if (sessionConfig) setSessionConfig({ ...sessionConfig, mode });
@@ -374,6 +418,14 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     ? formatShortModelDisplayName(currentModelOption.name)
     : undefined;
   const availableVariants = currentModelOption?.variants ?? [];
+  // When an agent locks the model, swap the user's session variant for the
+  // agent's variant (which may be undefined — i.e. no thinking-effort chip).
+  // The variant picker is hidden in that case; it only shows when the user is
+  // free to pick their own model.
+  const displayVariant = modelPickerLocked
+    ? agentVariantOverride
+    : (sessionConfig?.variant ?? undefined);
+  const displayAvailableVariants = modelPickerLocked ? [] : availableVariants;
 
   const placeholder = isLoading
     ? 'Loading session…'
@@ -507,16 +559,21 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                         placeholder={placeholder}
                         slashCommands={availableCommands}
                         mode={sessionConfig?.mode as AgentMode | undefined}
-                        model={sessionConfig?.model}
+                        model={displayModel}
                         modelOptions={modelOptions}
                         isLoadingModels={isLoadingModels}
                         onModeChange={handleModeChange}
                         onModelChange={handleModelChange}
-                        variant={sessionConfig?.variant ?? undefined}
+                        variant={displayVariant}
                         onVariantChange={handleVariantChange}
-                        availableVariants={availableVariants}
+                        availableVariants={displayAvailableVariants}
                         showToolbar={Boolean(sessionIdFromParams)}
                         initialValue={failedPrompt ?? undefined}
+                        customModeOptions={customModeOptions}
+                        modelPickerDisabled={modelPickerLocked}
+                        modelPickerTooltip={lockTooltip}
+                        variantPickerDisabled={modelPickerLocked}
+                        variantPickerTooltip={lockTooltip}
                         imageUploadOptions={{
                           messageUuid: imageMessageUuid,
                           organizationId,

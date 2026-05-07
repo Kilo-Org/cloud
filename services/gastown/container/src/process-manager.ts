@@ -30,6 +30,7 @@ type SDKInstance = {
   client: KiloClient;
   server: { url: string; close(): void };
   sessionCount: number;
+  configContent?: string;
 };
 
 const agents = new Map<string, ManagedAgent>();
@@ -581,6 +582,12 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
  * corrupting each other's globals. Once created, the SDK instance is
  * cached and returned without locking.
  */
+const PERSIST_ENV_KEYS = new Set([
+  'KILO_CONFIG_CONTENT',
+  'OPENCODE_CONFIG_CONTENT',
+  'GASTOWN_ORGANIZATION_ID',
+]);
+
 async function ensureSDKServer(
   workdir: string,
   env: Record<string, string>
@@ -588,10 +595,23 @@ async function ensureSDKServer(
   // Fast path: reuse existing instance without locking.
   const existing = sdkInstances.get(workdir);
   if (existing) {
-    return {
-      client: existing.client,
-      port: parseInt(new URL(existing.server.url).port),
-    };
+    const newConfig = env.KILO_CONFIG_CONTENT;
+    if (newConfig && newConfig !== existing.configContent) {
+      console.log(
+        `${MANAGER_LOG} ensureSDKServer: config mismatch for ${workdir}, evicting prewarmed server`
+      );
+      existing.server.close();
+      sdkInstances.delete(workdir);
+    } else {
+      for (const key of PERSIST_ENV_KEYS) {
+        const value = env[key];
+        if (value) process.env[key] = value;
+      }
+      return {
+        client: existing.client,
+        port: parseInt(new URL(existing.server.url).port),
+      };
+    }
   }
 
   // Slow path: serialize server creation. createKilo() reads process.cwd()
@@ -611,25 +631,27 @@ async function ensureSDKServer(
     // Re-check after acquiring lock — another caller may have created it.
     const cached = sdkInstances.get(workdir);
     if (cached) {
-      return {
-        client: cached.client,
-        port: parseInt(new URL(cached.server.url).port),
-      };
+      const newConfig = env.KILO_CONFIG_CONTENT;
+      if (newConfig && newConfig !== cached.configContent) {
+        console.log(
+          `${MANAGER_LOG} ensureSDKServer: config mismatch for ${workdir} (locked), evicting prewarmed server`
+        );
+        cached.server.close();
+        sdkInstances.delete(workdir);
+      } else {
+        for (const key of PERSIST_ENV_KEYS) {
+          const value = env[key];
+          if (value) process.env[key] = value;
+        }
+        return {
+          client: cached.client,
+          port: parseInt(new URL(cached.server.url).port),
+        };
+      }
     }
 
     const port = nextPort++;
     console.log(`${MANAGER_LOG} Starting SDK server on port ${port} for ${workdir}`);
-
-    // Keys that must persist on process.env after the SDK server starts.
-    // KILO_CONFIG_CONTENT / OPENCODE_CONFIG_CONTENT carry the kilo provider
-    // auth config (including organizationId) and must survive the snapshot
-    // restore so extractOrganizationId() and subsequent model hot-swaps can
-    // read them. GASTOWN_ORGANIZATION_ID is the standalone org ID env var.
-    const PERSIST_ENV_KEYS = new Set([
-      'KILO_CONFIG_CONTENT',
-      'OPENCODE_CONFIG_CONTENT',
-      'GASTOWN_ORGANIZATION_ID',
-    ]);
 
     const envSnapshot: Record<string, string | undefined> = {};
     for (const key of Object.keys(env)) {
@@ -646,7 +668,12 @@ async function ensureSDKServer(
         timeout: 30_000,
       });
 
-      const instance: SDKInstance = { client, server, sessionCount: 0 };
+      const instance: SDKInstance = {
+        client,
+        server,
+        sessionCount: 0,
+        configContent: env.KILO_CONFIG_CONTENT,
+      };
       sdkInstances.set(workdir, instance);
 
       console.log(`${MANAGER_LOG} SDK server started: ${server.url}`);
@@ -2625,8 +2652,6 @@ function buildPrewarmEnv(mayorAgentId: string): Record<string, string> {
     'GASTOWN_CONTAINER_TOKEN',
     'GASTOWN_TOWN_ID',
     'KILOCODE_TOKEN',
-    'KILO_CONFIG_CONTENT',
-    'OPENCODE_CONFIG_CONTENT',
     'GASTOWN_ORGANIZATION_ID',
     'KILO_API_URL',
     'KILO_OPENROUTER_BASE',
@@ -2635,6 +2660,20 @@ function buildPrewarmEnv(mayorAgentId: string): Record<string, string> {
     const value = process.env[key];
     if (value) env[key] = value;
   }
+
+  const kilocodeToken = env.KILOCODE_TOKEN;
+  if (kilocodeToken) {
+    const organizationId = env.GASTOWN_ORGANIZATION_ID || undefined;
+    const configJson = buildKiloConfigContent(
+      kilocodeToken,
+      'anthropic/claude-sonnet-4.6',
+      'anthropic/claude-haiku-4.5',
+      organizationId
+    );
+    env.KILO_CONFIG_CONTENT = configJson;
+    env.OPENCODE_CONFIG_CONTENT = configJson;
+  }
+
   return env;
 }
 

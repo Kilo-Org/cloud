@@ -63,6 +63,7 @@ describe('completeStoreKiloPassPurchase', () => {
       status: 'active',
       tier: KiloPassTier.Tier49,
       cadence: KiloPassCadence.Monthly,
+      current_streak_months: 1,
     });
 
     const storePurchases = await db
@@ -161,6 +162,66 @@ describe('completeStoreKiloPassPurchase', () => {
       .from(kilo_pass_issuance_items)
       .where(eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuances[0]?.id ?? ''));
     expect(items).toHaveLength(1);
+  });
+
+  it('increments the streak for consecutive App Store monthly renewals', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+
+    const first = await completeStoreKiloPassPurchase({
+      user,
+      purchase: applePurchase({
+        providerSubscriptionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        providerTransactionId: `tx-${crypto.randomUUID()}`,
+        purchasedAtIso: '2026-01-05T12:00:00.000Z',
+      }),
+    });
+    await completeStoreKiloPassPurchase({
+      user,
+      purchase: applePurchase({
+        providerSubscriptionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        providerTransactionId: `tx-${crypto.randomUUID()}`,
+        purchasedAtIso: '2026-02-05T12:00:00.000Z',
+      }),
+    });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, first.subscriptionId),
+    });
+
+    expect(subscription?.current_streak_months).toBe(2);
+  });
+
+  it('resets the App Store monthly streak when a renewal month is missing', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+
+    const first = await completeStoreKiloPassPurchase({
+      user,
+      purchase: applePurchase({
+        providerSubscriptionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        providerTransactionId: `tx-${crypto.randomUUID()}`,
+        purchasedAtIso: '2026-01-05T12:00:00.000Z',
+      }),
+    });
+    await completeStoreKiloPassPurchase({
+      user,
+      purchase: applePurchase({
+        providerSubscriptionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        providerTransactionId: `tx-${crypto.randomUUID()}`,
+        purchasedAtIso: '2026-03-05T12:00:00.000Z',
+      }),
+    });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, first.subscriptionId),
+    });
+
+    expect(subscription?.current_streak_months).toBe(1);
   });
 
   it('rejects when the same provider transaction is replayed by another user', async () => {

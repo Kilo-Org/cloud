@@ -1,12 +1,14 @@
 import {
+  kilo_pass_issuances,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilocode_users,
   type User,
 } from '@kilocode/db/schema';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@/lib/drizzle';
 import { toMicrodollars } from '@/lib/utils';
 import { getMonthlyPriceUsd } from './bonus';
 import { dayjs } from './dayjs';
@@ -24,7 +26,9 @@ import {
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
 } from './issuance';
+import { getPausedMonthSet } from './pause-events';
 import { isStripeSubscriptionEnded } from './stripe-subscription-status';
+import { getPreviousIssueMonth } from './stripe-handlers-utils';
 
 export type ValidatedStoreKiloPassPurchase = {
   paymentProvider: KiloPassPaymentProvider.AppStore | KiloPassPaymentProvider.GooglePlay;
@@ -78,6 +82,51 @@ function findStorePurchaseByProviderTransaction(
       eq(kilo_pass_store_purchases.provider_transaction_id, purchase.providerTransactionId)
     ),
   });
+}
+
+async function computeMonthlyStoreStreak(
+  tx: DrizzleTransaction,
+  params: {
+    subscriptionId: string;
+    issueMonth: string;
+  }
+): Promise<number> {
+  const monthlyIssuanceMonths = await tx
+    .select({ issueMonth: kilo_pass_issuances.issue_month })
+    .from(kilo_pass_issuances)
+    .where(
+      and(
+        eq(kilo_pass_issuances.kilo_pass_subscription_id, params.subscriptionId),
+        lte(kilo_pass_issuances.issue_month, params.issueMonth)
+      )
+    )
+    .orderBy(desc(kilo_pass_issuances.issue_month))
+    .limit(36);
+
+  const issueMonthSet = new Set(monthlyIssuanceMonths.map(row => row.issueMonth));
+  const pausedMonthSet = await getPausedMonthSet(tx, {
+    kiloPassSubscriptionId: params.subscriptionId,
+    fromIssueMonth: params.issueMonth,
+    maxMonthsBack: 36,
+  });
+
+  let computedStreak = 0;
+  let cursor = params.issueMonth;
+  const maxIterations = 36;
+  let iterations = 0;
+  while (iterations < maxIterations) {
+    if (issueMonthSet.has(cursor)) {
+      computedStreak += 1;
+      cursor = getPreviousIssueMonth(cursor);
+    } else if (pausedMonthSet.has(cursor)) {
+      cursor = getPreviousIssueMonth(cursor);
+    } else {
+      break;
+    }
+    iterations += 1;
+  }
+
+  return Math.max(1, computedStreak);
 }
 
 export async function completeStoreKiloPassPurchase(params: {
@@ -231,6 +280,18 @@ export async function completeStoreKiloPassPurchase(params: {
           )}`,
         })
         .where(eq(kilocode_users.id, user.id));
+    }
+
+    if (purchase.cadence === KiloPassCadence.Monthly) {
+      const currentStreakMonths = await computeMonthlyStoreStreak(tx, {
+        subscriptionId,
+        issueMonth,
+      });
+
+      await tx
+        .update(kilo_pass_subscriptions)
+        .set({ current_streak_months: currentStreakMonths, next_yearly_issue_at: null })
+        .where(eq(kilo_pass_subscriptions.id, subscriptionId));
     }
 
     await appendKiloPassAuditLog(tx, {

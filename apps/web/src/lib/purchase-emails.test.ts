@@ -533,11 +533,13 @@ describe('sendCreditsTopUpEmail payload', () => {
     expect(params.html).toContain(
       'A Kilo credit top-up has been processed for Acme Labs. The credits are now available to the organization.'
     );
-    expect(params.html).toContain('/organizations/org_123/payment-details');
+    expect(params.html).toContain(
+      'href="http://localhost:3000/organizations/org_123/payment-details"'
+    );
     expect(params.html).toContain('https://pay.stripe.com/receipts/org-manual');
   });
 
-  test('org_auto variant emits team auto-top-up copy and supports URL override', async () => {
+  test('org_auto variant emits team auto-top-up copy and organization payment details URL', async () => {
     await sendCreditsTopUpEmail({
       to: 'billing@example.com',
       variant: 'org_auto',
@@ -545,7 +547,7 @@ describe('sendCreditsTopUpEmail payload', () => {
       creditsCents: 4000,
       purchaseDate: new Date('2026-05-01T00:00:00Z'),
       receiptUrl: null,
-      creditsUrl: 'https://billing.example.test/org/payments',
+      organizationId: 'org_456',
       organizationName: 'Globex',
     });
 
@@ -555,7 +557,9 @@ describe('sendCreditsTopUpEmail payload', () => {
     expect(params.html).toContain(
       'Globex was automatically topped up so your team can keep using Kilo without interruption. The new credits are available now.'
     );
-    expect(params.html).toContain('https://billing.example.test/org/payments');
+    expect(params.html).toContain(
+      'href="http://localhost:3000/organizations/org_456/payment-details"'
+    );
     expect(params.html).not.toContain('/credits');
   });
 
@@ -605,7 +609,9 @@ describe('sendCreditsTopUpEmail payload', () => {
     });
 
     const [params] = sendViaMailgunMock.mock.calls[0];
-    expect(params.html).toContain('/organizations/org_123/payment-details');
+    expect(params.html).toContain(
+      'href="http://localhost:3000/organizations/org_123/payment-details"'
+    );
     expect(params.html).not.toContain('href=""');
   });
 

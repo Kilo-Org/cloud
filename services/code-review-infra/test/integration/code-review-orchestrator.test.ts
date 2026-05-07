@@ -338,6 +338,70 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(true);
   });
 
+  it('skips continuation and prepares a fresh session when previous execution is active', async () => {
+    const stub = getReviewStub();
+    const previousSessionId = 'agent_previous_active';
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/getSessionHealth')) {
+        return Response.json({
+          result: {
+            data: {
+              cloudAgentSessionId: previousSessionId,
+              sandboxStatus: 'healthy',
+              executionHealth: 'healthy',
+              activeExecutionId: 'exec-active',
+              activeExecutionStatus: 'running',
+            },
+          },
+        });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return Response.json({
+          result: {
+            data: {
+              cloudAgentSessionId: 'agent-fresh-active',
+              kiloSessionId: 'ses_fresh_active',
+            },
+          },
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return Response.json({
+          result: { data: { executionId: 'exec-fresh', status: 'running' } },
+        });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put(
+        'state',
+        codeReview({
+          previousCloudAgentSessionId: previousSessionId,
+        })
+      );
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    const status = await stub.status();
+    expect(status).toMatchObject({
+      status: 'running',
+      sessionId: 'agent-fresh-active',
+      cliSessionId: 'ses_fresh_active',
+    });
+    expect(hasFetchCall(fetchMock, '/trpc/updateSession')).toBe(false);
+    expect(hasFetchCall(fetchMock, '/trpc/sendMessageV2')).toBe(false);
+    expect(hasFetchCall(fetchMock, '/trpc/prepareSession')).toBe(true);
+  });
+
   it('falls back to a fresh session when health preflight returns an error', async () => {
     const stub = getReviewStub();
     const previousSessionId = 'agent_previous_missing';

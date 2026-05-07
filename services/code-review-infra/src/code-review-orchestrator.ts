@@ -28,7 +28,11 @@ import { InternalStatusResponseSchema } from './types';
 type UpdateStatusResult = 'updated' | 'db-terminal';
 
 function canContinueCloudAgentNextSession(health: CloudAgentSessionHealthOutput): boolean {
-  return health.sandboxStatus === 'healthy' && health.executionHealth !== 'stale';
+  return (
+    health.sandboxStatus === 'healthy' &&
+    health.executionHealth === 'none' &&
+    health.activeExecutionId === undefined
+  );
 }
 
 /** Shape of an SSE event parsed from the cloud agent stream */

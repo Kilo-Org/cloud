@@ -1,16 +1,10 @@
-import {
-  Environment,
-  SignedDataVerifier,
-  type JWSTransactionDecodedPayload,
-} from '@apple/app-store-server-library';
+import { type JWSTransactionDecodedPayload } from '@apple/app-store-server-library';
 import * as z from 'zod';
 
-import { getEnvVariable } from '@/lib/dotenvx';
 import type { ValidatedStoreKiloPassPurchase } from './store-subscription-completion';
 import { KiloPassPaymentProvider } from './enums';
 import { getMobileStoreKiloPassProductByAppleProductId } from './mobile-store-products';
-
-const BUNDLE_ID = 'com.kilocode.kiloapp';
+import { APPLE_STORE_BUNDLE_ID, createAppleStoreSignedDataVerifier } from './apple-store-sdk';
 
 export type AppleStoreEnvironment = 'Sandbox' | 'Production';
 
@@ -38,42 +32,6 @@ const AppleStoreTransactionPayloadSchema = z
     environment: z.string().optional(),
   })
   .passthrough();
-
-function requiredEnv(name: string): string {
-  const value = getEnvVariable(name);
-  if (!value) throw new Error(`${name} is not set`);
-  return value;
-}
-
-function getAppleEnvironment(): Environment {
-  return requiredEnv('APPLE_IAP_ENVIRONMENT') === 'Production'
-    ? Environment.PRODUCTION
-    : Environment.SANDBOX;
-}
-
-function getAppleAppAppleId(): number | undefined {
-  const value = getEnvVariable('APPLE_APP_APPLE_ID');
-  return value ? Number(value) : undefined;
-}
-
-function getAppleRootCertificates(): Buffer[] {
-  const pemBundle = requiredEnv('APPLE_ROOT_CERTIFICATES_PEM');
-  return pemBundle
-    .split('-----END CERTIFICATE-----')
-    .map(part => part.trim())
-    .filter(Boolean)
-    .map(part => Buffer.from(`${part}\n-----END CERTIFICATE-----\n`));
-}
-
-export function createAppleStoreSignedDataVerifier(): SignedDataVerifier {
-  return new SignedDataVerifier(
-    getAppleRootCertificates(),
-    true,
-    getAppleEnvironment(),
-    BUNDLE_ID,
-    getAppleAppAppleId()
-  );
-}
 
 function normalizeEnvironment(environment: string | undefined): AppleStoreEnvironment {
   if (environment === 'Production') return 'Production';
@@ -117,7 +75,7 @@ export function mapAppleKiloPassTransaction(
   if (!transaction.transactionId || !transaction.originalTransactionId || !transaction.bundleId) {
     throw new Error('Apple transaction payload missing required identifiers');
   }
-  if (transaction.bundleId !== BUNDLE_ID) {
+  if (transaction.bundleId !== APPLE_STORE_BUNDLE_ID) {
     throw new Error('Apple transaction bundle mismatch');
   }
   if (transaction.revocationDate) {

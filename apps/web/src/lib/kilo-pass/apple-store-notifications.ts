@@ -12,12 +12,12 @@ import { db } from '@/lib/drizzle';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult, KiloPassPaymentProvider } from './enums';
 import { appendKiloPassAuditLog } from './issuance';
 import {
-  createAppleStoreSignedDataVerifier,
   decodeAppleStoreTransactionJws,
   mapAppleKiloPassTransaction,
   type AppleStoreDecodedTransaction,
   type AppleStoreEnvironment,
 } from './apple-store-verifier';
+import { createAppleStoreSignedDataVerifier } from './apple-store-sdk';
 import { completeStoreKiloPassPurchase } from './store-subscription-completion';
 
 export type AppleStoreDecodedNotification = {

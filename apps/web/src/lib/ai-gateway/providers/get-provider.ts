@@ -96,9 +96,7 @@ async function checkCustomLlm(
     return null;
   }
   const bedrock = customLlm.aws_bedrock;
-  const signRequest = bedrock
-    ? makeBedrockSignRequest(bedrock, customLlm.internal_id)
-    : undefined;
+  const signRequest = bedrock ? makeBedrockSignRequest(bedrock, customLlm.internal_id) : undefined;
   return {
     provider: {
       id: 'custom',

@@ -50,7 +50,7 @@ export async function upstreamRequest({
     for (const [key, value] of Object.entries(signed.headers)) {
       headers.set(key, value);
     }
-  } else {
+  } else if (provider.apiKey) {
     headers.set('Authorization', `Bearer ${provider.apiKey}`);
   }
 

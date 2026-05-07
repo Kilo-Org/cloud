@@ -18,7 +18,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e:clawmetry": "node e2e/clawmetry-integration.mjs"
+    "test:e2e:clawmetry": "node e2e/clawmetry-integration.mjs",
+    "test:e2e:clawmetry-normal": "node e2e/clawmetry-normal-user.mjs"
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",

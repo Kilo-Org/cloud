@@ -55,6 +55,17 @@ function check(label, condition, detail) {
 
 // ── Bootstrap-equivalent: register a fresh machine + build dashboard URL ──
 
+async function postJson(path, payload, apiKey) {
+  return fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 async function provision() {
   const machineId = `kc-e2e-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
 
@@ -62,19 +73,18 @@ async function provision() {
   // Retry a few times with backoff before giving up.
   // 429 = registration-rate-limit hit (10/hour per IP) — bail cleanly so CI
   // doesn't flag the test red on a legitimate cloud defense.
+  // source: 'kiloclaw' is what puts this account in deferred-sync mode on
+  // the cloud side — see clawmetry-cloud's routes/auth.py register flow.
   let body,
     lastErr,
     lastStatus = 0;
   for (let attempt = 1; attempt <= 4; attempt++) {
-    const res = await fetch(`${API_BASE}/api/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        hostname: machineId,
-        machine_id: machineId,
-        platform: 'Linux',
-        email: `kc-e2e+${machineId}@clawmetry.com`,
-      }),
+    const res = await postJson('/api/register', {
+      hostname: machineId,
+      machine_id: machineId,
+      platform: 'Linux',
+      email: `kc-e2e+${machineId}@clawmetry.com`,
+      source: 'kiloclaw',
     });
     if (res.ok) {
       body = await res.json();
@@ -95,36 +105,45 @@ async function provision() {
     throw new Error(lastErr || '/api/register failed after retries');
   }
 
-  // The `nodes` table is only populated by the sync daemon's first POST to
-  // /api/ingest/heartbeat — until then, the dashboard renders "Node not
-  // found". In production, KiloClaw spawns the daemon on the user's first
-  // "View Observability" click, which races with the dashboard load. Here
-  // we simulate the first heartbeat synchronously so the dashboard loads
-  // deterministically. (This mirrors what services/kiloclaw/controller's
-  // clawmetry-start-sync route triggers — minus the spawn.)
-  const hbRes = await fetch(`${API_BASE}/ingest/heartbeat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${body.api_key}`,
-    },
-    body: JSON.stringify({
-      node_id: body.node_id,
-      hostname: machineId,
-      platform: 'Linux',
-      version: 'e2e-test',
-    }),
-  });
-  if (!hbRes.ok) {
-    throw new Error(`/api/ingest/heartbeat returned ${hbRes.status}: ${await hbRes.text()}`);
-  }
-
   const encKey = crypto.randomBytes(32).toString('base64');
   const dashboardUrl =
     `${API_BASE}/cloud/node/${encodeURIComponent(body.node_id)}` +
     `?token=${encodeURIComponent(body.api_key)}` +
     `#key=${encodeURIComponent(encKey)}&node=${encodeURIComponent(body.node_id)}`;
-  return { ...body, encKey, dashboardUrl };
+  return { ...body, machineId, encKey, dashboardUrl };
+}
+
+async function sendHeartbeat(p, { expectDeferred = false } = {}) {
+  // Cloud Run runs multiple instances; the INSERT in /api/register can
+  // take ~500ms to be visible to the instance handling /ingest/heartbeat.
+  // When we expect deferred mode, retry once on the legacy {ok:true}
+  // response shape — a real bug would persist past a 1s wait, while a
+  // propagation race resolves immediately.
+  const call = async () => {
+    const res = await postJson(
+      '/ingest/heartbeat',
+      { node_id: p.node_id, hostname: p.machineId, platform: 'Linux', version: 'e2e-test' },
+      p.api_key
+    );
+    if (!res.ok) {
+      throw new Error(`/ingest/heartbeat returned ${res.status}: ${await res.text()}`);
+    }
+    return res.json();
+  };
+  let body = await call();
+  if (expectDeferred && body.sync_allowed !== false) {
+    await new Promise(r => setTimeout(r, 1500));
+    body = await call();
+  }
+  return body;
+}
+
+async function intentStart(p) {
+  const res = await postJson('/api/cloud/intent-start', {}, p.api_key);
+  if (!res.ok) {
+    throw new Error(`/api/cloud/intent-start returned ${res.status}: ${await res.text()}`);
+  }
+  return res.json();
 }
 
 // Retry wrapper for the dashboard load — handles cold-start instances and
@@ -155,7 +174,7 @@ async function main() {
   console.log(`[clawmetry-e2e] target: ${API_BASE}`);
   console.log(`[clawmetry-e2e] headless: ${HEADLESS}\n`);
 
-  console.log('▸ Provisioning fresh test account via /api/register');
+  console.log("▸ Bootstrap: register with source='kiloclaw' (deferred-sync mode)");
   const p = await provision();
   console.log(`  api_key:      ${p.api_key.slice(0, 16)}…`);
   console.log(`  node_id:      ${p.node_id}`);
@@ -173,6 +192,37 @@ async function main() {
   check('register response: node_id present', !!p.node_id);
   check('register response: plan is free', p.plan === 'free', `plan=${p.plan}`);
 
+  // ── Deferred-sync gate ────────────────────────────────────────────────
+  // Until the user clicks "View Observability", every heartbeat from this
+  // account should come back with sync_allowed=false, reason='intent_pending'.
+  // The OSS daemon respects this and skips every upload path while
+  // continuing to send heartbeats.
+  console.log("\n▸ Daemon's first heartbeat — should be deferred");
+  const hb1 = await sendHeartbeat(p, { expectDeferred: true });
+  console.log(`  response: ${JSON.stringify(hb1)}`);
+  check('hb1: sync_allowed === false', hb1.sync_allowed === false);
+  check('hb1: reason === "intent_pending"', hb1.reason === 'intent_pending');
+
+  // ── Intent flip ──────────────────────────────────────────────────────
+  // Simulates the KiloClaw web UI's "View Observability" click. The
+  // controller's /_kilo/clawmetry-start-sync route POSTs to this endpoint
+  // before opening the dashboard URL.
+  console.log('\n▸ User clicks "View Observability" → POST /api/cloud/intent-start');
+  const intent = await intentStart(p);
+  console.log(`  response: ${JSON.stringify(intent)}`);
+  check('intent: ok === true', intent.ok === true);
+  check('intent: already_started === false', intent.already_started === false);
+
+  console.log('\n▸ Heartbeat after intent — gate should be open');
+  const hb2 = await sendHeartbeat(p);
+  console.log(`  response: ${JSON.stringify(hb2)}`);
+  check('hb2: sync_allowed is not false', hb2.sync_allowed !== false);
+
+  console.log('\n▸ Idempotency — second intent-start is a no-op');
+  const intent2 = await intentStart(p);
+  console.log(`  response: ${JSON.stringify(intent2)}`);
+  check('intent2: already_started === true', intent2.already_started === true);
+
   console.log('\n▸ /api/cloud/account reports the new account');
   const accRes = await fetch(
     `${API_BASE}/api/cloud/account?token=${encodeURIComponent(p.api_key)}`
@@ -180,10 +230,6 @@ async function main() {
   const account = await accRes.json();
   check('account: ok=true', account.ok === true);
   check('account: plan=free', account.plan === 'free');
-  // Note: account.node_count is a Stripe-driven counter, not a row count.
-  // It stays 0 for fresh free-tier signups (no billing event yet) — don't
-  // assert on it here; the dashboard-load check below proves the node
-  // landed in the `nodes` table.
 
   console.log('\n▸ Browser: open dashboard URL with retry');
   const browser = await chromium.launch({ headless: HEADLESS });

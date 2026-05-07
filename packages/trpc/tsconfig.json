@@ -25,8 +25,6 @@
   "include": [
     "src/**/*",
     "../../apps/web/src/types/next-auth.d.ts",
-    "../../apps/web/src/types/next-page.d.ts",
-    "../../packages/db/src/kiloclaw-personal-subscription-collapse.ts",
-    "../../packages/db/src/kiloclaw-subscription-change-log.ts"
+    "../../apps/web/src/types/next-page.d.ts"
   ]
 }

@@ -4645,6 +4645,10 @@ export const transactional_email_log = pgTable(
     ),
     index('IDX_transactional_email_log_user_id').on(table.user_id),
     index('IDX_transactional_email_log_organization_id').on(table.organization_id),
+    check(
+      'CHK_transactional_email_log_owner',
+      sql`${table.user_id} IS NOT NULL OR ${table.organization_id} IS NOT NULL`
+    ),
   ]
 );
 

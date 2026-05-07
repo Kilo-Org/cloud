@@ -418,7 +418,9 @@ export async function handleSuccessfulChargeWithPayment(
       `Processing top-up for organization ${organizationId} from charge ${charge.id}`
     );
     config.stripe_payment_id = paymentIntent.id;
-    await processTopupForOrganization(kiloUserId, organizationId, creditAmountInCents, config);
+    await processTopupForOrganization(kiloUserId, organizationId, creditAmountInCents, config, {
+      isAutoTopUp: paymentIntent.metadata.type === 'org-auto-topup-setup',
+    });
 
     if (paymentIntent.metadata.type === 'org-auto-topup-setup') {
       await handleOrgAutoTopUpSetup(organizationId, kiloUserId, paymentIntent, config);

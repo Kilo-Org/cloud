@@ -43,11 +43,7 @@ const EXPIRED_TYPES = new Set<string>([
   NotificationTypeV2.EXPIRED,
   NotificationTypeV2.DID_FAIL_TO_RENEW,
 ]);
-const REFUND_TYPES = new Set<string>([
-  NotificationTypeV2.REFUND,
-  NotificationTypeV2.REVOKE,
-  NotificationTypeV2.CONSUMPTION_REQUEST,
-]);
+const REFUND_TYPES = new Set<string>([NotificationTypeV2.REFUND, NotificationTypeV2.REVOKE]);
 
 const AppleStoreNotificationPayloadSchema = z
   .object({

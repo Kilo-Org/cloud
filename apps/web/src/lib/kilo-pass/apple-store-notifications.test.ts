@@ -242,4 +242,40 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.cancel_at_period_end).toBe(true);
     expect(subscription?.ended_at).toBeNull();
   });
+
+  it('records consumption request notifications without ending the subscription', async () => {
+    const user = await insertTestUser();
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'consumption-initial-buy',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'consumption-request',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'consumption-request',
+          notificationType: NotificationTypeV2.CONSUMPTION_REQUEST,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(
+        kilo_pass_subscriptions.provider_subscription_id,
+        decodedTransaction.originalTransactionId
+      ),
+    });
+    expect(subscription?.status).toBe('active');
+    expect(subscription?.ended_at).toBeNull();
+  });
 });

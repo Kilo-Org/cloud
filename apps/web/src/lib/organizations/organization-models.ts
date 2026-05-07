@@ -18,7 +18,7 @@ export async function getAvailableModelsForOrganization(
     return null;
   }
 
-  let restrictions: ModelRestrictions = { modelDenyList: [], providerDenyList: [] };
+  let restrictions: ModelRestrictions = { modelDenyList: [] };
 
   if (organization.plan === 'enterprise') {
     restrictions = getEffectiveModelRestrictions(organization);

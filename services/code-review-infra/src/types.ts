@@ -69,6 +69,7 @@ export interface CodeReview {
   agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
+  sandboxRetryAttempted?: boolean;
 }
 
 export interface CodeReviewStatusResponse {

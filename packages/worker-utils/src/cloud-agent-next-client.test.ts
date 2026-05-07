@@ -98,6 +98,7 @@ describe('CloudAgentNextFetchClient billing error detection', () => {
       expect(error).toBeInstanceOf(CloudAgentNextBillingError);
       const billingError = error as CloudAgentNextBillingError;
       expect(billingError.terminalReason).toBe('billing');
+      expect(billingError.procedure).toBe('prepareSession');
       expect(billingError.status).toBe(402);
     }
   });
@@ -127,6 +128,29 @@ describe('CloudAgentNextFetchClient billing error detection', () => {
         }
       )
     ).rejects.not.toThrow(CloudAgentNextBillingError);
+  });
+
+  it('preserves procedure metadata on generic errors', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, 'Internal Server Error'));
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+
+    try {
+      await client.prepareSession(
+        {},
+        {
+          prompt: 'test',
+          mode: 'code',
+          model: 'test-model',
+        }
+      );
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(CloudAgentNextError);
+      const cloudAgentError = error as CloudAgentNextError;
+      expect(cloudAgentError.procedure).toBe('prepareSession');
+      expect(cloudAgentError.status).toBe(500);
+      expect(cloudAgentError.body).toBe('Internal Server Error');
+    }
   });
 
   it('throws generic CloudAgentNextError for 404', async () => {

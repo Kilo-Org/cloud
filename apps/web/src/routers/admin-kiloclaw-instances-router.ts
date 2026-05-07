@@ -48,6 +48,13 @@ import type {
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import { InstanceTierKeySchema } from '@kilocode/kiloclaw-instance-tiers';
+import {
+  AdminSizeOverridePayloadSchema,
+  AdminSizeOverridePresetSchema,
+  presetToMachineSize,
+  type AdminSizeOverridePayload,
+} from '@/lib/kiloclaw/admin-size-override';
 import { alias } from 'drizzle-orm/pg-core';
 import {
   eq,
@@ -69,6 +76,25 @@ const initiatingAdminUsers = alias(kilocode_users, 'initiating_admin_users');
 const pinnedByUsers = alias(kilocode_users, 'pinned_by_users');
 
 /**
+ * Validate the JSONB `admin_size_override` column via the shared Zod
+ * schema. Bad payloads return null and emit a warn so DO/Postgres
+ * divergence surfaces (the DO is the only writer; a malformed payload
+ * means schema drift or a manually-edited row).
+ */
+function parseAdminSizeOverride(value: unknown): AdminSizeOverrideRow | null {
+  if (value === null || value === undefined) return null;
+  const parsed = AdminSizeOverridePayloadSchema.safeParse(value);
+  if (!parsed.success) {
+    console.warn('[admin-kiloclaw] Dropping malformed admin_size_override payload', {
+      value,
+      issues: parsed.error.issues,
+    });
+    return null;
+  }
+  return parsed.data;
+}
+
+/**
  * Sentinel for `imageTag` filter — matches rows where `tracked_image_tag IS NULL`
  * (DO alarm hasn't ticked yet, hibernated DOs).
  */
@@ -84,6 +110,13 @@ const ListInstancesSchema = z.object({
     .enum(['all', 'active', 'inactive_trial_stopped', 'suspended', 'destroyed'])
     .default('all'),
   imageTag: z.string().max(128).optional(),
+  /**
+   * When true, restrict the list to instances with an active admin
+   * `admin_size_override`. Powered by the partial index on
+   * `kiloclaw_instances.admin_size_override`. Used by the admin list
+   * page's "Has size override" filter.
+   */
+  hasSizeOverride: z.boolean().optional(),
 });
 
 const DetectOrphansSchema = z.object({
@@ -352,7 +385,19 @@ export type AdminKiloclawInstance = {
     pinned_by_user_id: string;
     is_admin_pin: boolean;
   } | null;
+  /**
+   * Active admin size override, if any. Mirrors the DO's
+   * `adminMachineSizeOverride` + metadata. Non-null means the instance is
+   * running on hardware that diverges from its billable tier.
+   */
+  admin_size_override: AdminSizeOverrideRow | null;
 };
+
+// Re-export the shared payload as the row type so the router and the lib
+// share a single canonical schema. The shape is whatever
+// `AdminSizeOverridePayloadSchema` enforces (validated at the JSONB column
+// boundary by `parseAdminSizeOverride`).
+export type AdminSizeOverrideRow = AdminSizeOverridePayload;
 
 export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
   inbound_email_address: string | null;
@@ -417,6 +462,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               is_admin_pin: result.pin_pinned_by_is_admin ?? false,
             }
           : null,
+      admin_size_override: parseAdminSizeOverride(result.instance.admin_size_override),
     };
 
     const inboundEmailAddress = await getInboundEmailAddressForInstance(instance.id);
@@ -503,7 +549,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   list: adminProcedure.input(ListInstancesSchema).query(async ({ input }) => {
-    const { offset, limit, sortBy, sortOrder, search, status, imageTag } = input;
+    const { offset, limit, sortBy, sortOrder, search, status, imageTag, hasSizeOverride } = input;
     const searchTerm = search?.trim() || '';
 
     const conditions: SQL[] = [];
@@ -547,6 +593,14 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       conditions.push(isNull(kiloclaw_instances.tracked_image_tag));
     } else if (imageTag) {
       conditions.push(eq(kiloclaw_instances.tracked_image_tag, imageTag));
+    }
+
+    if (hasSizeOverride) {
+      // Match the partial-index predicate exactly so the planner can use it.
+      // Intent is "outstanding overrides on live instances" — a destroyed
+      // instance with a leftover override is not actionable for support.
+      conditions.push(isNotNull(kiloclaw_instances.admin_size_override));
+      conditions.push(isNull(kiloclaw_instances.destroyed_at));
     }
 
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
@@ -620,6 +674,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               is_admin_pin: row.pin_pinned_by_is_admin ?? false,
             }
           : null,
+      admin_size_override: parseAdminSizeOverride(row.instance.admin_size_override),
     }));
 
     return {
@@ -2665,13 +2720,22 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           .string()
           .min(1)
           .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+        targetSizeGb: z.number().int().min(1).max(500),
       })
     )
     .mutation(async ({ input, ctx }) => {
       console.log(
-        `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} size=15GB`
+        `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} targetSizeGb=${input.targetSizeGb}`
       );
       const instance = await resolveInstance(input.userId, input.instanceId);
+      // Same ownership-check pattern as resizeMachine /
+      // setAdminMachineSizeOverride / clearAdminMachineSizeOverride.
+      // resolveInstance(userId, instanceId) does NOT filter by user_id when
+      // instanceId is supplied — without this assert, an admin passing
+      // userId=A + instanceId=B (B owned by user C) would extend C's
+      // volume while the audit log records target_user_id=A. Fly volumes
+      // can grow but cannot shrink, so the storage change is permanent.
+      assertInstanceBelongsToUser(instance, input.userId);
       const client = new KiloClawInternalClient();
       const instanceId = workerInstanceId(instance);
 
@@ -2694,6 +2758,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           message: `Fly resource mismatch: expected app=${status.flyAppName} volume=${status.flyVolumeId}, got app=${input.appName} volume=${input.volumeId}`,
         });
       }
+      const currentSizeGb = status.volumeSizeGb ?? 10;
+      if (input.targetSizeGb <= currentSizeGb) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Target size must be greater than current size (${currentSizeGb} GB)`,
+        });
+      }
 
       const fallbackMessage = 'Failed to extend Fly volume';
       try {
@@ -2701,6 +2772,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           input.userId,
           input.appName,
           input.volumeId,
+          input.targetSizeGb,
           instanceId
         );
 
@@ -2711,11 +2783,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
             target_user_id: input.userId,
-            message: `Fly volume extended to 15GB: app=${input.appName} volume=${input.volumeId}`,
+            message: `Fly volume extended to ${input.targetSizeGb}GB: app=${input.appName} volume=${input.volumeId}`,
             metadata: {
               appName: input.appName,
               volumeId: input.volumeId,
-              sizeGb: 15,
+              previousSizeGb: currentSizeGb,
+              sizeGb: input.targetSizeGb,
             },
           });
         } catch (auditErr) {
@@ -2951,37 +3024,41 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        machineSize: z.object({
-          cpus: z.number().int().min(1).max(8),
-          memory_mb: z.number().int().min(256).max(16384),
-          cpu_kind: z.enum(['shared', 'performance']).optional(),
-        }),
+        instanceType: InstanceTierKeySchema,
       })
     )
     .mutation(async ({ input, ctx }): Promise<ResizeMachineResponse> => {
       console.log(
-        `[admin-kiloclaw] Machine resize triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: ${JSON.stringify(input.machineSize)}`
+        `[admin-kiloclaw] Machine resize triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: ${input.instanceType}`
       );
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
         const client = new KiloClawInternalClient();
         const result = await client.resizeMachine(
           input.userId,
-          input.machineSize,
+          input.instanceType,
           workerInstanceId(instance)
         );
 
         try {
+          const clearedOverrideMessage = result.clearedOverride
+            ? ` (cleared admin override: ${result.clearedOverride.size.cpus}× ${result.clearedOverride.size.cpu_kind ?? 'shared'}, ${result.clearedOverride.size.memory_mb}MB)`
+            : '';
           await createKiloClawAdminAuditLog({
             action: 'kiloclaw.machine.resize',
             actor_id: ctx.user.id,
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
             target_user_id: input.userId,
-            message: `Machine resized: ${JSON.stringify(result.previousSize)} → ${JSON.stringify(result.newSize)}`,
+            message: `Machine resized: ${result.previousTier ?? 'unknown'} → ${result.newTier}${clearedOverrideMessage}`,
             metadata: {
-              previousSize: result.previousSize,
-              newSize: result.newSize,
+              previousTier: result.previousTier,
+              newTier: result.newTier,
+              previousVolumeSizeGb: result.previousVolumeSizeGb,
+              newVolumeSizeGb: result.newVolumeSizeGb,
+              machineSize: result.machineSize,
+              clearedOverride: result.clearedOverride,
             },
           });
         } catch (auditErr) {
@@ -2992,6 +3069,114 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       } catch (err) {
         console.error('Failed to resize machine for user:', input.userId, err);
         throwKiloclawAdminError(err, 'Failed to resize machine');
+      }
+    }),
+
+  setAdminMachineSizeOverride: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        preset: AdminSizeOverridePresetSchema,
+        reason: z.string().min(10).max(500),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      console.log(
+        `[admin-kiloclaw] Admin size override SET by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: preset=${input.preset}`
+      );
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
+        const size = presetToMachineSize(input.preset);
+        const client = new KiloClawInternalClient();
+        const result = await client.setAdminMachineSizeOverride(
+          input.userId,
+          {
+            size,
+            reason: input.reason,
+            actorId: ctx.user.id,
+            actorEmail: ctx.user.google_user_email,
+          },
+          workerInstanceId(instance)
+        );
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.admin_size_override.set',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Admin size override set: preset=${input.preset} (${size.cpus}× ${size.cpu_kind ?? 'shared'}, ${size.memory_mb}MB). Reason: ${input.reason}`,
+            metadata: {
+              preset: input.preset,
+              previousOverride: result.previousOverride,
+              newOverride: result.newOverride,
+              reason: input.reason,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for admin size override set:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error('Failed to set admin size override for user:', input.userId, err);
+        throwKiloclawAdminError(err, 'Failed to set admin size override');
+      }
+    }),
+
+  clearAdminMachineSizeOverride: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        reason: z.string().min(10).max(500),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      console.log(
+        `[admin-kiloclaw] Admin size override CLEAR by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}`
+      );
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
+        const client = new KiloClawInternalClient();
+        const result = await client.clearAdminMachineSizeOverride(
+          input.userId,
+          {
+            reason: input.reason,
+            actorId: ctx.user.id,
+            actorEmail: ctx.user.google_user_email,
+          },
+          workerInstanceId(instance)
+        );
+
+        try {
+          const previousMessage = result.previousOverride
+            ? `${result.previousOverride.cpus}× ${result.previousOverride.cpu_kind ?? 'shared'}, ${result.previousOverride.memory_mb}MB`
+            : 'none';
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.admin_size_override.clear',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Admin size override cleared (previous: ${previousMessage}). Reason: ${input.reason}`,
+            metadata: {
+              previousOverride: result.previousOverride,
+              reason: input.reason,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for admin size override clear:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error('Failed to clear admin size override for user:', input.userId, err);
+        throwKiloclawAdminError(err, 'Failed to clear admin size override');
       }
     }),
 

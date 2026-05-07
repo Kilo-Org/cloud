@@ -15,6 +15,8 @@ import type {
   FlyVolumeSnapshot,
   CreateVolumeRequest,
   CreateVolumeRequestWithoutRegion,
+  ExtendVolumeRequest,
+  ExtendVolumeResponse,
   CreateMachineRequest,
   FlyWaitableState,
   MachineExecRequest,
@@ -240,6 +242,20 @@ export async function deleteVolume(config: FlyClientConfig, volumeId: string): P
     method: 'DELETE',
   });
   await assertOk(resp, 'deleteVolume');
+}
+
+export async function extendVolume(
+  config: FlyClientConfig,
+  volumeId: string,
+  sizeGb: number
+): Promise<ExtendVolumeResponse> {
+  const body: ExtendVolumeRequest = { size_gb: sizeGb };
+  const resp = await flyFetch(config, `/volumes/${volumeId}/extend`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+  await assertOk(resp, 'extendVolume');
+  return resp.json();
 }
 
 export async function listVolumeSnapshots(

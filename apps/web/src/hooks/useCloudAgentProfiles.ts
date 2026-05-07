@@ -2,6 +2,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { AgentConfig } from '@kilocode/db/schema-types';
 import { useTRPC } from '@/lib/trpc/utils';
 
 // Owner type for profiles
@@ -17,6 +18,9 @@ export type ProfileSummary = {
   updatedAt: string;
   varCount: number;
   commandCount: number;
+  mcpServerCount: number;
+  skillCount: number;
+  agentCount: number;
 };
 
 // Profile summary with owner type for combined listings
@@ -37,6 +41,43 @@ export type ProfileCommand = {
   command: string;
 };
 
+export type ProfileMcpServer = {
+  id: string;
+  name: string;
+  type: 'local' | 'remote';
+  enabled: boolean;
+  timeout: number | null;
+  /** env/header values are returned masked (never plaintext/ciphertext). */
+  config:
+    | { command: string[]; environment?: Record<string, string> }
+    | { url: string; headers?: Record<string, string> };
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProfileSkill = {
+  id: string;
+  name: string;
+  description: string | null;
+  sourceType: 'marketplace' | 'custom';
+  sourceUrl: string | null;
+  rawMarkdown: string;
+  /** Companion files (excluding SKILL.md). Relative path → content. */
+  files: Record<string, string>;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProfileAgent = {
+  id: string;
+  slug: string;
+  name: string;
+  config: AgentConfig;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProfileDetails = {
   id: string;
   name: string;
@@ -46,6 +87,9 @@ export type ProfileDetails = {
   updatedAt: string;
   vars: ProfileVar[];
   commands: ProfileCommand[];
+  mcpServers: ProfileMcpServer[];
+  skills: ProfileSkill[];
+  agents: ProfileAgent[];
 };
 
 // Combined profiles result for org context
@@ -155,6 +199,11 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
   const setAsDefault = useMutation(
     trpc.agentProfiles.setAsDefault.mutationOptions({
       onSuccess: async () => {
+        // Setting a default flips isDefault on both the new and previous default,
+        // so invalidate every single-profile get query in addition to the list.
+        await queryClient.invalidateQueries({
+          queryKey: trpc.agentProfiles.get.queryKey(),
+        });
         await invalidateProfiles();
       },
     })
@@ -163,6 +212,9 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
   const clearDefault = useMutation(
     trpc.agentProfiles.clearDefault.mutationOptions({
       onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.agentProfiles.get.queryKey(),
+        });
         await invalidateProfiles();
       },
     })
@@ -192,6 +244,86 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     })
   );
 
+  const createMcp = useMutation(
+    trpc.agentProfiles.createMcp.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const updateMcp = useMutation(
+    trpc.agentProfiles.updateMcp.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const deleteMcp = useMutation(
+    trpc.agentProfiles.deleteMcp.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const setMcpEnabled = useMutation(
+    trpc.agentProfiles.setMcpEnabled.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+
+  const createCustomSkill = useMutation(
+    trpc.agentProfiles.createCustomSkill.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const updateSkill = useMutation(
+    trpc.agentProfiles.updateSkill.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const deleteSkill = useMutation(
+    trpc.agentProfiles.deleteSkill.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const setSkillEnabled = useMutation(
+    trpc.agentProfiles.setSkillEnabled.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+
+  const createAgent = useMutation(
+    trpc.agentProfiles.createAgent.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const updateAgent = useMutation(
+    trpc.agentProfiles.updateAgent.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+  const deleteAgent = useMutation(
+    trpc.agentProfiles.deleteAgent.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
+
   return {
     createProfile,
     updateProfile,
@@ -201,6 +333,17 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     setVar,
     deleteVar,
     setCommands,
+    createMcp,
+    updateMcp,
+    deleteMcp,
+    setMcpEnabled,
+    createCustomSkill,
+    updateSkill,
+    deleteSkill,
+    setSkillEnabled,
+    createAgent,
+    updateAgent,
+    deleteAgent,
     /** Manually invalidate profiles list */
     invalidateProfiles,
     /** Manually invalidate specific profile */
@@ -230,7 +373,7 @@ type UseCombinedProfilesOptions = {
 /**
  * Hook to fetch both org and personal profiles when in org context.
  * Returns profiles grouped by owner type with effective default resolution.
- * Org default takes precedence over personal default.
+ * Personal default takes precedence over org default.
  */
 export function useCombinedProfiles(options: UseCombinedProfilesOptions) {
   const { organizationId, enabled = true } = options;
@@ -311,6 +454,11 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
   const setAsDefault = useMutation(
     trpc.agentProfiles.setAsDefault.mutationOptions({
       onSuccess: async () => {
+        // Setting a default flips isDefault on both the new and previous default,
+        // so invalidate every single-profile get query in addition to the lists.
+        await queryClient.invalidateQueries({
+          queryKey: trpc.agentProfiles.get.queryKey(),
+        });
         await invalidateCombinedProfiles();
       },
     })
@@ -319,6 +467,9 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
   const clearDefault = useMutation(
     trpc.agentProfiles.clearDefault.mutationOptions({
       onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.agentProfiles.get.queryKey(),
+        });
         await invalidateCombinedProfiles();
       },
     })
@@ -348,6 +499,86 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     })
   );
 
+  const createMcp = useMutation(
+    trpc.agentProfiles.createMcp.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const updateMcp = useMutation(
+    trpc.agentProfiles.updateMcp.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const deleteMcp = useMutation(
+    trpc.agentProfiles.deleteMcp.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const setMcpEnabled = useMutation(
+    trpc.agentProfiles.setMcpEnabled.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+
+  const createCustomSkill = useMutation(
+    trpc.agentProfiles.createCustomSkill.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const updateSkill = useMutation(
+    trpc.agentProfiles.updateSkill.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const deleteSkill = useMutation(
+    trpc.agentProfiles.deleteSkill.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const setSkillEnabled = useMutation(
+    trpc.agentProfiles.setSkillEnabled.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+
+  const createAgent = useMutation(
+    trpc.agentProfiles.createAgent.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const updateAgent = useMutation(
+    trpc.agentProfiles.updateAgent.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+  const deleteAgent = useMutation(
+    trpc.agentProfiles.deleteAgent.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
+
   return {
     createProfile,
     updateProfile,
@@ -357,6 +588,17 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     setVar,
     deleteVar,
     setCommands,
+    createMcp,
+    updateMcp,
+    deleteMcp,
+    setMcpEnabled,
+    createCustomSkill,
+    updateSkill,
+    deleteSkill,
+    setSkillEnabled,
+    createAgent,
+    updateAgent,
+    deleteAgent,
     /** Manually invalidate combined profiles */
     invalidateCombinedProfiles,
     /** Manually invalidate specific profile */

@@ -3,10 +3,18 @@ import { NextResponse } from 'next/server';
 import { withAuthenticatedAdminApiRoutes } from './middleware/withAuthenticatedAdminApiRoutes';
 import { withBlockedClients } from './middleware/withBlockedClients';
 import { withKiloEditorCookie } from './middleware/withKiloEditorCookie';
+import {
+  buildContentSecurityPolicy,
+  getConfiguredConnectSrcOrigins,
+  getContentSecurityPolicyHeaderName,
+  getContentSecurityPolicyMode,
+  getSecurityPolicyReportingHeaders,
+} from '@/lib/security-headers';
 
 function baseProxy(request: NextRequestWithAuth) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', request.nextUrl.pathname);
+
   const response = NextResponse.next({
     request: {
       headers: requestHeaders,
@@ -16,6 +24,21 @@ function baseProxy(request: NextRequestWithAuth) {
   if (request.nextUrl.pathname === '/auth/verify-magic-link') {
     response.headers.set('Cache-Control', 'no-store');
     response.headers.set('X-Robots-Tag', 'noindex, noarchive, nofollow');
+  }
+
+  const cspHeaderName = getContentSecurityPolicyHeaderName(getContentSecurityPolicyMode());
+  if (cspHeaderName) {
+    response.headers.set(
+      cspHeaderName,
+      buildContentSecurityPolicy({
+        isDevelopment: process.env.NODE_ENV === 'development',
+        connectSrcUrls: getConfiguredConnectSrcOrigins(),
+      })
+    );
+
+    for (const [name, value] of Object.entries(getSecurityPolicyReportingHeaders())) {
+      response.headers.set(name, value);
+    }
   }
 
   return response;

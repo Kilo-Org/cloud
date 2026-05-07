@@ -623,6 +623,11 @@ export class SoftDeletePreconditionError extends Error {
  *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
  *   kiloclaw_instances/inbound_email_aliases/access_codes, user_period_cache,
  *   kilo_pass_scheduled_changes)
+ * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
+ *   + free-form reason; cleared on the deleted user's retained destroyed
+ *   instances, AND on any other instances where this user was the admin
+ *   actor — since their email and any reason text they wrote is their PII
+ *   regardless of which instance the override targeted)
  */
 export async function softDeleteUser(userId: string) {
   const user = await findUserById(userId);
@@ -824,6 +829,27 @@ export async function softDeleteUser(userId: string) {
     await tx.delete(code_indexing_manifest).where(eq(code_indexing_manifest.kilo_user_id, userId));
 
     // ── 3. Anonymize PII in retained tables ──────────────────────────────
+
+    // kiloclaw_instances.admin_size_override JSONB carries actorEmail (an
+    // admin's address) and a free-form reason (often referencing a ticket
+    // or the customer scenario). Clear it on:
+    //   (a) this user's retained destroyed instances — keeping the user's
+    //       deletion clean of any reason text written about their incident;
+    //   (b) ANY instance where this user was the admin actor — their email
+    //       and reason text are their PII regardless of whose instance it
+    //       targeted, so they need to be scrubbed when the actor is deleted.
+    // The denormalized read-cache loses the audit trail, but the canonical
+    // record lives in `kiloclaw_admin_audit_logs` (whose actor PII is
+    // anonymized below by the same flow).
+    await tx
+      .update(kiloclaw_instances)
+      .set({ admin_size_override: null })
+      .where(
+        or(
+          eq(kiloclaw_instances.user_id, userId),
+          sql`${kiloclaw_instances.admin_size_override}->>'actorId' = ${userId}`
+        )
+      );
 
     // Organization audit logs: keep the log entries, strip actor PII
     await tx

@@ -353,6 +353,8 @@ describe('kiloclawRouter getStatus', () => {
       flyVolumeId: null,
       flyRegion: null,
       machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
       openclawVersion: null,
       imageVariant: null,
       trackedImageTag: null,

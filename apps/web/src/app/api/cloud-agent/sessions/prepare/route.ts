@@ -21,13 +21,7 @@ import { generateApiToken } from '@/lib/tokens';
 import { publicPrepareSessionSchema } from './schema';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
-import type { ProfileOwner } from '@/lib/agent/types';
-import type { EncryptedEnvelope } from '@/lib/encryption';
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
-import {
-  mergeProfileConfiguration,
-  ProfileNotFoundError,
-} from '@/lib/agent/profile-session-config';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 function handleTRPCError(error: unknown): NextResponse {
@@ -177,50 +171,6 @@ export async function POST(request: Request) {
       );
     }
 
-    let mergedEnvVars: Record<string, string> | undefined;
-    let mergedSetupCommands: string[] | undefined;
-    let encryptedSecrets: Record<string, EncryptedEnvelope> | undefined;
-
-    try {
-      const owner: ProfileOwner = input.organizationId
-        ? { type: 'organization', id: input.organizationId }
-        : { type: 'user', id: user.id };
-
-      const repoFullName = input.githubRepo ?? input.gitlabProject;
-      const platform = input.gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB;
-
-      const merged = await mergeProfileConfiguration({
-        profileName: input.profileName,
-        owner,
-        // In org context, pass userId to enable fallback to personal profiles
-        userId: input.organizationId ? user.id : undefined,
-        repoFullName,
-        platform,
-        envVars: input.envVars,
-        setupCommands: input.setupCommands,
-      });
-
-      mergedEnvVars = merged.envVars;
-      mergedSetupCommands = merged.setupCommands;
-      encryptedSecrets = merged.encryptedSecrets;
-    } catch (error) {
-      if (error instanceof ProfileNotFoundError) {
-        return NextResponse.json(
-          {
-            error: 'Profile not found',
-            details: [
-              {
-                path: 'profileName',
-                message: error.message,
-              },
-            ],
-          },
-          { status: 404 }
-        );
-      }
-      throw error;
-    }
-
     try {
       const authToken = generateApiToken(user);
       const client = createCloudAgentClient(authToken);
@@ -239,9 +189,12 @@ export async function POST(request: Request) {
         platform: input.gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB,
         // Common params
         kilocodeOrganizationId,
-        envVars: mergedEnvVars,
-        encryptedSecrets,
-        setupCommands: mergedSetupCommands,
+        // Profile resolution happens in cloud-agent-next — forward profileId
+        // and any inline overrides. cloud agent merges profile-derived values with
+        // the inline fields using the same precedence the web used to apply.
+        profileId: input.profileId,
+        envVars: input.envVars,
+        setupCommands: input.setupCommands,
         mcpServers: input.mcpServers,
         autoCommit: input.autoCommit,
         upstreamBranch: input.upstreamBranch,
@@ -260,6 +213,25 @@ export async function POST(request: Request) {
         ...ticketResult,
       });
     } catch (error) {
+      // Profile resolution failures are surfaced by cloud agent as 404s. Forward them
+      // through without mapping to a generic "Failed to prepare session"
+      // response so the caller sees the same shape we used before this
+      // refactor.
+      if (error instanceof Error && /Profile '.+' not found/i.test(error.message)) {
+        return NextResponse.json(
+          {
+            error: 'Profile not found',
+            details: [
+              {
+                path: 'profileId',
+                message: error.message,
+              },
+            ],
+          },
+          { status: 404 }
+        );
+      }
+
       captureException(error, {
         tags: { source: 'cloud-agent-prepare-session', step: 'forward-to-cloud-agent' },
         extra: {

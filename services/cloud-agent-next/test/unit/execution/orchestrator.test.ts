@@ -325,8 +325,10 @@ describe('WorkspacePlan types', () => {
       gitUrl: 'https://git.example.com/repo.git',
       githubToken: 'gh_token',
       gitToken: 'git_token',
-      envVars: { NODE_ENV: 'production' },
-      setupCommands: ['npm install'],
+      profile: {
+        envVars: { NODE_ENV: 'production' },
+        setupCommands: ['npm install'],
+      },
       upstreamBranch: 'main',
       kiloSessionId: 'kilo_sess',
       isPreparedSession: true,

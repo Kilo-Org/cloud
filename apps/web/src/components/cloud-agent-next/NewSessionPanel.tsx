@@ -3,16 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtom, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import {
   AlertCircle,
+  Brain,
   FolderGit2,
   Loader2,
   Lock,
   RefreshCw,
   Send,
-  Settings,
   Unlock,
   Check,
   Paperclip,
@@ -22,26 +22,16 @@ import { startOfDay, subDays } from 'date-fns';
 import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
 
-import {
-  useProfile,
-  useProfiles,
-  useCombinedProfiles,
-  useRepoBindings,
-} from '@/hooks/useCloudAgentProfiles';
+import { useProfiles, useCombinedProfiles, useProfile } from '@/hooks/useCloudAgentProfiles';
 import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import {
-  manualEnvVarsAtom,
-  manualSetupCommandsAtom,
   selectedProfileIdAtom,
-  hasAutoSelectedDefaultAtom,
-  profileConfigAtom,
-  effectiveEnvVarsAtom,
-  effectiveSetupCommandsAtom,
   resetSessionFormAtom,
 } from '@/components/cloud-agent/store/session-form-atoms';
 import {
@@ -49,16 +39,13 @@ import {
   type RepositoryPlatform,
 } from '@/components/shared/RepositoryCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { ModeCombobox, NEXT_MODE_OPTIONS } from '@/components/shared/ModeCombobox';
+import { formatShortModelDisplayName } from '@/lib/format-model-name';
+import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
+import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
-import { AdvancedConfig } from '@/components/shared/AdvancedConfig';
-import {
-  buildProfileConfigIndicatorState,
-  ProfileConfigIndicator,
-} from '@/components/cloud-agent/ProfileConfigIndicator';
+import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
 import {
   Command,
   CommandEmpty,
@@ -189,15 +176,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   const isImageLimitReached = imageUpload.images.length >= CLOUD_AGENT_IMAGE_MAX_COUNT;
 
   // ---------------------------------------------------------------------------
-  // Session form atoms (profile / env / commands)
+  // Session form atoms (profile override)
   // ---------------------------------------------------------------------------
-  const [manualEnvVars, setManualEnvVars] = useAtom(manualEnvVarsAtom);
-  const [manualSetupCommands, setManualSetupCommands] = useAtom(manualSetupCommandsAtom);
   const [selectedProfileId, setSelectedProfileId] = useAtom(selectedProfileIdAtom);
-  const [hasAutoSelectedDefault, setHasAutoSelectedDefault] = useAtom(hasAutoSelectedDefaultAtom);
-  const setProfileConfig = useSetAtom(profileConfigAtom);
-  const effectiveEnvVars = useAtomValue(effectiveEnvVarsAtom);
-  const effectiveSetupCommands = useAtomValue(effectiveSetupCommandsAtom);
   const resetSessionForm = useSetAtom(resetSessionFormAtom);
 
   // Clear any lingering manual overrides whenever the page loads
@@ -271,21 +252,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   );
 
   // ---------------------------------------------------------------------------
-  // Profiles
+  // Profiles — used for the selector and to clear a stale selection when a
+  // selected profile is deleted elsewhere.
   // ---------------------------------------------------------------------------
-  const {
-    data: combinedProfilesData,
-    isLoading: isLoadingCombinedProfiles,
-    error: combinedProfilesError,
-  } = useCombinedProfiles({
+  const { data: combinedProfilesData } = useCombinedProfiles({
     organizationId: organizationId ?? '',
     enabled: !!organizationId,
   });
-  const {
-    data: personalProfiles,
-    isLoading: isLoadingPersonalProfiles,
-    error: personalProfilesError,
-  } = useProfiles({
+  const { data: personalProfiles } = useProfiles({
     organizationId: undefined,
     enabled: !organizationId,
   });
@@ -296,101 +270,64 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         ...(combinedProfilesData?.personalProfiles ?? []),
       ]
     : (personalProfiles ?? []);
-  const effectiveDefaultId = organizationId
-    ? combinedProfilesData?.effectiveDefaultId
-    : personalProfiles?.find(p => p.isDefault)?.id;
 
-  // Auto-select effective default profile on initial load
+  // If the override profile was deleted, clear the selection
   useEffect(() => {
-    if (!hasAutoSelectedDefault && !selectedProfileId && effectiveDefaultId) {
-      setSelectedProfileId(effectiveDefaultId);
-      setHasAutoSelectedDefault(true);
-    } else if (!hasAutoSelectedDefault && allProfiles.length > 0) {
-      setHasAutoSelectedDefault(true);
-    }
-  }, [
-    allProfiles.length,
-    effectiveDefaultId,
-    hasAutoSelectedDefault,
-    selectedProfileId,
-    setSelectedProfileId,
-    setHasAutoSelectedDefault,
-  ]);
-
-  // If a profile is deleted from the list, clear the selection
-  useEffect(() => {
-    if (!selectedProfileId || allProfiles.length === 0) {
-      return;
-    }
-    const stillPresent = allProfiles.some(p => p.id === selectedProfileId);
-    if (!stillPresent) {
+    if (!selectedProfileId || allProfiles.length === 0) return;
+    if (!allProfiles.some(p => p.id === selectedProfileId)) {
       setSelectedProfileId(null);
-      setProfileConfig(null);
     }
-  }, [allProfiles, selectedProfileId, setProfileConfig, setSelectedProfileId]);
+  }, [allProfiles, selectedProfileId, setSelectedProfileId]);
 
-  const selectedProfileSummary = selectedProfileId
-    ? allProfiles.find(profile => profile.id === selectedProfileId)
-    : undefined;
-
-  const { data: repoBindings, error: repoBindingsError } = useRepoBindings({
-    organizationId,
-    enabled: !!selectedRepo,
+  // Resolve the profile whose custom agents should appear in the mode picker.
+  // Prefers an explicit selection; otherwise falls back to the effective
+  // default (personal default wins over org default). This mirrors the
+  // server-side resolution in mergeProfileConfiguration for a useful preview.
+  const effectiveAgentProfileId =
+    selectedProfileId ??
+    (organizationId
+      ? combinedProfilesData?.effectiveDefaultId
+      : (personalProfiles?.find(p => p.isDefault)?.id ?? null)) ??
+    null;
+  const effectiveAgentProfileOrg =
+    effectiveAgentProfileId && organizationId
+      ? combinedProfilesData?.orgProfiles.some(p => p.id === effectiveAgentProfileId)
+        ? organizationId
+        : undefined
+      : undefined;
+  const { data: selectedProfileDetails } = useProfile(effectiveAgentProfileId ?? '', {
+    organizationId: effectiveAgentProfileOrg,
+    enabled: !!effectiveAgentProfileId,
   });
-
-  const repoBoundProfileName = useMemo(() => {
-    if (!selectedRepo || !repoBindings) return null;
-    const binding = repoBindings.find(
-      repoBinding =>
-        repoBinding.repoFullName.toLowerCase() === selectedRepo.toLowerCase() &&
-        repoBinding.platform === selectedPlatform
-    );
-    return binding?.profileName ?? null;
-  }, [repoBindings, selectedPlatform, selectedRepo]);
-
-  const isProfilesLoading = organizationId ? isLoadingCombinedProfiles : isLoadingPersonalProfiles;
-  const profilesError = organizationId ? combinedProfilesError : personalProfilesError;
-  const profileIndicatorState = buildProfileConfigIndicatorState({
-    selectedProfileName: selectedProfileSummary?.name ?? null,
-    repoBoundProfileName,
-    hasManualEnvVars: Object.keys(manualEnvVars).length > 0,
-    hasManualSetupCommands: manualSetupCommands.length > 0,
-    hasSelectedProfileId: !!selectedProfileId,
-    isProfilesLoading,
-    hasProfileError: !!profilesError,
-    hasRepoBindingError: !!selectedRepo && !!repoBindingsError,
-  });
-
-  // Fetch selected profile data
-  const { data: selectedProfile } = useProfile(selectedProfileId || '', {
-    organizationId,
-    enabled: !!selectedProfileId,
-  });
-
-  // Update profile config atom when profile data is loaded
-  useEffect(() => {
-    if (selectedProfile) {
-      setProfileConfig({
-        vars: selectedProfile.vars.map(v => ({
-          key: v.key,
-          value: v.value,
-          isSecret: v.isSecret,
-        })),
-        commands: selectedProfile.commands
-          .sort((a, b) => a.sequence - b.sequence)
-          .map(c => c.command),
-      });
-    } else {
-      setProfileConfig(null);
-    }
-  }, [selectedProfile, setProfileConfig]);
-
-  const handleProfileSelect = useCallback(
-    (profileId: string | null) => {
-      setSelectedProfileId(profileId);
-    },
-    [setSelectedProfileId]
+  // Expose only agents that would actually surface in the chat picker:
+  // not disabled, not hidden, and not subagent-only. Matches the
+  // extension's `session.agents().filter(a => a.mode !== 'subagent' && !a.hidden)`.
+  const visibleCustomAgents = (selectedProfileDetails?.agents ?? []).filter(
+    a => !a.config.disable && !a.config.hidden && a.config.mode !== 'subagent'
   );
+  const customModeOptions: ModeOption<AgentMode>[] = visibleCustomAgents.map(a => ({
+    value: a.slug as AgentMode,
+    label: a.name,
+    description: a.config.description ?? '',
+  }));
+
+  // When a custom agent pins a `model`, the override wins over the user's
+  // model combobox selection. The agent's `variant` is only meaningful when
+  // it also pins a model (variants are model-specific, validated at write
+  // time in AgentConfigSchema), so it travels with the locked model.
+  const selectedCustomAgent = visibleCustomAgents.find(a => a.slug === mode);
+  const agentModelOverride = selectedCustomAgent?.config.model?.trim() || undefined;
+  const hasAgentModelOverride = !!agentModelOverride;
+  const agentVariantOverride = hasAgentModelOverride
+    ? selectedCustomAgent?.config.variant?.trim() || undefined
+    : undefined;
+  const displayModel = agentModelOverride ?? model;
+  const displayModelOption = modelOptions.find(m => m.id === displayModel);
+  const displayModelLabel = displayModelOption
+    ? formatShortModelDisplayName(displayModelOption.name)
+    : displayModel;
+  const displayVariant = hasAgentModelOverride ? agentVariantOverride : variant;
+  const displayVariants = hasAgentModelOverride ? [] : availableVariants;
 
   // ---------------------------------------------------------------------------
   // Repositories (GitHub + GitLab)
@@ -607,7 +544,6 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
   // Repo popover state (must be declared before early returns to satisfy Rules of Hooks)
   // ---------------------------------------------------------------------------
   const [repoPopoverOpen, setRepoPopoverOpen] = useState(false);
-  const [settingsPopoverOpen, setSettingsPopoverOpen] = useState(false);
 
   const recentFullNames = useMemo(() => new Set(recentRepos.map(r => r.fullName)), [recentRepos]);
   const githubRepos = unifiedRepositories.filter(
@@ -656,11 +592,9 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
       const baseInput = {
         prompt: prompt.trim(),
         mode,
-        model,
-        variant,
-        envVars: Object.keys(manualEnvVars).length > 0 ? manualEnvVars : undefined,
-        setupCommands: manualSetupCommands.length > 0 ? manualSetupCommands : undefined,
-        profileName: selectedProfile?.name,
+        model: displayModel,
+        variant: displayVariant,
+        profileId: selectedProfileId ?? undefined,
         autoCommit: true,
         autoInitiate: true,
         initialMessageId,
@@ -696,8 +630,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
         }
       }
 
-      setLastUsedModel(model, organizationId);
-      if (variant) {
+      if (!hasAgentModelOverride) {
+        setLastUsedModel(model, organizationId);
+      }
+      if (!hasAgentModelOverride && variant) {
         setLastUsedVariant(model, variant, organizationId);
       }
 
@@ -723,8 +659,15 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     }
   }, [
     imageUpload,
-    manualEnvVars,
-    manualSetupCommands,
+    displayModel,
+    // `displayVariant` is what we actually submit; raw `variant` is only read
+    // inside the `!hasAgentModelOverride` branch for last-used persistence, so
+    // keeping `displayVariant` (which equals `variant` in that branch) here is
+    // sufficient and avoids the stale-variant race when the agent-provided
+    // override changes while `variant`/`model`/`mode`/`hasAgentModelOverride`
+    // stay the same.
+    displayVariant,
+    hasAgentModelOverride,
     model,
     mode,
     organizationId,
@@ -732,11 +675,10 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     queryClient,
     router,
     selectedPlatform,
+    selectedProfileId,
     selectedRepo,
-    selectedProfile,
     trpc.cliSessionsV2.list,
     trpcClient,
-    variant,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -922,15 +864,24 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             <MobileToolbarPopover
               mode={mode}
               onModeChange={setMode}
-              model={model}
+              model={displayModel}
               modelOptions={modelOptions}
               onModelChange={handleModelChange}
               isLoadingModels={!modelsData}
-              variant={variant}
-              availableVariants={availableVariants}
+              variant={displayVariant}
+              availableVariants={displayVariants}
               onVariantChange={handleVariantChange}
               disabled={isPreparing}
+              modelPickerDisabled={hasAgentModelOverride}
+              modelPickerTooltip={
+                hasAgentModelOverride ? `Locked by agent "${selectedCustomAgent?.name}"` : undefined
+              }
+              variantPickerDisabled={hasAgentModelOverride}
+              variantPickerTooltip={
+                hasAgentModelOverride ? `Locked by agent "${selectedCustomAgent?.name}"` : undefined
+              }
               className="md:hidden"
+              customModeOptions={customModeOptions}
             />
             {/* Desktop: individual pickers */}
             <div className="hidden md:contents">
@@ -938,28 +889,58 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
                 value={mode}
                 onValueChange={setMode}
                 options={NEXT_MODE_OPTIONS}
+                customOptions={customModeOptions}
                 variant="compact"
                 disabled={isPreparing}
                 className="min-w-0"
               />
-              <ModelCombobox
-                models={modelOptions}
-                value={model}
-                onValueChange={handleModelChange}
-                isLoading={!modelsData}
-                variant="compact"
-                disabled={isPreparing}
-                className="min-w-0"
-              />
-              {availableVariants.length > 0 && (
-                <VariantCombobox
-                  variants={availableVariants}
-                  value={variant}
-                  onValueChange={handleVariantChange}
+              {hasAgentModelOverride ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="text-muted-foreground flex h-9 min-w-0 items-center rounded-md border border-dashed px-2 text-xs">
+                      <span className={cn('truncate', !displayModelOption && 'font-mono')}>
+                        {displayModelLabel}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Model is locked by agent &ldquo;{selectedCustomAgent?.name}&rdquo;
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <ModelCombobox
+                  models={modelOptions}
+                  value={model}
+                  onValueChange={handleModelChange}
+                  isLoading={!modelsData}
+                  variant="compact"
                   disabled={isPreparing}
                   className="min-w-0"
                 />
               )}
+              {hasAgentModelOverride
+                ? displayVariant && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="text-muted-foreground flex h-9 min-w-0 items-center gap-1.5 rounded-md border border-dashed px-2 text-xs">
+                          <Brain className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                          <span className="truncate">{thinkingEffortLabel(displayVariant)}</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        Locked by agent &ldquo;{selectedCustomAgent?.name}&rdquo;
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                : availableVariants.length > 0 && (
+                    <VariantCombobox
+                      variants={availableVariants}
+                      value={variant}
+                      onValueChange={handleVariantChange}
+                      disabled={isPreparing}
+                      className="min-w-0"
+                    />
+                  )}
             </div>
 
             <div className="flex-1" />
@@ -1106,52 +1087,14 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             </PopoverContent>
           </Popover>
 
-          {/* Settings — bottom right */}
-          <div className="flex shrink-0 items-center gap-3">
-            <ProfileConfigIndicator
-              state={profileIndicatorState}
-              onOpenSettings={() => setSettingsPopoverOpen(true)}
-            />
-            {profileIndicatorState && <Separator orientation="vertical" className="h-4" />}
-            <Popover open={settingsPopoverOpen} onOpenChange={setSettingsPopoverOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  Settings
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-[min(28rem,calc(100vw-2rem))] p-0"
-                align="end"
-                side="bottom"
-                sideOffset={8}
-              >
-                <div className="px-4 py-3">
-                  <p className="text-sm font-medium">Advanced settings</p>
-                </div>
-                <Separator />
-                <div className="p-4">
-                  <AdvancedConfig
-                    label=""
-                    organizationId={organizationId}
-                    selectedProfileId={selectedProfileId}
-                    onProfileSelect={handleProfileSelect}
-                    manualEnvVars={manualEnvVars}
-                    manualSetupCommands={manualSetupCommands}
-                    effectiveEnvVars={effectiveEnvVars}
-                    effectiveSetupCommands={effectiveSetupCommands}
-                    onManualEnvVarsChange={setManualEnvVars}
-                    onManualSetupCommandsChange={setManualSetupCommands}
-                    repoFullName={selectedRepo || undefined}
-                    platform={selectedPlatform}
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
+          {/* Profile chip — bottom right */}
+          <ProfilePickerPopover
+            organizationId={organizationId}
+            selectedOverrideProfileId={selectedProfileId}
+            onOverrideProfileSelect={setSelectedProfileId}
+            repoFullName={selectedRepo || undefined}
+            platform={selectedPlatform}
+          />
         </div>
       </div>
     </div>

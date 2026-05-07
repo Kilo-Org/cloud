@@ -5,7 +5,6 @@ import './globals.css';
 import { PostHogProvider } from '../components/PostHogProvider';
 import { Providers } from '../components/Providers';
 import { DataLayerProvider } from '../components/DataLayerProvider';
-import { GoogleTagManager } from '@next/third-parties/google';
 import { APP_URL } from '@/lib/constants';
 
 const inter = Inter({
@@ -113,13 +112,15 @@ export default function RootLayout({
         </Providers>
 
         {process.env.NEXT_PUBLIC_GTM_ID && (
-          <GoogleTagManager gtmId={process.env.NEXT_PUBLIC_GTM_ID} />
+          <Script
+            id="google-tag-manager"
+            src="/api/marketing-tags/gtm"
+            strategy="afterInteractive"
+          />
         )}
 
         {process.env.NEXT_PUBLIC_IMPACT_UTT_ID && (
-          <Script id="impact-utt" strategy="beforeInteractive">
-            {`(function(a,b,c,d,e,f,g){e.ire_o=c;e[c]=e[c]||function(){(e[c].a=e[c].a||[]).push(arguments)};f=d.createElement(b);g=d.getElementsByTagName(b)[0];f.async=1;f.src=a;g.parentNode.insertBefore(f,g);})('https://utt.impactcdn.com/${process.env.NEXT_PUBLIC_IMPACT_UTT_ID}.js','script','ire',document,window);`}
-          </Script>
+          <Script id="impact-utt" src="/api/marketing-tags/impact" strategy="beforeInteractive" />
         )}
       </body>
     </html>

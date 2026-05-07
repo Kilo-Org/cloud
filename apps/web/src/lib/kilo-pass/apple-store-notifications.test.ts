@@ -35,6 +35,7 @@ function transaction(
     bundleId: 'com.kilocode.kiloapp',
     productId: 'kilopass.tier19.monthly.v1',
     purchaseDate: 1_777_626_000_000,
+    expiresDate: 1_780_218_000_000,
     environment: 'Sandbox',
     rawPayload: { test: true },
     ...overrides,

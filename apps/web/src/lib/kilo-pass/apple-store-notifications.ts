@@ -159,6 +159,7 @@ function getStoreEventPayload(params: {
           providerOriginalTransactionId: params.purchase.providerOriginalTransactionId,
           appAccountToken: params.purchase.appAccountToken,
           purchasedAtIso: params.purchase.purchasedAtIso,
+          expiresAtIso: params.purchase.expiresAtIso,
           environment: params.purchase.environment,
           tier: params.purchase.tier,
           cadence: params.purchase.cadence,

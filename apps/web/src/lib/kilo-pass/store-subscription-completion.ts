@@ -1,4 +1,5 @@
 import {
+  credit_transactions,
   kilo_pass_issuances,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
@@ -40,6 +41,7 @@ export type ValidatedStoreKiloPassPurchase = {
   purchaseToken: string | null;
   environment: string;
   purchasedAtIso: string;
+  expiresAtIso: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
   rawPayload: Record<string, unknown>;
@@ -82,6 +84,178 @@ function findStorePurchaseByProviderTransaction(
       eq(kilo_pass_store_purchases.payment_provider, purchase.paymentProvider),
       eq(kilo_pass_store_purchases.provider_transaction_id, purchase.providerTransactionId)
     ),
+  });
+}
+
+function findLatestStorePurchaseForSubscription(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  purchase: ValidatedStoreKiloPassPurchase
+) {
+  return tx.query.kilo_pass_store_purchases.findFirst({
+    where: and(
+      eq(kilo_pass_store_purchases.payment_provider, purchase.paymentProvider),
+      eq(kilo_pass_store_purchases.provider_subscription_id, purchase.providerSubscriptionId)
+    ),
+    orderBy: desc(kilo_pass_store_purchases.purchased_at),
+  });
+}
+
+function computeProratedRefundMicrodollars(params: {
+  oldTier: KiloPassTier;
+  oldPurchasedAtIso: string;
+  oldExpiresAtIso: string;
+  upgradePurchasedAtIso: string;
+}): number {
+  const oldPurchasedAt = dayjs(params.oldPurchasedAtIso).valueOf();
+  const oldExpiresAt = dayjs(params.oldExpiresAtIso).valueOf();
+  const upgradePurchasedAt = dayjs(params.upgradePurchasedAtIso).valueOf();
+  const periodMs = oldExpiresAt - oldPurchasedAt;
+  if (periodMs <= 0) return 0;
+
+  const remainingMs = Math.max(0, Math.min(oldExpiresAt - upgradePurchasedAt, periodMs));
+  const oldTierMicrodollars = toMicrodollars(getMonthlyPriceUsd(params.oldTier));
+  return Math.round(oldTierMicrodollars * (remainingMs / periodMs));
+}
+
+async function insertCreditTransactionAdjustment(
+  tx: DrizzleTransaction,
+  params: {
+    kiloUserId: string;
+    amountMicrodollars: number;
+    description: string;
+    creditCategory: string;
+    originalBaselineMicrodollarsUsed: number;
+  }
+): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
+  const creditTransactionId = crypto.randomUUID();
+  const insertResult = await tx
+    .insert(credit_transactions)
+    .values({
+      id: creditTransactionId,
+      kilo_user_id: params.kiloUserId,
+      amount_microdollars: params.amountMicrodollars,
+      is_free: false,
+      description: params.description,
+      credit_category: params.creditCategory,
+      check_category_uniqueness: true,
+      original_baseline_microdollars_used: params.originalBaselineMicrodollarsUsed,
+    })
+    .onConflictDoNothing();
+
+  if ((insertResult.rowCount ?? 0) === 0) {
+    const existingRows = await tx
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, params.kiloUserId),
+          eq(credit_transactions.credit_category, params.creditCategory)
+        )
+      )
+      .limit(1);
+    return { wasInserted: false, creditTransactionId: existingRows[0]?.id ?? null };
+  }
+
+  await tx
+    .update(kilocode_users)
+    .set({
+      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${params.amountMicrodollars}`,
+    })
+    .where(eq(kilocode_users.id, params.kiloUserId));
+
+  return { wasInserted: true, creditTransactionId };
+}
+
+async function applyStoreUpgradeCreditAdjustments(
+  tx: DrizzleTransaction,
+  params: {
+    subscriptionId: string;
+    user: User;
+    purchase: ValidatedStoreKiloPassPurchase;
+    oldTier: KiloPassTier;
+    oldPurchasedAtIso: string;
+    oldExpiresAtIso: string;
+  }
+): Promise<void> {
+  const freshUserRows = await tx
+    .select({ microdollarsUsed: kilocode_users.microdollars_used })
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, params.user.id))
+    .for('update')
+    .limit(1);
+  const freshUser = freshUserRows[0];
+  if (!freshUser) {
+    throw new Error('Failed to lock user for App Store upgrade credit adjustment');
+  }
+
+  const refundMicrodollars = computeProratedRefundMicrodollars({
+    oldTier: params.oldTier,
+    oldPurchasedAtIso: params.oldPurchasedAtIso,
+    oldExpiresAtIso: params.oldExpiresAtIso,
+    upgradePurchasedAtIso: params.purchase.purchasedAtIso,
+  });
+
+  if (refundMicrodollars > 0) {
+    const refundResult = await insertCreditTransactionAdjustment(tx, {
+      kiloUserId: params.user.id,
+      amountMicrodollars: -refundMicrodollars,
+      description: `Kilo Pass upgrade refund clawback (${params.oldTier})`,
+      creditCategory: `kilo-pass-upgrade-refund:${params.purchase.paymentProvider}:${params.purchase.providerTransactionId}`,
+      originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,
+    });
+    await appendKiloPassAuditLog(tx, {
+      action: KiloPassAuditLogAction.BaseCreditsIssued,
+      result: refundResult.wasInserted
+        ? KiloPassAuditLogResult.Success
+        : KiloPassAuditLogResult.SkippedIdempotent,
+      kiloUserId: params.user.id,
+      kiloPassSubscriptionId: params.subscriptionId,
+      relatedCreditTransactionId: refundResult.creditTransactionId,
+      payload: {
+        kind: 'store_upgrade_refund_clawback',
+        oldTier: params.oldTier,
+        providerSubscriptionId: params.purchase.providerSubscriptionId,
+        providerTransactionId: params.purchase.providerTransactionId,
+        amountMicrodollars: -refundMicrodollars,
+      },
+    });
+  }
+
+  const newTierAmountUsd = getMonthlyPriceUsd(params.purchase.tier);
+  const newTierMicrodollars = toMicrodollars(newTierAmountUsd);
+  const issueResult = await insertCreditTransactionAdjustment(tx, {
+    kiloUserId: params.user.id,
+    amountMicrodollars: newTierMicrodollars,
+    description: `Kilo Pass upgrade base credits (${params.purchase.tier}, ${params.purchase.cadence})`,
+    creditCategory: `kilo-pass-upgrade-base:${params.purchase.paymentProvider}:${params.purchase.providerTransactionId}`,
+    originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,
+  });
+
+  if (issueResult.wasInserted) {
+    await tx
+      .update(kilocode_users)
+      .set({
+        kilo_pass_threshold: sql`${kilocode_users.microdollars_used} + ${newTierMicrodollars}`,
+      })
+      .where(eq(kilocode_users.id, params.user.id));
+  }
+
+  await appendKiloPassAuditLog(tx, {
+    action: KiloPassAuditLogAction.BaseCreditsIssued,
+    result: issueResult.wasInserted
+      ? KiloPassAuditLogResult.Success
+      : KiloPassAuditLogResult.SkippedIdempotent,
+    kiloUserId: params.user.id,
+    kiloPassSubscriptionId: params.subscriptionId,
+    relatedCreditTransactionId: issueResult.creditTransactionId,
+    payload: {
+      kind: 'store_upgrade_base',
+      tier: params.purchase.tier,
+      cadence: params.purchase.cadence,
+      providerSubscriptionId: params.purchase.providerSubscriptionId,
+      providerTransactionId: params.purchase.providerTransactionId,
+      amountUsd: newTierAmountUsd,
+    },
   });
 }
 
@@ -167,6 +341,19 @@ export async function completeStoreKiloPassPurchase(params: {
       throw new Error('You already have an active Kilo Pass subscription');
     }
 
+    const previousStorePurchase =
+      activeSubscription?.provider_subscription_id === purchase.providerSubscriptionId
+        ? await findLatestStorePurchaseForSubscription(tx, purchase)
+        : null;
+    const isAppStoreUpgrade =
+      purchase.paymentProvider === KiloPassPaymentProvider.AppStore &&
+      activeSubscription?.provider_subscription_id === purchase.providerSubscriptionId &&
+      getMonthlyPriceUsd(purchase.tier) > getMonthlyPriceUsd(activeSubscription.tier);
+
+    if (isAppStoreUpgrade && !previousStorePurchase?.expires_at) {
+      throw new Error('App Store upgrade cannot be processed without previous period expiration');
+    }
+
     const nextYearlyIssueAt = getNextYearlyIssueAt({
       cadence: purchase.cadence,
       purchasedAtIso: purchase.purchasedAtIso,
@@ -200,6 +387,7 @@ export async function completeStoreKiloPassPurchase(params: {
           cadence: purchase.cadence,
           status: 'active',
           cancel_at_period_end: false,
+          started_at: purchase.purchasedAtIso,
           ended_at: null,
           next_yearly_issue_at: nextYearlyIssueAt,
         },
@@ -225,6 +413,7 @@ export async function completeStoreKiloPassPurchase(params: {
         purchase_token: purchase.purchaseToken,
         environment: purchase.environment,
         purchased_at: purchase.purchasedAtIso,
+        expires_at: purchase.expiresAtIso,
         raw_payload_json: purchase.rawPayload,
       })
       .onConflictDoNothing({
@@ -264,16 +453,30 @@ export async function completeStoreKiloPassPurchase(params: {
     });
 
     const baseAmountUsd = getMonthlyPriceUsd(purchase.tier);
-    const baseCreditsResult = await issueBaseCreditsForIssuance(tx, {
-      issuanceId: issuanceHeader.issuanceId,
-      subscriptionId,
-      kiloUserId: user.id,
-      amountUsd: baseAmountUsd,
-      providerPaymentId: getProviderPaymentId(purchase),
-      description: `Kilo Pass base credits (${purchase.tier}, ${purchase.cadence})`,
-    });
+    const baseCreditsResult = isAppStoreUpgrade
+      ? {
+          wasIssued: false,
+          amountUsd: baseAmountUsd,
+        }
+      : await issueBaseCreditsForIssuance(tx, {
+          issuanceId: issuanceHeader.issuanceId,
+          subscriptionId,
+          kiloUserId: user.id,
+          amountUsd: baseAmountUsd,
+          providerPaymentId: getProviderPaymentId(purchase),
+          description: `Kilo Pass base credits (${purchase.tier}, ${purchase.cadence})`,
+        });
 
-    if (baseCreditsResult.wasIssued) {
+    if (isAppStoreUpgrade && previousStorePurchase?.expires_at) {
+      await applyStoreUpgradeCreditAdjustments(tx, {
+        subscriptionId,
+        user,
+        purchase,
+        oldTier: activeSubscription.tier,
+        oldPurchasedAtIso: previousStorePurchase.purchased_at,
+        oldExpiresAtIso: previousStorePurchase.expires_at,
+      });
+    } else if (baseCreditsResult.wasIssued) {
       await tx
         .update(kilocode_users)
         .set({
@@ -310,6 +513,7 @@ export async function completeStoreKiloPassPurchase(params: {
         issueMonth,
         issuanceHeaderWasCreated: issuanceHeader.wasCreated,
         baseCreditsIssued: baseCreditsResult.wasIssued,
+        appStoreUpgradeApplied: isAppStoreUpgrade,
       },
     });
 

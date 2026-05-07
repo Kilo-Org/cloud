@@ -5,10 +5,16 @@ import * as path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
 const devVarsPath = path.join(repoRoot, 'services/kiloclaw/.dev.vars');
+const envLocalPath = path.join(repoRoot, '.env.local');
 
 type TunnelConfig = {
   tunnelName: string;
+  tunnelConfig: string;
   tunnelHostname: string;
+  appHostname: string;
+  kiloclawHostname: string;
+  kiloChatHostname: string;
+  updateAppEnv: boolean;
 };
 
 const DOCKER_HOST_INTERNAL = 'host.docker.internal';
@@ -39,8 +45,33 @@ function loadTunnelConfig(): TunnelConfig {
 
   return {
     tunnelName: merged['TUNNEL_NAME'] ?? '',
+    tunnelConfig: expandHome(merged['TUNNEL_CONFIG'] ?? ''),
     tunnelHostname: merged['TUNNEL_HOSTNAME'] ?? '',
+    appHostname: merged['TUNNEL_APP_HOSTNAME'] ?? merged['TUNNEL_HOSTNAME'] ?? '',
+    kiloclawHostname: merged['TUNNEL_KILOCLAW_HOSTNAME'] ?? merged['TUNNEL_HOSTNAME'] ?? '',
+    kiloChatHostname: merged['TUNNEL_KILOCHAT_HOSTNAME'] ?? merged['TUNNEL_HOSTNAME'] ?? '',
+    updateAppEnv: merged['TUNNEL_UPDATE_APP_ENV'] !== 'false',
   };
+}
+
+function expandHome(value: string): string {
+  if (value === '~') return os.homedir();
+  if (value.startsWith('~/')) return path.join(os.homedir(), value.slice(2));
+  return value;
+}
+
+function originFromHostname(value: string): string | null {
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!trimmed) return null;
+
+  try {
+    if (/^https?:\/\//.test(trimmed)) {
+      return new URL(trimmed).origin;
+    }
+    return new URL(`https://${trimmed}`).origin;
+  } catch {
+    throw new Error(`Invalid tunnel hostname: ${value}`);
+  }
 }
 
 function updateEnvValue(filePath: string, key: string, value: string): void {
@@ -49,19 +80,65 @@ function updateEnvValue(filePath: string, key: string, value: string): void {
     content = fs.readFileSync(filePath, 'utf-8');
   }
 
-  const activePattern = new RegExp(`^${key}=.*`, 'm');
-  const commentedPattern = new RegExp(`^# ${key}=.*`, 'm');
+  const lines = content.split('\n');
+  const nextLines: string[] = [];
+  let replaced = false;
+  let replacedComment = false;
 
-  if (activePattern.test(content)) {
-    content = content.replace(activePattern, `${key}=${value}`);
-  } else if (commentedPattern.test(content)) {
-    content = content.replace(commentedPattern, `${key}=${value}`);
-  } else {
-    content = content.endsWith('\n') || content === '' ? content : content + '\n';
-    content += `${key}=${value}\n`;
+  for (const [index, line] of lines.entries()) {
+    if (line === '' && index === lines.length - 1) continue;
+    const trimmed = line.trimStart();
+    if (!replaced && line.startsWith(`${key}=`)) {
+      nextLines.push(`${key}=${value}`);
+      replaced = true;
+      continue;
+    }
+    if (!replaced && !replacedComment && trimmed.startsWith(`# ${key}=`)) {
+      nextLines.push(`${key}=${value}`);
+      replaced = true;
+      replacedComment = true;
+      continue;
+    }
+    if (line.startsWith(`${key}=`)) {
+      continue;
+    }
+    nextLines.push(line);
   }
 
-  fs.writeFileSync(filePath, content);
+  if (!replaced) {
+    if (nextLines.length > 0 && nextLines[nextLines.length - 1] !== '') {
+      nextLines.push('');
+    }
+    nextLines.push(`${key}=${value}`);
+  }
+
+  fs.writeFileSync(filePath, `${nextLines.join('\n').replace(/\n+$/, '')}\n`);
+}
+
+function readEnvValueFromFile(filePath: string, key: string): string | null {
+  if (!fs.existsSync(filePath)) return null;
+  for (const line of fs.readFileSync(filePath, 'utf-8').split('\n')) {
+    if (line.startsWith(`${key}=`)) {
+      return line.slice(key.length + 1);
+    }
+  }
+  return null;
+}
+
+function appendEnvListValues(filePath: string, key: string, values: string[]): void {
+  const existing = readEnvValueFromFile(filePath, key);
+  const entries = new Set(
+    (existing ?? '')
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean)
+  );
+  for (const value of values) {
+    if (value) entries.add(value);
+  }
+  if (entries.size > 0) {
+    updateEnvValue(filePath, key, [...entries].join(','));
+  }
 }
 
 function loadKiloClawProvider(): string {
@@ -155,35 +232,70 @@ if (provider === DOCKER_LOCAL_PROVIDER) {
   console.log(`Set KILOCHAT_BASE_URL=${kiloChatUrl}`);
 
   setInterval(() => undefined, 60_000);
-} else {
-  if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
-    console.error(
-      'cloudflared not found on PATH. Install it:\n  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/\n  brew install cloudflared'
-    );
-    process.exit(1);
-  }
+} else if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
+  console.error(
+    'cloudflared not found on PATH. Install it:\n  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/\n  brew install cloudflared'
+  );
+  process.exit(1);
 }
 
-if (provider !== DOCKER_LOCAL_PROVIDER && config.tunnelName) {
+if (provider !== DOCKER_LOCAL_PROVIDER && (config.tunnelName || config.tunnelConfig)) {
   const label = 'kiloclaw-tunnel';
-  const child = spawn('cloudflared', ['tunnel', 'run', config.tunnelName], {
+  const args = config.tunnelConfig
+    ? ['tunnel', '--config', config.tunnelConfig, 'run']
+    : ['tunnel', 'run', config.tunnelName];
+  const child = spawn('cloudflared', args, {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   trackChild(label, child);
 
-  console.log(`Named tunnel: ${config.tunnelName} -> ${config.tunnelHostname}`);
+  const appOrigin = originFromHostname(config.appHostname);
+  const kiloclawOrigin = originFromHostname(config.kiloclawHostname);
+  const kiloChatOrigin = originFromHostname(config.kiloChatHostname);
 
-  if (config.tunnelHostname) {
-    const apiUrl = `https://${config.tunnelHostname}/api/gateway/`;
-    const checkinUrl = `https://${config.tunnelHostname}/api/controller/checkin`;
-    const kiloChatUrl = `https://${config.tunnelHostname}`;
+  console.log(
+    `Named tunnel: ${config.tunnelConfig || config.tunnelName}` +
+      `${appOrigin ? `\n  app      -> ${appOrigin}` : ''}` +
+      `${kiloclawOrigin ? `\n  kiloclaw -> ${kiloclawOrigin}` : ''}` +
+      `${kiloChatOrigin ? `\n  kilochat -> ${kiloChatOrigin}` : ''}`
+  );
+
+  if (appOrigin) {
+    const apiUrl = `${appOrigin}/api/gateway/`;
+    updateEnvValue(devVarsPath, 'BACKEND_API_URL', appOrigin);
     updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
-    updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
-    updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', kiloChatUrl);
+    console.log(`Set BACKEND_API_URL=${appOrigin}`);
     console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
-    console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
-    console.log(`Set KILOCHAT_BASE_URL=${kiloChatUrl}`);
+
+    if (config.updateAppEnv) {
+      updateEnvValue(envLocalPath, 'APP_URL_OVERRIDE', appOrigin);
+      updateEnvValue(envLocalPath, 'NEXTAUTH_URL', appOrigin);
+      console.log(`Set APP_URL_OVERRIDE=${appOrigin}`);
+      console.log(`Set NEXTAUTH_URL=${appOrigin}`);
+    }
   }
+
+  if (kiloclawOrigin) {
+    const checkinUrl = `${kiloclawOrigin}/api/controller/checkin`;
+    updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
+    console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
+
+    if (config.updateAppEnv) {
+      updateEnvValue(envLocalPath, 'KILOCLAW_API_URL', kiloclawOrigin);
+      console.log(`Set KILOCLAW_API_URL=${kiloclawOrigin}`);
+    }
+  }
+
+  if (kiloChatOrigin) {
+    updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', kiloChatOrigin);
+    console.log(`Set KILOCHAT_BASE_URL=${kiloChatOrigin}`);
+  }
+
+  appendEnvListValues(
+    devVarsPath,
+    'OPENCLAW_ALLOWED_ORIGINS',
+    [appOrigin, kiloclawOrigin, kiloChatOrigin].filter((origin): origin is string => !!origin)
+  );
 
   child.stdout.on('data', data => prefixAndWrite(label, data));
   child.stderr.on('data', data => prefixAndWrite(label, data));

@@ -52,6 +52,17 @@ import {
   agent_environment_profiles,
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
+  deleted_user_email_tombstones,
+  kiloclaw_attribution_touches,
+  impact_advocate_participants,
+  impact_advocate_registration_attempts,
+  kiloclaw_referrals,
+  kiloclaw_referral_conversions,
+  kiloclaw_referral_reward_decisions,
+  kiloclaw_referral_rewards,
+  kiloclaw_referral_reward_applications,
+  impact_advocate_reward_redemptions,
+  impact_conversion_reports,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -61,6 +72,7 @@ import {
   findUsersByIds,
   createOrUpdateUser,
 } from './user';
+import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact-referral';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
@@ -86,6 +98,17 @@ describe('User', () => {
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
+    await db.delete(kiloclaw_attribution_touches);
+    await db.delete(impact_advocate_registration_attempts);
+    await db.delete(impact_advocate_participants);
+    await db.delete(impact_conversion_reports);
+    await db.delete(impact_advocate_reward_redemptions);
+    await db.delete(kiloclaw_referral_reward_applications);
+    await db.delete(kiloclaw_referral_rewards);
+    await db.delete(kiloclaw_referral_reward_decisions);
+    await db.delete(kiloclaw_referral_conversions);
+    await db.delete(kiloclaw_referrals);
+    await db.delete(deleted_user_email_tombstones);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_issuance_items);
     await db.delete(kilo_pass_issuances);
@@ -126,6 +149,9 @@ describe('User', () => {
     await db.delete(kiloclaw_subscriptions);
     await db.delete(kiloclaw_earlybird_purchases);
     await db.delete(kiloclaw_instances);
+    await db.delete(agent_environment_profile_skills);
+    await db.delete(agent_environment_profile_mcp_servers);
+    await db.delete(agent_environment_profiles);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -376,6 +402,173 @@ describe('User', () => {
         '2026-01-15T12:00:00.000Z'
       );
       expect(blockedUserAfter!.blocked_by_kilo_user_id).toBeNull();
+    });
+
+    it('should tombstone normalized email hashes and delete referral program records', async () => {
+      const referrer = await insertTestUser({
+        id: 'referrer-user',
+        google_user_email: 'referrer@example.com',
+        normalized_email: 'referrer@example.com',
+      });
+      const user = await insertTestUser({
+        id: 'referee-user',
+        google_user_email: 'referee@example.com',
+        normalized_email: 'referee@example.com',
+      });
+      const touchId = randomUUID();
+      const participantId = randomUUID();
+      const conversionId = randomUUID();
+      const decisionId = randomUUID();
+      const rewardId = randomUUID();
+
+      await db.insert(kiloclaw_attribution_touches).values({
+        id: touchId,
+        dedupe_key: 'touch-dedupe',
+        user_id: user.id,
+        touch_type: 'referral',
+        provider: 'impact_advocate',
+        opaque_tracking_value: 'sq-cookie',
+        tracking_value_length: 9,
+        is_tracking_value_accepted: true,
+        touched_at: '2026-04-23T00:00:00.000Z',
+        expires_at: '2026-05-23T00:00:00.000Z',
+      });
+      await db.insert(impact_advocate_participants).values({
+        id: participantId,
+        user_id: user.id,
+        advocate_id: user.id,
+        advocate_account_id: user.id,
+        contact_email: user.google_user_email,
+        registration_state: 'pending',
+      });
+      await db.insert(impact_advocate_registration_attempts).values({
+        participant_id: participantId,
+        dedupe_key: 'registration-dedupe',
+        opaque_cookie_value: 'sq-cookie',
+        cookie_value_length: 9,
+        delivery_state: 'queued',
+      });
+      await db.insert(kiloclaw_referrals).values({
+        referee_user_id: user.id,
+        referrer_user_id: referrer.id,
+        source_touch_id: touchId,
+      });
+      await db.insert(kiloclaw_referral_conversions).values({
+        id: conversionId,
+        referee_user_id: user.id,
+        referrer_user_id: referrer.id,
+        source_touch_id: touchId,
+        winning_touch_type: 'referral',
+        source_payment_id: 'payment-123',
+        qualified: true,
+        converted_at: '2026-04-23T00:00:00.000Z',
+      });
+      await db.insert(kiloclaw_referral_reward_decisions).values({
+        id: decisionId,
+        conversion_id: conversionId,
+        beneficiary_user_id: user.id,
+        beneficiary_role: 'referee',
+        outcome: 'granted',
+        months_granted: 1,
+      });
+      await db.insert(kiloclaw_referral_rewards).values({
+        id: rewardId,
+        conversion_id: conversionId,
+        decision_id: decisionId,
+        beneficiary_user_id: user.id,
+        beneficiary_role: 'referee',
+        months_granted: 1,
+        status: 'pending',
+        earned_at: '2026-04-23T00:00:00.000Z',
+      });
+      await db.insert(kiloclaw_referral_reward_applications).values({
+        reward_id: rewardId,
+        beneficiary_user_id: user.id,
+        previous_renewal_boundary: '2026-05-01T00:00:00.000Z',
+        new_renewal_boundary: '2026-06-01T00:00:00.000Z',
+        applied_at: '2026-04-23T00:00:00.000Z',
+      });
+      await db.insert(impact_advocate_reward_redemptions).values({
+        reward_id: rewardId,
+        dedupe_key: 'reward-redemption-dedupe',
+        beneficiary_user_id: user.id,
+        state: 'queued',
+        request_payload: {
+          lookup: {
+            accountId: user.google_user_email,
+            userId: user.google_user_email,
+            rewardTypeFilter: 'CREDIT',
+          },
+          redemption: { amount: 1, unit: 'free-months' },
+        },
+      });
+      await db.insert(impact_conversion_reports).values({
+        conversion_id: conversionId,
+        dedupe_key: 'impact-report-dedupe',
+        action_tracker_id: 71659,
+        order_id: 'payment-123',
+        state: 'queued',
+      });
+
+      await softDeleteUser(user.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(deleted_user_email_tombstones)
+        .where(
+          eq(
+            deleted_user_email_tombstones.normalized_email_hash,
+            hashNormalizedEmailForDeletionTombstone('referee@example.com')
+          )
+        );
+      expect(tombstone).toBeDefined();
+
+      const [touchCount] = await db
+        .select({ count: count() })
+        .from(kiloclaw_attribution_touches)
+        .where(eq(kiloclaw_attribution_touches.user_id, user.id));
+      expect(touchCount.count).toBe(0);
+
+      const [participantCount] = await db
+        .select({ count: count() })
+        .from(impact_advocate_participants)
+        .where(eq(impact_advocate_participants.user_id, user.id));
+      expect(participantCount.count).toBe(0);
+
+      const [redemptionCount] = await db
+        .select({ count: count() })
+        .from(impact_advocate_reward_redemptions)
+        .where(eq(impact_advocate_reward_redemptions.beneficiary_user_id, user.id));
+      expect(redemptionCount.count).toBe(0);
+
+      const [conversionCount] = await db
+        .select({ count: count() })
+        .from(kiloclaw_referral_conversions)
+        .where(eq(kiloclaw_referral_conversions.referee_user_id, user.id));
+      expect(conversionCount.count).toBe(0);
+    });
+
+    it('falls back to google_user_email when normalized_email is null', async () => {
+      // Pre-0090 users can have NULL normalized_email but a real google_user_email.
+      // Soft-delete must still record a tombstone so a re-registration of the
+      // same email cannot bypass the previously-deleted-referee guard.
+      const legacyUser = await insertTestUser({
+        google_user_email: 'legacy-no-normalized@example.com',
+        normalized_email: null,
+      });
+
+      await softDeleteUser(legacyUser.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(deleted_user_email_tombstones)
+        .where(
+          eq(
+            deleted_user_email_tombstones.normalized_email_hash,
+            hashNormalizedEmailForDeletionTombstone('legacy-no-normalized@example.com')
+          )
+        );
+      expect(tombstone).toBeDefined();
     });
 
     it('should delete auth providers', async () => {

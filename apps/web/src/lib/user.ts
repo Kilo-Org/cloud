@@ -63,6 +63,15 @@ import {
   contributor_champion_memberships,
   contributor_champion_contributors,
   credit_campaigns,
+  kiloclaw_attribution_touches,
+  impact_advocate_participants,
+  kiloclaw_referrals,
+  kiloclaw_referral_conversions,
+  kiloclaw_referral_reward_decisions,
+  kiloclaw_referral_rewards,
+  kiloclaw_referral_reward_applications,
+  impact_advocate_reward_redemptions,
+  impact_conversion_reports,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from './constants';
@@ -82,6 +91,18 @@ import {
 import { normalizeEmail } from '@/lib/utils';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
+import {
+  createDeletedUserEmailTombstone,
+  queueImpactAdvocateParticipantRegistration,
+  recordImpactAffiliateTouch,
+  recordImpactReferralTouch,
+} from '@/lib/impact-referral';
+import {
+  redactLandingPathForLogs,
+  type ParsedImpactAffiliateTouch,
+  type ParsedImpactReferralTouch,
+} from '@/lib/impact-referral-utils';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -223,6 +244,14 @@ export type CreateOrUpdateUserArgs = {
   display_name?: string | null;
 };
 
+export type CreateOrUpdateUserTrackingContext = {
+  affiliateTouch?: ParsedImpactAffiliateTouch | null;
+  referralTouch?: ParsedImpactReferralTouch | null;
+  anonymousId?: string | null;
+  locale?: string | null;
+  countryCode?: string | null;
+};
+
 export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
   const timer = createTimer();
   const existing_kilo_user_id = await findUserIdByAuthProvider(
@@ -298,7 +327,8 @@ export async function createOrUpdateUser(
   turnstile_guid: UUID | undefined,
   autoLinkToExistingUser: boolean = false,
   requestHeaders?: Headers,
-  affiliateTrackingId?: string | null
+  affiliateTrackingId?: string | null,
+  trackingContext?: CreateOrUpdateUserTrackingContext
 ): Promise<Result<{ user: User; isNew: boolean }, AuthErrorType>> {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
@@ -444,14 +474,93 @@ export async function createOrUpdateUser(
       });
 
       if (affiliateTrackingId?.trim()) {
-        await recordAffiliateAttributionAndQueueParentEvent({
-          database: tx,
-          userId: inserted.id,
-          provider: 'impact',
-          trackingId: affiliateTrackingId,
-          customerEmail: inserted.google_user_email,
-          eventDate: new Date(inserted.created_at),
-        });
+        try {
+          logImpactReferralDebug('Signup recording Impact affiliate attribution and parent event', {
+            userId: inserted.id,
+            trackingIdLength: affiliateTrackingId.trim().length,
+          });
+          await recordAffiliateAttributionAndQueueParentEvent({
+            database: tx,
+            userId: inserted.id,
+            provider: 'impact',
+            trackingId: affiliateTrackingId,
+            customerEmail: inserted.google_user_email,
+            eventDate: new Date(inserted.created_at),
+          });
+        } catch (error) {
+          console.error('[user] failed to persist affiliate attribution during signup', {
+            userId: inserted.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (trackingContext?.affiliateTouch) {
+        try {
+          logImpactReferralDebug('Signup recording Impact affiliate touch', {
+            userId: inserted.id,
+            anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
+            landingPath: redactLandingPathForLogs(trackingContext.affiliateTouch.landingPath),
+            trackingValueLength: trackingContext.affiliateTouch.trackingValueLength,
+            isTrackingValueAccepted: trackingContext.affiliateTouch.isTrackingValueAccepted,
+          });
+          await recordImpactAffiliateTouch({
+            database: tx,
+            userId: inserted.id,
+            anonymousId: trackingContext.anonymousId ?? null,
+            touch: trackingContext.affiliateTouch,
+          });
+        } catch (error) {
+          console.error('[user] failed to record affiliate touch during signup', {
+            userId: inserted.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (trackingContext?.referralTouch) {
+        try {
+          logImpactReferralDebug('Signup recording Impact Advocate referral touch', {
+            userId: inserted.id,
+            anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
+            landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
+            rsCodePresent: Boolean(trackingContext.referralTouch.rsCode?.trim()),
+            trackingValueLength: trackingContext.referralTouch.trackingValueLength,
+            isTrackingValueAccepted: trackingContext.referralTouch.isTrackingValueAccepted,
+          });
+          await recordImpactReferralTouch({
+            database: tx,
+            userId: inserted.id,
+            anonymousId: trackingContext.anonymousId ?? null,
+            touch: trackingContext.referralTouch,
+          });
+        } catch (error) {
+          console.error('[user] failed to record referral touch during signup', {
+            userId: inserted.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        try {
+          logImpactReferralDebug('Signup queueing Impact Advocate participant registration', {
+            userId: inserted.id,
+            landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
+            localePresent: Boolean(trackingContext.locale?.trim()),
+            countryCode: trackingContext.countryCode ?? null,
+          });
+          await queueImpactAdvocateParticipantRegistration({
+            database: tx,
+            user: inserted,
+            referralTouch: trackingContext.referralTouch,
+            locale: trackingContext.locale,
+            countryCode: trackingContext.countryCode,
+          });
+        } catch (error) {
+          console.error('[user] failed to enqueue Impact Advocate registration during signup', {
+            userId: inserted.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       return successResult({ user: inserted });
@@ -687,6 +796,15 @@ export async function softDeleteUser(userId: string) {
       );
     }
 
+    // Pre-0090 users can have NULL normalized_email but a real google_user_email.
+    // Fall back to google_user_email so the tombstone hash still gets recorded
+    // before the row below anonymizes both columns; otherwise a previously
+    // deleted user could re-register and qualify as a referee.
+    await createDeletedUserEmailTombstone({
+      database: tx,
+      normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
+    });
+
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx
       .update(kilocode_users)
@@ -723,6 +841,46 @@ export async function softDeleteUser(userId: string) {
       .delete(user_affiliate_attributions)
       .where(eq(user_affiliate_attributions.user_id, userId));
     await tx.delete(user_affiliate_events).where(eq(user_affiliate_events.user_id, userId));
+    await tx
+      .delete(kiloclaw_attribution_touches)
+      .where(eq(kiloclaw_attribution_touches.user_id, userId));
+    await tx
+      .delete(impact_advocate_participants)
+      .where(eq(impact_advocate_participants.user_id, userId));
+    await tx
+      .delete(kiloclaw_referral_reward_applications)
+      .where(eq(kiloclaw_referral_reward_applications.beneficiary_user_id, userId));
+    await tx
+      .delete(impact_advocate_reward_redemptions)
+      .where(eq(impact_advocate_reward_redemptions.beneficiary_user_id, userId));
+    await tx
+      .delete(kiloclaw_referral_rewards)
+      .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, userId));
+    await tx
+      .delete(kiloclaw_referral_reward_decisions)
+      .where(eq(kiloclaw_referral_reward_decisions.beneficiary_user_id, userId));
+    await tx.delete(impact_conversion_reports).where(
+      sql`${impact_conversion_reports.conversion_id} IN (
+          SELECT c.id FROM ${kiloclaw_referral_conversions} c
+          WHERE c.referee_user_id = ${userId} OR c.referrer_user_id = ${userId}
+        )`
+    );
+    await tx
+      .delete(kiloclaw_referral_conversions)
+      .where(
+        or(
+          eq(kiloclaw_referral_conversions.referee_user_id, userId),
+          eq(kiloclaw_referral_conversions.referrer_user_id, userId)
+        )
+      );
+    await tx
+      .delete(kiloclaw_referrals)
+      .where(
+        or(
+          eq(kiloclaw_referrals.referee_user_id, userId),
+          eq(kiloclaw_referrals.referrer_user_id, userId)
+        )
+      );
     await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
     await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
 

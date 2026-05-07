@@ -1,16 +1,20 @@
 'use client';
 
 import { useCallback, useState, type ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
+import { DetailRow } from '@/components/subscriptions/DetailRow';
 import { StripePortalLink } from '@/components/subscriptions/StripePortalLink';
 import { BillingHistoryTable } from '@/components/subscriptions/BillingHistoryTable';
+import { ReferralRewardsSummary } from '@/app/(app)/claw/components/billing/ReferralRewardsSummary';
+import { useInvalidateKiloClawBilling } from '@/components/subscriptions/kiloclaw/useKiloClawBillingQueries';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,7 +57,7 @@ type ConfirmationDetails = {
 export function KiloClawDetail({ instanceId }: { instanceId: string }) {
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
-  const queryClient = useQueryClient();
+  const refreshData = useInvalidateKiloClawBilling(instanceId);
   const [confirmationAction, setConfirmationAction] =
     useState<SubscriptionConfirmationAction | null>(null);
   const [pendingConfirmationAction, setPendingConfirmationAction] =
@@ -71,20 +75,6 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
     fetchMore: fetchMoreBilling,
     resetKey: instanceId,
   });
-
-  async function refreshData() {
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.getSubscriptionDetail.queryKey({ instanceId }),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: trpc.kiloclaw.getBillingHistory.queryKey({ instanceId }),
-      }),
-    ]);
-  }
 
   async function runAction(action: () => Promise<unknown>, successMessage: string) {
     await action();
@@ -235,9 +225,9 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
       });
   }
 
-  const primaryDetailRows: Array<{ label: string; value: string }> = [
+  const primaryDetailRows: Array<{ label: string; value: string; numeric?: boolean }> = [
     { label: 'Plan', value: capitalize(subscription.plan) },
-    { label: 'Price', value: formatKiloclawPrice(subscription.plan) },
+    { label: 'Price', value: formatKiloclawPrice(subscription.plan), numeric: true },
     {
       label: 'Payment source',
       value: formatPaymentSummary({
@@ -248,25 +238,29 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
     {
       label: 'Next renewal',
       value: nextRenewalLabel === 'At your next renewal' ? '—' : nextRenewalLabel,
+      numeric: true,
     },
   ];
-  const secondaryDetailRows: Array<{ label: string; value: string }> = [
+  type SecondaryRow = { label: string; value: string; numeric?: boolean };
+  const secondaryRowSource: Array<SecondaryRow | null> = [
     subscription.commitEndsAt
-      ? { label: 'Commit ends', value: formatDateLabel(subscription.commitEndsAt) }
+      ? { label: 'Commit ends', value: formatDateLabel(subscription.commitEndsAt), numeric: true }
       : null,
     subscription.status === 'trialing' && subscription.trialEndsAt
-      ? { label: 'Trial ends', value: formatDateLabel(subscription.trialEndsAt) }
+      ? { label: 'Trial ends', value: formatDateLabel(subscription.trialEndsAt), numeric: true }
       : null,
     subscription.suspendedAt
-      ? { label: 'Suspended at', value: formatDateLabel(subscription.suspendedAt) }
+      ? { label: 'Suspended at', value: formatDateLabel(subscription.suspendedAt), numeric: true }
       : null,
     subscription.destructionDeadline
       ? {
           label: 'Destruction deadline',
           value: formatDateLabel(subscription.destructionDeadline),
+          numeric: true,
         }
       : null,
-  ].filter((row): row is { label: string; value: string } => row !== null);
+  ];
+  const secondaryDetailRows = secondaryRowSource.filter((row): row is SecondaryRow => row !== null);
 
   return (
     <div className="space-y-6">
@@ -293,20 +287,30 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {primaryDetailRows.map(row => (
-                <DetailRow key={row.label} label={row.label} value={row.value} />
+                <DetailRow
+                  key={row.label}
+                  label={row.label}
+                  value={row.value}
+                  numeric={row.numeric}
+                />
               ))}
             </div>
 
             {statusNote ? (
-              <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-300">
-                {statusNote}
-              </div>
+              <Alert variant="notice">
+                <AlertDescription>{statusNote}</AlertDescription>
+              </Alert>
             ) : null}
 
             {secondaryDetailRows.length > 0 ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 {secondaryDetailRows.map(row => (
-                  <DetailRow key={row.label} label={row.label} value={row.value} />
+                  <DetailRow
+                    key={row.label}
+                    label={row.label}
+                    value={row.value}
+                    numeric={row.numeric}
+                  />
                 ))}
               </div>
             ) : null}
@@ -319,26 +323,24 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
           {subscription.plan !== 'trial' ? (
             hasUserRequestedSwitch ? (
               <Button variant="outline" onClick={() => setConfirmationAction('cancelPlanSwitch')}>
-                Cancel Plan Switch
+                Cancel plan switch
               </Button>
             ) : (
               <Button variant="outline" onClick={() => setConfirmationAction('switchPlan')}>
-                Switch to {capitalize(otherPlan)} Plan
+                Switch to {capitalize(otherPlan)} plan
               </Button>
             )
           ) : null}
 
           {subscription.cancelAtPeriodEnd ? (
-            <Button variant="outline" onClick={() => setConfirmationAction('reactivate')}>
-              Reactivate
-            </Button>
+            <Button onClick={() => setConfirmationAction('reactivate')}>Reactivate</Button>
           ) : (
             <Button
               variant="outline"
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={() => setConfirmationAction('cancelSubscription')}
             >
-              Cancel Subscription
+              Cancel subscription
             </Button>
           )}
 
@@ -361,6 +363,8 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
           ) : null}
         </div>
       )}
+
+      <ReferralRewardsSummary rewards={subscription.referralRewards} />
 
       <Card>
         <CardHeader className="pb-4">
@@ -399,6 +403,7 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
               variant={confirmationDetails?.confirmVariant ?? 'default'}
               onClick={confirmSubscriptionAction}
               disabled={pendingConfirmationAction !== null}
+              aria-busy={pendingConfirmationAction !== null}
             >
               {pendingConfirmationAction !== null
                 ? confirmationDetails?.pendingLabel
@@ -416,15 +421,6 @@ function ConfirmationDetailRow({ label, value }: { label: string; value: string 
     <div>
       <div className="text-muted-foreground text-xs">{label}</div>
       <div className="font-medium">{value}</div>
-    </div>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="space-y-1">
-      <div className="text-muted-foreground text-sm">{label}</div>
-      <div className="font-medium break-all">{value}</div>
     </div>
   );
 }

@@ -834,6 +834,13 @@
       "when": 1778169599348,
       "tag": "0118_blue_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1778177693899,
+      "tag": "0119_sad_katie_power",
+      "breakpoints": true
     }
   ]
 }

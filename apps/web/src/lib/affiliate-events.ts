@@ -16,6 +16,7 @@ import {
   reverseImpactAction,
   sendImpactConversionPayload,
 } from '@/lib/impact';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
 import { sentryLogger } from '@/lib/utils.server';
 import {
   kilocode_users,
@@ -792,6 +793,10 @@ export async function findOrCreateParentEvent(
   logInfo(inserted ? 'Enqueued affiliate parent event' : 'Affiliate parent event already exists', {
     ...buildAffiliateEventLogFields(event),
   });
+  logImpactReferralDebug(
+    inserted ? 'Enqueued affiliate parent event' : 'Affiliate parent event already exists',
+    buildAffiliateEventLogFields(event)
+  );
   return event;
 }
 
@@ -801,10 +806,21 @@ export async function recordAffiliateAttributionAndQueueParentEvent(
   const database = getDatabaseClient(params.database);
   const trackingId = params.trackingId.trim();
 
+  logImpactReferralDebug('Recording affiliate attribution and queueing parent event', {
+    userId: params.userId,
+    affiliateProvider: params.provider,
+    trackingIdPresent: Boolean(trackingId),
+    trackingIdLength: trackingId.length,
+  });
+
   if (!trackingId) {
     logWarning('Skipped affiliate attribution enqueue because tracking ID was empty', {
       user_id: params.userId,
       affiliate_provider: params.provider,
+    });
+    logImpactReferralDebug('Skipped affiliate attribution enqueue because tracking ID was empty', {
+      userId: params.userId,
+      affiliateProvider: params.provider,
     });
     return null;
   }
@@ -847,6 +863,12 @@ export async function enqueueAffiliateEventForUser(
       affiliate_event_type: params.eventType,
       affiliate_dedupe_key: params.dedupeKey,
     });
+    logImpactReferralDebug('Skipped affiliate child enqueue because user was missing', {
+      userId: params.userId,
+      affiliateProvider: params.provider,
+      affiliateEventType: params.eventType,
+      affiliateDedupeKey: params.dedupeKey,
+    });
     return null;
   }
 
@@ -865,6 +887,12 @@ export async function enqueueAffiliateEventForUser(
     .limit(1);
 
   if (!attribution) {
+    logImpactReferralDebug('Skipped affiliate child enqueue because attribution row was missing', {
+      userId: params.userId,
+      affiliateProvider: params.provider,
+      affiliateEventType: params.eventType,
+      affiliateDedupeKey: params.dedupeKey,
+    });
     return null;
   }
 
@@ -922,6 +950,10 @@ export async function enqueueAffiliateEventForUser(
   logInfo(inserted ? 'Enqueued affiliate child event' : 'Affiliate child event already exists', {
     ...buildAffiliateEventLogFields(event),
   });
+  logImpactReferralDebug(
+    inserted ? 'Enqueued affiliate child event' : 'Affiliate child event already exists',
+    buildAffiliateEventLogFields(event)
+  );
   return event;
 }
 
@@ -1266,6 +1298,10 @@ export async function dispatchQueuedAffiliateEvents(params?: {
 }): Promise<AffiliateEventDispatchSummary> {
   const database = getDatabaseClient(params?.database);
   const limit = params?.limit ?? DEFAULT_CLAIM_LIMIT;
+  logImpactReferralDebug('Processing affiliate event dispatch queue', {
+    limit,
+    impactConfigured: isImpactConfigured(),
+  });
   const summary: AffiliateEventDispatchSummary = {
     reclaimed: 0,
     claimed: 0,
@@ -1335,6 +1371,10 @@ export async function dispatchQueuedAffiliateEvents(params?: {
         ...buildAffiliateEventLogFields(event),
         dispatch_source: 'cron',
       });
+      logImpactReferralDebug('Claimed affiliate event for dispatch', {
+        ...buildAffiliateEventLogFields(event),
+        dispatch_source: 'cron',
+      });
 
       if (event.event_type === 'sale_reversal') {
         const reversalOutcome = await dispatchSaleReversalEvent(database, event);
@@ -1373,6 +1413,16 @@ export async function dispatchQueuedAffiliateEvents(params?: {
             dispatch_source: 'cron',
           }
         );
+        logImpactReferralDebug(
+          result.skipped === 'unconfigured'
+            ? 'Skipped affiliate event delivery because Impact is unconfigured'
+            : 'Delivered affiliate event',
+          {
+            ...buildAffiliateEventLogFields(deliveredEvent),
+            dispatch_source: 'cron',
+            delivery: result.skipped ?? result.delivery ?? null,
+          }
+        );
 
         if (
           event.event_type === getParentEventType(event.provider) ||
@@ -1392,6 +1442,12 @@ export async function dispatchQueuedAffiliateEvents(params?: {
       }
 
       if (result.failureKind === 'http_4xx' || result.failureKind === 'submission_failed') {
+        logImpactReferralDebug('Affiliate event delivery failed permanently', {
+          ...buildAffiliateEventLogFields(event),
+          dispatch_source: 'cron',
+          failureKind: result.failureKind,
+          statusCode: result.statusCode ?? null,
+        });
         await handlePermanentFailure(database, event, result.failureKind, {
           statusCode: result.statusCode,
           error: result.error ?? result.responseBody,
@@ -1400,6 +1456,12 @@ export async function dispatchQueuedAffiliateEvents(params?: {
         continue;
       }
 
+      logImpactReferralDebug('Affiliate event delivery scheduled for retry', {
+        ...buildAffiliateEventLogFields(event),
+        dispatch_source: 'cron',
+        failureKind: result.failureKind,
+        statusCode: result.statusCode ?? null,
+      });
       await handleRetryableFailure(database, event, result.failureKind, result.statusCode);
       summary.retried += 1;
     }

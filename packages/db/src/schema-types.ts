@@ -225,6 +225,101 @@ export const AffiliateEventDeliveryState = {
 export type AffiliateEventDeliveryState =
   (typeof AffiliateEventDeliveryState)[keyof typeof AffiliateEventDeliveryState];
 
+export const KiloClawAttributionTouchType = {
+  Affiliate: 'affiliate',
+  Referral: 'referral',
+} as const;
+
+export type KiloClawAttributionTouchType =
+  (typeof KiloClawAttributionTouchType)[keyof typeof KiloClawAttributionTouchType];
+
+export const KiloClawAttributionTouchProvider = {
+  ImpactPerformance: 'impact_performance',
+  ImpactAdvocate: 'impact_advocate',
+} as const;
+
+export type KiloClawAttributionTouchProvider =
+  (typeof KiloClawAttributionTouchProvider)[keyof typeof KiloClawAttributionTouchProvider];
+
+export const ImpactAdvocateRegistrationState = {
+  Pending: 'pending',
+  Retrying: 'retrying',
+  Registered: 'registered',
+  Failed: 'failed',
+} as const;
+
+export type ImpactAdvocateRegistrationState =
+  (typeof ImpactAdvocateRegistrationState)[keyof typeof ImpactAdvocateRegistrationState];
+
+export const ImpactAdvocateAttemptDeliveryState = {
+  Queued: 'queued',
+  Sending: 'sending',
+  Succeeded: 'succeeded',
+  Failed: 'failed',
+} as const;
+
+export type ImpactAdvocateAttemptDeliveryState =
+  (typeof ImpactAdvocateAttemptDeliveryState)[keyof typeof ImpactAdvocateAttemptDeliveryState];
+
+export const KiloClawReferralBeneficiaryRole = {
+  Referrer: 'referrer',
+  Referee: 'referee',
+} as const;
+
+export type KiloClawReferralBeneficiaryRole =
+  (typeof KiloClawReferralBeneficiaryRole)[keyof typeof KiloClawReferralBeneficiaryRole];
+
+export const KiloClawReferralWinningTouchType = {
+  Referral: 'referral',
+  Affiliate: 'affiliate',
+  None: 'none',
+} as const;
+
+export type KiloClawReferralWinningTouchType =
+  (typeof KiloClawReferralWinningTouchType)[keyof typeof KiloClawReferralWinningTouchType];
+
+export const KiloClawReferralDecisionOutcome = {
+  Granted: 'granted',
+  CapLimited: 'cap_limited',
+  Disqualified: 'disqualified',
+} as const;
+
+export type KiloClawReferralDecisionOutcome =
+  (typeof KiloClawReferralDecisionOutcome)[keyof typeof KiloClawReferralDecisionOutcome];
+
+export const KiloClawReferralRewardStatus = {
+  Pending: 'pending',
+  Earned: 'earned',
+  Applied: 'applied',
+  Reversed: 'reversed',
+  Expired: 'expired',
+  Canceled: 'canceled',
+  ReviewRequired: 'review_required',
+} as const;
+
+export type KiloClawReferralRewardStatus =
+  (typeof KiloClawReferralRewardStatus)[keyof typeof KiloClawReferralRewardStatus];
+
+export const ImpactConversionReportState = {
+  Queued: 'queued',
+  Retrying: 'retrying',
+  Delivered: 'delivered',
+  Failed: 'failed',
+} as const;
+
+export type ImpactConversionReportState =
+  (typeof ImpactConversionReportState)[keyof typeof ImpactConversionReportState];
+
+export const ImpactAdvocateRewardRedemptionState = {
+  Queued: 'queued',
+  Retrying: 'retrying',
+  Redeemed: 'redeemed',
+  Failed: 'failed',
+} as const;
+
+export type ImpactAdvocateRewardRedemptionState =
+  (typeof ImpactAdvocateRewardRedemptionState)[keyof typeof ImpactAdvocateRewardRedemptionState];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',

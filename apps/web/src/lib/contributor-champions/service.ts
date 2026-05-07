@@ -16,7 +16,6 @@ import * as z from 'zod';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import { toMicrodollars, fromMicrodollars } from '@/lib/utils';
 import { captureException } from '@sentry/nextjs';
-import { createHash } from 'node:crypto';
 
 const TEAM_LOGIN_CONFIG_SCHEMA = z.union([
   z.array(z.string().min(1)),
@@ -37,24 +36,11 @@ const TEAM_EMAILS = new Set(
     .map(email => email.trim().toLowerCase())
     .filter(Boolean)
 );
-// Legacy personal team-email exclusions, hashed so source does not store raw email literals.
-const DEFAULT_TEAM_EMAIL_HASHES = new Set([
-  '35c746fe86048e6d3fc8e93083ccecf0abd69e44e2874e8bf9238885f1a84f05',
-]);
-
-function sha256Hex(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
-}
-
 function isTeamEmail(email: string | null): boolean {
   if (!email) return false;
   const lower = email.trim().toLowerCase();
   const domain = lower.split('@')[1];
-  return (
-    (domain !== undefined && TEAM_EMAIL_DOMAINS.has(domain)) ||
-    TEAM_EMAILS.has(lower) ||
-    DEFAULT_TEAM_EMAIL_HASHES.has(sha256Hex(lower))
-  );
+  return (domain !== undefined && TEAM_EMAIL_DOMAINS.has(domain)) || TEAM_EMAILS.has(lower);
 }
 
 const REPO_OWNER = 'Kilo-Org';

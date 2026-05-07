@@ -1319,7 +1319,22 @@ function MayorTerminalPane({ townId, collapsed }: { townId: string; collapsed: b
 
   const ensureMayor = useMutation(
     trpc.gastown.ensureMayor.mutationOptions({
-      onSuccess: () => {
+      onSuccess: data => {
+        queryClient.setQueryData(
+          trpc.gastown.getMayorStatus.queryKey({ townId }),
+          (old: { configured?: boolean; townId?: string; session?: { agentId?: string; sessionId?: string; status?: string; lastActivityAt?: string } } | undefined) => ({
+            ...(old ?? {}),
+            configured: true,
+            townId,
+            session: {
+              ...(old?.session ?? {}),
+              agentId: data.agentId,
+              sessionId: data.agentId,
+              status: data.sessionStatus,
+              lastActivityAt: old?.session?.lastActivityAt ?? new Date().toISOString(),
+            },
+          })
+        );
         void queryClient.invalidateQueries({
           queryKey: trpc.gastown.getMayorStatus.queryKey(),
         });

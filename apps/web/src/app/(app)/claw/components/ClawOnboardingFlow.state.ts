@@ -6,20 +6,13 @@ export type PopulatedClawStatus = KiloClawDashboardStatus & {
 
 export type ClawOnboardingMode = 'create-first' | 'post-provisioning';
 
-export type OnboardingStep =
-  | 'identity'
-  | 'calendar'
-  | 'channels'
-  | 'provisioning'
-  | 'pairing'
-  | 'done';
+export type OnboardingStep = 'identity' | 'calendar' | 'email' | 'provisioning' | 'done';
 
 export const CLAW_ONBOARDING_WIZARD_STEPS = [
   'identity',
   'calendar',
-  'channels',
+  'email',
   'provisioning',
-  'pairing',
 ] as const satisfies OnboardingStep[];
 
 export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[number];
@@ -27,12 +20,14 @@ export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[num
 export type ClawOnboardingRenderStep =
   | 'identity'
   | 'calendar'
-  | 'channels'
+  | 'email'
   | 'provisioning'
-  | 'pairing'
   | 'complete'
   | 'error';
 
+// Kept for parity with `ChannelPairingStep.tsx`, which currently isn't wired
+// into the wizard but stays in the codebase in case channel pairing comes
+// back. Not used in the active onboarding flow.
 export type PairingChannelId = 'telegram' | 'discord';
 
 export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
@@ -40,9 +35,8 @@ export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 export const CLAW_ONBOARDING_FAKE_STEPS = [
   'identity',
   'calendar',
-  'channels',
+  'email',
   'provisioning',
-  'pairing',
   'complete',
   'error',
 ] satisfies ClawOnboardingRenderStep[];
@@ -72,7 +66,6 @@ export type ClawOnboardingFlowStateInput = {
   setupFailed?: boolean;
   onboardingStep: OnboardingStep;
   hasBotIdentity: boolean;
-  selectedChannelId: string | null;
   gatewayState?: GatewayProcessStatusResponse['state'] | null;
   debugLogSource?: string;
 };
@@ -85,7 +78,6 @@ export type ClawOnboardingFlowState = {
   instanceRunning: boolean;
   createSetupActive: boolean;
   postProvisioningReady: boolean;
-  hasPairingStep: boolean;
   currentStep: number;
   totalSteps: number;
 };
@@ -107,12 +99,12 @@ export function isClawOnboardingErrorStatus(status: PopulatedClawStatus['status'
   return false;
 }
 
-export function getClawOnboardingStepProgress(
-  step: OnboardingStep,
-  hasPairingStep: boolean
-): { currentStep: number; totalSteps: number } {
+export function getClawOnboardingStepProgress(step: OnboardingStep): {
+  currentStep: number;
+  totalSteps: number;
+} {
   const wizardSteps: readonly OnboardingStep[] = CLAW_ONBOARDING_WIZARD_STEPS;
-  const totalSteps = hasPairingStep ? wizardSteps.length : wizardSteps.length - 1;
+  const totalSteps = wizardSteps.length;
 
   if (step === 'done') {
     return { currentStep: totalSteps, totalSteps };
@@ -131,7 +123,6 @@ export function getClawOnboardingFlowState({
   setupFailed = false,
   onboardingStep,
   hasBotIdentity,
-  selectedChannelId,
   gatewayState,
   debugLogSource = 'default',
 }: ClawOnboardingFlowStateInput): ClawOnboardingFlowState {
@@ -142,8 +133,7 @@ export function getClawOnboardingFlowState({
   const postProvisioningReady = isRunning;
   const createSetupActive =
     mode === 'create-first' && (createSetupStarted || instanceStatus !== null);
-  const hasPairingStep = isPairingChannel(selectedChannelId);
-  const { currentStep, totalSteps } = getClawOnboardingStepProgress(onboardingStep, hasPairingStep);
+  const { currentStep, totalSteps } = getClawOnboardingStepProgress(onboardingStep);
   const renderStepDecision = getRenderStepDecision({
     mode,
     createSetupStarted,
@@ -152,7 +142,6 @@ export function getClawOnboardingFlowState({
     postProvisioningReady,
     onboardingStep,
     hasBotIdentity,
-    hasPairingStep,
   });
   const flowState = {
     renderStep: renderStepDecision.renderStep,
@@ -162,7 +151,6 @@ export function getClawOnboardingFlowState({
     instanceRunning,
     createSetupActive,
     postProvisioningReady,
-    hasPairingStep,
     currentStep,
     totalSteps,
   } satisfies ClawOnboardingFlowState;
@@ -174,7 +162,6 @@ export function getClawOnboardingFlowState({
     setupFailed,
     onboardingStep,
     hasBotIdentity,
-    selectedChannelId,
     gatewayState,
     debugLogSource,
     instanceStatus,
@@ -183,7 +170,6 @@ export function getClawOnboardingFlowState({
     instanceRunning,
     createSetupActive,
     postProvisioningReady,
-    hasPairingStep,
     currentStep,
     totalSteps,
     renderStepDecision,
@@ -198,7 +184,6 @@ type RenderStepInput = Pick<
 > & {
   instanceStatus: PopulatedClawStatus | null;
   postProvisioningReady: boolean;
-  hasPairingStep: boolean;
 };
 
 type RenderStepDecision = {
@@ -214,7 +199,6 @@ type ClawOnboardingFlowDebugLogInput = ClawOnboardingFlowStateInput & {
   instanceRunning: boolean;
   createSetupActive: boolean;
   postProvisioningReady: boolean;
-  hasPairingStep: boolean;
   currentStep: number;
   totalSteps: number;
   renderStepDecision: RenderStepDecision;
@@ -237,7 +221,6 @@ function getRenderStepDecision({
   postProvisioningReady,
   onboardingStep,
   hasBotIdentity,
-  hasPairingStep,
 }: RenderStepInput): RenderStepDecision {
   if (instanceStatus && isClawOnboardingErrorStatus(instanceStatus.status)) {
     return {
@@ -257,32 +240,23 @@ function getRenderStepDecision({
     // After a full-page reload (e.g. the Google OAuth round-trip), the
     // wizard often remounts in post-provisioning mode because the instance
     // row is now visible — but the user is still mid-wizard. Honor any
-    // explicit wizard step rather than auto-routing them past it. Without
-    // this, advancing from calendar → channels → provisioning would fall
-    // through to the default post-prov branch and skip channels, pairing,
-    // and the provisioning UX entirely.
+    // explicit wizard step rather than auto-routing them past it.
     if (onboardingStep === 'calendar') {
       return {
         renderStep: 'calendar',
         reason: 'calendar resume requested; honor it even in post-provisioning mode',
       };
     }
-    if (onboardingStep === 'channels') {
+    if (onboardingStep === 'email') {
       return {
-        renderStep: 'channels',
-        reason: 'wizard resume on channels; honor it even in post-provisioning mode',
+        renderStep: 'email',
+        reason: 'wizard resume on email; honor it even in post-provisioning mode',
       };
     }
     if (onboardingStep === 'provisioning') {
       return {
         renderStep: 'provisioning',
         reason: 'wizard resume on provisioning; honor it even in post-provisioning mode',
-      };
-    }
-    if (onboardingStep === 'pairing' && hasPairingStep) {
-      return {
-        renderStep: 'pairing',
-        reason: 'wizard resume on pairing; honor it even in post-provisioning mode',
       };
     }
     if (postProvisioningReady) {
@@ -327,10 +301,10 @@ function getRenderStepDecision({
     };
   }
 
-  if (onboardingStep === 'channels') {
+  if (onboardingStep === 'email') {
     return {
-      renderStep: 'channels',
-      reason: 'stored onboarding step is channels',
+      renderStep: 'email',
+      reason: 'stored onboarding step is email',
     };
   }
 
@@ -338,13 +312,6 @@ function getRenderStepDecision({
     return {
       renderStep: 'provisioning',
       reason: 'stored onboarding step is provisioning',
-    };
-  }
-
-  if (onboardingStep === 'pairing' && hasPairingStep) {
-    return {
-      renderStep: 'pairing',
-      reason: 'stored onboarding step is pairing and the selected channel requires pairing',
     };
   }
 
@@ -361,7 +328,6 @@ function logClawOnboardingFlowStateDecision({
   setupFailed,
   onboardingStep,
   hasBotIdentity,
-  selectedChannelId,
   gatewayState,
   debugLogSource,
   instanceStatus,
@@ -370,7 +336,6 @@ function logClawOnboardingFlowStateDecision({
   instanceRunning,
   createSetupActive,
   postProvisioningReady,
-  hasPairingStep,
   currentStep,
   totalSteps,
   renderStepDecision,
@@ -384,7 +349,6 @@ function logClawOnboardingFlowStateDecision({
       setupFailed,
       onboardingStep,
       hasBotIdentity,
-      selectedChannelId,
       gatewayState: gatewayState ?? null,
       status: status?.status ?? null,
       hasStatusResponse: status !== undefined,
@@ -400,7 +364,6 @@ function logClawOnboardingFlowStateDecision({
       instanceRunning,
       createSetupActive,
       postProvisioningReady,
-      hasPairingStep,
       currentStep,
       totalSteps,
     },

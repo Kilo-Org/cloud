@@ -1,4 +1,4 @@
-import { describe, expect, jest, test, beforeEach } from '@jest/globals';
+import { describe, expect, test, beforeEach } from '@jest/globals';
 import { GET } from './route';
 import { getOpenRouterEmbeddingModels } from '@/lib/ai-gateway/providers/openrouter';
 import type {

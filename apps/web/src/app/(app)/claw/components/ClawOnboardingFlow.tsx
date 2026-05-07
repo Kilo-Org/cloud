@@ -487,7 +487,14 @@ function ClawOnboardingFlowInner({
   }
 
   function renderProvisioningStep() {
-    if (mode === 'post-provisioning')
+    // Static ProvisioningStepView is only for the original post-provisioning
+    // case (returning user lands on /claw/new with an active instance — the
+    // state machine flips to 'complete' separately and PR-1's auto-redirect
+    // takes over). When a wizard resume after an OAuth round-trip reaches
+    // the provisioning step explicitly (onboardingStep === 'provisioning'),
+    // use the full ProvisioningStep so its onComplete fires and the user
+    // actually advances to pairing/done instead of getting stuck.
+    if (mode === 'post-provisioning' && onboardingStep !== 'provisioning')
       return (
         <ProvisioningStepView
           currentStep={flowState.currentStep}

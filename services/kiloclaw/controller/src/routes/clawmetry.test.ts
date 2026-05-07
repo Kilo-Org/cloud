@@ -105,7 +105,9 @@ describe('POST /_kilo/clawmetry-start-sync', () => {
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, alreadyRunning: false });
-    expect(spawnCalls).toEqual([{ cmd: 'clawmetry', args: ['sync'] }]);
+    expect(spawnCalls).toEqual([
+      { cmd: '/root/.clawmetry/bin/python3', args: ['-m', 'clawmetry.sync'] },
+    ]);
     expect(fakeChild.unref).toHaveBeenCalledOnce();
   });
 

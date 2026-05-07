@@ -112,8 +112,12 @@ export function registerClawmetryRoutes(
       return c.json({ ok: true, alreadyRunning: true });
     }
     try {
+      // Spawn the sync daemon directly via the venv python — `clawmetry sync`
+      // isn't a CLI subcommand; the canonical entry point is the sync.py
+      // module (see clawmetry/cli.py:_start_subprocess). install.sh creates
+      // a venv at /root/.clawmetry, so the python is at /root/.clawmetry/bin/python3.
       // Detached + ignored stdio so the daemon outlives this request handler.
-      const child = spawnFn('clawmetry', ['sync'], {
+      const child = spawnFn('/root/.clawmetry/bin/python3', ['-m', 'clawmetry.sync'], {
         detached: true,
         stdio: 'ignore',
       });

@@ -9225,21 +9225,84 @@ describe('resizeMachine', () => {
     expect(storage._store.get('instanceType')).toBe('perf-4-8');
   });
 
-  it('rejects Northflank resize before persisting tier changes', async () => {
+  it('persists Northflank resize after volume and deployment plan updates are accepted', async () => {
     const { instance, storage } = createInstance();
-    await seedProvisioned(storage, {
+    await seedNorthflankInstance(storage, {
       provider: 'northflank',
-      providerState: { provider: 'northflank' },
-      status: 'stopped',
+      providerState: northflankProviderState(),
+      status: 'running',
       instanceType: 'perf-1-3',
       machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
       volumeSizeGb: 10,
     });
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/volume-1')) {
+        return new Response(JSON.stringify({ data: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/services/deployment/service-1')) {
+        return new Response(JSON.stringify({ data: { id: 'service-1', name: 'kc-ki-test' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unhandled Northflank API request: ${url}`);
+    });
+
+    const result = await instance.resizeMachine('perf-4-8');
+
+    expect(result.newTier).toBe('perf-4-8');
+    expect(storage._store.get('instanceType')).toBe('perf-4-8');
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 4,
+      memory_mb: 8192,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('volumeSizeGb')).toBe(20);
+    expect(storage._store.get('providerState')).toEqual(
+      expect.objectContaining({ ingressHost: 'kc-ki-test.code.run' })
+    );
+  });
+
+  it('leaves Northflank tier state unchanged when provider resize fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedNorthflankInstance(storage, {
+      status: 'running',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url = fetchInputUrl(input);
+      if (url.endsWith('/volumes/volume-1')) {
+        return new Response(JSON.stringify({ data: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/services/deployment/service-1')) {
+        return new Response(JSON.stringify({ error: 'deployment patch failed' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unhandled Northflank API request: ${url}`);
+    });
 
     await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Instance tier resize is not yet supported on Northflank instances'
+      'Northflank API patchDeploymentService failed (500)'
     );
+
     expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('volumeSizeGb')).toBe(10);
   });
 
   it('clears any active admin size override and reports it in the response', async () => {

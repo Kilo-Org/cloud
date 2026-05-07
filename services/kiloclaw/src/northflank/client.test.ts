@@ -13,6 +13,7 @@ import {
   isNorthflankNotFound,
   listServices,
   putProjectSecret,
+  updateVolume,
 } from './client';
 import { getNorthflankConfig } from './config';
 import type { NorthflankClientConfig } from './client';
@@ -152,6 +153,37 @@ describe('Northflank Worker fetch client', () => {
 
     const [url] = firstFetchCall(fetchMock);
     expect(url).toBe('https://api.northflank.com/v1/projects/project-1/volumes/kc-ki-test');
+  });
+
+  it('updates volume storage size through the documented empty response endpoint', async () => {
+    const fetchMock = mockFetchSequence([[200, { data: {} }]]);
+
+    await expect(
+      updateVolume(config, 'project-1', 'volume-1', { storageSizeMb: 20480 })
+    ).resolves.toBeUndefined();
+
+    const [url, init] = firstFetchCall(fetchMock);
+    expect(url).toBe('https://api.northflank.com/v1/projects/project-1/volumes/volume-1');
+    const requestInit = expectRequestInit(init);
+    expect(requestInit.method).toBe('POST');
+    expect(JSON.parse(expectStringBody(requestInit.body))).toEqual({
+      spec: {
+        storageSize: 20480,
+      },
+    });
+  });
+
+  it('updates volumes through team-scoped routes when a team ID is configured', async () => {
+    const fetchMock = mockFetchSequence([[200, { data: {} }]]);
+
+    await updateVolume({ ...config, teamId: 'team-1' }, 'project-1', 'volume-1', {
+      storageSizeMb: 40960,
+    });
+
+    const [url] = firstFetchCall(fetchMock);
+    expect(url).toBe(
+      'https://api.northflank.com/v1/teams/team-1/projects/project-1/volumes/volume-1'
+    );
   });
 
   it('finds services by deterministic name with a direct GET', async () => {

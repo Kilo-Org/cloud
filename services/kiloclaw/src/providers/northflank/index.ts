@@ -1,10 +1,11 @@
 import type { CreateSecretRequest, CreateServiceDeploymentRequest } from '@northflank/js-client';
 import type { NorthflankProviderState } from '../../schemas/instance-config';
 import type { InstanceMutableState } from '../../durable-objects/kiloclaw-instance/types';
+import { DEFAULT_VOLUME_SIZE_GB } from '../../config';
 import { getNorthflankProviderState } from '../../durable-objects/kiloclaw-instance/state';
 import type { RuntimeSpec, InstanceProviderAdapter } from '../types';
 import { northflankClientConfig } from '../../northflank/config';
-import { DEFAULT_INSTANCE_TIER } from '@kilocode/kiloclaw-instance-tiers';
+import { DEFAULT_INSTANCE_TIER, getTier } from '@kilocode/kiloclaw-instance-tiers';
 import { resolveNorthflankPlan } from '../../northflank/config';
 import {
   createDeploymentService,
@@ -26,6 +27,7 @@ import {
   isNorthflankNotFound,
   patchDeploymentService,
   putProjectSecret,
+  updateVolume,
   waitForDeploymentCompleted,
   type NorthflankClientConfig,
   type NorthflankProject,
@@ -833,6 +835,60 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       observation: {
         runtimeState: 'running',
       },
+    };
+  },
+
+  async resizeRuntime({ env, state, targetTier }) {
+    const config = northflankClientConfig(env);
+    const providerState = getNorthflankProviderState(state);
+    if (!providerState.projectId || !providerState.serviceId) {
+      throw new Error('Northflank resize requires an existing deployment service');
+    }
+
+    const tier = getTier(targetTier);
+    const currentVolumeSizeGb = state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB;
+    if (tier.volumeSizeGb > currentVolumeSizeGb) {
+      if (!providerState.volumeId) {
+        throw new Error('Northflank resize requires an existing volume when storage grows');
+      }
+      // Northflank's documented update-volume endpoint returns only an
+      // empty success response and does not expose a separate completion
+      // status to poll. Treat a successful 200 as the provider's accepted
+      // storage update; the persisted tier is desired state once Northflank
+      // accepts the storage and compute-plan updates.
+      await updateVolume(config, providerState.projectId, providerState.volumeId, {
+        storageSizeMb: tier.volumeSizeGb * 1024,
+      });
+    }
+
+    const deploymentPlan = resolveNorthflankDeploymentPlan(config, targetTier, state.sandboxId);
+    logNorthflank('resize_runtime_patch_service', {
+      description: 'Patching Northflank service compute plan for instance tier resize',
+      apiOperation: 'PATCH /projects/{projectId}/services/deployment/{serviceId}',
+      sandboxId: state.sandboxId,
+      projectId: providerState.projectId,
+      serviceId: providerState.serviceId,
+      serviceName: providerState.serviceName,
+      targetTier,
+      deploymentPlan,
+    });
+    await patchDeploymentService(config, providerState.projectId, providerState.serviceId, {
+      billing: { deploymentPlan },
+    });
+
+    logNorthflank('resize_runtime_patch_accepted', {
+      description:
+        'Northflank accepted the service compute-plan patch; persisted tier now reflects desired state',
+      apiOperation: 'PATCH /projects/{projectId}/services/deployment/{serviceId}',
+      sandboxId: state.sandboxId,
+      projectId: providerState.projectId,
+      serviceId: providerState.serviceId,
+      targetTier,
+      deploymentPlan,
+    });
+
+    return {
+      providerState,
     };
   },
 

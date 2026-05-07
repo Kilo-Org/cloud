@@ -1421,6 +1421,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const provider = data?.workerStatus?.provider ?? null;
   const isFlyProvider = provider === 'fly';
+  const isNorthflankProvider = provider === 'northflank';
   const runtimeId = data?.workerStatus?.runtimeId ?? null;
   const storageId = data?.workerStatus?.storageId ?? null;
   const flyMachineId = data?.workerStatus?.flyMachineId ?? null;
@@ -1838,7 +1839,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   // Poll status during resize phases
   const resizePolling =
-    resizePhase === 'stopping' || resizePhase === 'starting' || resizePhase === 'waiting';
+    resizePhase === 'stopping' ||
+    resizePhase === 'starting' ||
+    resizePhase === 'waiting' ||
+    (isNorthflankProvider && resizePhase === 'resizing');
   useQuery({
     queryKey: ['machine-resize-poll', userId, instanceId, resizePolling],
     queryFn: async () => {
@@ -1865,6 +1869,19 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     if (!data || !userId) return;
 
     try {
+      if (isNorthflankProvider) {
+        setResizePhase('resizing');
+        await resizeMachineMutation({
+          userId,
+          instanceId: data.id,
+          instanceType: selectedInstanceType,
+        });
+        invalidateMachineQueries();
+        setResizePhase('done');
+        toast.success('Northflank resize completed');
+        return;
+      }
+
       // Step 1: Stop if running — retry up to 3 times since Fly can be slow
       if (currentStatus !== 'stopped') {
         setResizePhase('stopping');
@@ -3295,7 +3312,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <div className="space-y-1">
                   <p className="text-sm font-medium">
                     {resizePhase === 'stopping' && 'Stopping machine...'}
-                    {resizePhase === 'resizing' && 'Updating machine size...'}
+                    {resizePhase === 'resizing' &&
+                      (isNorthflankProvider
+                        ? 'Resizing Northflank deployment...'
+                        : 'Updating machine size...')}
                     {resizePhase === 'starting' && 'Starting machine with new size...'}
                     {resizePhase === 'waiting' && 'Waiting for machine to be ready...'}
                   </p>
@@ -3342,9 +3362,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               <div className="flex items-center gap-3 rounded border border-green-600/30 bg-green-600/5 p-4">
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
                 <div>
-                  <p className="text-sm font-medium text-green-600">Machine resize complete</p>
+                  <p className="text-sm font-medium text-green-600">Runtime resize complete</p>
                   <p className="text-muted-foreground text-xs">
-                    Machine is running with the new size.
+                    {isNorthflankProvider
+                      ? 'Northflank completed the deployment rollout.'
+                      : 'Machine is running with the new size.'}
                   </p>
                 </div>
                 <Button
@@ -3398,11 +3420,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-orange-500">
                 <AlertTriangle className="h-5 w-5" />
-                Resize Machine
+                Resize runtime
               </DialogTitle>
               <DialogDescription className="pt-3">
-                This will stop the machine, update its CPU/memory and storage spec, and restart it.
-                The user will be disconnected during the restart.
+                {isNorthflankProvider
+                  ? 'Northflank will resize this instance by rolling the deployment onto the target compute plan. The instance may restart during the rollout.'
+                  : 'This will stop the machine, update its CPU/memory and storage spec, and restart it. The user will be disconnected during the restart.'}
                 <span className="text-foreground mt-2 block font-medium">
                   User: {data?.user_email ?? data?.user_id}
                 </span>
@@ -3444,6 +3467,14 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   })}
                 </select>
               </div>
+              {isNorthflankProvider && (
+                <Alert className="border-muted-foreground/30 bg-muted/30">
+                  <AlertDescription className="text-muted-foreground">
+                    Northflank applies the compute change through a deployment rollout. The worker
+                    waits for Northflank to report completion before saving the new tier.
+                  </AlertDescription>
+                </Alert>
+              )}
               {data?.workerStatus?.provider === 'fly' &&
                 getTier(selectedInstanceType).volumeSizeGb >
                   (data?.workerStatus?.volumeSizeGb ?? 10) && (
@@ -3453,6 +3484,18 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                       Fly volume will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB to{' '}
                       {getTier(selectedInstanceType).volumeSizeGb} GB. Fly volumes can grow but
                       cannot be shrunk, so you will not be able to downgrade this instance.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              {isNorthflankProvider &&
+                getTier(selectedInstanceType).volumeSizeGb >
+                  (data?.workerStatus?.volumeSizeGb ?? 10) && (
+                  <Alert className="border-orange-500/30 bg-orange-500/10">
+                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    <AlertDescription className="text-orange-700 dark:text-orange-300">
+                      Northflank volume will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB
+                      to {getTier(selectedInstanceType).volumeSizeGb} GB. Volumes can grow but
+                      cannot be shrunk.
                     </AlertDescription>
                   </Alert>
                 )}

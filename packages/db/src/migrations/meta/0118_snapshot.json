@@ -1,5 +1,5 @@
 {
-  "id": "c930b44f-2f36-4ce0-8fec-4e62e2447c57",
+  "id": "6099d909-8168-469c-a73f-f7cdbf127379",
   "prevId": "cb685002-1d7d-4954-825a-6da1d1e18bcf",
   "version": "7",
   "dialect": "postgresql",
@@ -14442,6 +14442,28 @@
           "method": "btree",
           "with": {}
         },
+        "UQ_platform_integrations_linear_platform_inst": {
+          "name": "UQ_platform_integrations_linear_platform_inst",
+          "columns": [
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_installation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"platform_integrations\".\"platform\" = 'linear' AND \"platform_integrations\".\"platform_installation_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_platform_integrations_owned_by_org_id": {
           "name": "IDX_platform_integrations_owned_by_org_id",
           "columns": [
@@ -17498,13 +17520,7 @@
           "name": "user_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "email_type": {
           "name": "email_type",
@@ -17562,21 +17578,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "IDX_transactional_email_log_organization_id": {
-          "name": "IDX_transactional_email_log_organization_id",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -17592,30 +17593,12 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "transactional_email_log_organization_id_organizations_id_fk": {
-          "name": "transactional_email_log_organization_id_organizations_id_fk",
-          "tableFrom": "transactional_email_log",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "CHK_transactional_email_log_owner": {
-          "name": "CHK_transactional_email_log_owner",
-          "value": "\"transactional_email_log\".\"user_id\" IS NOT NULL OR \"transactional_email_log\".\"organization_id\" IS NOT NULL"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.user_admin_notes": {

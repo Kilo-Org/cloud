@@ -92,7 +92,9 @@ export async function GET(request: NextRequest) {
   );
   authorizeUrl.searchParams.set(
     'state',
-    createGitHubBotLinkState(user.id, verifiedToken.installationId)
+    createGitHubBotLinkState(user.id, verifiedToken.installationId, {
+      contextKey: verifiedToken.contextKey ?? undefined,
+    })
   );
   authorizeUrl.searchParams.set('scope', 'read:user');
 

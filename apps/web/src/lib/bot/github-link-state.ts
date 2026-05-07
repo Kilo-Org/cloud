@@ -10,6 +10,12 @@ type GitHubBotLinkStatePayload = {
   userId: string;
   installationId: string;
   callbackPath: string;
+  /**
+   * Redis key referencing the thread + message to replay after linking.
+   * Preserved across the GitHub OAuth round-trip so the callback can
+   * resume processing the original mention once the account is linked.
+   */
+  contextKey?: string;
   iat: number;
   nonce: string;
 };
@@ -18,6 +24,7 @@ export type VerifiedGitHubBotLinkState = {
   userId: string;
   installationId: string;
   callbackPath: string;
+  contextKey: string | null;
 };
 
 function sign(data: string): string {
@@ -27,12 +34,13 @@ function sign(data: string): string {
 export function createGitHubBotLinkState(
   userId: string,
   installationId: string,
-  callbackPath = '/github/link'
+  options: { callbackPath?: string; contextKey?: string } = {}
 ): string {
   const payload: GitHubBotLinkStatePayload = {
     userId,
     installationId,
-    callbackPath,
+    callbackPath: options.callbackPath ?? '/github/link',
+    ...(options.contextKey ? { contextKey: options.contextKey } : {}),
     iat: Math.floor(Date.now() / 1000),
     nonce: crypto.randomBytes(NONCE_BYTES).toString('base64url'),
   };
@@ -67,6 +75,7 @@ export function verifyGitHubBotLinkState(state: string | null): VerifiedGitHubBo
     if (typeof data.callbackPath !== 'string' || !data.callbackPath.startsWith('/')) return null;
     if (typeof data.iat !== 'number') return null;
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
+    if (data.contextKey !== undefined && typeof data.contextKey !== 'string') return null;
 
     const ageSeconds = Math.floor(Date.now() / 1000) - data.iat;
     if (ageSeconds < 0 || ageSeconds > STATE_TTL_SECONDS) return null;
@@ -75,6 +84,7 @@ export function verifyGitHubBotLinkState(state: string | null): VerifiedGitHubBo
       userId: data.userId,
       installationId: data.installationId,
       callbackPath: data.callbackPath,
+      contextKey: data.contextKey ?? null,
     };
   } catch {
     return null;

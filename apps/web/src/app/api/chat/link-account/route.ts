@@ -1,6 +1,5 @@
 import { bot } from '@/lib/bot';
 import { APP_URL } from '@/lib/constants';
-import { captureException } from '@sentry/nextjs';
 import { after } from 'next/server';
 import {
   consumeLinkAccountContext,
@@ -14,9 +13,8 @@ import {
   getPlatformIntegration,
 } from '@/lib/bot/platform-helpers';
 import { botPlatforms } from '@/lib/bot/platforms';
-import { processLinkedMessage } from '@/lib/bot/run';
-import { Message, ThreadImpl, type Thread } from 'chat';
-import type { User } from '@kilocode/db';
+import { reprocessLinkedMessage } from '@/lib/bot/run';
+import { Message, ThreadImpl } from 'chat';
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -115,9 +113,17 @@ export async function GET(request: Request) {
   await linkKiloUser(bot.getState(), identity, user.id);
 
   if (await consumeLinkAccountContext(bot.getState(), contextKey)) {
-    after(() =>
-      reprocessLinkedMessage(identity, ThreadImpl.fromJSON(thread), Message.fromJSON(message), user)
-    );
+    const platformIntegration = await getPlatformIntegration(identity);
+    if (platformIntegration) {
+      after(() =>
+        reprocessLinkedMessage({
+          platformIntegration,
+          thread: ThreadImpl.fromJSON(thread),
+          message: Message.fromJSON(message),
+          user,
+        })
+      );
+    }
   }
 
   return new Response(
@@ -132,38 +138,4 @@ export async function GET(request: Request) {
 </body></html>`,
     { headers: { 'content-type': 'text/html; charset=utf-8' } }
   );
-}
-
-async function reprocessLinkedMessage(
-  identity: PlatformIdentity,
-  thread: Thread,
-  message: Message,
-  user: User
-): Promise<void> {
-  try {
-    const platformIntegration = await getPlatformIntegration(identity);
-    if (!platformIntegration) return;
-
-    await botPlatforms.require(platformIntegration.platform).withAuthContext({
-      platformIntegration,
-      fn: async () => {
-        await processLinkedMessage({
-          thread,
-          message,
-          platformIntegration,
-          user,
-        });
-      },
-    });
-  } catch (error) {
-    console.error('[Bot] Failed to reprocess linked message:', error);
-    captureException(error, {
-      tags: { component: 'kilo-bot', op: 'link-account-reprocess-message' },
-      extra: {
-        threadId: thread.id,
-        messageId: message.id,
-        userId: user.id,
-      },
-    });
-  }
 }

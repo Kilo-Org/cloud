@@ -3,19 +3,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
-import { linkKiloUser } from '@/lib/bot-identity';
+import {
+  consumeLinkAccountContext,
+  linkKiloUser,
+  readLinkAccountContext,
+} from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
+import { reprocessLinkedMessage } from '@/lib/bot/run';
 import { failureResult } from '@/lib/maybe-result';
 import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
-import type { StateAdapter } from 'chat';
+import type { SerializedMessage, SerializedThread, StateAdapter } from 'chat';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 const mockIsEnabledForBot = jest.fn();
+const mockedAfter = jest.fn();
 
+jest.mock('next/server', () => {
+  const actual = jest.requireActual('next/server');
+  return {
+    ...actual,
+    after: (fn: () => Promise<void> | void) => mockedAfter(fn),
+  };
+});
 jest.mock('@/lib/user.server');
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot-identity');
+jest.mock('@/lib/bot/run', () => ({
+  reprocessLinkedMessage: jest.fn(async () => undefined),
+}));
 jest.mock('@/lib/integrations/platforms/github/adapter');
 jest.mock('@/lib/bot', () => ({
   bot: {
@@ -66,11 +82,22 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
 }));
+jest.mock(
+  'chat',
+  () => ({
+    Message: { fromJSON: jest.fn(value => value) },
+    ThreadImpl: { fromJSON: jest.fn(value => value) },
+  }),
+  { virtual: true }
+);
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedVerifyGitHubBotLinkState = jest.mocked(verifyGitHubBotLinkState);
 const mockedExchangeGitHubOAuthCode = jest.mocked(exchangeGitHubOAuthCode);
 const mockedLinkKiloUser = jest.mocked(linkKiloUser);
+const mockedReadLinkAccountContext = jest.mocked(readLinkAccountContext);
+const mockedConsumeLinkAccountContext = jest.mocked(consumeLinkAccountContext);
+const mockedReprocessLinkedMessage = jest.mocked(reprocessLinkedMessage);
 const mockedBot = jest.mocked(bot);
 const mockedFindIntegrationByInstallationId = jest.mocked(findIntegrationByInstallationId);
 const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
@@ -103,6 +130,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       userId: USER_ID,
       installationId: INSTALLATION_ID,
       callbackPath: '/github/link',
+      contextKey: null,
     });
     mockedExchangeGitHubOAuthCode.mockResolvedValue({ id: GITHUB_USER_ID, login: 'octocat' });
     mockedFindIntegrationByInstallationId.mockResolvedValue({
@@ -113,6 +141,8 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     } as never);
     mockedIsOrganizationMember.mockResolvedValue(true);
     mockIsEnabledForBot.mockReturnValue(true);
+    mockedReadLinkAccountContext.mockResolvedValue(null);
+    mockedConsumeLinkAccountContext.mockResolvedValue(true);
   });
 
   test('redirects unauthenticated bot-link callbacks to existing callback auth fallback', async () => {
@@ -150,6 +180,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       userId: OTHER_USER_ID,
       installationId: INSTALLATION_ID,
       callbackPath: '/github/link',
+      contextKey: null,
     });
 
     const { GET } = await import('./route');
@@ -211,6 +242,122 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     await GET(makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never);
 
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'lite');
+  });
+
+  test('replays the original mention when the link state carries a context key', async () => {
+    const integration = {
+      owned_by_organization_id: 'org_1',
+      owned_by_user_id: null,
+      github_app_type: 'standard',
+      metadata: { bot_enabled: true },
+    };
+    const thread: SerializedThread = {
+      _type: 'chat:Thread',
+      adapterName: 'github',
+      channelId: 'github:acme/widgets',
+      id: 'github:acme/widgets:issue:42',
+      isDM: false,
+    };
+    const message: SerializedMessage = {
+      _type: 'chat:Message',
+      attachments: [],
+      author: {
+        fullName: 'octocat',
+        isBot: false,
+        isMe: false,
+        userId: '12345',
+        userName: 'octocat',
+      },
+      formatted: { type: 'root', children: [] },
+      id: 'm_1',
+      metadata: { dateSent: '2026-05-05T07:32:52.000Z', edited: false },
+      raw: {},
+      text: '@kilocode fix this',
+      threadId: 'github:acme/widgets:issue:42',
+    };
+
+    mockedFindIntegrationByInstallationId.mockResolvedValue(integration as never);
+    mockedVerifyGitHubBotLinkState.mockReturnValue({
+      userId: USER_ID,
+      installationId: INSTALLATION_ID,
+      callbackPath: '/github/link',
+      contextKey: 'link-account-context:abc',
+    });
+    mockedReadLinkAccountContext.mockResolvedValue({ thread, message });
+    mockedConsumeLinkAccountContext.mockResolvedValue(true);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain('Kilo is already processing your message');
+    expect(mockedLinkKiloUser).toHaveBeenCalled();
+    expect(mockedReadLinkAccountContext).toHaveBeenCalledWith(
+      mockState,
+      'link-account-context:abc'
+    );
+    expect(mockedConsumeLinkAccountContext).toHaveBeenCalledWith(
+      mockState,
+      'link-account-context:abc'
+    );
+    expect(mockedAfter).toHaveBeenCalledTimes(1);
+    const scheduled = mockedAfter.mock.calls[0][0] as () => Promise<void>;
+    await scheduled();
+    expect(mockedReprocessLinkedMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platformIntegration: integration,
+        thread,
+        message,
+        user: expect.objectContaining({ id: USER_ID }),
+      })
+    );
+  });
+
+  test('skips replay when the context was already consumed (duplicate OAuth callback)', async () => {
+    mockedVerifyGitHubBotLinkState.mockReturnValue({
+      userId: USER_ID,
+      installationId: INSTALLATION_ID,
+      callbackPath: '/github/link',
+      contextKey: 'link-account-context:abc',
+    });
+    mockedReadLinkAccountContext.mockResolvedValue({
+      thread: {
+        _type: 'chat:Thread',
+        adapterName: 'github',
+        channelId: 'github:acme/widgets',
+        id: 'github:acme/widgets:issue:42',
+        isDM: false,
+      },
+      message: {
+        _type: 'chat:Message',
+        attachments: [],
+        author: {
+          fullName: 'octocat',
+          isBot: false,
+          isMe: false,
+          userId: '12345',
+          userName: 'octocat',
+        },
+        formatted: { type: 'root', children: [] },
+        id: 'm_1',
+        metadata: { dateSent: '2026-05-05T07:32:52.000Z', edited: false },
+        raw: {},
+        text: '@kilocode fix this',
+        threadId: 'github:acme/widgets:issue:42',
+      },
+    });
+    mockedConsumeLinkAccountContext.mockResolvedValue(false);
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain('mention Kilo again');
+    expect(mockedAfter).not.toHaveBeenCalled();
   });
 
   test('rejects bot-link callbacks for integrations without bot_enabled metadata', async () => {

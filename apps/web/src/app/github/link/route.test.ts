@@ -57,6 +57,7 @@ describe('GET /github/link', () => {
     mockedVerifyGitHubLinkToken.mockReturnValue({
       platformIntegrationId: PLATFORM_INTEGRATION_ID,
       installationId: INSTALLATION_ID,
+      contextKey: null,
     });
     mockedVerifyGitHubBotLinkState.mockReturnValue(null);
     mockedCreateGitHubBotLinkState.mockReturnValue('signed-state');
@@ -136,8 +137,25 @@ describe('GET /github/link', () => {
     expect(redirectUrl.searchParams.get('state')).toBe('signed-state');
     expect(redirectUrl.searchParams.get('scope')).toBe('read:user');
     expect(mockedGetPlatformIntegrationById).toHaveBeenCalledWith(PLATFORM_INTEGRATION_ID);
-    expect(mockedCreateGitHubBotLinkState).toHaveBeenCalledWith(USER_ID, INSTALLATION_ID);
+    expect(mockedCreateGitHubBotLinkState).toHaveBeenCalledWith(USER_ID, INSTALLATION_ID, {
+      contextKey: undefined,
+    });
     expect(mockedGetGitHubAppCredentials).toHaveBeenCalledWith('standard');
+  });
+
+  test('propagates the context key from the link token into the OAuth state', async () => {
+    mockedVerifyGitHubLinkToken.mockReturnValue({
+      platformIntegrationId: PLATFORM_INTEGRATION_ID,
+      installationId: INSTALLATION_ID,
+      contextKey: 'link-account-context:abc',
+    });
+
+    const { GET } = await import('./route');
+    await GET(makeRequest('/github/link?token=signed-token') as never);
+
+    expect(mockedCreateGitHubBotLinkState).toHaveBeenCalledWith(USER_ID, INSTALLATION_ID, {
+      contextKey: 'link-account-context:abc',
+    });
   });
 
   test("picks credentials matching the integration's github_app_type", async () => {

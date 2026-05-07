@@ -15,6 +15,11 @@ const NONCE_BYTES = 16;
 type GitHubLinkTokenPayload = {
   platformIntegrationId: string;
   installationId: string;
+  /**
+   * Redis key referencing the thread + message to replay after linking.
+   * Optional because older tokens and non-mention flows may not carry one.
+   */
+  contextKey?: string;
   iat: number;
   nonce: string;
 };
@@ -22,6 +27,7 @@ type GitHubLinkTokenPayload = {
 export type VerifiedGitHubLinkToken = {
   platformIntegrationId: string;
   installationId: string;
+  contextKey: string | null;
 };
 
 function sign(data: string): string {
@@ -31,10 +37,12 @@ function sign(data: string): string {
 export function createGitHubLinkToken(params: {
   platformIntegrationId: string;
   installationId: string;
+  contextKey?: string;
 }): string {
   const payload: GitHubLinkTokenPayload = {
     platformIntegrationId: params.platformIntegrationId,
     installationId: params.installationId,
+    ...(params.contextKey ? { contextKey: params.contextKey } : {}),
     iat: Math.floor(Date.now() / 1000),
     nonce: crypto.randomBytes(NONCE_BYTES).toString('base64url'),
   };
@@ -70,6 +78,7 @@ export function verifyGitHubLinkToken(token: string | null): VerifiedGitHubLinkT
     if (typeof data.installationId !== 'string' || data.installationId.length === 0) return null;
     if (typeof data.iat !== 'number') return null;
     if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
+    if (data.contextKey !== undefined && typeof data.contextKey !== 'string') return null;
 
     const ageSeconds = Math.floor(Date.now() / 1000) - data.iat;
     if (ageSeconds < 0 || ageSeconds > TOKEN_TTL_SECONDS) return null;
@@ -77,6 +86,7 @@ export function verifyGitHubLinkToken(token: string | null): VerifiedGitHubLinkT
     return {
       platformIntegrationId: data.platformIntegrationId,
       installationId: data.installationId,
+      contextKey: data.contextKey ?? null,
     };
   } catch {
     return null;

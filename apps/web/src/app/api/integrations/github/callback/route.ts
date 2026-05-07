@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { getUserFromAuth } from '@/lib/user.server';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
@@ -22,11 +22,18 @@ import type {
 } from '@/lib/integrations/core/types';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
-import { linkKiloUser } from '@/lib/bot-identity';
+import {
+  consumeLinkAccountContext,
+  linkKiloUser,
+  readLinkAccountContext,
+} from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
+import { reprocessLinkedMessage } from '@/lib/bot/run';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { botPlatforms } from '@/lib/bot/platforms';
+import { Message, ThreadImpl } from 'chat';
+import type { PlatformIntegration, User } from '@kilocode/db';
 
 function htmlPage(title: string, message: string, status = 200): Response {
   return new Response(
@@ -42,7 +49,7 @@ function htmlPage(title: string, message: string, status = 200): Response {
   );
 }
 
-async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: string }) {
+async function handleGitHubBotLinkCallback(request: NextRequest, user: User) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get('code');
   const state = verifyGitHubBotLinkState(searchParams.get('state'));
@@ -100,10 +107,44 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
     user.id
   );
 
+  const replayed = await scheduleMessageReplay(state.contextKey, integration, user);
+
   return htmlPage(
     'GitHub account linked',
-    `GitHub account ${githubUser.login} has been linked to your Kilo account.<br>You can return to GitHub and mention Kilo again.`
+    `GitHub account ${githubUser.login} has been linked to your Kilo account.<br>${
+      replayed
+        ? 'You can close this tab — Kilo is already processing your message.'
+        : 'You can return to GitHub and mention Kilo again.'
+    }`
   );
+}
+
+/**
+ * If the link flow carried a message context key, replay the original
+ * mention so the user does not need to ping Kilo a second time. Matches
+ * the Slack link-account UX where replay happens automatically.
+ */
+async function scheduleMessageReplay(
+  contextKey: string | null,
+  platformIntegration: PlatformIntegration,
+  user: User
+): Promise<boolean> {
+  if (!contextKey) return false;
+
+  const context = await readLinkAccountContext(bot.getState(), contextKey);
+  if (!context) return false;
+
+  if (!(await consumeLinkAccountContext(bot.getState(), contextKey))) return false;
+
+  after(() =>
+    reprocessLinkedMessage({
+      platformIntegration,
+      thread: ThreadImpl.fromJSON(context.thread),
+      message: Message.fromJSON(context.message),
+      user,
+    })
+  );
+  return true;
 }
 
 /**

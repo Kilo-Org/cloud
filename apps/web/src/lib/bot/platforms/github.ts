@@ -7,6 +7,7 @@ import {
   truncate,
 } from '@/lib/bot/platforms/shared';
 import type { BotPlatform } from '@/lib/bot/platforms/types';
+import { storeLinkAccountContext } from '@/lib/bot-identity';
 import { APP_URL } from '@/lib/constants';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -298,13 +299,22 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
         getGitHubRepositoryReference(thread, message)
       );
     },
-    async promptLinkAccount({ thread, identity, platformIntegration }) {
+    async promptLinkAccount({ thread, message, identity, platformIntegration, state }) {
+      // Stash the thread + message so the OAuth callback can replay the
+      // mention automatically once the account is linked — matching the
+      // Slack link-account flow where replay happens after a single hop.
+      const contextKey = await storeLinkAccountContext(state, {
+        thread: thread.toJSON(),
+        message: message.toJSON(),
+      });
+
       const url = new URL(GITHUB_LINK_PATH, APP_URL);
       url.searchParams.set(
         'token',
         createGitHubLinkToken({
           platformIntegrationId: platformIntegration.id,
           installationId: identity.teamId,
+          contextKey,
         })
       );
 
@@ -312,7 +322,7 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
         markdown:
           'To use Kilo from GitHub you first need to link your GitHub account to Kilo. ' +
           `[Link your Kilo account](${url.toString()}) to continue. ` +
-          'After linking, mention me again in this issue or pull request.',
+          'Once linked, I will pick up your message automatically.',
       });
     },
     async withAuthContext({ fn }) {

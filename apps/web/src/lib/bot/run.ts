@@ -1,9 +1,47 @@
 import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
 import { runBotAgent } from '@/lib/bot/agent-runner';
 import { extractAndUploadImages } from '@/lib/bot/images';
+import { botPlatforms } from '@/lib/bot/platforms';
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
+
+/**
+ * Replay a user's original mention after their account is linked. Shared
+ * between the Slack single-hop link route and the GitHub OAuth callback so
+ * the experience is identical: link, then immediately pick up the message.
+ */
+export async function reprocessLinkedMessage({
+  platformIntegration,
+  thread,
+  message,
+  user,
+}: {
+  platformIntegration: PlatformIntegration;
+  thread: Thread;
+  message: Message;
+  user: User;
+}): Promise<void> {
+  try {
+    await botPlatforms.require(platformIntegration.platform).withAuthContext({
+      platformIntegration,
+      fn: async () => {
+        await processLinkedMessage({ thread, message, platformIntegration, user });
+      },
+    });
+  } catch (error) {
+    console.error('[Bot] Failed to reprocess linked message:', error);
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'link-account-reprocess-message' },
+      extra: {
+        platform: platformIntegration.platform,
+        threadId: thread.id,
+        messageId: message.id,
+        userId: user.id,
+      },
+    });
+  }
+}
 
 export async function processLinkedMessage({
   thread,

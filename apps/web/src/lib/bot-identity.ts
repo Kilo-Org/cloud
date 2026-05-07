@@ -216,6 +216,30 @@ function createLinkToken(payload: LinkTokenPayload): string {
   return `${encodedPayload}.${hmacSign(encodedPayload)}`;
 }
 
+/**
+ * Store thread + message context under a fresh Redis key so a link flow
+ * (Slack's single-hop route or GitHub's OAuth round-trip) can replay the
+ * user's original message after account linking succeeds.
+ */
+export async function storeLinkAccountContext(
+  state: StateAdapter,
+  context: LinkAccountContext
+): Promise<string> {
+  const contextKey = `${LINK_ACCOUNT_CONTEXT_KEY_PREFIX}${crypto.randomBytes(NONCE_BYTES).toString('base64url')}`;
+  await state.set<LinkAccountContext>(contextKey, context, LINK_ACCOUNT_CONTEXT_TTL_MS);
+  return contextKey;
+}
+
+export async function readLinkAccountContext(
+  state: StateAdapter,
+  contextKey: string
+): Promise<LinkAccountContext | null> {
+  const raw = await state.get<unknown>(contextKey);
+  if (raw === null || raw === undefined) return null;
+  const parsed = linkAccountContextSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
 export async function createLinkAccountToken({
   identity,
   thread,
@@ -225,8 +249,7 @@ export async function createLinkAccountToken({
   identity: PlatformIdentity;
   state: StateAdapter;
 }): Promise<string> {
-  const contextKey = `${LINK_ACCOUNT_CONTEXT_KEY_PREFIX}${crypto.randomBytes(NONCE_BYTES).toString('base64url')}`;
-  await state.set<LinkAccountContext>(contextKey, { thread, message }, LINK_ACCOUNT_CONTEXT_TTL_MS);
+  const contextKey = await storeLinkAccountContext(state, { thread, message });
   return createLinkToken({ identity, contextKey });
 }
 

@@ -672,29 +672,54 @@ export function configureLinear(env: EnvLike): void {
 // ---- Step 6b: ClawMetry observability sync ----
 
 const CLAWMETRY_DIR = '/root/.clawmetry';
-const CLAWMETRY_TOKEN_PATH = '/root/.clawmetry/token';
+const CLAWMETRY_CONFIG_PATH = '/root/.clawmetry/config.json';
+const CLAWMETRY_DASHBOARD_URL_PATH = '/root/.clawmetry/dashboard-url.txt';
 const CLAWMETRY_REGISTER_TIMEOUT_MS = 8_000;
 
 type ClawMetryRegisterResponse = {
   ok?: boolean;
   api_key?: string;
+  dashboard_id?: string;
+  node_id?: string;
   error?: string;
 };
 
 /**
  * Register this instance with ClawMetry and start the sync daemon.
  *
- * ClawMetry (https://clawmetry.com) is a free observability dashboard for
- * OpenClaw runtimes. The Python package is pre-installed in the image; this
- * step (a) calls the public `/api/register` endpoint to get a free per-
- * machine cm_token, (b) writes it to `~/.clawmetry/token`, (c) spawns the
- * sync daemon (detached) so events flow to app.clawmetry.com.
+ * ClawMetry (https://clawmetry.com) is a free, end-to-end-encrypted
+ * observability dashboard for OpenClaw runtimes. The Python package is
+ * pre-installed in the image; this step (a) calls the public
+ * `/api/register` endpoint to get a per-machine cm_token, (b) generates a
+ * client-side AES-256-GCM encryption key (never sent to the server), (c)
+ * writes both to `~/.clawmetry/config.json` in the schema the sync daemon
+ * expects, (d) writes a self-decrypting dashboard URL to
+ * `~/.clawmetry/dashboard-url.txt` so KiloClaw's UI can surface a "View
+ * Observability" link, and (e) spawns `clawmetry sync` detached.
  *
- * Same flow any user installing clawmetry on a fresh OpenClaw box would
- * use — no special endpoint, no partner key, no secrets to manage. Tokens
- * are scoped to the Fly machine ID (or HOSTNAME fallback) so each instance
- * gets its own ClawMetry account; users with multiple instances can link
- * them later via the standard OTP flow.
+ * E2E model: the encryption_key is generated on this box and never leaves
+ * it via any HTTP request. The cloud only ever sees ciphertext blobs. The
+ * dashboard URL embeds the key as a `#fragment` (which browsers never send
+ * to servers), so opening the URL in a browser primes localStorage with the
+ * key and decrypts events on the fly.
+ *
+ * Deferred sync: this step does NOT spawn the sync daemon. We only PRE-WIRE
+ * the integration (install + config + decryptable URL). The daemon should
+ * be started on demand — when the user clicks "View Observability" in
+ * KiloClaw's web UI, KiloClaw's controller exec's `clawmetry sync` in the
+ * background and opens the dashboard URL in a new tab. This avoids burning
+ * compute / bandwidth / cloud storage syncing for users who never look at
+ * the dashboard. The daemon, once started, can read the persisted local
+ * OpenClaw session files and publish a catch-up batch.
+ *
+ * KiloClaw's web UI should expose two controller endpoints:
+ *   GET  /_kilo/clawmetry-dashboard-url  → returns the contents of
+ *                                          dashboard-url.txt
+ *   POST /_kilo/clawmetry-start-sync     → spawns `nohup clawmetry sync &`
+ *                                          (idempotent — checks pgrep first)
+ *
+ * Same provisioning flow any user installing clawmetry on a fresh OpenClaw
+ * box would use — no special endpoint, no partner key, no secrets to manage.
  *
  * Failures NEVER block boot — observability is best-effort. Operators can
  * set `KILOCLAW_CLAWMETRY_DISABLED=true` to skip entirely.
@@ -726,7 +751,7 @@ export function provisionClawMetrySync(env: EnvLike, deps: BootstrapDeps = defau
     payload.email = userEmail;
   }
 
-  let token: string;
+  let registered: ClawMetryRegisterResponse;
   try {
     const result = deps.execFileSync(
       'curl',
@@ -744,42 +769,58 @@ export function provisionClawMetrySync(env: EnvLike, deps: BootstrapDeps = defau
       ],
       { stdio: 'pipe' }
     );
-    const parsed = JSON.parse(String(result)) as ClawMetryRegisterResponse;
-    if (!parsed.api_key) {
-      console.warn(`ClawMetry: register returned no api_key — ${parsed.error ?? 'unknown error'}`);
+    registered = JSON.parse(String(result)) as ClawMetryRegisterResponse;
+    if (!registered.api_key) {
+      console.warn(
+        `ClawMetry: register returned no api_key — ${registered.error ?? 'unknown error'}`
+      );
       return;
     }
-    token = parsed.api_key;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`ClawMetry: register request failed — ${message}`);
     return;
   }
 
+  // Generate the E2E encryption key client-side. The cloud will never see
+  // this. AES-256-GCM uses a 32-byte key — base64 encoding gives 44 chars.
+  const encryptionKey = crypto.randomBytes(32).toString('base64');
+  const nodeId = registered.node_id || machineId;
+
   if (!deps.existsSync(CLAWMETRY_DIR)) {
     deps.mkdirSync(CLAWMETRY_DIR, { recursive: true, mode: 0o700 });
   }
-  deps.writeFileSync(CLAWMETRY_TOKEN_PATH, token);
-  deps.chmodSync(CLAWMETRY_TOKEN_PATH, 0o600);
 
-  // Spawn `clawmetry sync` detached, fire-and-forget. ClawMetry's own
-  // process supervisor handles its lifecycle from here. Failure to start
-  // does not block boot — gateway is the critical path, observability is
-  // best-effort.
-  try {
-    deps.execFileSync(
-      'sh',
-      [
-        '-c',
-        `nohup clawmetry sync --token "$(cat ${CLAWMETRY_TOKEN_PATH})" >/var/log/clawmetry-sync.log 2>&1 &`,
-      ],
-      { stdio: 'pipe' }
-    );
-    console.log(`ClawMetry: sync daemon started (machine=${machineId})`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`ClawMetry: failed to start sync daemon — ${message}`);
-  }
+  // Schema matches what `clawmetry connect` writes (clawmetry/cli.py:495).
+  // `clawmetry sync` reads from this file via clawmetry/sync.py:924.
+  const config = {
+    api_key: registered.api_key,
+    node_id: nodeId,
+    platform: 'Linux',
+    connected_at: new Date().toISOString(),
+    encryption_key: encryptionKey,
+  };
+  deps.writeFileSync(CLAWMETRY_CONFIG_PATH, JSON.stringify(config, null, 2));
+  deps.chmodSync(CLAWMETRY_CONFIG_PATH, 0o600);
+
+  // Self-decrypting dashboard URL. The `#fragment` is never sent to any
+  // server (browsers strip it from outgoing requests) — the dashboard JS
+  // reads it client-side and stashes the enc_key in localStorage. KiloClaw's
+  // web UI should fetch this file via a controller endpoint and render it
+  // as a "View Observability Dashboard" link.
+  const dashboardUrl = `${apiBase}/cloud#key=${encodeURIComponent(encryptionKey)}&node=${encodeURIComponent(nodeId)}`;
+  deps.writeFileSync(CLAWMETRY_DASHBOARD_URL_PATH, dashboardUrl + '\n');
+  deps.chmodSync(CLAWMETRY_DASHBOARD_URL_PATH, 0o600);
+
+  // Deliberately DO NOT spawn `clawmetry sync` here — see the deferred-sync
+  // note in the function docstring. KiloClaw's web UI starts the daemon on
+  // demand when the user clicks "View Observability" so we don't burn
+  // resources syncing data nobody is going to look at. The persisted local
+  // OpenClaw session files give the daemon a complete catch-up log to
+  // publish whenever it does start.
+  console.log(
+    `ClawMetry: provisioned (node=${nodeId}, E2E enabled) — sync deferred until user opens dashboard`
+  );
 }
 
 // ---- Step 7: Onboard / doctor + config patching ----

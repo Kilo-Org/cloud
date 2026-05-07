@@ -594,13 +594,18 @@ describe('provisionClawMetrySync', () => {
     warnSpy.mockRestore();
   });
 
-  it('registers via /api/register, writes token with 600, and starts the daemon', () => {
+  it('registers via /api/register, writes config + dashboard URL, does NOT start daemon', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const { deps, execCalls, writeCalls, chmodCalls, mkdirCalls } = fakeDeps();
     deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
       execCalls.push({ cmd, args });
       if (cmd === 'curl') {
-        return JSON.stringify({ ok: true, api_key: 'cm_abc123' });
+        return JSON.stringify({
+          ok: true,
+          api_key: 'cm_abc123',
+          dashboard_id: 'dash-uuid-1',
+          node_id: 'agent-vivek-fly',
+        });
       }
       return '';
     });
@@ -619,10 +624,8 @@ describe('provisionClawMetrySync', () => {
     expect(curlCall?.args).toContain('https://app.clawmetry.com/api/register');
     // Public endpoint — no X-Partner-Key header anywhere
     expect(curlCall?.args.every(a => !a.includes('X-Partner-Key'))).toBe(true);
-    // Payload carries machine_id, hostname, platform, email
-    const payload = curlCall?.args.find(a => a.includes('machine_id')) ?? '';
-    const parsed = JSON.parse(payload);
-    expect(parsed).toEqual({
+    const payload = JSON.parse(curlCall?.args.find(a => a.includes('machine_id')) ?? '{}');
+    expect(payload).toEqual({
       hostname: 'agent-vivek-fly',
       machine_id: 'fly-machine-abc',
       platform: 'Linux',
@@ -630,16 +633,55 @@ describe('provisionClawMetrySync', () => {
     });
 
     expect(mkdirCalls).toContain('/root/.clawmetry');
-    expect(writeCalls).toEqual([{ path: '/root/.clawmetry/token', data: 'cm_abc123' }]);
-    expect(chmodCalls).toEqual([{ path: '/root/.clawmetry/token', mode: 0o600 }]);
 
-    const daemonCall = execCalls.find(c => c.cmd === 'sh');
-    expect(daemonCall).toBeDefined();
-    expect(daemonCall?.args[1]).toContain('clawmetry sync');
-    expect(daemonCall?.args[1]).toContain('nohup');
+    // config.json: full schema with api_key + encryption_key + node_id
+    const configWrite = writeCalls.find(w => w.path === '/root/.clawmetry/config.json');
+    expect(configWrite).toBeDefined();
+    const config = JSON.parse(configWrite!.data);
+    expect(config.api_key).toBe('cm_abc123');
+    expect(config.node_id).toBe('agent-vivek-fly');
+    expect(config.platform).toBe('Linux');
+    // encryption_key is 32 random bytes base64-encoded → 44 chars
+    expect(config.encryption_key).toHaveLength(44);
+    expect(typeof config.connected_at).toBe('string');
 
-    expect(logSpy).toHaveBeenCalledWith('ClawMetry: sync daemon started (machine=fly-machine-abc)');
+    // dashboard URL embeds enc_key + node_id as URL fragment (#...)
+    const urlWrite = writeCalls.find(w => w.path === '/root/.clawmetry/dashboard-url.txt');
+    expect(urlWrite).toBeDefined();
+    expect(urlWrite!.data).toMatch(
+      /^https:\/\/app\.clawmetry\.com\/cloud#key=[^&]+&node=agent-vivek-fly\n$/
+    );
+
+    // Both files written 0600
+    expect(chmodCalls).toContainEqual({ path: '/root/.clawmetry/config.json', mode: 0o600 });
+    expect(chmodCalls).toContainEqual({ path: '/root/.clawmetry/dashboard-url.txt', mode: 0o600 });
+
+    // Deferred-sync: NO daemon spawn at bootstrap time
+    expect(execCalls.find(c => c.cmd === 'sh')).toBeUndefined();
+
+    expect(logSpy).toHaveBeenCalledWith(
+      'ClawMetry: provisioned (node=agent-vivek-fly, E2E enabled) — sync deferred until user opens dashboard'
+    );
     logSpy.mockRestore();
+  });
+
+  it('uses machine_id as node_id fallback when /api/register omits node_id', () => {
+    const { deps, execCalls, writeCalls } = fakeDeps();
+    deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
+      execCalls.push({ cmd, args });
+      if (cmd === 'curl') return JSON.stringify({ api_key: 'cm_x' });
+      return '';
+    });
+
+    provisionClawMetrySync({ FLY_MACHINE_ID: 'fallback-mid', HOSTNAME: 'h1' }, deps);
+
+    const config = JSON.parse(
+      writeCalls.find(w => w.path === '/root/.clawmetry/config.json')!.data
+    );
+    expect(config.node_id).toBe('fallback-mid');
+
+    const urlContents = writeCalls.find(w => w.path === '/root/.clawmetry/dashboard-url.txt')!.data;
+    expect(urlContents).toContain('node=fallback-mid');
   });
 
   it('omits email from payload when neither KILOCLAW_USER_EMAIL nor GITHUB_EMAIL is set', () => {

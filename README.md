@@ -32,6 +32,10 @@ pnpm drizzle migrate
 pnpm dev:start
 ```
 
+## Acknowledgements
+
+Special thanks to **Marius** for his hard work and contributions to the Kilo Code cloud platform.
+
 ## External resources
 
 - [Vercel project](https://vercel.com/kilocode/kilocode-app)

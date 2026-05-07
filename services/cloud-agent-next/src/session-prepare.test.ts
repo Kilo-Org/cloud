@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schemas from './router/schemas.js';
 import * as schemaLimits from './schema.js';
@@ -28,6 +29,7 @@ const createMockSandbox = () => {
     createSession: vi.fn().mockResolvedValue(mockSession),
     listProcesses: vi.fn().mockResolvedValue([]),
     mkdir: vi.fn().mockResolvedValue(undefined),
+    destroy: vi.fn().mockResolvedValue(undefined),
   };
 };
 
@@ -480,6 +482,44 @@ describe('prepareSession endpoint', () => {
     // NOTE: CLI session creation (createCliSessionViaSessionIngest) is handled via session-ingest.
     // The kiloSessionId now comes from the kilo CLI server's POST /session API.
     // Tests for backend session creation error handling and rollback have been removed.
+
+    it('marks sandbox 500 preparation failures as retryable', async () => {
+      const sandbox = createMockSandbox();
+      const sandboxError = new Error('HTTP error! status: 500');
+      Object.assign(sandboxError, { name: 'SandboxError' });
+      vi.mocked(mockedCloneGitHubRepo).mockRejectedValueOnce(sandboxError);
+      const { getSandbox } = await import('@cloudflare/sandbox');
+      vi.mocked(getSandbox).mockReturnValueOnce(
+        sandbox as unknown as ReturnType<typeof getSandbox>
+      );
+
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub });
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          githubToken: 'ghp_test_token',
+        });
+        expect.unreachable('should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(TRPCError);
+        const trpcError = error as TRPCError;
+        expect(trpcError.code).toBe('INTERNAL_SERVER_ERROR');
+        expect(trpcError.message).toBe('Sandbox returned 500 during workspace preparation');
+        expect(trpcError.cause).toMatchObject({
+          error: 'sandbox_internal_server_error',
+          retryable: true,
+        });
+      }
+
+      expect(sandbox.destroy).toHaveBeenCalledOnce();
+      expect(doStub.prepare).not.toHaveBeenCalled();
+    });
   });
 
   describe('user-error mapping (HTTP 400)', () => {

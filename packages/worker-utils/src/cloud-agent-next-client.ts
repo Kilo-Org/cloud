@@ -102,12 +102,14 @@ export type CloudAgentTerminalReason =
   | 'unknown';
 
 export class CloudAgentNextError extends Error {
+  readonly procedure: string;
   readonly status: number;
   readonly body: string;
 
   constructor(procedure: string, status: number, body: string) {
     super(`${procedure} failed (${status}): ${body}`);
     this.name = 'CloudAgentNextError';
+    this.procedure = procedure;
     this.status = status;
     this.body = body;
   }

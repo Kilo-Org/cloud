@@ -5,9 +5,12 @@
 ## What this gives the user
 
 - Real-time dashboard of agent sessions, token spend, and tool activity (once they open it)
-- Free tier: one node (their KiloClaw instance), 90-day session retention
+- **Free tier (forever, no account required)**: 1 node monitoring · 24-hour Brain feed history · 7-day token tracking · E2E encryption
+- Optional **Pro upgrade** ($5/node/month, 7-day free trial): unlimited nodes · 30-day Brain feed · 90-day token analytics + CSV export · 90-day event retention · approval policies · channel integrations (Slack/Telegram/PagerDuty/Phone) · Flow view · custom alert webhooks · budget limits
 - Zero setup — works out of the box; one click to view
 - E2E encrypted: cloud only ever sees ciphertext; encryption key never leaves their KiloClaw instance
+
+Pricing: <https://clawmetry.com/pricing>
 
 ## How it works
 

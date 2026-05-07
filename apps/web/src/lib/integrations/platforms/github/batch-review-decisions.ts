@@ -1,6 +1,5 @@
 import 'server-only';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
-import { after } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { github_branch_pull_requests } from '@kilocode/db/schema';
@@ -322,5 +321,5 @@ export function triggerBatchReviewDecisionFetchIfNeeded(
   owner: TenantOwner
 ): void {
   if (!hasPendingRows) return;
-  after(() => executeBatchReviewDecisionFetch(owner).catch(captureException));
+  executeBatchReviewDecisionFetch(owner).catch(captureException);
 }

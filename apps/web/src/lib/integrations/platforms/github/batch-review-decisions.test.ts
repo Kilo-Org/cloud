@@ -16,11 +16,6 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getIntegrationForOwner: jest.fn(),
 }));
 
-// next/server after() is a no-op in tests
-jest.mock('next/server', () => ({
-  after: (fn: () => void) => fn(),
-}));
-
 import { fetchBatchedReviewDecisions } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 
@@ -243,16 +238,13 @@ describe('batch-review-decisions', () => {
 
   describe('triggerBatchReviewDecisionFetchIfNeeded', () => {
     it('does not call executeBatch when hasPendingRows=false', () => {
-      // after() is mocked to run synchronously, so we can verify mock isn't called
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockGetIntegration.mockResolvedValue(null as any);
       triggerBatchReviewDecisionFetchIfNeeded(false, testOwner);
-      // Even though after() would execute synchronously in test, getIntegration
-      // is never called because the guard short-circuits before after().
       expect(mockGetIntegration).not.toHaveBeenCalled();
     });
 
-    it('calls executeBatch via after() when hasPendingRows=true', async () => {
+    it('calls executeBatch when hasPendingRows=true', async () => {
       const branch = 'batch/trigger-true';
       await seedSession(branch);
       await seedPrRow(branch, 40, { pending: true });
@@ -262,7 +254,6 @@ describe('batch-review-decisions', () => {
 
       triggerBatchReviewDecisionFetchIfNeeded(true, testOwner);
 
-      // after() is mocked to run synchronously, so by now the fetch should have run
       // Give it a tick for any resolved promises
       await new Promise(r => setTimeout(r, 0));
 

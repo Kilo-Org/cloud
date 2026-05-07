@@ -91,6 +91,12 @@ After installing or upgrading dependencies, run `pnpx expo-doctor` and fix any i
 - For platform primitives such as sheets, alerts, pickers, tabs, gestures, and keyboard behavior, use established native or app-standard components that preserve expected gestures and accessibility.
 - Avoid custom replacements that need workarounds, omit standard gestures, or add complexity without a product reason. A plain sheet that behaves correctly on iOS and Android is better than a bespoke sheet that looks clever but feels broken.
 
+### Press Feedback
+
+- Every pressable surface must notify the user when the press gesture lands. Use the feedback that best fits the surface: pressed opacity, native ripple, haptics, state change, navigation transition, loading state, or another platform-appropriate response.
+- Do not add redundant feedback. If the press immediately causes a clear visual transition or native control response, that can be enough; if the surface otherwise feels inert, add explicit pressed styling or haptics.
+- Keep feedback native-feeling and lightweight. Avoid custom animations or haptic patterns that make simple list rows, cards, or buttons feel heavier than the action deserves.
+
 ### Icons
 
 - Use `lucide-react-native` for all icons. Never use emoji as UI elements.

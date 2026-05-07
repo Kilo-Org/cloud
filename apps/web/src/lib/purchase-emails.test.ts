@@ -563,20 +563,19 @@ describe('sendCreditsTopUpEmail payload', () => {
     expect(params.html).not.toContain('/credits');
   });
 
+  // @ts-expect-error org top-up emails need organizationId or creditsUrl.
+  const invalidOrganizationTopUpEmailParams: Parameters<typeof sendCreditsTopUpEmail>[0] = {
+    to: 'billing@example.com',
+    variant: 'org_manual',
+    amountCents: 2500,
+    creditsCents: 2500,
+    purchaseDate: new Date('2026-04-01T00:00:00Z'),
+    receiptUrl: null,
+    organizationName: 'Acme Labs',
+  };
+
   test('org variants require an organization destination at the type boundary', () => {
-    // Validated by pnpm --filter web typecheck; Jest does not execute this block.
-    if (false) {
-      // @ts-expect-error org top-up emails need organizationId or creditsUrl.
-      sendCreditsTopUpEmail({
-        to: 'billing@example.com',
-        variant: 'org_manual',
-        amountCents: 2500,
-        creditsCents: 2500,
-        purchaseDate: new Date('2026-04-01T00:00:00Z'),
-        receiptUrl: null,
-        organizationName: 'Acme Labs',
-      });
-    }
+    expect(invalidOrganizationTopUpEmailParams).toBeDefined();
   });
 
   test('org variants reject missing organization destination at runtime', async () => {

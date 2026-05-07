@@ -153,7 +153,6 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
 
     const receiptUrl = await resolveStripeReceiptUrl(stripeChargeOrInvoiceId);
     let sentEmails = 0;
-    let terminalFailures = 0;
     let retryableFailures = 0;
 
     for (const recipient of recipients) {
@@ -172,7 +171,6 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
         if (sendResult.sent) {
           sentEmails += 1;
         } else if (sendResult.reason === 'neverbounce_rejected') {
-          terminalFailures += 1;
           captureMessage('Organization top-up confirmation email recipient rejected', {
             level: 'warning',
             tags: {

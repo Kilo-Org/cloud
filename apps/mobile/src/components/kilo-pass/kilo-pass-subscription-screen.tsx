@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -27,6 +28,10 @@ export function KiloPassSubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const productsQuery = useStoreKiloPassProducts();
   const purchase = useStoreKiloPassPurchase();
+  const handleProductPress = (product: AppStoreKiloPassProduct) => {
+    void Haptics.selectionAsync();
+    void purchase.purchase(product);
+  };
 
   return (
     <View className="flex-1 bg-background">
@@ -68,7 +73,7 @@ export function KiloPassSubscriptionScreen() {
                 className="rounded-xl border border-border bg-card p-5 active:opacity-80"
                 disabled={purchase.isPending}
                 onPress={() => {
-                  void purchase.purchase(product);
+                  handleProductPress(product);
                 }}
               >
                 <View className="flex-row items-start justify-between gap-4">

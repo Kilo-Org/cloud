@@ -1,5 +1,6 @@
 import { showManageSubscriptionsIOS } from 'expo-iap';
 import { type Href, useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Linking, Platform, Pressable, View } from 'react-native';
 import { ShieldCheck } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -36,21 +37,23 @@ export function KiloPassSubscriptionCard() {
       );
     }
   };
+  const handlePress = () => {
+    void Haptics.selectionAsync();
+    if (cardState.action === 'open-web-management') {
+      void Linking.openURL(KILO_PASS_MANAGE_URL);
+      return;
+    }
+    if (cardState.action === 'open-store-management') {
+      void openAppStoreManagement();
+      return;
+    }
+    router.push('/(app)/kilo-pass' as Href);
+  };
 
   return (
     <Pressable
       className="rounded-lg border border-border bg-card p-3 active:opacity-80"
-      onPress={() => {
-        if (cardState.action === 'open-web-management') {
-          void Linking.openURL(KILO_PASS_MANAGE_URL);
-          return;
-        }
-        if (cardState.action === 'open-store-management') {
-          void openAppStoreManagement();
-          return;
-        }
-        router.push('/(app)/kilo-pass' as Href);
-      }}
+      onPress={handlePress}
     >
       <View className="flex-row items-center gap-3">
         <View className="h-10 w-10 items-center justify-center rounded-md bg-secondary">

@@ -206,7 +206,7 @@ function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeSte
       return (
         <InboundEmailStepView
           {...stepProgress}
-          address="operator@inbound.claw.kilocode.ai"
+          address="operator@inbound.example.com"
           enabled={true}
           loading={false}
           onContinue={() => setStep('provisioning')}

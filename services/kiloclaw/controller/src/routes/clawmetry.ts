@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import { spawn } from 'node:child_process';
 import type { Hono } from 'hono';
 import { timingSafeTokenEqual } from '../auth';
 import { getBearerToken } from './gateway';
@@ -8,35 +7,58 @@ import { getBearerToken } from './gateway';
  * ClawMetry observability endpoints.
  *
  * These pair with the `provisionClawMetrySync` bootstrap step that pre-wires
- * each instance with a ClawMetry account at boot. The sync daemon stays
- * dormant until a user clicks "View Observability" — at that point the web
- * UI hits these two endpoints to (1) start the daemon, (2) fetch the self-
- * decrypting dashboard URL, then opens it in a new tab.
+ * each instance with a ClawMetry account at boot AND spawns the daemon. The
+ * daemon heartbeats every 60s but uploads zero session / event / log /
+ * memory data because the cloud responds to /ingest/heartbeat with
+ * sync_allowed=false, reason='intent_pending' (see clawmetry-cloud's
+ * deferred-sync gate).
  *
- * Auth: same bearer-token gate as the rest of `/_kilo/*` (handled by the
- * shared `_kilo/*` middleware that registerHealthRoutes installs).
+ * When the user clicks "View Observability" in the KiloClaw web UI:
+ *   1. The web UI POSTs /_kilo/clawmetry-start-sync (this file).
+ *   2. We POST to ClawMetry's /api/cloud/intent-start, flipping the
+ *      cloud-side flag for this account.
+ *   3. We GET /_kilo/clawmetry-dashboard-url and return the URL.
+ *   4. The web UI opens that URL in a new tab.
+ *   5. The daemon's next heartbeat (~60s) sees sync_allowed=true and
+ *      uploads resume — sessions / events / logs / memory all start
+ *      flowing.
+ *
+ * Auth: same bearer-token gate as the rest of `/_kilo/*`.
  */
 
 export const CLAWMETRY_DASHBOARD_URL_PATH = '/root/.clawmetry/dashboard-url.txt';
+export const CLAWMETRY_CONFIG_PATH = '/root/.clawmetry/config.json';
+
+type IntentStartFn = (apiKey: string) => Promise<{ ok: boolean; alreadyStarted?: boolean }>;
 
 type ClawmetryDeps = {
   readFileSync?: (path: string, encoding: BufferEncoding) => string;
   existsSync?: (path: string) => boolean;
-  spawn?: typeof spawn;
-  isAlreadyRunning?: () => boolean;
+  intentStart?: IntentStartFn;
+  apiBase?: string;
 };
 
-/** Default: check if `clawmetry sync` is already in the process table. */
-function defaultIsAlreadyRunning(): boolean {
-  try {
-    const out = spawn('pgrep', ['-f', 'clawmetry sync'], { stdio: 'pipe' });
-    // Synchronous check via the kernel-side pid table is heavier than this
-    // worth — instead, treat the file-based marker as authoritative when set.
-    // Callers that want true freshness should check /var/log/clawmetry-sync.log.
-    return false;
-  } catch {
-    return false;
+/** POST to ClawMetry's /api/cloud/intent-start. Flips the deferred-sync gate. */
+async function defaultIntentStart(
+  apiBase: string,
+  apiKey: string
+): Promise<{
+  ok: boolean;
+  alreadyStarted?: boolean;
+}> {
+  const res = await fetch(`${apiBase}/api/cloud/intent-start`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    throw new Error(`intent-start returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
   }
+  const body = (await res.json()) as { ok?: boolean; already_started?: boolean };
+  return { ok: !!body.ok, alreadyStarted: !!body.already_started };
 }
 
 export function registerClawmetryRoutes(
@@ -46,8 +68,9 @@ export function registerClawmetryRoutes(
 ): void {
   const readFileSync = deps.readFileSync ?? ((p, e) => fs.readFileSync(p, e));
   const existsSync = deps.existsSync ?? (p => fs.existsSync(p));
-  const spawnFn = deps.spawn ?? spawn;
-  const isAlreadyRunning = deps.isAlreadyRunning ?? defaultIsAlreadyRunning;
+  const apiBase = deps.apiBase ?? process.env.CLAWMETRY_API_BASE ?? 'https://app.clawmetry.com';
+  const intentStart: IntentStartFn =
+    deps.intentStart ?? (apiKey => defaultIntentStart(apiBase, apiKey));
 
   // Shared bearer-token gate for both endpoints.
   app.use('/_kilo/clawmetry-dashboard-url', async (c, next) => {
@@ -99,34 +122,44 @@ export function registerClawmetryRoutes(
   /**
    * POST /_kilo/clawmetry-start-sync
    *
-   * Spawns `clawmetry sync` as a detached background process. Idempotent —
-   * if the daemon is already running, this is a no-op and returns
-   * { ok: true, alreadyRunning: true }. The daemon reads its config from
-   * /root/.clawmetry/config.json (written at bootstrap).
+   * The daemon is already running (spawned at bootstrap) but in deferred
+   * mode — heartbeats only, no uploads. This endpoint signals user intent
+   * to the ClawMetry cloud, which flips the gate so the daemon's next
+   * heartbeat (~60s) returns sync_allowed=true and content uploads resume.
    *
-   * Always returns 200 on success. The web UI calls this before opening
-   * the dashboard URL so the dashboard sees fresh events arriving.
+   * Idempotent: hitting this multiple times is a no-op after the first
+   * success — the cloud's intent-start endpoint short-circuits when
+   * users.sync_intent_at is already set.
+   *
+   * Returns { ok: true, alreadyStarted: bool }. The web UI calls this
+   * before opening the dashboard URL so by the time the user starts
+   * looking, the daemon's first content sync is at most ~60s away.
    */
-  app.post('/_kilo/clawmetry-start-sync', c => {
-    if (isAlreadyRunning()) {
-      return c.json({ ok: true, alreadyRunning: true });
+  app.post('/_kilo/clawmetry-start-sync', async c => {
+    if (!existsSync(CLAWMETRY_CONFIG_PATH)) {
+      return c.json({ error: 'ClawMetry config not found — provisioning may not have run' }, 404);
     }
+    let apiKey: string;
     try {
-      // Spawn the sync daemon directly via the venv python — `clawmetry sync`
-      // isn't a CLI subcommand; the canonical entry point is the sync.py
-      // module (see clawmetry/cli.py:_start_subprocess). install.sh creates
-      // a venv at /root/.clawmetry, so the python is at /root/.clawmetry/bin/python3.
-      // Detached + ignored stdio so the daemon outlives this request handler.
-      const child = spawnFn('/root/.clawmetry/bin/python3', ['-m', 'clawmetry.sync'], {
-        detached: true,
-        stdio: 'ignore',
-      });
-      child.unref();
-      return c.json({ ok: true, alreadyRunning: false });
+      const config = JSON.parse(readFileSync(CLAWMETRY_CONFIG_PATH, 'utf8')) as {
+        api_key?: string;
+      };
+      if (!config.api_key) {
+        return c.json({ error: 'ClawMetry config missing api_key' }, 500);
+      }
+      apiKey = config.api_key;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[clawmetry] failed to spawn sync daemon: ${message}`);
-      return c.json({ error: 'Failed to start sync daemon' }, 500);
+      console.warn(`[clawmetry] failed to read config: ${message}`);
+      return c.json({ error: 'Failed to read ClawMetry config' }, 500);
+    }
+    try {
+      const result = await intentStart(apiKey);
+      return c.json({ ok: true, alreadyStarted: !!result.alreadyStarted });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[clawmetry] intent-start failed: ${message}`);
+      return c.json({ error: 'Failed to start sync' }, 502);
     }
   });
 }

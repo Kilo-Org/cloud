@@ -252,6 +252,8 @@ export function registerConfigRoutes(
         readdirSync: () => [],
         statSync: () => ({ isDirectory: () => false }),
         execFileSync: () => '',
+        spawn: () =>
+          ({ unref: () => {} }) as unknown as ReturnType<typeof import('node:child_process').spawn>,
       });
 
       return c.json({ ok: true, enabled: parsed.data.enabled }, 200);

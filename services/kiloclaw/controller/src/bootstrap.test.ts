@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import crypto from 'node:crypto';
+import type { spawn as nodeSpawn } from 'node:child_process';
 import {
   decryptEnvVars,
   setupDirectories,
@@ -58,6 +59,7 @@ function fakeDeps(): {
   chdirCalls: string[];
   copyCalls: { src: string; dest: string }[];
   execCalls: { cmd: string; args: string[]; input?: string }[];
+  spawnCalls: { cmd: string; args: string[] }[];
   writeCalls: { path: string; data: string }[];
   renameCalls: { from: string; to: string }[];
   setConfigExists: (v: boolean) => void;
@@ -67,6 +69,7 @@ function fakeDeps(): {
   const chdirCalls: string[] = [];
   const copyCalls: { src: string; dest: string }[] = [];
   const execCalls: { cmd: string; args: string[]; input?: string }[] = [];
+  const spawnCalls: { cmd: string; args: string[] }[] = [];
   const writeCalls: { path: string; data: string }[] = [];
   const renameCalls: { from: string; to: string }[] = [];
   let configExists = false;
@@ -106,12 +109,18 @@ function fakeDeps(): {
         execCalls.push({ cmd, args, input: opts?.input });
         return '';
       }),
+      spawn: vi.fn((cmd: string, args: string[]) => {
+        spawnCalls.push({ cmd, args });
+        // Minimal ChildProcess stub — bootstrap only calls .unref().
+        return { unref: () => {} } as unknown as ReturnType<typeof nodeSpawn>;
+      }),
     },
     mkdirCalls,
     chmodCalls,
     chdirCalls,
     copyCalls,
     execCalls,
+    spawnCalls,
     writeCalls,
     renameCalls,
     setConfigExists(v: boolean) {
@@ -594,9 +603,9 @@ describe('provisionClawMetrySync', () => {
     warnSpy.mockRestore();
   });
 
-  it('registers via /api/register, writes config + dashboard URL, does NOT start daemon', () => {
+  it('registers via /api/register with source=kiloclaw, writes config, spawns daemon (which will defer uploads)', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { deps, execCalls, writeCalls, chmodCalls, mkdirCalls } = fakeDeps();
+    const { deps, execCalls, spawnCalls, writeCalls, chmodCalls, mkdirCalls } = fakeDeps();
     deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
       execCalls.push({ cmd, args });
       if (cmd === 'curl') {
@@ -629,6 +638,7 @@ describe('provisionClawMetrySync', () => {
       hostname: 'agent-vivek-fly',
       machine_id: 'fly-machine-abc',
       platform: 'Linux',
+      source: 'kiloclaw',
       email: 'user@kilocode.ai',
     });
 
@@ -657,11 +667,15 @@ describe('provisionClawMetrySync', () => {
     expect(chmodCalls).toContainEqual({ path: '/root/.clawmetry/config.json', mode: 0o600 });
     expect(chmodCalls).toContainEqual({ path: '/root/.clawmetry/dashboard-url.txt', mode: 0o600 });
 
-    // Deferred-sync: NO daemon spawn at bootstrap time
-    expect(execCalls.find(c => c.cmd === 'sh')).toBeUndefined();
+    // Daemon spawned at bootstrap with source=kiloclaw — the cloud will tell
+    // it sync_allowed=false, reason='intent_pending' until the user clicks
+    // "View Observability". Heartbeats fire so dashboard is ready when they do.
+    expect(spawnCalls).toEqual([
+      { cmd: '/root/.clawmetry/bin/python3', args: ['-m', 'clawmetry.sync'] },
+    ]);
 
     expect(logSpy).toHaveBeenCalledWith(
-      'ClawMetry: provisioned (node=agent-vivek-fly, E2E enabled) — sync deferred until user opens dashboard'
+      'ClawMetry: provisioned (node=agent-vivek-fly, E2E enabled, daemon spawned) — sync deferred until user opens dashboard'
     );
     logSpy.mockRestore();
   });

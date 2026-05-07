@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
-import { registerClawmetryRoutes, CLAWMETRY_DASHBOARD_URL_PATH } from './clawmetry';
+import {
+  registerClawmetryRoutes,
+  CLAWMETRY_DASHBOARD_URL_PATH,
+  CLAWMETRY_CONFIG_PATH,
+} from './clawmetry';
 
 const TOKEN = 'test-token';
 const AUTH = { authorization: `Bearer ${TOKEN}` };
@@ -86,17 +90,20 @@ describe('GET /_kilo/clawmetry-dashboard-url', () => {
 // ── POST start-sync ────────────────────────────────────────────────────────
 
 describe('POST /_kilo/clawmetry-start-sync', () => {
-  it('spawns the daemon and returns { ok: true, alreadyRunning: false }', async () => {
-    const spawnCalls: { cmd: string; args: string[] }[] = [];
-    const fakeChild = {
-      unref: vi.fn(),
-    };
+  it('reads api_key from config and POSTs to ClawMetry intent-start', async () => {
+    const intentCalls: string[] = [];
     const app = makeApp({
-      isAlreadyRunning: () => false,
-      spawn: ((cmd: string, args: string[]) => {
-        spawnCalls.push({ cmd, args });
-        return fakeChild as unknown as ReturnType<typeof import('node:child_process').spawn>;
-      }) as typeof import('node:child_process').spawn,
+      existsSync: p => p === CLAWMETRY_CONFIG_PATH,
+      readFileSync: p => {
+        if (p === CLAWMETRY_CONFIG_PATH) {
+          return JSON.stringify({ api_key: 'cm_abc123', node_id: 'agent-vivek-fly' });
+        }
+        return '';
+      },
+      intentStart: async apiKey => {
+        intentCalls.push(apiKey);
+        return { ok: true, alreadyStarted: false };
+      },
     });
 
     const res = await app.request('/_kilo/clawmetry-start-sync', {
@@ -104,18 +111,15 @@ describe('POST /_kilo/clawmetry-start-sync', () => {
       headers: AUTH,
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, alreadyRunning: false });
-    expect(spawnCalls).toEqual([
-      { cmd: '/root/.clawmetry/bin/python3', args: ['-m', 'clawmetry.sync'] },
-    ]);
-    expect(fakeChild.unref).toHaveBeenCalledOnce();
+    expect(await res.json()).toEqual({ ok: true, alreadyStarted: false });
+    expect(intentCalls).toEqual(['cm_abc123']);
   });
 
-  it('is idempotent — returns alreadyRunning:true when daemon exists', async () => {
-    const spawnSpy = vi.fn();
+  it('returns alreadyStarted:true when intent was already set on a prior call', async () => {
     const app = makeApp({
-      isAlreadyRunning: () => true,
-      spawn: spawnSpy as unknown as typeof import('node:child_process').spawn,
+      existsSync: () => true,
+      readFileSync: () => JSON.stringify({ api_key: 'cm_abc123' }),
+      intentStart: async () => ({ ok: true, alreadyStarted: true }),
     });
 
     const res = await app.request('/_kilo/clawmetry-start-sync', {
@@ -123,21 +127,46 @@ describe('POST /_kilo/clawmetry-start-sync', () => {
       headers: AUTH,
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, alreadyRunning: true });
-    expect(spawnSpy).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ ok: true, alreadyStarted: true });
   });
 
-  it('returns 500 when spawn throws', async () => {
+  it('returns 404 when bootstrap config is missing (provisioning never ran)', async () => {
     const app = makeApp({
-      isAlreadyRunning: () => false,
-      spawn: (() => {
-        throw new Error('ENOENT');
-      }) as typeof import('node:child_process').spawn,
+      existsSync: () => false,
+      intentStart: vi.fn(),
+    });
+    const res = await app.request('/_kilo/clawmetry-start-sync', {
+      method: 'POST',
+      headers: AUTH,
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 500 when config exists but is missing api_key', async () => {
+    const app = makeApp({
+      existsSync: () => true,
+      readFileSync: () => JSON.stringify({ node_id: 'x' }),
+      intentStart: vi.fn(),
     });
     const res = await app.request('/_kilo/clawmetry-start-sync', {
       method: 'POST',
       headers: AUTH,
     });
     expect(res.status).toBe(500);
+  });
+
+  it('returns 502 when intent-start upstream fails', async () => {
+    const app = makeApp({
+      existsSync: () => true,
+      readFileSync: () => JSON.stringify({ api_key: 'cm_abc123' }),
+      intentStart: async () => {
+        throw new Error('cloud unreachable');
+      },
+    });
+    const res = await app.request('/_kilo/clawmetry-start-sync', {
+      method: 'POST',
+      headers: AUTH,
+    });
+    expect(res.status).toBe(502);
   });
 });

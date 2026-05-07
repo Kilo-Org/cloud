@@ -12,7 +12,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync as nodeExecFileSync } from 'node:child_process';
+import { execFileSync as nodeExecFileSync, spawn as nodeSpawn } from 'node:child_process';
+import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import {
   generateBaseConfig,
   sanitizeLegacyStreamChatConfig,
@@ -82,6 +83,7 @@ export type BootstrapDeps = {
   readdirSync: (dir: string) => string[];
   statSync: (p: string) => { isDirectory: () => boolean };
   execFileSync: (cmd: string, args: string[], opts?: ExecOpts) => string;
+  spawn: (cmd: string, args: string[], opts?: SpawnOptions) => ChildProcess;
 };
 
 const defaultDeps: BootstrapDeps = {
@@ -103,6 +105,7 @@ const defaultDeps: BootstrapDeps = {
       env: opts?.env,
       input: opts?.input,
     }),
+  spawn: (cmd, args, opts) => nodeSpawn(cmd, args, opts ?? {}),
 };
 
 // ---- Controller state type ----
@@ -742,10 +745,21 @@ export function provisionClawMetrySync(env: EnvLike, deps: BootstrapDeps = defau
 
   // Build the same payload the standard `clawmetry connect` flow would.
   // Email is optional; account is keyed on machine_id either way.
-  const payload: { hostname: string; machine_id: string; platform: string; email?: string } = {
+  // `source: 'kiloclaw'` puts the account in deferred-sync mode on the
+  // ClawMetry cloud — heartbeats go through but every other upload path
+  // is gated until the user clicks "View Observability" (which fires
+  // /api/cloud/intent-start; see routes/clawmetry.ts).
+  const payload: {
+    hostname: string;
+    machine_id: string;
+    platform: string;
+    source: string;
+    email?: string;
+  } = {
     hostname,
     machine_id: machineId,
     platform: 'Linux',
+    source: 'kiloclaw',
   };
   if (userEmail) {
     payload.email = userEmail;
@@ -820,15 +834,35 @@ export function provisionClawMetrySync(env: EnvLike, deps: BootstrapDeps = defau
   deps.writeFileSync(CLAWMETRY_DASHBOARD_URL_PATH, dashboardUrl + '\n');
   deps.chmodSync(CLAWMETRY_DASHBOARD_URL_PATH, 0o600);
 
-  // Deliberately DO NOT spawn `clawmetry sync` here — see the deferred-sync
-  // note in the function docstring. KiloClaw's web UI starts the daemon on
-  // demand when the user clicks "View Observability" so we don't burn
-  // resources syncing data nobody is going to look at. The persisted local
-  // OpenClaw session files give the daemon a complete catch-up log to
-  // publish whenever it does start.
-  console.log(
-    `ClawMetry: provisioned (node=${nodeId}, E2E enabled) — sync deferred until user opens dashboard`
-  );
+  // Spawn the sync daemon here, at instance boot. With source='kiloclaw',
+  // the cloud-side /ingest/heartbeat will tell this daemon sync_allowed=
+  // false, reason='intent_pending' — so the daemon heartbeats every 60s
+  // (cheap, metadata only) but uploads zero session / event / log /
+  // memory data until the user clicks "View Observability". That click
+  // fires POST /api/cloud/intent-start, the cloud flips users.sync_intent_at,
+  // and the daemon's next heartbeat returns sync_allowed=true.
+  //
+  // Spawning at bootstrap (vs. on first click) eliminates the spawn-on-
+  // click race that previously left users staring at a "Run: clawmetry
+  // connect" banner during cold-start. The daemon is always there; only
+  // the data flow is deferred.
+  try {
+    const child = deps.spawn('/root/.clawmetry/bin/python3', ['-m', 'clawmetry.sync'], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+    console.log(
+      `ClawMetry: provisioned (node=${nodeId}, E2E enabled, daemon spawned) — sync deferred until user opens dashboard`
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Bootstrap should not fail because the daemon couldn't spawn — the
+    // gateway boot continues. Worst case: user clicks View Observability
+    // and start-sync fires intent-start, but no daemon is alive to pick
+    // it up. They'll see the dashboard chrome with empty data.
+    console.warn(`ClawMetry: daemon spawn failed (continuing) — ${message}`);
+  }
 }
 
 // ---- Step 7: Onboard / doctor + config patching ----

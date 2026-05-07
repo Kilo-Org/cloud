@@ -1,8 +1,7 @@
-// Finish reason / stop_reason / Responses API status values observed across
-// OpenAI & OpenRouter chat completions (stop, tool_calls, stop_sequence,
-// length, content_filter), Vercel AI SDK (tool-calls, content-filter),
-// Anthropic Messages (end_turn, tool_use, refusal, model_context_window_exceeded),
-// and the OpenAI Responses API (completed, failed, incomplete, in_progress).
+// The two lists below enumerate every distinct finish_reason / stop_reason /
+// Responses API status value observed in production microdollar_usage logs,
+// spanning OpenAI & OpenRouter chat completions, Vercel AI SDK, Anthropic
+// Messages, and the OpenAI Responses API.
 // `unknown` / `other` are kept as non-error catch-alls so a novel upstream
 // value does not immediately inflate the error rate.
 

@@ -4636,7 +4636,7 @@ export const transactional_email_log = pgTable(
       .primaryKey()
       .notNull(),
     user_id: text().references(() => kilocode_users.id),
-    organization_id: uuid().references(() => organizations.id),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     email_type: text().notNull(),
     idempotency_key: text().notNull(),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),

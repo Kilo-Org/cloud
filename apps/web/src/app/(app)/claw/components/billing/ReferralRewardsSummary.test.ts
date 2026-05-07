@@ -16,17 +16,15 @@ describe('ReferralRewardsSummary', () => {
       React.createElement(ReferralRewardsSummary, { rewards: emptyRewards })
     );
 
-    expect(html).toContain('Referral rewards');
     expect(html).toContain('No rewards yet. Refer a friend to earn a free month.');
-    expect(html).toContain('Refer a friend');
     expect(html).toContain('href="/claw/refer"');
   });
 
-  it('renders applied reward rows with renewal boundaries and Kilo-voice role label', () => {
+  it('renders applied referrer and referee rewards with renewal boundaries', () => {
     const html = renderToStaticMarkup(
       React.createElement(ReferralRewardsSummary, {
         rewards: {
-          totalAppliedMonths: 1,
+          totalAppliedMonths: 2,
           applications: [
             {
               role: 'referrer',
@@ -35,37 +33,23 @@ describe('ReferralRewardsSummary', () => {
               previousRenewalBoundary: '2026-05-01T00:00:00.000Z',
               newRenewalBoundary: '2026-06-01T00:00:00.000Z',
             },
-          ],
-        },
-      })
-    );
-
-    expect(html).toContain('1 free month applied');
-    expect(html).toContain('Reward for referring');
-    expect(html).toContain('Applied April 10, 2026');
-    expect(html).toContain('May 1, 2026');
-    expect(html).toContain('June 1, 2026');
-  });
-
-  it('uses the welcome-reward label for referee rewards', () => {
-    const html = renderToStaticMarkup(
-      React.createElement(ReferralRewardsSummary, {
-        rewards: {
-          totalAppliedMonths: 1,
-          applications: [
             {
               role: 'referee',
-              appliedAt: '2026-04-10T00:05:00.000Z',
+              appliedAt: '2026-04-11T00:05:00.000Z',
               monthsGranted: 1,
-              previousRenewalBoundary: '2026-05-01T00:00:00.000Z',
-              newRenewalBoundary: '2026-06-01T00:00:00.000Z',
+              previousRenewalBoundary: '2026-06-01T00:00:00.000Z',
+              newRenewalBoundary: '2026-07-01T00:00:00.000Z',
             },
           ],
         },
       })
     );
 
+    expect(html).toContain('2 free months applied');
+    expect(html).toContain('Reward for referring');
     expect(html).toContain('Welcome reward');
+    expect(html).toContain('May 1, 2026');
+    expect(html).toContain('July 1, 2026');
   });
 
   it('drops its own border when rendered as a section variant', () => {

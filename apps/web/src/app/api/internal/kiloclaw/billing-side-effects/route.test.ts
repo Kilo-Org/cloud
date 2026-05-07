@@ -240,7 +240,7 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
     });
   });
 
-  it('processes paid conversions and only enqueues affiliate sales when they win attribution', async () => {
+  it('processes paid conversions without enqueueing affiliate sales when referrals win attribution', async () => {
     mockProcessPersonalKiloClawPaidConversion.mockResolvedValueOnce({
       shouldEnqueueAffiliateSale: false,
       winningTouchType: 'referral',
@@ -283,6 +283,53 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
       winningTouchType: 'referral',
       conversionId: 'conversion_impact',
       disqualificationReason: null,
+    });
+  });
+
+  it('enqueues affiliate sales when paid conversion attribution returns an affiliate winner', async () => {
+    mockProcessPersonalKiloClawPaidConversion.mockResolvedValueOnce({
+      shouldEnqueueAffiliateSale: true,
+      winningTouchType: 'affiliate',
+      conversionId: 'conversion_affiliate',
+      disqualificationReason: 'referral_affiliate_won',
+    });
+
+    const response = await POST(
+      createRequest({
+        action: 'process_paid_conversion',
+        input: {
+          userId: 'user-123',
+          dedupeKey: 'affiliate:impact:sale:period-123',
+          eventDateIso: '2026-04-09T10:00:00.000Z',
+          orderId: 'period-123',
+          amount: 9,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-standard',
+          itemName: 'KiloClaw Standard Plan',
+          itemSku: 'price_standard',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEnqueueAffiliateEventForUser).toHaveBeenCalledWith({
+      userId: 'user-123',
+      provider: 'impact',
+      eventType: 'sale',
+      dedupeKey: 'affiliate:impact:sale:period-123',
+      eventDate: new Date('2026-04-09T10:00:00.000Z'),
+      orderId: 'period-123',
+      amount: 9,
+      currencyCode: 'usd',
+      itemCategory: 'kiloclaw-standard',
+      itemName: 'KiloClaw Standard Plan',
+      itemSku: 'price_standard',
+    });
+    await expect(response.json()).resolves.toEqual({
+      affiliateSaleEnqueued: true,
+      winningTouchType: 'affiliate',
+      conversionId: 'conversion_affiliate',
+      disqualificationReason: 'referral_affiliate_won',
     });
   });
 });

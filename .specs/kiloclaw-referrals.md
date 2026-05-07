@@ -201,7 +201,7 @@ interventions, and non-KiloClaw purchases are out of scope.
 28. At first paid KiloClaw conversion time, the system MUST evaluate valid affiliate and referral touches together.
 
 29. For KiloClaw conversions governed by this referral spec, referral-priority attribution overrides the permanent
-    first-touch affiliate attribution rules in `.specs/impact-affiliate-tracking.md`.
+    first-touch affiliate attribution rules in `.specs/kiloclaw-affiliates.md`.
 
 30. A valid referral touch MUST win over a valid affiliate touch unless the affiliate touch has already been
     sale-attributed before the referral touch occurred. Initial attribution for a not-yet-attributed SALE MUST prefer

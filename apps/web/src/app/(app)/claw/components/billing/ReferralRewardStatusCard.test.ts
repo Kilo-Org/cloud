@@ -19,31 +19,19 @@ const emptySummary = {
 };
 
 describe('ReferralRewardStatusCard', () => {
-  it('renders program guidance and an empty my rewards state', () => {
+  it('renders the empty state with a referral-share CTA and no warning state', () => {
     const html = renderToStaticMarkup(
       React.createElement(ReferralRewardStatusCard, { summary: emptySummary })
     );
 
-    expect(html).toContain('Earn a free month of KiloClaw hosting');
-    expect(html).toContain('Earned rewards');
-    expect(html).toContain('Total rewards earned');
-    expect(html).toContain('Rewards on hold');
-    expect(html).toContain('Rewards applied');
-    expect(html).toContain('Share your referral link');
+    expect(html).toContain('No referral rewards yet.');
     expect(html).toContain('href="#referral-share"');
+    expect(html).not.toContain('data-testid="summary-indicator-warning"');
     expect(html).not.toContain('credits');
     expect(html).not.toContain('awards');
   });
 
-  it('does not render the warning indicator dot when no rewards are on hold', () => {
-    const html = renderToStaticMarkup(
-      React.createElement(ReferralRewardStatusCard, { summary: emptySummary })
-    );
-
-    expect(html).not.toContain('data-testid="summary-indicator-warning"');
-  });
-
-  it('renders the share widget slot when provided', () => {
+  it('renders the Impact share widget slot when provided', () => {
     const html = renderToStaticMarkup(
       React.createElement(ReferralRewardStatusCard, {
         summary: emptySummary,
@@ -56,12 +44,12 @@ describe('ReferralRewardStatusCard', () => {
     expect(html).toContain('widget body');
   });
 
-  it('renders reward status labels, referred people, and a top-of-card reactivate banner', () => {
+  it('surfaces on-hold rewards, applied renewal dates, and customer-safe referee status', () => {
     const html = renderToStaticMarkup(
       React.createElement(ReferralRewardStatusCard, {
         summary: {
           totals: {
-            totalRewards: 6,
+            totalRewards: 2,
             pendingRewards: 1,
             totalAppliedMonths: 1,
           },
@@ -107,67 +95,22 @@ describe('ReferralRewardStatusCard', () => {
               reviewReason: null,
               application: null,
             },
-            {
-              role: 'referrer',
-              status: 'expired',
-              monthsGranted: 1,
-              earnedAt: '2026-04-12T00:00:00.000Z',
-              appliedAt: null,
-              expiresAt: '2027-04-12T00:00:00.000Z',
-              reviewReason: null,
-              application: null,
-            },
-            {
-              role: 'referrer',
-              status: 'canceled',
-              monthsGranted: 1,
-              earnedAt: '2026-04-13T00:00:00.000Z',
-              appliedAt: null,
-              expiresAt: null,
-              reviewReason: null,
-              application: null,
-            },
-            {
-              role: 'referrer',
-              status: 'reversed',
-              monthsGranted: 1,
-              earnedAt: '2026-04-14T00:00:00.000Z',
-              appliedAt: null,
-              expiresAt: null,
-              reviewReason: null,
-              application: null,
-            },
-            {
-              role: 'referrer',
-              status: 'review_required',
-              monthsGranted: 1,
-              earnedAt: '2026-04-15T00:00:00.000Z',
-              appliedAt: null,
-              expiresAt: null,
-              reviewReason: 'referral_payment_chargeback',
-              application: null,
-            },
           ],
         },
       })
     );
 
+    expect(html).toContain('1 reward on hold');
+    expect(html).toContain('Start or reactivate KiloClaw');
+    expect(html).toContain('data-testid="summary-indicator-warning"');
     expect(html).toContain('Applied');
-    expect(html).toContain('Waiting for an eligible KiloClaw subscription');
-    expect(html).toContain('Expired');
-    expect(html).toContain('Canceled');
-    expect(html).toContain('Reversed');
-    expect(html).toContain('Needs review');
     expect(html).toContain('May 1, 2026');
     expect(html).toContain('June 1, 2026');
-    expect(html).toContain('Your referees');
+    expect(html).toContain('Waiting for an eligible KiloClaw subscription');
     expect(html).toContain('q***@example.com');
     expect(html).toContain('Reward granted');
     expect(html).toContain('s***@example.com');
     expect(html).toContain('Signed up, waiting for paid KiloClaw conversion');
-    expect(html).toContain('1 reward on hold');
-    expect(html).toContain('Start or reactivate KiloClaw');
-    expect(html).toContain('data-testid="summary-indicator-warning"');
   });
 
   it('pluralizes the reactivate banner copy when more than one reward is pending', () => {

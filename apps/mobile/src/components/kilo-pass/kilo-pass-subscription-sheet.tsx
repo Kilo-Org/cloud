@@ -1,7 +1,5 @@
-import { Portal } from '@rn-primitives/portal';
 import { Check, X } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,8 +14,10 @@ type KiloPassSubscriptionSheetProps = {
   products: AppStoreKiloPassProduct[];
   isLoading: boolean;
   isPurchasing: boolean;
+  unavailableMessage: string | null;
   onClose: () => void;
   onPurchase: (product: AppStoreKiloPassProduct) => void;
+  onRetry: () => void;
 };
 
 function formatTier(product: AppStoreKiloPassProduct): string {
@@ -33,28 +33,19 @@ export function KiloPassSubscriptionSheet({
   products,
   isLoading,
   isPurchasing,
+  unavailableMessage,
   onClose,
   onPurchase,
+  onRetry,
 }: Readonly<KiloPassSubscriptionSheetProps>) {
   const colors = useThemeColors();
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const selectedProduct = useMemo(
-    () => products.find(product => product.appleProductId === selectedProductId) ?? products[0],
-    [products, selectedProductId]
-  );
-
-  useEffect(() => {
-    if (selectedProductId === null && products[0]) {
-      setSelectedProductId(products[0].appleProductId);
-    }
-  }, [products, selectedProductId]);
 
   if (!visible) {
     return null;
   }
 
   return (
-    <Portal name="kilo-pass-subscriptions">
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View className="absolute inset-0 justify-end bg-black/40">
         <Pressable
           className="flex-1"
@@ -101,75 +92,69 @@ export function KiloPassSubscriptionSheet({
                 <Skeleton key={index} className="h-[96px] w-full rounded-xl" />
               ))}
 
-            {!isLoading &&
-              products.map(product => {
-                const selected = product.appleProductId === selectedProduct?.appleProductId;
+            {!isLoading && products.length === 0 && (
+              <Pressable
+                accessibilityRole="button"
+                className="rounded-xl border border-border bg-card p-4 active:opacity-80"
+                disabled={isPurchasing}
+                onPress={onRetry}
+              >
+                <Text className="font-semibold text-foreground">
+                  App Store products unavailable
+                </Text>
+                <Text className="mt-1 text-sm text-muted-foreground">
+                  {unavailableMessage ?? 'Kilo Pass products could not be loaded from App Store.'}
+                </Text>
+                <Text className="mt-3 text-sm font-medium text-primary">Try again</Text>
+              </Pressable>
+            )}
 
-                return (
-                  <Pressable
-                    key={product.appleProductId}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    className={`rounded-xl border p-4 active:opacity-80 ${
-                      selected ? 'border-primary bg-secondary' : 'border-border bg-card'
-                    }`}
-                    disabled={isPurchasing}
-                    onPress={() => {
-                      setSelectedProductId(product.appleProductId);
-                    }}
-                  >
-                    <View className="flex-row items-start justify-between gap-3">
-                      <View className="flex-1 gap-1">
-                        <Text className="font-semibold text-foreground">
-                          {formatTier(product)} · {formatCadence(product)}
-                        </Text>
-                        <Text className="text-xs text-muted-foreground">
-                          Base credits plus monthly bonus progress.
-                        </Text>
-                      </View>
-                      <View className="items-end gap-2">
-                        <Text className="text-sm font-semibold text-foreground">
-                          {product.displayPrice}
-                        </Text>
-                        <View
-                          className={`h-5 w-5 items-center justify-center rounded-full border ${
-                            selected ? 'border-primary bg-primary' : 'border-border'
-                          }`}
-                        >
-                          {selected && <Check size={12} color={colors.primaryForeground} />}
-                        </View>
-                      </View>
-                    </View>
-                    <View className="mt-3 flex-row items-center gap-2">
-                      <Check size={14} color={colors.good} />
+            {!isLoading &&
+              products.map(product => (
+                <Pressable
+                  key={product.appleProductId}
+                  accessibilityRole="button"
+                  className="rounded-xl border border-border bg-card p-4 active:opacity-80"
+                  disabled={isPurchasing}
+                  onPress={() => {
+                    onPurchase(product);
+                  }}
+                >
+                  <View className="flex-row items-start justify-between gap-3">
+                    <View className="flex-1 gap-1">
+                      <Text className="font-semibold text-foreground">
+                        {formatTier(product)} · {formatCadence(product)}
+                      </Text>
                       <Text className="text-xs text-muted-foreground">
-                        Credits are added after store validation.
+                        Base credits plus monthly bonus progress.
                       </Text>
                     </View>
-                  </Pressable>
-                );
-              })}
+                    <View className="items-end gap-2">
+                      <Text className="text-sm font-semibold text-foreground">
+                        {product.displayPrice}
+                      </Text>
+                      <View className="h-5 w-5 items-center justify-center rounded-full border border-primary bg-primary">
+                        <Check size={12} color={colors.primaryForeground} />
+                      </View>
+                    </View>
+                  </View>
+                  <View className="mt-3 flex-row items-center gap-2">
+                    <Check size={14} color={colors.good} />
+                    <Text className="text-xs text-muted-foreground">
+                      Credits are added after store validation.
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
           </ScrollView>
 
-          <Button
-            className="mt-4"
-            disabled={isPurchasing || !selectedProduct}
-            onPress={() => {
-              if (selectedProduct) {
-                onPurchase(selectedProduct);
-              }
-            }}
-          >
-            {isPurchasing ? (
+          {isPurchasing && (
+            <Button className="mt-4" disabled>
               <ActivityIndicator size="small" color={colors.primaryForeground} />
-            ) : (
-              <Text>
-                {selectedProduct ? `Subscribe for ${selectedProduct.displayPrice}` : 'Subscribe'}
-              </Text>
-            )}
-          </Button>
+            </Button>
+          )}
         </View>
       </View>
-    </Portal>
+    </Modal>
   );
 }

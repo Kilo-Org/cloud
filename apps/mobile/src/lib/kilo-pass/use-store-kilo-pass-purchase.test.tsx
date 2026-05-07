@@ -78,6 +78,23 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     });
   });
 
+  it('shows an error when the App Store purchase request fails before opening the sheet', async () => {
+    const showError = vi.fn();
+    const actions = createAppStoreKiloPassPurchaseActions({
+      completeAppStorePurchase: vi.fn(),
+      finishTransaction: vi.fn(),
+      invalidateAfterCompletion: vi.fn(),
+      requestPurchase: vi.fn().mockRejectedValue(new Error('Could not connect to App Store')),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    await actions.purchase(product);
+
+    expect(showError).toHaveBeenCalledWith('Could not connect to App Store');
+  });
+
   it('does not finish the transaction when backend completion fails', async () => {
     const finishTransaction = vi.fn();
     const actions = createAppStoreKiloPassPurchaseActions({

@@ -31,6 +31,7 @@ export function KiloPassSubscriptionCard() {
 
   const subscription = stateQuery.data?.subscription;
   const cardState = getKiloPassSubscriptionCardState(subscription);
+
   const openAppStoreManagement = async () => {
     try {
       await showManageSubscriptionsIOS();
@@ -75,11 +76,15 @@ export function KiloPassSubscriptionCard() {
         products={productsQuery.products}
         isLoading={productsQuery.isLoading}
         isPurchasing={purchase.isPending}
+        unavailableMessage={productsQuery.errorMessage}
         onClose={() => {
           setSheetVisible(false);
         }}
         onPurchase={product => {
           void purchase.purchase(product);
+        }}
+        onRetry={() => {
+          void productsQuery.refetch();
         }}
       />
     </>

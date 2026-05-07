@@ -50,10 +50,16 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
 
   return {
     purchase: async (product: AppStoreKiloPassProduct) => {
-      await deps.requestPurchase({
-        request: { apple: { sku: product.appleProductId } },
-        type: 'subs',
-      });
+      try {
+        await deps.requestPurchase({
+          request: { apple: { sku: product.appleProductId } },
+          type: 'subs',
+        });
+      } catch (error) {
+        deps.showError(
+          error instanceof Error ? error.message : 'Failed to start App Store purchase.'
+        );
+      }
     },
     handlePurchaseSuccess,
     recoverPurchases: async (purchases: Purchase[]) => {

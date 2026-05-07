@@ -53,6 +53,7 @@ minimumReleaseAgeExclude:
   - 'react-native'
   - 'react-native-*'
   - '@anthropic-ai/sdk'
+  - '@apple/app-store-server-library'
 
 onlyBuiltDependencies:
   - '@swc/core'

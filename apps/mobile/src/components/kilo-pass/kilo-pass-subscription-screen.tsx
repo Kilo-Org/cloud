@@ -1,4 +1,4 @@
-import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
@@ -9,8 +9,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
 import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
-
-const KILO_PASS_INFO_URL = 'https://kilo.ai/features/kilo-pass';
 
 function formatTier(product: AppStoreKiloPassProduct): string {
   return `$${product.webMonthlyPriceUsd} credits`;
@@ -34,19 +32,6 @@ export function KiloPassSubscriptionScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title="Kilo Pass" modal />
       <View className="flex-1 px-5">
-        <View className="mb-5">
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel="How Kilo Pass works"
-            hitSlop={8}
-            onPress={() => {
-              void Linking.openURL(KILO_PASS_INFO_URL);
-            }}
-          >
-            <Text className="text-sm font-medium text-primary">How Kilo Pass works</Text>
-          </Pressable>
-        </View>
-
         <ScrollView
           className="-mx-1 flex-1"
           contentContainerClassName="gap-3 px-1 pb-6"

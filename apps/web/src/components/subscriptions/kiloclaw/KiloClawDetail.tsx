@@ -342,6 +342,32 @@ export function KiloClawDetail({ instanceId }: { instanceId: string }) {
             </Button>
           )}
 
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const t = toast.loading('Starting ClawMetry sync…');
+              try {
+                const res = await fetch(
+                  `/api/kiloclaw/clawmetry/${encodeURIComponent(instanceId)}`,
+                  {
+                    method: 'POST',
+                  }
+                );
+                const body = (await res.json()) as { url?: string; error?: string };
+                if (!res.ok || !body.url) {
+                  toast.error(body.error ?? 'Could not open observability dashboard', { id: t });
+                  return;
+                }
+                toast.success('Opening ClawMetry — syncing your data…', { id: t });
+                window.open(body.url, '_blank', 'noopener,noreferrer');
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'Network error', { id: t });
+              }
+            }}
+          >
+            View Observability
+          </Button>
+
           {subscription.showConversionPrompt ? (
             <Button variant="outline" onClick={() => setConfirmationAction('switchToCredits')}>
               Switch to Credits

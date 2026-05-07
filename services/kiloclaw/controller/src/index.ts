@@ -42,6 +42,7 @@ import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
 import { registerKiloCliRunRoutes } from './routes/kilo-cli-run';
 import { registerMorningBriefingRoutes } from './routes/morning-briefing';
+import { registerClawmetryRoutes } from './routes/clawmetry';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
 import { writeGogCredentials } from './gog-credentials';
@@ -448,6 +449,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   registerInboundEmailRoute(honoApp, supervisor, config.expectedToken, config.hooksToken);
   registerFileRoutes(honoApp, config.expectedToken, '/root/.openclaw');
   registerKiloCliRunRoutes(honoApp, config.expectedToken);
+  registerClawmetryRoutes(honoApp, config.expectedToken);
   honoApp.all(
     '*',
     createHttpProxy({

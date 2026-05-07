@@ -366,7 +366,7 @@ describe('northflankProviderAdapter', () => {
     });
 
     const createPayload = vi.mocked(createDeploymentService).mock.calls[0]?.[2];
-    expect(createPayload?.billing.deploymentPlan).toBe('nf-compute-200');
+    expect(createPayload?.billing.deploymentPlan).toBe('nf-compute-400-16');
   });
 
   it('falls back and warns for legacy Northflank tier labels', async () => {
@@ -498,7 +498,7 @@ describe('northflankProviderAdapter', () => {
       expect.anything(),
       'project-1',
       'service-1',
-      { billing: { deploymentPlan: 'nf-compute-200' } }
+      { billing: { deploymentPlan: 'nf-compute-400' } }
     );
     expect(waitForDeploymentCompleted).not.toHaveBeenCalled();
   });

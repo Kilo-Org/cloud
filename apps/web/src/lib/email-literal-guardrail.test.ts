@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
-import { join, relative } from 'path';
+import { extname, join, relative } from 'path';
 
 const EMAIL_REGEX = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.mdx']);
@@ -36,7 +36,7 @@ function listProductionSourceFiles(dir: string): string[] {
       continue;
     }
 
-    if (!SOURCE_EXTENSIONS.has(path.slice(path.lastIndexOf('.')))) continue;
+    if (!SOURCE_EXTENSIONS.has(extname(path))) continue;
     if (path.endsWith('.test.ts') || path.endsWith('.test.tsx')) continue;
     files.push(path);
   }

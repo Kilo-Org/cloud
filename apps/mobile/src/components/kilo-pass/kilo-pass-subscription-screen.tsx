@@ -1,4 +1,3 @@
-import { Check } from 'lucide-react-native';
 import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,11 +13,15 @@ import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-pu
 const KILO_PASS_INFO_URL = 'https://kilo.ai/features/kilo-pass';
 
 function formatTier(product: AppStoreKiloPassProduct): string {
-  return `$${product.webMonthlyPriceUsd}/mo credits`;
+  return `$${product.webMonthlyPriceUsd} credits`;
 }
 
 function formatCadence(product: AppStoreKiloPassProduct): string {
   return product.cadence === 'yearly' ? 'Yearly' : 'Monthly';
+}
+
+function formatStorePrice(product: AppStoreKiloPassProduct): string {
+  return `${product.displayPrice}/${product.cadence === 'yearly' ? 'yr' : 'mo'}`;
 }
 
 export function KiloPassSubscriptionScreen() {
@@ -31,7 +34,7 @@ export function KiloPassSubscriptionScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title="Kilo Pass" modal />
       <View className="flex-1 px-5">
-        <View className="mb-4 gap-1">
+        <View className="mb-5">
           <Pressable
             accessibilityRole="link"
             accessibilityLabel="How Kilo Pass works"
@@ -42,7 +45,6 @@ export function KiloPassSubscriptionScreen() {
           >
             <Text className="text-sm font-medium text-primary">How Kilo Pass works</Text>
           </Pressable>
-          <Text className="text-sm text-muted-foreground">App Store subscription</Text>
         </View>
 
         <ScrollView
@@ -51,12 +53,14 @@ export function KiloPassSubscriptionScreen() {
           showsVerticalScrollIndicator={false}
         >
           {productsQuery.isLoading &&
-            [0, 1, 2].map(index => <Skeleton key={index} className="h-[96px] w-full rounded-xl" />)}
+            [0, 1, 2].map(index => (
+              <Skeleton key={index} className="h-[112px] w-full rounded-xl" />
+            ))}
 
           {!productsQuery.isLoading && productsQuery.products.length === 0 && (
             <Pressable
               accessibilityRole="button"
-              className="rounded-xl border border-border bg-card p-4 active:opacity-80"
+              className="rounded-xl border border-border bg-card p-5 active:opacity-80"
               disabled={purchase.isPending}
               onPress={() => {
                 void productsQuery.refetch();
@@ -76,14 +80,14 @@ export function KiloPassSubscriptionScreen() {
               <Pressable
                 key={product.appleProductId}
                 accessibilityRole="button"
-                className="rounded-xl border border-border bg-card p-4 active:opacity-80"
+                className="rounded-xl border border-border bg-card p-5 active:opacity-80"
                 disabled={purchase.isPending}
                 onPress={() => {
                   void purchase.purchase(product);
                 }}
               >
-                <View className="flex-row items-start justify-between gap-3">
-                  <View className="flex-1 gap-1">
+                <View className="flex-row items-start justify-between gap-4">
+                  <View className="flex-1 gap-1.5">
                     <Text className="font-semibold text-foreground">
                       {formatTier(product)} · {formatCadence(product)}
                     </Text>
@@ -91,19 +95,8 @@ export function KiloPassSubscriptionScreen() {
                       Base credits plus monthly bonus progress.
                     </Text>
                   </View>
-                  <View className="items-end gap-2">
-                    <Text className="text-sm font-semibold text-foreground">
-                      {product.displayPrice}
-                    </Text>
-                    <View className="h-5 w-5 items-center justify-center rounded-full border border-primary bg-primary">
-                      <Check size={12} color={colors.primaryForeground} />
-                    </View>
-                  </View>
-                </View>
-                <View className="mt-3 flex-row items-center gap-2">
-                  <Check size={14} color={colors.good} />
-                  <Text className="text-xs text-muted-foreground">
-                    Credits are added after store validation.
+                  <Text className="text-base font-semibold text-foreground tabular-nums">
+                    {formatStorePrice(product)}
                   </Text>
                 </View>
               </Pressable>

@@ -19,11 +19,13 @@ import { ChannelPairingStepView } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
+import { CalendarConnectStepView } from './CalendarConnectStep';
 import { ClawSetupCompleteStep, ClawSetupErrorStep } from './ClawOnboardingFlow';
 import { ProvisioningStepView } from './ProvisioningStep';
 
 const FAKE_STEP_LABELS: Record<ClawOnboardingRenderStep, string> = {
   identity: 'Identity',
+  calendar: 'Calendar',
   channels: 'Channels',
   provisioning: 'Provisioning',
   pairing: 'Pairing',
@@ -189,6 +191,7 @@ function getFakeStepProgress(
 function getFakeOnboardingStep(step: ClawOnboardingRenderStep): OnboardingStep {
   switch (step) {
     case 'identity':
+    case 'calendar':
     case 'channels':
     case 'provisioning':
     case 'pairing':
@@ -210,7 +213,21 @@ function renderFakeStep({
 }: RenderFakeStepInput) {
   switch (step) {
     case 'identity': {
-      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('channels')} />;
+      return <BotIdentityStep {...stepProgress} onContinue={() => setStep('calendar')} />;
+    }
+    case 'calendar': {
+      return (
+        <CalendarConnectStepView
+          {...stepProgress}
+          connectUrl="#"
+          isConnected={false}
+          connectedAccountEmail={null}
+          readyToConnect={true}
+          onConnectClick={() => setStep('channels')}
+          onSkip={() => setStep('channels')}
+          onContinue={() => setStep('channels')}
+        />
+      );
     }
     case 'channels': {
       return (

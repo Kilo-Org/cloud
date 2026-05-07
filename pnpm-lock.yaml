@@ -482,6 +482,9 @@ importers:
       '@chat-adapter/github':
         specifier: 4.27.0
         version: 4.27.0
+      '@chat-adapter/linear':
+        specifier: ^4.27.0
+        version: 4.27.0
       '@chat-adapter/slack':
         specifier: ^4.27.0
         version: 4.27.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
@@ -524,6 +527,9 @@ importers:
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
+      '@linear/sdk':
+        specifier: ^76.0.0
+        version: 76.0.0
       '@lottiefiles/dotlottie-react':
         specifier: ^0.17.15
         version: 0.17.15(react@19.2.4)
@@ -3343,6 +3349,9 @@ packages:
   '@chat-adapter/github@4.27.0':
     resolution: {integrity: sha512-3/lz5oo/z18H90c89FAXomHnmbXx+E55Nl4jfjtgq4FEUcEI9BU+tbkVANpkQ54tHTEPmhxfg/qJ3mJPctk5hg==}
 
+  '@chat-adapter/linear@4.27.0':
+    resolution: {integrity: sha512-B3zcdPw7L20EylAE58wAJAmKUyBQp+RWE3yPDyEHLPudwOjL8C59ay2djBfQ0Zknxd9S7lSJtVguz7TO6/QEkw==}
+
   '@chat-adapter/shared@4.27.0':
     resolution: {integrity: sha512-Wz+YZ8Mp2/qcxxJ+rU0ofZQSEtOF/4toEh7wbA+q+uLlPrLue+7hImWluJpQUZqGjSwsUoXhjSNwgFv3hz20aQ==}
 
@@ -4165,6 +4174,11 @@ packages:
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
 
+  '@graphql-typed-document-node/core@3.2.0':
+    resolution: {integrity: sha512-mB9oAsNCm9aM3/SOv4YtBMqZbYj10R7dkq8byBqxGY/ncFwhf2oQzMV+LCRlWoDSEBJ3COiR1yeDvMtsoOsuFQ==}
+    peerDependencies:
+      graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
+
   '@hapi/hoek@9.3.0':
     resolution: {integrity: sha512-/c6rf4UJlmHlC9b5BaNvzAcFv7HZ2QHaV0D4/HNlBdvFnvQq8RI4kYdhyPCl7Xj+oWvTWQ8ujhqS53LIgAe6KQ==}
 
@@ -4802,6 +4816,10 @@ packages:
 
   '@lezer/yaml@1.0.4':
     resolution: {integrity: sha512-2lrrHqxalACEbxIbsjhqGpSW8kWpUKuY6RHgnSAFZa6qK62wvnPxA8hGOwOoDbwHcOFs5M4o27mjGu+P7TvBmw==}
+
+  '@linear/sdk@76.0.0':
+    resolution: {integrity: sha512-Xt0x5Kl6qBoWhGFypb8ykyP+c5kT7scmRPs1uJidSPOaRgkMJ/4y41QpmZCWCBUMmZtf/O0VktgQio6rLXT94w==}
+    engines: {node: '>=18.x'}
 
   '@lottiefiles/dotlottie-react@0.17.15':
     resolution: {integrity: sha512-4wYAjsJhM28eUvJ/gT3KRM6fcyT7EM9n7PDrP71LaBTacc6bSN43qFTSJc1Li3QxUiraz23p0Q8EJBzXo8DsRw==}
@@ -16942,6 +16960,15 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@chat-adapter/linear@4.27.0':
+    dependencies:
+      '@chat-adapter/shared': 4.27.0
+      '@linear/sdk': 76.0.0
+      chat: 4.27.0
+    transitivePeerDependencies:
+      - graphql
+      - supports-color
+
   '@chat-adapter/shared@4.27.0':
     dependencies:
       chat: 4.27.0
@@ -18110,6 +18137,8 @@ snapshots:
 
   '@floating-ui/utils@0.2.11': {}
 
+  '@graphql-typed-document-node/core@3.2.0': {}
+
   '@hapi/hoek@9.3.0': {}
 
   '@hapi/topo@5.1.0':
@@ -18951,6 +18980,12 @@ snapshots:
       '@lezer/common': 1.5.2
       '@lezer/highlight': 1.2.3
       '@lezer/lr': 1.4.10
+
+  '@linear/sdk@76.0.0':
+    dependencies:
+      '@graphql-typed-document-node/core': 3.2.0
+    transitivePeerDependencies:
+      - graphql
 
   '@lottiefiles/dotlottie-react@0.17.15(react@19.2.4)':
     dependencies:

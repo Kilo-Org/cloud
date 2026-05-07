@@ -124,6 +124,15 @@ export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
 
+// Linear (bot integration)
+// @chat-adapter/linear 4.27 does not (yet) support encryption-at-rest via
+// an `encryptionKey` config option the way @chat-adapter/slack does; the
+// adapter stores installations (including OAuth tokens) via the configured
+// Chat SDK state adapter. Revisit when the adapter exposes an encryption key.
+export const LINEAR_CLIENT_ID = getEnvVariable('LINEAR_CLIENT_ID');
+export const LINEAR_CLIENT_SECRET = getEnvVariable('LINEAR_CLIENT_SECRET');
+export const LINEAR_WEBHOOK_SECRET = getEnvVariable('LINEAR_WEBHOOK_SECRET');
+
 // Discord (bot integration — existing)
 export const DISCORD_CLIENT_ID = getEnvVariable('DISCORD_CLIENT_ID');
 export const DISCORD_CLIENT_SECRET = getEnvVariable('DISCORD_CLIENT_SECRET');

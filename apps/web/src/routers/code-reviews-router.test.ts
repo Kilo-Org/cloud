@@ -87,7 +87,7 @@ describe('codeReviewRouter.cancel', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user');
+    expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user', 1);
     expect(storedReview?.status).toBe('cancelled');
     expect(storedReview?.completed_at).toBeTruthy();
   });
@@ -126,7 +126,7 @@ describe('codeReviewRouter.cancel', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user');
+    expect(mockCancelReview).toHaveBeenCalledWith(review.id, 'Cancelled by user', 1);
     expect(storedReview?.status).toBe('cancelled');
     expect(storedReview?.completed_at).toBeTruthy();
   });

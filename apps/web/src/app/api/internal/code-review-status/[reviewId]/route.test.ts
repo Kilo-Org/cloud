@@ -2,6 +2,7 @@ import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import type { NextRequest } from 'next/server';
 import type * as codeReviewsDbModule from '@/lib/code-reviews/db/code-reviews';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
+import type * as sandboxRetryModule from '@/lib/code-reviews/sandbox-retry';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 
 // --- Mock functions ---
@@ -9,8 +10,8 @@ import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 const mockGetCodeReviewById = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.getCodeReviewById
 >;
-const mockUpdateCodeReviewStatus = jest.fn() as jest.MockedFunction<
-  typeof codeReviewsDbModule.updateCodeReviewStatus
+const mockUpdateCodeReviewStatusForAttempt = jest.fn() as jest.MockedFunction<
+  typeof codeReviewsDbModule.updateCodeReviewStatusForAttempt
 >;
 const mockUpdateCodeReviewUsage = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.updateCodeReviewUsage
@@ -20,6 +21,9 @@ const mockGetSessionUsageFromBilling = jest.fn() as jest.MockedFunction<
 >;
 const mockGetIntegrationById = jest.fn() as jest.MockedFunction<
   typeof platformIntegrationsModule.getIntegrationById
+>;
+const mockClaimAndDispatchCodeReviewSandboxRetries = jest.fn() as jest.MockedFunction<
+  typeof sandboxRetryModule.claimAndDispatchCodeReviewSandboxRetries
 >;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockTryDispatchPendingReviews = jest.fn<any>();
@@ -62,9 +66,13 @@ jest.mock('@/lib/config.server', () => ({
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   getCodeReviewById: mockGetCodeReviewById,
-  updateCodeReviewStatus: mockUpdateCodeReviewStatus,
+  updateCodeReviewStatusForAttempt: mockUpdateCodeReviewStatusForAttempt,
   updateCodeReviewUsage: mockUpdateCodeReviewUsage,
   getSessionUsageFromBilling: mockGetSessionUsageFromBilling,
+}));
+
+jest.mock('@/lib/code-reviews/sandbox-retry', () => ({
+  claimAndDispatchCodeReviewSandboxRetries: mockClaimAndDispatchCodeReviewSandboxRetries,
 }));
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
@@ -129,6 +137,7 @@ function makeRequest(body: Record<string, unknown>, secret = VALID_SECRET): Next
     headers: {
       get: (name: string) => (name === 'X-Internal-Secret' ? secret : null),
     },
+    nextUrl: new URL('https://test.kilo.ai/api/internal/code-review-status/test'),
     json: () => Promise.resolve(body),
   } as unknown as NextRequest;
 }
@@ -156,6 +165,11 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     platform_project_id: null,
     session_id: null,
     cli_session_id: null,
+    sandbox_id: null,
+    sandbox_retry_count: 0,
+    sandbox_retry_reason: null,
+    sandbox_retry_at: null,
+    current_attempt: 1,
     status: 'running',
     error_message: null,
     terminal_reason: null,
@@ -181,7 +195,11 @@ let POST: typeof POSTType;
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  mockUpdateCodeReviewStatus.mockResolvedValue(undefined);
+  mockUpdateCodeReviewStatusForAttempt.mockResolvedValue(true);
+  mockClaimAndDispatchCodeReviewSandboxRetries.mockResolvedValue({
+    claimed: 0,
+    dispatchedOwners: 0,
+  });
   mockTryDispatchPendingReviews.mockResolvedValue(undefined);
   mockGetBotUserId.mockResolvedValue(null);
   mockGetIntegrationById.mockResolvedValue({
@@ -230,8 +248,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusForAttempt).toHaveBeenCalledWith(
         REVIEW_ID,
+        1,
         'cancelled',
         expect.objectContaining({ errorMessage: 'User interrupted' })
       );
@@ -250,8 +269,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusForAttempt).toHaveBeenCalledWith(
         REVIEW_ID,
+        1,
         'failed',
         expect.objectContaining({
           errorMessage: 'Insufficient credits: $1 minimum required',
@@ -272,8 +292,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusForAttempt).toHaveBeenCalledWith(
         REVIEW_ID,
+        1,
         'failed',
         expect.objectContaining({
           errorMessage: 'This is a paid model. To use paid models, you need to add credits.',
@@ -294,8 +315,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusForAttempt).toHaveBeenCalledWith(
         REVIEW_ID,
+        1,
         'failed',
         expect.objectContaining({
           errorMessage: 'Add credits to continue, or switch to a free model',
@@ -316,8 +338,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusForAttempt).toHaveBeenCalledWith(
         REVIEW_ID,
+        1,
         'cancelled',
         expect.objectContaining({
           errorMessage: 'User cancelled the review',
@@ -339,8 +362,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusForAttempt).toHaveBeenCalledWith(
         REVIEW_ID,
+        1,
         'failed',
         expect.objectContaining({
           terminalReason: 'billing',
@@ -362,10 +386,55 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeParams(REVIEW_ID)
       );
 
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusForAttempt).toHaveBeenCalledWith(
         REVIEW_ID,
+        1,
         'failed',
         expect.objectContaining({ terminalReason: 'timeout' })
+      );
+    });
+
+    it('accepts sandbox_error terminalReason', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          terminalReason: 'sandbox_error',
+          sandboxId: 'usr-sandbox',
+          errorMessage: 'Sandbox destroyed after 500',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatusForAttempt).toHaveBeenCalledWith(
+        REVIEW_ID,
+        1,
+        'failed',
+        expect.objectContaining({
+          terminalReason: 'sandbox_error',
+          sandboxId: 'usr-sandbox',
+        })
+      );
+      expect(mockClaimAndDispatchCodeReviewSandboxRetries).toHaveBeenCalledWith({
+        sandboxId: 'usr-sandbox',
+        source: 'sandbox-error-status-callback',
+      });
+    });
+
+    it('persists sandboxId from running callbacks', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'queued' }));
+
+      await POST(
+        makeRequest({ status: 'running', sandboxId: 'usr-sandbox' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewStatusForAttempt).toHaveBeenCalledWith(
+        REVIEW_ID,
+        1,
+        'running',
+        expect.objectContaining({ sandboxId: 'usr-sandbox' })
       );
     });
 
@@ -374,11 +443,28 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
-      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+      expect(mockUpdateCodeReviewStatusForAttempt).toHaveBeenCalledWith(
         REVIEW_ID,
+        1,
         'completed',
         expect.objectContaining({ terminalReason: undefined })
       );
+    });
+
+    it('ignores stale callback attempts before gate updates', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ current_attempt: 2 }));
+
+      const response = await POST(
+        makeRequest({ status: 'failed', attempt: 1, errorMessage: 'old failure' }),
+        makeParams(REVIEW_ID)
+      );
+
+      await expect(response.json()).resolves.toMatchObject({
+        success: true,
+        message: 'Stale callback attempt ignored',
+      });
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatusForAttempt).not.toHaveBeenCalled();
     });
   });
 

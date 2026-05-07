@@ -96,6 +96,7 @@ async function prepareSessionWithCallback(
     gitUrl: 'https://example.com/repo.git',
     gitToken: 'git-token',
     callbackTarget: { url: 'https://example.com/callback' },
+    sandboxId: 'usr-c0ffee',
   });
   expect(prepareResult.success).toBe(true);
 }
@@ -141,6 +142,7 @@ describe('Callback notification with latest assistant message', () => {
     expect(queue.captured).toHaveLength(1);
     const [job] = queue.captured;
     expect(job.payload.status).toBe('completed');
+    expect(job.payload.sandboxId).toBe('usr-c0ffee');
     expect(job.payload.lastAssistantMessageText).toBe('Hello world');
     expect(job.target.url).toBe('https://example.com/callback');
   });

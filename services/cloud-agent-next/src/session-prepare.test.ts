@@ -28,6 +28,7 @@ const createMockSandbox = () => {
     createSession: vi.fn().mockResolvedValue(mockSession),
     listProcesses: vi.fn().mockResolvedValue([]),
     mkdir: vi.fn().mockResolvedValue(undefined),
+    destroy: vi.fn().mockResolvedValue(undefined),
   };
 };
 
@@ -141,6 +142,8 @@ function createMockDOStub(
     updateMetadata: overrides.updateMetadata ?? vi.fn().mockResolvedValue(undefined),
     deleteSession: overrides.deleteSession ?? vi.fn().mockResolvedValue(undefined),
     markAsInterrupted: vi.fn().mockResolvedValue(undefined),
+    registerSession: vi.fn().mockResolvedValue({ success: true }),
+    startPreparationAsync: vi.fn().mockResolvedValue(undefined),
     isInterrupted: vi.fn().mockResolvedValue(false),
     clearInterrupted: vi.fn().mockResolvedValue(undefined),
     updateKiloSessionId: vi.fn().mockResolvedValue(undefined),
@@ -316,6 +319,7 @@ describe('prepareSession endpoint', () => {
 
       expect(result.cloudAgentSessionId).toMatch(/^agent_[0-9a-f-]+$/);
       expect(result.kiloSessionId).toBe('cli-session-abc123');
+      expect(result.sandboxId).toMatch(/^usr-[0-9a-f]+$/);
       expect(doStub.prepare).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionId: expect.stringMatching(/^agent_/) as unknown,
@@ -347,6 +351,7 @@ describe('prepareSession endpoint', () => {
 
       expect(result.cloudAgentSessionId).toBeDefined();
       expect(result.kiloSessionId).toBe('cli-session-abc123');
+      expect(result.sandboxId).toMatch(/^usr-[0-9a-f]+$/);
       expect(doStub.prepare).toHaveBeenCalledWith(
         expect.objectContaining({
           gitUrl: 'https://gitlab.com/org/repo.git',
@@ -1145,6 +1150,7 @@ describe('integration flow tests', () => {
 
       expect(prepareResult.cloudAgentSessionId).toBeDefined();
       expect(prepareResult.kiloSessionId).toBeDefined();
+      expect(prepareResult.sandboxId).toBeDefined();
 
       // 2. Update session
       const updateStub = createMockDOStub({

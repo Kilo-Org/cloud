@@ -191,6 +191,10 @@ export type CloudAgentSessionState = {
   branchName?: string;
   /** Sandbox ID where the session runs */
   sandboxId?: SandboxId;
+  /** Last-known sandbox health for recovery/preflight checks. */
+  sandboxStatus?: 'healthy' | 'destroyed' | 'unhealthy';
+  sandboxDestroyedAt?: string;
+  sandboxFailureReason?: string;
 
   // Initial message ID for correlation
   initialMessageId?: string;
@@ -245,6 +249,8 @@ export type PersistenceEnv = {
 
   /** Shared secret for internal service-to-service authentication */
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
+  /** Shared secret for backend-to-backend HTTP calls. */
+  INTERNAL_API_SECRET?: string;
 
   R2_ENDPOINT?: string;
   R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID?: string;

@@ -39,6 +39,7 @@ export type CloudAgentPrepareSessionInput = {
 export type CloudAgentPrepareSessionOutput = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
+  sandboxId: string;
 };
 
 export type CloudAgentInitiateInput = {
@@ -99,17 +100,103 @@ export type CloudAgentTerminalReason =
   | 'interrupted'
   | 'timeout'
   | 'upstream_error'
+  | 'sandbox_error'
   | 'unknown';
+
+export const SANDBOX_DESTROYED_AFTER_500_ERROR = 'SANDBOX_DESTROYED_AFTER_500' as const;
+
+export type CloudAgentNextSandboxDestroyedErrorData = {
+  code: typeof SANDBOX_DESTROYED_AFTER_500_ERROR;
+  sandboxId?: string;
+  phase?: string;
+  sessionId?: string;
+  destroyedAt?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getStringProperty(value: Record<string, unknown>, key: string): string | undefined {
+  const property = value[key];
+  return typeof property === 'string' ? property : undefined;
+}
+
+function parseJsonObject(value: string): unknown {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function readSandboxDestroyedData(
+  value: unknown
+): CloudAgentNextSandboxDestroyedErrorData | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const marker = getStringProperty(value, 'error') ?? getStringProperty(value, 'code');
+  if (marker === SANDBOX_DESTROYED_AFTER_500_ERROR) {
+    const sessionId =
+      getStringProperty(value, 'sessionId') ?? getStringProperty(value, 'triggeringSessionId');
+    const data: CloudAgentNextSandboxDestroyedErrorData = {
+      code: SANDBOX_DESTROYED_AFTER_500_ERROR,
+      sandboxId: getStringProperty(value, 'sandboxId'),
+      phase: getStringProperty(value, 'phase'),
+      destroyedAt: getStringProperty(value, 'destroyedAt'),
+    };
+    if (sessionId) data.sessionId = sessionId;
+    return data;
+  }
+
+  const error = value.error;
+  if (isRecord(error)) {
+    const fromError = readSandboxDestroyedData(error);
+    if (fromError) return fromError;
+  }
+
+  const data = value.data;
+  if (isRecord(data)) {
+    const fromData = readSandboxDestroyedData(data);
+    if (fromData) return fromData;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const fromItem = readSandboxDestroyedData(item);
+      if (fromItem) return fromItem;
+    }
+  }
+
+  return undefined;
+}
+
+export function parseCloudAgentNextSandboxDestroyedError(
+  body: string
+): CloudAgentNextSandboxDestroyedErrorData | undefined {
+  return readSandboxDestroyedData(parseJsonObject(body));
+}
+
+export function getCloudAgentNextSandboxDestroyedError(
+  error: unknown
+): CloudAgentNextSandboxDestroyedErrorData | undefined {
+  if (error instanceof CloudAgentNextError) {
+    return error.sandboxDestroyedAfter500;
+  }
+  return undefined;
+}
 
 export class CloudAgentNextError extends Error {
   readonly status: number;
   readonly body: string;
+  readonly sandboxDestroyedAfter500?: CloudAgentNextSandboxDestroyedErrorData;
 
   constructor(procedure: string, status: number, body: string) {
     super(`${procedure} failed (${status}): ${body}`);
     this.name = 'CloudAgentNextError';
     this.status = status;
     this.body = body;
+    this.sandboxDestroyedAfter500 = parseCloudAgentNextSandboxDestroyedError(body);
   }
 }
 
@@ -211,7 +298,11 @@ export function createCloudAgentNextFetchClient(baseUrl: string): CloudAgentNext
         input,
         'prepareSession'
       );
-      if (typeof data.cloudAgentSessionId !== 'string' || typeof data.kiloSessionId !== 'string') {
+      if (
+        typeof data.cloudAgentSessionId !== 'string' ||
+        typeof data.kiloSessionId !== 'string' ||
+        typeof data.sandboxId !== 'string'
+      ) {
         throw new Error(
           `Unexpected prepareSession response shape: ${JSON.stringify(data).slice(0, 500)}`
         );

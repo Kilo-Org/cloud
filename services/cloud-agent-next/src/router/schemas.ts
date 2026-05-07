@@ -298,6 +298,7 @@ export const PrepareSessionInput = z
 export const PrepareSessionOutput = z.object({
   cloudAgentSessionId: z.string().describe('The generated cloud-agent session ID'),
   kiloSessionId: z.string().describe('The Kilo CLI session ID'),
+  sandboxId: z.string().describe('The cloud-agent sandbox ID associated with this session'),
 });
 
 /**

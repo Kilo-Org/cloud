@@ -97,6 +97,40 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
   });
 
+  it('status route can read attempt-aware DO state', async () => {
+    const reviewId = crypto.randomUUID();
+    const attemptOneStub = getReviewStub(reviewId);
+    const attemptTwoStub = getReviewStub(`${reviewId}:2`);
+    await attemptOneStub.start({
+      reviewId,
+      attempt: 1,
+      authToken: 'test-auth-token',
+      sessionInput: sessionInput(),
+      owner: { type: 'user', id: 'user-id', userId: 'user-id' },
+      agentVersion: 'v2',
+    });
+    await attemptTwoStub.start({
+      reviewId,
+      attempt: 2,
+      authToken: 'test-auth-token',
+      sessionInput: sessionInput(),
+      owner: { type: 'user', id: 'user-id', userId: 'user-id' },
+      agentVersion: 'v2',
+    });
+
+    const attemptTwoResponse = await SELF.fetch(
+      `https://worker.test/reviews/${reviewId}/status?attempt=2`,
+      { headers: workerAuthHeaders() }
+    );
+
+    expect(attemptTwoResponse.status).toBe(200);
+    await expect(attemptTwoResponse.json()).resolves.toMatchObject({
+      reviewId,
+      attempt: 2,
+      status: 'queued',
+    });
+  });
+
   it('queued review alarm retries runReview and transitions to running', async () => {
     const stub = getReviewStub();
     const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
@@ -110,6 +144,7 @@ describe('CodeReviewOrchestrator recovery', () => {
             data: {
               cloudAgentSessionId: 'agent-test-session',
               kiloSessionId: 'ses_test_session',
+              sandboxId: 'usr-test-sandbox',
             },
           },
         });
@@ -134,6 +169,7 @@ describe('CodeReviewOrchestrator recovery', () => {
       status: 'running',
       sessionId: 'agent-test-session',
       cliSessionId: 'ses_test_session',
+      sandboxId: 'usr-test-sandbox',
     });
     expect(fetchMock).toHaveBeenCalledWith(
       'https://cloud-agent-next.example.test/trpc/prepareSession',
@@ -143,6 +179,14 @@ describe('CodeReviewOrchestrator recovery', () => {
       'https://cloud-agent-next.example.test/trpc/initiateFromKilocodeSessionV2',
       expect.any(Object)
     );
+    const prepareCall = fetchMock.mock.calls.find(([request]) =>
+      String(request).includes('/trpc/prepareSession')
+    );
+    expect(prepareCall).toBeDefined();
+    const prepareBody = JSON.parse((prepareCall?.[1] as RequestInit).body as string) as {
+      callbackTarget?: { url?: string };
+    };
+    expect(prepareBody.callbackTarget?.url).toContain('attempt=1');
   });
 
   it('aborts alarm recovery before cloud-agent calls when DB is already terminal', async () => {

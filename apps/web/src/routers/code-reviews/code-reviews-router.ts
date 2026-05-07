@@ -378,7 +378,8 @@ export const codeReviewRouter = createTRPCRouter({
         try {
           const cancelResult = await codeReviewWorkerClient.cancelReview(
             input.reviewId,
-            'Cancelled by user'
+            'Cancelled by user',
+            review.current_attempt ?? 1
           );
           if (!cancelResult.success && review.status === 'queued' && !review.session_id) {
             logExceptInTest(
@@ -561,7 +562,10 @@ export const codeReviewRouter = createTRPCRouter({
         }
 
         // Fetch events from worker (server-side, auth token stays secure)
-        const events = await codeReviewWorkerClient.getReviewEvents(input.reviewId);
+        const events = await codeReviewWorkerClient.getReviewEvents(
+          input.reviewId,
+          review.current_attempt ?? 1
+        );
 
         return successResult({ events });
       } catch (error) {

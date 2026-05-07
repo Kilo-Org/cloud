@@ -19,12 +19,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
-  updateCodeReviewStatus,
+  updateCodeReviewStatusForAttempt,
   updateCodeReviewUsage,
   getCodeReviewById,
   getSessionUsageFromBilling,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
+import { claimAndDispatchCodeReviewSandboxRetries } from '@/lib/code-reviews/sandbox-retry';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import {
@@ -65,8 +66,10 @@ import {
  * Payload from the orchestrator DO (legacy format).
  */
 type OrchestratorPayload = {
+  attempt?: number | string;
   sessionId?: string;
   cliSessionId?: string;
+  sandboxId?: string;
   status: 'running' | 'completed' | 'failed' | 'cancelled';
   errorMessage?: string;
   terminalReason?: CodeReviewTerminalReason;
@@ -77,10 +80,12 @@ type OrchestratorPayload = {
  * Payload from cloud-agent-next callback (ExecutionCallbackPayload).
  */
 type CloudAgentNextCallbackPayload = {
+  attempt?: number | string;
   sessionId?: string;
   cloudAgentSessionId?: string;
   executionId?: string;
   kiloSessionId?: string;
+  sandboxId?: string;
   status: 'completed' | 'failed' | 'interrupted';
   errorMessage?: string;
   terminalReason?: CodeReviewTerminalReason;
@@ -96,8 +101,10 @@ type StatusUpdatePayload = OrchestratorPayload | CloudAgentNextCallbackPayload;
  */
 function normalizePayload(raw: StatusUpdatePayload): {
   status: 'running' | 'completed' | 'failed' | 'cancelled';
+  attempt?: number | string;
   sessionId?: string;
   cliSessionId?: string;
+  sandboxId?: string;
   errorMessage?: string;
   terminalReason?: CodeReviewTerminalReason;
   gateResult?: 'pass' | 'fail';
@@ -135,12 +142,23 @@ function normalizePayload(raw: StatusUpdatePayload): {
 
   return {
     status,
+    attempt: raw.attempt,
     sessionId,
     cliSessionId,
+    sandboxId: raw.sandboxId,
     errorMessage: raw.errorMessage,
     terminalReason,
     gateResult: raw.gateResult,
   };
+}
+
+function normalizeAttempt(value: string | number | undefined | null): number {
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  }
+  return 1;
 }
 
 function isBillingCodeReviewTerminalReason(
@@ -455,8 +473,17 @@ export async function POST(
 
     const { reviewId } = await params;
     const rawPayload: StatusUpdatePayload = await req.json();
-    const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult } =
-      normalizePayload(rawPayload);
+    const {
+      status,
+      attempt: payloadAttempt,
+      sessionId,
+      cliSessionId,
+      sandboxId,
+      errorMessage,
+      terminalReason,
+      gateResult,
+    } = normalizePayload(rawPayload);
+    const attempt = normalizeAttempt(req.nextUrl?.searchParams.get('attempt') ?? payloadAttempt);
 
     // Validate payload
     if (!status) {
@@ -476,6 +503,7 @@ export async function POST(
       sessionId,
       cliSessionId,
       status,
+      attempt,
       hasError: !!errorMessage,
       ...(errorMessage ? { errorMessage } : {}),
     });
@@ -486,6 +514,20 @@ export async function POST(
     if (!review) {
       logExceptInTest('[code-review-status] Review not found', { reviewId });
       return NextResponse.json({ error: 'Review not found' }, { status: 404 });
+    }
+
+    const currentAttempt = review.current_attempt ?? 1;
+    if (attempt !== currentAttempt) {
+      logExceptInTest('[code-review-status] Stale callback attempt, skipping update', {
+        reviewId,
+        callbackAttempt: attempt,
+        currentAttempt,
+        requestedStatus: status,
+      });
+      return NextResponse.json({
+        success: true,
+        message: 'Stale callback attempt ignored',
+      });
     }
 
     // Determine valid transitions based on incoming status
@@ -503,6 +545,7 @@ export async function POST(
         success: true,
         message: 'Review already in terminal state',
         currentStatus: review.status,
+        terminalReason: review.terminal_reason,
       });
     }
 
@@ -582,9 +625,10 @@ export async function POST(
     }
 
     // Update review status in database
-    await updateCodeReviewStatus(reviewId, status, {
+    const updated = await updateCodeReviewStatusForAttempt(reviewId, attempt, status, {
       sessionId,
       cliSessionId,
+      sandboxId,
       errorMessage,
       terminalReason,
       startedAt: status === 'running' ? new Date() : undefined,
@@ -593,6 +637,23 @@ export async function POST(
           ? new Date()
           : undefined,
     });
+
+    if (!updated) {
+      logExceptInTest('[code-review-status] Review attempt changed before status update', {
+        reviewId,
+        attempt,
+        status,
+      });
+      return NextResponse.json({ success: true, message: 'Stale callback attempt ignored' });
+    }
+
+    if (status === 'failed' && terminalReason === 'sandbox_error' && sandboxId) {
+      await claimAndDispatchCodeReviewSandboxRetries({
+        sandboxId,
+        source: 'sandbox-error-status-callback',
+      });
+      return NextResponse.json({ success: true });
+    }
 
     logExceptInTest('[code-review-status] Updated review status', {
       reviewId,

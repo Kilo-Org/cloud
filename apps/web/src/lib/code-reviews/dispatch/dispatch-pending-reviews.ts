@@ -256,6 +256,11 @@ async function dispatchReview(
     agentConfig,
     platform,
   });
+  const dispatchPayload = { ...payload };
+  if (review.sandbox_retry_count > 0 || review.sandbox_retry_reason) {
+    delete dispatchPayload.previousCloudAgentSessionId;
+  }
+  const attempt = review.current_attempt ?? 1;
 
   // 3. Atomically claim the review to prevent concurrent dispatchers from
   //    picking the same review. Done as late as possible (after all prep work)
@@ -267,6 +272,7 @@ async function dispatchReview(
     .where(
       and(
         eq(cloud_agent_code_reviews.id, review.id),
+        eq(cloud_agent_code_reviews.current_attempt, attempt),
         or(
           eq(cloud_agent_code_reviews.status, 'pending'),
           and(
@@ -289,11 +295,30 @@ async function dispatchReview(
   //    If this fails, probe DO state before deciding whether to release the claim.
   const agentVersion = 'v2';
   try {
-    await codeReviewWorkerClient.dispatchReview({
-      ...payload,
+    const dispatchResponse = await codeReviewWorkerClient.dispatchReview({
+      ...dispatchPayload,
+      attempt,
       skipBalanceCheck: true,
       agentVersion,
     });
+    if (
+      dispatchResponse &&
+      (dispatchResponse.status === 'completed' ||
+        dispatchResponse.status === 'failed' ||
+        dispatchResponse.status === 'cancelled')
+    ) {
+      const workerStatus = await codeReviewWorkerClient.getReviewStatus(review.id, attempt);
+      if (workerStatus) {
+        await updateCodeReviewStatusIfNonTerminal(review.id, workerStatus.status, {
+          sessionId: workerStatus.sessionId,
+          cliSessionId: workerStatus.cliSessionId,
+          sandboxId: workerStatus.sandboxId,
+          errorMessage: workerStatus.errorMessage,
+          terminalReason: workerStatus.terminalReason,
+          completedAt: workerStatus.completedAt ? new Date(workerStatus.completedAt) : new Date(),
+        });
+      }
+    }
   } catch (dispatchError) {
     errorExceptInTest('[dispatchReview] Worker dispatch failed, leaving review queued', {
       reviewId: review.id,
@@ -337,10 +362,30 @@ async function handleAmbiguousDispatchFailure(
   owner: Owner
 ): Promise<boolean> {
   try {
-    const workerStatus = await codeReviewWorkerClient.getReviewStatus(review.id);
+    const workerStatus = await codeReviewWorkerClient.getReviewStatus(
+      review.id,
+      review.current_attempt ?? 1
+    );
 
     if (!workerStatus) {
-      const released = await releaseQueuedReviewClaim(review.id);
+      const currentReview = await db.query.cloud_agent_code_reviews.findFirst({
+        where: eq(cloud_agent_code_reviews.id, review.id),
+      });
+      const released =
+        currentReview?.current_attempt === (review.current_attempt ?? 1)
+          ? await releaseQueuedReviewClaim(review.id)
+          : false;
+      if (currentReview && currentReview.current_attempt !== (review.current_attempt ?? 1)) {
+        logExceptInTest(
+          '[dispatchReview] Review attempt changed during dispatch failure handling',
+          {
+            reviewId: review.id,
+            originalAttempt: review.current_attempt ?? 1,
+            currentAttempt: currentReview.current_attempt,
+          }
+        );
+        return false;
+      }
       logExceptInTest('[dispatchReview] Worker has no DO state after dispatch failure', {
         reviewId: review.id,
         released,
@@ -359,7 +404,9 @@ async function handleAmbiguousDispatchFailure(
     const mirrored = await updateCodeReviewStatusIfNonTerminal(review.id, workerStatus.status, {
       sessionId: workerStatus.sessionId,
       cliSessionId: workerStatus.cliSessionId,
+      sandboxId: workerStatus.sandboxId,
       errorMessage: workerStatus.errorMessage,
+      terminalReason: workerStatus.terminalReason,
       completedAt: workerStatus.completedAt ? new Date(workerStatus.completedAt) : undefined,
     });
 

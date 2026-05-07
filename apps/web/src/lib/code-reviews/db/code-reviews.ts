@@ -11,7 +11,7 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
-import { eq, and, desc, count, ne, inArray, sql, sum, gte, isNull } from 'drizzle-orm';
+import { eq, and, desc, count, ne, inArray, sql, sum, gte, isNull, or } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
@@ -89,6 +89,8 @@ export async function updateCodeReviewStatus(
     cliSessionId?: string;
     errorMessage?: string;
     terminalReason?: CodeReviewTerminalReason;
+    sandboxId?: string | null;
+    currentAttempt?: number;
     startedAt?: Date;
     completedAt?: Date;
     agentVersion?: string;
@@ -116,6 +118,12 @@ export async function updateCodeReviewStatus(
     }
     if (updates.terminalReason !== undefined) {
       updateData.terminal_reason = updates.terminalReason;
+    }
+    if (updates.sandboxId !== undefined) {
+      updateData.sandbox_id = updates.sandboxId;
+    }
+    if (updates.currentAttempt !== undefined) {
+      updateData.current_attempt = updates.currentAttempt;
     }
     if (updates.startedAt !== undefined) {
       updateData.started_at = updates.startedAt.toISOString();
@@ -163,6 +171,66 @@ export async function updateCodeReviewStatus(
   }
 }
 
+export async function updateCodeReviewStatusForAttempt(
+  reviewId: string,
+  expectedAttempt: number,
+  status: CodeReviewStatus,
+  updates: {
+    sessionId?: string;
+    cliSessionId?: string;
+    errorMessage?: string;
+    terminalReason?: CodeReviewTerminalReason;
+    sandboxId?: string | null;
+    startedAt?: Date;
+    completedAt?: Date;
+  } = {}
+): Promise<boolean> {
+  try {
+    const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (updates.sessionId !== undefined) updateData.session_id = updates.sessionId;
+    if (updates.cliSessionId !== undefined) updateData.cli_session_id = updates.cliSessionId;
+    if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
+    if (updates.terminalReason !== undefined) updateData.terminal_reason = updates.terminalReason;
+    if (updates.sandboxId !== undefined) updateData.sandbox_id = updates.sandboxId;
+    if (updates.startedAt !== undefined) updateData.started_at = updates.startedAt.toISOString();
+    if (updates.completedAt !== undefined)
+      updateData.completed_at = updates.completedAt.toISOString();
+
+    if (status === 'running' && !updates.startedAt) {
+      updateData.started_at = new Date().toISOString();
+    }
+    if (
+      (status === 'completed' || status === 'failed' || status === 'cancelled') &&
+      !updates.completedAt
+    ) {
+      updateData.completed_at = new Date().toISOString();
+    }
+
+    const updated = await db
+      .update(cloud_agent_code_reviews)
+      .set(updateData)
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.id, reviewId),
+          eq(cloud_agent_code_reviews.current_attempt, expectedAttempt)
+        )
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    return updated.length > 0;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'updateCodeReviewStatusForAttempt' },
+      extra: { reviewId, expectedAttempt, status, updates },
+    });
+    throw error;
+  }
+}
+
 export async function updateCodeReviewStatusIfNonTerminal(
   reviewId: string,
   status: CodeReviewStatus,
@@ -171,6 +239,8 @@ export async function updateCodeReviewStatusIfNonTerminal(
     cliSessionId?: string;
     errorMessage?: string;
     terminalReason?: CodeReviewTerminalReason;
+    sandboxId?: string | null;
+    currentAttempt?: number;
     startedAt?: Date;
     completedAt?: Date;
     agentVersion?: string;
@@ -190,6 +260,8 @@ export async function updateCodeReviewStatusIfNonTerminal(
     if (updates.cliSessionId !== undefined) updateData.cli_session_id = updates.cliSessionId;
     if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
     if (updates.terminalReason !== undefined) updateData.terminal_reason = updates.terminalReason;
+    if (updates.sandboxId !== undefined) updateData.sandbox_id = updates.sandboxId;
+    if (updates.currentAttempt !== undefined) updateData.current_attempt = updates.currentAttempt;
     if (updates.startedAt !== undefined) updateData.started_at = updates.startedAt.toISOString();
     if (updates.completedAt !== undefined) {
       updateData.completed_at = updates.completedAt.toISOString();
@@ -253,6 +325,86 @@ export async function releaseQueuedReviewClaim(reviewId: string): Promise<boolea
     captureException(error, {
       tags: { operation: 'releaseQueuedReviewClaim' },
       extra: { reviewId },
+    });
+    throw error;
+  }
+}
+
+export type SandboxRetryEvent = {
+  reason: 'sandbox_500_destroyed';
+  destroyedAt?: string;
+};
+
+export type ClaimedCodeReviewForSandboxRetry = Pick<
+  CloudAgentCodeReview,
+  | 'id'
+  | 'owned_by_organization_id'
+  | 'owned_by_user_id'
+  | 'platform_integration_id'
+  | 'platform'
+  | 'platform_project_id'
+  | 'repo_full_name'
+  | 'pr_number'
+  | 'head_sha'
+  | 'check_run_id'
+  | 'current_attempt'
+>;
+
+export async function claimCodeReviewsForSandboxRetry(
+  sandboxId: string,
+  event: SandboxRetryEvent
+): Promise<ClaimedCodeReviewForSandboxRetry[]> {
+  try {
+    const retryAt = event.destroyedAt ? new Date(event.destroyedAt) : new Date();
+    const claimed = await db
+      .update(cloud_agent_code_reviews)
+      .set({
+        status: 'pending',
+        current_attempt: sql`${cloud_agent_code_reviews.current_attempt} + 1`,
+        sandbox_retry_count: sql`${cloud_agent_code_reviews.sandbox_retry_count} + 1`,
+        sandbox_retry_reason: event.reason,
+        sandbox_retry_at: retryAt.toISOString(),
+        session_id: null,
+        cli_session_id: null,
+        sandbox_id: null,
+        started_at: null,
+        completed_at: null,
+        error_message: null,
+        terminal_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.sandbox_id, sandboxId),
+          eq(cloud_agent_code_reviews.sandbox_retry_count, 0),
+          or(
+            inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running']),
+            and(
+              eq(cloud_agent_code_reviews.status, 'failed'),
+              eq(cloud_agent_code_reviews.terminal_reason, 'sandbox_error')
+            )
+          )
+        )
+      )
+      .returning({
+        id: cloud_agent_code_reviews.id,
+        owned_by_organization_id: cloud_agent_code_reviews.owned_by_organization_id,
+        owned_by_user_id: cloud_agent_code_reviews.owned_by_user_id,
+        platform_integration_id: cloud_agent_code_reviews.platform_integration_id,
+        platform: cloud_agent_code_reviews.platform,
+        platform_project_id: cloud_agent_code_reviews.platform_project_id,
+        repo_full_name: cloud_agent_code_reviews.repo_full_name,
+        pr_number: cloud_agent_code_reviews.pr_number,
+        head_sha: cloud_agent_code_reviews.head_sha,
+        check_run_id: cloud_agent_code_reviews.check_run_id,
+        current_attempt: cloud_agent_code_reviews.current_attempt,
+      });
+
+    return claimed;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'claimCodeReviewsForSandboxRetry' },
+      extra: { sandboxId, event },
     });
     throw error;
   }
@@ -475,6 +627,8 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
         cli_session_id: null,
         error_message: null,
         check_run_id: null,
+        sandbox_id: null,
+        current_attempt: sql`${cloud_agent_code_reviews.current_attempt} + 1`,
         started_at: null,
         completed_at: null,
         model: null,
@@ -494,17 +648,20 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
 }
 
 /**
- * Finds all active (non-completed) reviews for a PR except the given SHA
- * Returns review IDs that should be cancelled when a new push comes in
+ * Finds all active (non-completed) reviews for a PR except the given SHA.
+ * Returns IDs and attempts so callers address the correct worker DO.
  */
 export async function findActiveReviewsForPR(
   repoFullName: string,
   prNumber: number,
   excludeSha: string
-): Promise<string[]> {
+): Promise<{ id: string; current_attempt: number }[]> {
   try {
     const reviews = await db
-      .select({ id: cloud_agent_code_reviews.id })
+      .select({
+        id: cloud_agent_code_reviews.id,
+        current_attempt: cloud_agent_code_reviews.current_attempt,
+      })
       .from(cloud_agent_code_reviews)
       .where(
         and(
@@ -515,7 +672,7 @@ export async function findActiveReviewsForPR(
         )
       );
 
-    return reviews.map(r => r.id);
+    return reviews;
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findActiveReviewsForPR' },

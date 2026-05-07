@@ -7,9 +7,14 @@ import type { TRPCContext } from '../types.js';
  */
 type ErrorCauseData = {
   error?: string;
+  code?: string;
   message?: string;
   activeExecutionId?: string;
   retryable?: boolean;
+  sandboxId?: string;
+  phase?: string;
+  sessionId?: string;
+  destroyedAt?: string;
 };
 
 // Initialize tRPC with context and error formatter
@@ -24,8 +29,13 @@ export const t = initTRPC.context<TRPCContext>().create({
           ...shape.data,
           // Include structured error info from cause
           ...(causeData.error && { error: causeData.error }),
+          ...(causeData.code && { code: causeData.code }),
           ...(causeData.activeExecutionId && { activeExecutionId: causeData.activeExecutionId }),
           ...(causeData.retryable !== undefined && { retryable: causeData.retryable }),
+          ...(causeData.sandboxId && { sandboxId: causeData.sandboxId }),
+          ...(causeData.phase && { phase: causeData.phase }),
+          ...(causeData.sessionId && { sessionId: causeData.sessionId }),
+          ...(causeData.destroyedAt && { destroyedAt: causeData.destroyedAt }),
         },
       };
     }

@@ -36,7 +36,10 @@ import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encrypti
 import type { MCPSecretValue } from './router/schemas.js';
 import type { SessionProfileBundle } from './session-profile.js';
 import { readProfileBundle } from './session-profile.js';
-import { destroySandboxAfterInternalServerError } from './sandbox-recovery.js';
+import {
+  attachSandboxDestroyedAfter500Data,
+  destroySandboxAfterInternalServerError,
+} from './sandbox-recovery.js';
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const SANDBOX_RETRY_DEFAULTS = {
@@ -1680,12 +1683,13 @@ export class SessionService {
       // Wrapper will be (re)started by the orchestrator after we return
       onProgress?.('kilo_server', 'Starting Kilo…');
     } catch (error) {
-      const sandboxDestroyed = await destroySandboxAfterInternalServerError(
+      const recovery = await destroySandboxAfterInternalServerError(
         {
           sandbox,
           sandboxId: context.sandboxId,
           sessionId,
           phase: 'coldStartResume',
+          env,
         },
         error
       );
@@ -1694,7 +1698,7 @@ export class SessionService {
       // retry will start from a fresh container. Otherwise, remove the workspace
       // and sessionHome so the next retry sees a true cold start and re-runs the
       // full restore from scratch.
-      if (!sandboxDestroyed) {
+      if (!recovery.destroyed) {
         logger
           .withFields({
             sessionId,
@@ -1704,6 +1708,9 @@ export class SessionService {
         await cleanupWorkspace(session, context.workspacePath, context.sessionHome);
       }
 
+      if (recovery.destroyed) {
+        attachSandboxDestroyedAfter500Data(error, recovery.data);
+      }
       throw error;
     }
   }

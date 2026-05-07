@@ -5,6 +5,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import {
   createCodeReview,
+  claimCodeReviewsForSandboxRetry,
   updateCodeReviewStatus,
   findPreviousCompletedReview,
 } from './code-reviews';
@@ -140,5 +141,47 @@ describe('findPreviousCompletedReview', () => {
       .limit(1);
 
     expect(review?.agentVersion).toBe('v2');
+  });
+
+  it('claims sandbox retries once and increments attempt counters atomically', async () => {
+    const id = await createReview('sha-sandbox-retry');
+    await updateCodeReviewStatus(id, 'running', {
+      sessionId: 'agent_retry',
+      cliSessionId: 'ses_retry',
+      sandboxId: 'usr-sandbox-retry',
+    });
+
+    const firstClaim = await claimCodeReviewsForSandboxRetry('usr-sandbox-retry', {
+      reason: 'sandbox_500_destroyed',
+      destroyedAt: new Date().toISOString(),
+    });
+    const secondClaim = await claimCodeReviewsForSandboxRetry('usr-sandbox-retry', {
+      reason: 'sandbox_500_destroyed',
+    });
+
+    expect(firstClaim.map(review => review.id)).toEqual([id]);
+    expect(secondClaim).toEqual([]);
+
+    const [review] = await db
+      .select({
+        status: cloud_agent_code_reviews.status,
+        currentAttempt: cloud_agent_code_reviews.current_attempt,
+        sandboxRetryCount: cloud_agent_code_reviews.sandbox_retry_count,
+        sandboxRetryReason: cloud_agent_code_reviews.sandbox_retry_reason,
+        sessionId: cloud_agent_code_reviews.session_id,
+        sandboxId: cloud_agent_code_reviews.sandbox_id,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, id))
+      .limit(1);
+
+    expect(review).toMatchObject({
+      status: 'pending',
+      currentAttempt: 2,
+      sandboxRetryCount: 1,
+      sandboxRetryReason: 'sandbox_500_destroyed',
+      sessionId: null,
+      sandboxId: null,
+    });
   });
 });

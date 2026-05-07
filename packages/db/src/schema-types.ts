@@ -1028,6 +1028,7 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'interrupted',
   'timeout',
   'upstream_error',
+  'sandbox_error',
   'unknown',
 ] as const;
 

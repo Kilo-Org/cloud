@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const { mockError, mockInfo, mockWithFields } = vi.hoisted(() => {
   const error = vi.fn();
   const info = vi.fn();
-  const withFields = vi.fn(() => ({ error, info }));
+  const warn = vi.fn();
+  const withFields = vi.fn(() => ({ error, info, warn }));
   return { mockError: error, mockInfo: info, mockWithFields: withFields };
 });
 
@@ -20,6 +21,13 @@ import {
 } from './sandbox-recovery.js';
 
 describe('sandbox recovery', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    globalThis.fetch = originalFetch;
+  });
+
   it('classifies sandbox SDK internal server errors', () => {
     const error = new Error('control plane failed');
     Object.assign(error, {
@@ -100,6 +108,9 @@ describe('sandbox recovery', () => {
 
     expect(sandbox.destroy).toHaveBeenCalledOnce();
     expect(mockError).toHaveBeenCalledWith(
+      'Skipping code review sandbox recovery notification: internal secret unavailable'
+    );
+    expect(mockError).toHaveBeenCalledWith(
       'Sandbox returned 500 during workspace preparation; destroying sandbox'
     );
     expect(mockInfo).toHaveBeenCalledWith('Destroyed sandbox after workspace preparation 500');
@@ -117,7 +128,63 @@ describe('sandbox recovery', () => {
       new Error('Git clone failed')
     );
 
-    expect(destroyed).toBe(false);
+    expect(destroyed).toEqual({ destroyed: false });
     expect(sandbox.destroy).not.toHaveBeenCalled();
+  });
+
+  it('notifies the web app after confirmed sandbox destruction', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ claimed: 1 }));
+    globalThis.fetch = fetchMock;
+    const sandbox = { destroy: vi.fn().mockResolvedValue(undefined) };
+    const error = new Error('HTTP error! status: 500');
+    Object.assign(error, { name: 'SandboxError' });
+
+    const result = await destroySandboxAfterInternalServerError(
+      {
+        sandbox,
+        sandboxId: 'ses-test',
+        sessionId: 'agent_test',
+        phase: 'prepareSession',
+        env: {
+          KILOCODE_BACKEND_BASE_URL: 'https://app.test',
+          INTERNAL_API_SECRET: 'secret',
+        },
+      },
+      error
+    );
+
+    expect(result).toMatchObject({
+      destroyed: true,
+      data: { sandboxId: 'ses-test', phase: 'prepareSession', sessionId: 'agent_test' },
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://app.test/api/internal/code-review-sandbox-destroyed',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'X-Internal-Secret': 'secret' }),
+      })
+    );
+  });
+
+  it('does not notify when destroy fails', async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock;
+    const sandbox = { destroy: vi.fn().mockRejectedValue(new Error('destroy failed')) };
+    const error = new Error('HTTP error! status: 500');
+    Object.assign(error, { name: 'SandboxError' });
+
+    const result = await destroySandboxAfterInternalServerError(
+      {
+        sandbox,
+        sandboxId: 'ses-test',
+        sessionId: 'agent_test',
+        phase: 'prepareSession',
+        env: { KILOCODE_BACKEND_BASE_URL: 'https://app.test', INTERNAL_API_SECRET: 'secret' },
+      },
+      error
+    );
+
+    expect(result).toEqual({ destroyed: false });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

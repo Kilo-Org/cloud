@@ -18,6 +18,7 @@ import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 /** Retryable error codes that should map to 503 */
 const RETRYABLE_CODES: readonly RetryableResultCode[] = [
   'SANDBOX_CONNECT_FAILED',
+  'SANDBOX_DESTROYED_AFTER_500',
   'WORKSPACE_SETUP_FAILED',
   'KILO_SERVER_FAILED',
   'WRAPPER_START_FAILED',
@@ -50,8 +51,13 @@ function throwStartExecutionError(
       message: result.error,
       cause: {
         error: result.code,
+        code: result.code,
         message: result.error,
         retryable: true,
+        sandboxId: result.sandboxId,
+        phase: result.phase,
+        sessionId: result.sessionId,
+        destroyedAt: result.destroyedAt,
       },
     });
   }

@@ -8,6 +8,10 @@ import * as z from 'zod';
 const FETCH_TIMEOUT_MS = 10000;
 const CODE_REVIEW_WORKER_URL = process.env.CODE_REVIEW_WORKER_URL;
 
+function attemptQuery(attempt?: number): string {
+  return attempt && attempt > 1 ? `?attempt=${attempt}` : '';
+}
+
 /**
  * Fetch with timeout support
  */
@@ -37,8 +41,9 @@ async function fetchWithTimeout(
 
 // Types for API responses
 export type DispatchReviewResponse = {
-  success: boolean;
   reviewId: string;
+  attempt?: number;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 };
 
 /**
@@ -65,9 +70,11 @@ export type CancelReviewResponse = {
 
 const ReviewStatusResponseSchema = z.object({
   reviewId: z.string(),
+  attempt: z.number().optional(),
   status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
   sessionId: z.string().optional(),
   cliSessionId: z.string().optional(),
+  sandboxId: z.string().optional(),
   startedAt: z.string().optional(),
   completedAt: z.string().optional(),
   model: z.string().optional(),
@@ -75,7 +82,18 @@ const ReviewStatusResponseSchema = z.object({
   totalTokensOut: z.number().optional(),
   totalCost: z.number().optional(),
   errorMessage: z.string().optional(),
-  terminalReason: z.string().optional(),
+  terminalReason: z
+    .enum([
+      'billing',
+      'user_cancelled',
+      'superseded',
+      'interrupted',
+      'timeout',
+      'upstream_error',
+      'sandbox_error',
+      'unknown',
+    ])
+    .optional(),
 });
 
 export type ReviewStatusResponse = z.infer<typeof ReviewStatusResponseSchema>;
@@ -132,8 +150,9 @@ class CodeReviewWorkerClient {
   /**
    * Get events for a code review (used by SSE/cloud-agent flow for polling)
    */
-  async getReviewEvents(reviewId: string): Promise<ReviewEvent[]> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/events`, {
+  async getReviewEvents(reviewId: string, attempt?: number): Promise<ReviewEvent[]> {
+    const query = attemptQuery(attempt);
+    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/events${query}`, {
       headers: this.getHeaders(),
     });
 
@@ -149,8 +168,13 @@ class CodeReviewWorkerClient {
    * Cancel a running or queued code review
    * Signals the orchestrator to stop processing and marks the review as cancelled
    */
-  async cancelReview(reviewId: string, reason?: string): Promise<CancelReviewResponse> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/cancel`, {
+  async cancelReview(
+    reviewId: string,
+    reason?: string,
+    attempt?: number
+  ): Promise<CancelReviewResponse> {
+    const query = attemptQuery(attempt);
+    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/cancel${query}`, {
       method: 'POST',
       headers: this.getHeaders({
         'Content-Type': 'application/json',
@@ -166,8 +190,9 @@ class CodeReviewWorkerClient {
     return response.json() as Promise<CancelReviewResponse>;
   }
 
-  async getReviewStatus(reviewId: string): Promise<ReviewStatusResponse | null> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/status`, {
+  async getReviewStatus(reviewId: string, attempt?: number): Promise<ReviewStatusResponse | null> {
+    const query = attemptQuery(attempt);
+    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/status${query}`, {
       headers: this.getHeaders(),
     });
 

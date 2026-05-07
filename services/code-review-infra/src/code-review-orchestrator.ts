@@ -10,6 +10,7 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   createCloudAgentNextFetchClient,
   CloudAgentNextBillingError,
+  getCloudAgentNextSandboxDestroyedError,
   type CloudAgentNextFetchClient,
   type CloudAgentTerminalReason,
 } from '@kilocode/worker-utils';
@@ -198,32 +199,37 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     options?: {
       sessionId?: string;
       cliSessionId?: string;
+      sandboxId?: string;
       errorMessage?: string;
       terminalReason?: CloudAgentTerminalReason;
     }
   ): Promise<UpdateStatusResult> {
+    const effectiveOptions = options ?? {};
+    if (status === 'running' && !('sandboxId' in effectiveOptions) && this.state.sandboxId) {
+      effectiveOptions.sandboxId = this.state.sandboxId;
+    }
     // Check if there are any actual changes to process
     const statusChanged = this.state.status !== status;
     const sessionIdChanged =
-      options !== undefined && 'sessionId' in options && options.sessionId !== this.state.sessionId;
+      'sessionId' in effectiveOptions && effectiveOptions.sessionId !== this.state.sessionId;
     const cliSessionIdChanged =
-      options !== undefined &&
-      'cliSessionId' in options &&
-      options.cliSessionId !== this.state.cliSessionId;
+      'cliSessionId' in effectiveOptions &&
+      effectiveOptions.cliSessionId !== this.state.cliSessionId;
+    const sandboxIdChanged =
+      'sandboxId' in effectiveOptions && effectiveOptions.sandboxId !== this.state.sandboxId;
     const errorMessageChanged =
-      options !== undefined &&
-      'errorMessage' in options &&
-      options.errorMessage !== this.state.errorMessage;
+      'errorMessage' in effectiveOptions &&
+      effectiveOptions.errorMessage !== this.state.errorMessage;
     const terminalReasonChanged =
-      options !== undefined &&
-      'terminalReason' in options &&
-      options.terminalReason !== this.state.terminalReason;
+      'terminalReason' in effectiveOptions &&
+      effectiveOptions.terminalReason !== this.state.terminalReason;
 
     // Early return only if nothing has changed
     if (
       !statusChanged &&
       !sessionIdChanged &&
       !cliSessionIdChanged &&
+      !sandboxIdChanged &&
       !errorMessageChanged &&
       !terminalReasonChanged
     ) {
@@ -231,12 +237,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         return 'updated';
       }
 
-      try {
-        return await this.updateDBStatus(status, options);
-      } catch (error) {
-        console.error('[CodeReviewOrchestrator] Failed to refresh DB running status:', error);
-        return 'updated';
-      }
+      return this.refreshRunningStatus();
     }
 
     // Update status if it changed
@@ -266,27 +267,33 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     }
 
     // Update metadata (sessionId, cliSessionId, errorMessage) even if status didn't change
-    if (options !== undefined && 'sessionId' in options) {
+    if ('sessionId' in effectiveOptions) {
       // Only apply if it's a non-empty string (sessionId should be meaningful)
-      if (options.sessionId) {
-        this.state.sessionId = options.sessionId;
+      if (effectiveOptions.sessionId) {
+        this.state.sessionId = effectiveOptions.sessionId;
       }
     }
 
-    if (options !== undefined && 'cliSessionId' in options) {
+    if ('cliSessionId' in effectiveOptions) {
       // Only apply if it's a non-empty string (cliSessionId should be meaningful)
-      if (options.cliSessionId) {
-        this.state.cliSessionId = options.cliSessionId;
+      if (effectiveOptions.cliSessionId) {
+        this.state.cliSessionId = effectiveOptions.cliSessionId;
       }
     }
 
-    if (options !== undefined && 'errorMessage' in options) {
-      // Error messages can be empty strings (though unusual)
-      this.state.errorMessage = options.errorMessage;
+    if ('sandboxId' in effectiveOptions) {
+      if (effectiveOptions.sandboxId) {
+        this.state.sandboxId = effectiveOptions.sandboxId;
+      }
     }
 
-    if (options !== undefined && 'terminalReason' in options) {
-      this.state.terminalReason = options.terminalReason;
+    if ('errorMessage' in effectiveOptions) {
+      // Error messages can be empty strings (though unusual)
+      this.state.errorMessage = effectiveOptions.errorMessage;
+    }
+
+    if ('terminalReason' in effectiveOptions) {
+      this.state.terminalReason = effectiveOptions.terminalReason;
     }
 
     this.state.updatedAt = new Date().toISOString();
@@ -294,7 +301,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     // Update Next.js DB via internal API
     try {
-      const dbUpdateResult = await this.updateDBStatus(status, options);
+      const dbUpdateResult = await this.updateDBStatus(status, effectiveOptions);
       if (dbUpdateResult === 'db-terminal') {
         return 'db-terminal';
       }
@@ -313,6 +320,23 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     }
 
     return 'updated';
+  }
+
+  private async refreshRunningStatus(): Promise<UpdateStatusResult> {
+    try {
+      const options: {
+        sessionId?: string;
+        cliSessionId?: string;
+        sandboxId?: string;
+      } = {};
+      if (this.state.sessionId) options.sessionId = this.state.sessionId;
+      if (this.state.cliSessionId) options.cliSessionId = this.state.cliSessionId;
+      if (this.state.sandboxId) options.sandboxId = this.state.sandboxId;
+      return await this.updateDBStatus('running', options);
+    } catch (error) {
+      console.error('[CodeReviewOrchestrator] Failed to refresh DB running status:', error);
+      return 'updated';
+    }
   }
 
   private async setLocalTerminalStateFromDB(
@@ -338,6 +362,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     options?: {
       sessionId?: string;
       cliSessionId?: string;
+      sandboxId?: string;
       errorMessage?: string;
       terminalReason?: CloudAgentTerminalReason;
     }
@@ -348,8 +373,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     // Payload without reviewId (it's in the URL path)
     const payload = {
       status,
+      attempt: this.state.attempt ?? 1,
       sessionId: options?.sessionId,
       cliSessionId: options?.cliSessionId,
+      sandboxId: options?.sandboxId,
       errorMessage: options?.errorMessage,
       terminalReason: options?.terminalReason,
     };
@@ -371,6 +398,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     const body = InternalStatusResponseSchema.parse(await response.json());
     if (body.message === 'Review already in terminal state' && body.currentStatus) {
       await this.setLocalTerminalStateFromDB(body.currentStatus);
+      if (body.terminalReason) {
+        this.state.terminalReason = body.terminalReason;
+        await this.saveState();
+      }
       return 'db-terminal';
     }
 
@@ -380,6 +411,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   private getTerminalReason(error: unknown): CloudAgentTerminalReason | undefined {
     if (error instanceof CloudAgentNextBillingError) {
       return 'billing';
+    }
+
+    if (getCloudAgentNextSandboxDestroyedError(error)) {
+      return 'sandbox_error';
     }
 
     if (!(error instanceof Error)) {
@@ -466,6 +501,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
    */
   async start(params: {
     reviewId: string;
+    attempt?: number;
     authToken: string;
     sessionInput: SessionInput;
     owner: {
@@ -492,6 +528,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     this.state = {
       reviewId: params.reviewId,
+      attempt: params.attempt ?? 1,
       authToken: params.authToken,
       sessionInput: params.sessionInput,
       owner: params.owner,
@@ -543,9 +580,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     return {
       reviewId: this.state.reviewId,
+      attempt: this.state.attempt,
       status: this.state.status,
       sessionId: this.state.sessionId,
       cliSessionId: this.state.cliSessionId,
+      sandboxId: this.state.sandboxId,
       startedAt: this.state.startedAt,
       completedAt: this.state.completedAt,
       model: this.state.model,
@@ -553,6 +592,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       totalTokensOut: this.state.totalTokensOut,
       totalCost: this.state.totalCost,
       errorMessage: this.state.errorMessage,
+      terminalReason: this.state.terminalReason,
     };
   }
 
@@ -717,8 +757,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       }
 
       // Step 1: Prepare session with callback target
+      const attempt = this.state.attempt ?? 1;
       const callbackTarget = {
-        url: `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}`,
+        url: `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}?attempt=${attempt}`,
         headers: {
           'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
         },
@@ -737,7 +778,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         skipBalanceCheck: this.state.skipBalanceCheck,
       });
 
-      const { cloudAgentSessionId, kiloSessionId } = await client.prepareSession(
+      const { cloudAgentSessionId, kiloSessionId, sandboxId } = await client.prepareSession(
         internalHeaders,
         prepareInput
       );
@@ -746,12 +787,14 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         reviewId: this.state.reviewId,
         cloudAgentSessionId,
         kiloSessionId,
+        sandboxId,
       });
 
       // Store session IDs immediately (no stream parsing needed)
       await this.updateStatus('running', {
         sessionId: cloudAgentSessionId,
         cliSessionId: kiloSessionId,
+        sandboxId,
       });
 
       // Step 2: Initiate execution
@@ -788,8 +831,13 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const terminalReason = this.getTerminalReason(error);
+      const sandboxError = getCloudAgentNextSandboxDestroyedError(error);
 
-      await this.updateStatus('failed', { errorMessage, terminalReason });
+      await this.updateStatus('failed', {
+        errorMessage,
+        terminalReason,
+        sandboxId: sandboxError?.sandboxId,
+      });
 
       console.error('[CodeReviewOrchestrator] Review failed (cloud-agent-next):', {
         reviewId: this.state.reviewId,
@@ -850,8 +898,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       // Step 1: Update callback target via updateSession (internal-only endpoint).
       // callbackTarget must be set through an internal procedure, not the
       // user-facing sendMessageV2, to prevent SSRF via arbitrary callback URLs.
+      const attempt = this.state.attempt ?? 1;
       const callbackTarget = {
-        url: `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}`,
+        url: `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}?attempt=${attempt}`,
         headers: {
           'X-Internal-Secret': this.env.INTERNAL_API_SECRET,
         },
@@ -915,6 +964,24 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
             error: errorMessage,
           }
         );
+        return;
+      }
+
+      const sandboxError = getCloudAgentNextSandboxDestroyedError(error);
+      if (sandboxError) {
+        const errorMessage = error instanceof Error ? error.message : 'Sandbox destroyed after 500';
+        await this.updateStatus('failed', {
+          errorMessage,
+          terminalReason: 'sandbox_error',
+          sandboxId: sandboxError.sandboxId,
+        });
+
+        console.warn('[CodeReviewOrchestrator] sendMessageV2 sandbox failure, waiting for retry', {
+          reviewId: this.state.reviewId,
+          previousCloudAgentSessionId: previousSessionId,
+          sandboxId: sandboxError.sandboxId,
+          error: errorMessage,
+        });
         return;
       }
 

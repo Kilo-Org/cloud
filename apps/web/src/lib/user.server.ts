@@ -418,19 +418,34 @@ async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): P
   const callbackUrlCookie =
     cookieStore.get('__Secure-next-auth.callback-url')?.value ??
     cookieStore.get('next-auth.callback-url')?.value;
+  const cookieTrackingId = cookieStore.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
 
   if (callbackUrlCookie) {
     try {
       const callbackUrl = new URL(callbackUrlCookie, 'http://localhost');
       const referralTouch = parseImpactReferralTouchFromUrl(callbackUrl);
-      const affiliateTouch = parseImpactAffiliateTouchFromUrl(callbackUrl);
+      const urlImRefParam = callbackUrl.searchParams.get('im_ref')?.trim() || null;
+      const ignoreUrlImRefForReferralTouch = Boolean(
+        referralTouch?.opaqueTrackingValue && urlImRefParam
+      );
+      const fallbackUrl = new URL('http://localhost/users/after-sign-in');
+      const affiliateTouch = ignoreUrlImRefForReferralTouch
+        ? cookieTrackingId && cookieTrackingId !== urlImRefParam
+          ? parseImpactAffiliateTouchFromUrl(fallbackUrl, cookieTrackingId)
+          : null
+        : (parseImpactAffiliateTouchFromUrl(callbackUrl) ??
+          (cookieTrackingId
+            ? parseImpactAffiliateTouchFromUrl(fallbackUrl, cookieTrackingId)
+            : null));
 
       logImpactReferralDebug('Auth flow parsed Impact tracking context from callback URL cookie', {
         affiliateTouchPresent: Boolean(affiliateTouch),
         referralTouchPresent: Boolean(referralTouch),
         referralCookieValuePresent: Boolean(referralTouch?.opaqueTrackingValue),
         affiliateTrackingIdPresent: Boolean(affiliateTouch?.trackingId?.trim()),
-        urlImRefParamPresent: Boolean(callbackUrl.searchParams.get('im_ref')?.trim()),
+        urlImRefParamPresent: Boolean(urlImRefParam),
+        ignoredUrlImRefForReferralTouch: ignoreUrlImRefForReferralTouch,
+        affiliateCookieFallbackPresent: Boolean(cookieTrackingId?.trim()),
         callbackPath: callbackUrl.pathname,
       });
 
@@ -448,7 +463,6 @@ async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): P
     }
   }
 
-  const cookieTrackingId = cookieStore.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null;
   const fallbackUrl = new URL('http://localhost/users/after-sign-in');
   const affiliateTouch = cookieTrackingId
     ? parseImpactAffiliateTouchFromUrl(fallbackUrl, cookieTrackingId)

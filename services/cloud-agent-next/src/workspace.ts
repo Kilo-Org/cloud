@@ -615,7 +615,7 @@ export async function cloneGitRepo(
     // Log actual error for debugging
     const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error('Git clone failed', {
-      error: errorMessage,
+      error: sanitizeGitOutput(errorMessage),
       gitUrl: sanitizedGitUrl,
     });
 

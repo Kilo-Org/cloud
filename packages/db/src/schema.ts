@@ -84,6 +84,7 @@ import type {
   ContributorChampionTier,
 } from './schema-types';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
+import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -3914,6 +3915,16 @@ export const kiloclaw_instances = pgTable(
     // can filter populations by current running version via SQL. Up to ~30min stale on
     // idle instances (matches the longest alarm interval).
     tracked_image_tag: text(),
+    // Denormalized copy of the DO's instanceType. Source of truth remains the DO;
+    // this column exists so admin tooling and future billing work can filter by tier.
+    instance_type: text(),
+    // Denormalized copy of the DO's `adminMachineSizeOverride` + metadata. Non-null
+    // means the instance is currently running with admin-supplied CPU/RAM that
+    // diverge from its billable tier hardware (`machineSize` / `instance_type`).
+    // Source of truth is the DO; written by the worker on explicit admin
+    // set/clear, plus auto-cleared as part of a tier resize.
+    // Shape: { size: { cpus, memory_mb, cpu_kind? }, reason, actorId, actorEmail, setAt }.
+    admin_size_override: jsonb(),
   },
   table => [
     // One active instance per user+sandbox combination.
@@ -3930,6 +3941,21 @@ export const kiloclaw_instances = pgTable(
     index('IDX_kiloclaw_instances_tracked_image_tag')
       .on(table.tracked_image_tag)
       .where(isNull(table.destroyed_at)),
+    index('IDX_kiloclaw_instances_instance_type')
+      .on(table.instance_type)
+      .where(isNull(table.destroyed_at)),
+    check(
+      'CHK_kiloclaw_instances_instance_type',
+      sql`${table.instance_type} IS NULL OR ${table.instance_type} IN (${sql.join(
+        INSTANCE_TYPE_VALUES.map(value => sql.raw(`'${value}'`)),
+        sql.raw(', ')
+      )})`
+    ),
+    // Powers the admin "outstanding overrides" filter. Partial (active rows
+    // only) so the index stays small.
+    index('IDX_kiloclaw_instances_admin_size_override')
+      .on(table.id)
+      .where(sql`${table.admin_size_override} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
   ]
 );
 

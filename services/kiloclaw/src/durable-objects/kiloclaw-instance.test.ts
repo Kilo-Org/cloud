@@ -47,6 +47,7 @@ vi.mock('../fly/client', async () => {
     updateMachine: vi.fn(),
     createVolume: vi.fn(),
     createVolumeWithFallback: vi.fn(),
+    extendVolume: vi.fn().mockResolvedValue({ id: 'vol-1', size_gb: 20, region: 'iad' }),
     deleteVolume: vi.fn(),
     getVolume: vi.fn(),
     listMachines: vi.fn().mockResolvedValue([]),
@@ -99,6 +100,8 @@ vi.mock('../db', () => ({
     api_token_pepper: 'pepper-1',
   }),
   markInstanceDestroyed: vi.fn().mockResolvedValue(undefined),
+  syncInstanceType: vi.fn().mockResolvedValue(undefined),
+  syncAdminSizeOverride: vi.fn().mockResolvedValue(undefined),
 }));
 
 // -- Mock gateway/env --
@@ -214,6 +217,9 @@ function createFakeStorage() {
     },
     setAlarm(time: number): void {
       alarmTime = time;
+    },
+    getAlarm(): number | null {
+      return alarmTime;
     },
     deleteAlarm(): void {
       alarmTime = null;
@@ -1095,8 +1101,8 @@ describe('reconciliation: machine status sync', () => {
       await inst.alarm();
       if (i === SELF_HEAL_THRESHOLD - 1) {
         // 3 = recovery launch + tracked_image_tag Postgres sync + scheduled-action
-        // apply pass (both syncs are always enqueued by alarm() when sandboxId is
-        // set; see kiloclaw-instance/index.ts).
+        // apply pass. instance_type Postgres sync is no longer unconditional —
+        // it now only fires when DO state actually changes (backfill or resize).
         expect(waitUntilPromises).toHaveLength(3);
       }
     }
@@ -1115,8 +1121,9 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    // 2 = tracked_image_tag Postgres sync + scheduled-action apply pass; no
-    // recovery launched.
+    // 2 = tracked_image_tag sync + scheduled-action apply pass; no recovery
+    // launched. instance_type Postgres sync no longer fires unconditionally —
+    // only when backfill or resize changes DO state.
     expect(waitUntilPromises).toHaveLength(2);
     expect(storage._store.get('status')).toBe('running');
     expect(storage._store.get('healthCheckFailCount')).toBe(0);
@@ -1131,8 +1138,8 @@ describe('reconciliation: machine status sync', () => {
 
     await instance.alarm();
 
-    // 2 = tracked_image_tag Postgres sync + scheduled-action apply pass; no
-    // fresh recovery launched.
+    // 2 = tracked_image_tag sync + scheduled-action apply pass; no fresh
+    // recovery launched, no instance_type sync (state unchanged).
     expect(waitUntilPromises).toHaveLength(2);
   });
 
@@ -7665,6 +7672,40 @@ describe("provision: async start sets status to 'starting'", () => {
     expect(flyClient.createMachine).not.toHaveBeenCalled();
     expect(storage._store.get('status')).toBe('running');
   });
+
+  it('preserves custom tier and machine size on re-provision', async () => {
+    const { instance, storage } = createInstance();
+    const customMachineSize = { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' };
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'custom',
+      machineSize: customMachineSize,
+      volumeSizeGb: 15,
+    });
+
+    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+
+    expect(storage._store.get('instanceType')).toBe('custom');
+    expect(storage._store.get('machineSize')).toEqual(customMachineSize);
+    expect(storage._store.get('volumeSizeGb')).toBe(15);
+  });
+
+  it('preserves unknown legacy machine size on re-provision instead of defaulting to perf-1-3', async () => {
+    const { instance, storage } = createInstance();
+    const legacyMachineSize = { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' };
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: null,
+      machineSize: legacyMachineSize,
+      volumeSizeGb: 15,
+    });
+
+    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+
+    expect(storage._store.get('instanceType')).toBeNull();
+    expect(storage._store.get('machineSize')).toEqual(legacyMachineSize);
+    expect(storage._store.get('volumeSizeGb')).toBe(15);
+  });
 });
 
 describe("status guards: 'starting'", () => {
@@ -8725,93 +8766,834 @@ describe('reassociateVolume', () => {
 });
 
 // ============================================================================
+// instanceType resolution (getStatus self-heal)
+// ============================================================================
+
+describe('getStatus instanceType resolution', () => {
+  it('drops a stale custom label when machineSize is null', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      instanceType: 'custom',
+      machineSize: null,
+      volumeSizeGb: null,
+    });
+
+    const result = await instance.getStatus();
+
+    expect(result.instanceType).toBeNull();
+  });
+
+  it('preserves custom when backed by a non-catalog machineSize', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      instanceType: 'custom',
+      machineSize: { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    const result = await instance.getStatus();
+
+    expect(result.instanceType).toBe('custom');
+  });
+
+  it('does not propagate a stale custom label on re-provision', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      instanceType: 'custom',
+      machineSize: null,
+      volumeSizeGb: null,
+    });
+
+    await instance.provision('user-1', { kilocodeApiKey: 'new-key' });
+
+    expect(storage._store.get('instanceType')).not.toBe('custom');
+  });
+});
+
+// ============================================================================
+// instanceType backfill from live Fly machine config
+// ============================================================================
+
+describe('instanceType alarm-driven backfill', () => {
+  it('backfills machineSize and instanceType during alarm reconcile when DO state is legacy', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'perf-1-3'
+    );
+  });
+
+  it('skips backfill when an admin override is active even on a legacy null-machineSize instance', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'override active',
+        actorId: 'admin-1',
+        actorEmail: 'a@e.com',
+        setAt: 1,
+      },
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      // Live Fly guest reflects the override, not the (unobserved) tier hardware.
+      config: { guest: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
+
+    // machineSize / instanceType remain null — backfill correctly refused to
+    // mistake the override-shape for tier hardware.
+    expect(storage._store.get('machineSize')).toBeNull();
+    expect(storage._store.get('instanceType')).toBeNull();
+    expect(dbModule.syncInstanceType).not.toHaveBeenCalled();
+  });
+
+  it('does not touch DO state or Postgres when machineSize is already populated', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      instanceType: 'perf-1-3',
+      volumeSizeGb: 10,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(dbModule.syncInstanceType).not.toHaveBeenCalled();
+  });
+
+  it('writes custom and syncs Postgres when the live Fly guest does not match any catalog tier', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.alarm();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(storage._store.get('instanceType')).toBe('custom');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'custom'
+    );
+  });
+});
+
+describe('getDebugState live-check dispatch', () => {
+  it('dispatches a Fly live check on getDebugState when running and past the throttle, and syncs Postgres on backfill', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: null,
+      instanceType: null,
+      volumeSizeGb: null,
+      lastLiveCheckAt: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.getDebugState();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(flyClient.getMachine).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'acct-test' },
+      'machine-1'
+    );
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'perf-1-3'
+    );
+  });
+
+  it('does not sync Postgres on getDebugState when state is already populated (no-op alarm)', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      instanceType: 'perf-1-3',
+      volumeSizeGb: 10,
+      lastLiveCheckAt: null,
+    });
+
+    (flyClient.getMachine as Mock).mockResolvedValue({
+      state: 'started',
+      config: { guest: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' } },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    await instance.getDebugState();
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(dbModule.syncInstanceType).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
 // resizeMachine
 // ============================================================================
 
 describe('resizeMachine', () => {
   it('rejects when instance is not provisioned', async () => {
     const { instance } = createInstance();
-    await expect(
-      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
-    ).rejects.toThrow('Instance is not provisioned');
+    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow('Instance is not provisioned');
   });
 
   it('rejects when instance is being destroyed', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'destroying' });
 
-    await expect(
-      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
-    ).rejects.toThrow('Cannot resize: instance is being destroyed');
+    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
+      'Cannot resize: instance is being destroyed'
+    );
   });
 
   it('rejects when instance is restoring', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'restoring' });
 
-    await expect(
-      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
-    ).rejects.toThrow('Cannot resize: instance is restoring from snapshot');
+    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
+      'Cannot resize: instance is restoring from snapshot'
+    );
   });
 
   it('rejects when instance is recovering', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, { status: 'recovering' });
 
-    await expect(
-      instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' })
-    ).rejects.toThrow('Cannot resize: instance is recovering');
+    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
+      'Cannot resize: instance is recovering'
+    );
   });
 
-  it('persists new machine size and returns previous', async () => {
+  it('persists new tier and returns previous tier', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage, {
       machineSize: { cpus: 2, memory_mb: 3072, cpu_kind: 'shared' },
+      instanceType: 'shared-2-3',
+      volumeSizeGb: 10,
+      status: 'stopped',
     });
 
-    const result = await instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' });
+    const result = await instance.resizeMachine('perf-4-8');
 
-    expect(result.previousSize).toEqual({ cpus: 2, memory_mb: 3072, cpu_kind: 'shared' });
-    expect(result.newSize).toEqual({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' });
+    expect(result.previousTier).toBe('shared-2-3');
+    expect(result.newTier).toBe('perf-4-8');
     const stored = storage._store.get('machineSize') as { cpus: number; memory_mb: number };
     expect(stored.cpus).toBe(4);
-    expect(stored.memory_mb).toBe(3072);
+    expect(stored.memory_mb).toBe(8192);
   });
 
-  it('returns null previousSize when no prior size set', async () => {
+  it('returns inferred previous tier when no prior tier is set', async () => {
     const { instance, storage } = createInstance();
-    await seedProvisioned(storage);
+    await seedProvisioned(storage, { status: 'stopped' });
 
-    const result = await instance.resizeMachine({
-      cpus: 1,
-      memory_mb: 3072,
-      cpu_kind: 'performance',
+    const result = await instance.resizeMachine('perf-4-8');
+
+    expect(result.previousTier).toBeNull();
+    expect(result.machineSize).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
+  });
+
+  it('rejects resize when instance is running', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage, {
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
     });
 
-    expect(result.previousSize).toBeNull();
-    expect(result.newSize).toEqual({ cpus: 1, memory_mb: 3072, cpu_kind: 'performance' });
-  });
-
-  it('allows resize when instance is running', async () => {
-    const { instance, storage } = createInstance();
-    await seedRunning(storage);
-
-    const result = await instance.resizeMachine({ cpus: 4, memory_mb: 3072, cpu_kind: 'shared' });
-
-    expect(result.newSize.cpus).toBe(4);
+    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
+      'Instance must be stopped before resizing machine tier'
+    );
   });
 
   it('allows resize when instance is stopped', async () => {
     const { instance, storage } = createInstance();
-    await seedProvisioned(storage, { status: 'stopped' });
-
-    const result = await instance.resizeMachine({
-      cpus: 2,
-      memory_mb: 4096,
-      cpu_kind: 'performance',
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
     });
 
-    expect(result.newSize).toEqual({ cpus: 2, memory_mb: 4096, cpu_kind: 'performance' });
+    const result = await instance.resizeMachine('perf-4-8');
+
+    expect(result.newTier).toBe('perf-4-8');
+    expect(result.machineSize).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
+  });
+
+  it('rejects offered-tier downgrades', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-4-8',
+      machineSize: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      volumeSizeGb: 20,
+    });
+
+    await expect(instance.resizeMachine('perf-1-3')).rejects.toThrow(
+      'downgrades and sidegrades are not allowed'
+    );
+  });
+
+  it('rejects offered-tier sidegrades', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    await expect(instance.resizeMachine('perf-1-3')).rejects.toThrow(
+      'downgrades and sidegrades are not allowed'
+    );
+  });
+
+  it('rejects legacy tiers as resize targets', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { status: 'stopped' });
+
+    await expect(instance.resizeMachine('shared-2-3')).rejects.toThrow(
+      'is not an offerable resize target'
+    );
+  });
+
+  it('extends volume and persists volume size before tier state', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: 'vol-1',
+    });
+
+    const result = await instance.resizeMachine('perf-4-16');
+
+    expect(flyClient.extendVolume).toHaveBeenCalledWith(
+      { apiToken: 'test-token', appName: 'test-app' },
+      'vol-1',
+      40
+    );
+    expect(result.newVolumeSizeGb).toBe(40);
+    expect(storage._store.get('volumeSizeGb')).toBe(40);
+    expect(storage._store.get('instanceType')).toBe('perf-4-16');
+  });
+
+  it('keeps DO state unchanged when Fly volume extend fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: 'vol-1',
+    });
+    (flyClient.extendVolume as Mock).mockRejectedValueOnce(new Error('extend failed'));
+
+    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow('extend failed');
+
+    expect(storage._store.get('volumeSizeGb')).toBe(10);
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+  });
+
+  it('persists tier when Postgres sync fails', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: 'vol-1',
+    });
+    const db = await import('../db');
+    (db.syncInstanceType as Mock).mockRejectedValueOnce(new Error('postgres down'));
+
+    await instance.resizeMachine('perf-4-8');
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(storage._store.get('instanceType')).toBe('perf-4-8');
+  });
+
+  it('persists docker-local resize without calling Fly volume APIs', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      provider: 'docker-local',
+      providerState: {
+        provider: 'docker-local',
+        containerName: 'kiloclaw-test',
+        volumeName: 'kiloclaw-root-test',
+        hostPort: 45001,
+      },
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: null,
+      flyMachineId: null,
+    });
+
+    const result = await instance.resizeMachine('perf-4-8');
+
+    expect(result.newTier).toBe('perf-4-8');
+    expect(flyClient.extendVolume).not.toHaveBeenCalled();
+    expect(storage._store.get('instanceType')).toBe('perf-4-8');
+  });
+
+  it('rejects Northflank resize before persisting tier changes', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      provider: 'northflank',
+      providerState: { provider: 'northflank' },
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
+      'Instance tier resize is not yet supported on Northflank instances'
+    );
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+  });
+
+  it('clears any active admin size override and reports it in the response', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      flyVolumeId: 'vol-1',
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'OOM ticket #1',
+        actorId: 'admin-1',
+        actorEmail: 'alice@example.com',
+        setAt: 1234567890,
+      },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.resizeMachine('perf-4-8');
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.clearedOverride).toEqual({
+      size: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+      metadata: {
+        reason: 'OOM ticket #1',
+        actorId: 'admin-1',
+        actorEmail: 'alice@example.com',
+        setAt: 1234567890,
+      },
+    });
+    expect(storage._store.get('adminMachineSizeOverride')).toBeNull();
+    expect(storage._store.get('adminMachineSizeOverrideMetadata')).toBeNull();
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      null
+    );
+  });
+});
+
+// ============================================================================
+// adminMachineSizeOverride
+// ============================================================================
+
+describe('setAdminMachineSizeOverride', () => {
+  const overrideArgs = {
+    size: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' as const },
+    reason: 'OOM recovery for ticket #1234',
+    actorId: 'admin-1',
+    actorEmail: 'alice@example.com',
+  };
+
+  it('persists the override and metadata, syncs Postgres', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.setAdminMachineSizeOverride(overrideArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toBeNull();
+    expect(result.newOverride).toEqual(overrideArgs.size);
+    expect(storage._store.get('adminMachineSizeOverride')).toEqual(overrideArgs.size);
+    const stored = storage._store.get('adminMachineSizeOverrideMetadata') as Record<
+      string,
+      unknown
+    >;
+    expect(stored).toMatchObject({
+      reason: overrideArgs.reason,
+      actorId: 'admin-1',
+      actorEmail: 'alice@example.com',
+    });
+    expect(typeof stored.setAt).toBe('number');
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      expect.objectContaining({
+        size: overrideArgs.size,
+        reason: overrideArgs.reason,
+      })
+    );
+    // Tier hardware untouched.
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('instanceType')).toBe('perf-1-3');
+    expect(storage._store.get('volumeSizeGb')).toBe(10);
+  });
+
+  it('persists override on a running instance — applies on next restart', async () => {
+    // Set is a pure DO state write; the Fly `updateMachine(guest=...)` call
+    // doesn't happen until the next stop/start cycle. The current container
+    // keeps running on tier hardware in the meantime.
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    const result = await instance.setAdminMachineSizeOverride(overrideArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.newOverride).toEqual(overrideArgs.size);
+    expect(storage._store.get('adminMachineSizeOverride')).toEqual(overrideArgs.size);
+    // Tier hardware untouched.
+    expect(storage._store.get('machineSize')).toEqual({
+      cpus: 1,
+      memory_mb: 3072,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('rejects on Northflank instances', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      provider: 'northflank',
+      providerState: { provider: 'northflank' },
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    await expect(instance.setAdminMachineSizeOverride(overrideArgs)).rejects.toThrow(
+      'Admin size override is not yet supported on Northflank instances'
+    );
+  });
+
+  it('rejects when machineSize is null (legacy instance — wait for backfill first)', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: null,
+      machineSize: null,
+      volumeSizeGb: null,
+    });
+
+    await expect(instance.setAdminMachineSizeOverride(overrideArgs)).rejects.toThrow(
+      'machineSize has not been observed yet'
+    );
+  });
+
+  it('overwrites a prior override and reports the previous value', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'previous reason xx',
+        actorId: 'admin-0',
+        actorEmail: 'bob@example.com',
+        setAt: 1,
+      },
+    });
+
+    const result = await instance.setAdminMachineSizeOverride({
+      ...overrideArgs,
+      size: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+    });
+
+    expect(result.previousOverride).toEqual({ cpus: 4, memory_mb: 8192, cpu_kind: 'performance' });
+    expect(result.newOverride).toEqual({ cpus: 4, memory_mb: 16384, cpu_kind: 'performance' });
+    expect(storage._store.get('adminMachineSizeOverride')).toEqual({
+      cpus: 4,
+      memory_mb: 16384,
+      cpu_kind: 'performance',
+    });
+  });
+});
+
+describe('clearAdminMachineSizeOverride', () => {
+  const clearArgs = {
+    reason: 'cleanup after recovery',
+    actorId: 'admin-1',
+    actorEmail: 'alice@example.com',
+  };
+
+  it('clears persisted override and metadata, syncs Postgres', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'OOM ticket #1',
+        actorId: 'admin-2',
+        actorEmail: 'bob@example.com',
+        setAt: 1,
+      },
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toEqual({
+      cpus: 4,
+      memory_mb: 8192,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('adminMachineSizeOverride')).toBeNull();
+    expect(storage._store.get('adminMachineSizeOverrideMetadata')).toBeNull();
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      null
+    );
+  });
+
+  it('is a DO no-op when no override is active but still fires Postgres sync to repair the denormalized cache', async () => {
+    // The Postgres `admin_size_override` column is a best-effort denormalized
+    // read cache for the admin "Has size override" list filter. If a prior
+    // best-effort sync failed (or DO state was restored without an override
+    // while Postgres held a stale payload), the admin list would show a
+    // phantom override forever. An admin firing "Clear Size Override" must
+    // repair the cache even when the DO is already null.
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'stopped',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncAdminSizeOverride as Mock).mockClear();
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toBeNull();
+    // Postgres sync still fires with null payload (idempotent via IS DISTINCT FROM
+    // — SQL no-op when the column is already null, repair when stale).
+    expect(dbModule.syncAdminSizeOverride).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      null
+    );
+  });
+
+  it('clears override on a running instance — revert applies on next restart', async () => {
+    // Mirror of the running-instance set test: clear is a DO state write;
+    // the running container keeps the override hardware until next restart.
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+      adminMachineSizeOverride: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+      adminMachineSizeOverrideMetadata: {
+        reason: 'reason xx',
+        actorId: 'admin-0',
+        actorEmail: 'b@e.com',
+        setAt: 1,
+      },
+    });
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousOverride).toEqual({
+      cpus: 4,
+      memory_mb: 8192,
+      cpu_kind: 'performance',
+    });
+    expect(storage._store.get('adminMachineSizeOverride')).toBeNull();
+    expect(storage._store.get('status')).toBe('running');
+  });
+
+  it('is a no-op even on a destroying instance when no override is active', async () => {
+    // Idempotent clear bypasses the guard so admins triaging incidents
+    // can fire it from a list-page action without inspecting status first.
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      instanceType: 'perf-1-3',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      volumeSizeGb: 10,
+    });
+
+    const result = await instance.clearAdminMachineSizeOverride(clearArgs);
+
+    expect(result.previousOverride).toBeNull();
+  });
+});
+
+// ============================================================================
+// recordVolumeExtend
+// ============================================================================
+
+describe('recordVolumeExtend', () => {
+  it('persists the new volume size, marks the instance custom, and syncs Postgres', async () => {
+    const { instance, storage, waitUntilPromises } = createInstance();
+    await seedRunning(storage, {
+      provider: 'fly',
+      flyMachineId: 'machine-1',
+      flyAppName: 'acct-test',
+      machineSize: { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
+      instanceType: 'perf-1-3',
+      volumeSizeGb: 10,
+    });
+    const dbModule = await import('../db');
+    (dbModule.syncInstanceType as Mock).mockClear();
+
+    const result = await instance.recordVolumeExtend(15);
+    await Promise.allSettled(waitUntilPromises);
+
+    expect(result.previousVolumeSizeGb).toBe(10);
+    expect(result.newVolumeSizeGb).toBe(15);
+    expect(result.instanceType).toBe('custom');
+    expect(storage._store.get('volumeSizeGb')).toBe(15);
+    expect(storage._store.get('instanceType')).toBe('custom');
+    expect(dbModule.syncInstanceType).toHaveBeenCalledWith(
+      expect.anything(),
+      'user-1',
+      'sandbox-1',
+      'custom'
+    );
+  });
+
+  it('rejects invalid sizes', async () => {
+    const { instance, storage } = createInstance();
+    await seedRunning(storage);
+
+    await expect(instance.recordVolumeExtend(0)).rejects.toThrow('Invalid volume size');
+    await expect(instance.recordVolumeExtend(501)).rejects.toThrow('Invalid volume size');
+    await expect(instance.recordVolumeExtend(10.5)).rejects.toThrow('Invalid volume size');
+  });
+
+  it('rejects when not provisioned', async () => {
+    const { instance } = createInstance();
+    await expect(instance.recordVolumeExtend(20)).rejects.toThrow('Instance is not provisioned');
   });
 });
 

@@ -48,6 +48,8 @@ import type {
   CandidateVolumesResponse,
   ReassociateVolumeResponse,
   ResizeMachineResponse,
+  SetAdminMachineSizeOverrideResponse,
+  ClearAdminMachineSizeOverrideResponse,
   RestoreVolumeSnapshotResponse,
   CleanupRecoveryPreviousVolumeResponse,
   RegionsResponse,
@@ -56,6 +58,7 @@ import type {
   UpdateProviderRolloutResponse,
   ProviderRolloutConfig,
 } from './types';
+import type { InstanceTierKey } from '@kilocode/kiloclaw-instance-tiers';
 
 /** Keep in sync with: kiloclaw/controller/src/routes/files.ts, kiloclaw/src/.../gateway.ts (Zod) */
 export interface FileNode {
@@ -974,7 +977,7 @@ export class KiloClawInternalClient {
 
   async resizeMachine(
     userId: string,
-    machineSize: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' },
+    instanceType: InstanceTierKey,
     instanceId?: string
   ): Promise<ResizeMachineResponse> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -982,7 +985,44 @@ export class KiloClawInternalClient {
       `/api/platform/resize-machine${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, machineSize }),
+        body: JSON.stringify({ userId, instanceType }),
+      },
+      { userId }
+    );
+  }
+
+  async setAdminMachineSizeOverride(
+    userId: string,
+    payload: {
+      size: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' };
+      reason: string;
+      actorId: string;
+      actorEmail: string;
+    },
+    instanceId?: string
+  ): Promise<SetAdminMachineSizeOverrideResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/admin-size-override/set${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...payload }),
+      },
+      { userId }
+    );
+  }
+
+  async clearAdminMachineSizeOverride(
+    userId: string,
+    payload: { reason: string; actorId: string; actorEmail: string },
+    instanceId?: string
+  ): Promise<ClearAdminMachineSizeOverrideResponse> {
+    const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
+    return this.request(
+      `/api/platform/admin-size-override/clear${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, ...payload }),
       },
       { userId }
     );
@@ -1025,6 +1065,7 @@ export class KiloClawInternalClient {
     userId: string,
     appName: string,
     volumeId: string,
+    targetSizeGb: number,
     instanceId?: string
   ): Promise<{ ok: true; needsRestart: boolean }> {
     const params = instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : '';
@@ -1032,7 +1073,7 @@ export class KiloClawInternalClient {
       `/api/platform/extend-volume${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, appName, volumeId }),
+        body: JSON.stringify({ userId, appName, volumeId, targetSizeGb }),
       },
       { userId }
     );

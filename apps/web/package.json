@@ -47,6 +47,7 @@
     "@kilocode/event-service": "workspace:*",
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/kilo-chat-hooks": "workspace:*",
+    "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@lottiefiles/dotlottie-react": "^0.17.15",

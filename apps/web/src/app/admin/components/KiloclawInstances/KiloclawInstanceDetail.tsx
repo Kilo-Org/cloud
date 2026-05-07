@@ -60,6 +60,7 @@ import {
   Stethoscope,
   CheckCircle2,
   XCircle,
+  Shield,
   ShieldAlert,
   Activity,
   Copy,
@@ -79,6 +80,21 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { toast } from 'sonner';
 import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
 import {
+  canUpgradeTo,
+  DEFAULT_INSTANCE_TIER,
+  formatTierHardware,
+  getTier,
+  INSTANCE_TIERS,
+  InstanceTierKeySchema,
+  OFFERED_TIERS,
+  type InstanceTierKey,
+  type InstanceType,
+} from '@kilocode/kiloclaw-instance-tiers';
+import {
+  ADMIN_SIZE_OVERRIDE_PRESETS,
+  type AdminSizeOverridePreset,
+} from '@/lib/kiloclaw/admin-size-override';
+import {
   defaultScheduledAt,
   defaultNotifyFormState,
   type NotifyFormState,
@@ -86,7 +102,7 @@ import {
 import { ScheduleNotifyFields } from '../KiloclawScheduler/ScheduleNotifyFields';
 import { AdminFileEditor } from './AdminFileEditor';
 import { KiloCliRunCard } from './KiloCliRunCard';
-import { BumpVolumeTo15GbButton } from './BumpVolumeTo15GbDialog';
+import { ExtendVolumeButton } from './ExtendVolumeDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useKiloclawInstanceEvents,
@@ -104,6 +120,35 @@ function formatEpochTime(epoch: number | null): string {
 function formatEpochRelativeTime(epoch: number | null): string {
   if (epoch === null) return '—';
   return formatDistanceToNow(new Date(epoch), { addSuffix: true });
+}
+
+function InstanceTypeBadge({ instanceType }: { instanceType: InstanceType | null }) {
+  if (!instanceType) {
+    return <Badge variant="outline">Unknown</Badge>;
+  }
+  if (instanceType === 'custom') {
+    return <Badge variant="secondary">Custom</Badge>;
+  }
+  const tier = getTier(instanceType);
+  return tier.status === 'legacy' ? (
+    <Badge variant="secondary">{instanceType} (legacy)</Badge>
+  ) : (
+    <Badge>{instanceType}</Badge>
+  );
+}
+
+function canResizeToTier(
+  current: InstanceType | null,
+  machineSize: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' } | null,
+  volumeSizeGb: number | null,
+  target: InstanceTierKey
+): boolean {
+  return canUpgradeTo({
+    currentType: current,
+    currentSize: machineSize,
+    currentVolumeSizeGb: volumeSizeGb,
+    targetTier: target,
+  });
 }
 
 function useControllerTelemetryDiskUsage(sandboxId: string) {
@@ -1259,7 +1304,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [restoreConfigDialogOpen, setRestoreConfigDialogOpen] = useState(false);
   const [destroyMachineDialogOpen, setDestroyMachineDialogOpen] = useState(false);
   const [resizeMachineDialogOpen, setResizeMachineDialogOpen] = useState(false);
-  const [selectedMachineSize, setSelectedMachineSize] = useState<string>('performance-1x');
+  const [selectedInstanceType, setSelectedInstanceType] =
+    useState<InstanceTierKey>(DEFAULT_INSTANCE_TIER);
   const [resizeConfirmText, setResizeConfirmText] = useState('');
   const [changeVersionDialogOpen, setChangeVersionDialogOpen] = useState(false);
   const [changeVersionSelectedTag, setChangeVersionSelectedTag] = useState<string>('');
@@ -1280,6 +1326,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [cleanupRecoveryVolumeDialogOpen, setCleanupRecoveryVolumeDialogOpen] = useState(false);
   const [inboundEmailCycleDialogOpen, setInboundEmailCycleDialogOpen] = useState(false);
   const [awaitingRestoreCompletion, setAwaitingRestoreCompletion] = useState(false);
+  const [sizeOverrideDialogOpen, setSizeOverrideDialogOpen] = useState(false);
+  const [sizeOverrideMode, setSizeOverrideMode] = useState<'set' | 'clear'>('set');
+  const [sizeOverridePreset, setSizeOverridePreset] = useState<AdminSizeOverridePreset>('perf-4-8');
+  const [sizeOverrideReason, setSizeOverrideReason] = useState('');
 
   const { data, isLoading, error } = useQuery({
     ...trpc.admin.kiloclawInstances.get.queryOptions({ id: instanceId }),
@@ -1507,6 +1557,16 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     data?.destroyed_at === null &&
     data?.workerStatus?.status !== 'restoring' &&
     data?.workerStatus?.status !== 'recovering';
+  const nextResizeTier = data?.workerStatus
+    ? OFFERED_TIERS.find(tier =>
+        canResizeToTier(
+          data.workerStatus?.instanceType ?? null,
+          data.workerStatus?.machineSize ?? null,
+          data.workerStatus?.volumeSizeGb ?? null,
+          tier
+        )
+      )
+    : undefined;
   const hasRuntime = !!runtimeId;
   const hasFlyMachine = isFlyProvider && !!flyMachineId;
   const canRetryMetadataRecovery =
@@ -1719,6 +1779,60 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     trpc.admin.kiloclawInstances.resizeMachine.mutationOptions()
   );
 
+  const { mutateAsync: setSizeOverrideMutation, isPending: isSettingSizeOverride } = useMutation(
+    trpc.admin.kiloclawInstances.setAdminMachineSizeOverride.mutationOptions({
+      onSuccess: result => {
+        toast.success(
+          `Admin override set: ${result.newOverride.cpus}× ${result.newOverride.cpu_kind ?? 'shared'}, ${result.newOverride.memory_mb}MB`
+        );
+        invalidateMachineQueries();
+        setSizeOverrideDialogOpen(false);
+        setSizeOverrideReason('');
+      },
+      onError: err => {
+        toast.error(`Failed to set admin override: ${err.message}`);
+      },
+    })
+  );
+
+  const { mutateAsync: clearSizeOverrideMutation, isPending: isClearingSizeOverride } = useMutation(
+    trpc.admin.kiloclawInstances.clearAdminMachineSizeOverride.mutationOptions({
+      onSuccess: () => {
+        toast.success('Admin override cleared');
+        invalidateMachineQueries();
+        setSizeOverrideDialogOpen(false);
+        setSizeOverrideReason('');
+      },
+      onError: err => {
+        toast.error(`Failed to clear admin override: ${err.message}`);
+      },
+    })
+  );
+
+  const isMutatingSizeOverride = isSettingSizeOverride || isClearingSizeOverride;
+
+  const handleSizeOverrideSubmit = async () => {
+    if (!data || !userId) return;
+    if (sizeOverrideReason.trim().length < 10) {
+      toast.error('Reason must be at least 10 characters');
+      return;
+    }
+    if (sizeOverrideMode === 'set') {
+      await setSizeOverrideMutation({
+        userId,
+        instanceId,
+        preset: sizeOverridePreset,
+        reason: sizeOverrideReason.trim(),
+      });
+    } else {
+      await clearSizeOverrideMutation({
+        userId,
+        instanceId,
+        reason: sizeOverrideReason.trim(),
+      });
+    }
+  };
+
   const isResizingMachine =
     resizePhase !== 'idle' && resizePhase !== 'done' && resizePhase !== 'error';
 
@@ -1748,17 +1862,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     setResizeConfirmText('');
     setResizeError(null);
 
-    const sizeMap: Record<
-      string,
-      { cpus: number; memory_mb: number; cpu_kind: 'shared' | 'performance' }
-    > = {
-      'shared-cpu-2x': { cpus: 2, memory_mb: 3072, cpu_kind: 'shared' },
-      'shared-cpu-4x': { cpus: 4, memory_mb: 3072, cpu_kind: 'shared' },
-      'performance-1x': { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
-      'performance-2x': { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' },
-    };
-    const machineSize = sizeMap[selectedMachineSize];
-    if (!machineSize || !data || !userId) return;
+    if (!data || !userId) return;
 
     try {
       // Step 1: Stop if running — retry up to 3 times since Fly can be slow
@@ -1789,7 +1893,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
       // Step 2: Update DO state
       setResizePhase('resizing');
-      await resizeMachineMutation({ userId, instanceId: data.id, machineSize });
+      await resizeMachineMutation({
+        userId,
+        instanceId: data.id,
+        instanceType: selectedInstanceType,
+      });
 
       // Step 3: Start with new size
       setResizePhase('starting');
@@ -2478,6 +2586,36 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <AlertDescription>{data.workerStatusError}</AlertDescription>
               </Alert>
             )}
+            {data.workerStatus?.adminMachineSizeOverride && (
+              <Alert className="mb-4 border-amber-500/30 bg-amber-500/10">
+                <Shield className="h-4 w-4 text-amber-500" />
+                <AlertDescription className="text-amber-700 dark:text-amber-300">
+                  {/* Wrap in a single <p> so AlertDescription's grid layout
+                      doesn't put each inline child on its own row. */}
+                  <p>
+                    <span className="font-medium">
+                      Admin size override: {data.workerStatus.adminMachineSizeOverride.cpus}×{' '}
+                      {data.workerStatus.adminMachineSizeOverride.cpu_kind ?? 'shared'},{' '}
+                      {data.workerStatus.adminMachineSizeOverride.memory_mb}MB
+                    </span>
+                    {data.workerStatus.adminMachineSizeOverrideMetadata && (
+                      <>
+                        {' · '}
+                        <strong>
+                          {data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail}
+                        </strong>
+                        {', '}
+                        {formatEpochRelativeTime(
+                          data.workerStatus.adminMachineSizeOverrideMetadata.setAt
+                        )}
+                        {' — '}
+                        <em>{data.workerStatus.adminMachineSizeOverrideMetadata.reason}</em>
+                      </>
+                    )}
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
             {data.workerStatus ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <DetailField label="DO Status">
@@ -2534,6 +2672,29 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
                 <div className="flex items-center gap-2">
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <DetailField label="Instance Tier">
+                    <span className="flex items-center gap-2">
+                      <InstanceTypeBadge instanceType={data.workerStatus.instanceType ?? null} />
+                      {data.workerStatus.adminMachineSizeOverride && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          title={
+                            data.workerStatus.adminMachineSizeOverrideMetadata
+                              ? `Set by ${data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail} — ${data.workerStatus.adminMachineSizeOverrideMetadata.reason}`
+                              : 'Admin override active'
+                          }
+                        >
+                          <Shield className="mr-1 h-3 w-3" />
+                          Override
+                        </Badge>
+                      )}
+                    </span>
+                  </DetailField>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Server className="text-muted-foreground h-4 w-4 shrink-0" />
                   <DetailField label="Machine Size">
                     {data.workerStatus.machineSize ? (
                       <code className="text-sm">
@@ -2546,6 +2707,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         default (performance-1x, 3072MB)
                       </span>
                     )}
+                  </DetailField>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <DetailField label="Volume Size">
+                    {data.workerStatus.volumeSizeGb ? `${data.workerStatus.volumeSizeGb} GB` : '—'}
                   </DetailField>
                 </div>
 
@@ -2991,21 +3159,52 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={machineActionPending || isResizingMachine}
+                  disabled={machineActionPending || isResizingMachine || !nextResizeTier}
                   onClick={() => {
-                    const ms = data?.workerStatus?.machineSize;
-                    const key = ms
-                      ? ms.cpu_kind === 'performance'
-                        ? `performance-${ms.cpus}x`
-                        : `shared-cpu-${ms.cpus}x`
-                      : 'performance-1x';
-                    setSelectedMachineSize(key);
+                    if (!nextResizeTier) return;
+                    setSelectedInstanceType(nextResizeTier);
                     setResizeMachineDialogOpen(true);
                   }}
                 >
                   <ArrowUpDown className="mr-1 h-4 w-4" />
                   Resize Runtime
                 </Button>
+                {(isFlyProvider || data?.workerStatus?.provider === 'docker-local') && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={
+                      data?.workerStatus?.adminMachineSizeOverride
+                        ? 'border-amber-500 text-amber-500 hover:bg-amber-500/10'
+                        : ''
+                    }
+                    // Button stays clickable when the instance is running so
+                    // admins can discover the affordance; the dialog itself
+                    // disables Set/Clear until the machine is stopped and
+                    // surfaces an inline "must be stopped" message. The DO RPC
+                    // is the authoritative guard.
+                    disabled={
+                      machineActionPending ||
+                      isResizingMachine ||
+                      isMutatingSizeOverride ||
+                      !hasRuntime ||
+                      !!data?.destroyed_at
+                    }
+                    onClick={() => {
+                      setSizeOverrideMode(
+                        data?.workerStatus?.adminMachineSizeOverride ? 'clear' : 'set'
+                      );
+                      setSizeOverrideReason('');
+                      setSizeOverridePreset('perf-4-8');
+                      setSizeOverrideDialogOpen(true);
+                    }}
+                  >
+                    <Shield className="mr-1 h-4 w-4" />
+                    {data?.workerStatus?.adminMachineSizeOverride
+                      ? 'Clear Size Override'
+                      : 'Size Override…'}
+                  </Button>
+                )}
                 {isFlyProvider && (
                   <Button
                     size="sm"
@@ -3202,42 +3401,71 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 Resize Machine
               </DialogTitle>
               <DialogDescription className="pt-3">
-                This will stop the machine, update its CPU/memory spec, and restart it. The user
-                will be disconnected during the restart.
+                This will stop the machine, update its CPU/memory and storage spec, and restart it.
+                The user will be disconnected during the restart.
                 <span className="text-foreground mt-2 block font-medium">
                   User: {data?.user_email ?? data?.user_id}
                 </span>
-                {data?.workerStatus?.machineSize ? (
-                  <span className="mt-2 block text-sm">
-                    Current:{' '}
-                    <code className="text-xs">
-                      {data.workerStatus.machineSize.cpu_kind ?? 'shared'}-cpu-
-                      {data.workerStatus.machineSize.cpus}x,{' '}
-                      {data.workerStatus.machineSize.memory_mb}MB
-                    </code>
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground mt-2 block text-sm">
-                    Current: default (performance-1x, 3072MB)
-                  </span>
-                )}
+                <span className="mt-2 flex items-center gap-2 text-sm">
+                  Current:{' '}
+                  <InstanceTypeBadge instanceType={data?.workerStatus?.instanceType ?? null} />
+                </span>
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <label className="text-sm font-medium">New size</label>
+                <label className="text-sm font-medium">New tier</label>
                 <select
                   className="bg-background border-input mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                  value={selectedMachineSize}
-                  onChange={e => setSelectedMachineSize(e.target.value)}
+                  value={selectedInstanceType}
+                  onChange={e =>
+                    setSelectedInstanceType(InstanceTierKeySchema.parse(e.target.value))
+                  }
                   disabled={isResizingMachine}
                 >
-                  <option value="shared-cpu-2x">shared-cpu-2x, 3GB (~$20/mo)</option>
-                  <option value="shared-cpu-4x">shared-cpu-4x, 3GB (~$24/mo)</option>
-                  <option value="performance-1x">performance-1x, 3GB (~$47/mo)</option>
-                  <option value="performance-2x">performance-2x, 4GB (~$85/mo)</option>
+                  {OFFERED_TIERS.map(tierKey => {
+                    const tier = getTier(tierKey);
+                    return (
+                      <option
+                        key={tierKey}
+                        value={tierKey}
+                        disabled={
+                          !canResizeToTier(
+                            data?.workerStatus?.instanceType ?? null,
+                            data?.workerStatus?.machineSize ?? null,
+                            data?.workerStatus?.volumeSizeGb ?? null,
+                            tierKey
+                          )
+                        }
+                      >
+                        {tierKey} — {formatTierHardware(tier)}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
+              {data?.workerStatus?.provider === 'fly' &&
+                getTier(selectedInstanceType).volumeSizeGb >
+                  (data?.workerStatus?.volumeSizeGb ?? 10) && (
+                  <Alert className="border-orange-500/30 bg-orange-500/10">
+                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    <AlertDescription className="text-orange-700 dark:text-orange-300">
+                      Fly volume will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB to{' '}
+                      {getTier(selectedInstanceType).volumeSizeGb} GB. Fly volumes can grow but
+                      cannot be shrunk, so you will not be able to downgrade this instance.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              {data?.workerStatus?.provider === 'docker-local' &&
+                getTier(selectedInstanceType).volumeSizeGb !==
+                  (data?.workerStatus?.volumeSizeGb ?? 10) && (
+                  <Alert className="border-muted-foreground/30 bg-muted/30">
+                    <AlertDescription className="text-muted-foreground">
+                      docker-local uses a host bind mount; storage will stay at its current size
+                      regardless of tier. Only CPU and memory limits will change.
+                    </AlertDescription>
+                  </Alert>
+                )}
               <div>
                 <label className="text-sm font-medium">
                   Type <code className="text-destructive text-xs">RESIZE</code> to confirm
@@ -3264,6 +3492,124 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 onClick={() => void handleResize()}
               >
                 Confirm Resize
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Admin Size Override Dialog */}
+        <Dialog
+          open={sizeOverrideDialogOpen}
+          onOpenChange={open => {
+            if (isMutatingSizeOverride) return;
+            setSizeOverrideDialogOpen(open);
+            if (!open) setSizeOverrideReason('');
+          }}
+        >
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-500">
+                <Shield className="h-5 w-5" />
+                {sizeOverrideMode === 'set' ? 'Set Temporary Size Override' : 'Clear Size Override'}
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                {sizeOverrideMode === 'set' ? (
+                  <>
+                    Override CPU/RAM without changing the billed tier. Use for OOM recovery and
+                    incident response. Volume size is not affected; the customer continues to be
+                    billed on the original tier.
+                  </>
+                ) : (
+                  <>
+                    This clears the active admin size override. The instance will revert to its tier
+                    hardware on the next start.
+                  </>
+                )}
+                <span className="text-foreground mt-2 block font-medium">
+                  User: {data?.user_email ?? data?.user_id}
+                </span>
+                {currentStatus === 'running' && (
+                  <span className="mt-2 block text-xs text-amber-600 dark:text-amber-400">
+                    Machine is currently running. The change will apply on the next stop/start cycle
+                    (manual restart, customer-initiated, or admin-triggered).
+                  </span>
+                )}
+                {data?.workerStatus?.adminMachineSizeOverride && (
+                  <span className="text-foreground mt-2 block">
+                    Current override:{' '}
+                    <code className="text-xs">
+                      {data.workerStatus.adminMachineSizeOverride.cpus}×{' '}
+                      {data.workerStatus.adminMachineSizeOverride.cpu_kind ?? 'shared'},{' '}
+                      {data.workerStatus.adminMachineSizeOverride.memory_mb}MB
+                    </code>
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {sizeOverrideMode === 'set' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Override hardware</label>
+                  <div className="space-y-2">
+                    {ADMIN_SIZE_OVERRIDE_PRESETS.map(preset => {
+                      const tier = INSTANCE_TIERS[preset];
+                      return (
+                        <label
+                          key={preset}
+                          className="hover:bg-muted/40 flex cursor-pointer items-start gap-2 rounded-md border p-3"
+                        >
+                          <input
+                            type="radio"
+                            name="size-override-preset"
+                            value={preset}
+                            checked={sizeOverridePreset === preset}
+                            onChange={() => setSizeOverridePreset(preset)}
+                            disabled={isMutatingSizeOverride}
+                            className="mt-1"
+                          />
+                          <span>
+                            <span className="font-medium">{preset} hardware</span>
+                            <span className="text-muted-foreground block text-xs">
+                              {tier.machineSize.cpus}× {tier.machineSize.cpu_kind ?? 'shared'},{' '}
+                              {(tier.machineSize.memory_mb / 1024).toFixed(0)} GB RAM
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium">
+                  Reason{' '}
+                  <span className="text-muted-foreground text-xs">
+                    (10–500 chars, e.g. "OOM recovery for ticket #1234")
+                  </span>
+                </label>
+                <Textarea
+                  className="mt-1"
+                  rows={3}
+                  value={sizeOverrideReason}
+                  onChange={e => setSizeOverrideReason(e.target.value)}
+                  disabled={isMutatingSizeOverride}
+                  placeholder="OOM recovery — ticket #…"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isMutatingSizeOverride}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant={sizeOverrideMode === 'set' ? 'default' : 'destructive'}
+                disabled={isMutatingSizeOverride || sizeOverrideReason.trim().length < 10}
+                onClick={() => void handleSizeOverrideSubmit()}
+              >
+                {isMutatingSizeOverride ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                {sizeOverrideMode === 'set' ? 'Set Override' : 'Clear Override'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -3853,11 +4199,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     </CardDescription>
                   </div>
                 </div>
-                <BumpVolumeTo15GbButton
+                <ExtendVolumeButton
                   userId={data.user_id}
                   instanceId={data.id}
                   appName={data.workerStatus?.flyAppName}
                   volumeId={volumeId}
+                  currentSizeGb={data.workerStatus?.volumeSizeGb ?? null}
                   userLabel={data.user_email ?? data.user_id}
                   disabled={
                     data.workerStatus?.status === 'recovering' ||

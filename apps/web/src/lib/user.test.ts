@@ -863,6 +863,94 @@ describe('User', () => {
       expect(targets[0].status).toBe('applied');
     });
 
+    it('should clear admin_size_override on the deleted user\u2019s destroyed instances and on instances where the deleted user was the admin actor', async () => {
+      // The kiloclaw_instances.admin_size_override JSONB carries the admin's
+      // email and free-form reason text — both PII. Clear it on:
+      //   (a) the deleted user's own destroyed instances (retained for audit)
+      //   (b) ANY instance where the deleted user was the admin actor —
+      //       their email/reason is their PII regardless of which user's
+      //       instance it targeted.
+      const targetUser = await insertTestUser();
+      const adminUser = await insertTestUser();
+      const otherCustomer = await insertTestUser();
+
+      // (a) target user's own destroyed instance with an override set
+      const [targetInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: targetUser.id,
+          sandbox_id: `test-sdu-override-target-${Date.now()}`,
+          destroyed_at: new Date().toISOString(),
+          admin_size_override: {
+            size: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+            reason: 'OOM ticket #1234 mentioning sensitive context',
+            actorId: adminUser.id,
+            actorEmail: adminUser.google_user_email,
+            setAt: 1700000000000,
+          },
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // (b) someone else's active instance where adminUser was the actor
+      const [otherInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: otherCustomer.id,
+          sandbox_id: `test-sdu-override-other-${Date.now()}`,
+          admin_size_override: {
+            size: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+            reason: 'support upgrade by adminUser',
+            actorId: adminUser.id,
+            actorEmail: adminUser.google_user_email,
+            setAt: 1700000000000,
+          },
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // Control: an unrelated instance with a different admin actor.
+      const unrelatedAdmin = await insertTestUser();
+      const [unrelatedInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: otherCustomer.id,
+          sandbox_id: `test-sdu-override-unrelated-${Date.now()}`,
+          admin_size_override: {
+            size: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+            reason: 'unrelated override',
+            actorId: unrelatedAdmin.id,
+            actorEmail: unrelatedAdmin.google_user_email,
+            setAt: 1700000000001,
+          },
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // Soft-delete the target user (case a) AND the admin user (case b).
+      await softDeleteUser(targetUser.id);
+      await softDeleteUser(adminUser.id);
+
+      const [targetRow] = await db
+        .select({ override: kiloclaw_instances.admin_size_override })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, targetInstance.id));
+      expect(targetRow?.override).toBeNull();
+
+      const [otherRow] = await db
+        .select({ override: kiloclaw_instances.admin_size_override })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, otherInstance.id));
+      expect(otherRow?.override).toBeNull();
+
+      // Control row's override is untouched — different admin actor.
+      const [unrelatedRow] = await db
+        .select({ override: kiloclaw_instances.admin_size_override })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, unrelatedInstance.id));
+      expect(unrelatedRow).toBeDefined();
+      expect(unrelatedRow.override).not.toBeNull();
+      const unrelatedOverride = unrelatedRow.override as { actorId: string };
+      expect(unrelatedOverride.actorId).toBe(unrelatedAdmin.id);
+    });
+
     it('should anonymize credit_campaigns created_by_kilo_user_id', async () => {
       const creator = await insertTestUser();
       const otherAdmin = await insertTestUser();

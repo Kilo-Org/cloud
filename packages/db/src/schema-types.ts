@@ -245,6 +245,8 @@ export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.inbound_email.update_enabled',
   'kiloclaw.machine.destroy_fly',
   'kiloclaw.machine.resize',
+  'kiloclaw.admin_size_override.set',
+  'kiloclaw.admin_size_override.clear',
   'kiloclaw.subscription.bulk_trial_grant',
   'kiloclaw.subscription.admin_cancel',
   'kiloclaw.cli_run.start',

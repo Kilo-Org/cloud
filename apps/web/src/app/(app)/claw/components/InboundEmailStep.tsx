@@ -13,6 +13,13 @@ type InboundEmailStepViewProps = {
   address: string | null;
   /** `KiloClawDashboardStatus.inboundEmailEnabled`. */
   enabled: boolean;
+  /**
+   * True when the platform status query hasn't returned yet (or has returned
+   * with `enabled: true` but no address). Distinguishes the loading case from
+   * the genuine "feature is disabled for this instance" case so we can show
+   * the right copy and prevent the user from skipping the screen entirely.
+   */
+  loading: boolean;
   onContinue: () => void;
   onCopyClick?: () => void;
 };
@@ -22,21 +29,29 @@ export function InboundEmailStepView({
   totalSteps,
   address,
   enabled,
+  loading,
   onContinue,
   onCopyClick,
 }: InboundEmailStepViewProps) {
   const [copied, setCopied] = useState(false);
   const ready = Boolean(address) && enabled;
+  const canContinue = !loading;
 
-  function handleCopy() {
+  async function handleCopy() {
     if (!address) return;
-    void navigator.clipboard
-      .writeText(address)
-      .then(() => toast.success('Inbound email address copied'))
-      .catch(() => toast.error('Failed to copy inbound email address'));
-    onCopyClick?.();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (!navigator.clipboard?.writeText) {
+      toast.error('Clipboard copy is not available in this browser');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(address);
+      toast.success('Inbound email address copied');
+      onCopyClick?.();
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy inbound email address');
+    }
   }
 
   return (
@@ -62,7 +77,11 @@ export function InboundEmailStepView({
                 </code>
               ) : (
                 <span className="text-muted-foreground text-sm">
-                  {enabled ? 'Setting up your inbox…' : 'Inbound email is not enabled.'}
+                  {loading
+                    ? 'Setting up your inbox…'
+                    : enabled
+                      ? 'Setting up your inbox…'
+                      : 'Inbound email is not enabled.'}
                 </span>
               )}
             </div>
@@ -84,8 +103,13 @@ export function InboundEmailStepView({
         </div>
 
         <div className="flex items-center justify-end gap-3 pt-2">
-          <Button type="button" variant="primary" onClick={() => onContinue()}>
-            Continue →
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => onContinue()}
+            disabled={!canContinue}
+          >
+            {loading ? 'Setting up your instance…' : 'Continue →'}
           </Button>
         </div>
       </div>

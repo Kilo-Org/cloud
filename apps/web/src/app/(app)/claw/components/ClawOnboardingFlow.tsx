@@ -459,12 +459,22 @@ function ClawOnboardingFlowInner({
   }
 
   function renderEmailStep() {
+    // Loading = platform status hasn't returned yet (instanceStatus null) OR
+    // the alias hasn't propagated despite the feature being enabled. Either
+    // way, the address can't be displayed; gate Continue so users don't
+    // skip the screen during the brief window before the alias appears.
+    const persisted = flowState.instanceStatus;
+    const inboundEmailAddress = persisted?.inboundEmailAddress ?? null;
+    const inboundEmailEnabled = persisted?.inboundEmailEnabled ?? false;
+    const loading = persisted === null || (inboundEmailEnabled && inboundEmailAddress === null);
+
     return (
       <InboundEmailStepView
         currentStep={flowState.currentStep}
         totalSteps={flowState.totalSteps}
-        address={flowState.instanceStatus?.inboundEmailAddress ?? null}
-        enabled={flowState.instanceStatus?.inboundEmailEnabled ?? false}
+        address={inboundEmailAddress}
+        enabled={inboundEmailEnabled}
+        loading={loading}
         onCopyClick={() => {
           posthog?.capture('claw_setup_email_address_copied');
         }}

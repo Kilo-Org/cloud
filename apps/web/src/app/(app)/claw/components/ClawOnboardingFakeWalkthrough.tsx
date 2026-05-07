@@ -208,6 +208,7 @@ function renderFakeStep({ step, setStep, stepProgress, basePath }: RenderFakeSte
           {...stepProgress}
           address="operator@inbound.claw.kilocode.ai"
           enabled={true}
+          loading={false}
           onContinue={() => setStep('provisioning')}
         />
       );

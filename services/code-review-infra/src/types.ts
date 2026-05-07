@@ -4,6 +4,7 @@
 
 import type { CodeReviewOrchestrator } from './code-review-orchestrator';
 import type { Owner, MCPServerConfig, CloudAgentTerminalReason } from '@kilocode/worker-utils';
+import * as z from 'zod';
 
 export type { Owner, MCPServerConfig };
 
@@ -88,6 +89,17 @@ export interface CodeReviewStatusResponse {
   errorMessage?: string;
   terminalReason?: CloudAgentTerminalReason;
 }
+
+export type CodeReviewStatusResult = CodeReviewStatusResponse | null;
+
+export const InternalStatusResponseSchema = z.object({
+  success: z.boolean().optional(),
+  message: z.string().optional(),
+  currentStatus: z.enum(['completed', 'failed', 'cancelled']).optional(),
+  error: z.string().optional(),
+});
+
+export type InternalStatusResponse = z.infer<typeof InternalStatusResponseSchema>;
 
 export interface CodeReviewRequest {
   reviewId: string;

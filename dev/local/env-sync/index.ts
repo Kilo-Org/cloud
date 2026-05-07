@@ -52,14 +52,19 @@ async function syncEnvVars(options: {
   }
 
   const hasChanges = planHasChanges(plan);
-  const totalMissing = plan.devVarsChanges.reduce((sum, c) => sum + c.missingValues.length, 0);
+  const totalMissing =
+    plan.devVarsChanges.reduce((sum, c) => sum + c.missingValues.length, 0) +
+    plan.secretStoreWarnings.reduce((sum, c) => sum + c.bindings.length, 0);
 
   displayPlan(plan);
 
   if (check) {
     return {
-      ok: !hasChanges,
-      changed: plan.devVarsChanges.length + plan.envLocalAutoCreates.length,
+      ok: !hasChanges && plan.secretStoreWarnings.length === 0,
+      changed:
+        plan.devVarsChanges.length +
+        plan.envLocalAutoCreates.length +
+        plan.secretStoreAutoCreates.length,
       missing: totalMissing,
     };
   }
@@ -79,7 +84,10 @@ async function syncEnvVars(options: {
 
   return {
     ok: true,
-    changed: plan.devVarsChanges.length + plan.envLocalAutoCreates.length,
+    changed:
+      plan.devVarsChanges.length +
+      plan.envLocalAutoCreates.length +
+      plan.secretStoreAutoCreates.length,
     missing: totalMissing,
   };
 }
@@ -92,14 +100,18 @@ async function checkEnvVars(repoRoot: string, targets?: string[]): Promise<Check
 
   const serviceFilter = resolveServiceFilter(targets);
   const plan = computePlan(repoRoot, serviceFilter);
-  const totalMissing = plan.devVarsChanges.reduce((sum, c) => sum + c.missingValues.length, 0);
+  const totalMissing =
+    plan.devVarsChanges.reduce((sum, c) => sum + c.missingValues.length, 0) +
+    plan.secretStoreWarnings.reduce((sum, c) => sum + c.bindings.length, 0);
   const workerCount = findDevVarsExamples(repoRoot).length;
 
   return {
     ok:
       !plan.devVarsChanges.some(c => c.isNew || c.keyChanges.length > 0) &&
       plan.envDevLocalChanges.length === 0 &&
-      plan.envLocalAutoCreates.length === 0,
+      plan.envLocalAutoCreates.length === 0 &&
+      plan.secretStoreAutoCreates.length === 0 &&
+      plan.secretStoreWarnings.length === 0,
     envLocalExists: true,
     missing: totalMissing,
     workerCount,

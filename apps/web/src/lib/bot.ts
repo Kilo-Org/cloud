@@ -1,32 +1,41 @@
-import { Chat, emoji, type ActionEvent, type Message, type Thread } from 'chat';
-import { createSlackAdapter } from '@chat-adapter/slack';
+import { Chat, type Message, type Thread } from 'chat';
+import type { GitHubAdapter } from '@chat-adapter/github';
+import type { SlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
 import { resolveKiloUserId, unlinkKiloUser } from '@/lib/bot-identity';
-import { getPlatformIdentity, getPlatformIntegration } from '@/lib/bot/platform-helpers';
-import { LINK_ACCOUNT_ACTION_PREFIX, promptLinkAccount } from '@/lib/bot/link-account';
-import { createBotRequest, updateBotRequest } from '@/lib/bot/request-logging';
+import {
+  canKiloUserAccessPlatformIntegration,
+  getPlatformIntegration,
+} from '@/lib/bot/platform-helpers';
 import { findUserById } from '@/lib/user';
-import { processMessage } from '@/lib/bot/run';
+import { processLinkedMessage } from '@/lib/bot/run';
 import { createChatState } from '@/lib/bot/state';
-import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET } from '@/lib/config.server';
+import { githubAdapter } from '@/lib/bot/github-adapter';
+import { slackAdapter } from '@/lib/bot/slack-adapter';
+import { botPlatforms } from '@/lib/bot/platforms';
+import { createSlackWebhookHandler } from '@/lib/bot/platforms/slack-webhook';
 
-function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
+function createKiloBot(slackAdapter: SlackAdapter, githubAdapter: GitHubAdapter) {
   const chatBot = new Chat({
-    // TODO(remon): Update names before going live
-    userName: process.env.NODE_ENV === 'production' ? 'Pound' : 'Sjors Bot',
+    userName: process.env.NODE_ENV === 'production' ? 'Kilo' : 'Henk',
     adapters: {
+      github: githubAdapter,
       slack: slackAdapter,
     },
     state: createChatState(),
+    logger: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   });
+
+  chatBot.webhooks.slack = createSlackWebhookHandler(chatBot, slackAdapter);
 
   chatBot.onNewMention(async function handleIncomingMessage(
     thread: Thread,
     message: Message
   ): Promise<void> {
-    const identity = getPlatformIdentity(thread, message);
+    const botPlatform = botPlatforms.requireByAdapter(thread.adapter);
+    const identity = await botPlatform.getIdentity({ thread, message });
     const [platformIntegration, kiloUserId] = await Promise.all([
-      getPlatformIntegration(thread, message),
+      getPlatformIntegration(identity),
       resolveKiloUserId(chatBot.getState(), identity),
     ]);
 
@@ -37,8 +46,22 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
       return;
     }
 
+    if (!botPlatform.isEnabledForBot(platformIntegration)) {
+      return;
+    }
+
+    if (!(await botPlatform.canHandleMessage({ thread, message, platformIntegration }))) {
+      return;
+    }
+
     if (!kiloUserId) {
-      await promptLinkAccount(thread, message, identity);
+      await botPlatform.promptLinkAccount({
+        thread,
+        message,
+        identity,
+        platformIntegration,
+        state: chatBot.getState(),
+      });
       return;
     }
 
@@ -46,65 +69,58 @@ function createKiloBot(slackAdapter: ReturnType<typeof createSlackAdapter>) {
 
     if (!user) {
       await unlinkKiloUser(chatBot.getState(), identity);
-      await promptLinkAccount(thread, message, identity);
+      await botPlatform.promptLinkAccount({
+        thread,
+        message,
+        identity,
+        platformIntegration,
+        state: chatBot.getState(),
+      });
       return;
     }
 
-    const platform = thread.id.split(':')[0];
-    const botRequestId = await createBotRequest({
-      createdBy: user.id,
-      organizationId: platformIntegration.owned_by_organization_id ?? null,
-      platformIntegrationId: platformIntegration.id,
-      platform,
-      platformThreadId: thread.id,
-      platformMessageId: message.id,
-      userMessage: message.text,
-      modelUsed: undefined,
-    });
-
-    const received = thread.createSentMessageFromMessage(message);
-    await received.addReaction(emoji.eyes);
-
-    await chatBot.registerSingleton();
+    if (!(await canKiloUserAccessPlatformIntegration(platformIntegration, user.id))) {
+      await unlinkKiloUser(chatBot.getState(), identity);
+      await botPlatform.promptLinkAccount({
+        thread,
+        message,
+        identity,
+        platformIntegration,
+        state: chatBot.getState(),
+      });
+      return;
+    }
 
     try {
-      await processMessage({ thread, message, platformIntegration, user, botRequestId });
+      await processLinkedMessage({ thread, message, platformIntegration, user });
     } catch (error) {
       console.error('[Bot] Unhandled error in message handler:', error);
-      if (botRequestId) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        updateBotRequest(botRequestId, {
-          status: 'error',
-          errorMessage: errMsg.slice(0, 2000),
-        });
-      }
       await thread.post({ markdown: 'Sorry, something went wrong while processing your message.' });
     }
   });
 
-  // When the user clicks the "Link Account" LinkButton, Slack fires a
-  // block_actions event *in addition to* opening the URL in the browser.
-  // For ephemeral messages the adapter encodes the response_url into the
-  // messageId, so deleteMessage sends `{ delete_original: true }` — removing
-  // the ephemeral card from the user's view.
-  chatBot.onAction(async function handleLinkAccountClick(event: ActionEvent): Promise<void> {
-    if (!event.actionId.startsWith(LINK_ACCOUNT_ACTION_PREFIX)) return;
+  chatBot.onAction(async event => {
+    await botPlatforms.getByAdapter(event.adapter)?.handleAction?.(event);
+  });
 
-    try {
-      await event.adapter.deleteMessage(event.threadId, event.messageId);
-    } catch (error) {
-      // Not critical — the ephemeral message will disappear on its own eventually
-      console.warn('[Bot] Failed to delete link-account ephemeral:', error);
-    }
+  chatBot.onAssistantThreadStarted(async event => {
+    await botPlatforms.getByAdapter(event.adapter)?.handleAssistantThreadStarted?.(event);
+  });
+
+  chatBot.onMemberJoinedChannel(async event => {
+    await botPlatforms.getByAdapter(event.adapter)?.handleMemberJoinedChannel?.(event);
+  });
+
+  chatBot.onAppHomeOpened(async event => {
+    await botPlatforms.getByAdapter(event.adapter)?.handleAppHomeOpened?.(event);
   });
 
   return chatBot;
 }
 
-const slackAdapter = createSlackAdapter({
-  clientId: SLACK_CLIENT_ID,
-  clientSecret: SLACK_CLIENT_SECRET,
-  signingSecret: SLACK_SIGNING_SECRET,
-});
+export const bot = createKiloBot(slackAdapter, githubAdapter);
 
-export const bot = createKiloBot(slackAdapter);
+// registerSingleton is synchronous and idempotent and is required for
+// ThreadImpl.fromJSON deserialization. Doing it once at module load means
+// callers don't need to repeat it on every request.
+bot.registerSingleton();

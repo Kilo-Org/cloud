@@ -51,6 +51,17 @@ export interface TriageTicket {
   owner: Owner;
   status: TriageStatus;
   sessionId?: string;
+  /** cloud-agent-next session id, stored after prepareSession returns */
+  cloudAgentSessionId?: string;
+  /** Per-ticket secret minted at prepareSession time and relayed via callbackTarget.headers */
+  callbackSecret?: string;
+  /** Labels snapshotted from classify-config so the callback can parse without a re-call */
+  availableLabels?: string[];
+  /** Classify config snapshotted so the callback can parse and label-check without a re-call */
+  classifyConfig?: {
+    model_slug: string;
+    custom_instructions?: string | null;
+  };
   classification?: TriageClassification;
   confidence?: number;
   intentSummary?: string;
@@ -129,6 +140,21 @@ export const classificationResultSchema = z.object({
 export type ClassificationResult = z.infer<typeof classificationResultSchema>;
 
 /**
+ * Callback payload delivered by cloud-agent-next when a classification session
+ * reaches a terminal state. Mirrors `ExecutionCallbackPayload` from
+ * `services/cloud-agent-next/src/callbacks/types.ts` — we only validate the
+ * fields we actually use and tolerate any extras.
+ */
+export const classificationCallbackPayloadSchema = z.object({
+  cloudAgentSessionId: z.string(),
+  status: z.enum(['completed', 'failed', 'interrupted']),
+  errorMessage: z.string().optional(),
+  lastAssistantMessageText: z.string().optional(),
+});
+
+export type ClassificationCallbackPayload = z.infer<typeof classificationCallbackPayloadSchema>;
+
+/**
  * Environment bindings for the worker
  */
 export interface Env {
@@ -140,6 +166,8 @@ export interface Env {
   INTERNAL_API_SECRET: string;
   CLOUD_AGENT_URL: string;
   BACKEND_AUTH_TOKEN: string;
+  /** Public URL of this worker, used as the classification callback target. */
+  SELF_URL: string;
 
   // Optional Sentry
   SENTRY_DSN?: string;

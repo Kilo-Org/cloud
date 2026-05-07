@@ -22,43 +22,34 @@ This repo bakes those settings into datasource provisioning and uses Cloudflare'
 
 ## Required environment variables
 
-In normal use, you only need to provide the Cloudflare API token:
+In normal use, you only need to provide the Cloudflare API token. The recommended place is the repo-root `.env.local` (the same file used for other local dev secrets):
 
-```bash
-export CF_AE_TOKEN="<cloudflare-api-token>"
 ```
+CF_AE_TOKEN=<cloudflare-api-token>
+```
+
+When Grafana is started via `pnpm dev:start`, the runner passes `--env-file .env.local` to docker compose, so the token reaches the Grafana container as an environment variable. The file's values are scoped to that compose invocation — they are _not_ loaded into the runner's process env or inherited by sibling services.
+
+Shell exports still take precedence over file values (docker compose's standard `--env-file` behaviour), so you can temporarily override with `CF_AE_TOKEN=<other> pnpm dev:start observability`.
 
 Provision a Cloudflare user API token with permission `All accounts - Account Analytics:Read`, then use that token as `CF_AE_TOKEN`.
 
 `CF_ACCOUNT_ID` defaults to the repo's Cloudflare account ID from `kiloclaw/wrangler.jsonc`, so you usually do not need to set it manually.
 
-If you do want to override it:
+Optional overrides (same file):
 
-```bash
-export CF_ACCOUNT_ID="<32-character-account-id>"
 ```
-
-Optional transport settings:
-
-```bash
-export GRAFANA_CLICKHOUSE_SECURE="true"
-export GRAFANA_CLICKHOUSE_SKIP_TLS_VERIFY="false"
+CF_ACCOUNT_ID=<32-character-account-id>
+GRAFANA_CLICKHOUSE_SECURE=true
+GRAFANA_CLICKHOUSE_SKIP_TLS_VERIFY=false
 ```
 
 ## Keeping credentials out of git
 
-Never commit Cloudflare API tokens, `.env.local` files, or shell snippets containing `CF_AE_TOKEN`.
-
-Safe patterns:
-
-- export the token only in your shell session
-- pass it inline when starting compose
-- use an ignored local env file only if you run this often
-
-Recommended one-liner:
+`.env.local` is already gitignored — never move these values into a committed file. If you use the standalone docker compose path instead of `pnpm dev:start`, either export the token in the shell or pass it inline:
 
 ```bash
-CF_AE_TOKEN="<cloudflare-api-token>" docker compose -f dev/docker-compose.yml up grafana
+CF_AE_TOKEN="<cloudflare-api-token>" docker compose --profile grafana -f dev/docker-compose.yml up grafana
 ```
 
 If you want to avoid putting the token directly in shell history, enter it interactively:
@@ -70,6 +61,20 @@ docker compose --profile grafana -f dev/docker-compose.yml up grafana
 ```
 
 ## Start Grafana
+
+### Via `pnpm dev:start` (recommended)
+
+Grafana is part of the `observability` group in the dev runner. With `CF_AE_TOKEN` set in `.env.local` (see above):
+
+```bash
+pnpm dev:start observability    # or: pnpm dev:start all
+```
+
+Grafana appears in the tmux sidebar under the `OBSERVABILITY` group. Toggle it on/off with space; press Enter on the service to focus its logs pane.
+
+If `CF_AE_TOKEN` isn't set anywhere, the runner prints an advisory warning and still boots Grafana — only dashboard queries fail until a token is provided. Add the token to `.env.local`, restart the session (or the `grafana` window with `r` in the sidebar), and queries start working.
+
+### Via Docker Compose directly
 
 Shortest path from the repo root:
 

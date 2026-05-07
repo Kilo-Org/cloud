@@ -1,0 +1,1463 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 200,
+      "panels": [],
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Unique sandbox IDs (blob1) seen in the selected window. AE preserves true unique values across sampling, so this is exact — not extrapolated.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "id": 21,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT COUNT(DISTINCT blob1) AS sandboxes FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion)",
+          "rawSql": "SELECT COUNT(DISTINCT blob1) AS sandboxes FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion)",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Distinct Sandboxes",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Unique fly machine IDs (blob8) seen in the selected window. Excludes empty machine IDs (early-boot rows).",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 22,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT COUNT(DISTINCT blob8) AS machines FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob8 != ''",
+          "rawSql": "SELECT COUNT(DISTINCT blob8) AS machines FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob8 != ''",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Distinct Machines",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Linux 5-min load average across selected check-ins. Compare against host CPU count; values approaching the CPU count indicate saturation.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 1
+      },
+      "id": 23,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT AVG(double4) AS avg_load FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion)",
+          "rawSql": "SELECT AVG(double4) AS avg_load FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion)",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Avg Load",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "description": "Average machine uptime (seconds) across selected check-ins.",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 1
+      },
+      "id": 24,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT AVG(double3) AS avg_uptime_seconds FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion)",
+          "rawSql": "SELECT AVG(double3) AS avg_uptime_seconds FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion)",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Avg Uptime",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 201,
+      "panels": [],
+      "title": "Telemetry",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "description": "Check-in volume (sample-corrected) split by supervisor state (blob6). Useful to see if a state is gaining or losing membership.",
+      "id": 25,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob6 AS label, SUM(_sample_interval) AS checkins FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob6 AS label, SUM(_sample_interval) AS checkins FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY t, label ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Check-ins by Supervisor State",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "description": "Mean 5-min Linux load average per supervisor state. Compare against the typical CPU count of the host class.",
+      "id": 26,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob6 AS label, AVG(double4) AS avg_load FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob6 AS label, AVG(double4) AS avg_load FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY t, label ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Average Load by Supervisor State",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "description": "Mean machine uptime per supervisor state. A drop means many machines were recently (re)started.",
+      "id": 27,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob6 AS label, AVG(double3) AS avg_uptime_seconds FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob6 AS label, AVG(double3) AS avg_uptime_seconds FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY t, label ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Average Uptime by Supervisor State",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "description": "Sample-corrected check-ins reporting supervisor_state = crashed. Use this to spot crash spikes.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 18,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "id": 36,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, 'crashed' AS label, SUM(_sample_interval) AS crashed_checkins FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  AND blob6 = 'crashed'\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY t ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, 'crashed' AS label, SUM(_sample_interval) AS crashed_checkins FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  AND blob6 = 'crashed'\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY t ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Crashed Check-ins",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 202,
+      "panels": [],
+      "title": "Tables",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Distribution of supervisor states across check-ins, sample-corrected.",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 23
+      },
+      "id": 29,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT blob6 AS supervisor_state, SUM(_sample_interval) AS count FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY supervisor_state ORDER BY count DESC",
+          "rawSql": "SELECT blob6 AS supervisor_state, SUM(_sample_interval) AS count FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) GROUP BY supervisor_state ORDER BY count DESC",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Supervisor State Distribution",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "total_bandwidth_in_bytes" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "total_bandwidth_out_bytes" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          }
+        ]
+      },
+      "description": "Top hosts by total bandwidth (sample-corrected via _sample_interval). Bandwidth columns render in IEC bytes (KiB/MiB/GiB).",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 23
+      },
+      "id": 30,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT blob8 AS host, blob1 AS sandbox_id, SUM(_sample_interval * double5) AS total_bandwidth_in_bytes, SUM(_sample_interval * double6) AS total_bandwidth_out_bytes, MAX(timestamp) AS last_checkin FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob8 != '' GROUP BY host, sandbox_id HAVING total_bandwidth_in_bytes > 0 OR total_bandwidth_out_bytes > 0 ORDER BY total_bandwidth_out_bytes DESC, total_bandwidth_in_bytes DESC LIMIT 20",
+          "rawSql": "SELECT blob8 AS host, blob1 AS sandbox_id, SUM(_sample_interval * double5) AS total_bandwidth_in_bytes, SUM(_sample_interval * double6) AS total_bandwidth_out_bytes, MAX(timestamp) AS last_checkin FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob8 != '' GROUP BY host, sandbox_id HAVING total_bandwidth_in_bytes > 0 OR total_bandwidth_out_bytes > 0 ORDER BY total_bandwidth_out_bytes DESC, total_bandwidth_in_bytes DESC LIMIT 20",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Top Host Bandwidth Deltas",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "100 most recent raw check-ins with full dimensional context. Useful for ad-hoc debugging of a specific sandbox.",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 23
+      },
+      "id": 31,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": true,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT timestamp, blob1 AS sandbox_id, blob8 AS machine_id, blob7 AS fly_region, blob2 AS controller_version, blob4 AS openclaw_version, blob6 AS supervisor_state, double2 AS total_restarts, double3 AS uptime_seconds, double4 AS load_avg_5m, double5 AS bandwidth_in_delta_bytes, double6 AS bandwidth_out_delta_bytes, blob9 AS last_exit_reason FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) ORDER BY timestamp DESC LIMIT 100",
+          "rawSql": "SELECT timestamp, blob1 AS sandbox_id, blob8 AS machine_id, blob7 AS fly_region, blob2 AS controller_version, blob4 AS openclaw_version, blob6 AS supervisor_state, double2 AS total_restarts, double3 AS uptime_seconds, double4 AS load_avg_5m, double5 AS bandwidth_in_delta_bytes, double6 AS bandwidth_out_delta_bytes, blob9 AS last_exit_reason FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) ORDER BY timestamp DESC LIMIT 100",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Latest Check-ins",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 203,
+      "panels": [],
+      "title": "Disk Usage",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "description": "Average disk fill percentage (double7 / double8) across selected hosts. Climbs toward 100% indicate hosts at risk of running out of space. Extrapolation is disabled because this is an AVG of a ratio — extrapolating the last partial bucket would distort the value rather than estimate a missing tail.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 12,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": 0 },
+              { "color": "yellow", "value": 0.8 },
+              { "color": "red", "value": 0.9 }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 32,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT $timeSeries AS t, blob7 AS label, AVG(double7 / double8) AS disk_fill FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND double8 > 0 GROUP BY t, label ORDER BY t",
+          "rawSql": "SELECT $timeSeries AS t, blob7 AS label, AVG(double7 / double8) AS disk_fill FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND double8 > 0 GROUP BY t, label ORDER BY t",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Disk Fill % by Region",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "description": "Hosts ranked by peak disk fill percentage in the selected window. Investigate any row > 90%.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "peak_disk_fill" },
+            "properties": [
+              { "id": "unit", "value": "percentunit" },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": 0 },
+                    { "color": "yellow", "value": 0.8 },
+                    { "color": "red", "value": 0.9 }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background", "mode": "gradient" }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "peak_disk_used_bytes" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "disk_total_bytes" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "id": 33,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT blob8 AS host, blob1 AS sandbox_id, MAX(double7) AS peak_disk_used_bytes, MAX(double8) AS disk_total_bytes, MAX(double7) / MAX(double8) AS peak_disk_fill, MAX(timestamp) AS last_checkin FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob8 != '' AND double8 > 0 GROUP BY host, sandbox_id ORDER BY peak_disk_fill DESC LIMIT 20",
+          "rawSql": "SELECT blob8 AS host, blob1 AS sandbox_id, MAX(double7) AS peak_disk_used_bytes, MAX(double8) AS disk_total_bytes, MAX(double7) / MAX(double8) AS peak_disk_fill, MAX(timestamp) AS last_checkin FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob8 != '' AND double8 > 0 GROUP BY host, sandbox_id ORDER BY peak_disk_fill DESC LIMIT 20",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Top Hosts by Disk Fill",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 204,
+      "panels": [],
+      "title": "Reliability",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "description": "Top reasons reported in blob9 (last_exit_reason). Spikes in 'oom_killed' / 'signal_killed' / non-zero exit codes are the first thing to look at after a regression.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 41
+      },
+      "id": 34,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT blob9 AS last_exit_reason, SUM(_sample_interval) AS count, COUNT(DISTINCT blob1) AS distinct_sandboxes FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob9 != '' GROUP BY last_exit_reason ORDER BY count DESC LIMIT 20",
+          "rawSql": "SELECT blob9 AS last_exit_reason, SUM(_sample_interval) AS count, COUNT(DISTINCT blob1) AS distinct_sandboxes FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob9 != '' GROUP BY last_exit_reason ORDER BY count DESC LIMIT 20",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Top Exit Reasons",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "${DS_KILOCLAW}"
+      },
+      "description": "Restart delta (MAX(double2) - MIN(double2)) per host over the selected window — how many restarts occurred during the window, inferred from the change in the cumulative counter. Use to identify flapping machines.",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": 0 }]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 41
+      },
+      "id": 35,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "adHocFilters": [],
+          "adHocValuesQuery": "",
+          "add_metadata": true,
+          "contextWindowSize": "10",
+          "dateTimeColDataType": "timestamp",
+          "dateTimeType": "DATETIME",
+          "editorMode": "sql",
+          "extrapolate": false,
+          "format": "table",
+          "interval": "",
+          "intervalFactor": 1,
+          "nullifySparse": false,
+          "query": "SELECT blob8 AS host, blob1 AS sandbox_id, MAX(double2) AS max_total_restarts, MAX(double2) - MIN(double2) AS restart_delta, MAX(timestamp) AS last_checkin FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob8 != '' GROUP BY host, sandbox_id HAVING restart_delta > 0 ORDER BY restart_delta DESC LIMIT 20",
+          "rawSql": "SELECT blob8 AS host, blob1 AS sandbox_id, MAX(double2) AS max_total_restarts, MAX(double2) - MIN(double2) AS restart_delta, MAX(timestamp) AS last_checkin FROM kiloclaw_controller_telemetry WHERE $timeFilter\n  $conditionalTest(AND index1 = ${sandboxId:sqlstring},, $sandboxId)\n  $conditionalTest(AND blob6 IN ($supervisorState),, $supervisorState)\n  $conditionalTest(AND blob7 IN ($flyRegion),, $flyRegion)\n  $conditionalTest(AND blob2 IN ($controllerVersion),, $controllerVersion) AND blob8 != '' GROUP BY host, sandbox_id HAVING restart_delta > 0 ORDER BY restart_delta DESC LIMIT 20",
+          "refId": "A",
+          "round": "0s",
+          "showFormattedSQL": false,
+          "showHelp": false,
+          "skip_comments": true,
+          "table": "kiloclaw_controller_telemetry",
+          "useWindowFuncForMacros": true
+        }
+      ],
+      "title": "Top Hosts by Restart Delta",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 42,
+  "tags": ["kiloclaw", "analytics-engine", "controller"],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "Analytics Engine",
+          "value": "bffxugc31cnpcc"
+        },
+        "includeAll": false,
+        "name": "DS_KILOCLAW",
+        "options": [],
+        "query": "vertamedia-clickhouse-datasource",
+        "refresh": 1,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Sandbox ID",
+        "name": "sandboxId",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "vertamedia-clickhouse-datasource",
+          "uid": "${DS_KILOCLAW}"
+        },
+        "definition": "SELECT blob6 FROM kiloclaw_controller_telemetry WHERE blob6 != '' GROUP BY blob6 ORDER BY blob6",
+        "includeAll": true,
+        "label": "Supervisor State",
+        "multi": true,
+        "name": "supervisorState",
+        "options": [],
+        "query": "SELECT blob6 FROM kiloclaw_controller_telemetry WHERE blob6 != '' GROUP BY blob6 ORDER BY blob6",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "vertamedia-clickhouse-datasource",
+          "uid": "${DS_KILOCLAW}"
+        },
+        "definition": "SELECT blob7 FROM kiloclaw_controller_telemetry WHERE blob7 != '' GROUP BY blob7 ORDER BY blob7",
+        "includeAll": true,
+        "label": "Fly Region",
+        "multi": true,
+        "name": "flyRegion",
+        "options": [],
+        "query": "SELECT blob7 FROM kiloclaw_controller_telemetry WHERE blob7 != '' GROUP BY blob7 ORDER BY blob7",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "vertamedia-clickhouse-datasource",
+          "uid": "${DS_KILOCLAW}"
+        },
+        "definition": "SELECT blob2 FROM kiloclaw_controller_telemetry WHERE blob2 != '' GROUP BY blob2 ORDER BY blob2",
+        "includeAll": true,
+        "label": "Controller Version",
+        "multi": true,
+        "name": "controllerVersion",
+        "options": [],
+        "query": "SELECT blob2 FROM kiloclaw_controller_telemetry WHERE blob2 != '' GROUP BY blob2 ORDER BY blob2",
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "KiloClaw Controller Telemetry",
+  "uid": "kiloclaw-controller-telemetry",
+  "version": 1,
+  "weekStart": ""
+}

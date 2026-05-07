@@ -51,7 +51,7 @@ import { getSandbox } from '@cloudflare/sandbox';
 import { generateSessionId, fetchSessionMetadata } from './session-service.js';
 import { sessionIdSchema, envVarsSchema } from './types.js';
 import { appRouter } from './router.js';
-import type { TRPCContext, SessionId } from './types.js';
+import type { Env, TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
 
 type MockSessionStub = {
@@ -306,10 +306,14 @@ describe('router sessionId validation', () => {
                 fetch: vi.fn(),
               } as unknown as TRPCContext['env']['SESSION_INGEST'],
               R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+              GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
               NEXTAUTH_SECRET: 'test-secret',
               INTERNAL_API_SECRET_PROD: {
                 get: vi.fn().mockResolvedValue('test-secret'),
               } as unknown as TRPCContext['env']['INTERNAL_API_SECRET_PROD'],
+              HYPERDRIVE: {
+                connectionString: 'postgresql://test',
+              } as unknown as TRPCContext['env']['HYPERDRIVE'],
             },
           };
           cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
@@ -676,10 +680,14 @@ describe('router sessionId validation', () => {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+            GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
             NEXTAUTH_SECRET: 'test-secret',
             INTERNAL_API_SECRET_PROD: {
               get: vi.fn().mockResolvedValue('test-secret'),
             } as unknown as TRPCContext['env']['INTERNAL_API_SECRET_PROD'],
+            HYPERDRIVE: {
+              connectionString: 'postgresql://test',
+            } as unknown as TRPCContext['env']['HYPERDRIVE'],
           },
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
@@ -735,11 +743,6 @@ describe('router sessionId validation', () => {
           expect(result.initiatedAt).toBe(1700000001000);
           expect(result.timestamp).toBe(123456789);
           expect(result.version).toBe(123456789);
-
-          // Verify counts are returned, not actual values
-          expect(result.envVarCount).toBe(2);
-          expect(result.setupCommandCount).toBe(2);
-          expect(result.mcpServerCount).toBe(1);
 
           // Verify secrets are NOT returned
           expect(result).not.toHaveProperty('githubToken');
@@ -797,9 +800,6 @@ describe('router sessionId validation', () => {
           expect(result.autoCommit).toBeUndefined();
           expect(result.preparedAt).toBeUndefined();
           expect(result.initiatedAt).toBeUndefined();
-          expect(result.envVarCount).toBeUndefined();
-          expect(result.setupCommandCount).toBeUndefined();
-          expect(result.mcpServerCount).toBeUndefined();
         });
       });
 
@@ -929,10 +929,14 @@ describe('router sessionId validation', () => {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
             R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
+            GIT_TOKEN_SERVICE: {} as Env['GIT_TOKEN_SERVICE'],
             NEXTAUTH_SECRET: 'test-secret',
             INTERNAL_API_SECRET_PROD: {
               get: vi.fn().mockResolvedValue('test-secret'),
             } as unknown as TRPCContext['env']['INTERNAL_API_SECRET_PROD'],
+            HYPERDRIVE: {
+              connectionString: 'postgresql://test',
+            } as unknown as TRPCContext['env']['HYPERDRIVE'],
           },
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;

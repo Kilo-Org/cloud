@@ -11,6 +11,9 @@ type TunnelConfig = {
   tunnelHostname: string;
 };
 
+const DOCKER_HOST_INTERNAL = 'host.docker.internal';
+const DOCKER_LOCAL_PROVIDER = 'docker-local';
+
 function parseConfFile(filePath: string): Record<string, string> {
   if (!fs.existsSync(filePath)) return {};
   const result: Record<string, string> = {};
@@ -61,6 +64,10 @@ function updateEnvValue(filePath: string, key: string, value: string): void {
   fs.writeFileSync(filePath, content);
 }
 
+function loadKiloClawProvider(): string {
+  return parseConfFile(devVarsPath)['KILOCLAW_DEFAULT_PROVIDER'] ?? DOCKER_LOCAL_PROVIDER;
+}
+
 function prefixAndWrite(label: string, chunk: Buffer): void {
   const text = chunk.toString();
   const lines = text.split('\n');
@@ -71,16 +78,11 @@ function prefixAndWrite(label: string, chunk: Buffer): void {
   }
 }
 
-if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
-  console.error(
-    'cloudflared not found on PATH. Install it:\n  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/\n  brew install cloudflared'
-  );
-  process.exit(1);
-}
-
 const port = process.argv[2] ?? '3000';
 const controllerPort = process.argv[3] ?? '8795';
+const kiloChatPort = process.argv[4] ?? '8808';
 const config = loadTunnelConfig();
+const provider = loadKiloClawProvider();
 
 const children: Array<{ label: string; child: ReturnType<typeof spawn> }> = [];
 
@@ -138,7 +140,31 @@ function startQuickTunnel(options: {
   child.on('close', code => exitAndStopOthers(label, code));
 }
 
-if (config.tunnelName) {
+if (provider === DOCKER_LOCAL_PROVIDER) {
+  const apiUrl = `http://${DOCKER_HOST_INTERNAL}:${port}/api/gateway/`;
+  const checkinUrl = `http://${DOCKER_HOST_INTERNAL}:${controllerPort}/api/controller/checkin`;
+  const kiloChatUrl = `http://${DOCKER_HOST_INTERNAL}:${kiloChatPort}`;
+
+  updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
+  updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
+  updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', kiloChatUrl);
+
+  console.log('Docker-local provider detected; skipping Cloudflare quick tunnels.');
+  console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
+  console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
+  console.log(`Set KILOCHAT_BASE_URL=${kiloChatUrl}`);
+
+  setInterval(() => undefined, 60_000);
+} else {
+  if (spawnSync('cloudflared', ['version'], { stdio: 'ignore' }).error) {
+    console.error(
+      'cloudflared not found on PATH. Install it:\n  https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/\n  brew install cloudflared'
+    );
+    process.exit(1);
+  }
+}
+
+if (provider !== DOCKER_LOCAL_PROVIDER && config.tunnelName) {
   const label = 'kiloclaw-tunnel';
   const child = spawn('cloudflared', ['tunnel', 'run', config.tunnelName], {
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -150,16 +176,19 @@ if (config.tunnelName) {
   if (config.tunnelHostname) {
     const apiUrl = `https://${config.tunnelHostname}/api/gateway/`;
     const checkinUrl = `https://${config.tunnelHostname}/api/controller/checkin`;
+    const kiloChatUrl = `https://${config.tunnelHostname}`;
     updateEnvValue(devVarsPath, 'KILOCODE_API_BASE_URL', apiUrl);
     updateEnvValue(devVarsPath, 'KILOCLAW_CHECKIN_URL', checkinUrl);
+    updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', kiloChatUrl);
     console.log(`Set KILOCODE_API_BASE_URL=${apiUrl}`);
     console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
+    console.log(`Set KILOCHAT_BASE_URL=${kiloChatUrl}`);
   }
 
   child.stdout.on('data', data => prefixAndWrite(label, data));
   child.stderr.on('data', data => prefixAndWrite(label, data));
   child.on('close', code => exitAndStopOthers(label, code));
-} else {
+} else if (provider !== DOCKER_LOCAL_PROVIDER) {
   startQuickTunnel({
     label: 'gateway',
     localPort: port,
@@ -181,8 +210,23 @@ if (config.tunnelName) {
       console.log(`Set KILOCLAW_CHECKIN_URL=${checkinUrl}`);
     },
   });
+
+  startQuickTunnel({
+    label: 'kilo-chat',
+    localPort: kiloChatPort,
+    onUrl: url => {
+      updateEnvValue(devVarsPath, 'KILOCHAT_BASE_URL', url);
+      console.log(`\nKilo-chat tunnel URL: ${url}`);
+      console.log(`Set KILOCHAT_BASE_URL=${url}`);
+    },
+  });
 }
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.on(signal, () => stopAllChildren(signal));
+  process.on(signal, () => {
+    stopAllChildren(signal);
+    if (children.length === 0) {
+      process.exit(0);
+    }
+  });
 }

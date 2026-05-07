@@ -12,6 +12,7 @@ import { useManager } from './CloudAgentProvider';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
+import type { ModeOption } from '@/components/shared/ModeCombobox';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { MessageBubble } from './MessageBubble';
 import { SessionStatusIndicator } from './SessionStatusIndicator';
@@ -150,13 +151,14 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   useEffect(() => {
     if (prevActivityRef.current === 'busy' && activity.type === 'idle') {
       playCelebrationSound();
-      void queryClient.invalidateQueries(trpc.unifiedSessions.list.pathFilter());
+      void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
     }
     prevActivityRef.current = activity.type;
   }, [activity.type, playCelebrationSound, queryClient, trpc]);
 
   // -- Scroll ---------------------------------------------------------------
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const messagesContentRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const chatUI = useAtomValue(manager.atoms.chatUI);
@@ -166,25 +168,83 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   // Without this, auto-scroll's scrollTo fires handleScroll which re-enables
   // shouldAutoScroll, making it impossible for the user to scroll away during streaming.
   const isAutoScrollingRef = useRef(false);
+  const autoScrollRunRef = useRef(0);
   const lastScrollTopRef = useRef(0);
 
   const autoScrollFrameRef = useRef(0);
+  const delayedAutoScrollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scrollToBottomNow = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const scrollRun = autoScrollRunRef.current + 1;
+    autoScrollRunRef.current = scrollRun;
+    isAutoScrollingRef.current = true;
+    el.scrollTop = el.scrollHeight;
+    lastScrollTopRef.current = el.scrollTop;
+    setShowScrollButton(false);
+
+    requestAnimationFrame(() => {
+      if (autoScrollRunRef.current === scrollRun) {
+        isAutoScrollingRef.current = false;
+      }
+    });
+  }, []);
+
+  const scheduleScrollToBottom = useCallback(() => {
+    cancelAnimationFrame(autoScrollFrameRef.current);
+    if (delayedAutoScrollRef.current !== null) {
+      clearTimeout(delayedAutoScrollRef.current);
+      delayedAutoScrollRef.current = null;
+    }
+
+    autoScrollFrameRef.current = requestAnimationFrame(() => {
+      scrollToBottomNow();
+      requestAnimationFrame(scrollToBottomNow);
+      delayedAutoScrollRef.current = setTimeout(() => {
+        delayedAutoScrollRef.current = null;
+        scrollToBottomNow();
+      }, 100);
+    });
+  }, [scrollToBottomNow]);
+
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(autoScrollFrameRef.current);
+      if (delayedAutoScrollRef.current !== null) {
+        clearTimeout(delayedAutoScrollRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!chatUI.shouldAutoScroll) return;
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    // Coalesce rapid streaming updates into one scroll per animation frame
-    cancelAnimationFrame(autoScrollFrameRef.current);
-    autoScrollFrameRef.current = requestAnimationFrame(() => {
-      isAutoScrollingRef.current = true;
-      el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
-      requestAnimationFrame(() => {
-        isAutoScrollingRef.current = false;
-      });
+    scheduleScrollToBottom();
+  }, [staticMessages, dynamicMessages, chatUI.shouldAutoScroll, scheduleScrollToBottom]);
+
+  useEffect(() => {
+    if (!chatUI.shouldAutoScroll) return;
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const content = messagesContentRef.current;
+    if (!content) return;
+
+    const observer = new ResizeObserver(() => {
+      scheduleScrollToBottom();
     });
-    return () => cancelAnimationFrame(autoScrollFrameRef.current);
-  }, [staticMessages, dynamicMessages, chatUI.shouldAutoScroll]);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [chatUI.shouldAutoScroll, scheduleScrollToBottom]);
+
+  useEffect(() => {
+    if (!sessionIdFromParams) return;
+
+    setChatUI({ shouldAutoScroll: true });
+    lastScrollTopRef.current = 0;
+    setShowScrollButton(false);
+    scheduleScrollToBottom();
+  }, [sessionIdFromParams, setChatUI, scheduleScrollToBottom]);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -209,31 +269,43 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const scrollToBottom = useCallback(() => {
     setChatUI({ shouldAutoScroll: true });
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    isAutoScrollingRef.current = true;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
-    requestAnimationFrame(() => {
-      isAutoScrollingRef.current = false;
-    });
-  }, [setChatUI]);
+    scheduleScrollToBottom();
+  }, [scheduleScrollToBottom, setChatUI]);
 
   // -- Handlers -------------------------------------------------------------
   const handleSendMessage = useCallback(
     async (prompt: string, images?: Images) => {
-      const accepted = await manager.send({
+      setChatUI({ shouldAutoScroll: true });
+      const selectedRuntimeAgentForSend = sessionConfig?.runtimeAgents?.find(
+        a => a.slug === sessionConfig?.mode
+      );
+      const agentModelOverrideForSend = selectedRuntimeAgentForSend?.model?.trim() || undefined;
+      // An agent's variant only applies when it also pins a model — variants
+      // are model-specific (validated at write time in AgentConfigSchema). When
+      // an agent pins a model, its variant (if any) wins; otherwise the
+      // user-selected session variant applies.
+      const agentVariantOverrideForSend = agentModelOverrideForSend
+        ? selectedRuntimeAgentForSend?.variant?.trim() || undefined
+        : undefined;
+      const acceptedPromise = manager.send({
         prompt,
         mode: sessionConfig?.mode ?? 'code',
-        model: sessionConfig?.model ?? '',
-        variant: sessionConfig?.variant ?? undefined,
+        model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
+        variant: agentModelOverrideForSend
+          ? agentVariantOverrideForSend
+          : (sessionConfig?.variant ?? undefined),
         images,
       });
+      scheduleScrollToBottom();
+
+      const accepted = await acceptedPromise;
       if (accepted) {
         setImageMessageUuid(crypto.randomUUID());
+        scheduleScrollToBottom();
       }
       return accepted;
     },
-    [manager, sessionConfig]
+    [manager, scheduleScrollToBottom, sessionConfig, setChatUI]
   );
 
   const handleStopExecution = useCallback(() => {
@@ -269,6 +341,36 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     (requestId: string) => manager.dismissSuggestion(requestId),
     [manager]
   );
+
+  // Expose the session's custom agents to the chat picker. Slug + name only;
+  // the full config stays server-side. `GetSessionOutput.runtimeAgents`
+  // already filters to enabled & non-hidden at send time, so we just pass
+  // through.
+  const customModeOptions: ModeOption<AgentMode>[] | undefined = sessionConfig?.runtimeAgents
+    ?.length
+    ? sessionConfig.runtimeAgents.map(a => ({
+        value: a.slug as AgentMode,
+        label: a.name,
+        description: '',
+      }))
+    : undefined;
+
+  // If the selected custom agent pins a model, the chat model picker must
+  // reflect + lock that value. The agent's `variant` is only meaningful when
+  // it also pins a model (variants are model-specific, validated at write
+  // time in AgentConfigSchema), so we surface it alongside the locked model.
+  const selectedRuntimeAgent = sessionConfig?.runtimeAgents?.find(
+    a => a.slug === sessionConfig?.mode
+  );
+  const agentModelOverride = selectedRuntimeAgent?.model?.trim() || undefined;
+  const agentVariantOverride = agentModelOverride
+    ? selectedRuntimeAgent?.variant?.trim() || undefined
+    : undefined;
+  const displayModel = agentModelOverride ?? sessionConfig?.model;
+  const modelPickerLocked = !!agentModelOverride;
+  const lockTooltip = modelPickerLocked
+    ? `Locked by agent "${selectedRuntimeAgent?.name}"`
+    : undefined;
 
   const handleModeChange = useCallback(
     (mode: AgentMode) => {
@@ -316,6 +418,14 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     ? formatShortModelDisplayName(currentModelOption.name)
     : undefined;
   const availableVariants = currentModelOption?.variants ?? [];
+  // When an agent locks the model, swap the user's session variant for the
+  // agent's variant (which may be undefined — i.e. no thinking-effort chip).
+  // The variant picker is hidden in that case; it only shows when the user is
+  // free to pick their own model.
+  const displayVariant = modelPickerLocked
+    ? agentVariantOverride
+    : (sessionConfig?.variant ?? undefined);
+  const displayAvailableVariants = modelPickerLocked ? [] : availableVariants;
 
   const placeholder = isLoading
     ? 'Loading session…'
@@ -384,16 +494,21 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                     className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] pb-2 pt-4 transition-opacity duration-150 lg:pt-12 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                     onScroll={handleScroll}
                   >
-                    <StaticMessages messages={staticMessages} getChildMessages={getChildMessages} />
-                    <DynamicMessages
-                      messages={dynamicMessages}
-                      getChildMessages={getChildMessages}
-                    />
+                    <div ref={messagesContentRef}>
+                      <StaticMessages
+                        messages={staticMessages}
+                        getChildMessages={getChildMessages}
+                      />
+                      <DynamicMessages
+                        messages={dynamicMessages}
+                        getChildMessages={getChildMessages}
+                      />
 
-                    <WorkingIndicator messages={dynamicMessages} isStreaming={isStreaming} />
-                    {statusIndicator && <SessionStatusIndicator indicator={statusIndicator} />}
+                      <WorkingIndicator messages={dynamicMessages} isStreaming={isStreaming} />
+                      {statusIndicator && <SessionStatusIndicator indicator={statusIndicator} />}
 
-                    <div ref={messagesEndRef} />
+                      <div ref={messagesEndRef} />
+                    </div>
                   </div>
 
                   {showScrollButton && (
@@ -444,16 +559,21 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                         placeholder={placeholder}
                         slashCommands={availableCommands}
                         mode={sessionConfig?.mode as AgentMode | undefined}
-                        model={sessionConfig?.model}
+                        model={displayModel}
                         modelOptions={modelOptions}
                         isLoadingModels={isLoadingModels}
                         onModeChange={handleModeChange}
                         onModelChange={handleModelChange}
-                        variant={sessionConfig?.variant ?? undefined}
+                        variant={displayVariant}
                         onVariantChange={handleVariantChange}
-                        availableVariants={availableVariants}
+                        availableVariants={displayAvailableVariants}
                         showToolbar={Boolean(sessionIdFromParams)}
                         initialValue={failedPrompt ?? undefined}
+                        customModeOptions={customModeOptions}
+                        modelPickerDisabled={modelPickerLocked}
+                        modelPickerTooltip={lockTooltip}
+                        variantPickerDisabled={modelPickerLocked}
+                        variantPickerTooltip={lockTooltip}
                         imageUploadOptions={{
                           messageUuid: imageMessageUuid,
                           organizationId,

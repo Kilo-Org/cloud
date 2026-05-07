@@ -20,9 +20,8 @@ import {
   kiloclaw_instances,
   kiloclaw_subscriptions,
   user_push_tokens,
-  channel_badge_counts,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, inArray, sql, gte, sum } from 'drizzle-orm';
+import { eq, and, isNull, inArray, sql, gte } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
@@ -38,6 +37,7 @@ import {
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
 import { getBalanceForUser } from '@/lib/user.balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { revokeWebSessions } from '@/lib/web-session-revocation';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
@@ -298,6 +298,12 @@ export const userRouter = createTRPCRouter({
       .update(kilocode_users)
       .set({ api_token_pepper: crypto.randomUUID() })
       .where(eq(kilocode_users.id, ctx.user.id));
+
+    return successResult();
+  }),
+
+  signOutBrowserSessions: baseProcedure.mutation(async ({ ctx }) => {
+    await revokeWebSessions(ctx.user.id);
 
     return successResult();
   }),
@@ -715,30 +721,4 @@ export const userRouter = createTRPCRouter({
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));
   }),
-
-  // ─── Badge Counts ──────────────────────────────────────────────────
-
-  // Called by the mobile app when the user opens a chat. Resets the badge
-  // count for that channel to 0 and returns the new total across all
-  // channels, which the app applies as the OS badge count.
-  markChatRead: baseProcedure
-    .input(z.object({ channelId: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) => {
-      await db
-        .update(channel_badge_counts)
-        .set({ badge_count: 0 })
-        .where(
-          and(
-            eq(channel_badge_counts.user_id, ctx.user.id),
-            eq(channel_badge_counts.channel_id, input.channelId)
-          )
-        );
-
-      const [totals] = await db
-        .select({ total: sum(channel_badge_counts.badge_count) })
-        .from(channel_badge_counts)
-        .where(eq(channel_badge_counts.user_id, ctx.user.id));
-
-      return { badgeCount: Number(totals?.total ?? 0) };
-    }),
 });

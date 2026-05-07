@@ -120,11 +120,33 @@ if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
   posthogClient.debug();
 }
 
-const SIGNUP_RATE_LIMIT_MAX = 5;
-const SIGNUP_RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+// Per-IP signup rate limit. Two overlapping windows so an IP can absorb a
+// one-off spike (e.g. meetup where 100 people sign up from the same NAT in a
+// single day) while still bounding sustained abuse. Passing requires both:
+//   - <= 100 signups in the last 24h (burst)
+//   - <= 150 signups in the last 30d  (sustained, averages ~5/day)
+// After a full burst day, only ~50 more signups are allowed over the next
+// 29 days, and the burst day must roll out of the 30d window before the IP
+// can spike again.
+const SIGNUP_BURST_MAX = 100;
+const SIGNUP_BURST_WINDOW_MS = 24 * 60 * 60 * 1000;
+const SIGNUP_SUSTAINED_MAX = 150;
+const SIGNUP_SUSTAINED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 function getSignupIp(requestHeaders?: Headers): string | null {
   return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+}
+
+async function countSignupsFromIpSince(
+  signupIp: string,
+  sinceIso: string,
+  tx: DrizzleTransaction
+): Promise<number> {
+  const [result] = await tx
+    .select({ count: count() })
+    .from(kilocode_users)
+    .where(and(eq(kilocode_users.signup_ip, signupIp), gte(kilocode_users.created_at, sinceIso)));
+  return result?.count ?? 0;
 }
 
 async function checkSignupIpRateLimit(
@@ -134,21 +156,23 @@ async function checkSignupIpRateLimit(
   if (IS_DEVELOPMENT) return successResult(null);
   if (!signupIp) return successResult(null);
 
-  const windowStart = new Date(Date.now() - SIGNUP_RATE_LIMIT_WINDOW_MS).toISOString();
-  const [result] = await tx
-    .select({ count: count() })
-    .from(kilocode_users)
-    .where(
-      and(eq(kilocode_users.signup_ip, signupIp), gte(kilocode_users.created_at, windowStart))
-    );
+  const now = Date.now();
+  const burstWindowStart = new Date(now - SIGNUP_BURST_WINDOW_MS).toISOString();
+  const sustainedWindowStart = new Date(now - SIGNUP_SUSTAINED_WINDOW_MS).toISOString();
 
-  const existingAccounts = result?.count ?? 0;
-  if (existingAccounts < SIGNUP_RATE_LIMIT_MAX) return successResult(null);
+  const burstCount = await countSignupsFromIpSince(signupIp, burstWindowStart, tx);
+  const sustainedCount = await countSignupsFromIpSince(signupIp, sustainedWindowStart, tx);
+
+  if (burstCount < SIGNUP_BURST_MAX && sustainedCount < SIGNUP_SUSTAINED_MAX) {
+    return successResult(null);
+  }
 
   console.warn('[auth] Signup rejected due to per-IP rate limit', {
     ip_address: signupIp,
-    existing_accounts_24h: existingAccounts,
-    max_signups: SIGNUP_RATE_LIMIT_MAX,
+    existing_accounts_24h: burstCount,
+    existing_accounts_30d: sustainedCount,
+    max_signups_24h: SIGNUP_BURST_MAX,
+    max_signups_30d: SIGNUP_SUSTAINED_MAX,
   });
 
   return failureResult('SIGNUP-RATE-LIMITED');
@@ -569,6 +593,10 @@ export class SoftDeletePreconditionError extends Error {
  * - stytch_fingerprints (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
+ * - kiloclaw_scheduled_action_targets (retained operational records;
+ * - transactional_email_log (retained outbox marker, financial record)
+ *   user_id FK references the anonymized kilocode_users row — no PII
+ *   stored directly on the target row)
  *
  * What is scrubbed/deleted:
  * - PII on the user row (email, name, avatar, urls)
@@ -667,7 +695,8 @@ export async function softDeleteUser(userId: string) {
         linkedin_url: null,
         github_url: null,
         discord_server_membership_verified_at: null,
-        api_token_pepper: null,
+        api_token_pepper: randomUUID(),
+        web_session_pepper: randomUUID(),
         default_model: null,
         blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
         blocked_at: null,

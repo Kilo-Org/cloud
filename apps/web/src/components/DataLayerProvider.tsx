@@ -1,5 +1,6 @@
 'use client';
 
+import type {} from '@/types/datalayer';
 import { useSession } from 'next-auth/react';
 import { useEffect } from 'react';
 

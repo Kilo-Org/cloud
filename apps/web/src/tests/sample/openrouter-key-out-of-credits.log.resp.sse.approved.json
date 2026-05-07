@@ -12,6 +12,7 @@
   "generation_time": null,
   "streamed": true,
   "cancelled": null,
+  "status_code": 402,
   "inputTokens": 0,
   "cacheHitTokens": 0,
   "cacheWriteTokens": 0,

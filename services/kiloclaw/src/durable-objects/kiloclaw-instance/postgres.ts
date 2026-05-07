@@ -1,10 +1,16 @@
 import type { KiloClawEnv } from '../../types';
-import type { EncryptedEnvelope } from '../../schemas/instance-config';
+import type {
+  EncryptedEnvelope,
+  FlyProviderState,
+  NorthflankProviderState,
+} from '../../schemas/instance-config';
 import {
   getWorkerDb,
   getActivePersonalInstance,
+  getInstanceById,
   getInstanceBySandboxId,
   markInstanceDestroyed,
+  syncTrackedImageTag,
 } from '../../db';
 import { appNameFromUserId, appNameFromInstanceId } from '../../fly/apps';
 import type { InstanceMutableState } from './types';
@@ -12,12 +18,79 @@ import { getAppKey, getFlyConfig } from './types';
 import { applyProviderState, storageUpdate } from './state';
 import { attemptMetadataRecovery } from './reconcile';
 import { doError, doWarn, toLoggable, createReconcileContext } from './log';
-import { isInstanceKeyedSandboxId } from '@kilocode/worker-utils/instance-id';
+import {
+  isInstanceKeyedSandboxId,
+  instanceIdFromSandboxId,
+} from '@kilocode/worker-utils/instance-id';
+import { northflankClientConfig } from '../../northflank/config';
+import {
+  findProjectByName,
+  findProjectSecretByName,
+  findServiceByName,
+  findVolumeByName,
+} from '../../northflank/client';
+import { northflankResourceNames } from '../../providers/northflank/names';
 
 type RestoreOpts = {
   /** If the DO has a stored sandboxId, use it for precise lookup. */
   sandboxId?: string | null;
 };
+
+type RestoredInstance = NonNullable<Awaited<ReturnType<typeof getInstanceBySandboxId>>>;
+
+function firstNorthflankIngressHost(service: {
+  ports?: Array<{ dns?: string | null }>;
+}): string | null {
+  return service.ports?.find(port => port.dns)?.dns ?? null;
+}
+
+async function getRestoreInstance(
+  db: ReturnType<typeof getWorkerDb>,
+  userId: string,
+  opts?: RestoreOpts
+): Promise<RestoredInstance | null> {
+  if (opts?.sandboxId && isInstanceKeyedSandboxId(opts.sandboxId)) {
+    const byId = await getInstanceById(db, instanceIdFromSandboxId(opts.sandboxId));
+    if (byId) return byId;
+  }
+  if (opts?.sandboxId) {
+    return await getInstanceBySandboxId(db, opts.sandboxId);
+  }
+  const personal = await getActivePersonalInstance(db, userId);
+  return personal ? await getInstanceBySandboxId(db, personal.sandboxId) : null;
+}
+
+async function recoverNorthflankProviderState(
+  env: KiloClawEnv,
+  sandboxId: string
+): Promise<NorthflankProviderState> {
+  const config = northflankClientConfig(env);
+  const names = await northflankResourceNames(sandboxId);
+  const project = await findProjectByName(config, names.projectName);
+  const [volume, service, secret] = await Promise.all([
+    project ? findVolumeByName(config, project.id, names.volumeName) : Promise.resolve(null),
+    project ? findServiceByName(config, project.id, names.serviceName) : Promise.resolve(null),
+    project ? findProjectSecretByName(config, project.id, names.secretName) : Promise.resolve(null),
+  ]);
+
+  return {
+    provider: 'northflank',
+    projectId: project?.id ?? null,
+    projectName: project?.name ?? names.projectName,
+    serviceId: service?.id ?? null,
+    serviceName: service?.name ?? names.serviceName,
+    volumeId: volume?.id ?? null,
+    volumeName: volume?.name ?? names.volumeName,
+    secretId: secret?.id ?? null,
+    secretName: secret?.name ?? names.secretName,
+    // Recovery path: we can't derive the content hash from Northflank (secret
+    // values aren't returned on find), so leave it null. The next ensureSecret
+    // call will write and persist a fresh hash, treating it as a cold start.
+    secretContentHash: null,
+    ingressHost: service ? firstNorthflankIngressHost(service) : null,
+    region: config.region,
+  };
+}
 
 export async function fallbackAppNameForRestore(
   userId: string,
@@ -28,6 +101,25 @@ export async function fallbackAppNameForRestore(
   return isInstanceKeyedSandboxId(sandboxId)
     ? appNameFromInstanceId(appKey, prefix)
     : appNameFromUserId(appKey, prefix);
+}
+
+async function recoverFlyProviderState(
+  env: KiloClawEnv,
+  userId: string,
+  sandboxId: string
+): Promise<FlyProviderState> {
+  const appKey = getAppKey({ userId, sandboxId });
+  const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
+  const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
+  const fallbackAppName = await fallbackAppNameForRestore(userId, sandboxId, prefix);
+  const recoveredAppName = (await appStub.getAppName()) ?? fallbackAppName;
+  return {
+    provider: 'fly',
+    appName: recoveredAppName,
+    machineId: null,
+    volumeId: null,
+    region: null,
+  };
 }
 
 /**
@@ -53,44 +145,35 @@ export async function restoreFromPostgres(
   try {
     const db = getWorkerDb(connectionString);
 
-    // Prefer sandboxId lookup (multi-instance safe) over userId lookup (ambiguous).
-    const instance = opts?.sandboxId
-      ? await getInstanceBySandboxId(db, opts.sandboxId)
-      : await getActivePersonalInstance(db, userId);
+    const instance = await getRestoreInstance(db, userId, opts);
 
     if (!instance) {
       doWarn(state, 'No active instance found in Postgres', { userId });
       return;
     }
 
-    console.log('[DO] Restoring state from Postgres backup for', userId);
+    const restoredUserId = instance.userId ?? userId;
+    console.log('[DO] Restoring state from Postgres backup for', restoredUserId);
 
     const envVars: Record<string, string> | null = null;
     const encryptedSecrets: Record<string, EncryptedEnvelope> | null = null;
     const channels = null;
 
-    // Recover flyAppName from the App DO or derive deterministically.
-    // Instance-keyed DOs (ki_ sandboxId) have per-instance apps (inst-{hash}),
-    // legacy DOs have per-user apps (acct-{hash}).
-    const appKey = getAppKey({ userId, sandboxId: instance.sandboxId });
-    const appStub = env.KILOCLAW_APP.get(env.KILOCLAW_APP.idFromName(appKey));
-    const prefix = env.WORKER_ENV === 'development' ? 'dev' : undefined;
-    const fallbackAppName = await fallbackAppNameForRestore(userId, instance.sandboxId, prefix);
-    const recoveredAppName = (await appStub.getAppName()) ?? fallbackAppName;
-    const providerState = {
-      provider: 'fly',
-      appName: recoveredAppName,
-      machineId: null,
-      volumeId: null,
-      region: null,
-    } as const;
+    // docker-local is development-only and should not be restored from Postgres.
+    // Treat any non-Northflank persisted provider as Fly for legacy safety.
+    const provider = instance.provider === 'northflank' ? 'northflank' : 'fly';
+    const providerState =
+      provider === 'northflank'
+        ? await recoverNorthflankProviderState(env, instance.sandboxId)
+        : await recoverFlyProviderState(env, restoredUserId, instance.sandboxId);
+    const recoveredAppName = providerState.provider === 'fly' ? providerState.appName : null;
 
     await ctx.storage.put(
       storageUpdate({
-        userId,
+        userId: restoredUserId,
         sandboxId: instance.sandboxId,
         orgId: instance.orgId ?? null,
-        provider: 'fly',
+        provider,
         providerState,
         status: 'provisioned',
         envVars,
@@ -116,7 +199,7 @@ export async function restoreFromPostgres(
       })
     );
 
-    state.userId = userId;
+    state.userId = restoredUserId;
     state.sandboxId = instance.sandboxId;
     state.orgId = instance.orgId ?? null;
     applyProviderState(state, providerState);
@@ -143,22 +226,56 @@ export async function restoreFromPostgres(
 
     console.log('[DO] Restored from Postgres: sandboxId =', instance.sandboxId);
 
-    // Attempt to recover machine/volume IDs via Fly metadata.
-    try {
-      const flyConfig = getFlyConfig(env, state);
-      await attemptMetadataRecovery(
-        flyConfig,
-        ctx,
-        state,
-        createReconcileContext(state, env, 'postgres_restore')
-      );
-    } catch (err) {
-      doWarn(state, 'Metadata recovery after Postgres restore failed', {
-        error: toLoggable(err),
-      });
+    if (provider === 'fly') {
+      try {
+        const flyConfig = getFlyConfig(env, state);
+        await attemptMetadataRecovery(
+          flyConfig,
+          ctx,
+          state,
+          createReconcileContext(state, env, 'postgres_restore')
+        );
+      } catch (err) {
+        doWarn(state, 'Metadata recovery after Postgres restore failed', {
+          error: toLoggable(err),
+        });
+      }
     }
   } catch (err) {
     doError(state, 'Postgres restore failed', { error: toLoggable(err) });
+  }
+}
+
+/**
+ * Best-effort sync of the DO's trackedImageTag to the Postgres registry row.
+ *
+ * This is one of the two Worker-side Postgres write carve-outs documented in
+ * services/kiloclaw/AGENTS.md ("Next.js owns the Postgres registry; the Worker
+ * writes only narrow operational metadata"). The DO remains the source of truth
+ * for trackedImageTag; the Postgres column is a denormalized read cache that
+ * exists so admin tooling can filter populations of instances by current
+ * running version via SQL (Phase 1.5+ bulk version change).
+ *
+ * Postgres failures are logged and swallowed so they cannot break the alarm
+ * reconciler. The UPDATE is a no-op at the SQL level when the value already
+ * matches (IS DISTINCT FROM), keeping vacuum pressure low on idle fleets.
+ */
+export async function syncTrackedImageTagToPostgresHelper(
+  env: KiloClawEnv,
+  state: InstanceMutableState,
+  userId: string,
+  sandboxId: string
+): Promise<void> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return;
+
+  try {
+    const db = getWorkerDb(connectionString);
+    await syncTrackedImageTag(db, userId, sandboxId, state.trackedImageTag ?? null);
+  } catch (err) {
+    doWarn(state, 'Failed to sync tracked_image_tag to Postgres', {
+      error: toLoggable(err),
+    });
   }
 }
 

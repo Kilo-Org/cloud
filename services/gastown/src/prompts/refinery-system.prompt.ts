@@ -51,7 +51,7 @@ export function buildRefinerySystemPrompt(params: {
       ? buildDirectMergeInstructions(params)
       : buildPRMergeInstructions(params);
 
-  return `You are the Refinery agent for rig "${params.rigId}" (town "${params.townId}").
+  return /* md */ `You are the Refinery agent for rig "${params.rigId}" (town "${params.townId}").
 Your identity: ${params.identity}
 
 ## Your Role
@@ -175,7 +175,7 @@ function buildPRReviewPrompt(params: {
 - \`gt_escalate\` — Record issues for visibility
 - \`gt_checkpoint\` — Save progress for crash recovery`;
 
-  return `You are the Refinery agent for rig "${params.rigId}" (town "${params.townId}").
+  return /* md */ `You are the Refinery agent for rig "${params.rigId}" (town "${params.townId}").
 Your identity: ${params.identity}
 
 ## Your Role
@@ -232,7 +232,7 @@ function buildConvoySection(ctx: {
   isIntermediateStep: boolean;
 }): string {
   if (ctx.mergeMode === 'review-then-land' && ctx.isIntermediateStep) {
-    return `
+    return /* md */ `
 ## Convoy Context
 This bead is part of a **review-then-land** convoy. Your job for this intermediate step is:
 1. **Review the code** — run quality gates and code review as normal.
@@ -242,7 +242,7 @@ This bead is part of a **review-then-land** convoy. Your job for this intermedia
 The final merge/PR to main happens automatically once ALL beads in the convoy are done. Do NOT create a PR for this intermediate step.`;
   }
   if (ctx.mergeMode === 'review-then-land' && !ctx.isIntermediateStep) {
-    return `
+    return /* md */ `
 ## Convoy Context — Final Landing
 This is the **final landing merge** for a review-then-land convoy. All individual beads have been reviewed and merged into the convoy's feature branch. Your job is to:
 
@@ -254,7 +254,7 @@ This is the **final landing merge** for a review-then-land convoy. All individua
 This merge represents all the work in the convoy landing together. Treat it with the same rigor as a large feature branch merge.`;
   }
   if (ctx.mergeMode === 'review-and-merge') {
-    return `
+    return /* md */ `
 ## Convoy Context
 This bead is part of a **review-and-merge** convoy. Each bead goes through the full review and merge/PR cycle independently. Proceed with your normal review and merge/PR process.`;
   }
@@ -262,7 +262,7 @@ This bead is part of a **review-and-merge** convoy. Each bead goes through the f
 }
 
 function buildDirectMergeInstructions(params: { branch: string; targetBranch: string }): string {
-  return `1. Fetch the latest target branch: \`git fetch origin ${params.targetBranch}\`
+  return /* md */ `1. Fetch the latest target branch: \`git fetch origin ${params.targetBranch}\`
 2. Check out the target branch: \`git checkout ${params.targetBranch} && git pull origin ${params.targetBranch}\`
 3. Merge the feature branch: \`git merge --no-ff ${params.branch}\`
    - If there are merge conflicts, resolve them, then \`git add\` the resolved files and \`git commit\`.
@@ -272,7 +272,7 @@ function buildDirectMergeInstructions(params: { branch: string; targetBranch: st
 }
 
 function buildPRMergeInstructions(params: { branch: string; targetBranch: string }): string {
-  return `1. Ensure the branch is pushed to origin: \`git push origin ${params.branch}\`
+  return /* md */ `1. Ensure the branch is pushed to origin: \`git push origin ${params.branch}\`
 2. Create a pull request using the GitHub or GitLab CLI:
    - **GitHub:** \`gh pr create --base ${params.targetBranch} --head ${params.branch} --title "<descriptive title>" --body "<summary of changes>"\`
    - **GitLab:** \`glab mr create --source-branch ${params.branch} --target-branch ${params.targetBranch} --title "<descriptive title>" --description "<summary of changes>"\`

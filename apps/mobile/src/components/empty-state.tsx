@@ -25,8 +25,8 @@ export function EmptyState({
 
   return (
     <View className={cn('items-center justify-center gap-4 px-6', className)}>
-      <View className="items-center justify-center rounded-full bg-muted p-4">
-        <Icon size={32} color={colors.mutedForeground} />
+      <View className="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card">
+        <Icon size={24} color={colors.mutedForeground} strokeWidth={1.5} />
       </View>
       <View className="items-center gap-1">
         <Text variant="large">{title}</Text>

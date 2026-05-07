@@ -1,0 +1,18 @@
+apiVersion: 1
+datasources:
+  - name: Analytics Engine
+    uid: bffxugc31cnpcc
+    type: vertamedia-clickhouse-datasource
+    # URL points at a fake internal host; the Worker's outbound handler
+    # forwards requests to api.cloudflare.com and injects the bearer token.
+    # The container cannot reach api.cloudflare.com directly (CF loopback
+    # protection), so this indirection is required.
+    url: ${CF_CLICKHOUSE_URL}
+    access: proxy
+    isDefault: true
+    editable: true
+    jsonData:
+      defaultDatabase: default
+      dialTimeout: 10
+      queryTimeout: 60
+      validateSql: false

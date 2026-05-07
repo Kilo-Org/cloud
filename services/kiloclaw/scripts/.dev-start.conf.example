@@ -17,3 +17,7 @@
 #   split  — single tab with split panes (requires iTerm2)
 #   tmux   — tmux session "kiloclaw"
 DISPLAY_MODE=tabs
+
+# Preserve a custom OpenClaw tarball image during normal dev-start runs.
+# Equivalent to passing --local-openclaw-image.
+# LOCAL_OPENCLAW_IMAGE=true

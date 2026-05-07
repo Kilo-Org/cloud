@@ -15,11 +15,22 @@ type ServiceGroup = {
 
 const groups: ServiceGroup[] = [
   { id: 'core', label: 'Core', alwaysOn: true },
-  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false, sectionBreakBefore: true },
-  { id: 'cloud-agent', label: 'Cloud Agent', alwaysOn: false },
+  {
+    id: 'git-token-service',
+    label: 'Git Tokens',
+    alwaysOn: false,
+    sectionBreakBefore: true,
+  },
+  { id: 'kiloclaw', label: 'KiloClaw', alwaysOn: false },
+  {
+    id: 'cloud-agent',
+    label: 'Cloud Agent',
+    alwaysOn: false,
+    groupDependsOn: ['git-token-service'],
+  },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'gastown', label: 'Gastown', alwaysOn: false },
+  { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
   {
     id: 'auto-triage',
     label: 'Auto Triage',
@@ -30,6 +41,7 @@ const groups: ServiceGroup[] = [
   { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
+  { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
 ];
 
@@ -59,7 +71,7 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
-    dependsOn: ['postgres', 'nextjs', 'cloudflare-session-ingest'],
+    dependsOn: ['postgres', 'nextjs', 'cloudflare-session-ingest', 'cloudflare-git-token-service'],
     dir: 'services/cloud-agent-next',
     useLanIp: true,
   },
@@ -73,6 +85,12 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres'],
     dir: 'services/session-ingest',
   },
+  // git-token-service (shared by cloud-agent, app-builder, gastown)
+  'cloudflare-git-token-service': {
+    group: 'git-token-service',
+    dependsOn: ['postgres'],
+    dir: 'services/git-token-service',
+  },
   // app-builder
   'app-builder-tunnel': { group: 'app-builder', dependsOn: [] },
   'cloudflare-app-builder': {
@@ -85,11 +103,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'app-builder',
     dependsOn: ['postgres'],
     dir: 'services/db-proxy',
-  },
-  'cloudflare-git-token-service': {
-    group: 'app-builder',
-    dependsOn: ['postgres'],
-    dir: 'services/git-token-service',
   },
   // code-review
   'cloudflare-code-review-infra': {
@@ -124,9 +137,14 @@ const serviceMeta: Record<string, ServiceMeta> = {
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-stripe': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
+  notifications: {
+    group: 'kiloclaw',
+    dependsOn: ['postgres'],
+    dir: 'services/notifications',
+  },
   kiloclaw: {
     group: 'kiloclaw',
-    dependsOn: ['postgres', 'kiloclaw-tunnel'],
+    dependsOn: ['postgres', 'kiloclaw-tunnel', 'notifications'],
     dir: 'services/kiloclaw',
   },
   'kiloclaw-inbound-email': {
@@ -139,6 +157,16 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'nextjs', 'kiloclaw'],
     dir: 'services/kiloclaw-billing',
   },
+  'event-service': {
+    group: 'kiloclaw',
+    dependsOn: [],
+    dir: 'services/event-service',
+  },
+  'kilo-chat': {
+    group: 'kiloclaw',
+    dependsOn: ['kiloclaw', 'event-service'],
+    dir: 'services/kilo-chat',
+  },
   // observability
   'cloudflare-o11y': {
     group: 'observability',
@@ -150,6 +178,9 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/ai-attribution',
   },
+  grafana: { group: 'observability', dependsOn: [] },
+  // mobile
+  mobile: { group: 'mobile', dependsOn: [], dir: 'apps/mobile' },
   // storybook
   storybook: { group: 'storybook', dependsOn: [] },
   // gastown
@@ -249,7 +280,19 @@ function readWranglerPort(dir: string): number {
 // Build service definitions from serviceMeta + wrangler.jsonc
 // ---------------------------------------------------------------------------
 
-const INFRA_PORTS: Record<string, number> = { postgres: 5432, redis: 6379 };
+const INFRA_PORTS: Record<string, number> = { postgres: 5432, redis: 6379, grafana: 4000 };
+
+// Docker Compose profile that gates each infra service, if any. Services not
+// listed here are part of the default profile and start with a plain `up -d`.
+const INFRA_PROFILES: Record<string, string> = { grafana: 'grafana' };
+
+export function getInfraProfile(serviceName: string): string | undefined {
+  return INFRA_PROFILES[serviceName];
+}
+
+export function getAllInfraProfiles(): string[] {
+  return [...new Set(Object.values(INFRA_PROFILES))];
+}
 
 function buildServiceDefs(): ServiceDef[] {
   const repoRoot = path.resolve(import.meta.dirname, '../..');
@@ -284,6 +327,20 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'mobile') {
+      const port = 8081 + portOffset;
+      defs.push({
+        name,
+        type: 'process',
+        dir: 'apps/mobile',
+        port,
+        dependsOn: meta.dependsOn,
+        command: ['pnpm', 'run', 'start', '--', '--port', String(port)],
+        group: meta.group,
+      });
+      continue;
+    }
+
     if (name in INFRA_PORTS) {
       defs.push({
         name,
@@ -300,6 +357,7 @@ function buildServiceDefs(): ServiceDef[] {
     if (name === 'kiloclaw-tunnel') {
       const nextjsPort = 3000 + portOffset;
       const kiloclawPort = readWranglerPort(path.join(repoRoot, 'services/kiloclaw')) + portOffset;
+      const kiloChatPort = readWranglerPort(path.join(repoRoot, 'services/kilo-chat')) + portOffset;
       defs.push({
         name,
         type: 'process',
@@ -311,6 +369,7 @@ function buildServiceDefs(): ServiceDef[] {
           'dev/local/scripts/start-tunnel.ts',
           String(nextjsPort),
           String(kiloclawPort),
+          String(kiloChatPort),
         ],
         group: meta.group,
       });

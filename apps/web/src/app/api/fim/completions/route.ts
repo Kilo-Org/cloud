@@ -26,7 +26,14 @@ import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { sentryLogger } from '@/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 
-const MISTRAL_FIM_URL = 'https://api.mistral.ai/v1/fim/completions';
+// Mistral exposes FIM on two separate, key-incompatible endpoints:
+//   - https://api.mistral.ai          (La Plateforme, paid tier keys)
+//   - https://codestral.mistral.ai    (Codestral free tier, "Codestral" keys from
+//                                      https://console.mistral.ai/codestral)
+// A Codestral key is rejected by api.mistral.ai, so BYOK keys stored as `codestral`
+// must be routed to codestral.mistral.ai instead.
+const MISTRAL_LA_PLATEFORME_FIM_URL = 'https://api.mistral.ai/v1/fim/completions';
+const MISTRAL_CODESTRAL_FIM_URL = 'https://codestral.mistral.ai/v1/fim/completions';
 const INCEPTION_FIM_URL = 'https://api.inceptionlabs.ai/v1/fim/completions';
 const FIM_MAX_TOKENS_LIMIT = 1000;
 
@@ -35,23 +42,25 @@ type FimProvider = 'mistral' | 'inception';
 function resolveFimProvider(model: string): {
   provider: FimProvider;
   upstreamModel: string;
-  upstreamUrl: string;
 } | null {
   if (model.startsWith('mistralai/')) {
     return {
       provider: 'mistral',
       upstreamModel: model.slice('mistralai/'.length),
-      upstreamUrl: MISTRAL_FIM_URL,
     };
   }
   if (model.startsWith('inception/')) {
     return {
       provider: 'inception',
       upstreamModel: model.slice('inception/'.length),
-      upstreamUrl: INCEPTION_FIM_URL,
     };
   }
   return null;
+}
+
+function resolveFimUpstreamUrl(provider: FimProvider, usingCodestralByok: boolean): string {
+  if (provider === 'inception') return INCEPTION_FIM_URL;
+  return usingCodestralByok ? MISTRAL_CODESTRAL_FIM_URL : MISTRAL_LA_PLATEFORME_FIM_URL;
 }
 
 function getSystemApiKey(provider: FimProvider): string | null {
@@ -127,7 +136,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  const { provider: fimProvider, upstreamModel, upstreamUrl } = resolved;
+  const { provider: fimProvider, upstreamModel } = resolved;
 
   // Validate max_tokens
   if (!requestBody.max_tokens || requestBody.max_tokens > FIM_MAX_TOKENS_LIMIT) {
@@ -191,8 +200,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Use shared helper for organization model restrictions
-  // Model deny list only applies to Enterprise plans
+  // Use shared helper for organization model restrictions.
   const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
     modelId: requestBody.model,
     settings,
@@ -200,8 +208,18 @@ export async function POST(request: NextRequest) {
   });
   if (modelRestrictionError) return modelRestrictionError;
 
-  // FIM routes directly to providers (not via OpenRouter), so enforce
-  // the provider denylist by checking the resolved provider name.
+  // FIM routes directly to providers, so enforce the resolved provider name here.
+  if (providerConfig?.only && !providerConfig.only.includes(fimProvider)) {
+    return NextResponse.json(
+      {
+        error: 'Provider not allowed for your team.',
+        error_type: ProxyErrorType.provider_not_allowed,
+        message: `The provider "${fimProvider}" is not allowed for your team.`,
+      },
+      { status: 403 }
+    );
+  }
+
   if (providerConfig?.ignore?.includes(fimProvider)) {
     return NextResponse.json(
       {
@@ -214,7 +232,9 @@ export async function POST(request: NextRequest) {
   }
 
   const systemKey = getSystemApiKey(fimProvider);
-  const apiKey = userByok?.at(0)?.decryptedAPIKey ?? systemKey;
+  const userByokEntry = userByok?.at(0);
+  const apiKey = userByokEntry?.decryptedAPIKey ?? systemKey;
+  const upstreamUrl = resolveFimUpstreamUrl(fimProvider, userByokEntry?.providerId === 'codestral');
 
   if (!apiKey) {
     return NextResponse.json(

@@ -2,6 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class FakeDurableObject {},
+  WorkerEntrypoint: class FakeWorkerEntrypoint {
+    env: unknown;
+    ctx: unknown;
+
+    constructor(env: unknown, ctx: unknown) {
+      this.env = env;
+      this.ctx = ctx;
+    }
+  },
 }));
 
 vi.mock('./routes', async () => {
@@ -42,7 +51,7 @@ vi.mock('./lib/image-version', async () => {
   };
 });
 
-import worker from './index';
+import WorkerEntrypoint, { app } from './index';
 import { deriveGatewayToken } from './auth/gateway-token';
 import { KILOCLAW_ACTIVE_INSTANCE_COOKIE } from './config';
 
@@ -71,7 +80,7 @@ describe('platform route env validation', () => {
   });
 
   it('rejects platform routes when KILOCLAW_INTERNAL_API_SECRET is missing', async () => {
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/api/platform/provision', {
         method: 'POST',
         headers: {
@@ -85,6 +94,8 @@ describe('platform route env validation', () => {
         HYPERDRIVE: { connectionString: 'postgresql://fake' },
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
       } as never,
       { waitUntil: vi.fn() } as never
@@ -100,7 +111,7 @@ describe('platform route env validation', () => {
   });
 
   it('rejects platform routes when NEXTAUTH_SECRET is missing', async () => {
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/api/platform/provision', {
         method: 'POST',
         headers: {
@@ -114,6 +125,8 @@ describe('platform route env validation', () => {
         KILOCLAW_INTERNAL_API_SECRET: 'claw-secret',
         HYPERDRIVE: { connectionString: 'postgresql://fake' },
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
       } as never,
       { waitUntil: vi.fn() } as never
@@ -137,13 +150,15 @@ describe('controller google env validation', () => {
   });
 
   it('rejects controller google routes when broker env is missing', async () => {
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/api/controller/google/token', {
         method: 'POST',
       }),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
       } as never,
       { waitUntil: vi.fn() } as never
     );
@@ -158,13 +173,15 @@ describe('controller google env validation', () => {
   });
 
   it('allows controller google routes when broker env is configured', async () => {
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/api/controller/google/token', {
         method: 'POST',
       }),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         GOOGLE_WORKSPACE_OAUTH_CLIENT_ID: 'client-id',
         GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET: 'client-secret',
         GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY: 'refresh-key',
@@ -202,11 +219,13 @@ describe('proxy recovering state', () => {
       }),
     };
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/'),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
         FLY_APP_NAME: 'test-app',
         KILOCLAW_REGISTRY: {
@@ -226,6 +245,114 @@ describe('proxy recovering state', () => {
       error: 'Instance is recovering',
       hint: 'Your instance is being recovered after an unexpected stop. Please wait.',
     });
+  });
+});
+
+describe('kilo-chat webhook delivery', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('routes service-binding webhook payloads to the target instance gateway', async () => {
+    const sandboxId = 'ki_550e8400e29b41d4a716446655440000';
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({ sandboxId }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'https://test-app.fly.dev',
+        headers: { 'fly-force-instance-id': 'machine-1' },
+      }),
+    };
+    const instanceNamespace = {
+      idFromName: vi.fn().mockReturnValue('instance-id'),
+      get: vi.fn().mockReturnValue(instanceStub),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+
+    const worker = new WorkerEntrypoint(
+      {
+        KILOCLAW_INSTANCE: instanceNamespace,
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
+      } as never,
+      {} as never
+    );
+
+    await worker.deliverChatWebhook({
+      type: 'message.created',
+      targetBotId: `bot:kiloclaw:${sandboxId}`,
+      conversationId: '01KP8R0VX4HK4ZSVQR5ZBVKHQH',
+      messageId: '01KP8R0VX4HK4ZSVQR5ZBVKHQJ',
+      from: 'user-1',
+      text: 'Hello',
+      sentAt: '2026-04-21T12:00:00.000Z',
+    });
+
+    expect(instanceNamespace.idFromName).toHaveBeenCalledWith(
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
+    expect(instanceNamespace.get).toHaveBeenCalledWith('instance-id');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const { input, init } = getFetchCall(fetchMock);
+    expect(input).toBe('https://test-app.fly.dev/plugins/kilo-chat/webhook');
+    expect(init?.method).toBe('POST');
+    expect(init?.body).toBe(
+      JSON.stringify({
+        type: 'message.created',
+        conversationId: '01KP8R0VX4HK4ZSVQR5ZBVKHQH',
+        messageId: '01KP8R0VX4HK4ZSVQR5ZBVKHQJ',
+        from: 'user-1',
+        text: 'Hello',
+        sentAt: '2026-04-21T12:00:00.000Z',
+      })
+    );
+    if (!(init?.headers instanceof Headers)) {
+      throw new Error('Expected webhook fetch headers to be a Headers instance');
+    }
+    expect(init.headers.get('x-kiloclaw-proxy-token')).toBe(
+      await deriveGatewayToken(sandboxId, 'gateway-secret')
+    );
+    expect(init.headers.get('fly-force-instance-id')).toBe('machine-1');
+    expect(init.headers.get('content-type')).toBe('application/json');
+  });
+
+  it('rejects targetBotId suffixes that are not valid sandboxIds before routing', async () => {
+    for (const targetBotId of ['bot:kiloclaw:', 'bot:kiloclaw:bad$sandbox']) {
+      const registryStub = { listInstances: vi.fn().mockResolvedValue([]) };
+      const registryNamespace = {
+        idFromName: vi.fn().mockReturnValue('registry-id'),
+        get: vi.fn().mockReturnValue(registryStub),
+      };
+      const instanceNamespace = {
+        idFromName: vi.fn().mockReturnValue('instance-id'),
+        get: vi.fn(),
+      };
+
+      const worker = new WorkerEntrypoint(
+        {
+          KILOCLAW_INSTANCE: instanceNamespace,
+          KILOCLAW_REGISTRY: registryNamespace,
+          GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        } as never,
+        {} as never
+      );
+
+      await expect(
+        worker.deliverChatWebhook({
+          type: 'bot.status_request',
+          targetBotId,
+        })
+      ).rejects.toThrow(/Invalid sandboxId derived from targetBotId/);
+
+      expect(registryNamespace.idFromName).not.toHaveBeenCalled();
+      expect(instanceNamespace.idFromName).not.toHaveBeenCalled();
+    }
   });
 });
 
@@ -267,11 +394,13 @@ describe('proxy routing target usage', () => {
       })
     );
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/i/550e8400-e29b-41d4-a716-446655440000/api/foo?bar=baz'),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
         FLY_APP_NAME: 'test-app',
         KILOCLAW_REGISTRY: {
@@ -316,7 +445,7 @@ describe('proxy routing target usage', () => {
       getRoutingTarget: vi.fn().mockResolvedValue(null),
     };
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/', {
         headers: {
           Cookie: `${KILOCLAW_ACTIVE_INSTANCE_COOKIE}=550e8400-e29b-41d4-a716-446655440000`,
@@ -325,6 +454,8 @@ describe('proxy routing target usage', () => {
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
         FLY_APP_NAME: 'test-app',
         KILOCLAW_INSTANCE: {
@@ -361,11 +492,13 @@ describe('proxy routing target usage', () => {
     const fetchMock = vi.mocked(fetch) as FetchMock;
     fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/i/550e8400-e29b-41d4-a716-446655440000/api/foo'),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         KILOCLAW_INSTANCE: {
           idFromName: vi.fn().mockReturnValue('instance-id'),
           get: vi.fn().mockReturnValue(instanceStub),
@@ -379,7 +512,7 @@ describe('proxy routing target usage', () => {
     expect(input).toBe('http://127.0.0.1:45001/api/foo');
   });
 
-  it('rebuilds HTTP retry auth with the refreshed authoritative sandbox id after crash recovery', async () => {
+  it('does not start or retry the default HTTP proxy when the upstream fetch fails', async () => {
     const registryStub = {
       listInstances: vi.fn().mockResolvedValue([
         {
@@ -392,70 +525,33 @@ describe('proxy routing target usage', () => {
       ]),
     };
     const instanceStub = {
-      getStatus: vi
-        .fn()
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-old',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-old',
-          flyMachineId: 'machine-old',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-old',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-old',
-          flyMachineId: 'machine-old',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-new',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-new',
-          flyMachineId: 'machine-new',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-new',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-new',
-          flyMachineId: 'machine-new',
-          flyAppName: 'test-app',
-        }),
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'sandbox-1',
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+      }),
       start: vi.fn().mockResolvedValue({ started: true }),
-      getRoutingTarget: vi
-        .fn()
-        .mockResolvedValueOnce({
-          origin: 'https://test-app.fly.dev',
-          headers: {
-            'fly-force-instance-id': 'machine-old',
-          },
-        })
-        .mockResolvedValueOnce({
-          origin: 'https://test-app.fly.dev',
-          headers: {
-            'fly-force-instance-id': 'machine-new',
-          },
-        }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'https://test-app.fly.dev',
+        headers: {
+          'fly-force-instance-id': 'machine-1',
+        },
+      }),
     };
     const fetchMock = vi.mocked(fetch) as FetchMock;
-    fetchMock
-      .mockRejectedValueOnce(new Error('socket hang up'))
-      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+    fetchMock.mockRejectedValueOnce(new Error('socket hang up'));
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/api/foo?bar=baz'),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
         FLY_APP_NAME: 'test-app',
         KILOCLAW_REGISTRY: {
@@ -466,25 +562,21 @@ describe('proxy routing target usage', () => {
           idFromName: vi.fn().mockReturnValue('instance-id'),
           get: vi.fn().mockReturnValue(instanceStub),
         },
-        KILOCLAW_AE: { writeDataPoint: vi.fn() },
       } as never,
       { waitUntil: vi.fn() } as never
     );
 
-    expect(response.status).toBe(200);
-
-    const retryCall = getFetchCall(fetchMock, 1);
-    if (!(retryCall.init?.headers instanceof Headers)) {
-      throw new Error('Expected retry fetch headers to be a Headers instance');
-    }
-
-    expect(retryCall.init.headers.get('fly-force-instance-id')).toBe('machine-new');
-    expect(retryCall.init.headers.get('x-kiloclaw-proxy-token')).toBe(
-      await deriveGatewayToken('sandbox-new', 'gateway-secret')
-    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not reachable',
+      hint: 'Your instance may not be running. Start it from the dashboard.',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(instanceStub.start).not.toHaveBeenCalled();
   });
 
-  it('rebuilds WebSocket retry auth with the refreshed authoritative sandbox id after crash recovery', async () => {
+  it('does not start or retry the default WebSocket proxy when the upstream fetch fails', async () => {
     const registryStub = {
       listInstances: vi.fn().mockResolvedValue([
         {
@@ -497,72 +589,35 @@ describe('proxy routing target usage', () => {
       ]),
     };
     const instanceStub = {
-      getStatus: vi
-        .fn()
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-old',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-old',
-          flyMachineId: 'machine-old',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-old',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-old',
-          flyMachineId: 'machine-old',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-new',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-new',
-          flyMachineId: 'machine-new',
-          flyAppName: 'test-app',
-        })
-        .mockResolvedValueOnce({
-          userId: 'user-1',
-          sandboxId: 'sandbox-new',
-          status: 'running',
-          provider: 'fly',
-          runtimeId: 'machine-new',
-          flyMachineId: 'machine-new',
-          flyAppName: 'test-app',
-        }),
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'sandbox-1',
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+      }),
       start: vi.fn().mockResolvedValue({ started: true }),
-      getRoutingTarget: vi
-        .fn()
-        .mockResolvedValueOnce({
-          origin: 'https://test-app.fly.dev',
-          headers: {
-            'fly-force-instance-id': 'machine-old',
-          },
-        })
-        .mockResolvedValueOnce({
-          origin: 'https://test-app.fly.dev',
-          headers: {
-            'fly-force-instance-id': 'machine-new',
-          },
-        }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'https://test-app.fly.dev',
+        headers: {
+          'fly-force-instance-id': 'machine-1',
+        },
+      }),
     };
     const fetchMock = vi.mocked(fetch) as FetchMock;
-    fetchMock
-      .mockRejectedValueOnce(new Error('socket hang up'))
-      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+    fetchMock.mockRejectedValueOnce(new Error('socket hang up'));
 
-    const response = await worker.fetch(
+    const response = await app.fetch(
       new Request('https://example.com/socket', {
         headers: { Upgrade: 'websocket' },
       }),
       {
         NEXTAUTH_SECRET: 'nextauth-secret',
         GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'https',
         FLY_API_TOKEN: 'fly-token',
         FLY_APP_NAME: 'test-app',
         KILOCLAW_REGISTRY: {
@@ -573,21 +628,414 @@ describe('proxy routing target usage', () => {
           idFromName: vi.fn().mockReturnValue('instance-id'),
           get: vi.fn().mockReturnValue(instanceStub),
         },
-        KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Retry-After')).toBe('5');
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not reachable',
+      hint: 'Your instance may not be running. Start it from the dashboard.',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(instanceStub.start).not.toHaveBeenCalled();
+  });
+});
+
+describe('host-based routing', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const baseEnv = () => ({
+    NEXTAUTH_SECRET: 'nextauth-secret',
+    GATEWAY_TOKEN_SECRET: 'gateway-secret',
+    KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.ai',
+    KILOCLAW_INSTANCE_URL_SCHEME: 'https',
+    FLY_API_TOKEN: 'fly-token',
+    FLY_APP_NAME: 'test-app',
+  });
+
+  it('routes an instance-keyed host to the owning DO and proxies through', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'ki_550e8400e29b41d4a716446655440000',
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+        controllerCapabilitiesVersion: 2,
+      }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'https://test-app.fly.dev',
+        headers: { 'fly-force-instance-id': 'machine-1' },
+      }),
+    };
+    const instanceNamespace = {
+      idFromName: vi.fn().mockReturnValue('instance-id'),
+      get: vi.fn().mockReturnValue(instanceStub),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    const response = await app.fetch(
+      new Request('https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai/api/foo?bar=baz'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: instanceNamespace,
       } as never,
       { waitUntil: vi.fn() } as never
     );
 
     expect(response.status).toBe(200);
-
-    const retryCall = getFetchCall(fetchMock, 1);
-    if (!(retryCall.init?.headers instanceof Headers)) {
-      throw new Error('Expected retry fetch headers to be a Headers instance');
-    }
-
-    expect(retryCall.init.headers.get('fly-force-instance-id')).toBe('machine-new');
-    expect(retryCall.init.headers.get('x-kiloclaw-proxy-token')).toBe(
-      await deriveGatewayToken('sandbox-new', 'gateway-secret')
+    // DO is keyed by the instanceId (UUID), not by userId.
+    expect(instanceNamespace.idFromName).toHaveBeenCalledWith(
+      '550e8400-e29b-41d4-a716-446655440000'
     );
+    const { input } = getFetchCall(fetchMock);
+    expect(input).toBe('https://test-app.fly.dev/api/foo?bar=baz');
+  });
+
+  it('routes a legacy userId-keyed host to the owning DO', async () => {
+    const legacyUserId = 'user-1';
+    const legacySandboxId =
+      // sandboxIdFromUserId('user-1') === base64url('user-1')
+      // label is u-<base32hex('user-1')> — we let the code derive it.
+      'dXNlci0x';
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: legacyUserId,
+        sandboxId: legacySandboxId,
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+        controllerCapabilitiesVersion: 2,
+      }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'https://test-app.fly.dev',
+        headers: { 'fly-force-instance-id': 'machine-1' },
+      }),
+    };
+    const instanceNamespace = {
+      idFromName: vi.fn().mockReturnValue('instance-id'),
+      get: vi.fn().mockReturnValue(instanceStub),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    // Label for userId 'user-1': u-{base32hex('user-1')} = u-ekgq6t9k65gq (derived)
+    // Use the hostname-label helper to stay in sync if the encoding changes.
+    const { hostnameLabelFromSandboxId } = await import('./auth/hostname-label');
+    const label = hostnameLabelFromSandboxId(legacySandboxId);
+    if (!label) throw new Error('Expected a label for legacy sandboxId');
+
+    const response = await app.fetch(
+      new Request(`https://${label}.kiloclaw.ai/ping`),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: instanceNamespace,
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(200);
+    // DO is keyed by the decoded userId.
+    expect(instanceNamespace.idFromName).toHaveBeenCalledWith(legacyUserId);
+  });
+
+  it('returns 403 when the host resolves to an instance owned by another user', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'other-user',
+        sandboxId: 'ki_550e8400e29b41d4a716446655440000',
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+        controllerCapabilitiesVersion: 2,
+      }),
+    };
+
+    const response = await app.fetch(
+      new Request('https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai/'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it('returns 404 with a restart hint when the instance is pre-cutover (v1)', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'ki_550e8400e29b41d4a716446655440000',
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+        controllerCapabilitiesVersion: null,
+      }),
+    };
+
+    const response = await app.fetch(
+      new Request('https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai/some/path?x=1'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Instance not available on this host',
+      hint: 'This instance needs a restart before it can be reached at its per-instance hostname. Use the legacy URL for now.',
+    });
+  });
+
+  it('also 404s pre-cutover instances when the v1 status has controllerCapabilitiesVersion=1 explicitly', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'ki_550e8400e29b41d4a716446655440000',
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+        controllerCapabilitiesVersion: 1,
+      }),
+    };
+
+    const response = await app.fetch(
+      new Request('https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai/'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it('returns 404 for unparseable labels within the instance-host space', async () => {
+    const response = await app.fetch(new Request('https://marketing.kiloclaw.ai/'), baseEnv(), {
+      waitUntil: vi.fn(),
+    } as never);
+
+    expect(response.status).toBe(404);
+  });
+
+  it('returns 404 for multi-label subdomains within the instance-host space', async () => {
+    const response = await app.fetch(new Request('https://foo.bar.kiloclaw.ai/'), baseEnv(), {
+      waitUntil: vi.fn(),
+    } as never);
+
+    expect(response.status).toBe(404);
+  });
+
+  it('skips host-based routing for reserved labels (e.g. claw) and falls through', async () => {
+    // `claw` is reserved for controller check-in + platform traffic that's
+    // registered before the catch-all. A request hitting the catch-all on
+    // `claw.kiloclaw.ai` means no earlier route matched — we want to fall
+    // through to cookie/default routing rather than 404 with "Instance not
+    // found" (the host-branch's response for unparseable labels), which
+    // would be a misleading error for a reserved operational hostname.
+    const instanceStub = {
+      getStatus: vi.fn(),
+    };
+    const registryStub = {
+      // Empty registry → default-personal path resolves no instance,
+      // responds with "Instance not provisioned". Distinct from the
+      // host-branch's "Instance not found".
+      listInstances: vi.fn().mockResolvedValue([]),
+    };
+    const response = await app.fetch(
+      new Request('https://claw.kiloclaw.ai/some-unhandled-path'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+        KILOCLAW_REGISTRY: {
+          idFromName: vi.fn().mockReturnValue('registry-id'),
+          get: vi.fn().mockReturnValue(registryStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(404);
+    // Host branch would have replied `{ error: 'Instance not found' }`;
+    // the default branch replies `{ error: 'Instance not provisioned', ... }`.
+    // The latter body proves the reserved-label short-circuit kicked in.
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Instance not provisioned',
+    });
+    // Host branch would have called the Instance DO's getStatus for the
+    // `claw` label. It must not.
+    expect(instanceStub.getStatus).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the DO has no userId (instance never provisioned)', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: null,
+        sandboxId: null,
+        status: null,
+        provider: null,
+        runtimeId: null,
+        flyMachineId: null,
+        flyAppName: null,
+        controllerCapabilitiesVersion: null,
+      }),
+    };
+
+    const response = await app.fetch(
+      new Request('https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai/'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it('is case-insensitive on the host label', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'ki_550e8400e29b41d4a716446655440000',
+        status: 'running',
+        provider: 'fly',
+        runtimeId: 'machine-1',
+        flyMachineId: 'machine-1',
+        flyAppName: 'test-app',
+        controllerCapabilitiesVersion: 2,
+      }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'https://test-app.fly.dev',
+        headers: { 'fly-force-instance-id': 'machine-1' },
+      }),
+    };
+    const instanceNamespace = {
+      idFromName: vi.fn().mockReturnValue('instance-id'),
+      get: vi.fn().mockReturnValue(instanceStub),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    const response = await app.fetch(
+      new Request('https://I-550E8400E29B41D4A716446655440000.KILOCLAW.AI/'),
+      {
+        ...baseEnv(),
+        KILOCLAW_INSTANCE: instanceNamespace,
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(instanceNamespace.idFromName).toHaveBeenCalledWith(
+      '550e8400-e29b-41d4-a716-446655440000'
+    );
+  });
+
+  it('works with a dev suffix including a port', async () => {
+    const instanceStub = {
+      getStatus: vi.fn().mockResolvedValue({
+        userId: 'user-1',
+        sandboxId: 'ki_550e8400e29b41d4a716446655440000',
+        status: 'running',
+        provider: 'docker-local',
+        runtimeId: 'kiloclaw-sandbox-1',
+        flyMachineId: null,
+        flyAppName: null,
+        controllerCapabilitiesVersion: 2,
+      }),
+      getRoutingTarget: vi.fn().mockResolvedValue({
+        origin: 'http://127.0.0.1:45001',
+        headers: {},
+      }),
+    };
+    const fetchMock = vi.mocked(fetch) as FetchMock;
+    fetchMock.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    const response = await app.fetch(
+      new Request('http://i-550e8400e29b41d4a716446655440000.kiloclaw.localhost:8795/api/foo'),
+      {
+        NEXTAUTH_SECRET: 'nextauth-secret',
+        GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        KILOCLAW_INSTANCE_HOST_SUFFIX: '.kiloclaw.localhost:8795',
+        KILOCLAW_INSTANCE_URL_SCHEME: 'http',
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn().mockReturnValue('instance-id'),
+          get: vi.fn().mockReturnValue(instanceStub),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    expect(response.status).toBe(200);
+    const { input } = getFetchCall(fetchMock);
+    expect(input).toBe('http://127.0.0.1:45001/api/foo');
+  });
+
+  it('falls through to cookie-based routing when the host does not match the suffix', async () => {
+    // Host is `claw.kilosessions.ai` — doesn't match `.kiloclaw.ai` suffix,
+    // so the host branch is skipped and the cookie branch (no cookie set)
+    // falls through to the default registry lookup.
+    const registryStub = {
+      listInstances: vi.fn().mockResolvedValue([]),
+    };
+
+    const response = await app.fetch(
+      new Request('https://claw.kilosessions.ai/'),
+      {
+        ...baseEnv(),
+        KILOCLAW_REGISTRY: {
+          idFromName: vi.fn().mockReturnValue('registry-id'),
+          get: vi.fn().mockReturnValue(registryStub),
+        },
+        KILOCLAW_INSTANCE: {
+          idFromName: vi.fn(),
+          get: vi.fn(),
+        },
+      } as never,
+      { waitUntil: vi.fn() } as never
+    );
+
+    // No instance exists for user-1 → default path returns 404.
+    expect(response.status).toBe(404);
   });
 });

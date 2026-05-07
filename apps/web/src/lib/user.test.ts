@@ -38,13 +38,20 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_email_log,
+  transactional_email_log,
   kiloclaw_cli_runs,
   bot_requests,
   bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
+  kiloclaw_scheduled_actions,
+  kiloclaw_scheduled_action_stages,
+  kiloclaw_scheduled_action_targets,
   user_push_tokens,
   security_advisor_scans,
   credit_campaigns,
+  agent_environment_profiles,
+  agent_environment_profile_mcp_servers,
+  agent_environment_profile_skills,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -90,6 +97,9 @@ describe('User', () => {
     await db.delete(organization_audit_logs);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(kiloclaw_scheduled_action_targets);
+    await db.delete(kiloclaw_scheduled_action_stages);
+    await db.delete(kiloclaw_scheduled_actions);
     await db.delete(credit_campaigns);
     await db.delete(kiloclaw_google_oauth_connections);
     await db.delete(kiloclaw_inbound_email_aliases);
@@ -110,6 +120,7 @@ describe('User', () => {
     await db.delete(stytch_fingerprints);
     await db.delete(kiloclaw_cli_runs);
     await db.delete(kiloclaw_email_log);
+    await db.delete(transactional_email_log);
     await db.delete(kiloclaw_version_pins);
     await db.delete(kiloclaw_image_catalog);
     await db.delete(kiloclaw_subscriptions);
@@ -142,10 +153,10 @@ describe('User', () => {
       expect(result.user.signup_ip).toBe('203.0.113.25');
     });
 
-    it('rejects new signups after the per-IP threshold (5)', async () => {
+    it('rejects new signups after the per-IP burst threshold (100/24h)', async () => {
       const signupIp = '203.0.113.50';
-      for (let i = 1; i <= 5; i++) {
-        await insertTestUser({ id: `ip-limit-${i}`, signup_ip: signupIp });
+      for (let i = 1; i <= 100; i++) {
+        await insertTestUser({ id: `ip-burst-${i}`, signup_ip: signupIp });
       }
 
       const result = await createOrUpdateUser(
@@ -165,6 +176,98 @@ describe('User', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('SIGNUP-RATE-LIMITED');
+    });
+
+    it('allows up to 99 signups in 24h from a single IP (burst below threshold)', async () => {
+      const signupIp = '203.0.113.51';
+      for (let i = 1; i <= 99; i++) {
+        await insertTestUser({ id: `ip-burst-ok-${i}`, signup_ip: signupIp });
+      }
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'burst-ok@example.com',
+          google_user_name: 'Burst OK',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-burst-ok',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': signupIp })
+      );
+
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects new signups after the per-IP sustained threshold (150/30d)', async () => {
+      const signupIp = '203.0.113.52';
+      const now = Date.now();
+      // 99 signups yesterday — under the 24h burst threshold.
+      const yesterday = new Date(now - 2 * 60 * 60 * 1000).toISOString();
+      for (let i = 1; i <= 99; i++) {
+        await insertTestUser({
+          id: `ip-sustained-recent-${i}`,
+          signup_ip: signupIp,
+          created_at: yesterday,
+        });
+      }
+      // 51 more signups 10 days ago — outside the 24h window, inside 30d.
+      const tenDaysAgo = new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString();
+      for (let i = 1; i <= 51; i++) {
+        await insertTestUser({
+          id: `ip-sustained-old-${i}`,
+          signup_ip: signupIp,
+          created_at: tenDaysAgo,
+        });
+      }
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'sustained-limited@example.com',
+          google_user_name: 'Sustained Limited',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-sustained-limited',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': signupIp })
+      );
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toBe('SIGNUP-RATE-LIMITED');
+    });
+
+    it('ignores signups older than 30 days when evaluating the sustained limit', async () => {
+      const signupIp = '203.0.113.53';
+      const longAgo = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
+      for (let i = 1; i <= 200; i++) {
+        await insertTestUser({
+          id: `ip-sustained-expired-${i}`,
+          signup_ip: signupIp,
+          created_at: longAgo,
+        });
+      }
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'sustained-expired@example.com',
+          google_user_name: 'Sustained Expired',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-sustained-expired',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': signupIp })
+      );
+
+      expect(result.success).toBe(true);
     });
 
     it('rejects new signups whose normalized_email is already in use', async () => {
@@ -209,6 +312,8 @@ describe('User', () => {
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
+        api_token_pepper: 'api-token-pepper',
+        web_session_pepper: 'web-session-pepper',
         blocked_at: '2026-01-15T12:00:00.000Z',
         blocked_by_kilo_user_id: 'admin-user-id',
         is_admin: true,
@@ -235,7 +340,10 @@ describe('User', () => {
       );
       expect(softDeleted!.customer_source).toBeNull();
       expect(softDeleted!.signup_ip).toBeNull();
-      expect(softDeleted!.api_token_pepper).toBeNull();
+      expect(softDeleted!.api_token_pepper).toEqual(expect.any(String));
+      expect(softDeleted!.api_token_pepper).not.toBe('api-token-pepper');
+      expect(softDeleted!.web_session_pepper).toEqual(expect.any(String));
+      expect(softDeleted!.web_session_pepper).not.toBe('web-session-pepper');
       expect(softDeleted!.default_model).toBeNull();
       expect(softDeleted!.blocked_reason).toMatch(/^soft-deleted at \d{4}-\d{2}-\d{2}T/);
       expect(softDeleted!.blocked_at).toBeNull();
@@ -690,6 +798,71 @@ describe('User', () => {
       expect(logs[0].actor_email).toBe(adminUser.google_user_email); // admin not anonymized
     });
 
+    it('should retain kiloclaw_scheduled_action_targets after soft-delete (anonymized FK)', async () => {
+      // Per the GDPR policy in softDeleteUser's doc-comment, scheduled
+      // action targets are retained operational records. The user_id FK
+      // continues to reference the (now anonymized) kilocode_users row.
+      // No PII is stored directly on the target row.
+      const user = await insertTestUser();
+      const adminUser = await insertTestUser();
+
+      const [instance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: user.id,
+          sandbox_id: `test-sdu-scheduled-${Date.now()}`,
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // Mark destroyed so softDeleteUser preconditions pass.
+      await db
+        .update(kiloclaw_instances)
+        .set({ destroyed_at: new Date().toISOString() })
+        .where(eq(kiloclaw_instances.id, instance.id));
+
+      const [action] = await db
+        .insert(kiloclaw_scheduled_actions)
+        .values({
+          action_type: 'scheduled_restart',
+          status: 'completed',
+          created_by: adminUser.id,
+          total_count: 1,
+          applied_count: 1,
+          completed_at: new Date().toISOString(),
+        })
+        .returning({ id: kiloclaw_scheduled_actions.id });
+
+      const [stage] = await db
+        .insert(kiloclaw_scheduled_action_stages)
+        .values({
+          scheduled_action_id: action.id,
+          stage_index: 0,
+          scheduled_at: new Date().toISOString(),
+          status: 'completed',
+          applied_count: 1,
+        })
+        .returning({ id: kiloclaw_scheduled_action_stages.id });
+
+      await db.insert(kiloclaw_scheduled_action_targets).values({
+        scheduled_action_id: action.id,
+        stage_id: stage.id,
+        instance_id: instance.id,
+        user_id: user.id,
+        status: 'applied',
+      });
+
+      await expect(softDeleteUser(user.id)).resolves.toBeUndefined();
+
+      // Target row still references the (now anonymized) user. The FK is
+      // intentionally retained — no scrub on this table.
+      const targets = await db
+        .select()
+        .from(kiloclaw_scheduled_action_targets)
+        .where(eq(kiloclaw_scheduled_action_targets.user_id, user.id));
+      expect(targets).toHaveLength(1);
+      expect(targets[0].status).toBe('applied');
+    });
+
     it('should anonymize credit_campaigns created_by_kilo_user_id', async () => {
       const creator = await insertTestUser();
       const otherAdmin = await insertTestUser();
@@ -956,6 +1129,66 @@ describe('User', () => {
       expect(pms[0].address_city).toBeNull();
       // stripe_fingerprint preserved for fraud detection
       expect(pms[0].stripe_fingerprint).toBe(pm.stripe_fingerprint);
+    });
+
+    it('should cascade-delete agent environment profile MCPs and skills', async () => {
+      const user = await insertTestUser();
+
+      const [profile] = await db
+        .insert(agent_environment_profiles)
+        .values({
+          owned_by_user_id: user.id,
+          name: 'test-profile',
+        })
+        .returning();
+
+      const [mcpServer] = await db
+        .insert(agent_environment_profile_mcp_servers)
+        .values({
+          profile_id: profile.id,
+          name: 'demo',
+          type: 'local',
+          enabled: true,
+          config: {
+            command: ['node', 'server.js'],
+            environment: {
+              API_KEY: {
+                encryptedData: 'ciphertext',
+                encryptedDEK: 'key',
+                algorithm: 'rsa-aes-256-gcm',
+                version: 1,
+              },
+            },
+          },
+        })
+        .returning();
+
+      await db.insert(agent_environment_profile_skills).values({
+        profile_id: profile.id,
+        name: 'test-skill',
+        source_type: 'custom',
+        raw_markdown: '---\nname: test-skill\n---\nBody',
+      });
+
+      await softDeleteUser(user.id);
+
+      const profiles = await db
+        .select()
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.owned_by_user_id, user.id));
+      expect(profiles).toHaveLength(0);
+
+      const mcpServers = await db
+        .select()
+        .from(agent_environment_profile_mcp_servers)
+        .where(eq(agent_environment_profile_mcp_servers.id, mcpServer.id));
+      expect(mcpServers).toHaveLength(0);
+
+      const skills = await db
+        .select()
+        .from(agent_environment_profile_skills)
+        .where(eq(agent_environment_profile_skills.profile_id, profile.id));
+      expect(skills).toHaveLength(0);
     });
 
     it('should nullify user_feedback FK', async () => {
@@ -1543,6 +1776,26 @@ describe('User', () => {
           .select({ count: count() })
           .from(kiloclaw_email_log)
           .where(eq(kiloclaw_email_log.user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should retain transactional_email_log rows for the user', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(transactional_email_log).values({
+        user_id: user.id,
+        email_type: 'credits_top_up_confirmation',
+        idempotency_key: `ch_retain_${randomUUID()}`,
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(transactional_email_log)
+          .where(eq(transactional_email_log.user_id, user.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

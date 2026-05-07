@@ -49,10 +49,11 @@ export const publicPrepareSessionSchema = z
     organizationId: z.string().uuid('Invalid organization ID format').optional(),
 
     // Optional environment profile
-    // If provided, envVars and setupCommands from the profile will be used.
-    // Any inline envVars/setupCommands will be merged (inline takes precedence).
-    // If organizationId is provided, looks up org profile; otherwise looks up user profile.
-    profileName: z.string().max(100, 'Profile name must be at most 100 characters').optional(),
+    // If provided, envVars/setupCommands/MCP servers/skills/secrets from the
+    // profile are merged with inline values (inline takes precedence).
+    // When omitted no profile is applied — pass the desired profile's UUID
+    // explicitly to opt into profile-based configuration.
+    profileId: z.string().uuid('Invalid profile ID format').optional(),
 
     // Optional configuration
     envVars: z

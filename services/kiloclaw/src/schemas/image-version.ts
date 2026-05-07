@@ -17,6 +17,16 @@ export const ImageVersionEntrySchema = z.object({
   imageTag: z.string(),
   imageDigest: z.string().nullable(),
   publishedAt: z.string(),
+  // 0 = not exposed. 0 < x < 100 = staged candidate; instance is offered the
+  // upgrade when its SHA-256 bucket of `${imageTag}:instance:${instanceId}`
+  // falls below x. 100 = candidate fully rolled out (everyone qualifies).
+  // INDEPENDENT of `isLatest` — promoting to :latest is its own action.
+  rolloutPercent: z.number().int().min(0).max(100).default(0),
+  // True if this image is the current production `:latest` for its variant.
+  // Ops marks it explicitly via the admin Versions page. New instances and
+  // unpinned upgrades fall back to this image when they don't qualify for a
+  // candidate.
+  isLatest: z.boolean().default(false),
 });
 
 export type ImageVersionEntry = z.infer<typeof ImageVersionEntrySchema>;
@@ -33,6 +43,14 @@ export function imageVersionKey(version: string, variant: string): string {
 
 export function imageVersionLatestKey(variant: string): string {
   return `image-version:latest:${variant}`;
+}
+
+/**
+ * KV key for direct tag-to-entry lookup. Enables O(1) resolution of pinned
+ * image tags during provision and lookups by tag during rollout selection.
+ */
+export function imageVersionTagKey(imageTag: string): string {
+  return `image-version-tag:${imageTag}`;
 }
 
 /**

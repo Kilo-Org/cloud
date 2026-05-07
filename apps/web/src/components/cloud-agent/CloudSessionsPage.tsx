@@ -33,18 +33,9 @@ import {
   type DemoConfig,
 } from './demo-config';
 import type { AgentMode } from './types';
-import { useProfile, useProfiles, useCombinedProfiles } from '@/hooks/useCloudAgentProfiles';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import {
-  manualEnvVarsAtom,
-  manualSetupCommandsAtom,
-  selectedProfileIdAtom,
-  hasAutoSelectedDefaultAtom,
-  profileConfigAtom,
-  effectiveEnvVarsAtom,
-  effectiveSetupCommandsAtom,
-  resetSessionFormAtom,
-} from './store/session-form-atoms';
+import { useProfiles, useCombinedProfiles } from '@/hooks/useCloudAgentProfiles';
+import { useAtom, useSetAtom } from 'jotai';
+import { selectedProfileIdAtom, resetSessionFormAtom } from './store/session-form-atoms';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import {
@@ -53,8 +44,9 @@ import {
   type RepositoryPlatform,
 } from '@/components/shared/RepositoryCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { AdvancedConfig } from '@/components/shared/AdvancedConfig';
+import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
 import { cn } from '@/lib/utils';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@/lib/cloud-agent/constants';
 import { MODES } from './ResumeConfigModal';
 
 type CloudSessionsPageProps = {
@@ -109,14 +101,8 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
   const [isDemoActionLoading, setIsDemoActionLoading] = useState(false);
   const [highlightedDemoId, setHighlightedDemoId] = useState<string | null>(null);
 
-  // Session form atoms (profile/env/commands)
-  const [manualEnvVars, setManualEnvVars] = useAtom(manualEnvVarsAtom);
-  const [manualSetupCommands, setManualSetupCommands] = useAtom(manualSetupCommandsAtom);
+  // Profile override selection (base profile resolved server-side from repo binding / default)
   const [selectedProfileId, setSelectedProfileId] = useAtom(selectedProfileIdAtom);
-  const [hasAutoSelectedDefault, setHasAutoSelectedDefault] = useAtom(hasAutoSelectedDefaultAtom);
-  const setProfileConfig = useSetAtom(profileConfigAtom);
-  const effectiveEnvVars = useAtomValue(effectiveEnvVarsAtom);
-  const effectiveSetupCommands = useAtomValue(effectiveSetupCommandsAtom);
   const resetSessionForm = useSetAtom(resetSessionFormAtom);
 
   // Clear any lingering manual overrides whenever the page loads
@@ -150,7 +136,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
     // reset to an allowed model
     const isCurrentModelAvailable = modelOptions.some(m => m.id === model);
     if (!isCurrentModelAvailable || !model || !isModelUserSelected) {
-      // Prefer the default model if it's in the allow list, otherwise use the first available
+      // Prefer the default model if it is available under org policy, otherwise use the first available.
       const defaultModel = defaultsData?.defaultModel;
       const isDefaultAllowed = defaultModel && modelOptions.some(m => m.id === defaultModel);
       const newModel = isDefaultAllowed ? defaultModel : modelOptions[0]?.id;
@@ -180,71 +166,13 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
         ...(combinedProfilesData?.personalProfiles ?? []),
       ]
     : (personalProfiles ?? []);
-  const effectiveDefaultId = organizationId
-    ? combinedProfilesData?.effectiveDefaultId
-    : personalProfiles?.find(p => p.isDefault)?.id;
 
-  // Auto-select effective default profile on initial load
+  // If override profile was deleted, clear the selection
   useEffect(() => {
-    if (!hasAutoSelectedDefault && !selectedProfileId && effectiveDefaultId) {
-      setSelectedProfileId(effectiveDefaultId);
-      setHasAutoSelectedDefault(true);
-    } else if (!hasAutoSelectedDefault && allProfiles.length > 0) {
-      // Mark as auto-selected even if no default exists
-      setHasAutoSelectedDefault(true);
-    }
-  }, [
-    allProfiles.length,
-    effectiveDefaultId,
-    hasAutoSelectedDefault,
-    selectedProfileId,
-    setSelectedProfileId,
-    setHasAutoSelectedDefault,
-  ]);
-
-  // If a profile is deleted from the list, clear the selection so derived counts reset
-  useEffect(() => {
-    if (!selectedProfileId || allProfiles.length === 0) {
-      return;
-    }
+    if (!selectedProfileId || allProfiles.length === 0) return;
     const stillPresent = allProfiles.some(p => p.id === selectedProfileId);
-    if (!stillPresent) {
-      setSelectedProfileId(null);
-      setProfileConfig(null);
-    }
-  }, [allProfiles, selectedProfileId, setProfileConfig, setSelectedProfileId]);
-
-  // Fetch selected profile data
-  const { data: selectedProfile } = useProfile(selectedProfileId || '', {
-    organizationId,
-    enabled: !!selectedProfileId,
-  });
-
-  // Update profile config atom when profile data is loaded
-  useEffect(() => {
-    if (selectedProfile) {
-      setProfileConfig({
-        vars: selectedProfile.vars.map(v => ({
-          key: v.key,
-          value: v.value,
-          isSecret: v.isSecret,
-        })),
-        commands: selectedProfile.commands
-          .sort((a, b) => a.sequence - b.sequence)
-          .map(c => c.command),
-      });
-    } else {
-      setProfileConfig(null);
-    }
-  }, [selectedProfile, setProfileConfig]);
-
-  // Profile selection handler
-  const handleProfileSelect = useCallback(
-    (profileId: string | null) => {
-      setSelectedProfileId(profileId);
-    },
-    [setSelectedProfileId]
-  );
+    if (!stillPresent) setSelectedProfileId(null);
+  }, [allProfiles, selectedProfileId, setSelectedProfileId]);
 
   // Fetch GitHub repositories
   const {
@@ -418,17 +346,13 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
     setIsPreparing(true);
 
     try {
-      // Call prepareSession to create DB entry and cloud-agent DO
-      // If a profile is selected, pass the profile name so the backend
-      // can resolve encrypted secrets from the profile
-      // Build the base input without the repo field
+      // Call prepareSession to create DB entry and cloud-agent DO.
+      // profileId is unambiguous across org/personal.
       const baseInput = {
         prompt: prompt.trim(),
         mode,
         model,
-        envVars: Object.keys(manualEnvVars).length > 0 ? manualEnvVars : undefined,
-        setupCommands: manualSetupCommands.length > 0 ? manualSetupCommands : undefined,
-        profileName: selectedProfile?.name,
+        profileId: selectedProfileId ?? undefined,
         autoCommit: true,
       };
 
@@ -466,7 +390,11 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
         }
       }
 
-      // Invalidate the sessions list cache so the sidebar shows the new session
+      // Invalidate the sessions list cache so the sidebar shows the new session.
+      // This legacy page goes through cloudAgent.prepareSession which writes to
+      // cli_sessions (v1), so the sidebar/list data it produces still comes from
+      // the unified router (which UNIONs v1 and v2). Invalidating cliSessionsV2.list
+      // would miss the newly-created v1 row.
       void queryClient.invalidateQueries({
         queryKey: trpc.unifiedSessions.list.queryKey({
           limit: 3,
@@ -486,8 +414,6 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
       setIsPreparing(false);
     }
   }, [
-    manualEnvVars,
-    manualSetupCommands,
     model,
     mode,
     organizationId,
@@ -496,7 +422,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
     router,
     selectedPlatform,
     selectedRepo,
-    selectedProfile,
+    selectedProfileId,
     trpc.unifiedSessions.list,
     trpcClient,
   ]);
@@ -604,6 +530,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
 
   const isFormValid =
     prompt.trim().length > 0 &&
+    prompt.length <= CLOUD_AGENT_PROMPT_MAX_LENGTH &&
     selectedRepo.length > 0 &&
     model.length > 0 &&
     !isPreparing &&
@@ -681,20 +608,16 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
             isLoadingModels={!modelsData}
           />
 
-          {/* Advanced Configuration */}
-          <AdvancedConfig
-            organizationId={organizationId}
-            selectedProfileId={selectedProfileId}
-            onProfileSelect={handleProfileSelect}
-            manualEnvVars={manualEnvVars}
-            manualSetupCommands={manualSetupCommands}
-            effectiveEnvVars={effectiveEnvVars}
-            effectiveSetupCommands={effectiveSetupCommands}
-            onManualEnvVarsChange={setManualEnvVars}
-            onManualSetupCommandsChange={setManualSetupCommands}
-            repoFullName={selectedRepo || undefined}
-            platform={selectedPlatform}
-          />
+          {/* Profile picker — sits below mode/model row */}
+          <div className="flex items-center justify-end">
+            <ProfilePickerPopover
+              organizationId={organizationId}
+              selectedOverrideProfileId={selectedProfileId}
+              onOverrideProfileSelect={setSelectedProfileId}
+              repoFullName={selectedRepo || undefined}
+              platform={selectedPlatform}
+            />
+          </div>
 
           {/* Submit Button */}
           <SubmitButton
@@ -845,6 +768,9 @@ const PromptField = memo(function PromptField({ value, onChange }: PromptFieldPr
     [onChange]
   );
 
+  const isOverLimit = value.length > CLOUD_AGENT_PROMPT_MAX_LENGTH;
+  const showCounter = value.length >= CLOUD_AGENT_PROMPT_MAX_LENGTH * 0.9;
+
   return (
     <div className="space-y-2">
       <Label htmlFor="prompt">Task Description</Label>
@@ -855,8 +781,16 @@ const PromptField = memo(function PromptField({ value, onChange }: PromptFieldPr
         placeholder="Describe your task..."
         rows={3}
         className="resize-y"
+        maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
       />
-      <p className="text-xs text-gray-400">Describe what you want the cloud agent to do</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs text-gray-400">Describe what you want the cloud agent to do</p>
+        {showCounter && (
+          <p className={cn('text-xs', isOverLimit ? 'text-red-400' : 'text-gray-400')}>
+            {value.length.toLocaleString()} / {CLOUD_AGENT_PROMPT_MAX_LENGTH.toLocaleString()}
+          </p>
+        )}
+      </div>
     </div>
   );
 });

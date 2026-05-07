@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { getEmbeddingProvider } from '@/lib/ai-gateway/providers';
+import { getEmbeddingProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -22,6 +22,7 @@ import {
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
+import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import {
@@ -53,10 +54,11 @@ async function embeddingProxyRequest(params: {
   headers.set('Content-Type', 'application/json');
   headers.set('Authorization', `Bearer ${provider.apiKey}`);
 
-  // OpenRouter needs these identification headers (same as openRouterRequest)
+  // OpenRouter needs these identification headers (same as upstreamRequest)
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
-    headers.set('HTTP-Referer', 'https://kilocode.ai');
-    headers.set('X-Title', 'Kilo Code');
+    for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
+      headers.set(key, value);
+    }
   }
 
   const targetUrl = `${provider.apiUrl}/embeddings`;

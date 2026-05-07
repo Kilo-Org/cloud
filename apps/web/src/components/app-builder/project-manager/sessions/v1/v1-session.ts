@@ -5,7 +5,7 @@
 
 import type { CloudMessage } from '@/components/cloud-agent/types';
 import type { Images } from '@/lib/images-schema';
-import type { SessionDisplayInfo, WorkerVersion } from '@/lib/app-builder/types';
+import type { SessionDisplayInfo } from '@/lib/app-builder/types';
 import type { AppTRPCClient } from '../../types';
 import type { V1Session } from '../types';
 import { createV1SessionStore } from './store';
@@ -14,6 +14,7 @@ import {
   type V1StreamingCoordinator,
   type SessionChangedUserMessage,
 } from './streaming';
+import { createLogger } from '../../logging';
 
 export type CreateV1SessionConfig = {
   info: SessionDisplayInfo;
@@ -22,13 +23,7 @@ export type CreateV1SessionConfig = {
   projectId?: string;
   organizationId?: string | null;
   trpcClient?: AppTRPCClient;
-  sessionPrepared?: boolean | null;
-  onStreamComplete?: () => void;
-  onSessionChanged?: (
-    newSessionId: string,
-    workerVersion: WorkerVersion,
-    userMessage: SessionChangedUserMessage
-  ) => void;
+  onSessionChanged?: (newSessionId: string, userMessage: SessionChangedUserMessage) => void;
 };
 
 /**
@@ -36,17 +31,9 @@ export type CreateV1SessionConfig = {
  * For ended sessions, all streaming methods are no-ops.
  */
 export function createV1Session(config: CreateV1SessionConfig): V1Session {
-  const {
-    info,
-    initialMessages,
-    projectId,
-    organizationId,
-    trpcClient,
-    sessionPrepared,
-    onStreamComplete,
-    onSessionChanged,
-  } = config;
+  const { info, initialMessages, projectId, organizationId, trpcClient, onSessionChanged } = config;
   const cloudAgentSessionId = info.cloud_agent_session_id;
+  const logger = projectId ? createLogger(projectId) : null;
 
   const store = createV1SessionStore(initialMessages);
 
@@ -58,8 +45,6 @@ export function createV1Session(config: CreateV1SessionConfig): V1Session {
       trpcClient,
       store,
       cloudAgentSessionId: cloudAgentSessionId ?? null,
-      sessionPrepared: sessionPrepared ?? null,
-      onStreamComplete,
       onSessionChanged,
     });
   }
@@ -89,9 +74,27 @@ export function createV1Session(config: CreateV1SessionConfig): V1Session {
   let messagesLoaded = false;
 
   function loadMessages(): void {
-    if (messagesLoaded || !cloudAgentSessionId) return;
+    if (messagesLoaded || !cloudAgentSessionId || !projectId || !trpcClient) return;
     messagesLoaded = true;
-    connectToExistingSession(cloudAgentSessionId);
+
+    void (async () => {
+      try {
+        const result = organizationId
+          ? await trpcClient.organizations.appBuilder.getLegacySessionMessages.query({
+              projectId,
+              organizationId,
+              cloudAgentSessionId,
+            })
+          : await trpcClient.appBuilder.getLegacySessionMessages.query({
+              projectId,
+              cloudAgentSessionId,
+            });
+        store.setState({ messages: result.messages });
+      } catch (err) {
+        messagesLoaded = false;
+        logger?.logError('Failed to load historical messages for legacy v1 session', err);
+      }
+    })();
   }
 
   function destroy(): void {

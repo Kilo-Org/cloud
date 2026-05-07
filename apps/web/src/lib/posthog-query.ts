@@ -60,6 +60,7 @@ export async function posthogQuery(name: string, query: string): Promise<PostHog
 }
 
 const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
+const MEMORY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
   const parse = (name: string, raw: unknown): Output[] => {
@@ -70,12 +71,21 @@ export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
     return result.data;
   };
 
+  const memoryCache = new Map<string, { value: Output[]; at: number }>();
+
   return async (name: string, query: string): Promise<Output[]> => {
+    const memoryCached = memoryCache.get(name);
+    if (memoryCached && Date.now() - memoryCached.at < MEMORY_CACHE_TTL_MS) {
+      return memoryCached.value;
+    }
+
     const key = posthogQueryRedisKey(name);
 
     const cached = await redisGet(key);
     if (cached !== null) {
-      return parse(name, JSON.parse(cached));
+      const data = parse(name, JSON.parse(cached));
+      memoryCache.set(name, { value: data, at: Date.now() });
+      return data;
     }
 
     const startTime = performance.now();
@@ -89,6 +99,7 @@ export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
     );
 
     await redisSet(key, JSON.stringify(response.body.results), CACHE_TTL_SECONDS);
+    memoryCache.set(name, { value: data, at: Date.now() });
 
     return data;
   };

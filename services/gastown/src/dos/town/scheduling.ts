@@ -266,10 +266,18 @@ export function dispatchUnblockedBeads(ctx: SchedulingContext, closedBeadId: str
  * interval. Used to decide between active and idle alarm cadence.
  */
 export function hasActiveWork(sql: SqlStorage): boolean {
+  // Stalled agents older than 30min no longer count as active work: they
+  // typically represent stuck rows (container crashed hard, /status keeps
+  // returning running/unknown). Keeping them in the active set would pin
+  // the alarm at its 5s fast cadence indefinitely. The stalled->idle
+  // auto-transition in reconcileAgents cleans them up after 2h 30min.
   const activeAgentRows = [
     ...query(
       sql,
-      /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata} WHERE ${agent_metadata.status} IN ('working', 'stalled')`,
+      /* sql */ `SELECT COUNT(*) as cnt FROM ${agent_metadata}
+        WHERE ${agent_metadata.status} = 'working'
+           OR (${agent_metadata.status} = 'stalled'
+               AND ${agent_metadata.last_activity_at} > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes'))`,
       []
     ),
   ];

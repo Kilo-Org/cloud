@@ -5,6 +5,8 @@
  * collisions when adding new features.
  */
 
+import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+
 declare const redisKeyBrand: unique symbol;
 
 export type RedisKey = string & {
@@ -23,6 +25,9 @@ export const GATEWAY_METADATA_REDIS_KEYS = {
   vercelModels: redisKey('ai-gateway.metadata:vercel-models'),
   openrouterProviders: redisKey('ai-gateway.metadata:openrouter-providers'),
 } as const;
+
+export const directByokModelsRedisKey = (providerId: DirectUserByokInferenceProviderId) =>
+  redisKey(`ai-gateway.metadata.direct-byok-models:${providerId}`);
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 

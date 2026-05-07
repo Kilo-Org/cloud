@@ -9,7 +9,7 @@ import type {
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
 } from './providers/openrouter/types';
-import { fetchGeneration } from './providers';
+import { fetchGeneration } from './providers/upstream-request';
 import PROVIDERS from './providers/provider-definitions';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
@@ -43,6 +43,7 @@ import type {
   OpenRouterUsage,
   PromptInfo,
   UsageMetaData,
+  VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
 import {
   parseResponsesMicrodollarUsageFromStream,
@@ -53,8 +54,12 @@ import {
   parseMessagesMicrodollarUsageFromString,
 } from '@/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
-import { computeOpenRouterCostFields, drainSseStream } from '@/lib/ai-gateway/processUsage.shared';
-import { isAnthropicModel } from '@/lib/ai-gateway/providers/anthropic';
+import {
+  computeOpenRouterCostFields,
+  drainSseStream,
+  extractVercelIsByok,
+} from '@/lib/ai-gateway/processUsage.shared';
+import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
@@ -128,6 +133,36 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
   };
 }
 
+/**
+ * Strip NUL bytes (\u0000) in place from every string-typed field on `obj`.
+ *
+ * Postgres `text` columns reject NUL bytes with `22021 invalid byte sequence
+ * for encoding "UTF8": 0x00`, which crashes the `microdollar_usage` CTE insert
+ * and leaves the request un-billed (see Sentry KILOCODE-WEB-1G3Z).
+ *
+ * NULs have been observed in client-populated fields on the LLM gateway hot
+ * path: HTTP headers from the VS Code extension (machine_id, session_id,
+ * http_user_agent) and prompt-derived fields (system_prompt_prefix,
+ * user_prompt_prefix). Sanitizing at the DB boundary is a safety net; once
+ * the upstream source is identified via the `console.warn` in
+ * `toInsertableDbUsageRecord` (queryable in Axiom), sanitize at the source
+ * and remove this.
+ *
+ * Any sanitized field names are appended to `dirtyFields` so the caller can
+ * log them for source attribution.
+ */
+export function stripNulBytesInPlace(obj: Record<string, unknown>, dirtyFields: string[]): void {
+  for (const key of Object.keys(obj)) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.indexOf('\u0000') >= 0) {
+      // Using split/join rather than a regex avoids the no-control-regex
+      // lint rule; the NUL byte is the intended match here.
+      obj[key] = value.split('\u0000').join('');
+      dirtyFields.push(key);
+    }
+  }
+}
+
 export function toInsertableDbUsageRecord(
   usageStats: MicrodollarUsageStats,
   usageContextInfo: UsageContextInfo
@@ -165,7 +200,7 @@ export function toInsertableDbUsageRecord(
     message_id: usageStats.messageId ?? '<missing>',
     upstream_id: usageStats.upstream_id,
     finish_reason: usageStats.finish_reason,
-    latency: ttfb_ms,
+    latency: usageStats.latency ?? ttfb_ms,
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
     is_byok: usageStats.is_byok,
@@ -183,6 +218,26 @@ export function toInsertableDbUsageRecord(
     metadata.system_prompt_prefix = null;
   }
 
+  // Strip NUL bytes before returning. Postgres `text` columns reject them
+  // (error 22021) and crash the microdollar_usage CTE insert, leaving the
+  // request un-billed. See KILOCODE-WEB-1G3Z.
+  const dirtyFields: string[] = [];
+  stripNulBytesInPlace(core as unknown as Record<string, unknown>, dirtyFields);
+  stripNulBytesInPlace(metadata as unknown as Record<string, unknown>, dirtyFields);
+  if (dirtyFields.length > 0) {
+    // Log to Axiom (not Sentry) — this is a one-off source-attribution probe,
+    // not an issue to triage. Once the dominant field is identified via
+    // `summarize count() by fields`, sanitize at the source and remove both
+    // this log and the sanitizer above.
+    console.warn('microdollar_usage string field contained NUL bytes; sanitized before insert', {
+      source: 'toInsertableDbUsageRecord',
+      fields: dirtyFields,
+      kilo_user_id,
+      requested_model: usageContextInfo.requested_model,
+      provider,
+    });
+  }
+
   return { core, metadata };
 }
 
@@ -190,6 +245,7 @@ export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
 ) {
+  usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
   const { core, metadata } = toInsertableDbUsageRecord(usageStats, contextInfo);
 
@@ -602,7 +658,8 @@ export function countAndStoreUsage(
 
 export function processOpenRouterUsage(
   usage: OpenRouterUsage | null | undefined,
-  coreProps: NotYetCostedUsageStats
+  coreProps: NotYetCostedUsageStats,
+  vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
   const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
@@ -620,7 +677,7 @@ export function processOpenRouterUsage(
       0,
     outputTokens: usage?.completion_tokens ?? 0,
     cost_mUsd,
-    is_byok,
+    is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
   };
 }
 
@@ -646,11 +703,13 @@ export async function parseMicrodollarUsageFromStream(
   let model: string | null = null;
   let responseContent = ''; // for abuse investigation
   let reportedError = statusCode >= 400;
+  let effectiveStatusCode = statusCode;
   const startedAt = performance.now();
   let firstTokenReceived = false;
   let usage: OpenRouterUsage | null = null;
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
+  let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
@@ -679,6 +738,9 @@ export async function parseMicrodollarUsageFromStream(
       if ('error' in json) {
         const error = json.error as OpenRouterError;
         reportedError = true;
+        if (typeof error.code === 'number') {
+          effectiveStatusCode = error.code;
+        }
         captureException(new Error(`OpenRouter error: ${error.message}`), {
           tags: { source: 'sse_processing' },
           extra: { json, event },
@@ -689,9 +751,13 @@ export async function parseMicrodollarUsageFromStream(
       messageId = json.id ?? messageId;
       usage = json.usage ?? usage;
       const choice = json.choices?.[0];
+      const chunkProviderMetadata = choice?.delta?.provider_metadata;
+      if (chunkProviderMetadata) {
+        vercelProviderMetadata = chunkProviderMetadata;
+      }
       inference_provider =
         json.provider ??
-        choice?.delta?.provider_metadata?.gateway?.routing?.finalProvider ??
+        chunkProviderMetadata?.gateway?.routing?.finalProvider ??
         inference_provider;
       finish_reason = choice?.finish_reason ?? finish_reason;
 
@@ -730,9 +796,10 @@ export async function parseMicrodollarUsageFromStream(
     generation_time: null,
     streamed: true,
     cancelled: null,
+    status_code: effectiveStatusCode,
   };
 
-  const costs = processOpenRouterUsage(usage, coreProps);
+  const costs = processOpenRouterUsage(usage, coreProps, vercelProviderMetadata);
 
   return { ...coreProps, ...costs };
 }
@@ -772,9 +839,14 @@ export function parseMicrodollarUsageFromString(
     generation_time: null,
     streamed: false,
     cancelled: null,
+    status_code: statusCode,
   };
 
-  const costs = processOpenRouterUsage(responseJson?.usage, coreProps);
+  const costs = processOpenRouterUsage(
+    responseJson?.usage,
+    coreProps,
+    choice?.message?.provider_metadata ?? null
+  );
 
   return { ...coreProps, ...costs };
 }
@@ -825,7 +897,7 @@ async function processTokenData(
   const provider = Object.values(PROVIDERS).find(p => p.id === usageContext.provider);
   const generation =
     provider &&
-    useGenerationLookup(provider.id, usageStats) &&
+    useGenerationLookup(usageStats, usageContext) &&
     usageStats.messageId &&
     (await fetchGeneration(usageStats.messageId, provider));
   if (usageStats.messageId) {
@@ -842,6 +914,7 @@ async function processTokenData(
 
     genStats.model = usageStats.model; // openrouter bug?
     genStats.hasError = usageStats.hasError; // retain by choice
+    genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
     if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
       console.warn(
@@ -892,17 +965,20 @@ async function processTokenData(
 }
 
 function useAnthropicStyleTokenCounting(requestedModel: string, provider: ProviderId) {
-  return (
-    provider === 'vercel' && (isAnthropicModel(requestedModel) || isMinimaxModel(requestedModel))
-  );
+  return provider === 'vercel' && (isClaudeModel(requestedModel) || isMinimaxModel(requestedModel));
 }
 
-function useGenerationLookup(provider: ProviderId, usageStats: MicrodollarUsageStats | null) {
-  // vercel has requested to not hammer their generation endpoint,
-  // so only do it when we didn't get the usage data inline
-  return (
-    provider === 'openrouter' || (provider === 'vercel' && (usageStats?.inputTokens ?? 0) === 0)
-  );
+function useGenerationLookup(
+  usageStats: MicrodollarUsageStats | null,
+  usageContext: MicrodollarUsageContext
+) {
+  const isGatewayProvider =
+    usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
+  const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
+  const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
+  const hasCostWhenPaid =
+    isFreeModel(usageContext.requested_model) || (usageStats?.cost_mUsd ?? 0) > 0;
+  return isGatewayProvider && isSuccessStatusCode && (!hasOutputTokens || !hasCostWhenPaid);
 }
 
 export const mapToUsageStats = (
@@ -954,5 +1030,6 @@ export const mapToUsageStats = (
     generation_time: data.generation_time ?? null,
     streamed: data.streamed ?? null,
     cancelled: data.cancelled ?? null,
+    status_code: 200,
   };
 };

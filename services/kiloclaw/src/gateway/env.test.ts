@@ -252,6 +252,60 @@ describe('buildEnvVars', () => {
     expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBeUndefined();
   });
 
+  it('appends `i-{hex}.kiloclaw.ai` origin for instance-keyed sandboxes', async () => {
+    // ki_{32 hex} — derived from a UUID with dashes stripped. Hostname label
+    // strips the `ki_` prefix and re-prefixes with `i-` so the body stays
+    // strictly alnum (RFC 1035 compliant).
+    const instanceSandboxId = 'ki_550e8400e29b41d4a716446655440000';
+    const env = createMockEnv({
+      OPENCLAW_ALLOWED_ORIGINS: 'https://claw.kilosessions.ai,https://kilo.ai',
+    });
+
+    const result = await buildEnvVars(env, instanceSandboxId, SECRET);
+
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe(
+      'https://claw.kilosessions.ai,https://kilo.ai,https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai'
+    );
+  });
+
+  it('emits per-instance origin as the sole entry when worker env has none', async () => {
+    const instanceSandboxId = 'ki_550e8400e29b41d4a716446655440000';
+    const env = createMockEnv();
+
+    const result = await buildEnvVars(env, instanceSandboxId, SECRET);
+
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe(
+      'https://i-550e8400e29b41d4a716446655440000.kiloclaw.ai'
+    );
+  });
+
+  it('appends `u-{base32hex(userId)}.kiloclaw.ai` origin for legacy sandboxes', async () => {
+    const legacySandboxId = 'dGVzdHVzZXJhYmMxMjM'; // base64url("testuserabc123")
+    const env = createMockEnv({
+      OPENCLAW_ALLOWED_ORIGINS: 'https://claw.kilosessions.ai',
+    });
+
+    const result = await buildEnvVars(env, legacySandboxId, SECRET);
+
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe(
+      'https://claw.kilosessions.ai,https://u-ehin6t3ledin4ob2ccoj4co.kiloclaw.ai'
+    );
+  });
+
+  it('skips per-instance origin when the sandboxId cannot be safely labelled', async () => {
+    // Overlong legacy user IDs cannot fit in one DNS label after base32hex
+    // encoding. Those instances keep using the shared legacy origins.
+    const unsafeSandboxId = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'; // base64url("i".repeat(39))
+    const env = createMockEnv({
+      OPENCLAW_ALLOWED_ORIGINS: 'https://claw.kilosessions.ai',
+    });
+
+    const result = await buildEnvVars(env, unsafeSandboxId, SECRET);
+
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).toBe('https://claw.kilosessions.ai');
+    expect(result.env.OPENCLAW_ALLOWED_ORIGINS).not.toMatch(/\.kiloclaw\.ai/);
+  });
+
   it('passes REQUIRE_PROXY_TOKEN from worker env when configured', async () => {
     const env = createMockEnv({ REQUIRE_PROXY_TOKEN: 'true' });
     const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
@@ -581,6 +635,22 @@ describe('buildEnvVars', () => {
     });
 
     expect(result.env.KILOCLAW_SECRET_CONFIG_PATHS).toBeUndefined();
+  });
+
+  // ─── kilo-chat env passthrough ──────────────────────────────────────
+
+  it('forwards KILOCHAT_BASE_URL into plaintext env', async () => {
+    const env = createMockEnv({
+      KILOCHAT_BASE_URL: 'https://chat.kiloapps.io',
+    });
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+    expect(result.env.KILOCHAT_BASE_URL).toBe('https://chat.kiloapps.io');
+  });
+
+  it('omits KILOCHAT_BASE_URL when not provided', async () => {
+    const env = createMockEnv();
+    const result = await buildEnvVars(env, SANDBOX_ID, SECRET);
+    expect(result.env.KILOCHAT_BASE_URL).toBeUndefined();
   });
 
   // ─── Vector memory + dreaming ───────────────────────────────────────

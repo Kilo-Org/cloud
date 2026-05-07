@@ -37,51 +37,26 @@ export const CardLinkFooter = React.forwardRef<HTMLAnchorElement, CardLinkFooter
     };
 
     return (
-      <>
-        <Link
-          ref={ref}
-          onMouseEnter={handleMouseEnter}
-          className={cn(
-            'text-muted-foreground relative mt-6 -mr-6 -mb-6 -ml-6 overflow-hidden rounded-br-2xl rounded-bl-2xl border-t border-t-[#2c2c2c] px-4 py-3 text-sm transition-colors hover:bg-gray-900',
-            isAnimating ? 'animate-liquid-ripple' : '',
-            className
-          )}
-          {...props}
-        >
-          {isAnimating && (
-            <div
-              className="pointer-events-none absolute inset-0 rounded-br-2xl rounded-bl-2xl"
-              style={{
-                background: `radial-gradient(circle at ${rippleOrigin.x}% ${rippleOrigin.y}%, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 50%, transparent 70%)`,
-                animation: 'liquidRipple 0.6s ease-out forwards',
-              }}
-            />
-          )}
-          {children}
-        </Link>
-        <style jsx>{
-          /* css */ `
-            @keyframes liquidRipple {
-              0% {
-                transform: scale(0);
-                opacity: 1;
-              }
-              50% {
-                transform: scale(1.2);
-                opacity: 0.8;
-              }
-              100% {
-                transform: scale(2);
-                opacity: 0;
-              }
-            }
-
-            .animate-liquid-ripple {
-              position: relative;
-            }
-          `
-        }</style>
-      </>
+      <Link
+        ref={ref}
+        onMouseEnter={handleMouseEnter}
+        className={cn(
+          'text-muted-foreground relative mt-6 -mr-6 -mb-6 -ml-6 overflow-hidden rounded-br-2xl rounded-bl-2xl border-t border-t-[#2c2c2c] px-4 py-3 text-sm transition-colors hover:bg-gray-900',
+          isAnimating ? 'animate-liquid-ripple' : '',
+          className
+        )}
+        {...props}
+      >
+        <div
+          className="pointer-events-none absolute inset-0 rounded-br-2xl rounded-bl-2xl"
+          style={{
+            background: `radial-gradient(circle at ${rippleOrigin.x}% ${rippleOrigin.y}%, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 50%, transparent 70%)`,
+            animation: 'liquidRipple 0.6s ease-out forwards',
+            visibility: isAnimating ? 'visible' : 'hidden',
+          }}
+        />
+        {children}
+      </Link>
     );
   }
 );

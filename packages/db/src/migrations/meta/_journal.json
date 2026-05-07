@@ -729,6 +729,97 @@
       "when": 1776886297031,
       "tag": "0103_omniscient_king_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1776948062389,
+      "tag": "0104_chubby_plazm",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1777032309451,
+      "tag": "0105_married_harry_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1777411448037,
+      "tag": "0106_petite_william_stryker",
+      "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1777499940275,
+      "tag": "0107_classy_ultimo",
+      "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1777634740320,
+      "tag": "0108_wise_psylocke",
+      "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1777664842970,
+      "tag": "0109_conscious_kingpin",
+      "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1777933531477,
+      "tag": "0110_nappy_newton_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1778004873761,
+      "tag": "0111_shocking_selene",
+      "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1778013789154,
+      "tag": "0112_nifty_typhoid_mary",
+      "breakpoints": true
+    },
+    {
+      "idx": 113,
+      "version": "7",
+      "when": 1778018757012,
+      "tag": "0113_black_george_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "7",
+      "when": 1778050833487,
+      "tag": "0114_steep_hercules",
+      "breakpoints": true
+    },
+    {
+      "idx": 115,
+      "version": "7",
+      "when": 1778063303197,
+      "tag": "0115_real_energizer",
+      "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1778068581602,
+      "tag": "0116_regular_molly_hayes",
+      "breakpoints": true
     }
   ]
 }

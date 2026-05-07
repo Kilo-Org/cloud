@@ -44,7 +44,7 @@ describe('Organization Usage Functions', () => {
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
 
       expect(result.balance).toBe(0.05); // 50000 microdollars = 0.05 USD
-      expect(result.settings?.model_deny_list).toEqual(['fizz', 'buzz']); // 50000 microdollars = 0.05 USD
+      expect(result.settings?.model_deny_list).toEqual(['fizz', 'buzz']);
     });
 
     test('should return balance for regular member', async () => {

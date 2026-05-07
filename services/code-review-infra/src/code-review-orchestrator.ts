@@ -18,9 +18,13 @@ import type {
   CodeReview,
   CodeReviewStatus,
   CodeReviewStatusResponse,
+  CodeReviewStatusResult,
   CodeReviewEvent,
   SessionInput,
 } from './types';
+import { InternalStatusResponseSchema } from './types';
+
+type UpdateStatusResult = 'updated' | 'db-terminal';
 
 /** Shape of an SSE event parsed from the cloud agent stream */
 type SseEventPayload = {
@@ -79,6 +83,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   /** Cleanup delay after review completion (7 days) */
   private static readonly CLEANUP_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
 
+  /** Fallback alarm for queued reviews accepted by the Worker but not run via waitUntil. */
+  private static readonly RUN_REVIEW_FALLBACK_DELAY_MS = 30_000;
+
   /** Batch size for event persistence (save every N events to reduce CPU usage) */
   private static readonly EVENT_BATCH_SIZE = 10;
 
@@ -104,9 +111,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   }
 
   /**
-   * Alarm handler for scheduled cleanup tasks.
-   * Only used for cleanup after review completion (7 days later).
-   * Review execution is handled via runReview() in HTTP context to avoid 15-min wall time limit.
+   * Alarm handler for review recovery and scheduled cleanup tasks.
    */
   async alarm(): Promise<void> {
     try {
@@ -129,6 +134,15 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
           status: this.state.status,
         });
         await this.ctx.storage.deleteAll();
+      } else if (this.state.status === 'queued') {
+        console.log('[CodeReviewOrchestrator] Fallback alarm starting queued review', {
+          reviewId: this.state.reviewId,
+        });
+        await this.runReview();
+      } else if (this.state.status === 'running') {
+        console.log('[CodeReviewOrchestrator] Fallback alarm no-op for running review', {
+          reviewId: this.state.reviewId,
+        });
       } else {
         // Unexpected state - log for debugging
         console.warn('[CodeReviewOrchestrator] Alarm fired for non-terminal state', {
@@ -187,7 +201,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       errorMessage?: string;
       terminalReason?: CloudAgentTerminalReason;
     }
-  ): Promise<void> {
+  ): Promise<UpdateStatusResult> {
     // Check if there are any actual changes to process
     const statusChanged = this.state.status !== status;
     const sessionIdChanged =
@@ -213,7 +227,16 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       !errorMessageChanged &&
       !terminalReasonChanged
     ) {
-      return;
+      if (status !== 'running') {
+        return 'updated';
+      }
+
+      try {
+        return await this.updateDBStatus(status, options);
+      } catch (error) {
+        console.error('[CodeReviewOrchestrator] Failed to refresh DB running status:', error);
+        return 'updated';
+      }
     }
 
     // Update status if it changed
@@ -271,7 +294,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
 
     // Update Next.js DB via internal API
     try {
-      await this.updateDBStatus(status, options);
+      const dbUpdateResult = await this.updateDBStatus(status, options);
+      if (dbUpdateResult === 'db-terminal') {
+        return 'db-terminal';
+      }
     } catch (error) {
       console.error('[CodeReviewOrchestrator] Failed to update DB status:', error);
 
@@ -285,6 +311,23 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       }
       // For non-terminal states (queued/running), continue - we've saved state locally
     }
+
+    return 'updated';
+  }
+
+  private async setLocalTerminalStateFromDB(
+    status: Extract<CodeReviewStatus, 'completed' | 'failed' | 'cancelled'>
+  ): Promise<void> {
+    this.state.status = status;
+    this.state.completedAt = this.state.completedAt ?? new Date().toISOString();
+    this.state.events = [];
+    this.state.updatedAt = new Date().toISOString();
+    await this.ctx.storage.setAlarm(Date.now() + CodeReviewOrchestrator.CLEANUP_DELAY_MS);
+    await this.saveState();
+    console.log('[CodeReviewOrchestrator] Local state synced to terminal DB status', {
+      reviewId: this.state.reviewId,
+      status,
+    });
   }
 
   /**
@@ -298,7 +341,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       errorMessage?: string;
       terminalReason?: CloudAgentTerminalReason;
     }
-  ): Promise<void> {
+  ): Promise<UpdateStatusResult> {
     // Use path-based endpoint (same as callback endpoint for consistency)
     const url = `${this.env.API_URL}/api/internal/code-review-status/${this.state.reviewId}`;
 
@@ -324,6 +367,14 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       const errorText = await response.text();
       throw new Error(`Failed to update DB status: ${response.status} ${errorText}`);
     }
+
+    const body = InternalStatusResponseSchema.parse(await response.json());
+    if (body.message === 'Review already in terminal state' && body.currentStatus) {
+      await this.setLocalTerminalStateFromDB(body.currentStatus);
+      return 'db-terminal';
+    }
+
+    return 'updated';
   }
 
   private getTerminalReason(error: unknown): CloudAgentTerminalReason | undefined {
@@ -451,6 +502,9 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       previousCloudAgentSessionId: params.previousCloudAgentSessionId,
     };
     await this.saveState();
+    await this.ctx.storage.setAlarm(
+      Date.now() + CodeReviewOrchestrator.RUN_REVIEW_FALLBACK_DELAY_MS
+    );
 
     console.log('[CodeReviewOrchestrator] Review created and queued', {
       reviewId: params.reviewId,
@@ -458,8 +512,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       agentVersion: params.agentVersion,
     });
 
-    // Note: Review execution is triggered via runReview() from the worker
-    // Alarms are only used for cleanup after completion.
+    console.log('[CodeReviewOrchestrator] Scheduled queued review fallback alarm', {
+      reviewId: params.reviewId,
+      fallbackInMs: CodeReviewOrchestrator.RUN_REVIEW_FALLBACK_DELAY_MS,
+    });
 
     return { status: this.state.status };
   }
@@ -468,12 +524,21 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
    * RPC method: Return current state.
    */
   async status(): Promise<CodeReviewStatusResponse> {
+    const currentStatus = await this.getStatus();
+    if (!currentStatus) {
+      throw new Error('Review not found');
+    }
+
+    return currentStatus;
+  }
+
+  async getStatus(): Promise<CodeReviewStatusResult> {
     if (!this.state) {
       await this.loadState();
     }
 
     if (!this.state) {
-      throw new Error('Review not found');
+      return null;
     }
 
     return {
@@ -634,7 +699,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     const client = this.getCloudAgentNextClient();
 
     try {
-      await this.updateStatus('running');
+      const statusUpdateResult = await this.updateStatus('running');
+      if (statusUpdateResult === 'db-terminal') return;
 
       console.log('[CodeReviewOrchestrator] Starting review via cloud-agent-next', {
         reviewId: this.state.reviewId,
@@ -769,7 +835,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     });
 
     try {
-      await this.updateStatus('running');
+      const statusUpdateResult = await this.updateStatus('running');
+      if (statusUpdateResult === 'db-terminal') return;
 
       // Build internal headers (internalApiProtectedProcedure — API key + Bearer token)
       const internalHeaders: Record<string, string> = {
@@ -892,7 +959,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     const runStartTime = Date.now();
 
     try {
-      await this.updateStatus('running');
+      const statusUpdateResult = await this.updateStatus('running');
+      if (statusUpdateResult === 'db-terminal') return;
 
       console.log('[CodeReviewOrchestrator] Starting review with async streaming', {
         reviewId: this.state.reviewId,

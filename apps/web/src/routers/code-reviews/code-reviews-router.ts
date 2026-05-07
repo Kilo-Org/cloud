@@ -46,7 +46,6 @@ import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
@@ -377,19 +376,44 @@ export const codeReviewRouter = createTRPCRouter({
       // This will: stop stream processing, update DB, and interrupt cloud agent session (kill processes)
       if (['running', 'queued'].includes(review.status)) {
         try {
-          await codeReviewWorkerClient.cancelReview(input.reviewId, 'Cancelled by user');
-          // Worker updates DB status and interrupts cloud agent session
+          const cancelResult = await codeReviewWorkerClient.cancelReview(
+            input.reviewId,
+            'Cancelled by user'
+          );
+          if (!cancelResult.success && review.status === 'queued' && !review.session_id) {
+            logExceptInTest(
+              '[cancel] Worker cancel returned false, cancelling queued review locally',
+              {
+                reviewId: input.reviewId,
+                status: review.status,
+              }
+            );
+            await cancelCodeReview(input.reviewId);
+            try {
+              await cancelPRGateCheck(review);
+            } catch (gateError) {
+              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            }
+            return successResult({ message: 'Code review cancelled successfully' });
+          }
+          if (!cancelResult.success) {
+            return failureResult('Worker could not cancel code review');
+          }
+          // Worker updates DB status and interrupts cloud agent session when cancellation succeeds.
           return successResult({ message: 'Code review cancelled successfully' });
         } catch (workerError) {
-          // If worker call fails, still update DB status as fallback
-          console.error('Worker cancel failed, updating DB directly:', workerError);
-          await cancelCodeReview(input.reviewId);
-          try {
-            await cancelPRGateCheck(review);
-          } catch (gateError) {
-            logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+          if (review.status === 'queued' && !review.session_id) {
+            console.error('Worker cancel failed, updating DB directly:', workerError);
+            await cancelCodeReview(input.reviewId);
+            try {
+              await cancelPRGateCheck(review);
+            } catch (gateError) {
+              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            }
+            return successResult({ message: 'Code review cancelled (worker unreachable)' });
           }
-          return successResult({ message: 'Code review cancelled (worker unreachable)' });
+          console.error('Worker cancel failed:', workerError);
+          return failureResult('Worker could not cancel code review');
         }
       }
 
@@ -459,9 +483,8 @@ export const codeReviewRouter = createTRPCRouter({
         // Reset the review for retry
         await resetCodeReviewForRetry(input.reviewId);
 
-        // Build owner object for dispatch (and flag evaluation).
-        // For org reviews, use the bot user ID so feature flags (e.g. code-review-cloud-agent-next)
-        // evaluate consistently regardless of which human triggers the retrigger.
+        // Build owner object for dispatch.
+        // For org reviews, use the bot user ID so retrigger dispatch matches webhook-created reviews.
         let owner: Owner;
         if (review.owned_by_organization_id) {
           const botUserId = await getBotUserId(review.owned_by_organization_id, 'code-review');
@@ -474,18 +497,12 @@ export const codeReviewRouter = createTRPCRouter({
           owner = { type: 'user', id: review.owned_by_user_id as string, userId: ctx.user.id };
         }
 
-        // Re-create PR gate check so status callbacks can update it (only when flag is enabled)
-        const isPrGateEnabled =
-          process.env.NODE_ENV === 'development' ||
-          (await isFeatureFlagEnabled('code-review-pr-gate', owner.userId));
-
-        if (isPrGateEnabled) {
-          try {
-            await recreatePRGateCheck(review);
-          } catch (gateError) {
-            // Non-blocking — the review still retries even if the gate check fails
-            logExceptInTest('[retrigger] Failed to re-create PR gate check:', gateError);
-          }
+        // Re-create PR gate check so status callbacks can update it.
+        try {
+          await recreatePRGateCheck(review);
+        } catch (gateError) {
+          // Non-blocking — the review still retries even if the gate check fails
+          logExceptInTest('[retrigger] Failed to re-create PR gate check:', gateError);
         }
 
         // Try to dispatch the review

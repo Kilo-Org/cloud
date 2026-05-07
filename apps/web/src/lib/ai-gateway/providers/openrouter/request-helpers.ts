@@ -240,6 +240,25 @@ export function isReasoningExplicitlyDisabled(request: GatewayRequest) {
   );
 }
 
+export function isReasoningExplicitlyEnabled(request: GatewayRequest) {
+  if (request.kind === 'messages') {
+    return request.body.thinking?.type === 'enabled' || request.body.thinking?.type === 'adaptive';
+  }
+  if (request.kind === 'responses') {
+    return request.body.reasoning?.effort !== undefined && request.body.reasoning.effort !== 'none';
+  }
+  if (request.body.reasoning?.enabled === false) {
+    return false;
+  }
+  return (
+    request.body.reasoning?.enabled === true ||
+    (request.body.reasoning?.effort !== undefined && request.body.reasoning.effort !== 'none') ||
+    (request.body.reasoning_effort !== undefined && request.body.reasoning_effort !== 'none') ||
+    request.body.enable_thinking === true || // Alibaba
+    request.body.thinking?.type === 'enabled' // Bytedance
+  );
+}
+
 export function enableReasoningSummaries(request: GatewayRequest) {
   if (
     request.kind === 'messages' &&

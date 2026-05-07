@@ -817,6 +817,7 @@ export const gastownRouter = router({
         title: z.string().min(1),
         body: z.string().optional(),
         model: z.string().default('kilo/kilo-auto/frontier'),
+        labels: z.array(z.string()).optional(),
       })
     )
     .output(RpcSlingResultOutput)
@@ -844,8 +845,116 @@ export const gastownRouter = router({
         rigId: rig.id,
         title: input.title,
         body: input.body,
+        labels: input.labels,
         metadata: { model: input.model, slung_by: user.id },
       });
+    }),
+
+  createBead: gastownProcedure
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        title: z.string().min(1),
+        body: z.string().optional(),
+        labels: z.array(z.string()).optional(),
+        startImmediately: z.boolean().default(false),
+        townId: z.string().uuid().optional(),
+      })
+    )
+    .output(RpcBeadOutput)
+    .mutation(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+
+      const labels = input.startImmediately
+        ? (input.labels ?? [])
+        : ['gt:held', ...(input.labels ?? [])];
+
+      const bead = await townStub.createHeldBead({
+        rigId: rig.id,
+        title: input.title,
+        body: input.body,
+        labels,
+      });
+
+      if (input.startImmediately) {
+        // Return the post-start bead so callers see the removed gt:held label
+        // and any status changes from dispatch.
+        return townStub.startHeldBead(bead.bead_id, rig.id);
+      }
+
+      // Mayor notification can start a container — use waitUntil so the Worker
+      // stays alive until the RPC completes without blocking the HTTP response.
+      ctx.executionCtx.waitUntil(
+        townStub
+          .notifyMayorOfNewBead(bead.bead_id, rig.id, input.title, input.body)
+          .catch(err => console.warn('[gastown-trpc] createBead: mayor notification failed', err))
+      );
+
+      return bead;
+    }),
+
+  startBead: gastownProcedure
+    .input(
+      z.object({
+        rigId: z.string().uuid(),
+        beadId: z.string().uuid(),
+        townId: z.string().uuid().optional(),
+      })
+    )
+    .output(RpcBeadOutput)
+    .mutation(async ({ ctx, input }) => {
+      const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
+      const townStub = getTownDOStub(ctx.env, rig.town_id);
+      return townStub.startHeldBead(input.beadId, rig.id);
+    }),
+
+  enrichBead: gastownProcedure
+    .input(
+      z.object({
+        body: z.string().min(10),
+        townId: z.string().uuid(),
+      })
+    )
+    .output(
+      z
+        .object({
+          title: z.string(),
+          labels: z.array(z.string()),
+        })
+        .nullable()
+    )
+    .mutation(async ({ ctx, input }) => {
+      await verifyTownOwnership(ctx.env, ctx, input.townId);
+
+      const result = await ctx.env.AI.run('@cf/meta/llama-3.2-3b-instruct', {
+        prompt: `You are a software project assistant. Given this task description, suggest a concise title (max 8 words) and 1-3 relevant labels from: [bug, feature, refactor, docs, test, chore, performance, security, ui, backend, infrastructure].\n\nTask description:\n${input.body}\n\nRespond with JSON only: { "title": "...", "labels": ["..."] }`,
+        max_tokens: 100,
+      });
+
+      const responseValue =
+        result && typeof result === 'object' && 'response' in result
+          ? (result as Record<'response', unknown>).response
+          : undefined;
+      const responseText = typeof responseValue === 'string' ? responseValue : null;
+
+      if (!responseText) return null;
+
+      try {
+        // Strip markdown code fences if present
+        const cleaned = responseText
+          .replace(/^```(?:json)?\s*/i, '')
+          .replace(/\s*```\s*$/, '')
+          .trim();
+        const parsed = JSON.parse(cleaned) as unknown;
+        const schema = z.object({
+          title: z.string(),
+          labels: z.array(z.string()),
+        });
+        return schema.parse(parsed);
+      } catch {
+        return null;
+      }
     }),
 
   // ── Mayor ───────────────────────────────────────────────────────────

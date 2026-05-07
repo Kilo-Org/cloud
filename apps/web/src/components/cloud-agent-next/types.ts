@@ -241,10 +241,19 @@ export function isMessageStreaming(message: StoredMessage): boolean {
 // ============================================================================
 
 /**
- * Valid mode values for cloud agent sessions.
- * Uses new modes for cloud-agent-next.
+ * Valid mode values for cloud agent sessions. Includes the cloud-agent-next
+ * built-in slugs plus any custom slug from a session's profile-scoped
+ * `runtimeAgents`. `(string & {})` keeps the literal completions while still
+ * accepting custom slugs.
  */
-export type AgentMode = 'code' | 'plan' | 'debug' | 'orchestrator' | 'ask';
+export type AgentMode =
+  | 'code'
+  | 'plan'
+  | 'debug'
+  | 'orchestrator'
+  | 'ask'
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+  | (string & {});
 
 // ============================================================================
 // Stream Event Types

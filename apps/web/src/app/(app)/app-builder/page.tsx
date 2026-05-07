@@ -1,8 +1,17 @@
+import { notFound } from 'next/navigation';
 import { AppBuilderPage } from '@/components/app-builder/AppBuilderPage';
+import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { getUserFromAuthOrRedirect } from '@/lib/user.server';
 
 export default async function CreatePage() {
-  await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/app-builder');
+  const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/app-builder');
+
+  const isAppBuilderEnabled = await isFeatureFlagEnabled('app-builder-feature', user.id);
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  if (!isAppBuilderEnabled && !isDevelopment) {
+    return notFound();
+  }
 
   return <AppBuilderPage organizationId={undefined} projectId={undefined} />;
 }

@@ -45,6 +45,8 @@ type SessionConfig = {
   mode: string;
   model: string;
   variant?: string | null;
+  /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
+  runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
 };
 type ActiveSessionType = 'cloud-agent' | 'remote';
 type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
@@ -79,6 +81,8 @@ type FetchedSessionData = {
   isPreparingAsync: boolean;
   prompt: string | null;
   initialMessageId: string | null;
+  /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
+  runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
 };
 
 type PrepareInput = {
@@ -92,7 +96,7 @@ type PrepareInput = {
   setupCommands?: string[];
   upstreamBranch?: string;
   autoCommit?: boolean;
-  profileName?: string;
+  profileId?: string;
 };
 
 type SessionManagerConfig = {
@@ -180,12 +184,9 @@ type SessionManager = {
 // Error formatting
 // ---------------------------------------------------------------------------
 
+const GENERIC_ERROR = 'Something went wrong. Please retry in a moment.';
+
 function formatError(err: unknown): string {
-  if (err instanceof Error) {
-    if (err.message.includes('ECONNREFUSED') || err.message.includes('fetch failed'))
-      return 'Connection lost. Please retry in a moment.';
-    return 'Connection failed. Please retry in a moment.';
-  }
   const r = errorShapeSchema.safeParse(err);
   if (r.success) {
     const code = r.data.data?.code ?? r.data.shape?.code;
@@ -197,9 +198,23 @@ function formatError(err: unknown): string {
     if (code === 'NOT_FOUND') return 'Service is unavailable right now. Please try again.';
     if (code === 'CONFLICT' || http === 409)
       return 'Previous task is still finishing up. Please wait a moment.';
-    return 'Something went wrong. Please retry in a moment.';
+    if (code === 'SERVICE_UNAVAILABLE' || http === 503)
+      return 'Service is temporarily unavailable. Please retry in a moment.';
+    if (code !== undefined || http !== undefined) {
+      return GENERIC_ERROR;
+    }
+    // `errorShapeSchema` uses `.passthrough()`, so `safeParse` succeeds on any
+    // object — including plain `Error` instances whose own properties satisfy
+    // the schema vacuously. Fall through to the transport-level checks below
+    // when neither `code` nor `httpStatus` is present so genuine connection
+    // failures keep their existing wording.
   }
-  return 'Something went wrong. Please retry in a moment.';
+  if (err instanceof Error) {
+    if (err.message.includes('ECONNREFUSED') || err.message.includes('fetch failed'))
+      return 'Connection lost. Please retry in a moment.';
+    return 'Connection failed. Please retry in a moment.';
+  }
+  return GENERIC_ERROR;
 }
 
 // ---------------------------------------------------------------------------
@@ -526,6 +541,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       mode: data.mode ?? '',
       model: data.model ?? '',
       variant: data.variant ?? null,
+      runtimeAgents: data.runtimeAgents,
     });
     store.set(sessionIdAtom, data.cloudAgentSessionId);
 
@@ -601,17 +617,20 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       onError: message => store.set(errorAtom, message),
       onEvent: event => {
         if (event.type === 'message.updated' && event.info.role === 'assistant') {
+          // `info.agent` is the agent slug (e.g. 'code', 'e-code'); `info.mode`
+          // is the visibility ('primary'|'subagent'|'all') and must not be used
+          // as the picker's selected mode.
           const currentConfig = store.get(sessionConfigAtom);
           if (
             currentConfig &&
             (currentConfig.model !== event.info.modelID ||
-              currentConfig.mode !== event.info.mode ||
+              currentConfig.mode !== event.info.agent ||
               currentConfig.variant !== (event.info.variant ?? null))
           ) {
             store.set(sessionConfigAtom, {
               ...currentConfig,
               model: event.info.modelID,
-              mode: event.info.mode,
+              mode: event.info.agent,
               variant: event.info.variant ?? null,
             });
           }

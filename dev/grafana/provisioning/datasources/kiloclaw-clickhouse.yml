@@ -4,6 +4,13 @@ datasources:
   - name: kilo-cloudflare-analytics-engine
     uid: kiloclaw-clickhouse
     type: vertamedia-clickhouse-datasource
+    # The top-level `url` is required by Grafana's built-in data-proxy path.
+    # Without it, queries routed through `/api/datasources/proxy/uid/...` fail
+    # with `http: no Host in request URL` → 502 Bad Gateway. The duplicated
+    # `jsonData.dataSourceUrl` below is the vertamedia plugin's own field and
+    # must match; older plugin versions used only dataSourceUrl, newer ones
+    # and Grafana's generic paths use `url`.
+    url: https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql
     access: proxy
     isDefault: true
     editable: true
@@ -12,6 +19,9 @@ datasources:
       secure: ${GRAFANA_CLICKHOUSE_SECURE}
       username: ''
       defaultDatabase: default
+      # tlsSkipVerify must be false in any non-local environment — we point at
+      # api.cloudflare.com over public TLS. The env var exists only so local
+      # dev can override against a self-signed proxy if ever needed.
       tlsSkipVerify: ${GRAFANA_CLICKHOUSE_SKIP_TLS_VERIFY}
       dialTimeout: 10
       httpHeaderName1: Authorization
@@ -19,4 +29,3 @@ datasources:
       validateSql: false
     secureJsonData:
       httpHeaderValue1: Bearer ${CF_AE_TOKEN}
-      xHeaderKey: Bearer ${CF_AE_TOKEN}

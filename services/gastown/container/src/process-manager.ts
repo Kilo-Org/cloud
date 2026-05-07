@@ -18,6 +18,7 @@ import {
   RESERVED_ENV_KEYS,
 } from './control-server';
 import { log } from './logger';
+import { refreshTokenIfNearExpiry } from './token-refresh';
 
 const MANAGER_LOG = '[process-manager]';
 
@@ -239,6 +240,66 @@ async function createSessionWithStaleDbFallback(
   return retryParsed.data.id;
 }
 
+/**
+ * Run `PRAGMA wal_checkpoint(TRUNCATE)` against kilo.db and return true
+ * only if the WAL is fully drained into the main db file.
+ *
+ * The pragma returns `(busy, log, checkpointed)` as a row:
+ *   busy=0 AND log == checkpointed  → WAL fully merged into main db
+ *   anything else                    → main db is stale vs the WAL
+ *
+ * Returning true on an incomplete checkpoint would cause the caller to
+ * upload a kilo.db that's missing recent writes (e.g. the just-accepted
+ * mayor turn), overwriting the remote snapshot with stale state.
+ */
+async function runWalCheckpoint(dbPath: string, agentId: string): Promise<boolean> {
+  try {
+    const checkpoint = Bun.spawn(
+      [
+        'bun',
+        '-e',
+        `const db = new (require("bun:sqlite").Database)(process.argv[1]);
+         const row = db.query("PRAGMA wal_checkpoint(TRUNCATE)").get();
+         process.stdout.write(JSON.stringify(row ?? null));`,
+        dbPath,
+      ],
+      { stdout: 'pipe', stderr: 'pipe' }
+    );
+    const exitCode = await checkpoint.exited;
+    const stdout = await new Response(checkpoint.stdout).text();
+    const stderr = await new Response(checkpoint.stderr).text();
+
+    if (exitCode !== 0) {
+      console.warn(`${MANAGER_LOG} WAL checkpoint exited ${exitCode} for ${agentId}: ${stderr}`);
+      return false;
+    }
+
+    // bun:sqlite returns the pragma row as an object. Accept snake_case,
+    // camelCase, or bare positional keys (`0`, `1`, `2`) defensively.
+    const parsed: unknown = stdout.trim() ? JSON.parse(stdout) : null;
+    if (!parsed || typeof parsed !== 'object') {
+      console.warn(`${MANAGER_LOG} WAL checkpoint returned no row for ${agentId}: ${stdout}`);
+      return false;
+    }
+    const row: Record<string, unknown> = { ...parsed };
+    const busy = Number(row.busy ?? row['0'] ?? 0);
+    const logFrames = Number(row.log ?? row['1'] ?? 0);
+    const checkpointed = Number(row.checkpointed ?? row['2'] ?? 0);
+
+    if (busy !== 0 || logFrames !== checkpointed) {
+      console.warn(
+        `${MANAGER_LOG} WAL checkpoint incomplete for ${agentId}: busy=${busy} log=${logFrames} checkpointed=${checkpointed}`
+      );
+      return false;
+    }
+    console.log(`${MANAGER_LOG} WAL checkpoint succeeded for ${agentId} (frames=${checkpointed})`);
+    return true;
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} WAL checkpoint failed for ${agentId}:`, err);
+    return false;
+  }
+}
+
 async function saveDbSnapshot(
   agentId: string,
   apiUrl: string,
@@ -247,6 +308,8 @@ async function saveDbSnapshot(
   townId: string
 ): Promise<void> {
   const MANAGER_LOG = '[process-manager]';
+  const t0 = Date.now();
+  const role = agents.get(agentId)?.role ?? null;
   try {
     const dbDir = `/tmp/agent-home-${agentId}/.local/share/kilo`;
     const dbPath = `${dbDir}/kilo.db`;
@@ -256,25 +319,30 @@ async function saveDbSnapshot(
     // checkpoint the WAL into the main DB file before snapshotting so the
     // snapshot contains all data. Use bun's built-in SQLite to run PRAGMA
     // wal_checkpoint(TRUNCATE) which merges the WAL and truncates it.
-    try {
-      const checkpoint = Bun.spawn(
-        [
-          'bun',
-          '-e',
-          `new (require("bun:sqlite").Database)(process.argv[1]).run("PRAGMA wal_checkpoint(TRUNCATE)")`,
-          dbPath,
-        ],
-        { stdout: 'pipe', stderr: 'pipe' }
+    //
+    // `PRAGMA wal_checkpoint(TRUNCATE)` returns a row `(busy, log, checkpointed)`:
+    //   - busy=1 means another writer is holding the WAL and the checkpoint
+    //     was blocked. The main kilo.db is then stale relative to the WAL.
+    //   - log != checkpointed means the checkpoint only partially drained
+    //     the WAL, so again the main db file is missing recent writes.
+    //
+    // Either case means uploading kilo.db would overwrite the remote
+    // snapshot with a stale copy missing the messages this path is meant
+    // to preserve. Skip the upload in that case.
+    const checkpointOk = await runWalCheckpoint(dbPath, agentId);
+    if (!checkpointOk) {
+      console.warn(
+        `${MANAGER_LOG} Skipping DB snapshot for ${agentId}: WAL not fully checkpointed`
       );
-      const exitCode = await checkpoint.exited;
-      if (exitCode === 0) {
-        console.log(`${MANAGER_LOG} WAL checkpoint succeeded for ${agentId}`);
-      } else {
-        const stderr = await new Response(checkpoint.stderr).text();
-        console.warn(`${MANAGER_LOG} WAL checkpoint exited ${exitCode} for ${agentId}: ${stderr}`);
-      }
-    } catch (err) {
-      console.warn(`${MANAGER_LOG} WAL checkpoint failed for ${agentId}:`, err);
+      log.error('mayor.snapshot_failed', {
+        event: 'mayor.snapshot_failed',
+        agentId,
+        role,
+        durationMs: Date.now() - t0,
+        error: 'wal_checkpoint_incomplete',
+        success: false,
+      });
+      return;
     }
 
     const buffer = await fs.readFile(dbPath);
@@ -291,17 +359,42 @@ async function saveDbSnapshot(
     );
     if (!resp.ok) {
       console.warn(`${MANAGER_LOG} Failed to save DB snapshot for ${agentId}: ${resp.status}`);
+      log.error('mayor.snapshot_failed', {
+        event: 'mayor.snapshot_failed',
+        agentId,
+        role,
+        durationMs: Date.now() - t0,
+        sizeBytes: buffer.byteLength,
+        status: resp.status,
+        success: false,
+      });
       return;
     }
     console.log(
       `${MANAGER_LOG} Saved DB snapshot for agent ${agentId} (${buffer.byteLength} bytes)`
     );
+    log.info('mayor.snapshot_saved', {
+      event: 'mayor.snapshot_saved',
+      agentId,
+      role,
+      durationMs: Date.now() - t0,
+      sizeBytes: buffer.byteLength,
+      success: true,
+    });
   } catch (err) {
     if ((err as { code?: string }).code === 'ENOENT') {
       console.log(`${MANAGER_LOG} No kilo.db found for agent ${agentId}, skipping snapshot save`);
       return;
     }
     console.warn(`${MANAGER_LOG} DB snapshot save failed for agent ${agentId}:`, err);
+    log.error('mayor.snapshot_failed', {
+      event: 'mayor.snapshot_failed',
+      agentId,
+      role,
+      durationMs: Date.now() - t0,
+      error: err instanceof Error ? err.message : String(err),
+      success: false,
+    });
   }
 }
 
@@ -897,7 +990,15 @@ async function subscribeToEvents(
     }
   } finally {
     clearIdleTimer(agent.agentId);
-    eventAbortControllers.delete(agent.agentId);
+    // Only clear the map entry if it still points at *our* controller.
+    // A concurrent refresh/model-swap may have already stored a fresh
+    // controller for a new subscription; an unconditional delete here
+    // would strand that stream with no way to abort it on future
+    // stops or refreshes.
+    const current = eventAbortControllers.get(agent.agentId);
+    if (current === controller) {
+      eventAbortControllers.delete(agent.agentId);
+    }
   }
 }
 
@@ -1270,6 +1371,25 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
 
   agent.messageCount++;
   agent.lastActivityAt = new Date().toISOString();
+
+  // Mayor-only: snapshot kilo.db immediately after the user message is
+  // accepted so the message survives a container crash mid-response.
+  // Polecats/refineries/triage have different session semantics (fresh
+  // session per dispatch) and rely on exit/drain snapshots.
+  //
+  // Prefer process.env.GASTOWN_CONTAINER_TOKEN over agent.gastownContainerToken:
+  // /refresh-token updates the env var first (process.env.GASTOWN_CONTAINER_TOKEN
+  // = body.token) and only then restarts agents, so the live env token is
+  // always at least as fresh as the cached field. Using the cached field
+  // first would 401 the snapshot upload after rotation and lose the turn
+  // we are trying to preserve.
+  if (agent.role === 'mayor') {
+    const apiUrl = agent.gastownApiUrl;
+    const token = process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? null;
+    if (apiUrl && token) {
+      void saveDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
+    }
+  }
 }
 
 /**
@@ -1308,6 +1428,394 @@ function extractOrganizationId(agent?: ManagedAgent): string | undefined {
 const MAYOR_STARTUP_PROMPT = 'Mayor ready. Waiting for instructions.';
 
 /**
+ * Env keys that may be refreshed at runtime by `POST /sync-config` or
+ * `POST /refresh-token`. When rebuilding an agent's env for a live SDK
+ * server restart, these are read from `process.env` (freshest source)
+ * rather than `agent.startupEnv` (captured once at agent start).
+ */
+const LIVE_ENV_KEYS = new Set([
+  'GASTOWN_CONTAINER_TOKEN',
+  'GIT_TOKEN',
+  'GITLAB_TOKEN',
+  'GITLAB_INSTANCE_URL',
+  'GITHUB_CLI_PAT',
+  'GASTOWN_GIT_AUTHOR_NAME',
+  'GASTOWN_GIT_AUTHOR_EMAIL',
+  'GASTOWN_DISABLE_AI_COAUTHOR',
+  'KILOCODE_TOKEN',
+  'GASTOWN_ORGANIZATION_ID',
+]);
+
+/**
+ * Build the env for a fresh `kilo serve` process that replaces an
+ * agent's current SDK server. Used by both model hot-swap and
+ * token-refresh hot-swap.
+ *
+ * Rules:
+ * - Start from `agent.startupEnv` (original dispatch env).
+ * - For every key in `LIVE_ENV_KEYS`, read from `process.env` so live
+ *   updates (container-token refresh, config sync) are picked up.
+ * - `KILO_CONFIG_CONTENT` / `OPENCODE_CONFIG_CONTENT` handling:
+ *     - Model hot-swap (`updateAgentModel`) rebuilds these for the new
+ *       model and writes them to `agent.startupEnv` before calling this
+ *       helper, so picking them up from `startupEnv` keeps the hot-swap
+ *       agent-specific.
+ *     - Token refresh does not touch the model, so `startupEnv` already
+ *       carries the correct per-agent config. Pulling it in here
+ *       guarantees each agent restart sets its own config on
+ *       `process.env` before `ensureSDKServer` spawns, even when a
+ *       different agent's config was last left in the global env by a
+ *       previous model swap or refresh.
+ * - Overlay town-config custom `env_vars` so values added/changed
+ *   after the initial dispatch are honoured. Infra keys in
+ *   `LIVE_ENV_KEYS` and `RESERVED_ENV_KEYS` always win.
+ * - Remove custom keys that were previously applied but have been
+ *   dropped from the town config.
+ * - Re-derive `GH_TOKEN` from the live `GITHUB_CLI_PAT` > `GIT_TOKEN`
+ *   > `GITHUB_TOKEN` chain so a rotated token takes effect.
+ */
+function buildLiveHotSwapEnv(agent: ManagedAgent): Record<string, string> {
+  const env: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(agent.startupEnv)) {
+    if (LIVE_ENV_KEYS.has(key)) {
+      const live = process.env[key];
+      if (live) env[key] = live;
+      continue;
+    }
+    env[key] = value;
+  }
+  // Inject live values for LIVE_ENV_KEYS that were absent from startupEnv
+  // (e.g. GASTOWN_ORGANIZATION_ID added after initial dispatch).
+  for (const key of LIVE_ENV_KEYS) {
+    if (key in env) continue;
+    const live = process.env[key];
+    if (live) env[key] = live;
+  }
+
+  // Overlay custom env_vars from the town config so hot-swap picks up
+  // values that were added/changed after the initial dispatch. Infra
+  // keys in LIVE_ENV_KEYS and RESERVED_ENV_KEYS always take precedence.
+  const freshConfig = getCurrentTownConfig();
+  const freshEnvVars = freshConfig?.env_vars;
+  const freshCustomKeySet = new Set<string>();
+  if (freshEnvVars !== null && typeof freshEnvVars === 'object' && !Array.isArray(freshEnvVars)) {
+    for (const [key, value] of Object.entries(freshEnvVars as Record<string, unknown>)) {
+      if (LIVE_ENV_KEYS.has(key)) continue;
+      if (RESERVED_ENV_KEYS.has(key)) continue;
+      freshCustomKeySet.add(key);
+      if (value !== undefined && value !== null) {
+        env[key] = typeof value === 'string' ? value : JSON.stringify(value);
+      } else {
+        delete env[key];
+      }
+    }
+  }
+  // Remove stale custom env vars that the town config no longer carries.
+  for (const key of getLastAppliedEnvVarKeys()) {
+    if (!freshCustomKeySet.has(key) && !LIVE_ENV_KEYS.has(key)) {
+      delete env[key];
+    }
+  }
+
+  // Re-derive GH_TOKEN from live values using the same priority chain
+  // as buildAgentEnv: GITHUB_CLI_PAT > GIT_TOKEN > GITHUB_TOKEN.
+  const liveGhToken =
+    process.env.GITHUB_CLI_PAT ?? process.env.GIT_TOKEN ?? process.env.GITHUB_TOKEN;
+  if (liveGhToken) {
+    env.GH_TOKEN = liveGhToken;
+  } else {
+    delete env.GH_TOKEN;
+  }
+
+  return env;
+}
+
+// Per-agent timeout for the `ensureSDKServer` step of a token refresh.
+// Server startup normally takes ~1-2s; anything beyond 6s means the
+// spawn is stuck and we'd rather fall back to the old instance than
+// block the caller. The TownDO alarm path has a 10s outer timeout, so
+// each agent must finish well under that even with queuing effects
+// from the sdkServerLock.
+const REFRESH_AGENT_TIMEOUT_MS = 6_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const handle = setTimeout(() => reject(new Error(`timeout after ${ms}ms: ${label}`)), ms);
+    promise.then(
+      value => {
+        clearTimeout(handle);
+        resolve(value);
+      },
+      err => {
+        clearTimeout(handle);
+        reject(err);
+      }
+    );
+  });
+}
+
+/**
+ * Restart every running agent's SDK server so a newly-refreshed
+ * `GASTOWN_CONTAINER_TOKEN` (or any other LIVE_ENV_KEYS value in
+ * `process.env`) is inherited by the fresh `kilo serve` child process.
+ *
+ * The agent's session is preserved: the mayor resumes its existing
+ * session (conversation history intact); other agents keep their
+ * current session id, since kilo.db persists across the restart.
+ *
+ * Each agent is restarted independently; a failure to restart one
+ * agent never blocks the others. Returns a per-agent summary so the
+ * caller can log telemetry.
+ */
+export async function refreshTokenForAllAgents(): Promise<
+  Array<{ agentId: string; success: boolean; durationMs: number; error?: string }>
+> {
+  // Only restart fully-running agents. A `starting` agent may not yet
+  // have a `sessionId` or an `sdkInstances` entry (still hydrating the
+  // DB or waiting on ensureSDKServer), and racing the startup path
+  // would leave duplicate subscriptions, an over-counted sessionCount,
+  // or an orphan server that never closes. `startAgent()` already
+  // reads `process.env.GASTOWN_CONTAINER_TOKEN` when it spawns the
+  // SDK server, so an agent that is still starting will pick up the
+  // fresh token on its own as part of normal startup — no restart
+  // needed. Agents in any terminal state (`exited`, `failed`, etc.)
+  // are also skipped: restarting them would revive a process that the
+  // completion/exit path already tore down.
+  const snapshot = [...agents.values()].filter(a => a.status === 'running');
+
+  // Restart agents in parallel. Each agent has its own workdir (and
+  // therefore its own sdkInstances key), so the Map mutations don't
+  // collide. Running serially would easily blow past the caller's
+  // 10s timeout once we have more than a couple of agents.
+  const restartAgent = async (
+    agent: ManagedAgent
+  ): Promise<{ agentId: string; success: boolean; durationMs: number; error?: string }> => {
+    const t0 = Date.now();
+    const oldInstance = sdkInstances.get(agent.workdir);
+    const oldSessionId = agent.sessionId;
+    const oldPort = agent.serverPort;
+    // Track the pending ensureSDKServer promise separately so the timeout
+    // path can clean up an orphan server if the spawn eventually resolves
+    // after we've already given up. withTimeout races the promise with a
+    // timer but cannot cancel the underlying spawn — the serialised SDK
+    // server creation may still install an instance into sdkInstances
+    // after we've restored the old one, leaking the fresh kilo serve child.
+    let pendingEnsure: Promise<{ client: KiloClient; port: number }> | null = null;
+    try {
+      const hotSwapEnv = buildLiveHotSwapEnv(agent);
+
+      // Tear down the existing SDK server so ensureSDKServer spawns
+      // a fresh kilo serve child with the updated env. We don't close
+      // it until after ensureSDKServer returns so fetch() during the
+      // window still has somewhere to land — but process.env changes
+      // are only visible to *new* child processes, so restarting the
+      // server is the only way to propagate the fresh token.
+      sdkInstances.delete(agent.workdir);
+
+      pendingEnsure = ensureSDKServer(agent.workdir, hotSwapEnv);
+      const { client, port } = await withTimeout(
+        pendingEnsure,
+        REFRESH_AGENT_TIMEOUT_MS,
+        `ensureSDKServer for ${agent.agentId}`
+      );
+      // Spawn completed within the timeout — no orphan to clean up.
+      pendingEnsure = null;
+      agent.serverPort = port;
+
+      // Resume the existing session. kilo.db is on disk and survives
+      // the restart, so session.list returns the prior session(s).
+      let newSessionId = oldSessionId;
+      let resumed = false;
+      try {
+        const existing = await withTimeout(
+          client.session.list(),
+          2_000,
+          `session.list for ${agent.agentId}`
+        );
+        const sessions = (existing.data ?? []) as Array<{
+          id: string;
+          time?: { updated?: number };
+        }>;
+        // Prefer the session we were already on; fall back to the most
+        // recently updated one if that id is no longer present.
+        const preferred = sessions.find(s => s.id === oldSessionId);
+        if (preferred) {
+          newSessionId = preferred.id;
+          resumed = true;
+        } else if (sessions.length > 0) {
+          const sorted = [...sessions].sort(
+            (a, b) => (b.time?.updated ?? 0) - (a.time?.updated ?? 0)
+          );
+          newSessionId = sorted[0].id;
+          resumed = true;
+        }
+      } catch (err) {
+        log.warn('refresh_token.session_list_failed', {
+          agentId: agent.agentId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      agent.sessionId = newSessionId;
+      const newInstance = sdkInstances.get(agent.workdir);
+      if (newInstance) newInstance.sessionCount++;
+
+      // New server is healthy — tear down the old one and its subscription.
+      if (oldInstance) {
+        const oldController = eventAbortControllers.get(agent.agentId);
+        if (oldController) oldController.abort();
+        try {
+          oldInstance.server.close();
+        } catch (err) {
+          log.warn('refresh_token.old_server_close_failed', {
+            agentId: agent.agentId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      // Re-subscribe to events on the new server so the agent keeps
+      // reporting activity after the swap.
+      void subscribeToEvents(client, agent, {
+        agentId: agent.agentId,
+        role: agent.role,
+        name: agent.name,
+        model: agent.model ?? '',
+        prompt: '',
+        rigId: agent.rigId,
+        townId: agent.townId,
+        identity: '',
+        gitUrl: '',
+        branch: '',
+        defaultBranch: '',
+      });
+
+      const durationMs = Date.now() - t0;
+      log.info('refresh_token.agent_restarted', {
+        agentId: agent.agentId,
+        role: agent.role,
+        name: agent.name,
+        oldPort,
+        newPort: port,
+        oldSessionId,
+        newSessionId,
+        resumed,
+        success: true,
+        durationMs,
+      });
+      return { agentId: agent.agentId, success: true, durationMs };
+    } catch (err) {
+      const durationMs = Date.now() - t0;
+      const message = err instanceof Error ? err.message : String(err);
+      // Three failure shapes to unwind, distinguished by what's in
+      // sdkInstances[workdir] and whether pendingEnsure is still set:
+      //
+      //   A. ensureSDKServer not yet resolved (pendingEnsure != null):
+      //      the map is empty (we deleted at 1619 and nothing was put
+      //      back yet). Restore old now; attach a reaper for the
+      //      eventual orphan that ensureSDKServer will install when
+      //      it finally resolves.
+      //
+      //   B. ensureSDKServer resolved, failure happened before or
+      //      inside the block that installs the new instance:
+      //      the map is empty. Restore old.
+      //
+      //   C. ensureSDKServer resolved AND new instance installed, but
+      //      a post-start step threw (e.g. an added future check, or
+      //      a throw from one of the already-caught calls if its
+      //      handler is ever changed). The map contains the fresh
+      //      instance. Close it, remove it, restore old, and point
+      //      the agent back at the old port/session.
+      const current = sdkInstances.get(agent.workdir);
+      if (current && current !== oldInstance) {
+        // Case C — fresh instance is installed. Tear it down and
+        // restore the old one so we don't leak a kilo serve process
+        // or leave the agent pointing at a partially-configured
+        // server (no event subscription, no session count bump, old
+        // server still alive on oldPort).
+        sdkInstances.delete(agent.workdir);
+        try {
+          current.server.close();
+        } catch (closeErr) {
+          log.warn('refresh_token.fresh_close_failed', {
+            agentId: agent.agentId,
+            error: closeErr instanceof Error ? closeErr.message : String(closeErr),
+          });
+        }
+        if (oldInstance) {
+          sdkInstances.set(agent.workdir, oldInstance);
+          agent.serverPort = oldPort;
+          agent.sessionId = oldSessionId;
+        }
+        log.warn('refresh_token.fresh_rolled_back', {
+          agentId: agent.agentId,
+          oldPort,
+          error: message,
+        });
+      } else if (oldInstance && !sdkInstances.has(agent.workdir)) {
+        // Case A/B — map is empty. Restore the old SDK instance in
+        // the map so the agent keeps pointing at a tracked server.
+        // The old kilo serve child still has the stale token, but
+        // having SOME server is strictly better than having none:
+        // session.prompt still works, and the next refresh / model
+        // swap will pick it up again.
+        sdkInstances.set(agent.workdir, oldInstance);
+        agent.serverPort = oldPort;
+        agent.sessionId = oldSessionId;
+      }
+      // If ensureSDKServer is still in flight, attach a reaper: when it
+      // finally resolves it will have registered a fresh SDK instance
+      // under agent.workdir, clobbering the restored old one. We evict
+      // and close that orphan so we don't leak a kilo serve process or
+      // leave the agent pointing at an un-subscribed server.
+      if (pendingEnsure) {
+        const reapWorkdir = agent.workdir;
+        const reapAgentId = agent.agentId;
+        const reapOldInstance = oldInstance;
+        pendingEnsure.then(
+          ({ port: orphanPort }) => {
+            const orphan = sdkInstances.get(reapWorkdir);
+            if (!orphan || orphan === reapOldInstance) return;
+            sdkInstances.delete(reapWorkdir);
+            if (reapOldInstance) {
+              sdkInstances.set(reapWorkdir, reapOldInstance);
+            }
+            try {
+              orphan.server.close();
+            } catch (closeErr) {
+              log.warn('refresh_token.orphan_close_failed', {
+                agentId: reapAgentId,
+                error: closeErr instanceof Error ? closeErr.message : String(closeErr),
+              });
+            }
+            log.warn('refresh_token.orphan_reaped', {
+              agentId: reapAgentId,
+              orphanPort,
+            });
+          },
+          () => {
+            // ensureSDKServer itself rejected — nothing was installed, so
+            // nothing to reap. The original timeout error already logged.
+          }
+        );
+      }
+      log.error('refresh_token.agent_restarted', {
+        agentId: agent.agentId,
+        role: agent.role,
+        name: agent.name,
+        success: false,
+        durationMs,
+        error: message,
+      });
+      return { agentId: agent.agentId, success: false, durationMs, error: message };
+    }
+  };
+
+  return Promise.all(snapshot.map(restartAgent));
+}
+
+/**
  * Update the model for a running agent by restarting its SDK server with
  * new KILO_CONFIG_CONTENT. The kilo serve child process reads the model
  * from KILO_CONFIG_CONTENT at startup (highest config precedence after
@@ -1340,6 +1848,8 @@ export async function updateAgentModel(
   const oldModel = agent.model;
   const prevConfigContent = process.env.KILO_CONFIG_CONTENT;
   const prevOpenCodeContent = process.env.OPENCODE_CONFIG_CONTENT;
+  const prevStartupConfig = agent.startupEnv.KILO_CONFIG_CONTENT;
+  const prevStartupOpenCode = agent.startupEnv.OPENCODE_CONFIG_CONTENT;
 
   console.log(
     `${MANAGER_LOG} updateAgentModel: restarting SDK server for agent ${agentId} with model=${model}`
@@ -1363,8 +1873,13 @@ export async function updateAgentModel(
     agent.startupEnv = { ...agent.startupEnv, GASTOWN_ORGANIZATION_ID: organizationId };
   }
 
-  // 2. Rebuild KILO_CONFIG_CONTENT with the new model and update process.env
-  //    so the next createKilo() spawns kilo serve with fresh config.
+  // 2. Rebuild KILO_CONFIG_CONTENT with the new model and persist it on
+  //    `agent.startupEnv` so subsequent hot-swaps (including token
+  //    refreshes performed by another code path) pick up the new model
+  //    instead of replaying the stale dispatch-time config. We also set
+  //    process.env as a secondary signal for any callers that read it
+  //    directly, but buildLiveHotSwapEnv is the authoritative source
+  //    now that it pulls KILO_CONFIG_CONTENT from startupEnv.
   const kilocodeToken = process.env.KILOCODE_TOKEN;
   if (kilocodeToken) {
     const configJson = buildKiloConfigContent(
@@ -1375,6 +1890,11 @@ export async function updateAgentModel(
     );
     process.env.KILO_CONFIG_CONTENT = configJson;
     process.env.OPENCODE_CONFIG_CONTENT = configJson;
+    agent.startupEnv = {
+      ...agent.startupEnv,
+      KILO_CONFIG_CONTENT: configJson,
+      OPENCODE_CONFIG_CONTENT: configJson,
+    };
   }
 
   // 3. Remove the old instance from the map so ensureSDKServer creates a
@@ -1384,83 +1904,11 @@ export async function updateAgentModel(
   agent.model = model;
 
   // Replay the full env from the initial dispatch so the new SDK server
-  // gets the same git identity, auth tokens, and plugin vars. Exclude
-  // KILO_CONFIG_CONTENT / OPENCODE_CONFIG_CONTENT — those were already
-  // rebuilt above with the new model and set on process.env.
-  //
-  // For env vars that syncConfigToContainer can update at runtime, prefer
-  // the live process.env value over the stale startupEnv snapshot.
-  const LIVE_ENV_KEYS = new Set([
-    'GASTOWN_CONTAINER_TOKEN',
-    'GIT_TOKEN',
-    'GITLAB_TOKEN',
-    'GITLAB_INSTANCE_URL',
-    'GITHUB_CLI_PAT',
-    'GASTOWN_GIT_AUTHOR_NAME',
-    'GASTOWN_GIT_AUTHOR_EMAIL',
-    'GASTOWN_DISABLE_AI_COAUTHOR',
-    'KILOCODE_TOKEN',
-    'GASTOWN_ORGANIZATION_ID',
-  ]);
-  const hotSwapEnv: Record<string, string> = {};
-  for (const [key, value] of Object.entries(agent.startupEnv)) {
-    if (key === 'KILO_CONFIG_CONTENT' || key === 'OPENCODE_CONFIG_CONTENT') continue;
-    if (LIVE_ENV_KEYS.has(key)) {
-      const live = process.env[key];
-      if (live) hotSwapEnv[key] = live;
-      continue;
-    }
-    hotSwapEnv[key] = value;
-  }
-  // Inject live values for LIVE_ENV_KEYS that were absent from startupEnv
-  // (e.g. GASTOWN_ORGANIZATION_ID added after initial dispatch).
-  for (const key of LIVE_ENV_KEYS) {
-    if (key in hotSwapEnv) continue;
-    const live = process.env[key];
-    if (live) hotSwapEnv[key] = live;
-  }
-
-  // Overlay custom env_vars from the town config so hot-swap picks up
-  // values that were added/changed after the initial dispatch. Infra
-  // keys in LIVE_ENV_KEYS and RESERVED_ENV_KEYS always take precedence
-  // (LIVE_ENV_KEYS were already populated from process.env above;
-  // RESERVED_ENV_KEYS are runtime routing vars that must never be clobbered).
-  const freshConfig = getCurrentTownConfig();
-  const freshEnvVars = freshConfig?.env_vars;
-  const freshCustomKeySet = new Set<string>();
-  if (freshEnvVars !== null && typeof freshEnvVars === 'object' && !Array.isArray(freshEnvVars)) {
-    for (const [key, value] of Object.entries(freshEnvVars as Record<string, unknown>)) {
-      if (LIVE_ENV_KEYS.has(key)) continue;
-      if (RESERVED_ENV_KEYS.has(key)) continue;
-      freshCustomKeySet.add(key);
-      if (value !== undefined && value !== null) {
-        hotSwapEnv[key] = typeof value === 'string' ? value : JSON.stringify(value);
-      } else {
-        delete hotSwapEnv[key];
-      }
-    }
-  }
-  // Remove stale custom env vars — keys that were applied in a previous
-  // sync but are no longer in the town config. Without this, startupEnv
-  // keeps carrying deleted custom keys through every hot-swap.
-  for (const key of getLastAppliedEnvVarKeys()) {
-    if (!freshCustomKeySet.has(key) && !LIVE_ENV_KEYS.has(key)) {
-      delete hotSwapEnv[key];
-    }
-  }
-
-  // Re-derive GH_TOKEN from live values using the same priority chain
-  // as buildAgentEnv: GITHUB_CLI_PAT > GIT_TOKEN > GITHUB_TOKEN.
-  // syncConfigToContainer updates these on process.env, but buildAgentEnv
-  // only ran once at initial dispatch. When all sources are cleared,
-  // remove GH_TOKEN so the SDK server doesn't retain stale credentials.
-  const liveGhCliPat = process.env.GITHUB_CLI_PAT;
-  const liveGhToken = liveGhCliPat ?? process.env.GIT_TOKEN ?? process.env.GITHUB_TOKEN;
-  if (liveGhToken) {
-    hotSwapEnv.GH_TOKEN = liveGhToken;
-  } else {
-    delete hotSwapEnv.GH_TOKEN;
-  }
+  // gets the same git identity, auth tokens, and plugin vars.
+  // KILO_CONFIG_CONTENT is now pulled from startupEnv (which we just
+  // updated above), making this hot-swap agent-specific even when
+  // process.env carries another agent's config.
+  const hotSwapEnv = buildLiveHotSwapEnv(agent);
 
   try {
     // 4. Create a new SDK server (spawns a fresh kilo serve with updated env)
@@ -1559,6 +2007,21 @@ export async function updateAgentModel(
     if (prevConfigContent !== undefined) process.env.KILO_CONFIG_CONTENT = prevConfigContent;
     if (prevOpenCodeContent !== undefined)
       process.env.OPENCODE_CONFIG_CONTENT = prevOpenCodeContent;
+    // Also restore the startupEnv copy; buildLiveHotSwapEnv now reads
+    // from startupEnv, so a stale forward-config could carry over into
+    // the next hot-swap otherwise.
+    const restoredStartup = { ...agent.startupEnv };
+    if (prevStartupConfig === undefined) {
+      delete restoredStartup.KILO_CONFIG_CONTENT;
+    } else {
+      restoredStartup.KILO_CONFIG_CONTENT = prevStartupConfig;
+    }
+    if (prevStartupOpenCode === undefined) {
+      delete restoredStartup.OPENCODE_CONFIG_CONTENT;
+    } else {
+      restoredStartup.OPENCODE_CONFIG_CONTENT = prevStartupOpenCode;
+    }
+    agent.startupEnv = restoredStartup;
     throw err;
   }
 }
@@ -1840,11 +2303,35 @@ export async function drainAll(): Promise<void> {
         });
       }
 
-      // 4d: Save DB snapshot
+      // 4d: Save DB snapshot — await with a 10s timeout so a slow KV
+      // write doesn't block container exit, but log loudly if it times out.
+      // withTimeout clears the timer on success so we don't leave a ref'd
+      // setTimeout keeping the process alive after drain finishes.
+      //
+      // Prefer process.env.GASTOWN_CONTAINER_TOKEN over the per-agent
+      // cached token for the same reason as the mayor sendMessage
+      // snapshot path: /refresh-token rotates the env var first, so a
+      // cached token captured at dispatch time may already be expired
+      // and would 401 the snapshot upload, silently dropping the latest
+      // kilo.db state on eviction.
       const apiUrl = agent.gastownApiUrl;
-      const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+      const token = process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? null;
       if (apiUrl && token) {
-        await saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+        await withTimeout(
+          saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId),
+          10_000,
+          'drain snapshot'
+        ).catch(err => {
+          console.error(`${DRAIN_LOG} snapshot timeout/failure for ${agent.agentId}:`, err);
+          log.error('mayor.snapshot_failed', {
+            event: 'mayor.snapshot_failed',
+            agentId: agent.agentId,
+            role: agent.role,
+            error: err instanceof Error ? err.message : String(err),
+            phase: 'drain',
+            success: false,
+          });
+        });
       }
 
       // 4e: Report the agent as completed so the TownDO can unhook it
@@ -1894,11 +2381,33 @@ export async function stopAll(): Promise<void> {
       agent.status = 'exited';
       agent.exitReason = 'container shutdown';
 
-      // Save DB snapshot before completing shutdown
+      // Save DB snapshot before completing shutdown. Await with a 10s
+      // timeout so the container can exit promptly on a stuck KV write,
+      // but a loud error is emitted so we can observe snapshot drops.
+      // withTimeout clears the timer on success so stopAll doesn't return
+      // with a still-ref'd setTimeout delaying container exit.
+      //
+      // Prefer the live env token over the per-agent cached token —
+      // /refresh-token rotates process.env first so the cached field
+      // can be expired after a rotation, 401'ing the final snapshot.
       const apiUrl = agent.gastownApiUrl;
-      const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
+      const token = process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? null;
       if (apiUrl && token) {
-        void saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId);
+        await withTimeout(
+          saveDbSnapshot(agent.agentId, apiUrl, token, agent.rigId, agent.townId),
+          10_000,
+          'stopAll snapshot'
+        ).catch(err => {
+          console.error(`[stop-all] snapshot timeout/failure for ${agent.agentId}:`, err);
+          log.error('mayor.snapshot_failed', {
+            event: 'mayor.snapshot_failed',
+            agentId: agent.agentId,
+            role: agent.role,
+            error: err instanceof Error ? err.message : String(err),
+            phase: 'stopAll',
+            success: false,
+          });
+        });
       }
     }
   }
@@ -1920,14 +2429,26 @@ export async function bootHydration(): Promise<void> {
   const LOG = '[boot-hydration]';
   const apiUrl = process.env.GASTOWN_API_URL;
   const townId = process.env.GASTOWN_TOWN_ID;
-  const token = process.env.GASTOWN_CONTAINER_TOKEN;
+  const initialToken = process.env.GASTOWN_CONTAINER_TOKEN;
 
-  if (!apiUrl || !townId || !token) {
+  if (!apiUrl || !townId || !initialToken) {
     console.log(
       `${LOG} Missing GASTOWN_API_URL, GASTOWN_TOWN_ID, or GASTOWN_CONTAINER_TOKEN — skipping boot hydration`
     );
     return;
   }
+
+  // Proactively refresh the container token if it's near expiry. A cold
+  // container that was last stopped close to the 8h JWT TTL would
+  // otherwise boot with a token about to expire and fail on the first
+  // worker call. The refresh endpoint tolerates tokens that have just
+  // expired so this covers the cold-restart case too.
+  await refreshTokenIfNearExpiry();
+
+  // Re-read the token AFTER the potential refresh so subsequent calls
+  // (registry fetch, and the env maps we hand to hydrated agents) use
+  // the fresh value.
+  const token = process.env.GASTOWN_CONTAINER_TOKEN ?? initialToken;
 
   console.log(`${LOG} Fetching container registry for town=${townId}`);
   let registry: unknown;
@@ -1964,9 +2485,14 @@ export async function bootHydration(): Promise<void> {
       continue;
     }
 
+    // Registry entries were written with the token snapshot at dispatch
+    // time. If we just refreshed, overlay the fresh value so the hydrated
+    // kilo serve child inherits the current token.
+    const hydratedEnv = { ...env, GASTOWN_CONTAINER_TOKEN: token };
+
     console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
     try {
-      await startAgent(agentRequest, workdir, env);
+      await startAgent(agentRequest, workdir, hydratedEnv);
       console.log(`${LOG} Agent ${agentId} resumed`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

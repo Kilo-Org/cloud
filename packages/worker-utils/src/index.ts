@@ -1,3 +1,5 @@
+export { getCachedSecret, clearSecretCacheForTest } from './cached-secret.js';
+
 export { withDORetry, DEFAULT_DO_RETRY_CONFIG } from './do-retry.js';
 export type { DORetryConfig } from './do-retry.js';
 
@@ -77,3 +79,6 @@ export type {
   KiloclawStopReason,
   KiloclawDestroyReason,
 } from './kiloclaw-lifecycle-reasons.js';
+
+export { isValidGitUrl, sanitizeGitUrl, parseGitUrl, repoFullNameFromGitUrl } from './git-url.js';
+export type { RepoCoordinates } from './git-url.js';

@@ -2,10 +2,15 @@ import '../global.css';
 import '@/lib/cloud-agent-runtime';
 
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
+import {
+  JetBrainsMono_500Medium,
+  JetBrainsMono_600SemiBold,
+} from '@expo-google-fonts/jetbrains-mono';
 import { PortalHost } from '@rn-primitives/portal';
 import * as Sentry from '@sentry/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { isRunningInExpoGo } from 'expo';
+import { useFonts } from 'expo-font';
 import { type Href, Slot, useNavigationContainerRef, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -24,6 +29,7 @@ import {
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
+import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
@@ -42,7 +48,8 @@ Sentry.init({
   // Enable Logs
   enableLogs: true,
 
-  tracesSampleRate: 1,
+  // Tracing is fully disabled.
+  tracesSampleRate: 0,
 
   // Configure Session Replay
   replaysSessionSampleRate: 0.1,
@@ -53,7 +60,7 @@ Sentry.init({
   attachViewHierarchy: true,
 
   integrations: [Sentry.mobileReplayIntegration(), navigationIntegration],
-  enableNativeFramesTracking: !isRunningInExpoGo(),
+  enableNativeFramesTracking: false,
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   spotlight: __DEV__,
@@ -66,10 +73,25 @@ checkInitialNotification();
 function RootLayoutNav() {
   const { token, isLoading: authLoading } = useAuth();
   const { updateRequired, isChecking: updateChecking } = useForceUpdate();
+  const [fontsLoaded, fontsError] = useFonts({
+    JetBrainsMono_500Medium,
+    JetBrainsMono_600SemiBold,
+  });
   const segments = useSegments();
   const router = useRouter();
 
-  const isLoading = authLoading || updateChecking;
+  useEffect(() => {
+    if (fontsError) {
+      Sentry.captureException(fontsError);
+    }
+  }, [fontsError]);
+
+  // Treat font load errors as terminal: fall back to system fonts rather
+  // than holding the app at opacity 0 forever. `useFonts` sets `error` and
+  // leaves `loaded` false on failure, so gating only on `!fontsLoaded` would
+  // keep the splash screen up indefinitely.
+  const fontsReady = fontsLoaded || fontsError !== null;
+  const isLoading = authLoading || updateChecking || !fontsReady;
   const inAuthGroup = segments[0] === '(auth)';
   const inForceUpdate = segments[0] === 'force-update';
 
@@ -104,9 +126,9 @@ function RootLayoutNav() {
     } else {
       void SplashScreen.hideAsync();
       // Navigate to pending notification deep link (cold start / background tap)
-      const pendingLink = getPendingNotificationLink();
-      if (pendingLink) {
-        router.push(pendingLink as Href);
+      const pendingNavigation = resolvePendingNotificationNavigation(getPendingNotificationLink());
+      if (pendingNavigation) {
+        router.replace(pendingNavigation.href as Href);
       }
     }
   }, [token, isLoading, updateRequired, inAuthGroup, inForceUpdate, router]);

@@ -21,7 +21,7 @@ scripts/          CI and one-off scripts
 
 ## Verification
 
-After making changes, verify your work. At minimum run typecheck; run the full suite when appropriate. **Always run `pnpm format` before committing** — CI will reject unformatted code.
+After making changes, verify your work with the narrowest relevant checks. Avoid running the full `pnpm typecheck` by default; it is slow enough to make development environments unusable. Prefer targeted package checks or `scripts/typecheck-all.sh --changes-only`, and mention in your final response when the full typecheck was skipped for this reason. Run the full suite when appropriate. **Always run `pnpm format` before committing** — CI will reject unformatted code.
 
 | Command          | What it checks                               |
 | ---------------- | -------------------------------------------- |
@@ -38,7 +38,11 @@ Target a specific test file: `pnpm test -- <path>`. Run tests for a specific ser
 ## Coding Standards
 
 - Prefer `type` over `interface`.
-- **Avoid** `as` casts and `!` non-null assertions — use `satisfies` or flow-sensitive typing.
+- Use `as` casts sparingly, but do not ban them outright. Prefer `satisfies`, discriminated unions, generics, or flow-sensitive narrowing when TypeScript can be made to understand the type naturally.
+- A targeted `as` cast is acceptable when code is at a known boundary where TypeScript has lost information that the surrounding control flow guarantees. For example, inside a platform switch, casting `message` to `Message<SlackEvent>` or `Message<GitHubRawMessage>` is preferable to adding generic `Record<string, unknown>` property helpers just to read known adapter fields.
+- Avoid broad casts that hide real uncertainty, especially `as any`, double casts through `unknown`, or casting external/untrusted data without validation. Use runtime validation when the data shape is genuinely unknown, user-controlled, persisted, or coming from an API contract we do not own.
+- The above restrictions on `as` do not apply inside test files (e.g. `*.test.ts`, `*.spec.ts`, files under `__tests__/`, and other test fixtures/helpers). `as` casts are explicitly permitted in tests, where they are commonly needed for fixture construction, narrowing partial mocks, and exercising error paths. Production code conventions still apply to non-test code imported by tests.
+- Avoid `!` non-null assertions; prefer explicit checks or flow-sensitive typing.
 - Avoid mocks in tests; assert on results or check the database for side effects.
 - Prefer clear names over comments. Only comment things not obvious in context.
 - When the linter flags an unused variable, investigate the root cause — do not blindly prefix with `_`.

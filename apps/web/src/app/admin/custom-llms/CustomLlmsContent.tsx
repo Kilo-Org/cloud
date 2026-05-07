@@ -27,9 +27,12 @@ import {
 } from '@/app/admin/api/custom-llms/hooks';
 import { CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { deepStrict } from '@/lib/zod/deep-strict';
 import { toast } from 'sonner';
 import { Plus, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';
+
+const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
 
 type EditorState = {
   open: boolean;
@@ -101,7 +104,7 @@ export function CustomLlmsContent() {
       return;
     }
 
-    const result = CustomLlmDefinitionSchema.strict().safeParse(parsed);
+    const result = StrictCustomLlmDefinitionSchema.safeParse(parsed);
     if (!result.success) {
       const messages = result.error.issues
         .map(issue => `${issue.path.join('.')}: ${issue.message}`)

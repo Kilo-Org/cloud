@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { CodeReviewPayload } from '../triggers/prepare-review-payload';
 import { CODE_REVIEW_WORKER_AUTH_TOKEN } from '@/lib/config.server';
+import * as z from 'zod';
 
 // Fetch timeout in milliseconds
 const FETCH_TIMEOUT_MS = 10000;
@@ -61,6 +62,23 @@ export type CancelReviewResponse = {
   success: boolean;
   reviewId: string;
 };
+
+const ReviewStatusResponseSchema = z.object({
+  reviewId: z.string(),
+  status: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+  sessionId: z.string().optional(),
+  cliSessionId: z.string().optional(),
+  startedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+  model: z.string().optional(),
+  totalTokensIn: z.number().optional(),
+  totalTokensOut: z.number().optional(),
+  totalCost: z.number().optional(),
+  errorMessage: z.string().optional(),
+  terminalReason: z.string().optional(),
+});
+
+export type ReviewStatusResponse = z.infer<typeof ReviewStatusResponseSchema>;
 
 /**
  * Code Review Worker API Client
@@ -146,6 +164,23 @@ class CodeReviewWorkerClient {
     }
 
     return response.json() as Promise<CancelReviewResponse>;
+  }
+
+  async getReviewStatus(reviewId: string): Promise<ReviewStatusResponse | null> {
+    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/status`, {
+      headers: this.getHeaders(),
+    });
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch review status: ${response.status} ${errorText}`);
+    }
+
+    return ReviewStatusResponseSchema.parse(await response.json());
   }
 }
 

@@ -25,7 +25,7 @@ export function buildTriageSystemPrompt(pendingRequests: TriageRequestBead[]): s
           ? JSON.stringify(meta.context, null, 2)
           : (req.body ?? 'No additional context');
 
-      return `${i + 1}. [${triageType}] ${req.title}
+      return /* md */ `${i + 1}. [${triageType}] ${req.title}
    Triage request ID: ${req.bead_id}
    Context:
 ${context
@@ -36,7 +36,7 @@ ${context
     })
     .join('\n\n');
 
-  return `You are a Gastown triage agent. Your job is to assess ambiguous situations
+  return /* md */ `You are a Gastown triage agent. Your job is to assess ambiguous situations
 that the mechanical patrol checks could not resolve automatically.
 
 You will be given a list of situations. For each one:

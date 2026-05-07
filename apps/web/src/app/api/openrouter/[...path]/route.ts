@@ -2,7 +2,8 @@ import { NextResponse, type NextResponse as NextResponseType } from 'next/server
 import { type NextRequest } from 'next/server';
 import { isOpenCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
-import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/ai-gateway/processUsage';
+import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
+import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
 import {
   validateFeatureHeader,
   FEATURE_HEADER,
@@ -15,13 +16,11 @@ import type {
   GatewayMessagesRequest,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  applyProviderSpecificLogic,
-  getProvider,
-  openRouterRequest,
-} from '@/lib/ai-gateway/providers';
+import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
+import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
-import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
+import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
@@ -40,9 +39,11 @@ import {
   featureExclusiveModelResponse,
   invalidPathResponse,
   invalidRequestResponse,
+  malformedJsonResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
+  noFreeModelsAvailableResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
@@ -81,12 +82,10 @@ import {
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
-import { isKiloAutoModel } from '@/lib/kilo-auto';
-import { applyResolvedAutoModel } from '@/lib/kilo-auto/resolution';
+import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
+import { applyResolvedAutoModel } from '@/lib/ai-gateway/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
-import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
-import { extractResponsesPromptInfo } from '@/lib/ai-gateway/processUsage.responses';
-import { extractMessagesPromptInfo } from '@/lib/ai-gateway/processUsage.messages';
+import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import {
   enableReasoningSummaries,
   fixResponsesRequest,
@@ -120,16 +119,6 @@ function validatePath(
     return { path: pathSuffix };
   }
   return { errorResponse: invalidPathResponse() };
-}
-
-function extractPromptInfo(requestBodyParsed: GatewayRequest): PromptInfo {
-  if (requestBodyParsed.kind === 'messages') {
-    return extractMessagesPromptInfo(requestBodyParsed.body);
-  }
-  if (requestBodyParsed.kind === 'responses') {
-    return extractResponsesPromptInfo(requestBodyParsed.body);
-  }
-  return extractChatCompletionsPromptInfo(requestBodyParsed.body);
 }
 
 async function resolveRateLimit(
@@ -191,11 +180,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestBodyParsed = { kind: 'responses', body };
     }
   } catch (e) {
-    captureException(e, {
-      extra: { requestBodyText },
-      tags: { source: 'openrouter-proxy' },
-    });
-    return invalidRequestResponse();
+    return malformedJsonResponse(e);
   }
 
   delete requestBodyParsed.body.models; // OpenRouter specific field we do not support
@@ -221,10 +206,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
-  const isLegacyOpenRouterPath = url.pathname.includes('/openrouter');
 
   const feature = validateFeatureHeader(
-    request.headers.get(FEATURE_HEADER) || (isLegacyOpenRouterPath ? '' : 'direct-gateway')
+    request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
   );
 
   const authPromise = getUserFromAuth({ adminOnly: false });
@@ -242,7 +226,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
-    await applyResolvedAutoModel(
+    const autoResult = await applyResolvedAutoModel(
       {
         model: requestedModelLowerCased,
         modeHeader,
@@ -255,6 +239,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       authPromise.then(res => res.user),
       balanceAndSettingsPromise.then(res => res.balance)
     );
+    if (autoResult.kind === 'no_free_models_available') {
+      return noFreeModelsAvailableResponse();
+    }
   }
 
   const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
@@ -280,7 +267,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // Server-side products (cloud-agent, code-review, app-builder) rate-limit
   // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
   // All other products rate-limit per IP (fast pre-auth path).
-  if (isKiloExclusiveFreeModel(originalModelIdLowerCased)) {
+  const isRateLimitedFreeModelRequest =
+    isKiloExclusiveFreeModel(originalModelIdLowerCased) || autoModel === KILO_AUTO_FREE_MODEL.id;
+  if (isRateLimitedFreeModelRequest) {
     const rateLimit = await resolveRateLimit(feature, ipAddress, authPromise);
     if (rateLimit instanceof NextResponse) return rateLimit;
 
@@ -373,7 +362,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   // Log to free_model_usage for rate limiting (at request start, before processing)
-  if (isKiloExclusiveFreeModel(originalModelIdLowerCased)) {
+  if (isRateLimitedFreeModelRequest) {
     await logFreeModelRequest(
       ipAddress,
       originalModelIdLowerCased,
@@ -470,8 +459,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
 
     // Organization model/provider restrictions check
-    // Model allow list only applies to Enterprise plans
-    // Provider allow list applies to Enterprise plans; data collection applies to all plans
+    // Provider/model access policy applies to Enterprise plans; data collection applies to all plans.
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
       modelId: originalModelIdLowerCased,
       settings,
@@ -490,7 +478,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   const openrouterRequestSpan = startInactiveSpan({
-    name: 'openrouter-request-start',
+    name: 'upstream-request-start',
     op: 'http.client',
   });
 
@@ -530,10 +518,11 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     originalModelIdLowerCased,
     requestBodyParsed,
     extraHeaders,
-    userByok
+    userByok,
+    fraudHeaders
   );
 
-  const response = await openRouterRequest({
+  const response = await upstreamRequest({
     path,
     search: url.search,
     method: request.method,

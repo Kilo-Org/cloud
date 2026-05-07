@@ -94,10 +94,12 @@ Control how the three processes are displayed with `--display <mode>`:
 
 ### Other flags
 
-| Flag                       | Description                                          |
-| -------------------------- | ---------------------------------------------------- |
-| `--has-controller-changes` | Build and push a new Docker image before starting    |
-| `--tunnel-name <name>`     | Use a named Cloudflare tunnel instead of a quick one |
+| Flag                          | Description                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| `--has-controller-changes`    | Build and push a new Docker image before starting                              |
+| `--local-openclaw-image`      | Build and push with `Dockerfile.local` and one local OpenClaw tarball          |
+| `--production-openclaw-image` | Use the production `Dockerfile` even when `.dev.vars` records local image mode |
+| `--tunnel-name <name>`        | Use a named Cloudflare tunnel instead of a quick one                           |
 
 ### Script configuration
 
@@ -208,16 +210,17 @@ KiloClaw uses the KiloCode provider only.
 
 ### Fly.io
 
-| Variable           | Description                                                                             | Source       | Auto-managed |
-| ------------------ | --------------------------------------------------------------------------------------- | ------------ | ------------ |
-| `FLY_API_TOKEN`    | Fly org token                                                                           | dev-start.sh | Yes          |
-| `FLY_ORG_SLUG`     | Fly org slug (read by script for token creation)                                        | Example      | No           |
-| `FLY_REGISTRY_APP` | Shared Fly app that holds Docker images (e.g., `kiloclaw-dev`)                          | Example      | No           |
-| `FLY_APP_NAME`     | Legacy fallback app name for existing instances (may be removed in future)              | Example      | No           |
-| `FLY_REGION`       | Region priority list, e.g. `us,eu`. Tries US first, falls back to EU, then gives up.    | Example      | No           |
-| `FLY_IMAGE_TAG`    | Docker image tag. Set automatically by `scripts/push-dev.sh`, or use `latest` to start. | push-dev.sh  | Yes          |
-| `FLY_IMAGE_DIGEST` | Docker image digest. Set automatically by `scripts/push-dev.sh`.                        | push-dev.sh  | Yes          |
-| `OPENCLAW_VERSION` | OpenClaw version in the image. Set automatically by `scripts/push-dev.sh`.              | push-dev.sh  | Yes          |
+| Variable                 | Description                                                                             | Source       | Auto-managed |
+| ------------------------ | --------------------------------------------------------------------------------------- | ------------ | ------------ |
+| `FLY_API_TOKEN`          | Fly org token                                                                           | dev-start.sh | Yes          |
+| `FLY_ORG_SLUG`           | Fly org slug (read by script for token creation)                                        | Example      | No           |
+| `FLY_REGISTRY_APP`       | Shared Fly app that holds Docker images (e.g., `kiloclaw-dev`)                          | Example      | No           |
+| `FLY_APP_NAME`           | Legacy fallback app name for existing instances (may be removed in future)              | Example      | No           |
+| `FLY_REGION`             | Region priority list, e.g. `us,eu`. Tries US first, falls back to EU, then gives up.    | Example      | No           |
+| `FLY_IMAGE_TAG`          | Docker image tag. Set automatically by `scripts/push-dev.sh`, or use `latest` to start. | push-dev.sh  | Yes          |
+| `FLY_IMAGE_DIGEST`       | Docker image digest. Set automatically by `scripts/push-dev.sh`.                        | push-dev.sh  | Yes          |
+| `FLY_IMAGE_CONTENT_MODE` | Image hash mode, `production` or `local`. Set automatically by `scripts/push-dev.sh`.   | push-dev.sh  | Yes          |
+| `OPENCLAW_VERSION`       | OpenClaw version in the image. Set automatically by `scripts/push-dev.sh`.              | push-dev.sh  | Yes          |
 
 `FLY_IMAGE_TAG`, `FLY_IMAGE_DIGEST`, and `OPENCLAW_VERSION` together control
 what version gets deployed by default for your dev instances. The build script
@@ -269,12 +272,34 @@ user-provided encrypted secrets and channel tokens are silently skipped.
 
 ### Optional
 
-| Variable                   | Description                                        |
-| -------------------------- | -------------------------------------------------- |
-| `KILOCODE_API_BASE_URL`    | Override KiloCode API base URL (dev only)          |
-| `CDP_SECRET`               | Shared secret for CDP browser automation endpoints |
-| `WORKER_URL`               | Public URL of the worker (required for CDP)        |
-| `OPENCLAW_ALLOWED_ORIGINS` | Comma-separated origins for WebSocket connections  |
+| Variable                        | Description                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------------- |
+| `KILOCODE_API_BASE_URL`         | Override KiloCode API base URL (dev only)                                     |
+| `CDP_SECRET`                    | Shared secret for CDP browser automation endpoints                            |
+| `WORKER_URL`                    | Public URL of the worker (required for CDP)                                   |
+| `OPENCLAW_ALLOWED_ORIGINS`      | Comma-separated origins for WebSocket connections                             |
+| `KILOCLAW_INSTANCE_HOST_SUFFIX` | Per-instance host suffix. Prod: `.kiloclaw.ai`. Required (no silent default). |
+| `KILOCLAW_INSTANCE_URL_SCHEME`  | URL scheme paired with the suffix. Prod: `https`. Required.                   |
+
+### Per-instance host routing (`*.kiloclaw.ai`)
+
+The worker proxies `<label>.kiloclaw.ai` requests by `Host` header to the
+owning instance DO. `<label>` is derived deterministically from the
+sandboxId (`i-{hex}` for instance-keyed, `u-{base32hex}` for legacy). The
+two env vars above feed three call sites: the catch-all host parser, the
+per-instance origin injector in `buildEnvVars` (machines' OpenClaw
+origin allowlist), and the Next.js link generator (in progress).
+
+**Dev parity (optional).** Setting `KILOCLAW_INSTANCE_HOST_SUFFIX=.kiloclaw.localhost:8795`
+and `KILOCLAW_INSTANCE_URL_SCHEME=http` in `.dev.vars` emulates the
+production routing locally. `.kiloclaw.localhost` auto-resolves to
+`127.0.0.1` per RFC 6761 on all modern OSes/browsers — no `/etc/hosts`
+entry, no TLS cert, no reverse proxy needed. Then open
+`http://i-<hex>.kiloclaw.localhost:8795/` to route through the host
+branch. Leaving the default prod values is also fine: the
+localhost-hosted dev worker never sees a Host header matching
+`.kiloclaw.ai`, so host-based routing stays inert and traffic falls
+through to the path-based flow.
 
 ### `.env.local` (Next.js, monorepo root)
 
@@ -344,6 +369,34 @@ The image is large, so pushes are slow. After pushing, restart the worker
 dashboard. A restart is sufficient to pick up the new image — you only need to
 destroy and re-provision if the volume or Fly app config changed.
 
+### Promoting a published image (required step)
+
+> **Publishing no longer auto-promotes to `:latest`.** A newly published image
+> is registered in the catalog at `rollout_percent = 0` and `is_latest = false`.
+> Until you promote it, it is **not served to any instance**.
+
+After pushing/publishing a new image, choose one of:
+
+1. **Full immediate rollout (typical for hotfixes):** open
+   `/admin/kiloclaw?tab=versions`, find your row, click **Make :latest**.
+   Confirms with a dialog, then atomically demotes the previous `:latest`
+   and your image becomes the new baseline. Every new instance and unpinned
+   upgrade picks it up.
+
+2. **Staged rollout (typical for risky changes):** open the same page, click
+   **Start rollout** on your row, enter an initial percent (e.g. `20`).
+   Instances whose deterministic SHA-256 bucket falls below the percent will
+   be offered the upgrade. Slide higher over time as confidence grows. When
+   the slider hits `100`, a modal asks if you want to promote to `:latest` —
+   confirm to close the rollout.
+
+If neither happens, the image sits dormant. The Versions admin page surfaces
+a yellow warning at the top listing any unpromoted images newer than the
+current `:latest`, so it's hard to miss.
+
+`POST /api/platform/publish-image-version` returns a `promotionHint` field
+in its JSON response that says the same thing — useful for CI log output.
+
 ### When do I need to push a new image?
 
 The Docker image bundles the **Node controller** (`controller/src/`) and
@@ -396,6 +449,17 @@ won't be committed.
 This uses `Dockerfile.local` instead of the default `Dockerfile`. The script
 validates that a tarball exists in `openclaw-build/` before building. Everything
 else (tagging, pushing, `.dev.vars` updates) works the same as a normal push.
+
+`push-dev.sh --local` records `FLY_IMAGE_CONTENT_MODE=local` in `.dev.vars`.
+Normal `dev-start.sh` runs preserve that mode, hash `Dockerfile.local` plus the
+selected tarball, and call `push-dev.sh --local` if the local image inputs
+change. You can also opt in explicitly with `./scripts/dev-start.sh
+--local-openclaw-image` or set `LOCAL_OPENCLAW_IMAGE=true` in
+`scripts/.dev-start.conf`.
+
+To switch back to the production OpenClaw package, run `./scripts/push-dev.sh`
+once or pass `--production-openclaw-image` to `dev-start.sh` when intentionally
+rebuilding the production image.
 
 ### 4. Deploy
 
@@ -546,8 +610,8 @@ User browser ──[JWT cookie]──> catch-all proxy ───┤
   and calls an RPC method.
 - **User routes** (`/api/kiloclaw/*`): JWT cookie auth. Returns user's config/status.
 - **Catch-all proxy**: JWT cookie auth. Resolves the user's per-user sandbox and
-  proxies HTTP/WebSocket to the OpenClaw gateway inside the container. Auto-recovers
-  crashed instances on the next request.
+  proxies HTTP/WebSocket to the OpenClaw gateway inside the container. Unexpected
+  stopped-machine recovery is handled by the reconciliation alarm, not by proxy requests.
 - **Admin routes** (`/api/admin/*`): JWT cookie auth. Storage sync, gateway restart.
   Delegates to the DO via RPC.
 

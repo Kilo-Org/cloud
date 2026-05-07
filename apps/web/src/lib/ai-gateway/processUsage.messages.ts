@@ -15,6 +15,7 @@ import {
   computeOpenRouterCostFields,
   computeVercelCostMicrodollars,
   drainSseStream,
+  extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
 import type Anthropic from '@anthropic-ai/sdk';
 
@@ -61,7 +62,7 @@ export function processMessagesApiUsage(
       cacheHitTokens,
       cacheWriteTokens,
       cost_mUsd,
-      is_byok: null,
+      is_byok: extractVercelIsByok(vercelGateway),
     };
   }
 
@@ -180,6 +181,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     generation_time: null,
     streamed: true,
     cancelled: null,
+    status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
@@ -216,6 +218,7 @@ export function parseMessagesMicrodollarUsageFromString(
     generation_time: null,
     streamed: false,
     cancelled: null,
+    status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);

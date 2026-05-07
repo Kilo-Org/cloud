@@ -1,0 +1,31 @@
+{
+  "name": "@kilocode/kilo-chat-hooks",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "@tanstack/react-query": "*"
+  },
+  "dependencies": {
+    "@kilocode/kilo-chat": "workspace:*",
+    "@kilocode/event-service": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "react": "^19.2.4",
+    "@tanstack/react-query": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "~3.2.4"
+  }
+}

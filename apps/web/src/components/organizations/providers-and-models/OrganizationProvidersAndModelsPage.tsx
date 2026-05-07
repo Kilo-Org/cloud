@@ -139,14 +139,33 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     rows.sort(compareRecommendedThenSourceIndex);
     return rows;
   }, [openRouterModels, preferredIndexByModelId, providerIndex]);
+
+  const initialModelDenyList = organizationData?.settings?.model_deny_list ?? [];
+
+  const initialProviderAllowList = useMemo(() => {
+    if (!organizationData) return [];
+    if (organizationData.settings?.provider_allow_list !== undefined) {
+      return organizationData.settings.provider_allow_list;
+    }
+    return selectors.allProviderSlugsWithEndpoints;
+  }, [organizationData, selectors.allProviderSlugsWithEndpoints]);
+
   useEffect(() => {
     if (!organizationData) return;
+    if (isOpenRouterLoading) return;
     if (state.status === 'ready') return;
     actions.initFromServer({
-      modelDenyList: organizationData.settings?.model_deny_list ?? [],
-      providerDenyList: organizationData.settings?.provider_deny_list ?? [],
+      modelDenyList: initialModelDenyList,
+      providerAllowList: initialProviderAllowList,
     });
-  }, [actions, organizationData, state.status]);
+  }, [
+    actions,
+    initialModelDenyList,
+    initialProviderAllowList,
+    isOpenRouterLoading,
+    organizationData,
+    state.status,
+  ]);
 
   const enabledProviderSlugs = selectors.enabledProviderSlugs;
   const allowedModelIds = selectors.allowedModelIds;
@@ -184,7 +203,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       await updateOrganizationSettings.mutateAsync({
         organizationId,
         model_deny_list: state.draftModelDenyList,
-        provider_deny_list: state.draftProviderDenyList,
+        provider_allow_list: state.draftProviderAllowList,
       });
 
       actions.markSaved();

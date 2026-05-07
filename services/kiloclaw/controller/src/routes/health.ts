@@ -8,11 +8,72 @@ import { getOpenclawVersion } from '../openclaw-version';
 
 export { parseOpenclawVersion } from '../openclaw-version';
 
+export type KiloChatHealthState = {
+  status: 'ok' | 'degraded' | 'unreachable';
+  lastCheckedAt: number;
+};
+
+export type KiloChatHealthProbe = {
+  getHealth(): KiloChatHealthState;
+  stop(): void;
+};
+
+export function startKiloChatHealthProbe(options: {
+  kiloChatBaseUrl: string;
+  intervalMs?: number;
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
+}): KiloChatHealthProbe {
+  const fetchFn = options.fetchImpl ?? fetch;
+  const intervalMs = options.intervalMs ?? 30_000;
+  const timeoutMs = options.timeoutMs ?? 5_000;
+
+  let state: KiloChatHealthState = {
+    status: 'unreachable',
+    lastCheckedAt: 0,
+  };
+
+  async function check(): Promise<void> {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetchFn(`${options.kiloChatBaseUrl}/health`, {
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          state = { status: 'ok', lastCheckedAt: Date.now() };
+        } else {
+          state = { status: 'degraded', lastCheckedAt: Date.now() };
+          console.warn(`[kilo-chat health] degraded: HTTP ${response.status}`);
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch (err) {
+      state = { status: 'unreachable', lastCheckedAt: Date.now() };
+      console.warn(
+        `[kilo-chat health] unreachable: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  // Run first check immediately
+  void check();
+  const timer = setInterval(() => void check(), intervalMs);
+
+  return {
+    getHealth: () => state,
+    stop: () => clearInterval(timer),
+  };
+}
+
 export function registerHealthRoute(
   app: Hono,
   supervisor: Supervisor | null,
   expectedToken?: string,
-  stateRef?: ControllerStateRef
+  stateRef?: ControllerStateRef,
+  kiloChatHealth?: KiloChatHealthProbe
 ): void {
   // Eagerly resolve so the first /_kilo/version request doesn't wait on the subprocess.
   void getOpenclawVersion();
@@ -55,6 +116,7 @@ export function registerHealthRoute(
       openclawCommit: openclaw.commit,
       gateway: supervisor?.getStats() ?? null,
       ...(stateRef ? { controllerState: stateRef.current } : {}),
+      ...(kiloChatHealth ? { kiloChatHealth: kiloChatHealth.getHealth() } : {}),
     });
   });
 }

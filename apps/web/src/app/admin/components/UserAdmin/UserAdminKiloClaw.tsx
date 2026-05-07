@@ -11,6 +11,7 @@ import {
   CreditCard,
   ExternalLink,
   History,
+  Rocket,
   Wallet,
 } from 'lucide-react';
 import type { inferRouterOutputs } from '@trpc/server';
@@ -30,6 +31,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioButtonGroup } from '@/components/ui/RadioGroup';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTRPC } from '@/lib/trpc/utils';
 import { formatDate, formatRelativeTime } from '@/lib/admin-utils';
@@ -320,6 +322,79 @@ function PaymentSourceLabel({ sub }: { sub: Subscription }) {
     );
   }
   return <span className="text-xs text-muted-foreground">No payment source</span>;
+}
+
+// ---------------------------------------------------------------------------
+// Early Access — canonical per-user toggle. The instance admin page mirrors
+// this read-only and links here, since the underlying flag lives on the user.
+// ---------------------------------------------------------------------------
+
+function EarlyAccessRow({ userId, initialValue }: { userId: string; initialValue: boolean }) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [optimistic, setOptimistic] = useState(initialValue);
+
+  // Reset to server value if the parent's data refreshes (e.g. cache invalidate
+  // from another admin tab). useState's initializer runs only on mount.
+  useEffect(() => {
+    setOptimistic(initialValue);
+  }, [initialValue]);
+
+  const { mutateAsync, isPending } = useMutation(
+    trpc.admin.kiloclawInstances.setEarlyAccess.mutationOptions({
+      onSuccess: result => {
+        toast.success(
+          result.earlyAccess
+            ? 'Early Access enabled for this user'
+            : 'Early Access disabled for this user'
+        );
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.users.getKiloClawState.queryKey({ userId }),
+        });
+      },
+      onError: err => {
+        setOptimistic(initialValue);
+        toast.error(`Failed to update Early Access: ${err.message}`);
+      },
+    })
+  );
+
+  return (
+    <div className="rounded-lg border bg-card/40 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <Rocket className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0">
+            <h4 className="text-sm font-medium">Early Access</h4>
+            <p className="text-muted-foreground text-xs">
+              Offers this user the newest available image (including any in-flight rollout
+              candidate) across all of their instances. Per-instance pins still take precedence.
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Switch
+            checked={optimistic}
+            disabled={isPending}
+            onCheckedChange={next => {
+              setOptimistic(next);
+              void mutateAsync({ userId, value: next });
+            }}
+            aria-label="Early Access"
+          />
+          <span className="text-sm">
+            {isPending ? (
+              <span className="text-muted-foreground">Saving…</span>
+            ) : optimistic ? (
+              <span className="font-medium text-green-500">Enabled</span>
+            ) : (
+              <span className="text-muted-foreground">Disabled</span>
+            )}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1275,6 +1350,8 @@ export function UserAdminKiloClaw({ userId }: { userId: string }) {
           ) : null}
 
           {subscriptions.length > 0 ? <SummaryStrip state={data} effective={effective} /> : null}
+
+          <EarlyAccessRow userId={userId} initialValue={data.kiloclawEarlyAccess} />
 
           {effective?.status === 'past_due' ? <PastDueBanner sub={effective} /> : null}
 

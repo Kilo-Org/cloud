@@ -97,6 +97,23 @@ export function redactOpaqueTrackingValueForLogs(value: string | null | undefine
   return `${normalized.slice(0, 4)}…${normalized.slice(-4)}`;
 }
 
+export function redactLandingPathForLogs(value: string | null | undefined): string | null {
+  const normalized = normalizeInput(value);
+  if (!normalized) return null;
+
+  try {
+    const url = new URL(normalized, 'http://localhost');
+    const redactedSearchParams = new URLSearchParams();
+    for (const [key] of url.searchParams) {
+      redactedSearchParams.append(key, 'redacted');
+    }
+    const search = redactedSearchParams.toString();
+    return `${url.pathname}${search ? `?${search}` : ''}`;
+  } catch {
+    return '[redacted: invalid landing path]';
+  }
+}
+
 export function parseImpactReferralTouchFromUrl(
   candidateUrl: string | URL,
   now: Date = new Date()

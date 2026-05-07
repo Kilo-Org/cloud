@@ -1025,20 +1025,22 @@ async function enqueueAffiliateEvent(
   );
 }
 
+type PaidConversionParams = {
+  userId: string;
+  dedupeKey: string;
+  eventDateIso: string;
+  orderId: string;
+  amount: number;
+  currencyCode: string;
+  itemCategory: string;
+  itemName: string;
+  itemSku?: string;
+};
+
 async function processPaidConversion(
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
-  params: {
-    userId: string;
-    dedupeKey: string;
-    eventDateIso: string;
-    orderId: string;
-    amount: number;
-    currencyCode: string;
-    itemCategory: string;
-    itemName: string;
-    itemSku?: string;
-  }
+  params: PaidConversionParams
 ): Promise<void> {
   await callBillingSideEffect(
     env,
@@ -1049,6 +1051,22 @@ async function processPaidConversion(
     },
     { userId: params.userId }
   );
+}
+
+async function processPaidConversionBestEffort(
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  params: PaidConversionParams
+): Promise<void> {
+  try {
+    await processPaidConversion(env, context, params);
+  } catch (error) {
+    log('error', 'Paid conversion side effect failed after credit renewal', {
+      userId: params.userId,
+      dedupeKey: params.dedupeKey,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 async function autoResumeIfSuspended(
@@ -1349,7 +1367,7 @@ async function processCreditRenewalRow(
     });
 
     if (!deductionIsNew) {
-      await processPaidConversion(env, context, {
+      await processPaidConversionBestEffort(env, context, {
         userId,
         dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
         eventDateIso: renewalAt,
@@ -1402,25 +1420,17 @@ async function processCreditRenewalRow(
       });
     }
 
-    try {
-      await processPaidConversion(env, context, {
-        userId,
-        dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
-        eventDateIso: renewalAt,
-        orderId: deductionCategory,
-        amount: costMicrodollars / 1_000_000,
-        currencyCode: 'usd',
-        itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
-        itemName: getKiloClawAffiliateItemName(effectivePlan),
-        itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
-      });
-    } catch (error) {
-      await database
-        .update(kiloclaw_subscriptions)
-        .set({ credit_renewal_at: renewalAt })
-        .where(eq(kiloclaw_subscriptions.id, row.id));
-      throw error;
-    }
+    await processPaidConversionBestEffort(env, context, {
+      userId,
+      dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
+      eventDateIso: renewalAt,
+      orderId: deductionCategory,
+      amount: costMicrodollars / 1_000_000,
+      currencyCode: 'usd',
+      itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
+      itemName: getKiloClawAffiliateItemName(effectivePlan),
+      itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
+    });
 
     summary.credit_renewals++;
     return;

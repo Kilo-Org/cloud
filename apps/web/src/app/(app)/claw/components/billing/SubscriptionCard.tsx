@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { useTRPC } from '@/lib/trpc/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -192,8 +193,15 @@ function ActiveSubscriptionCard({
     void (async () => {
       try {
         await activeConfirmation.run();
-        await invalidate();
         setConfirmationAction(null);
+        try {
+          await invalidate();
+        } catch (error) {
+          console.error('[kiloclaw-billing] failed to refresh after confirmation action', error);
+          toast.error('Action completed, but billing did not refresh. Refresh the page.');
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Action failed. Try again.');
       } finally {
         setPendingAction(null);
       }

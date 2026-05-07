@@ -423,20 +423,14 @@ async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): P
     try {
       const callbackUrl = new URL(callbackUrlCookie, 'http://localhost');
       const referralTouch = parseImpactReferralTouchFromUrl(callbackUrl);
-      const urlImRefParam = callbackUrl.searchParams.get('im_ref')?.trim() || null;
-      const ignoreUrlImRefForReferralTouch = Boolean(
-        referralTouch?.opaqueTrackingValue && urlImRefParam
-      );
-      const affiliateTouch = ignoreUrlImRefForReferralTouch
-        ? null
-        : parseImpactAffiliateTouchFromUrl(callbackUrl);
+      const affiliateTouch = parseImpactAffiliateTouchFromUrl(callbackUrl);
 
       logImpactReferralDebug('Auth flow parsed Impact tracking context from callback URL cookie', {
         affiliateTouchPresent: Boolean(affiliateTouch),
         referralTouchPresent: Boolean(referralTouch),
         referralCookieValuePresent: Boolean(referralTouch?.opaqueTrackingValue),
         affiliateTrackingIdPresent: Boolean(affiliateTouch?.trackingId?.trim()),
-        ignoredUrlImRefForReferralTouch: ignoreUrlImRefForReferralTouch,
+        urlImRefParamPresent: Boolean(callbackUrl.searchParams.get('im_ref')?.trim()),
         callbackPath: callbackUrl.pathname,
       });
 

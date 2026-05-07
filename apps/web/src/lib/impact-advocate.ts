@@ -137,12 +137,45 @@ export type ImpactAdvocateRewardListResult = ImpactAdvocateDispatchResult & {
   rewards?: unknown[];
 };
 
+function redactAdvocateEmailIdentityForLog(value: string | null | undefined): string | null {
+  return value?.trim() ? '[omitted: email identity is PII]' : null;
+}
+
+function truncateAndRedactAdvocateResponseForLog(value: string | null | undefined): string | null {
+  return (
+    truncateForLog(value)?.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]') ??
+    null
+  );
+}
+
 function getDebuggableRegisterParticipantPayload(
   payload: ImpactAdvocateRegisterParticipantPayload
 ) {
   return {
-    ...payload,
+    id: redactAdvocateEmailIdentityForLog(payload.id),
+    accountId: redactAdvocateEmailIdentityForLog(payload.accountId),
+    email: redactAdvocateEmailIdentityForLog(payload.email),
     cookies: '[omitted: cookie value is sensitive]',
+    firstName: payload.firstName ? '[omitted: name is PII]' : undefined,
+    lastName: payload.lastName ? '[omitted: name is PII]' : undefined,
+    locale: payload.locale,
+    countryCode: payload.countryCode,
+    segments: payload.segments,
+    customFieldsPresent: payload.customFields ? true : undefined,
+  };
+}
+
+function getDebuggableVerifiedAccessTokenPayload(
+  payload: ImpactAdvocateVerifiedAccessTokenPayload
+): ImpactAdvocateVerifiedAccessTokenPayload {
+  return {
+    ...payload,
+    user: {
+      ...payload.user,
+      id: redactAdvocateEmailIdentityForLog(payload.user.id) ?? '',
+      accountId: redactAdvocateEmailIdentityForLog(payload.user.accountId) ?? '',
+      email: redactAdvocateEmailIdentityForLog(payload.user.email) ?? '',
+    },
   };
 }
 
@@ -331,6 +364,14 @@ function getImpactAdvocateRegisterParticipantUrl(
   return `${base}/api/v1/${tenant}/open/account/${accountId}/user/${userId}`;
 }
 
+function getDebuggableImpactAdvocateRegisterParticipantUrl(
+  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>
+): string {
+  const base = trimTrailingSlashes(IMPACT_ADVOCATE_API_BASE_URL);
+  const tenant = encodeURIComponent(config.tenantAlias);
+  return `${base}/api/v1/${tenant}/open/account/[redacted-account-id]/user/[redacted-user-id]`;
+}
+
 function getImpactAdvocateRewardsUrl(
   config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>,
   payload: ImpactAdvocateRewardLookupPayload
@@ -340,6 +381,19 @@ function getImpactAdvocateRewardsUrl(
   const url = new URL(`${base}/api/v1/${tenant}/reward`);
   url.searchParams.set('accountId', payload.accountId);
   if (payload.userId) url.searchParams.set('userId', payload.userId);
+  if (payload.rewardTypeFilter) url.searchParams.set('rewardTypeFilter', payload.rewardTypeFilter);
+  return url.toString();
+}
+
+function getDebuggableImpactAdvocateRewardsUrl(
+  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>,
+  payload: ImpactAdvocateRewardLookupPayload
+): string {
+  const base = trimTrailingSlashes(IMPACT_ADVOCATE_API_BASE_URL);
+  const tenant = encodeURIComponent(config.tenantAlias);
+  const url = new URL(`${base}/api/v1/${tenant}/reward`);
+  url.searchParams.set('accountId', 'redacted');
+  if (payload.userId) url.searchParams.set('userId', 'redacted');
   if (payload.rewardTypeFilter) url.searchParams.set('rewardTypeFilter', payload.rewardTypeFilter);
   return url.toString();
 }
@@ -371,7 +425,7 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
       payload as unknown as Record<string, unknown>
     );
     logImpactAdvocateDebug('[impact-advocate] sending register participant request', {
-      url,
+      url: getDebuggableImpactAdvocateRegisterParticipantUrl(config),
       method: 'PUT',
       headers: {
         Authorization: 'not_logged',
@@ -395,10 +449,10 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
 
     const responseBody = await response.text();
     logImpactAdvocateDebug('[impact-advocate] register participant response', {
-      url,
+      url: getDebuggableImpactAdvocateRegisterParticipantUrl(config),
       ok: response.ok,
       statusCode: response.status,
-      responseBody: truncateForLog(responseBody),
+      responseBody: truncateAndRedactAdvocateResponseForLog(responseBody),
     });
 
     if (response.ok) {
@@ -442,7 +496,7 @@ export async function sendImpactAdvocateRewardLookupPayload(
   try {
     const url = getImpactAdvocateRewardsUrl(config, payload);
     logImpactAdvocateDebug('[impact-advocate] sending reward lookup request', {
-      url,
+      url: getDebuggableImpactAdvocateRewardsUrl(config, payload),
       method: 'GET',
       accountIdPresent: Boolean(payload.accountId.trim()),
       userIdPresent: Boolean(payload.userId?.trim()),
@@ -459,10 +513,10 @@ export async function sendImpactAdvocateRewardLookupPayload(
     const responseBody = await response.text();
 
     logImpactAdvocateDebug('[impact-advocate] reward lookup response', {
-      url,
+      url: getDebuggableImpactAdvocateRewardsUrl(config, payload),
       ok: response.ok,
       statusCode: response.status,
-      responseBody: truncateForLog(responseBody),
+      responseBody: truncateAndRedactAdvocateResponseForLog(responseBody),
     });
 
     if (response.ok) {
@@ -533,7 +587,7 @@ export async function sendImpactAdvocateRewardRedemptionPayload(
       url,
       ok: response.ok,
       statusCode: response.status,
-      responseBody: truncateForLog(responseBody),
+      responseBody: truncateAndRedactAdvocateResponseForLog(responseBody),
     });
 
     if (response.ok) {
@@ -586,7 +640,7 @@ export function issueImpactAdvocateVerifiedAccessToken(
 
   logImpactAdvocateDebug('[impact-advocate] issued verified access token', {
     jwtHeader: header,
-    jwtPayload: payload,
+    jwtPayload: getDebuggableVerifiedAccessTokenPayload(payload),
     signOptions: {
       algorithm: options.algorithm,
       noTimestamp: options.noTimestamp,

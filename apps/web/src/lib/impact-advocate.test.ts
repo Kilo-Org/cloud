@@ -62,7 +62,7 @@ describe('impact advocate', () => {
     expect(getImpactAdvocateWidgetId()).toBe('p/51699/w/referrerWidget');
   });
 
-  it('logs debug data without tokens, credentials, authorization headers, or cookie values', async () => {
+  it('logs debug data without tokens, credentials, authorization headers, cookie values, or email identities', async () => {
     process.env.IMPACT_ADVOCATE_PROGRAM_ID = '51699';
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
@@ -87,8 +87,9 @@ describe('impact advocate', () => {
     const loggedData = JSON.stringify(logSpy.mock.calls);
     expect(loggedData).toContain('[impact-advocate] built register participant payload');
     expect(loggedData).toContain('[impact-advocate] issued verified access token');
-    expect(loggedData).toContain('referee@example.com');
-    expect(loggedData).toContain('referrer@example.com');
+    expect(loggedData).toContain('[omitted: email identity is PII]');
+    expect(loggedData).not.toContain('referee@example.com');
+    expect(loggedData).not.toContain('referrer@example.com');
     expect(loggedData).toContain('impact-account-sid');
     expect(loggedData).toContain('segmentLengths');
     expect(loggedData).toContain('[omitted: cookie value is sensitive]');
@@ -136,6 +137,8 @@ describe('impact advocate', () => {
     process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
     process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
     process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
+    process.env.IMPACT_ADVOCATE_DEBUG_LOGGING = 'true';
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify({ rewards: [{ id: 'reward-123', type: 'CREDIT' }] }), {
         status: 200,
@@ -167,6 +170,10 @@ describe('impact advocate', () => {
         Accept: 'application/json',
       }),
     });
+    const loggedData = JSON.stringify(logSpy.mock.calls);
+    expect(loggedData).toContain('accountId=redacted');
+    expect(loggedData).toContain('userId=redacted');
+    expect(loggedData).not.toContain('user@example.com');
   });
 
   it('redeems a credit reward with amount and unit', async () => {

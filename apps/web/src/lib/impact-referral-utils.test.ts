@@ -4,6 +4,7 @@ import {
   IMPACT_REFERRAL_TOUCH_VALIDITY_MS,
   parseImpactAffiliateTouchFromUrl,
   parseImpactReferralTouchFromUrl,
+  redactLandingPathForLogs,
   redactOpaqueTrackingValueForLogs,
   sanitizeOpaqueTrackingValue,
 } from '@/lib/impact-referral-utils';
@@ -30,6 +31,14 @@ describe('impact referral utils', () => {
     expect(redactOpaqueTrackingValueForLogs('abcd1234wxyz5678')).toBe('abcd…5678');
     expect(redactOpaqueTrackingValueForLogs('tiny')).toBe('[redacted]');
     expect(redactOpaqueTrackingValueForLogs(null)).toBeNull();
+  });
+
+  it('redacts landing path query values for logs', () => {
+    expect(
+      redactLandingPathForLogs('/get-started?_saasquatch=sq-cookie&rsCode=abc&utm_campaign=launch')
+    ).toBe('/get-started?_saasquatch=redacted&rsCode=redacted&utm_campaign=redacted');
+    expect(redactLandingPathForLogs('/get-started')).toBe('/get-started');
+    expect(redactLandingPathForLogs(null)).toBeNull();
   });
 
   it('parses referral touches and applies a 30 day expiry window', () => {

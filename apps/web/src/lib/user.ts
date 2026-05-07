@@ -98,9 +98,10 @@ import {
   recordImpactAffiliateTouch,
   recordImpactReferralTouch,
 } from '@/lib/impact-referral';
-import type {
-  ParsedImpactAffiliateTouch,
-  ParsedImpactReferralTouch,
+import {
+  redactLandingPathForLogs,
+  type ParsedImpactAffiliateTouch,
+  type ParsedImpactReferralTouch,
 } from '@/lib/impact-referral-utils';
 
 const workos = new WorkOS(WORKOS_API_KEY);
@@ -499,7 +500,7 @@ export async function createOrUpdateUser(
           logImpactReferralDebug('Signup recording Impact affiliate touch', {
             userId: inserted.id,
             anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
-            landingPath: trackingContext.affiliateTouch.landingPath,
+            landingPath: redactLandingPathForLogs(trackingContext.affiliateTouch.landingPath),
             trackingValueLength: trackingContext.affiliateTouch.trackingValueLength,
             isTrackingValueAccepted: trackingContext.affiliateTouch.isTrackingValueAccepted,
           });
@@ -522,7 +523,7 @@ export async function createOrUpdateUser(
           logImpactReferralDebug('Signup recording Impact Advocate referral touch', {
             userId: inserted.id,
             anonymousIdPresent: Boolean(trackingContext.anonymousId?.trim()),
-            landingPath: trackingContext.referralTouch.landingPath,
+            landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
             rsCodePresent: Boolean(trackingContext.referralTouch.rsCode?.trim()),
             trackingValueLength: trackingContext.referralTouch.trackingValueLength,
             isTrackingValueAccepted: trackingContext.referralTouch.isTrackingValueAccepted,
@@ -543,7 +544,7 @@ export async function createOrUpdateUser(
         try {
           logImpactReferralDebug('Signup queueing Impact Advocate participant registration', {
             userId: inserted.id,
-            landingPath: trackingContext.referralTouch.landingPath,
+            landingPath: redactLandingPathForLogs(trackingContext.referralTouch.landingPath),
             localePresent: Boolean(trackingContext.locale?.trim()),
             countryCode: trackingContext.countryCode ?? null,
           });

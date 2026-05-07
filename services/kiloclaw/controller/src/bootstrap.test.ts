@@ -1600,28 +1600,20 @@ describe('TOOLS.md section configs', () => {
     expect(section).not.toContain('OpenClaw Security Advisor');
   });
 
-  it('Process Model: pins systemd-not-PID-1 directives', () => {
+  it('Process Model: pins systemd ban directives', () => {
     const section = PROCESS_MODEL_SECTION_CONFIG.section;
     // The lede must be unambiguous so an agent skimming the section
     // does not skip past it.
-    expect(section).toContain('does NOT use systemd as its init system');
-    // PID 1 cases — local dev (controller as PID 1), Fly (/fly/init),
-    // and provider init shims. Pin all three so a drive-by edit cannot
-    // collapse this back into a single-environment claim.
-    expect(section).toContain('node /usr/local/bin/kiloclaw-controller.js');
-    expect(section).toContain('/fly/init');
-    expect(section).toContain('tini');
+    expect(section).toContain('does NOT use systemd');
     // Explain WHY systemctl exists on disk despite not being usable, so
     // the agent does not treat `which systemctl` as evidence systemd works.
-    expect(section).toContain('systemctl is-system-running');
-    expect(section).toContain('offline');
-    expect(section).toContain('System has not been booted with systemd as init system');
+    expect(section).toContain('which systemctl');
     // The ban list — agents must not propose any of these.
     expect(section).toContain('Do not suggest `systemctl`');
     expect(section).toContain('`journalctl`');
     expect(section).toContain('unit files');
     // Tell the agent where process management actually lives.
-    expect(section).toContain("controller's in-process supervisor");
+    expect(section).toContain('supervised by the controller');
   });
 
   it('Plugin Install: references the CLI command and plugins.allow field', () => {

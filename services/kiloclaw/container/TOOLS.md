@@ -40,14 +40,9 @@ The Kilo CLI (`kilo`) is an agentic coding assistant for the terminal, pre-confi
 
 ## Process Model
 
-KiloClaw does NOT use systemd as its init system, in any deployment.
+KiloClaw does NOT use systemd. Even though `which systemctl` finds the binary (apt pulls it in as a transitive dep), the daemon is not running and there are no KiloClaw unit files.
 
-- **PID 1 varies by deployment**, but is never systemd:
-  - Local dev (plain `docker run`): `node /usr/local/bin/kiloclaw-controller.js` — the controller daemon runs as PID 1 directly.
-  - Fly Machines (production today): `/fly/init` — Fly's own init shim, which then execs the controller as a child.
-  - Other providers: whatever init shim that platform injects (e.g. `tini`, `dumb-init`, or a provider-specific equivalent). The controller still runs as a child of that shim.
-- **`systemctl` and the `systemd` binary are present on disk** because apt pulls them in as transitive deps (chromium, dbus, etc.), but **the systemd daemon is NOT running** in any environment. `systemctl is-system-running` returns `offline`, and any `systemctl` call against a service fails with "System has not been booted with systemd as init system (PID 1). Can't operate."
-- **There are NO KiloClaw unit files anywhere.** Do not suggest `systemctl`, `journalctl`, `service ...`, unit files, or any init-based remediation — none of it will work.
-- `openclaw`, the gateway, and other long-running KiloClaw processes are managed by the **controller's in-process supervisor** (a Node module inside the controller daemon). To inspect or restart them, use the controller's APIs and logs, not init.
+- Do not suggest `systemctl`, `journalctl`, `service ...`, unit files, or any init-based remediation — none of it will work.
+- `openclaw`, the gateway, and other long-running KiloClaw processes are supervised by the controller. To inspect or restart them, use the controller's APIs and logs, not init.
 
 <!-- END:process-model -->

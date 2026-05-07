@@ -17,11 +17,18 @@ describe('GET /api/gateway/embedding-models', () => {
 
   test('catalog includes default model metadata and aliases', () => {
     expect(KILO_EMBEDDING_MODEL_CATALOG.defaultModel).toBe(KILO_DEFAULT_EMBEDDING_MODEL);
-    expect(getKiloEmbeddingModel('codestral-embed-2505')).toMatchObject({
+    expect(getKiloEmbeddingModel(KILO_DEFAULT_EMBEDDING_MODEL)).toMatchObject({
       id: KILO_DEFAULT_EMBEDDING_MODEL,
-      dimension: 1536,
+      dimension: 1024,
       scoreThreshold: 0.35,
     });
-    expect(normalizeKiloEmbeddingModelId('text-embedding-3-small')).toBe('openai/text-embedding-3-small');
+    expect(getKiloEmbeddingModel('codestral-embed-2505')).toMatchObject({
+      id: 'mistralai/codestral-embed-2505',
+      dimension: 256,
+      scoreThreshold: 0.35,
+    });
+    expect(normalizeKiloEmbeddingModelId('text-embedding-3-small')).toBe(
+      'openai/text-embedding-3-small'
+    );
   });
 });

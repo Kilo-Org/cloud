@@ -20,6 +20,7 @@ type AppStoreKiloPassPurchaseActionsDeps = {
   completeAppStorePurchase: (input: { signedTransactionJws: string }) => Promise<unknown>;
   finishTransaction: (params: { purchase: Purchase; isConsumable: false }) => Promise<void>;
   invalidateAfterCompletion: () => Promise<void> | void;
+  onPurchaseCompleted?: () => void;
   showError: (message: string) => void;
 };
 
@@ -46,12 +47,18 @@ function isUserCancelledPurchaseError(error: unknown): boolean {
 }
 
 export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurchaseActionsDeps) {
-  async function handlePurchaseSuccess(purchase: Purchase) {
+  async function handlePurchaseSuccess(
+    purchase: Purchase,
+    options: { notifyCompletion?: boolean } = {}
+  ) {
     try {
       const signedTransactionJws = getPurchaseToken(purchase);
       await deps.completeAppStorePurchase({ signedTransactionJws });
       await deps.invalidateAfterCompletion();
       await deps.finishTransaction({ purchase, isConsumable: false });
+      if (options.notifyCompletion ?? true) {
+        deps.onPurchaseCompleted?.();
+      }
     } catch (error) {
       deps.showError(error instanceof Error ? error.message : 'Failed to complete purchase.');
     }
@@ -80,14 +87,14 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
         purchases
           .filter(purchase => isRecoverableKiloPassPurchase(purchase))
           .map(async purchase => {
-            await handlePurchaseSuccess(purchase);
+            await handlePurchaseSuccess(purchase, { notifyCompletion: false });
           })
       );
     },
   };
 }
 
-export function useStoreKiloPassPurchase() {
+export function useStoreKiloPassPurchase(options: { onPurchaseCompleted?: () => void } = {}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
@@ -131,6 +138,7 @@ export function useStoreKiloPassPurchase() {
         completeAppStorePurchase: completeAppStorePurchase.mutateAsync,
         finishTransaction,
         invalidateAfterCompletion,
+        onPurchaseCompleted: options.onPurchaseCompleted,
         showError: message => {
           toast.error(message);
         },
@@ -139,6 +147,7 @@ export function useStoreKiloPassPurchase() {
       completeAppStorePurchase.mutateAsync,
       finishTransaction,
       invalidateAfterCompletion,
+      options.onPurchaseCompleted,
       requestPurchase,
     ]
   );

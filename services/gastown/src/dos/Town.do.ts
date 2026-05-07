@@ -2654,6 +2654,11 @@ export class TownDO extends DurableObject<Env> {
    * Called eagerly on page load so the terminal is available immediately
    * without requiring the user to send a message first.
    */
+  async getMayorAgentId(): Promise<string | null> {
+    const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
+    return mayor?.id ?? null;
+  }
+
   async ensureMayor(): Promise<{
     agentId: string;
     sessionStatus: 'idle' | 'active' | 'starting';

@@ -659,6 +659,22 @@ app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c
   return c.json({ success: true });
 });
 
+// ── Mayor Agent ID ──────────────────────────────────────────────────────
+// Returns the mayor's agent ID for a town so the container can prewarm
+// the mayor's SDK server during bootHydration. Protected by authMiddleware
+// (accepts container JWTs), not kiloAuthMiddleware.
+
+app.use('/api/towns/:townId/mayor-id', async (c: Context<GastownEnv, string>, next) =>
+  c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
+);
+
+app.get('/api/towns/:townId/mayor-id', async c => {
+  const townId = c.req.param('townId');
+  const town = getTownDOStub(c.env, townId);
+  const agentId = await town.getMayorAgentId();
+  return c.json({ success: true, agentId });
+});
+
 // ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for dashboard/user
 // routes. Container→worker routes use the agent JWT middleware instead
@@ -671,7 +687,7 @@ app.use('/api/users/*', async (c: Context<GastownEnv, string>, next) =>
 // Skip for container-registry and db-snapshot routes which use authMiddleware with container JWT support.
 app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => {
   const path = c.req.path;
-  if (path.includes('/container-registry') || path.includes('/db-snapshot')) {
+  if (path.includes('/container-registry') || path.includes('/db-snapshot') || path.includes('/mayor-id')) {
     return next();
   }
   await kiloAuthMiddleware(c, async () => {

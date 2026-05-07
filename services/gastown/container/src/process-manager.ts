@@ -11,7 +11,7 @@ import { z } from 'zod';
 import * as fs from 'node:fs/promises';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
-import { buildKiloConfigContent } from './agent-runner';
+import { buildKiloConfigContent, mayorWorkdirForTown } from './agent-runner';
 import {
   getCurrentTownConfig,
   getLastAppliedEnvVarKeys,
@@ -1136,6 +1136,7 @@ async function startAgentImpl(
     });
 
     // 1. Ensure SDK server is running for this workdir
+    const sdkExistedBefore = sdkInstances.has(workdir);
     const { client, port } = await ensureSDKServer(workdir, env);
     agent.serverPort = port;
     const tSdkDone = Date.now();
@@ -1143,7 +1144,8 @@ async function startAgentImpl(
       agentId: request.agentId,
       phase: 'sdk_ready',
       elapsedMs: tSdkDone - t0,
-      phaseMs: tSdkDone - tDbDone,
+      phaseMs: sdkExistedBefore ? 0 : tSdkDone - tDbDone,
+      prewarmed: sdkExistedBefore,
     });
 
     // Check if startup was cancelled while waiting for the SDK server
@@ -2542,6 +2544,100 @@ export async function stopAll(): Promise<void> {
   sdkInstances.clear();
 }
 
+async function fetchMayorAgentId(
+  townId: string,
+  apiUrl: string,
+  token: string
+): Promise<string | null> {
+  try {
+    const resp = await fetch(`${apiUrl}/api/towns/${townId}/mayor-id`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!resp.ok) {
+      console.log(`${MANAGER_LOG} fetchMayorAgentId: ${resp.status} for town ${townId}`);
+      return null;
+    }
+    const json: unknown = await resp.json();
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      'agentId' in json &&
+      typeof (json as { agentId: unknown }).agentId === 'string'
+    ) {
+      return (json as { agentId: string }).agentId;
+    }
+    return null;
+  } catch (err) {
+    console.warn(`${MANAGER_LOG} fetchMayorAgentId failed:`, err);
+    return null;
+  }
+}
+
+function buildPrewarmEnvFromProcessEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  const keys = [
+    'GASTOWN_API_URL',
+    'GASTOWN_CONTAINER_TOKEN',
+    'GASTOWN_TOWN_ID',
+    'KILOCODE_TOKEN',
+    'KILO_CONFIG_CONTENT',
+    'OPENCODE_CONFIG_CONTENT',
+    'GASTOWN_ORGANIZATION_ID',
+    'KILO_API_URL',
+    'KILO_OPENROUTER_BASE',
+    'KILO_TEST_HOME',
+    'XDG_DATA_HOME',
+  ];
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value) env[key] = value;
+  }
+  return env;
+}
+
+async function prewarmMayorSDK(
+  townId: string,
+  apiUrl: string,
+  token: string
+): Promise<void> {
+  const t0 = Date.now();
+
+  const mayorAgentId = await fetchMayorAgentId(townId, apiUrl, token);
+  if (!mayorAgentId) {
+    console.log(`${MANAGER_LOG} prewarmMayorSDK: no mayor agent for town ${townId}`);
+    return;
+  }
+
+  const workdir = mayorWorkdirForTown(townId);
+
+  await hydrateDbFromSnapshot(mayorAgentId, apiUrl, token, `mayor-${townId}`, townId);
+
+  const env = buildPrewarmEnvFromProcessEnv();
+
+  const existing = sdkInstances.get(workdir);
+  if (existing) {
+    log.info('mayor.prewarm_complete', {
+      agentId: mayorAgentId,
+      townId,
+      port: parseInt(new URL(existing.server.url).port),
+      durationMs: Date.now() - t0,
+      alreadyRunning: true,
+    });
+    return;
+  }
+
+  const { port } = await ensureSDKServer(workdir, env);
+
+  log.info('mayor.prewarm_complete', {
+    agentId: mayorAgentId,
+    townId,
+    port,
+    durationMs: Date.now() - t0,
+    alreadyRunning: false,
+  });
+}
+
 /**
  * Boot-time agent hydration — fetches the container registry from the
  * Gastown worker and resumes all registered agents.
@@ -2592,34 +2688,49 @@ export async function bootHydration(): Promise<void> {
 
   if (!Array.isArray(registry) || registry.length === 0) {
     console.log(`${LOG} No agents in registry — nothing to hydrate`);
-    return;
+  } else {
+    console.log(`${LOG} Resuming ${registry.length} agent(s) from registry`);
+
+    for (const entry of registry as Record<string, unknown>[]) {
+      const agentId = entry.agentId as string | undefined;
+      const agentRequest = entry.request as StartAgentRequest | undefined;
+      const workdir = entry.workdir as string | undefined;
+      const env = entry.env as Record<string, string> | undefined;
+
+      if (!agentId || !agentRequest || !workdir || !env) {
+        console.warn(`${LOG} Skipping malformed registry entry:`, entry);
+        continue;
+      }
+
+      // Registry entries were written with the token snapshot at dispatch
+      // time. If we just refreshed, overlay the fresh value so the hydrated
+      // kilo serve child inherits the current token.
+      const hydratedEnv = { ...env, GASTOWN_CONTAINER_TOKEN: token };
+
+      console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
+      try {
+        await startAgent(agentRequest, workdir, hydratedEnv);
+        console.log(`${LOG} Agent ${agentId} resumed`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`${LOG} Failed to resume agent ${agentId}:`, msg);
+      }
+    }
   }
 
-  console.log(`${LOG} Resuming ${registry.length} agent(s) from registry`);
-
-  for (const entry of registry as Record<string, unknown>[]) {
-    const agentId = entry.agentId as string | undefined;
-    const agentRequest = entry.request as StartAgentRequest | undefined;
-    const workdir = entry.workdir as string | undefined;
-    const env = entry.env as Record<string, string> | undefined;
-
-    if (!agentId || !agentRequest || !workdir || !env) {
-      console.warn(`${LOG} Skipping malformed registry entry:`, entry);
-      continue;
-    }
-
-    // Registry entries were written with the token snapshot at dispatch
-    // time. If we just refreshed, overlay the fresh value so the hydrated
-    // kilo serve child inherits the current token.
-    const hydratedEnv = { ...env, GASTOWN_CONTAINER_TOKEN: token };
-
-    console.log(`${LOG} Resuming agent ${agentId} in ${workdir}`);
+  const mayorAlreadyResumed = (Array.isArray(registry) ? registry : []).some(
+    (e: unknown) =>
+      typeof e === 'object' &&
+      e !== null &&
+      'request' in e &&
+      typeof (e as { request?: { role?: string } }).request?.role === 'string' &&
+      (e as { request: { role: string } }).request.role === 'mayor'
+  );
+  if (!mayorAlreadyResumed) {
     try {
-      await startAgent(agentRequest, workdir, hydratedEnv);
-      console.log(`${LOG} Agent ${agentId} resumed`);
+      await prewarmMayorSDK(townId, apiUrl, token);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`${LOG} Failed to resume agent ${agentId}:`, msg);
+      console.warn(`${LOG} Mayor SDK prewarm failed:`, err);
     }
   }
 }

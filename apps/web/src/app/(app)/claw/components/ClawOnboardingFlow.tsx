@@ -116,7 +116,16 @@ function ClawOnboardingFlowInner({
 
   const gatewayUrl = useGatewayUrl(status);
 
-  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('identity');
+  // Lazy-init onboardingStep from `?step=` in the URL so first render already
+  // reflects a calendar resume. Without this the state machine would resolve
+  // to 'complete' (post-provisioning + ready) on first render and the auto-
+  // redirect to /chat would fire before the resume effect's setOnboardingStep
+  // could take effect, skipping the calendar success/error feedback entirely.
+  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(() => {
+    if (typeof window === 'undefined') return 'identity';
+    const initialStep = new URLSearchParams(window.location.search).get('step');
+    return initialStep === 'calendar' ? 'calendar' : 'identity';
+  });
   const selectedPreset: ExecPreset = DEFAULT_ONBOARDING_EXEC_PRESET;
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);

@@ -330,6 +330,39 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('provisioning');
   });
 
+  test('renders calendar in post-provisioning mode when explicit resume is requested', () => {
+    // After the OAuth full-page reload, the wizard often remounts in
+    // post-provisioning mode because the instance row is now visible.
+    // The resume path sets onboardingStep='calendar' so the user lands
+    // back on the calendar step rather than getting auto-redirected.
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('running'),
+        onboardingStep: 'calendar',
+        hasBotIdentity: true,
+        gatewayState: 'running',
+      })
+    );
+
+    expect(state.renderStep).toBe('calendar');
+  });
+
+  test('renders calendar in post-provisioning mode even before the gateway is ready', () => {
+    // The OAuth round-trip can complete before the gateway boots; respect
+    // the calendar resume regardless of postProvisioningReady.
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('starting'),
+        onboardingStep: 'calendar',
+        hasBotIdentity: true,
+      })
+    );
+
+    expect(state.renderStep).toBe('calendar');
+  });
+
   test('renders complete in post-provisioning mode once the machine is running', () => {
     const state = getClawOnboardingFlowState(
       createInput({

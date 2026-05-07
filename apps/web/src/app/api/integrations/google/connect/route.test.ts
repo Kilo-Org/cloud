@@ -252,6 +252,49 @@ describe('GET /api/integrations/google/connect', () => {
     expect(stateArg).not.toHaveProperty('returnTo');
   });
 
+  test('drops returnTo values with percent-encoded path-traversal segments', async () => {
+    // /claw/%2e%2e/admin decodes to /claw/../admin which would normalize to
+    // /admin in the callback. The decoder-then-segment check must catch this.
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/connect?returnTo=%2Fclaw%2F%2e%2e%2Fadmin') as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
+  test('drops returnTo values starting with a backslash escape', async () => {
+    // WHATWG URL parsing for the https scheme treats `\` as a path separator,
+    // so `/\evil.example.com/path` normalizes to https://evil.example.com/path
+    // when the callback constructs new URL(returnTo, APP_URL).
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        '/api/integrations/google/connect?returnTo=%2F%5Cevil.example.com%2Fpath'
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
+  test('drops returnTo values containing a mid-path backslash', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/connect?returnTo=%2Fclaw%5Cevil%2Fpath') as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
   test('drops returnTo values with a URI fragment', async () => {
     // Fragments are disallowed by RETURN_TO_REGEX because the helpers in
     // callback/route.ts append the success/error param using a `?`/`&`

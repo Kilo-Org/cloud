@@ -9,21 +9,34 @@ const GOOGLE_OAUTH_STATE_PREFIX = 'google:';
 // Constrain returnTo to a relative path so it can never be hijacked into an
 // open-redirect to an external host. Must start with `/`, may contain a
 // non-protocol-style path, optionally followed by a query string. Fragments
-// are disallowed — buildGoogleRedirectPath / appendQueryParam append the
-// success/error param using a `?` or `&` separator, and a fragment in the
-// returnTo would push the appended param past the `#` where browsers ignore
-// it. Disallows `//` after the leading slash so we don't accidentally accept
-// protocol-relative URLs like `//evil.example.com`.
-const RETURN_TO_REGEX = /^\/(?!\/)[^?#]*(\?[^#]*)?$/;
+// are disallowed because the helpers in callback/route.ts append the
+// success/error param using a `?`/`&` separator and a fragment in the
+// returnTo would push the appended param past `#` where browsers ignore it.
+// `//` and `/\` after the leading slash are disallowed to block protocol-
+// relative URLs and backslash-injection paths (WHATWG URL parsing for the
+// https scheme treats `\` as a path separator, so `/\evil.example.com/x`
+// would normalize to https://evil.example.com/x). Backslashes anywhere in
+// the body are also rejected for the same reason.
+const RETURN_TO_REGEX = /^\/(?![\\/])[^\\?#]*(\?[^#]*)?$/;
 
 /**
- * Defense-in-depth check: even though RETURN_TO_REGEX rejects external hosts,
- * a crafted `/foo/../admin` would still resolve to `/admin` after URL
- * normalization. Block any `..` or `.` path segment so the redirect target
- * stays anchored to the path the caller actually wrote.
+ * Defense-in-depth check that catches percent-encoded path-traversal
+ * segments which the regex alone would let through. Even though
+ * RETURN_TO_REGEX rejects external hosts, a crafted `/foo/../admin` or
+ * `/foo/%2e%2e/admin` would still resolve to `/admin` after URL
+ * normalization in the callback. Decoding once before splitting catches
+ * `%2e`, `%2E`, and any other encoded variant.
  */
 export function returnToHasPathTraversal(value: string): boolean {
-  const pathOnly = value.split('?')[0] ?? '';
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    // Malformed percent-encoding is itself suspicious — treat as traversal
+    // so the value is rejected.
+    return true;
+  }
+  const pathOnly = decoded.split('?')[0] ?? '';
   return pathOnly.split('/').some(segment => segment === '..' || segment === '.');
 }
 

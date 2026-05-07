@@ -254,6 +254,19 @@ function getRenderStepDecision({
   }
 
   if (mode === 'post-provisioning') {
+    // Allow explicit calendar resume even in post-provisioning mode. The
+    // Google OAuth round-trip is a full-page reload, and after it the
+    // wizard often remounts as post-provisioning (the instance row is now
+    // visible). Without this branch the state machine would force
+    // 'complete' or 'provisioning' before the resume effect's
+    // setOnboardingStep('calendar') could take effect, and the user would
+    // never see the calendar step's success/error feedback.
+    if (onboardingStep === 'calendar') {
+      return {
+        renderStep: 'calendar',
+        reason: 'calendar resume requested; honor it even in post-provisioning mode',
+      };
+    }
     if (postProvisioningReady) {
       return {
         renderStep: 'complete',

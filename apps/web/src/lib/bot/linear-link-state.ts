@@ -1,5 +1,6 @@
 import 'server-only';
 import crypto from 'node:crypto';
+import { z } from 'zod';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 
 // Signed `state` parameter for the Linear-bot account-link OAuth flow.
@@ -17,15 +18,17 @@ const NONCE_BYTES = 16;
 
 const KIND = 'linear-bot-link';
 
-type LinearBotLinkStatePayload = {
-  kind: typeof KIND;
-  userId: string;
-  platformIntegrationId: string;
-  organizationId: string;
-  callbackPath: string;
-  iat: number;
-  nonce: string;
-};
+const linearBotLinkStatePayloadSchema = z.object({
+  kind: z.literal(KIND),
+  userId: z.string().min(1),
+  platformIntegrationId: z.string().min(1),
+  organizationId: z.string().min(1),
+  callbackPath: z.string().startsWith('/'),
+  iat: z.number(),
+  nonce: z.string().min(1),
+});
+
+type LinearBotLinkStatePayload = z.infer<typeof linearBotLinkStatePayloadSchema>;
 
 export type VerifiedLinearBotLinkState = {
   userId: string;
@@ -74,31 +77,24 @@ export function verifyLinearBotLinkState(state: string | null): VerifiedLinearBo
     return null;
   }
 
+  let parsed: unknown;
   try {
-    const data = JSON.parse(
-      Buffer.from(payload, 'base64url').toString('utf8')
-    ) as Partial<LinearBotLinkStatePayload>;
-
-    if (data.kind !== KIND) return null;
-    if (typeof data.userId !== 'string' || data.userId.length === 0) return null;
-    if (typeof data.platformIntegrationId !== 'string' || data.platformIntegrationId.length === 0) {
-      return null;
-    }
-    if (typeof data.organizationId !== 'string' || data.organizationId.length === 0) return null;
-    if (typeof data.callbackPath !== 'string' || !data.callbackPath.startsWith('/')) return null;
-    if (typeof data.iat !== 'number') return null;
-    if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
-
-    const ageSeconds = Math.floor(Date.now() / 1000) - data.iat;
-    if (ageSeconds < 0 || ageSeconds > STATE_TTL_SECONDS) return null;
-
-    return {
-      userId: data.userId,
-      platformIntegrationId: data.platformIntegrationId,
-      organizationId: data.organizationId,
-      callbackPath: data.callbackPath,
-    };
+    parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
   } catch {
     return null;
   }
+
+  const result = linearBotLinkStatePayloadSchema.safeParse(parsed);
+  if (!result.success) return null;
+
+  const data = result.data;
+  const ageSeconds = Math.floor(Date.now() / 1000) - data.iat;
+  if (ageSeconds < 0 || ageSeconds > STATE_TTL_SECONDS) return null;
+
+  return {
+    userId: data.userId,
+    platformIntegrationId: data.platformIntegrationId,
+    organizationId: data.organizationId,
+    callbackPath: data.callbackPath,
+  };
 }

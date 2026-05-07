@@ -157,13 +157,13 @@ describe('sandbox recovery', () => {
       destroyed: true,
       data: { sandboxId: 'ses-test', phase: 'prepareSession', sessionId: 'agent_test' },
     });
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://app.test/api/internal/code-review-sandbox-destroyed',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ 'X-Internal-Secret': 'secret' }),
-      })
-    );
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const firstCall = fetchMock.mock.calls[0] as [string, RequestInit] | undefined;
+    expect(firstCall?.[0]).toBe('https://app.test/api/internal/code-review-sandbox-destroyed');
+    expect(firstCall?.[1]).toMatchObject({ method: 'POST' });
+    expect(firstCall?.[1].headers).toMatchObject({
+      'X-Internal-Secret': 'secret',
+    });
   });
 
   it('does not notify when destroy fails', async () => {

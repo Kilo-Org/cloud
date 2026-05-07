@@ -2687,14 +2687,31 @@ export class TownDO extends DurableObject<Env> {
 
     logger.setTags({ agentId: mayor.id });
 
-    // Check if the container is already running
+    // Check if the container is already running AND the SDK has a live
+    // session for the mayor. The SDK can be torn down (serverPort=0,
+    // sessionId='') after stream errors or drain while the agent record
+    // still says "running" — in that case we must fall through to a
+    // fresh dispatch instead of returning early.
     const containerStatus = await dispatch.checkAgentContainerStatus(this.env, townId, mayor.id);
     const isAlive = containerStatus.status === 'running' || containerStatus.status === 'starting';
+    const sdkAlive = isAlive && (containerStatus.serverPort ?? 0) > 0 && Boolean(containerStatus.sessionId);
 
-    if (isAlive) {
+    if (sdkAlive) {
       const isActive =
         mayor.status === 'working' || mayor.status === 'stalled' || mayor.status === 'waiting';
       return { agentId: mayor.id, sessionStatus: isActive ? 'active' : 'idle' };
+    }
+
+    // Container says running/starting but SDK has no port/session — the
+    // SDK was torn down (e.g. stream error, drain). Fall through to a
+    // fresh dispatch so the user doesn't have to manually refresh.
+    if (isAlive && !sdkAlive) {
+      logger.info('ensureMayor: container alive but SDK torn down, redispatching', {
+        agentId: mayor.id,
+        containerStatus: containerStatus.status,
+        serverPort: containerStatus.serverPort,
+        sessionId: containerStatus.sessionId,
+      });
     }
 
     // Start the container with an idle mayor (no initial prompt)

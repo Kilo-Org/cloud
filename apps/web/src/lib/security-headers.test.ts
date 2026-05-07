@@ -143,14 +143,15 @@ describe('security headers', () => {
   });
 
   it('supports enforcement, report-only, and off modes', () => {
-    expect(getContentSecurityPolicyMode({})).toBe('enforce');
-    expect(getContentSecurityPolicyHeaderName('enforce')).toBe('Content-Security-Policy');
-    expect(getContentSecurityPolicyMode({ CSP_MODE: 'report-only' })).toBe('report-only');
+    expect(getContentSecurityPolicyMode({})).toBe('report-only');
     expect(getContentSecurityPolicyHeaderName('report-only')).toBe(
       'Content-Security-Policy-Report-Only'
     );
+    expect(getContentSecurityPolicyMode({ CSP_MODE: 'enforce' })).toBe('enforce');
+    expect(getContentSecurityPolicyHeaderName('enforce')).toBe('Content-Security-Policy');
+    expect(getContentSecurityPolicyMode({ CSP_MODE: 'report-only' })).toBe('report-only');
     expect(getContentSecurityPolicyMode({ CSP_MODE: 'off' })).toBe('off');
     expect(getContentSecurityPolicyHeaderName('off')).toBeNull();
-    expect(getContentSecurityPolicyMode({ CSP_MODE: 'unexpected' })).toBe('enforce');
+    expect(getContentSecurityPolicyMode({ CSP_MODE: 'unexpected' })).toBe('report-only');
   });
 });

@@ -108,8 +108,14 @@ export function getContentSecurityPolicyMode(
   env: Record<string, string | undefined> = process.env
 ): ContentSecurityPolicyMode {
   const configuredMode = env.CSP_MODE?.trim().toLowerCase();
-  if (configuredMode === 'off' || configuredMode === 'report-only') return configuredMode;
-  return 'enforce';
+  if (
+    configuredMode === 'enforce' ||
+    configuredMode === 'off' ||
+    configuredMode === 'report-only'
+  ) {
+    return configuredMode;
+  }
+  return 'report-only';
 }
 
 export function getContentSecurityPolicyHeaderName(mode: ContentSecurityPolicyMode): string | null {

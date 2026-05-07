@@ -37,18 +37,16 @@ export type SignRequestArgs = {
 };
 
 export type SignedRequest = {
-  // When set, replaces the target URL (used e.g. for Bedrock path rewriting).
   url?: string;
-  // Final auth/signature headers. When `signRequest` is present, the caller
-  // skips the default `Authorization: Bearer ${apiKey}` header.
   headers: Record<string, string>;
 };
 
 export type Provider = {
   id: ProviderId;
   apiUrl: string;
-  apiKey: string;
+  apiKey: string | undefined;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   transformRequest(context: TransformRequestContext): void;
+  // When set, replaces the default `Authorization: Bearer ${apiKey}` header.
   signRequest?(args: SignRequestArgs): Promise<SignedRequest>;
 };

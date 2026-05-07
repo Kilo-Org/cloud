@@ -3,9 +3,6 @@ import { Sha256 } from '@aws-crypto/sha256-js';
 import type { CustomLlmAwsBedrock } from '@kilocode/db';
 import type { SignedRequest, SignRequestArgs } from '@/lib/ai-gateway/providers/types';
 
-// Returns a signRequest implementation that rewrites the URL to the Bedrock
-// `/model/<modelId>/invoke[-with-response-stream]` endpoint and signs it with
-// SigV4 for the `bedrock` service.
 export function makeBedrockSignRequest(
   credentials: CustomLlmAwsBedrock,
   modelId: string

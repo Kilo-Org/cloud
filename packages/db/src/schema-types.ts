@@ -951,11 +951,8 @@ export const CustomLlmPricingSchema = z.object({
 
 export type CustomLlmPricing = z.infer<typeof CustomLlmPricingSchema>;
 
-// AWS Bedrock credentials. When present, upstream requests are SigV4-signed
-// against the `bedrock` service instead of using `Authorization: Bearer`.
-// `base_url` should be `https://bedrock-runtime.<region>.amazonaws.com` and
-// `internal_id` is used as the Bedrock model id in the request path
-// (`/model/<internal_id>/invoke`).
+// When set, upstream requests are SigV4-signed instead of using Bearer auth;
+// `internal_id` is used as the Bedrock model id in the request path.
 export const CustomLlmAwsBedrockSchema = z.object({
   access_key_id: z.string(),
   secret_access_key: z.string(),
@@ -970,7 +967,7 @@ export const CustomLlmDefinitionSchema = z.object({
   context_length: z.number(),
   max_completion_tokens: z.number(),
   base_url: z.string(),
-  api_key: z.string(),
+  api_key: z.string().optional(),
   organization_ids: z.array(z.string()),
   supports_image_input: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),

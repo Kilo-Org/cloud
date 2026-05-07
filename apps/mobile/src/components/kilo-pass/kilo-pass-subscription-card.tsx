@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { showManageSubscriptionsIOS } from 'expo-iap';
 import { Linking, Platform, Pressable, View } from 'react-native';
 import { ShieldCheck } from 'lucide-react-native';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner-native';
 
 import { Text } from '@/components/ui/text';
 import { KiloPassSubscriptionSheet } from '@/components/kilo-pass/kilo-pass-subscription-sheet';
@@ -18,6 +20,7 @@ export function KiloPassSubscriptionCard() {
   const [sheetVisible, setSheetVisible] = useState(false);
   const colors = useThemeColors();
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
   const productsQuery = useStoreKiloPassProducts();
   const purchase = useStoreKiloPassPurchase();
@@ -28,6 +31,16 @@ export function KiloPassSubscriptionCard() {
 
   const subscription = stateQuery.data?.subscription;
   const cardState = getKiloPassSubscriptionCardState(subscription);
+  const openAppStoreManagement = async () => {
+    try {
+      await showManageSubscriptionsIOS();
+      await queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter());
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to open App Store subscription management.'
+      );
+    }
+  };
 
   return (
     <>
@@ -36,6 +49,10 @@ export function KiloPassSubscriptionCard() {
         onPress={() => {
           if (cardState.action === 'open-web-management') {
             void Linking.openURL(KILO_PASS_MANAGE_URL);
+            return;
+          }
+          if (cardState.action === 'open-store-management') {
+            void openAppStoreManagement();
             return;
           }
           setSheetVisible(true);

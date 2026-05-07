@@ -25,4 +25,18 @@ describe('getKiloPassSubscriptionCardState', () => {
       title: 'Kilo Pass',
     });
   });
+
+  it('sends App Store-managed Kilo Pass users to App Store management', () => {
+    expect(
+      getKiloPassSubscriptionCardState({
+        currentPeriodBaseCreditsUsd: 19,
+        paymentProvider: 'app_store',
+      })
+    ).toEqual({
+      action: 'open-store-management',
+      actionLabel: 'Manage',
+      description: '$19 monthly credits',
+      title: 'Kilo Pass active',
+    });
+  });
 });

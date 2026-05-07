@@ -4,7 +4,7 @@ type KiloPassSubscriptionCardSubscription = {
 };
 
 type KiloPassSubscriptionCardState = {
-  action: 'open-store-sheet' | 'open-web-management';
+  action: 'open-store-management' | 'open-store-sheet' | 'open-web-management';
   actionLabel: string;
   description: string;
   title: string;
@@ -23,6 +23,15 @@ export function getKiloPassSubscriptionCardState(
   }
 
   const credits = `$${subscription.currentPeriodBaseCreditsUsd.toFixed(0)} monthly credits`;
+  if (subscription.paymentProvider === 'app_store') {
+    return {
+      action: 'open-store-management',
+      actionLabel: 'Manage',
+      description: credits,
+      title: 'Kilo Pass active',
+    };
+  }
+
   if (subscription.paymentProvider === 'stripe') {
     return {
       action: 'open-web-management',

@@ -124,16 +124,6 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
     isAutoTopUp,
     purchaseDate,
   } = params;
-  const recipients = await getTopUpConfirmationRecipientMembersForOrganization(organization.id);
-
-  if (recipients.length === 0) {
-    captureMessage('Organization top-up confirmation email skipped: no eligible recipients', {
-      level: 'warning',
-      tags: { source: 'organization_credits_topup_email' },
-      extra: { user_id: userId, organization_id: organization.id, stripeChargeOrInvoiceId },
-    });
-    return;
-  }
 
   let insertedMarker = false;
 
@@ -151,11 +141,22 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
     insertedMarker = (insertResult.rowCount ?? 0) > 0;
     if (!insertedMarker) return;
 
+    const recipients = await getTopUpConfirmationRecipientMembersForOrganization(organization.id);
+
+    if (recipients.length === 0) {
+      captureMessage('Organization top-up confirmation email skipped: no eligible recipients', {
+        level: 'warning',
+        tags: { source: 'organization_credits_topup_email' },
+        extra: { user_id: userId, organization_id: organization.id, stripeChargeOrInvoiceId },
+      });
+      return;
+    }
+
     const receiptUrl = await resolveStripeReceiptUrl(stripeChargeOrInvoiceId);
     let sentEmails = 0;
     let retryableFailures = 0;
 
-    for (const recipient of recipients) {
+    for (const [recipientIndex, recipient] of recipients.entries()) {
       try {
         const sendResult = await sendCreditsTopUpEmail({
           to: recipient.email,
@@ -182,7 +183,8 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
               organization_id: organization.id,
               stripeChargeOrInvoiceId,
               isAutoTopUp,
-              recipient: recipient.email,
+              recipient_index: recipientIndex + 1,
+              recipient_total: recipients.length,
             },
           });
         } else {
@@ -198,7 +200,8 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
               organization_id: organization.id,
               stripeChargeOrInvoiceId,
               isAutoTopUp,
-              recipient: recipient.email,
+              recipient_index: recipientIndex + 1,
+              recipient_total: recipients.length,
             },
           });
         }
@@ -211,7 +214,8 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
             organization_id: organization.id,
             stripeChargeOrInvoiceId,
             isAutoTopUp,
-            recipient: recipient.email,
+            recipient_index: recipientIndex + 1,
+            recipient_total: recipients.length,
           },
         });
       }
@@ -222,7 +226,7 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
     }
   } catch (error) {
     captureException(error, {
-      tags: { source: 'organization_credits_topup_email' },
+      tags: { source: 'organization_credits_topup_email', failure_type: 'recipient_lookup' },
       extra: {
         user_id: userId,
         organization_id: organization.id,

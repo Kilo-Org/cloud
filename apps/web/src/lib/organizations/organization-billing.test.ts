@@ -24,6 +24,12 @@ import type Stripe from 'stripe';
 import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@/lib/autoTopUpConstants';
 
 type SendViaMailgunParams = { to: string; subject: string; html: string; replyTo?: string };
+const captureExceptionMock = jest.fn();
+jest.mock('@sentry/nextjs', () => ({
+  captureException: (...args: unknown[]) => captureExceptionMock(...args),
+  captureMessage: () => {},
+}));
+
 const sendViaMailgunMock = jest.fn<Promise<boolean>, [SendViaMailgunParams]>(async () => true);
 const verifyEmailMock = jest.fn<Promise<boolean>, [string]>(async () => true);
 const mockResolveStripeReceiptUrl = jest.fn<
@@ -791,7 +797,94 @@ describe('processTopupForOrganization', () => {
     });
     expect(creditTransaction?.organization_id).toBe(organizationWithoutRecipients.id);
     expect(sendViaMailgunMock).not.toHaveBeenCalled();
+    const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);
+    expect(emailMarkers).toHaveLength(1);
+    expect(emailMarkers[0]).toMatchObject({
+      email_type: 'organization_credits_top_up_confirmation',
+      idempotency_key: stripePaymentId,
+      user_id: null,
+      organization_id: organizationWithoutRecipients.id,
+    });
+  });
+
+  test('duplicate no-recipient org top-up does not email recipients added later', async () => {
+    const organizationWithoutRecipients = await createOrganization('No Recipients Later', null);
+    const laterOwner = await insertTestUser({ google_user_email: 'later-owner@example.com' });
+    const stripePaymentId = 'pi_test_no_eligible_org_recipients_terminal';
+
+    await processTopupForOrganization(
+      SYSTEM_AUTO_TOP_UP_USER_ID,
+      organizationWithoutRecipients.id,
+      1200,
+      {
+        type: 'stripe',
+        stripe_payment_id: stripePaymentId,
+      }
+    );
+
+    await addUserToOrganization(organizationWithoutRecipients.id, laterOwner.id, 'owner');
+    sendViaMailgunMock.mockClear();
+
+    await processTopupForOrganization(
+      SYSTEM_AUTO_TOP_UP_USER_ID,
+      organizationWithoutRecipients.id,
+      1200,
+      {
+        type: 'stripe',
+        stripe_payment_id: stripePaymentId,
+      }
+    );
+
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
+    expect(await getOrganizationTopUpEmailMarkers(stripePaymentId)).toHaveLength(1);
+  });
+
+  test('recipient lookup failures do not reject after credit commit', async () => {
+    const stripePaymentId = 'pi_test_recipient_lookup_failure_is_best_effort';
+    const amountInCents = 1200;
+    const originalSelect = db.select;
+    const selectMock = jest.spyOn(db, 'select');
+    selectMock.mockImplementation(fields => {
+      if (
+        fields &&
+        typeof fields === 'object' &&
+        'dailyUsageLimitUsdMicrodollars' in fields &&
+        'currentDailyUsageUsdMicrodollars' in fields
+      ) {
+        throw new Error('recipient lookup failed');
+      }
+
+      return Reflect.apply(originalSelect, db, fields === undefined ? [] : [fields]);
+    });
+
+    try {
+      await expect(
+        processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
+          type: 'stripe',
+          stripe_payment_id: stripePaymentId,
+        })
+      ).resolves.toBeUndefined();
+    } finally {
+      selectMock.mockRestore();
+    }
+
+    const updatedOrg = await db.query.organizations.findFirst({
+      where: eq(organizations.id, testOrganization.id),
+    });
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired + amountInCents * 10_000
+    );
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
     expect(await getOrganizationTopUpEmailMarkers(stripePaymentId)).toHaveLength(0);
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          source: 'organization_credits_topup_email',
+          failure_type: 'recipient_lookup',
+        }),
+      })
+    );
   });
 
   test('does not duplicate balance, audit log, or email marker for repeated payment id', async () => {

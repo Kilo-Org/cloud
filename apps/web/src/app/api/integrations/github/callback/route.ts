@@ -320,12 +320,14 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const { ownerToken: errorOwnerToken } = parseStateReturn(rawState);
+
     let redirectPath = '/?error=installation_failed';
 
-    if (rawState?.startsWith('org_')) {
-      const orgId = rawState.replace('org_', '');
+    if (errorOwnerToken.startsWith('org_')) {
+      const orgId = errorOwnerToken.slice(4);
       redirectPath = `/organizations/${orgId}/integrations/github?error=installation_failed`;
-    } else if (rawState?.startsWith('user_')) {
+    } else if (errorOwnerToken.startsWith('user_')) {
       redirectPath = `/integrations/github?error=installation_failed`;
     }
 

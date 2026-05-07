@@ -72,14 +72,15 @@ export function OnboardingStepRepo() {
     window.location.href = installUrl;
   }, [orgId, user?.id, githubAppName]);
 
-  const searchParams = useSearchParams();
+  const githubInstallParam = useSearchParams().get('github_install');
+  const { refetch: refetchGithubRepos } = githubReposQuery;
 
   useEffect(() => {
-    if (searchParams.get('github_install') === 'success') {
-      githubReposQuery.refetch();
+    if (githubInstallParam === 'success') {
+      refetchGithubRepos();
       toast.success('GitHub app installed. Select a repo to continue.');
     }
-  }, [searchParams, githubReposQuery]);
+  }, [githubInstallParam, refetchGithubRepos]);
 
   const handleRepoSelect = useCallback(
     (fullName: string) => {

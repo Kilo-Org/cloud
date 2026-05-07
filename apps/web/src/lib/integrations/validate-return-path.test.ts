@@ -99,4 +99,12 @@ describe('parseStateReturn', () => {
       returnTo: null,
     });
   });
+
+  it('returns null returnTo when return suffix has malformed percent-encoding', () => {
+    const result = parseStateReturn('user_abc|return=%ZZ');
+    expect(result).toEqual({
+      ownerToken: 'user_abc',
+      returnTo: null,
+    });
+  });
 });

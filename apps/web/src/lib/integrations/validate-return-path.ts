@@ -18,8 +18,12 @@ export function parseStateReturn(rawState: string | null): {
     const sepIdx = rawState.indexOf('|return=');
     if (sepIdx !== -1) {
       ownerToken = rawState.slice(0, sepIdx);
-      const candidate = decodeURIComponent(rawState.slice(sepIdx + '|return='.length));
-      returnTo = validateReturnPath(candidate);
+      try {
+        const candidate = decodeURIComponent(rawState.slice(sepIdx + '|return='.length));
+        returnTo = validateReturnPath(candidate);
+      } catch {
+        returnTo = null;
+      }
     }
   }
 

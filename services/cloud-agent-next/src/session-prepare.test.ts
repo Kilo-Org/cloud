@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schemas from './router/schemas.js';
 import * as schemaLimits from './schema.js';
+import type * as WorkspaceModule from './workspace.js';
+import type * as SessionServiceModule from './session-service.js';
 
 // Create a mock execution session
 const createMockExecutionSession = () => ({
@@ -34,17 +36,22 @@ vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(() => createMockSandbox()),
 }));
 
-// Mock workspace functions
-vi.mock('./workspace.js', () => ({
-  checkDiskAndCleanBeforeSetup: vi.fn().mockResolvedValue(undefined),
-  setupWorkspace: vi.fn().mockResolvedValue({
-    workspacePath: '/workspace/test',
-    sessionHome: '/home/test',
-  }),
-  cloneGitHubRepo: vi.fn().mockResolvedValue(undefined),
-  cloneGitRepo: vi.fn().mockResolvedValue(undefined),
-  manageBranch: vi.fn().mockResolvedValue(undefined),
-}));
+// Mock workspace functions, but keep the real exported error classes so
+// `instanceof` checks in the handler work against the same constructors.
+vi.mock('./workspace.js', async importOriginal => {
+  const actual = await importOriginal<typeof WorkspaceModule>();
+  return {
+    ...actual,
+    checkDiskAndCleanBeforeSetup: vi.fn().mockResolvedValue(undefined),
+    setupWorkspace: vi.fn().mockResolvedValue({
+      workspacePath: '/workspace/test',
+      sessionHome: '/home/test',
+    }),
+    cloneGitHubRepo: vi.fn().mockResolvedValue(undefined),
+    cloneGitRepo: vi.fn().mockResolvedValue(undefined),
+    manageBranch: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 // Mock WrapperClient.ensureWrapper (wrapper now starts kilo server in-process)
 vi.mock('./kilo/wrapper-client.js', () => ({
@@ -68,45 +75,52 @@ const {
   deleteCliSessionViaSessionIngestMock: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Mock session-service to isolate router tests
-vi.mock('./session-service.js', () => ({
-  generateSessionId: () => generateSessionIdMock(),
-  fetchSessionMetadata: vi.fn(),
-  determineBranchName: vi.fn(
-    (sessionId: string, upstreamBranch?: string) => upstreamBranch || `session/${sessionId}`
-  ),
-  runSetupCommands: vi.fn().mockResolvedValue(undefined),
-  writeAuthFile: vi.fn().mockResolvedValue(undefined),
-  writeGlobalRules: vi.fn().mockResolvedValue(undefined),
-  writeRuntimeSkills: vi.fn().mockResolvedValue(undefined),
-  InvalidSessionMetadataError: class InvalidSessionMetadataError extends Error {
-    constructor(
-      public readonly userId: string,
-      public readonly sessionId: string,
-      public readonly details?: string
-    ) {
-      super(`Invalid session metadata for session ${sessionId}`);
-      this.name = 'InvalidSessionMetadataError';
-    }
-  },
-  SessionService: class SessionService {
-    createCliSessionViaSessionIngest = createCliSessionViaSessionIngestMock;
-    deleteCliSessionViaSessionIngest = deleteCliSessionViaSessionIngestMock;
-    getOrCreateSession = vi.fn().mockResolvedValue(createMockExecutionSession());
-    buildContext = vi.fn().mockReturnValue({
-      sandboxId: 'test-sandbox',
-      orgId: 'test-org',
-      userId: 'test-user',
-      sessionId: 'test-session',
-      workspacePath: '/workspace/test',
-      sessionHome: '/home/test',
-    });
-  },
-}));
+// Mock session-service to isolate router tests, but keep the real exported
+// error classes (`SetupCommandFailedError`, `InvalidSessionMetadataError`)
+// so `instanceof` checks in the handler resolve to the same constructors
+// the production code throws.
+vi.mock('./session-service.js', async importOriginal => {
+  const actual = await importOriginal<typeof SessionServiceModule>();
+  return {
+    ...actual,
+    generateSessionId: () => generateSessionIdMock(),
+    fetchSessionMetadata: vi.fn(),
+    determineBranchName: vi.fn(
+      (sessionId: string, upstreamBranch?: string) => upstreamBranch || `session/${sessionId}`
+    ),
+    runSetupCommands: vi.fn().mockResolvedValue(undefined),
+    writeAuthFile: vi.fn().mockResolvedValue(undefined),
+    writeGlobalRules: vi.fn().mockResolvedValue(undefined),
+    writeRuntimeSkills: vi.fn().mockResolvedValue(undefined),
+    SessionService: class SessionService {
+      createCliSessionViaSessionIngest = createCliSessionViaSessionIngestMock;
+      deleteCliSessionViaSessionIngest = deleteCliSessionViaSessionIngestMock;
+      getOrCreateSession = vi.fn().mockResolvedValue(createMockExecutionSession());
+      buildContext = vi.fn().mockReturnValue({
+        sandboxId: 'test-sandbox',
+        orgId: 'test-org',
+        userId: 'test-user',
+        sessionId: 'test-session',
+        workspacePath: '/workspace/test',
+        sessionHome: '/home/test',
+      });
+    },
+  };
+});
 
 import { appRouter } from './router.js';
 import type { TRPCContext, SessionId } from './types.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
+import {
+  BranchNotFoundError,
+  GitRepositoryNotFoundError,
+  cloneGitHubRepo as mockedCloneGitHubRepo,
+  manageBranch as mockedManageBranch,
+} from './workspace.js';
+import {
+  SetupCommandFailedError,
+  runSetupCommands as mockedRunSetupCommands,
+} from './session-service.js';
 
 // Helper to create a mock DO stub
 function createMockDOStub(
@@ -466,6 +480,87 @@ describe('prepareSession endpoint', () => {
     // NOTE: CLI session creation (createCliSessionViaSessionIngest) is handled via session-ingest.
     // The kiloSessionId now comes from the kilo CLI server's POST /session API.
     // Tests for backend session creation error handling and rollback have been removed.
+  });
+
+  describe('user-error mapping (HTTP 400)', () => {
+    it('returns BAD_REQUEST when the repository is not found', async () => {
+      const doStub = createMockDOStub();
+      vi.mocked(mockedCloneGitHubRepo).mockRejectedValueOnce(
+        new GitRepositoryNotFoundError('https://github.com/acme/missing.git')
+      );
+
+      const ctx = createInternalApiContext({ doStub });
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(
+        caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/missing',
+          githubToken: 'ghp_test_token',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Repository not found') as unknown as string,
+      });
+
+      expect(doStub.prepare).not.toHaveBeenCalled();
+    });
+
+    it('returns BAD_REQUEST when the upstream branch is missing', async () => {
+      const doStub = createMockDOStub();
+      vi.mocked(mockedManageBranch).mockRejectedValueOnce(
+        new BranchNotFoundError('feature/does-not-exist')
+      );
+
+      const ctx = createInternalApiContext({ doStub });
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(
+        caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          githubToken: 'ghp_test_token',
+          upstreamBranch: 'feature/does-not-exist',
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining(
+          'Branch "feature/does-not-exist" not found'
+        ) as unknown as string,
+      });
+
+      expect(doStub.prepare).not.toHaveBeenCalled();
+    });
+
+    it('returns BAD_REQUEST when a setup command fails', async () => {
+      const doStub = createMockDOStub();
+      vi.mocked(mockedRunSetupCommands).mockRejectedValueOnce(
+        new SetupCommandFailedError('npm install', 1, 'ENOENT')
+      );
+
+      const ctx = createInternalApiContext({ doStub });
+      const caller = appRouter.createCaller(ctx);
+
+      await expect(
+        caller.prepareSession({
+          prompt: 'Test prompt',
+          mode: 'code',
+          model: 'claude-3',
+          githubRepo: 'acme/repo',
+          githubToken: 'ghp_test_token',
+          setupCommands: ['npm install'],
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Setup command failed') as unknown as string,
+      });
+
+      expect(doStub.prepare).not.toHaveBeenCalled();
+    });
   });
 });
 

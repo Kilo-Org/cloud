@@ -262,6 +262,10 @@ export const kilocode_users = pgTable(
      */
     kilo_pass_threshold: bigint({ mode: 'number' }),
     stripe_customer_id: text().notNull(),
+    app_store_account_token: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .notNull()
+      .unique(),
     is_admin: boolean().default(false).notNull(),
     total_microdollars_acquired: bigint({ mode: 'number' })
       .default(sql`'0'`)
@@ -513,6 +517,7 @@ export const kilo_pass_store_events = pgTable(
     event_id: text().notNull(),
     provider_subscription_id: text(),
     provider_transaction_id: text(),
+    app_account_token: uuid(),
     product_id: text().notNull(),
     environment: text().notNull(),
     payload_json: jsonb().$type<Record<string, unknown>>().notNull().default({}),
@@ -528,6 +533,7 @@ export const kilo_pass_store_events = pgTable(
       table.payment_provider,
       table.provider_subscription_id
     ),
+    index('IDX_kilo_pass_store_events_app_account_token').on(table.app_account_token),
     enumCheck(
       'kilo_pass_store_events_payment_provider_check',
       table.payment_provider,
@@ -557,6 +563,7 @@ export const kilo_pass_store_purchases = pgTable(
     provider_subscription_id: text().notNull(),
     provider_transaction_id: text().notNull(),
     provider_original_transaction_id: text(),
+    app_account_token: uuid(),
     purchase_token: text(),
     environment: text().notNull(),
     purchased_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
@@ -574,6 +581,7 @@ export const kilo_pass_store_purchases = pgTable(
     ),
     index('IDX_kilo_pass_store_purchases_subscription_id').on(table.kilo_pass_subscription_id),
     index('IDX_kilo_pass_store_purchases_user_id').on(table.kilo_user_id),
+    index('IDX_kilo_pass_store_purchases_app_account_token').on(table.app_account_token),
     enumCheck(
       'kilo_pass_store_purchases_payment_provider_check',
       table.payment_provider,

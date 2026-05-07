@@ -44,6 +44,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 const product: AppStoreKiloPassProduct = {
+  appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
   appleProductId: 'kilopass.tier19.monthly.v1',
   cadence: 'monthly',
   description: 'Kilo Pass',
@@ -76,7 +77,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     await actions.purchase(product);
 
     expect(requestPurchase).toHaveBeenCalledWith({
-      request: { apple: { sku: product.appleProductId } },
+      request: { apple: { appAccountToken: product.appAccountToken, sku: product.appleProductId } },
       type: 'subs',
     });
   });

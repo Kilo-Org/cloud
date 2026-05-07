@@ -64,6 +64,12 @@ function getStripeMock(): StripeMock {
 }
 
 type KiloPassCaller = {
+  getMobileStoreProducts: () => Promise<{
+    appAccountToken: string;
+    products: Array<{
+      appleProductId: string;
+    }>;
+  }>;
   getState: () => Promise<{
     subscription: {
       stripeSubscriptionId: string;
@@ -284,6 +290,18 @@ describe('kiloPassRouter', () => {
     stripeMock.checkout.sessions.create.mockReset();
     stripeMock.billingPortal.sessions.create.mockReset();
     stripeMock.invoices.list.mockReset();
+  });
+
+  describe('getMobileStoreProducts', () => {
+    it('returns the App Store account token for the signed-in user', async () => {
+      const user = await insertTestUser();
+      const caller = await createCallerForUser(user.id);
+
+      const result = await caller.kiloPass.getMobileStoreProducts();
+
+      expect(result.appAccountToken).toBe(user.app_store_account_token);
+      expect(result.products.length).toBeGreaterThan(0);
+    });
   });
 
   describe('getState', () => {

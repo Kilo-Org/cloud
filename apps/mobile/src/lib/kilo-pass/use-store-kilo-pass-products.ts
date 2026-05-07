@@ -63,7 +63,7 @@ export function useStoreKiloPassProducts() {
           const backendResponse = await queryClient.fetchQuery(
             trpc.kiloPass.getMobileStoreProducts.queryOptions()
           );
-          return backendResponse.products;
+          return backendResponse;
         },
       });
       return loadedProducts;

@@ -82,6 +82,99 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(replay).toEqual({ processed: false });
   });
 
+  it('records initial buy notifications before the app attaches a user', async () => {
+    const decodedNotification = notification({
+      notificationType: 'SUBSCRIBED',
+      subtype: 'INITIAL_BUY',
+    });
+    const decodedTransaction = transaction();
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'payload',
+      decodeNotification: async () => decodedNotification,
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const events = await db
+      .select()
+      .from(kilo_pass_store_events)
+      .where(eq(kilo_pass_store_events.event_id, decodedNotification.notificationUUID));
+    expect(events[0]?.processed_at).not.toBeNull();
+
+    const subscriptions = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(
+        eq(
+          kilo_pass_subscriptions.provider_subscription_id,
+          decodedTransaction.originalTransactionId
+        )
+      );
+    expect(subscriptions).toHaveLength(0);
+  });
+
+  it('creates the initial subscription from the App Store account token', async () => {
+    const user = await insertTestUser();
+    const decodedNotification = notification({
+      notificationType: 'SUBSCRIBED',
+      subtype: 'INITIAL_BUY',
+    });
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'payload',
+      decodeNotification: async () => decodedNotification,
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const subscriptions = await db
+      .select()
+      .from(kilo_pass_subscriptions)
+      .where(eq(kilo_pass_subscriptions.kilo_user_id, user.id));
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0]?.provider_subscription_id).toBe(
+      decodedTransaction.originalTransactionId
+    );
+  });
+
+  it('reprocesses notification rows left unprocessed by an earlier failure', async () => {
+    const decodedNotification = notification({
+      notificationType: 'SUBSCRIBED',
+      subtype: 'INITIAL_BUY',
+    });
+    const decodedTransaction = transaction();
+    await db.insert(kilo_pass_store_events).values({
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      event_id: decodedNotification.notificationUUID,
+      provider_subscription_id: decodedTransaction.originalTransactionId,
+      provider_transaction_id: decodedTransaction.transactionId,
+      product_id: decodedTransaction.productId,
+      environment: 'Sandbox',
+      payload_json: {
+        notificationType: decodedNotification.notificationType,
+        subtype: decodedNotification.subtype,
+      },
+    });
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'payload',
+      decodeNotification: async () => decodedNotification,
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const events = await db
+      .select()
+      .from(kilo_pass_store_events)
+      .where(eq(kilo_pass_store_events.event_id, decodedNotification.notificationUUID));
+    expect(events[0]?.processed_at).not.toBeNull();
+  });
+
   it('marks a subscription ended for expiration notifications', async () => {
     const user = await insertTestUser();
     const decodedTransaction = transaction();

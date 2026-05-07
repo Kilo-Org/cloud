@@ -5,6 +5,7 @@ import { joinAppStoreKiloPassProducts } from './store-products';
 describe('joinAppStoreKiloPassProducts', () => {
   it('joins backend Apple product ids to localized App Store subscription metadata', () => {
     const products = joinAppStoreKiloPassProducts({
+      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
       backendProducts: [
         {
           tier: 'tier_19',
@@ -42,6 +43,7 @@ describe('joinAppStoreKiloPassProducts', () => {
         appleProductId: 'kilopass.tier19.monthly.v1',
         displayPrice: '$24.99',
         title: 'Kilo Pass 19',
+        appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
       }),
     ]);
   });

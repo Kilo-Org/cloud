@@ -27,6 +27,7 @@ function applePurchase(
     providerTransactionId: `tx-${crypto.randomUUID()}`,
     providerOriginalTransactionId: `orig-${crypto.randomUUID()}`,
     providerSubscriptionId: `orig-${crypto.randomUUID()}`,
+    appAccountToken: crypto.randomUUID(),
     purchaseToken: `jws-${crypto.randomUUID()}`,
     environment: 'Sandbox',
     purchasedAtIso: '2026-05-01T12:00:00.000Z',
@@ -71,6 +72,7 @@ describe('completeStoreKiloPassPurchase', () => {
       .from(kilo_pass_store_purchases)
       .where(eq(kilo_pass_store_purchases.kilo_user_id, user.id));
     expect(storePurchases).toHaveLength(1);
+    expect(storePurchases[0]?.app_account_token).toBe(purchase.appAccountToken);
 
     const issuances = await db
       .select()

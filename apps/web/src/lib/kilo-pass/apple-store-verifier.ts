@@ -20,6 +20,7 @@ export type AppleStoreDecodedTransaction = {
   bundleId: string;
   productId: string;
   purchaseDate: number;
+  appAccountToken?: string;
   revocationDate?: number;
   environment: AppleStoreEnvironment;
   rawPayload: Record<string, unknown>;
@@ -32,6 +33,7 @@ const AppleStoreTransactionPayloadSchema = z
     bundleId: z.string().min(1),
     productId: z.string().min(1),
     purchaseDate: z.number(),
+    appAccountToken: z.string().uuid().optional(),
     revocationDate: z.number().optional(),
     environment: z.string().optional(),
   })
@@ -93,6 +95,7 @@ function decodeAppleStoreTransactionPayload(
     bundleId: payload.bundleId,
     productId: payload.productId,
     purchaseDate: payload.purchaseDate,
+    appAccountToken: payload.appAccountToken,
     revocationDate: payload.revocationDate,
     environment: normalizeEnvironment(payload.environment),
     rawPayload: payload,
@@ -132,6 +135,7 @@ export function mapAppleKiloPassTransaction(
     providerTransactionId: transaction.transactionId,
     providerOriginalTransactionId: transaction.originalTransactionId,
     providerSubscriptionId: transaction.originalTransactionId,
+    appAccountToken: transaction.appAccountToken ?? null,
     purchaseToken: null,
     environment: transaction.environment,
     purchasedAtIso: new Date(transaction.purchaseDate).toISOString(),

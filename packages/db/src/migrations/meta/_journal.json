@@ -813,6 +813,13 @@
       "when": 1778088504613,
       "tag": "0115_productive_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1778170260891,
+      "tag": "0116_plain_glorian",
+      "breakpoints": true
     }
   ]
 }

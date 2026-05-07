@@ -1,5 +1,5 @@
 import { type ResponseBodyV2DecodedPayload } from '@apple/app-store-server-library';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import * as z from 'zod';
 
 import {
@@ -89,20 +89,54 @@ async function markStoreSubscriptionEnded(
     .where(eq(kilo_pass_subscriptions.provider_subscription_id, transaction.originalTransactionId));
 }
 
-async function getUserForStoreRenewal(
-  providerSubscriptionId: string,
-  fallbackUser?: User
-): Promise<User | null> {
-  if (fallbackUser) return fallbackUser;
+async function getUserForStoreRenewal(params: {
+  providerSubscriptionId: string;
+  appAccountToken: string | null;
+  fallbackUser?: User;
+}): Promise<User | null> {
+  if (params.fallbackUser) return params.fallbackUser;
 
   const row = await db
     .select({ user: kilocode_users })
     .from(kilo_pass_subscriptions)
     .innerJoin(kilocode_users, eq(kilo_pass_subscriptions.kilo_user_id, kilocode_users.id))
-    .where(eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId))
+    .where(eq(kilo_pass_subscriptions.provider_subscription_id, params.providerSubscriptionId))
     .limit(1);
 
-  return row[0]?.user ?? null;
+  if (row[0]?.user) return row[0].user;
+
+  if (!params.appAccountToken) return null;
+
+  const tokenRows = await db
+    .select()
+    .from(kilocode_users)
+    .where(eq(kilocode_users.app_store_account_token, params.appAccountToken))
+    .limit(1);
+
+  return tokenRows[0] ?? null;
+}
+
+function getStoreEventPayload(params: {
+  notification: AppleStoreDecodedNotification;
+  purchase: ReturnType<typeof mapAppleKiloPassTransaction> | null;
+}): Record<string, unknown> {
+  return {
+    notificationType: params.notification.notificationType,
+    subtype: params.notification.subtype ?? null,
+    transaction: params.purchase
+      ? {
+          productId: params.purchase.productId,
+          providerSubscriptionId: params.purchase.providerSubscriptionId,
+          providerTransactionId: params.purchase.providerTransactionId,
+          providerOriginalTransactionId: params.purchase.providerOriginalTransactionId,
+          appAccountToken: params.purchase.appAccountToken,
+          purchasedAtIso: params.purchase.purchasedAtIso,
+          environment: params.purchase.environment,
+          tier: params.purchase.tier,
+          cadence: params.purchase.cadence,
+        }
+      : null,
+  };
 }
 
 export async function processAppStoreKiloPassNotification(params: {
@@ -126,37 +160,54 @@ export async function processAppStoreKiloPassNotification(params: {
       event_id: notification.notificationUUID,
       provider_subscription_id: purchase?.providerSubscriptionId ?? null,
       provider_transaction_id: purchase?.providerTransactionId ?? null,
+      app_account_token: purchase?.appAccountToken ?? null,
       product_id: purchase?.productId ?? 'unknown',
       environment: notification.environment,
-      payload_json: {
-        notificationType: notification.notificationType,
-        subtype: notification.subtype ?? null,
-      },
+      payload_json: getStoreEventPayload({ notification, purchase }),
     })
     .onConflictDoNothing();
 
   if ((insertResult.rowCount ?? 0) === 0) {
-    return { processed: false };
+    const existingEvents = await db
+      .select({ processedAt: kilo_pass_store_events.processed_at })
+      .from(kilo_pass_store_events)
+      .where(
+        and(
+          eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
+          eq(kilo_pass_store_events.event_id, notification.notificationUUID)
+        )
+      )
+      .limit(1);
+
+    if (existingEvents[0]?.processedAt) {
+      return { processed: false };
+    }
   }
 
   if (purchase && RENEWAL_TYPES.has(notification.notificationType)) {
-    const user = await getUserForStoreRenewal(
-      purchase.providerSubscriptionId,
-      params.userForRenewal
-    );
-    if (!user) {
-      throw new Error('App Store renewal notification cannot create a subscription without a user');
-    }
-    await completeStoreKiloPassPurchase({ user, purchase });
-    await appendKiloPassAuditLog(db, {
-      action: KiloPassAuditLogAction.StoreSubscriptionRenewed,
-      result: KiloPassAuditLogResult.Success,
-      kiloUserId: user.id,
-      payload: {
-        notificationUUID: notification.notificationUUID,
-        providerSubscriptionId: purchase.providerSubscriptionId,
-      },
+    const user = await getUserForStoreRenewal({
+      providerSubscriptionId: purchase.providerSubscriptionId,
+      appAccountToken: purchase.appAccountToken,
+      fallbackUser: params.userForRenewal,
     });
+    if (!user) {
+      if (notification.notificationType !== 'SUBSCRIBED') {
+        throw new Error(
+          'App Store renewal notification cannot create a subscription without a user'
+        );
+      }
+    } else {
+      await completeStoreKiloPassPurchase({ user, purchase });
+      await appendKiloPassAuditLog(db, {
+        action: KiloPassAuditLogAction.StoreSubscriptionRenewed,
+        result: KiloPassAuditLogResult.Success,
+        kiloUserId: user.id,
+        payload: {
+          notificationUUID: notification.notificationUUID,
+          providerSubscriptionId: purchase.providerSubscriptionId,
+        },
+      });
+    }
   }
 
   if (transaction && EXPIRED_TYPES.has(notification.notificationType)) {
@@ -186,7 +237,12 @@ export async function processAppStoreKiloPassNotification(params: {
   await db
     .update(kilo_pass_store_events)
     .set({ processed_at: new Date().toISOString() })
-    .where(eq(kilo_pass_store_events.event_id, notification.notificationUUID));
+    .where(
+      and(
+        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
+        eq(kilo_pass_store_events.event_id, notification.notificationUUID)
+      )
+    );
 
   return { processed: true };
 }

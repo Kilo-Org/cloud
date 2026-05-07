@@ -145,6 +145,18 @@ const CompleteStorePurchaseOutputSchema = z.object({
   alreadyProcessed: z.boolean(),
 });
 
+function assertAppStoreAccountTokenMatchesUser(params: {
+  appAccountToken: string | null;
+  userAppStoreAccountToken: string;
+}): void {
+  if (params.appAccountToken !== params.userAppStoreAccountToken) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'App Store purchase account token does not match the signed-in user.',
+    });
+  }
+}
+
 function isTwoMonthPromoOfferActive(): boolean {
   return dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
 }
@@ -388,7 +400,8 @@ const GetScheduledChangeOutputSchema = z.object({
 });
 
 export const kiloPassRouter = createTRPCRouter({
-  getMobileStoreProducts: baseProcedure.query(() => ({
+  getMobileStoreProducts: baseProcedure.query(({ ctx }) => ({
+    appAccountToken: ctx.user.app_store_account_token,
     products: getAllMobileStoreKiloPassProducts(),
   })),
 
@@ -397,6 +410,10 @@ export const kiloPassRouter = createTRPCRouter({
     .output(CompleteStorePurchaseOutputSchema)
     .mutation(async ({ ctx, input }) => {
       const purchase = await verifyAppleKiloPassTransactionJws(input.signedTransactionJws);
+      assertAppStoreAccountTokenMatchesUser({
+        appAccountToken: purchase.appAccountToken,
+        userAppStoreAccountToken: ctx.user.app_store_account_token,
+      });
       return completeStoreKiloPassPurchase({ user: ctx.user, purchase });
     }),
 

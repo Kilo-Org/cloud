@@ -36,6 +36,7 @@ export type ValidatedStoreKiloPassPurchase = {
   providerTransactionId: string;
   providerOriginalTransactionId: string | null;
   providerSubscriptionId: string;
+  appAccountToken: string | null;
   purchaseToken: string | null;
   environment: string;
   purchasedAtIso: string;
@@ -220,6 +221,7 @@ export async function completeStoreKiloPassPurchase(params: {
         provider_subscription_id: purchase.providerSubscriptionId,
         provider_transaction_id: purchase.providerTransactionId,
         provider_original_transaction_id: purchase.providerOriginalTransactionId,
+        app_account_token: purchase.appAccountToken,
         purchase_token: purchase.purchaseToken,
         environment: purchase.environment,
         purchased_at: purchase.purchasedAtIso,

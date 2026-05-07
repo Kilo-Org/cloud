@@ -21,6 +21,7 @@ export type StoreKiloPassProduct = {
 };
 
 export type AppStoreKiloPassProduct = BackendStoreKiloPassProduct & {
+  appAccountToken: string;
   displayPrice: string;
   title: string;
   description: string;
@@ -28,6 +29,7 @@ export type AppStoreKiloPassProduct = BackendStoreKiloPassProduct & {
 };
 
 export function joinAppStoreKiloPassProducts(params: {
+  appAccountToken: string;
   backendProducts: readonly BackendStoreKiloPassProduct[];
   storeProducts: readonly StoreKiloPassProduct[];
 }): AppStoreKiloPassProduct[] {
@@ -42,6 +44,7 @@ export function joinAppStoreKiloPassProducts(params: {
     return [
       {
         ...backendProduct,
+        appAccountToken: params.appAccountToken,
         displayPrice: storeProduct.displayPrice,
         title: storeProduct.title,
         description: storeProduct.description,

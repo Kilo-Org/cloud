@@ -14,7 +14,7 @@ const userCancelledPurchaseErrorSchema = z.object({
 
 type AppStoreKiloPassPurchaseActionsDeps = {
   requestPurchase: (params: {
-    request: { apple: { sku: string } };
+    request: { apple: { appAccountToken: string; sku: string } };
     type: 'subs';
   }) => Promise<unknown>;
   completeAppStorePurchase: (input: { signedTransactionJws: string }) => Promise<unknown>;
@@ -68,7 +68,9 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     purchase: async (product: AppStoreKiloPassProduct) => {
       try {
         await deps.requestPurchase({
-          request: { apple: { sku: product.appleProductId } },
+          request: {
+            apple: { appAccountToken: product.appAccountToken, sku: product.appleProductId },
+          },
           type: 'subs',
         });
       } catch (error) {

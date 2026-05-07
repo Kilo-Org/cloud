@@ -40,7 +40,10 @@ describe('loadAppStoreKiloPassProducts', () => {
 
     const products = await loadAppStoreKiloPassProducts({
       fetchStoreProducts,
-      loadBackendProducts: vi.fn().mockResolvedValue(backendProducts),
+      loadBackendProducts: vi.fn().mockResolvedValue({
+        appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+        products: backendProducts,
+      }),
     });
 
     expect(fetchStoreProducts).toHaveBeenCalledWith([
@@ -50,6 +53,7 @@ describe('loadAppStoreKiloPassProducts', () => {
     expect(products).toEqual([
       expect.objectContaining({
         appleProductId: 'kilopass.tier19.monthly.v1',
+        appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
         displayPrice: '$24.99',
       }),
     ]);
@@ -59,7 +63,10 @@ describe('loadAppStoreKiloPassProducts', () => {
     await expect(
       loadAppStoreKiloPassProducts({
         fetchStoreProducts: vi.fn().mockResolvedValue([]),
-        loadBackendProducts: vi.fn().mockResolvedValue(backendProducts),
+        loadBackendProducts: vi.fn().mockResolvedValue({
+          appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+          products: backendProducts,
+        }),
       })
     ).rejects.toThrow(NO_MATCHING_KILO_PASS_PRODUCTS_MESSAGE);
   });

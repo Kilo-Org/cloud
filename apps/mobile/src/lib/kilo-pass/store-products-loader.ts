@@ -10,9 +10,13 @@ export const NO_MATCHING_KILO_PASS_PRODUCTS_MESSAGE =
 
 export async function loadAppStoreKiloPassProducts(params: {
   fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreKiloPassProduct[]>;
-  loadBackendProducts: () => Promise<readonly BackendStoreKiloPassProduct[]>;
+  loadBackendProducts: () => Promise<{
+    appAccountToken: string;
+    products: readonly BackendStoreKiloPassProduct[];
+  }>;
 }): Promise<AppStoreKiloPassProduct[]> {
-  const backendProducts = await params.loadBackendProducts();
+  const backendResponse = await params.loadBackendProducts();
+  const backendProducts = backendResponse.products;
   const productSkus = backendProducts.map(product => product.appleProductId);
 
   if (productSkus.length === 0) {
@@ -21,6 +25,7 @@ export async function loadAppStoreKiloPassProducts(params: {
 
   const storeProducts = await params.fetchStoreProducts(productSkus);
   const products = joinAppStoreKiloPassProducts({
+    appAccountToken: backendResponse.appAccountToken,
     backendProducts,
     storeProducts,
   });

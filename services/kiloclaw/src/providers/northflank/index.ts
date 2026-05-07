@@ -854,8 +854,8 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       // Northflank's documented update-volume endpoint returns only an
       // empty success response and does not expose a separate completion
       // status to poll. Treat a successful 200 as the provider's accepted
-      // storage update; the DO still persists the larger volumeSizeGb only
-      // after the subsequent deployment rollout completes.
+      // storage update; the persisted tier is desired state once Northflank
+      // accepts the storage and compute-plan updates.
       await updateVolume(config, providerState.projectId, providerState.volumeId, {
         storageSizeMb: tier.volumeSizeGb * 1024,
       });
@@ -875,27 +875,20 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     await patchDeploymentService(config, providerState.projectId, providerState.serviceId, {
       billing: { deploymentPlan },
     });
-    const resized = await waitForDeploymentCompleted(
-      config,
-      providerState.projectId,
-      providerState.serviceId,
-      NORTHFLANK_STARTUP_TIMEOUT_SECONDS
-    );
 
-    logNorthflank('resize_runtime_deployment_completed', {
-      description: 'Northflank deployment reported COMPLETED during tier resize wait',
-      apiOperation: 'GET /projects/{projectId}/services/{serviceId}',
+    logNorthflank('resize_runtime_patch_accepted', {
+      description:
+        'Northflank accepted the service compute-plan patch; persisted tier now reflects desired state',
+      apiOperation: 'PATCH /projects/{projectId}/services/deployment/{serviceId}',
       sandboxId: state.sandboxId,
       projectId: providerState.projectId,
+      serviceId: providerState.serviceId,
       targetTier,
-      ...northflankServiceSummary(resized),
+      deploymentPlan,
     });
 
     return {
-      providerState: {
-        ...providerState,
-        ingressHost: firstIngressHost(resized) ?? providerState.ingressHost,
-      },
+      providerState,
     };
   },
 

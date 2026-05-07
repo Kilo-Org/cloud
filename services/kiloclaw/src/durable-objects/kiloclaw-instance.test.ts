@@ -9225,7 +9225,7 @@ describe('resizeMachine', () => {
     expect(storage._store.get('instanceType')).toBe('perf-4-8');
   });
 
-  it('rejects Northflank resize before persisting tier changes', async () => {
+  it('persists Northflank resize after volume and deployment plan updates are accepted', async () => {
     const { instance, storage } = createInstance();
     await seedNorthflankInstance(storage, {
       provider: 'northflank',
@@ -9249,19 +9249,6 @@ describe('resizeMachine', () => {
           headers: { 'content-type': 'application/json' },
         });
       }
-      if (url.endsWith('/services/service-1')) {
-        return new Response(
-          JSON.stringify({
-            data: {
-              id: 'service-1',
-              name: 'kc-ki-test',
-              ports: [{ name: 'p01', dns: 'kc-ki-test-resized.code.run' }],
-              status: { deployment: { status: 'COMPLETED' } },
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } }
-        );
-      }
       throw new Error(`Unhandled Northflank API request: ${url}`);
     });
 
@@ -9276,7 +9263,7 @@ describe('resizeMachine', () => {
     });
     expect(storage._store.get('volumeSizeGb')).toBe(20);
     expect(storage._store.get('providerState')).toEqual(
-      expect.objectContaining({ ingressHost: 'kc-ki-test-resized.code.run' })
+      expect.objectContaining({ ingressHost: 'kc-ki-test.code.run' })
     );
   });
 
@@ -9297,28 +9284,16 @@ describe('resizeMachine', () => {
         });
       }
       if (url.endsWith('/services/deployment/service-1')) {
-        return new Response(JSON.stringify({ data: { id: 'service-1', name: 'kc-ki-test' } }), {
-          status: 200,
+        return new Response(JSON.stringify({ error: 'deployment patch failed' }), {
+          status: 500,
           headers: { 'content-type': 'application/json' },
         });
-      }
-      if (url.endsWith('/services/service-1')) {
-        return new Response(
-          JSON.stringify({
-            data: {
-              id: 'service-1',
-              name: 'kc-ki-test',
-              status: { deployment: { status: 'FAILED' } },
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } }
-        );
       }
       throw new Error(`Unhandled Northflank API request: ${url}`);
     });
 
     await expect(instance.resizeMachine('perf-4-8')).rejects.toThrow(
-      'Northflank deployment failed for service service-1'
+      'Northflank API patchDeploymentService failed (500)'
     );
 
     expect(storage._store.get('instanceType')).toBe('perf-1-3');

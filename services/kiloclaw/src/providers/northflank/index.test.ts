@@ -434,14 +434,9 @@ describe('northflankProviderAdapter', () => {
     expect(result.observation?.runtimeState).toBe('stopped');
   });
 
-  it('resizes runtime by growing volume, patching deployment plan, and waiting for rollout', async () => {
+  it('resizes runtime by growing volume and patching the accepted deployment plan', async () => {
     vi.mocked(updateVolume).mockResolvedValue(undefined);
     vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
-    vi.mocked(waitForDeploymentCompleted).mockResolvedValue({
-      id: 'service-1',
-      name: 'kc-ki-123',
-      ports: [{ name: 'p01', dns: 'kc-ki-123.code.run' }],
-    });
 
     const result = await northflankProviderAdapter.resizeRuntime?.({
       env: { ...env, NF_DEPLOYMENT_PLAN_PERF_4_8: 'nf-compute-perf-4-8' } as never,
@@ -474,20 +469,14 @@ describe('northflankProviderAdapter', () => {
       'service-1',
       { billing: { deploymentPlan: 'nf-compute-perf-4-8' } }
     );
-    expect(waitForDeploymentCompleted).toHaveBeenCalledWith(
-      expect.objectContaining({ apiToken: 'nf-token' }),
-      'project-1',
-      'service-1',
-      240
-    );
+    expect(waitForDeploymentCompleted).not.toHaveBeenCalled();
     expect(result?.providerState).toEqual(
-      expect.objectContaining({ provider: 'northflank', ingressHost: 'kc-ki-123.code.run' })
+      expect.objectContaining({ provider: 'northflank', ingressHost: 'old.code.run' })
     );
   });
 
   it('resizes runtime without volume update when storage does not grow', async () => {
     vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
-    vi.mocked(waitForDeploymentCompleted).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
 
     await northflankProviderAdapter.resizeRuntime?.({
       env: env as never,
@@ -511,6 +500,7 @@ describe('northflankProviderAdapter', () => {
       'service-1',
       { billing: { deploymentPlan: 'nf-compute-200' } }
     );
+    expect(waitForDeploymentCompleted).not.toHaveBeenCalled();
   });
 
   it('rejects resize when service ID is missing', async () => {
@@ -546,10 +536,9 @@ describe('northflankProviderAdapter', () => {
     expect(patchDeploymentService).not.toHaveBeenCalled();
   });
 
-  it('propagates deployment wait failures from resize', async () => {
+  it('propagates deployment patch failures from resize', async () => {
     vi.mocked(updateVolume).mockResolvedValue(undefined);
-    vi.mocked(patchDeploymentService).mockResolvedValue({ id: 'service-1', name: 'kc-ki-123' });
-    vi.mocked(waitForDeploymentCompleted).mockRejectedValue(new Error('deployment failed'));
+    vi.mocked(patchDeploymentService).mockRejectedValue(new Error('deployment patch failed'));
 
     await expect(
       northflankProviderAdapter.resizeRuntime?.({
@@ -566,7 +555,8 @@ describe('northflankProviderAdapter', () => {
         } as never,
         targetTier: 'perf-4-8',
       })
-    ).rejects.toThrow('deployment failed');
+    ).rejects.toThrow('deployment patch failed');
+    expect(waitForDeploymentCompleted).not.toHaveBeenCalled();
   });
 
   it('skips writing the restricted secret on restart when bootstrap env is unchanged', async () => {

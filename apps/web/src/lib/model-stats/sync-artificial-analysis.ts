@@ -127,8 +127,8 @@ async function fetchArtificialAnalysisModels(): Promise<ArtificialAnalysisModel[
       },
     },
     {
-      baseDelayMs: 1000,
-      maxDelayMs: 10000,
+      baseDelayMs: 2000,
+      maxDelayMs: 120_000,
       retryResponse: r => r.status === 429 || r.status >= 500,
     }
   );

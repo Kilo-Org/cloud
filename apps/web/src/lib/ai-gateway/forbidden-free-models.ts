@@ -6,6 +6,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'arcee-ai/trinity-large-thinking:free',
   'corethink:free',
   'arcee-ai/trinity-mini:free',
+  'baidu/cobuddy:free', // massive rate limiting (429)
   'bytedance-seed/dola-seed-2.0-pro:free',
   'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
   'deepseek/deepseek-r1-0528:free',

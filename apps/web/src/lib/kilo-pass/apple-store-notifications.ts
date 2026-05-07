@@ -34,6 +34,8 @@ type DecodeTransaction = (signedTransactionJws: string) => Promise<AppleStoreDec
 const RENEWAL_TYPES = new Set(['DID_RENEW', 'SUBSCRIBED']);
 const EXPIRED_TYPES = new Set(['EXPIRED', 'DID_FAIL_TO_RENEW']);
 const REFUND_TYPES = new Set(['REFUND', 'REVOKE', 'CONSUMPTION_REQUEST']);
+const AUTO_RENEW_DISABLED_TYPE = 'DID_CHANGE_RENEWAL_STATUS';
+const AUTO_RENEW_DISABLED_SUBTYPE = 'AUTO_RENEW_DISABLED';
 
 const AppleStoreNotificationPayloadSchema = z
   .object({
@@ -85,6 +87,17 @@ async function markStoreSubscriptionEnded(
       status: 'canceled',
       cancel_at_period_end: false,
       ended_at: new Date().toISOString(),
+    })
+    .where(eq(kilo_pass_subscriptions.provider_subscription_id, transaction.originalTransactionId));
+}
+
+async function markStoreSubscriptionCancelingAtPeriodEnd(
+  transaction: AppleStoreDecodedTransaction
+): Promise<void> {
+  await db
+    .update(kilo_pass_subscriptions)
+    .set({
+      cancel_at_period_end: true,
     })
     .where(eq(kilo_pass_subscriptions.provider_subscription_id, transaction.originalTransactionId));
 }
@@ -214,6 +227,22 @@ export async function processAppStoreKiloPassNotification(params: {
     await markStoreSubscriptionEnded(transaction);
     await appendKiloPassAuditLog(db, {
       action: KiloPassAuditLogAction.StoreSubscriptionExpired,
+      result: KiloPassAuditLogResult.Success,
+      payload: {
+        notificationUUID: notification.notificationUUID,
+        providerSubscriptionId: transaction.originalTransactionId,
+      },
+    });
+  }
+
+  if (
+    transaction &&
+    notification.notificationType === AUTO_RENEW_DISABLED_TYPE &&
+    notification.subtype === AUTO_RENEW_DISABLED_SUBTYPE
+  ) {
+    await markStoreSubscriptionCancelingAtPeriodEnd(transaction);
+    await appendKiloPassAuditLog(db, {
+      action: KiloPassAuditLogAction.StoreSubscriptionCanceled,
       result: KiloPassAuditLogResult.Success,
       payload: {
         notificationUUID: notification.notificationUUID,

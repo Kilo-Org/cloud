@@ -205,4 +205,40 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.status).toBe('canceled');
     expect(subscription?.ended_at).not.toBeNull();
   });
+
+  it('marks auto-renew-disabled notifications as canceling at period end', async () => {
+    const user = await insertTestUser();
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'initial-buy',
+          notificationType: 'SUBSCRIBED',
+          subtype: 'INITIAL_BUY',
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'auto-renew-disabled',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'auto-renew-disabled',
+          notificationType: 'DID_CHANGE_RENEWAL_STATUS',
+          subtype: 'AUTO_RENEW_DISABLED',
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(
+        kilo_pass_subscriptions.provider_subscription_id,
+        decodedTransaction.originalTransactionId
+      ),
+    });
+    expect(subscription?.status).toBe('active');
+    expect(subscription?.cancel_at_period_end).toBe(true);
+    expect(subscription?.ended_at).toBeNull();
+  });
 });

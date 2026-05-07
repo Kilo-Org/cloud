@@ -7,20 +7,24 @@ import type { Terminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 
 /**
- * xterm.js doesn't support the Kitty keyboard protocol — all Enter
- * variants are encoded as bare `\r`. The remote TUI enables Kitty
- * protocol (`\x1b[>5u`) but xterm.js ignores it.
+ * Custom key handler for the xterm.js terminal.
  *
- * This handler intercepts modified Enter keys and sends the correct
- * Kitty CSI u escape sequences directly over the WebSocket:
- * - Shift+Enter → `\x1b[13;2u`
- * - Alt+Enter   → `\x1b[13;3u`
- * - Ctrl+Enter  → `\x1b[13;5u`
+ * 1. Paste: Ctrl+V / Ctrl+Shift+V on Windows/Linux.
+ *    xterm.js's default handler treats Ctrl+V as a control byte (0x16)
+ *    and calls preventDefault(), suppressing the browser's native paste.
+ *    macOS Cmd+V is unaffected — xterm.js lets it through to the
+ *    browser's native `paste` event on the helper textarea.
  *
- * Both keydown and keyup events are suppressed for modified Enter to
- * prevent xterm from also sending its default `\r`.
+ * 2. Kitty Enter: xterm.js doesn't support the Kitty keyboard protocol —
+ *    all Enter variants are encoded as bare `\r`. The remote TUI enables
+ *    Kitty protocol (`\x1b[>5u`) but xterm.js ignores it. This handler
+ *    intercepts modified Enter keys and sends the correct CSI u sequences
+ *    directly over the WebSocket.
+ *
+ * NOTE: attachCustomKeyEventHandler accepts only ONE handler — each call
+ * replaces the previous one. This is the sole call site.
  */
-export function attachKittyEnterHandler(term: Terminal, wsRef?: React.RefObject<WebSocket | null>) {
+export function attachCustomKeys(term: Terminal, wsRef?: React.RefObject<WebSocket | null>) {
   function send(seq: string) {
     if (wsRef?.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(seq);
@@ -30,23 +34,38 @@ export function attachKittyEnterHandler(term: Terminal, wsRef?: React.RefObject<
   }
 
   term.attachCustomKeyEventHandler(ev => {
-    // Block both keydown and keyup for modified Enter to prevent xterm
-    // from sending its default \r on either event phase.
+    if (ev.type !== 'keydown') {
+      // For Kitty Enter: suppress keyup too so xterm doesn't send \r.
+      const isModifiedEnter =
+        ev.key === 'Enter' && (ev.shiftKey || ev.altKey || ev.ctrlKey) && !ev.metaKey;
+      return !isModifiedEnter;
+    }
+
+    // ── Paste: Ctrl+V or Ctrl+Shift+V on Windows/Linux ──────────────
+    const isPaste =
+      ev.ctrlKey &&
+      !ev.metaKey &&
+      !ev.altKey &&
+      (ev.key === 'v' || ev.key === 'V');
+    if (isPaste) {
+      ev.preventDefault();
+      void navigator.clipboard
+        .readText()
+        .then(text => {
+          if (text) term.paste(text);
+        })
+        .catch(() => {});
+      return false;
+    }
+
+    // ── Kitty Enter ──────────────────────────────────────────────────
     const isModifiedEnter =
       ev.key === 'Enter' && (ev.shiftKey || ev.altKey || ev.ctrlKey) && !ev.metaKey;
-
     if (!isModifiedEnter) return true;
 
-    // Only send the sequence on keydown, but suppress keyup too
-    if (ev.type !== 'keydown') return false;
-
-    if (ev.shiftKey && !ev.ctrlKey && !ev.altKey) {
-      send('\x1b[13;2u');
-    } else if (ev.altKey && !ev.ctrlKey && !ev.shiftKey) {
-      send('\x1b[13;3u');
-    } else if (ev.ctrlKey && !ev.shiftKey && !ev.altKey) {
-      send('\x1b[13;5u');
-    }
+    if (ev.shiftKey && !ev.ctrlKey && !ev.altKey) send('\x1b[13;2u');
+    else if (ev.altKey && !ev.ctrlKey && !ev.shiftKey) send('\x1b[13;3u');
+    else if (ev.ctrlKey && !ev.shiftKey && !ev.altKey) send('\x1b[13;5u');
     return false;
   });
 }
@@ -118,6 +137,7 @@ export function useXtermPty({
   const reconnectAttemptsRef = useRef(0);
   const intentionalCloseRef = useRef(false);
   const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contextMenuHandlerRef = useRef<((e: MouseEvent) => void) | null>(null);
 
   const updateStatus = useCallback(
     (s: string) => {
@@ -329,7 +349,20 @@ export function useXtermPty({
       term.loadAddon(webLinksAddon);
       term.loadAddon(clipboardAddon);
       term.open(container);
-      attachKittyEnterHandler(term, wsRef);
+      attachCustomKeys(term, wsRef);
+
+      const onContextMenu = (e: MouseEvent) => {
+        e.preventDefault();
+        void navigator.clipboard
+          .readText()
+          .then(text => {
+            if (text) term.paste(text);
+          })
+          .catch(() => {});
+      };
+      contextMenuHandlerRef.current = onContextMenu;
+      container.addEventListener('contextmenu', onContextMenu);
+
       fitAddon.fit();
 
       xtermRef.current = term;
@@ -408,6 +441,10 @@ export function useXtermPty({
       resizeTimerRef.current = null;
       resizeObserverRef.current?.disconnect();
       resizeObserverRef.current = null;
+      if (terminalRef.current && contextMenuHandlerRef.current) {
+        terminalRef.current.removeEventListener('contextmenu', contextMenuHandlerRef.current);
+      }
+      contextMenuHandlerRef.current = null;
       wsRef.current?.close(1000, 'Terminal unmount');
       wsRef.current = null;
       xtermRef.current?.dispose();

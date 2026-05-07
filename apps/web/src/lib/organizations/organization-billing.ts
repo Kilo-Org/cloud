@@ -139,91 +139,24 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
       .onConflictDoNothing();
 
     insertedMarker = (insertResult.rowCount ?? 0) > 0;
-    if (!insertedMarker) return;
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'organization_credits_topup_email', failure_type: 'marker_insert' },
+      extra: {
+        user_id: userId,
+        organization_id: organization.id,
+        stripeChargeOrInvoiceId,
+        isAutoTopUp,
+      },
+    });
+    return;
+  }
 
-    const recipients = await getTopUpConfirmationRecipientMembersForOrganization(organization.id);
+  if (!insertedMarker) return;
 
-    if (recipients.length === 0) {
-      captureMessage('Organization top-up confirmation email skipped: no eligible recipients', {
-        level: 'warning',
-        tags: { source: 'organization_credits_topup_email' },
-        extra: { user_id: userId, organization_id: organization.id, stripeChargeOrInvoiceId },
-      });
-      return;
-    }
-
-    const receiptUrl = await resolveStripeReceiptUrl(stripeChargeOrInvoiceId);
-    let sentEmails = 0;
-    let retryableFailures = 0;
-
-    for (const [recipientIndex, recipient] of recipients.entries()) {
-      try {
-        const sendResult = await sendCreditsTopUpEmail({
-          to: recipient.email,
-          variant: isAutoTopUp ? 'org_auto' : 'org_manual',
-          amountCents: amountInCents,
-          creditsCents: amountInCents,
-          purchaseDate: purchaseDate ?? new Date(),
-          receiptUrl,
-          organizationId: organization.id,
-          organizationName: organization.name,
-        });
-
-        if (sendResult.sent) {
-          sentEmails += 1;
-        } else if (sendResult.reason === 'neverbounce_rejected') {
-          captureMessage('Organization top-up confirmation email recipient rejected', {
-            level: 'warning',
-            tags: {
-              source: 'organization_credits_topup_email',
-              reason: sendResult.reason,
-            },
-            extra: {
-              user_id: userId,
-              organization_id: organization.id,
-              stripeChargeOrInvoiceId,
-              isAutoTopUp,
-              recipient_index: recipientIndex + 1,
-              recipient_total: recipients.length,
-            },
-          });
-        } else {
-          retryableFailures += 1;
-          captureMessage('Organization top-up confirmation email send failed', {
-            level: 'warning',
-            tags: {
-              source: 'organization_credits_topup_email',
-              reason: sendResult.reason,
-            },
-            extra: {
-              user_id: userId,
-              organization_id: organization.id,
-              stripeChargeOrInvoiceId,
-              isAutoTopUp,
-              recipient_index: recipientIndex + 1,
-              recipient_total: recipients.length,
-            },
-          });
-        }
-      } catch (error) {
-        retryableFailures += 1;
-        captureException(error, {
-          tags: { source: 'organization_credits_topup_email' },
-          extra: {
-            user_id: userId,
-            organization_id: organization.id,
-            stripeChargeOrInvoiceId,
-            isAutoTopUp,
-            recipient_index: recipientIndex + 1,
-            recipient_total: recipients.length,
-          },
-        });
-      }
-    }
-
-    if (sentEmails === 0 && retryableFailures > 0) {
-      await deleteOrganizationTopUpEmailMarker(stripeChargeOrInvoiceId);
-    }
+  let recipients: Array<{ id: User['id']; email: string }>;
+  try {
+    recipients = await getTopUpConfirmationRecipientMembersForOrganization(organization.id);
   } catch (error) {
     captureException(error, {
       tags: { source: 'organization_credits_topup_email', failure_type: 'recipient_lookup' },
@@ -234,13 +167,152 @@ export async function maybeSendOrganizationTopUpConfirmationEmail(params: {
         isAutoTopUp,
       },
     });
-    if (insertedMarker) {
-      try {
-        await deleteOrganizationTopUpEmailMarker(stripeChargeOrInvoiceId);
-      } catch {
-        // Leave the marker in place; we prefer missing one email over duplicate sends.
+    await deleteOrganizationTopUpEmailMarkerBestEffort({
+      stripeChargeOrInvoiceId,
+      userId,
+      organizationId: organization.id,
+      isAutoTopUp,
+      cleanupReason: 'recipient_lookup',
+    });
+    return;
+  }
+
+  if (recipients.length === 0) {
+    captureMessage('Organization top-up confirmation email skipped: no eligible recipients', {
+      level: 'warning',
+      tags: { source: 'organization_credits_topup_email' },
+      extra: { user_id: userId, organization_id: organization.id, stripeChargeOrInvoiceId },
+    });
+    return;
+  }
+
+  let receiptUrl: string | null;
+  try {
+    receiptUrl = await resolveStripeReceiptUrl(stripeChargeOrInvoiceId);
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'organization_credits_topup_email', failure_type: 'receipt_lookup' },
+      extra: {
+        user_id: userId,
+        organization_id: organization.id,
+        stripeChargeOrInvoiceId,
+        isAutoTopUp,
+      },
+    });
+    await deleteOrganizationTopUpEmailMarkerBestEffort({
+      stripeChargeOrInvoiceId,
+      userId,
+      organizationId: organization.id,
+      isAutoTopUp,
+      cleanupReason: 'receipt_lookup',
+    });
+    return;
+  }
+
+  let sentEmails = 0;
+  let retryableFailures = 0;
+
+  for (const [recipientIndex, recipient] of recipients.entries()) {
+    try {
+      const sendResult = await sendCreditsTopUpEmail({
+        to: recipient.email,
+        variant: isAutoTopUp ? 'org_auto' : 'org_manual',
+        amountCents: amountInCents,
+        creditsCents: amountInCents,
+        purchaseDate: purchaseDate ?? new Date(),
+        receiptUrl,
+        organizationId: organization.id,
+        organizationName: organization.name,
+      });
+
+      if (sendResult.sent) {
+        sentEmails += 1;
+      } else if (sendResult.reason === 'neverbounce_rejected') {
+        captureMessage('Organization top-up confirmation email recipient rejected', {
+          level: 'warning',
+          tags: {
+            source: 'organization_credits_topup_email',
+            reason: sendResult.reason,
+          },
+          extra: {
+            user_id: userId,
+            organization_id: organization.id,
+            stripeChargeOrInvoiceId,
+            isAutoTopUp,
+            recipient_index: recipientIndex + 1,
+            recipient_total: recipients.length,
+          },
+        });
+      } else {
+        retryableFailures += 1;
+        captureMessage('Organization top-up confirmation email send failed', {
+          level: 'warning',
+          tags: {
+            source: 'organization_credits_topup_email',
+            reason: sendResult.reason,
+          },
+          extra: {
+            user_id: userId,
+            organization_id: organization.id,
+            stripeChargeOrInvoiceId,
+            isAutoTopUp,
+            recipient_index: recipientIndex + 1,
+            recipient_total: recipients.length,
+          },
+        });
       }
+    } catch (error) {
+      retryableFailures += 1;
+      captureException(error, {
+        tags: { source: 'organization_credits_topup_email', failure_type: 'recipient_send' },
+        extra: {
+          user_id: userId,
+          organization_id: organization.id,
+          stripeChargeOrInvoiceId,
+          isAutoTopUp,
+          recipient_index: recipientIndex + 1,
+          recipient_total: recipients.length,
+        },
+      });
     }
+  }
+
+  if (sentEmails === 0 && retryableFailures > 0) {
+    await deleteOrganizationTopUpEmailMarkerBestEffort({
+      stripeChargeOrInvoiceId,
+      userId,
+      organizationId: organization.id,
+      isAutoTopUp,
+      cleanupReason: 'all_retryable_failures',
+    });
+  }
+}
+
+async function deleteOrganizationTopUpEmailMarkerBestEffort(params: {
+  stripeChargeOrInvoiceId: string;
+  userId: User['id'];
+  organizationId: Organization['id'];
+  isAutoTopUp: boolean;
+  cleanupReason: 'recipient_lookup' | 'receipt_lookup' | 'all_retryable_failures';
+}): Promise<void> {
+  const { stripeChargeOrInvoiceId, userId, organizationId, isAutoTopUp, cleanupReason } = params;
+
+  try {
+    await deleteOrganizationTopUpEmailMarker(stripeChargeOrInvoiceId);
+  } catch (error) {
+    captureException(error, {
+      tags: {
+        source: 'organization_credits_topup_email',
+        failure_type: 'marker_cleanup',
+        cleanup_reason: cleanupReason,
+      },
+      extra: {
+        user_id: userId,
+        organization_id: organizationId,
+        stripeChargeOrInvoiceId,
+        isAutoTopUp,
+      },
+    });
   }
 }
 

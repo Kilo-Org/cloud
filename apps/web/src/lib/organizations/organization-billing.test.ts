@@ -539,6 +539,7 @@ describe('processTopupForOrganization', () => {
   let testOrganization: Organization;
 
   beforeEach(async () => {
+    captureExceptionMock.mockClear();
     sendViaMailgunMock.mockClear().mockResolvedValue(true);
     verifyEmailMock.mockClear().mockResolvedValue(true);
     mockResolveStripeReceiptUrl.mockClear().mockResolvedValue(null);
@@ -883,6 +884,43 @@ describe('processTopupForOrganization', () => {
           source: 'organization_credits_topup_email',
           failure_type: 'recipient_lookup',
         }),
+      })
+    );
+  });
+
+  test('receipt lookup failures are reported separately from recipient lookup failures', async () => {
+    const stripePaymentId = 'pi_test_receipt_lookup_failure_is_best_effort';
+    const amountInCents = 1200;
+    mockResolveStripeReceiptUrl.mockRejectedValueOnce(new Error('receipt lookup failed'));
+
+    await expect(
+      processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, {
+        type: 'stripe',
+        stripe_payment_id: stripePaymentId,
+      })
+    ).resolves.toBeUndefined();
+
+    const updatedOrg = await db.query.organizations.findFirst({
+      where: eq(organizations.id, testOrganization.id),
+    });
+    expect(updatedOrg?.total_microdollars_acquired).toBe(
+      testOrganization.total_microdollars_acquired + amountInCents * 10_000
+    );
+    expect(sendViaMailgunMock).not.toHaveBeenCalled();
+    expect(await getOrganizationTopUpEmailMarkers(stripePaymentId)).toHaveLength(0);
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          source: 'organization_credits_topup_email',
+          failure_type: 'receipt_lookup',
+        }),
+      })
+    );
+    expect(captureExceptionMock).not.toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({ failure_type: 'recipient_lookup' }),
       })
     );
   });

@@ -40,6 +40,28 @@ export function returnToHasPathTraversal(value: string): boolean {
   return pathOnly.split('/').some(segment => segment === '..' || segment === '.');
 }
 
+// C0 control characters (U+0000–U+001F) and DEL (U+007F). WHATWG URL parsing
+// strips these silently, so a crafted `/%0A/evil.example.com/path` would
+// pass a string-shape check yet normalize to `https://evil.example.com/path`
+// after `new URL(value, APP_URL)` in the callback.
+// eslint-disable-next-line no-control-regex
+const RETURN_TO_CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
+
+/**
+ * Single source of truth for whether a `returnTo` value is safe to bake
+ * into the signed OAuth state and later pass through `new URL(...)` in the
+ * callback. The connect route and the Zod state schema both call this so
+ * validation cannot drift between them.
+ */
+export function isSafeGoogleOAuthReturnTo(value: string): boolean {
+  return (
+    value.length <= 2048 &&
+    RETURN_TO_REGEX.test(value) &&
+    !RETURN_TO_CONTROL_CHARS.test(value) &&
+    !returnToHasPathTraversal(value)
+  );
+}
+
 const GoogleOAuthStatePayloadSchema = z.object({
   owner: z.discriminatedUnion('type', [
     z.object({ type: z.literal('user'), id: z.string().min(1) }),
@@ -49,9 +71,7 @@ const GoogleOAuthStatePayloadSchema = z.object({
   capabilities: z.array(GoogleCapabilitySchema).min(1),
   returnTo: z
     .string()
-    .regex(RETURN_TO_REGEX)
-    .max(2048)
-    .refine(v => !returnToHasPathTraversal(v), 'returnTo must not contain path traversal segments')
+    .refine(isSafeGoogleOAuthReturnTo, 'returnTo failed safety validation')
     .optional(),
 });
 

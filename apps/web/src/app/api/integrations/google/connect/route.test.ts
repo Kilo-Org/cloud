@@ -283,6 +283,26 @@ describe('GET /api/integrations/google/connect', () => {
     expect(stateArg).not.toHaveProperty('returnTo');
   });
 
+  test('drops returnTo values containing C0 control characters', async () => {
+    // %0A (newline) is silently stripped by WHATWG URL parsing, so a
+    // crafted /%0A/evil.example.com/path would pass a string-shape regex
+    // and then normalize to https://evil.example.com/path in the callback.
+    const { GET } = await import('./route');
+
+    for (const encoded of ['%0A', '%0D', '%09', '%00']) {
+      mockedCreateGoogleOAuthState.mockClear();
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/google/connect?returnTo=%2F${encoded}%2Fevil.example.com%2Fpath`
+        ) as never
+      );
+      expect(response.status).toBe(307);
+      const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+      expect(stateArg).toBeDefined();
+      expect(stateArg).not.toHaveProperty('returnTo');
+    }
+  });
+
   test('drops returnTo values containing a mid-path backslash', async () => {
     const { GET } = await import('./route');
     const response = await GET(

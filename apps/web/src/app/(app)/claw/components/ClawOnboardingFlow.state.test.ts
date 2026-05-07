@@ -363,6 +363,51 @@ describe('ClawOnboardingFlow state machine', () => {
     expect(state.renderStep).toBe('calendar');
   });
 
+  test('honors channels onboarding step in post-provisioning mode', () => {
+    // After the OAuth resume lands on calendar and the user clicks
+    // Continue/Skip to advance, onboardingStep flips to 'channels'. The
+    // post-prov branch should respect that rather than auto-completing.
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('running'),
+        onboardingStep: 'channels',
+        hasBotIdentity: true,
+        gatewayState: 'running',
+      })
+    );
+
+    expect(state.renderStep).toBe('channels');
+  });
+
+  test('honors provisioning onboarding step in post-provisioning mode', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('starting'),
+        onboardingStep: 'provisioning',
+        hasBotIdentity: true,
+      })
+    );
+
+    expect(state.renderStep).toBe('provisioning');
+  });
+
+  test('honors pairing onboarding step in post-provisioning mode for pairing channels', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('running'),
+        onboardingStep: 'pairing',
+        selectedChannelId: 'telegram',
+        hasBotIdentity: true,
+        gatewayState: 'running',
+      })
+    );
+
+    expect(state.renderStep).toBe('pairing');
+  });
+
   test('renders complete in post-provisioning mode once the machine is running', () => {
     const state = getClawOnboardingFlowState(
       createInput({

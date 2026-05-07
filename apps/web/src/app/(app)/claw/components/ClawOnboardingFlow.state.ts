@@ -254,17 +254,35 @@ function getRenderStepDecision({
   }
 
   if (mode === 'post-provisioning') {
-    // Allow explicit calendar resume even in post-provisioning mode. The
-    // Google OAuth round-trip is a full-page reload, and after it the
-    // wizard often remounts as post-provisioning (the instance row is now
-    // visible). Without this branch the state machine would force
-    // 'complete' or 'provisioning' before the resume effect's
-    // setOnboardingStep('calendar') could take effect, and the user would
-    // never see the calendar step's success/error feedback.
+    // After a full-page reload (e.g. the Google OAuth round-trip), the
+    // wizard often remounts in post-provisioning mode because the instance
+    // row is now visible — but the user is still mid-wizard. Honor any
+    // explicit wizard step rather than auto-routing them past it. Without
+    // this, advancing from calendar → channels → provisioning would fall
+    // through to the default post-prov branch and skip channels, pairing,
+    // and the provisioning UX entirely.
     if (onboardingStep === 'calendar') {
       return {
         renderStep: 'calendar',
         reason: 'calendar resume requested; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'channels') {
+      return {
+        renderStep: 'channels',
+        reason: 'wizard resume on channels; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'provisioning') {
+      return {
+        renderStep: 'provisioning',
+        reason: 'wizard resume on provisioning; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'pairing' && hasPairingStep) {
+      return {
+        renderStep: 'pairing',
+        reason: 'wizard resume on pairing; honor it even in post-provisioning mode',
       };
     }
     if (postProvisioningReady) {

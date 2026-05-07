@@ -8,8 +8,7 @@ import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
 import {
   createGoogleOAuthState,
-  GOOGLE_OAUTH_RETURN_TO_REGEX,
-  returnToHasPathTraversal,
+  isSafeGoogleOAuthReturnTo,
 } from '@/lib/integrations/google/oauth-state';
 import { DEFAULT_GOOGLE_CAPABILITIES } from '@/lib/integrations/google/capabilities';
 import { captureException, captureMessage } from '@sentry/nextjs';
@@ -80,12 +79,7 @@ export async function GET(request: NextRequest) {
 
     const returnToParam = request.nextUrl.searchParams.get('returnTo');
     const returnTo =
-      returnToParam &&
-      GOOGLE_OAUTH_RETURN_TO_REGEX.test(returnToParam) &&
-      returnToParam.length <= 2048 &&
-      !returnToHasPathTraversal(returnToParam)
-        ? returnToParam
-        : undefined;
+      returnToParam && isSafeGoogleOAuthReturnTo(returnToParam) ? returnToParam : undefined;
 
     const state = createGoogleOAuthState(
       {

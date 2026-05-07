@@ -13,12 +13,15 @@ type CalendarConnectStepViewProps = {
   isConnected: boolean;
   connectedAccountEmail?: string | null;
   /**
-   * Whether the kiloclaw instance row is provisioned. The
-   * /api/integrations/google/connect route requires an active instance and
-   * bounces the user out of onboarding when it can't find one, so the Connect
-   * button stays disabled until the instance row exists.
+   * Whether it's safe to start the OAuth round trip. Two prerequisites:
+   * (1) the kiloclaw instance row exists — `/api/integrations/google/connect`
+   * needs an active instance and bounces to Settings otherwise.
+   * (2) the wizard's pre-OAuth saves (bot identity, exec preset) have
+   * persisted — the OAuth round trip is a full-page reload, and unload
+   * mid-flight can race or cancel those mutations. The post-OAuth resume
+   * also relies on `botName` being persisted for hydration.
    */
-  instanceReady: boolean;
+  readyToConnect: boolean;
   onSkip: () => void;
   onContinue: () => void;
   onConnectClick?: () => void;
@@ -48,7 +51,7 @@ export function CalendarConnectStepView({
   connectUrl,
   isConnected,
   connectedAccountEmail,
-  instanceReady,
+  readyToConnect,
   onSkip,
   onContinue,
   onConnectClick,
@@ -129,7 +132,7 @@ export function CalendarConnectStepView({
             <Button variant="primary" onClick={() => onContinue()}>
               Continue
             </Button>
-          ) : instanceReady ? (
+          ) : readyToConnect ? (
             <Button asChild variant="primary">
               <Link href={connectUrl} onClick={() => onConnectClick?.()}>
                 Connect Google Calendar

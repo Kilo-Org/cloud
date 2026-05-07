@@ -220,7 +220,7 @@ function renderFakeStep({
           connectUrl="#"
           isConnected={false}
           connectedAccountEmail={null}
-          instanceReady={true}
+          readyToConnect={true}
           onConnectClick={() => setStep('channels')}
           onSkip={() => setStep('channels')}
           onContinue={() => setStep('channels')}

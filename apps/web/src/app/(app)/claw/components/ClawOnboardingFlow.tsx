@@ -440,7 +440,7 @@ function ClawOnboardingFlowInner({
         connectUrl={connectUrl}
         isConnected={isConnected}
         connectedAccountEmail={connectedEmail}
-        instanceReady={flowState.instanceStatus !== null}
+        readyToConnect={flowState.instanceStatus !== null && onboardingSaves.ready}
         onConnectClick={() => {
           posthog?.capture('claw_setup_calendar_connect_clicked', { skipped: false });
         }}

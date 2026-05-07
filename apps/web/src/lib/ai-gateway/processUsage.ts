@@ -974,7 +974,7 @@ function useGenerationLookup(
 ) {
   const isGatewayProvider =
     usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
-  const isSuccessStatusCode = (usageContext.status_code ?? 200) < 400;
+  const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
     isFreeModel(usageContext.requested_model) || (usageStats?.cost_mUsd ?? 0) > 0;

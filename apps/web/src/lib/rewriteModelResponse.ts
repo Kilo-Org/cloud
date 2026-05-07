@@ -1,5 +1,10 @@
 import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
-import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
+import type {
+  ChatCompletionChunk,
+  OpenRouterUsage,
+  VercelProviderMetaData,
+} from '@/lib/ai-gateway/processUsage.types';
+import { extractVercelIsByok } from '@/lib/ai-gateway/processUsage.shared';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';
@@ -206,6 +211,140 @@ export async function rewriteFreeModelResponse_Messages(response: Response, mode
             if (e.usage) {
               rewriteMessagesUsage(e.usage);
             }
+          }
+
+          const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
+          controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
+        },
+        onComment() {
+          controller.enqueue(': KILO PROCESSING\n\n');
+        },
+      });
+
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          controller.close();
+          break;
+        }
+        parser.feed(decoder.decode(value, { stream: true }));
+      }
+    },
+  });
+
+  return new NextResponse(stream, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+type MaybeHasVercelProviderMetadata = {
+  provider_metadata?: VercelProviderMetaData;
+};
+
+/**
+ * Translate Vercel AI Gateway cost fields (in `provider_metadata.gateway`)
+ * into OpenRouter-style cost fields (`cost`, `is_byok`, `cost_details`) on
+ * `usage`, mirroring what OpenRouter's Messages API natively emits.
+ *
+ * This lets clients (e.g. the Kilo provider) extract per-request cost from
+ * `usage.cost` regardless of whether the gateway routed via OpenRouter or
+ * Vercel internally.
+ *
+ * Mapping (matching OpenRouter's BYOK convention):
+ * - `usage.cost` ← `gateway.cost` (what Kilo charged)
+ * - `usage.cost_details.upstream_inference_cost` ← `gateway.marketCost`
+ *   (the upstream provider's cost, the figure shown to BYOK users)
+ * - `usage.is_byok` ← derived from `gateway.routing.modelAttempts[].providerAttempts[].credentialType`
+ *
+ * No-op when `usage` already carries OpenRouter-style cost fields, or when
+ * the Vercel gateway metadata is absent.
+ */
+function injectVercelCostFieldsIntoUsage(
+  usage: MessagesApiUsage | undefined,
+  providerMetadata: VercelProviderMetaData | undefined
+): void {
+  if (!usage) return;
+  if (usage.cost != null || usage.is_byok != null || usage.cost_details != null) return;
+  const gateway = providerMetadata?.gateway;
+  if (!gateway) return;
+
+  const cost = parseFloat(gateway.cost ?? '');
+  const marketCost = parseFloat(gateway.marketCost ?? '');
+  if (!isNaN(cost)) {
+    usage.cost = cost;
+  }
+  if (!isNaN(marketCost)) {
+    usage.cost_details = { upstream_inference_cost: marketCost };
+  }
+  usage.is_byok = extractVercelIsByok(gateway);
+}
+
+/**
+ * Rewrites a paid-model Messages API response served via the Vercel AI
+ * Gateway to inject OpenRouter-style cost fields into `usage`. This makes
+ * the response shape consistent with OpenRouter's Messages API so clients
+ * can extract cost from `usage.cost` without inspecting `provider_metadata`.
+ */
+export async function injectVercelCostFields_Messages(response: Response) {
+  const headers = getOutputHeaders(response);
+
+  if (headers.get('content-type')?.includes('application/json')) {
+    const text = await response.text();
+    let json: Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & { usage?: MessagesApiUsage };
+    try {
+      json = JSON.parse(text);
+    } catch {
+      return new NextResponse(text, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
+    injectVercelCostFieldsIntoUsage(json.usage, json.provider_metadata);
+    return NextResponse.json(json, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const reader = response.body?.getReader();
+      if (!reader) {
+        controller.close();
+        return;
+      }
+
+      const parser = createParser({
+        onEvent(event: EventSourceMessage) {
+          if (event.data === '[DONE]') {
+            const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
+            controller.enqueue(eventLine + 'data: [DONE]\n\n');
+            return;
+          }
+          let json:
+            | (MessagesApiMessageStart & MaybeHasVercelProviderMetadata)
+            | (MessagesApiMessageDelta & MaybeHasVercelProviderMetadata)
+            | (Anthropic.Messages.MessageStreamEvent & MaybeHasVercelProviderMetadata);
+          try {
+            json = JSON.parse(event.data);
+          } catch {
+            // Pass through unparseable events unchanged
+            const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
+            controller.enqueue(eventLine + 'data: ' + event.data + '\n\n');
+            return;
+          }
+
+          if (json.type === 'message_start') {
+            const e = json as MessagesApiMessageStart & MaybeHasVercelProviderMetadata;
+            injectVercelCostFieldsIntoUsage(e.message.usage, e.provider_metadata);
+          } else if (json.type === 'message_delta') {
+            const e = json as MessagesApiMessageDelta & MaybeHasVercelProviderMetadata;
+            injectVercelCostFieldsIntoUsage(e.usage, e.provider_metadata);
           }
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';

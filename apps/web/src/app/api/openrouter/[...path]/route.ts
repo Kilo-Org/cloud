@@ -56,6 +56,7 @@ import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage
 import { repairTools, sanitizeBinaryToolResults } from '@/lib/ai-gateway/tool-calling';
 import { isFreePromptTrainingAllowed } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
+  injectVercelCostFields_Messages,
   rewriteFreeModelResponse_ChatCompletions,
   rewriteFreeModelResponse_Messages,
   rewriteFreeModelResponse_Responses,
@@ -647,6 +648,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (requestBodyParsed.kind === 'messages') {
       return rewriteFreeModelResponse_Messages(response, originalModelIdLowerCased);
     }
+  }
+
+  // Vercel AI Gateway emits cost in `provider_metadata.gateway` rather than
+  // OpenRouter-style `usage.cost`. Translate to the OpenRouter shape so that
+  // clients (e.g. the Kilo provider) can extract per-request cost from
+  // `usage.cost` regardless of which gateway routed the request internally.
+  if (requestBodyParsed.kind === 'messages' && provider.id === 'vercel' && response.status < 400) {
+    return injectVercelCostFields_Messages(response);
   }
 
   return wrapInSafeNextResponse(response);

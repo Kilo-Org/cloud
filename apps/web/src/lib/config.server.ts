@@ -25,6 +25,8 @@ export const GITHUB_CLIENT_ID = getEnvVariable('GITHUB_CLIENT_ID');
 export const GITHUB_CLIENT_SECRET = getEnvVariable('GITHUB_CLIENT_SECRET');
 // Admin-only GitHub access (used for admin dashboards)
 export const GITHUB_ADMIN_STATS_TOKEN = getEnvVariable('GITHUB_ADMIN_STATS_TOKEN');
+export const CONTRIBUTOR_CHAMPION_TEAM_EMAILS =
+  getEnvVariable('CONTRIBUTOR_CHAMPION_TEAM_EMAILS') || '';
 export const GITLAB_CLIENT_ID = getEnvVariable('GITLAB_CLIENT_ID');
 export const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
 export const LINKEDIN_CLIENT_ID = getEnvVariable('LINKEDIN_CLIENT_ID');
@@ -121,6 +123,15 @@ export const APP_BUILDER_DB_PROXY_AUTH_TOKEN = getEnvVariable('APP_BUILDER_DB_PR
 export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');
 export const SLACK_SIGNING_SECRET = getEnvVariable('SLACK_SIGNING_SECRET');
+
+// Linear (bot integration)
+// @chat-adapter/linear 4.27 does not (yet) support encryption-at-rest via
+// an `encryptionKey` config option the way @chat-adapter/slack does; the
+// adapter stores installations (including OAuth tokens) via the configured
+// Chat SDK state adapter. Revisit when the adapter exposes an encryption key.
+export const LINEAR_CLIENT_ID = getEnvVariable('LINEAR_CLIENT_ID');
+export const LINEAR_CLIENT_SECRET = getEnvVariable('LINEAR_CLIENT_SECRET');
+export const LINEAR_WEBHOOK_SECRET = getEnvVariable('LINEAR_WEBHOOK_SECRET');
 
 // Discord (bot integration — existing)
 export const DISCORD_CLIENT_ID = getEnvVariable('DISCORD_CLIENT_ID');

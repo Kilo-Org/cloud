@@ -420,6 +420,37 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         sandboxId: 'usr-sandbox',
         source: 'sandbox-error-status-callback',
       });
+      expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith({
+        type: 'user',
+        id: 'user-1',
+        userId: 'user-1',
+      });
+      expect(mockAddReactionToPR).toHaveBeenCalledWith('inst-1', 'owner', 'repo', 1, 'confused');
+    });
+
+    it('skips terminal cleanup when sandbox retry is claimed', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockClaimAndDispatchCodeReviewSandboxRetries.mockResolvedValue({
+        claimed: 1,
+        dispatchedOwners: 1,
+      });
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          terminalReason: 'sandbox_error',
+          sandboxId: 'usr-sandbox',
+          errorMessage: 'Sandbox destroyed after 500',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockClaimAndDispatchCodeReviewSandboxRetries).toHaveBeenCalledWith({
+        sandboxId: 'usr-sandbox',
+        source: 'sandbox-error-status-callback',
+      });
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
     });
 
     it('persists sandboxId from running callbacks', async () => {

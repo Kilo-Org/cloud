@@ -648,11 +648,13 @@ export async function POST(
     }
 
     if (status === 'failed' && terminalReason === 'sandbox_error' && sandboxId) {
-      await claimAndDispatchCodeReviewSandboxRetries({
+      const retryResult = await claimAndDispatchCodeReviewSandboxRetries({
         sandboxId,
         source: 'sandbox-error-status-callback',
       });
-      return NextResponse.json({ success: true });
+      if (retryResult.claimed > 0) {
+        return NextResponse.json({ success: true });
+      }
     }
 
     logExceptInTest('[code-review-status] Updated review status', {

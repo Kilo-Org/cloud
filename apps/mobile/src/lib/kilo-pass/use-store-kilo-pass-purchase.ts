@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { type Purchase, useIAP } from 'expo-iap';
+import { ErrorCode, type Purchase, useIAP } from 'expo-iap';
 import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
+import { z } from 'zod';
 
 import { useTRPC } from '@/lib/trpc';
 import { type AppStoreKiloPassProduct } from './store-products';
+
+const userCancelledPurchaseErrorSchema = z.object({
+  code: z.literal(ErrorCode.UserCancelled),
+});
 
 type AppStoreKiloPassPurchaseActionsDeps = {
   requestPurchase: (params: {
@@ -36,6 +41,10 @@ function getPurchaseToken(purchase: Purchase): string {
   return token;
 }
 
+function isUserCancelledPurchaseError(error: unknown): boolean {
+  return userCancelledPurchaseErrorSchema.safeParse(error).success;
+}
+
 export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurchaseActionsDeps) {
   async function handlePurchaseSuccess(purchase: Purchase) {
     try {
@@ -56,6 +65,10 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
           type: 'subs',
         });
       } catch (error) {
+        if (isUserCancelledPurchaseError(error)) {
+          return;
+        }
+
         deps.showError(
           error instanceof Error ? error.message : 'Failed to start App Store purchase.'
         );
@@ -93,6 +106,10 @@ export function useStoreKiloPassPurchase() {
 
   const actionsRef = useIAP({
     onPurchaseError: error => {
+      if (isUserCancelledPurchaseError(error)) {
+        return;
+      }
+
       toast.error(error.message);
     },
     onPurchaseSuccess: purchase => {

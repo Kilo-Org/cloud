@@ -4,6 +4,9 @@ import { createAppStoreKiloPassPurchaseActions } from './use-store-kilo-pass-pur
 import { type AppStoreKiloPassProduct } from './store-products';
 
 vi.mock('expo-iap', () => ({
+  ErrorCode: {
+    UserCancelled: 'user-cancelled',
+  },
   useIAP: () => ({
     availablePurchases: [],
     connected: false,
@@ -93,6 +96,26 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     await actions.purchase(product);
 
     expect(showError).toHaveBeenCalledWith('Could not connect to App Store');
+  });
+
+  it('does not show an error when the user cancels the App Store purchase sheet', async () => {
+    const showError = vi.fn();
+    const actions = createAppStoreKiloPassPurchaseActions({
+      completeAppStorePurchase: vi.fn(),
+      finishTransaction: vi.fn(),
+      invalidateAfterCompletion: vi.fn(),
+      requestPurchase: vi.fn().mockRejectedValue({
+        code: 'user-cancelled',
+        message: 'User cancelled the purchase',
+      }),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    await actions.purchase(product);
+
+    expect(showError).not.toHaveBeenCalled();
   });
 
   it('does not finish the transaction when backend completion fails', async () => {

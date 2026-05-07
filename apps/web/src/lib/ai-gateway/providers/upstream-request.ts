@@ -31,14 +31,28 @@ export async function upstreamRequest({
   for (const [key, value] of Object.entries(ATTRIBUTION_HEADERS)) {
     headers.set(key, value);
   }
-  headers.set('Authorization', `Bearer ${provider.apiKey}`);
   headers.set('Content-Type', 'application/json');
 
   Object.entries(extraHeaders).forEach(([key, value]) => {
     headers.set(key, value);
   });
 
-  const targetUrl = `${provider.apiUrl}${path}${search}`;
+  let targetUrl = `${provider.apiUrl}${path}${search}`;
+  const serializedBody = JSON.stringify(body);
+
+  if (provider.signRequest) {
+    const signed = await provider.signRequest({
+      method,
+      url: targetUrl,
+      body: serializedBody,
+    });
+    if (signed.url) targetUrl = signed.url;
+    for (const [key, value] of Object.entries(signed.headers)) {
+      headers.set(key, value);
+    }
+  } else {
+    headers.set('Authorization', `Bearer ${provider.apiKey}`);
+  }
 
   const TEN_MINUTES_MS = 10 * 60 * 1000;
   const timeoutSignal = AbortSignal.timeout(TEN_MINUTES_MS);
@@ -47,7 +61,7 @@ export async function upstreamRequest({
   return await fetch(targetUrl, {
     method,
     headers,
-    body: JSON.stringify(body),
+    body: serializedBody,
     // @ts-expect-error see https://github.com/node-fetch/node-fetch/issues/1769
     duplex: 'half',
     signal: combinedSignal,

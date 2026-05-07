@@ -23,6 +23,7 @@ import {
   addCacheBreakpoints,
   injectReasoningIntoContent,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import { makeBedrockSignRequest } from '@/lib/ai-gateway/providers/bedrock-signer';
 
 function inferSupportedChatApis(
   aiSdkProvider: CustomLlmProvider | undefined,
@@ -94,6 +95,10 @@ async function checkCustomLlm(
   if (!customLlm || !customLlm.organization_ids.includes(organizationId)) {
     return null;
   }
+  const bedrock = customLlm.aws_bedrock;
+  const signRequest = bedrock
+    ? makeBedrockSignRequest(bedrock, customLlm.internal_id)
+    : undefined;
   return {
     provider: {
       id: 'custom',
@@ -120,6 +125,7 @@ async function checkCustomLlm(
           injectReasoningIntoContent(context.request);
         }
       },
+      signRequest,
     },
     userByok: null,
     bypassAccessCheck: true,

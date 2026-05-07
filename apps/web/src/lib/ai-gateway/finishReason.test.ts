@@ -1,7 +1,5 @@
 import {
   ERROR_FINISH_REASONS,
-  FINISH_REASONS,
-  FinishReasonSchema,
   NON_ERROR_FINISH_REASONS,
   isErrorFinishReason,
 } from '@/lib/ai-gateway/finishReason';
@@ -29,13 +27,6 @@ describe('finishReason', () => {
     // wasAborted) handle those cases. This also keeps us from creating
     // spurious error rows when a new provider adds a new stop reason.
     expect(isErrorFinishReason('something_new_from_provider')).toBe(false);
-  });
-
-  it('exposes a zod enum covering both error and non-error reasons', () => {
-    for (const reason of FINISH_REASONS) {
-      expect(FinishReasonSchema.safeParse(reason).success).toBe(true);
-    }
-    expect(FinishReasonSchema.safeParse('not_a_real_reason').success).toBe(false);
   });
 
   it('does not double-count any reason in both lists', () => {

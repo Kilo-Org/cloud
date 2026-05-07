@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 /**
  * Finish reasons that indicate the model completed its turn in an expected way.
  * Includes:
@@ -40,11 +38,6 @@ export const ERROR_FINISH_REASONS = [
   'incomplete',
   'in_progress',
 ] as const;
-
-export const FINISH_REASONS = [...NON_ERROR_FINISH_REASONS, ...ERROR_FINISH_REASONS] as const;
-
-export const FinishReasonSchema = z.enum(FINISH_REASONS);
-export type FinishReason = z.infer<typeof FinishReasonSchema>;
 
 const errorFinishReasonSet: ReadonlySet<string> = new Set(ERROR_FINISH_REASONS);
 

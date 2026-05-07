@@ -23,8 +23,6 @@ import {
   KeyRound,
   LayoutDashboard,
   Loader2,
-  Lock,
-  Mail,
   MessageSquare,
   Receipt,
   Settings,
@@ -63,6 +61,12 @@ import {
   type AdminBillingStatus,
   type AssociatedUser,
   type CreditBillingEntry,
+  type KiloAdminChangeLogEntry,
+  type KiloAdminKiloclawInstanceRow,
+  type KiloAdminKiloclawReadiness,
+  type KiloAdminKiloclawStats,
+  type KiloAdminOrgSupportSummary,
+  type KiloAdminUserSupportSummary,
   type KiloClawOrgSubscriptionRow,
   type MemberBillingStatus,
   type OrgBillingOperationalState,
@@ -1955,6 +1959,1028 @@ export function OrgDashboardWithBannerAndTile({
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Kilo Admin — internal support and ops previews
+// ---------------------------------------------------------------------------
+
+function AdminMetric({
+  label,
+  value,
+  hint,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  tone?: 'neutral' | 'warning' | 'danger' | 'success';
+}) {
+  const styles: Record<typeof tone, string> = {
+    neutral: 'border-border bg-card/40',
+    warning: 'border-yellow-500/20 bg-yellow-500/5',
+    danger: 'border-red-500/20 bg-red-500/5',
+    success: 'border-emerald-500/20 bg-emerald-500/5',
+  };
+
+  return (
+    <div className={cn('rounded-xl border p-4', styles[tone])}>
+      <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+        {label}
+      </p>
+      <p className="text-foreground mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+      {hint && <p className="text-muted-foreground mt-1 text-xs">{hint}</p>}
+    </div>
+  );
+}
+
+function ScopeBadge({ scope }: { scope: KiloAdminKiloclawInstanceRow['scope'] }) {
+  return (
+    <Badge variant="outline" className="gap-1.5 rounded-full text-[11px] capitalize">
+      {scope === 'organization' ? <Users className="h-3 w-3" /> : <User className="h-3 w-3" />}
+      {scope}
+    </Badge>
+  );
+}
+
+function TrialBadge({
+  trialKind,
+  isLaunchBackfill,
+}: {
+  trialKind: '7day_user' | '30day_launch' | null;
+  isLaunchBackfill: boolean;
+}) {
+  if (!trialKind) return null;
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        'rounded-full border-transparent px-2.5 py-1 text-[11px] ring-1',
+        isLaunchBackfill
+          ? 'bg-blue-500/10 text-blue-400 ring-blue-500/20'
+          : 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
+      )}
+    >
+      {trialKind === '30day_launch' ? '30-day launch' : '7-day trial'}
+    </Badge>
+  );
+}
+
+function OperationalBadge({ kind }: { kind: OrgBillingOperationalState['kind'] }) {
+  return <StatusBadge kind={kind} />;
+}
+
+function ParentEntitlementBadge({
+  state,
+}: {
+  state: KiloAdminKiloclawInstanceRow['parentEntitlement'];
+}) {
+  if (!state) return <span className="text-muted-foreground">—</span>;
+  const className =
+    state === 'active'
+      ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
+      : state === 'trialing'
+        ? 'bg-blue-500/10 text-blue-400 ring-blue-500/20'
+        : 'bg-red-500/10 text-red-400 ring-red-500/20';
+  return (
+    <Badge variant="outline" className={cn('rounded-full border-transparent ring-1', className)}>
+      {state.replace('_', ' ')}
+    </Badge>
+  );
+}
+
+function ReadonlyFilterPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-input bg-background flex h-9 min-w-0 items-center gap-2 rounded-md border px-3 text-sm">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className="text-foreground truncate font-medium">{value}</span>
+    </div>
+  );
+}
+
+export function KiloAdminKiloclawListPreview({
+  rows,
+  stats,
+}: {
+  rows: KiloAdminKiloclawInstanceRow[];
+  stats: KiloAdminKiloclawStats;
+}) {
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <CardTitle>All KiloClaw instances</CardTitle>
+              <CardDescription>
+                Org-aware list, filters, search, and support metadata for `/admin/kiloclaw`.
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm">
+              Export filtered CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+            <div className="border-input bg-background flex h-9 items-center gap-2 rounded-md border px-3 text-sm">
+              <SearchIcon />
+              <span className="text-muted-foreground truncate">
+                Search instance, user email, organization ID/name…
+              </span>
+            </div>
+            <ReadonlyFilterPill label="Scope" value="All · Personal · Organization" />
+            <ReadonlyFilterPill label="Status" value="active, trialing, past due" />
+            <ReadonlyFilterPill label="Operational" value="blocked / opt-out / canceling" />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <AdminMetric
+              label="Total instances"
+              value={stats.totalInstances}
+              hint="personal + org"
+            />
+            <AdminMetric
+              label="Organization"
+              value={stats.organizationCount}
+              hint={`${stats.personalCount} personal`}
+            />
+            <AdminMetric
+              label="Org paid active"
+              value={stats.activePaidOrgCount}
+              hint={`${stats.launchTrialingCount} launch trials · ${stats.sevenDayTrialingCount} 7-day trials`}
+              tone="success"
+            />
+            <AdminMetric
+              label="Needs attention"
+              value={
+                stats.pastDueCount +
+                stats.suspendedCount +
+                stats.blockedParentCount +
+                stats.blockedOptOutCount
+              }
+              hint={`${stats.pastDueCount} past due · ${stats.suspendedCount} suspended`}
+              tone="warning"
+            />
+            <AdminMetric label="Canceling" value={stats.cancelingAtPeriodEndCount} />
+            <AdminMetric label="Parent blocked" value={stats.blockedParentCount} tone="danger" />
+            <AdminMetric label="Opt-out blocked" value={stats.blockedOptOutCount} tone="danger" />
+            <AdminMetric label="Destroyed/canceled" value={stats.destroyedCanceledCount} />
+          </div>
+
+          <div className="overflow-hidden rounded-xl border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="px-4">Instance</TableHead>
+                  <TableHead>Organization</TableHead>
+                  <TableHead>Associated user</TableHead>
+                  <TableHead>Subscription</TableHead>
+                  <TableHead>Operational</TableHead>
+                  <TableHead>Renews</TableHead>
+                  <TableHead className="w-8 px-4" aria-label="Open" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map(row => (
+                  <TableRow key={row.instanceId} className="group relative cursor-pointer">
+                    <TableCell className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
+                          <KiloCrabIcon className="text-foreground h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <Link
+                            href={`/admin/kiloclaw/${row.instanceId}`}
+                            className="font-medium before:absolute before:inset-0 group-hover:underline"
+                          >
+                            {row.instanceName ?? 'Unnamed instance'}
+                          </Link>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <ScopeBadge scope={row.scope} />
+                            <span className="text-muted-foreground font-mono text-xs">
+                              {row.instanceId}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      {row.organizationId ? (
+                        <div className="flex flex-col leading-tight">
+                          <Link
+                            href={`/admin/organizations/${row.organizationId}`}
+                            className="relative z-10 text-sm font-medium hover:underline"
+                          >
+                            {row.organizationName}
+                          </Link>
+                          <span className="text-muted-foreground text-xs capitalize">
+                            {row.organizationPlan}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Personal</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex flex-col leading-tight">
+                        <Link
+                          href={`/admin/users/${row.associatedUserId}`}
+                          className="relative z-10 text-sm font-medium hover:underline"
+                        >
+                          {row.associatedUserDisplayName}
+                        </Link>
+                        <span className="text-muted-foreground text-xs">
+                          {row.associatedUserEmail}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap gap-1.5">
+                          {row.subscriptionStatus ? (
+                            <Badge variant="outline" className="rounded-full text-[11px]">
+                              {row.subscriptionStatus.replace('_', ' ')}
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive" className="rounded-full text-[11px]">
+                              missing row
+                            </Badge>
+                          )}
+                          <TrialBadge
+                            trialKind={row.trialKind}
+                            isLaunchBackfill={row.isLaunchBackfill}
+                          />
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                          {row.paymentSource === 'credits'
+                            ? row.providerSubscriptionId
+                              ? 'hybrid credits'
+                              : 'pure credits'
+                            : 'Stripe'}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        <OperationalBadge kind={row.operationalKind} />
+                        {row.suspendedAt && <StatusBadge kind="past_due" />}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3 font-mono text-sm tabular-nums">
+                      {formatDate(row.creditRenewalAt ?? row.currentPeriodEnd)}
+                    </TableCell>
+                    <TableCell className="w-8 px-4 py-3 text-right">
+                      <ChevronRight className="text-muted-foreground h-4 w-4" />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg
+      className="text-muted-foreground h-4 w-4 shrink-0"
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+export function KiloAdminBillingReadinessCardPreview({
+  readiness,
+}: {
+  readiness: KiloAdminKiloclawReadiness;
+}) {
+  const hasLaunchRisks =
+    readiness.activeOrgInstancesWithoutSubscription > 0 ||
+    readiness.launchBackfillRowsMissingFlag > 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <CardTitle>Launch and backfill readiness</CardTitle>
+            <CardDescription>
+              Read-only health check for `KILOCLAW_ORG_BILLING_LAUNCH_DATE` and launch backfill.
+            </CardDescription>
+          </div>
+          <Badge
+            variant="outline"
+            className={cn(
+              'rounded-full border-transparent ring-1',
+              hasLaunchRisks
+                ? 'bg-yellow-500/10 text-yellow-400 ring-yellow-500/20'
+                : 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
+            )}
+          >
+            {hasLaunchRisks ? 'Needs review' : 'Ready'}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <AdminMetric
+            label="Launch date"
+            value={readiness.launchDate ? formatDate(readiness.launchDate) : 'Unset'}
+            hint="environment config"
+            tone={readiness.launchDate ? 'success' : 'warning'}
+          />
+          <AdminMetric
+            label="Missing billing rows"
+            value={readiness.activeOrgInstancesWithoutSubscription}
+            hint="active org instances"
+            tone={readiness.activeOrgInstancesWithoutSubscription > 0 ? 'danger' : 'success'}
+          />
+          <AdminMetric
+            label="Launch trials"
+            value={readiness.launchTrialRows}
+            hint={`common end ${formatDate(readiness.commonLaunchTrialEnd)}`}
+          />
+          <AdminMetric
+            label="Due within 7d"
+            value={readiness.orgRowsDueWithin7Days}
+            hint="org KC renewals"
+            tone="warning"
+          />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ReadinessChecklist
+            title="Backfill integrity"
+            items={[
+              {
+                label: 'Active org instances have canonical subscription rows',
+                ok: readiness.activeOrgInstancesWithoutSubscription === 0,
+                detail: `${readiness.activeOrgInstancesWithoutSubscription} missing`,
+              },
+              {
+                label: 'Expected launch rows carry is_launch_backfill',
+                ok: readiness.launchBackfillRowsMissingFlag === 0,
+                detail: `${readiness.launchBackfillRowsMissingFlag} missing flag`,
+              },
+              {
+                label: 'Backfill sweep has run after launch',
+                ok: Boolean(readiness.lastBackfillSweepAt),
+                detail: readiness.lastBackfillSweepAt
+                  ? formatDate(readiness.lastBackfillSweepAt)
+                  : 'never',
+              },
+            ]}
+          />
+          <ReadinessChecklist
+            title="Incident pressure"
+            items={[
+              {
+                label: 'Past-due org KC subscriptions',
+                ok: readiness.pastDueCount === 0,
+                detail: `${readiness.pastDueCount} past due`,
+              },
+              {
+                label: 'Suspended org KC subscriptions',
+                ok: readiness.suspendedCount === 0,
+                detail: `${readiness.suspendedCount} suspended`,
+              },
+              {
+                label: 'Renewals due in the next 7 days are reviewable',
+                ok: readiness.orgRowsDueWithin7Days < 25,
+                detail: `${readiness.orgRowsDueWithin7Days} rows`,
+              },
+            ]}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReadinessChecklist({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ label: string; ok: boolean; detail: string }>;
+}) {
+  return (
+    <div className="rounded-xl border p-4">
+      <p className="text-sm font-semibold">{title}</p>
+      <div className="mt-3 space-y-3">
+        {items.map(item => (
+          <div key={item.label} className="flex items-start gap-3">
+            <span
+              className={cn(
+                'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px]',
+                item.ok
+                  ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
+                  : 'bg-yellow-500/10 text-yellow-400 ring-1 ring-yellow-500/20'
+              )}
+            >
+              {item.ok ? '✓' : '!'}
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm">{item.label}</p>
+              <p className="text-muted-foreground text-xs">{item.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function KiloAdminInstanceBillingSupportPreview({
+  row,
+  changeLogs,
+}: {
+  row: KiloAdminKiloclawInstanceRow;
+  changeLogs: KiloAdminChangeLogEntry[];
+}) {
+  const callout = (() => {
+    if (row.operationalKind === 'past_due' && row.suspendedAt) {
+      return {
+        tone: 'red' as const,
+        copy: 'Renewal failed and the grace period elapsed. Support should confirm org credits or auto top-up before resuming.',
+      };
+    }
+    if (row.operationalKind === 'blocked_parent_entitlement') {
+      return {
+        tone: 'red' as const,
+        copy:
+          row.blockingReason === 'org_subscription_ended'
+            ? 'Parent organization entitlement ended. Org KiloClaw access is blocked independently of this local subscription status.'
+            : 'Organization trial hard-expired. Access is blocked, but the KiloClaw subscription is not immediately canceled by that state alone.',
+      };
+    }
+    if (row.operationalKind === 'blocked_opt_out') {
+      return {
+        tone: 'yellow' as const,
+        copy: 'Enterprise KiloClaw opt-out is enforced. Provisioning, access, and renewal are blocked while the setting remains enabled.',
+      };
+    }
+    if (row.operationalKind === 'canceling_at_period_end') {
+      return {
+        tone: 'yellow' as const,
+        copy: `Instance was destroyed. Subscription remains visible until it cancels on ${formatDate(row.currentPeriodEnd)} with no refund or proration.`,
+      };
+    }
+    return null;
+  })();
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        backHref="/admin/kiloclaw"
+        backLabel="Back to admin KiloClaw"
+        title={row.instanceName ?? row.instanceId}
+        statusBadge={<OperationalBadge kind={row.operationalKind} />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/admin/users/${row.associatedUserId}`}>
+                User admin
+                <ExternalLink />
+              </Link>
+            </Button>
+            {row.organizationId && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/admin/organizations/${row.organizationId}`}>
+                  Org admin
+                  <ExternalLink />
+                </Link>
+              </Button>
+            )}
+          </div>
+        }
+      />
+
+      {callout && <NoteCallout tone={callout.tone} copy={callout.copy} />}
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Billing support</CardTitle>
+            <CardDescription>
+              Normalized internal payload for support triage. Org rows are credit-funded by the
+              organization, not the associated user.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <CardKV label="Scope">
+                <ScopeBadge scope={row.scope} />
+              </CardKV>
+              <CardKV label="Subscription status">
+                {row.subscriptionStatus?.replace('_', ' ') ?? 'missing'}
+              </CardKV>
+              <CardKV label="Payment source">
+                {row.paymentSource === 'credits'
+                  ? row.providerSubscriptionId
+                    ? 'Hybrid credits'
+                    : 'Pure organization credits'
+                  : 'Stripe'}
+              </CardKV>
+              <CardKV label="Current period" mono>
+                {formatDate(row.currentPeriodStart)} → {formatDate(row.currentPeriodEnd)}
+              </CardKV>
+              <CardKV label="Credit renewal" mono>
+                {formatDate(row.creditRenewalAt)}
+              </CardKV>
+              <CardKV label="Renewal cost" mono>
+                {row.renewalCostMicrodollars == null
+                  ? '—'
+                  : formatMicrodollars(row.renewalCostMicrodollars)}
+              </CardKV>
+              <CardKV label="Trial">
+                <TrialBadge trialKind={row.trialKind} isLaunchBackfill={row.isLaunchBackfill} />
+                {!row.trialKind && <span className="text-muted-foreground">—</span>}
+              </CardKV>
+              <CardKV label="Parent entitlement">
+                <ParentEntitlementBadge state={row.parentEntitlement} />
+              </CardKV>
+              <CardKV label="Enterprise opt-out">
+                {row.optOutEnforced
+                  ? 'Enforced'
+                  : row.optOutSetting
+                    ? 'Stored, not enforced'
+                    : 'Off'}
+              </CardKV>
+            </div>
+
+            <div className="grid gap-4 rounded-xl border p-4 sm:grid-cols-2">
+              <CardKV label="Associated user">
+                <Link href={`/admin/users/${row.associatedUserId}`} className="hover:underline">
+                  {row.associatedUserDisplayName}
+                </Link>
+                <p className="text-muted-foreground text-xs">{row.associatedUserEmail}</p>
+              </CardKV>
+              <CardKV label="Organization">
+                {row.organizationId ? (
+                  <>
+                    <Link
+                      href={`/admin/organizations/${row.organizationId}`}
+                      className="hover:underline"
+                    >
+                      {row.organizationName}
+                    </Link>
+                    <p className="text-muted-foreground text-xs capitalize">
+                      {row.organizationPlan} · balance{' '}
+                      {formatMicrodollars(row.orgCreditBalanceMicrodollars ?? 0)} · auto top-up{' '}
+                      {row.orgAutoTopUpEnabled ? 'on' : 'off'}
+                    </p>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">Personal context</span>
+                )}
+              </CardKV>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link
+                  href={`/organizations/${row.organizationId ?? 'personal'}/subscriptions/kiloclaw/${row.instanceId}`}
+                >
+                  Customer subscription page
+                  <ExternalLink />
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="#admin-change-log">
+                  Subscription change log
+                  <ChevronRight />
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Raw IDs</CardTitle>
+            <CardDescription>Copy/paste handles for logs and worker traces.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <CardKV label="Instance ID" mono>
+              {row.instanceId}
+            </CardKV>
+            <CardKV label="Sandbox ID" mono>
+              {row.sandboxId}
+            </CardKV>
+            <CardKV label="Subscription ID" mono>
+              {row.subscriptionId ?? '—'}
+            </CardKV>
+            <CardKV label="Provider subscription" mono>
+              {row.providerSubscriptionId ?? '—'}
+            </CardKV>
+          </CardContent>
+        </Card>
+      </div>
+
+      <KiloAdminChangeLogPreview entries={changeLogs} />
+    </div>
+  );
+}
+
+export function KiloAdminMutationSafetyPreview() {
+  const rows = [
+    {
+      action: 'Update trial end',
+      personal: 'Allowed for personal trial rows',
+      organization: 'Disabled for org rows; org trial eligibility is historical per user/org.',
+    },
+    {
+      action: 'Cancel subscription',
+      personal: 'Allowed when the row is personal and active',
+      organization: 'Disabled in MVP; customer-facing termination is Destroy only.',
+    },
+    {
+      action: 'Destroy instance',
+      personal: 'Tears down infra and preserves personal subscription transfer rules',
+      organization:
+        'Allowed only as explicit admin override; must mark destroyed, set cancel_at_period_end, and write both audit logs.',
+    },
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Admin mutation guardrails</CardTitle>
+        <CardDescription>
+          Personal-only actions stay disabled for org subscriptions unless an explicit org-safe
+          override is designed.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="overflow-hidden rounded-xl border">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="px-4">Action</TableHead>
+                <TableHead>Personal row</TableHead>
+                <TableHead>Organization row</TableHead>
+                <TableHead className="text-right">Prototype state</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map(row => (
+                <TableRow key={row.action}>
+                  <TableCell className="px-4 py-3 font-medium">{row.action}</TableCell>
+                  <TableCell className="py-3 text-sm">{row.personal}</TableCell>
+                  <TableCell className="py-3 text-sm">{row.organization}</TableCell>
+                  <TableCell className="py-3 text-right">
+                    {row.action === 'Destroy instance' ? (
+                      <Button variant="destructive" size="sm">
+                        Admin override
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" disabled>
+                        Disabled for org row
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <NoteCallout
+          tone="yellow"
+          copy="Org destroy copy must call out immediate infrastructure teardown, period-end cancellation, no refund/proration, KiloClaw admin audit log, and subscription change-log entry."
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+export function KiloAdminOrganizationKiloclawPreview({
+  summary,
+}: {
+  summary: KiloAdminOrgSupportSummary;
+}) {
+  const { organization, health, rows } = summary;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <CardTitle>KiloClaw support</CardTitle>
+            <CardDescription>
+              Organization-level support card for `/admin/organizations/[id]`.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className="rounded-full capitalize">
+              {organization.plan}
+            </Badge>
+            <Badge
+              variant="outline"
+              className={cn(
+                'rounded-full border-transparent ring-1',
+                organization.kiloclawOptOut
+                  ? 'bg-red-500/10 text-red-400 ring-red-500/20'
+                  : 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
+              )}
+            >
+              Opt-out {organization.kiloclawOptOut ? 'on' : 'off'}
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <AdminMetric label="Active instances" value={health.activeInstanceCount} />
+          <AdminMetric
+            label="Credit balance"
+            value={formatMicrodollars(organization.creditBalanceMicrodollars)}
+            hint={`auto top-up ${organization.autoTopUpEnabled ? 'on' : 'off'}`}
+            tone="success"
+          />
+          <AdminMetric
+            label="Next-period cost"
+            value={formatMicrodollars(health.totalRenewalCostMicrodollars)}
+            hint="all active org KC rows"
+          />
+          <AdminMetric
+            label="Needs attention"
+            value={health.pastDueCount + health.suspendedCount + health.blockedParentCount}
+            hint={`${health.pastDueCount} past due · ${health.suspendedCount} suspended`}
+            tone="warning"
+          />
+          <AdminMetric label="Paid active" value={health.activePaidCount} />
+          <AdminMetric label="7-day trials" value={health.sevenDayTrialingCount} />
+          <AdminMetric label="Launch trials" value={health.launchTrialingCount} />
+          <AdminMetric label="Canceling" value={health.cancelingAtPeriodEndCount} />
+        </div>
+
+        <div className="overflow-hidden rounded-xl border">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="px-4">Instance</TableHead>
+                <TableHead>Associated user</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Trial</TableHead>
+                <TableHead>Renews</TableHead>
+                <TableHead className="w-8 px-4" aria-label="Open" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map(row => (
+                <TableRow key={row.instanceId} className="group relative cursor-pointer">
+                  <TableCell className="px-4 py-3">
+                    <Link
+                      href={`/admin/kiloclaw/${row.instanceId}`}
+                      className="font-medium before:absolute before:inset-0 group-hover:underline"
+                    >
+                      {row.instanceName ?? 'Unnamed instance'}
+                    </Link>
+                    <p className="text-muted-foreground font-mono text-xs">{row.instanceId}</p>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <div className="leading-tight">
+                      <p className="text-sm">{row.associatedUserDisplayName}</p>
+                      <p className="text-muted-foreground text-xs">{row.associatedUserEmail}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <StatusBadge
+                      kind={row.status === 'canceled' ? 'canceled' : row.operationalKind}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <TrialBadge trialKind={row.trialKind} isLaunchBackfill={row.isLaunchBackfill} />
+                    {!row.trialKind && <span className="text-muted-foreground text-sm">—</span>}
+                  </TableCell>
+                  <TableCell className="py-3 font-mono text-sm tabular-nums">
+                    {formatDate(row.currentPeriodEnd)}
+                  </TableCell>
+                  <TableCell className="w-8 px-4 py-3 text-right">
+                    <ChevronRight className="text-muted-foreground h-4 w-4" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function KiloAdminUserKiloclawPreview({
+  summary,
+}: {
+  summary: KiloAdminUserSupportSummary;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>User KiloClaw tab · org-aware</CardTitle>
+        <CardDescription>
+          Personal access and organization-funded KiloClaw rows are separated so support does not
+          apply personal actions to org subscriptions.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="rounded-xl border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Personal KiloClaw</p>
+              <p className="text-muted-foreground text-xs">
+                {summary.personal.activeInstanceId
+                  ? `${summary.personal.instanceName} · ${summary.personal.subscriptionStatus}`
+                  : 'No active personal KiloClaw instance'}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" disabled={!summary.personal.actionsEnabled}>
+              Personal actions
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-semibold">Organization KiloClaw</p>
+            <p className="text-muted-foreground text-xs">
+              Org rows remain visible but personal trial/cancel controls are replaced with
+              org-specific support context.
+            </p>
+          </div>
+          <div className="overflow-hidden rounded-xl border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="px-4">Organization</TableHead>
+                  <TableHead>Instance</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Funding</TableHead>
+                  <TableHead>Action state</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {summary.organizationRows.map(row => (
+                  <TableRow key={row.instanceId}>
+                    <TableCell className="px-4 py-3">
+                      <Link
+                        href={`/admin/organizations/${row.organizationId}`}
+                        className="font-medium hover:underline"
+                      >
+                        {row.organizationName}
+                      </Link>
+                      <p className="text-muted-foreground text-xs capitalize">
+                        {row.organizationPlan}
+                      </p>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Link href={`/admin/kiloclaw/${row.instanceId}`} className="hover:underline">
+                        {row.instanceName ?? row.instanceId}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        <StatusBadge kind={row.operationalKind} />
+                        <TrialBadge
+                          trialKind={row.trialKind}
+                          isLaunchBackfill={row.isLaunchBackfill}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3 text-sm">{row.orgFundedLabel}</TableCell>
+                    <TableCell className="py-3">
+                      <Badge variant="outline" className="rounded-full text-[11px]">
+                        {row.personalActionsDisabledReason}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function KiloAdminChangeLogPreview({ entries }: { entries: KiloAdminChangeLogEntry[] }) {
+  return (
+    <Card id="admin-change-log">
+      <CardHeader>
+        <CardTitle>Subscription change log</CardTitle>
+        <CardDescription>
+          Instance and organization pages link here so support can inspect canonical billing
+          mutations without reconstructing state from app logs.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-hidden rounded-xl border">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="px-4">Time</TableHead>
+                <TableHead>Actor</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>Before → after</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {entries.map(entry => (
+                <TableRow key={entry.id}>
+                  <TableCell className="px-4 py-3 font-mono text-xs tabular-nums">
+                    {formatDate(entry.timestamp)}
+                  </TableCell>
+                  <TableCell className="py-3 font-mono text-xs">{entry.actor}</TableCell>
+                  <TableCell className="py-3">
+                    <Badge variant="outline" className="rounded-full text-[11px]">
+                      {entry.action}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-3 text-sm">{entry.reason}</TableCell>
+                  <TableCell className="py-3 text-xs">
+                    <span className="text-muted-foreground">{entry.before}</span>
+                    <span className="text-muted-foreground mx-2">→</span>
+                    <span>{entry.after}</span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function KiloAdminObservabilityPreview() {
+  const filters = [
+    'Org past due',
+    'Org suspended',
+    'Launch trials ending within 7 days',
+    'Canceling at period end',
+    'Parent entitlement blocked',
+    'Enterprise opt-out blocked',
+    'Missing billing row / orphaned pair',
+  ];
+  const notes = [
+    'Org KiloClaw is pure credits only; Stripe seat subscriptions are not mutated for KiloClaw.',
+    'Each instance owns one subscription row. Associated user owns operational lifecycle; organization owns funding.',
+    'Parent entitlement and Enterprise opt-out can block access independently of the local KiloClaw status.',
+    'Destroy is the only customer-facing termination path in MVP; support overrides must write admin audit and subscription change logs.',
+  ];
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>Saved incident filters</CardTitle>
+          <CardDescription>Common support queues for `/admin/kiloclaw`.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {filters.map(filter => (
+            <Button key={filter} variant="outline" size="sm" asChild>
+              <Link href={`/admin/kiloclaw?filter=${encodeURIComponent(filter)}`}>{filter}</Link>
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Inline support notes</CardTitle>
+          <CardDescription>Short invariants surfaced near admin controls.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="text-muted-foreground space-y-2 text-sm">
+            {notes.map(note => (
+              <li key={note} className="flex gap-2">
+                <span className="text-primary mt-1">•</span>
+                <span>{note}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }

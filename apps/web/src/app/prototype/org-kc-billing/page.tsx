@@ -13,7 +13,6 @@
 'use client';
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -27,6 +26,12 @@ import {
   billingHistoryFixture,
   detailRowFixtures,
   healthSummaryFixtures,
+  kiloAdminChangeLogFixture,
+  kiloAdminKiloclawInstanceRowsFixture,
+  kiloAdminKiloclawReadinessFixture,
+  kiloAdminKiloclawStatsFixture,
+  kiloAdminOrgSupportFixture,
+  kiloAdminUserSupportFixture,
   memberFixtures,
   preflightFixtures,
   subscriptionRowsFixture,
@@ -36,6 +41,13 @@ import {
   AssociatedUserChip,
   DashboardCTAsPreview,
   InstanceControlsHeaderPreview,
+  KiloAdminBillingReadinessCardPreview,
+  KiloAdminInstanceBillingSupportPreview,
+  KiloAdminKiloclawListPreview,
+  KiloAdminMutationSafetyPreview,
+  KiloAdminObservabilityPreview,
+  KiloAdminOrganizationKiloclawPreview,
+  KiloAdminUserKiloclawPreview,
   OrgAccessLockedDialogPreview,
   OrgBillingBannerPreview,
   OrgDashboardWithBannerAndTile,
@@ -56,13 +68,24 @@ import { OptOutTabClient } from './opt-out-client';
 // Role filter
 // ---------------------------------------------------------------------------
 
-type Role = 'admin' | 'member';
-type RoleVisibility = Role | 'both';
+type Role = 'admin' | 'member' | 'kilo_admin';
+type RoleVisibility = Role | 'both' | 'all';
 
 const RoleContext = createContext<Role>('admin');
 
 function visibleForRole(roles: RoleVisibility, current: Role): boolean {
-  return roles === 'both' || roles === current;
+  if (roles === 'all') return true;
+  if (roles === 'both') return current === 'admin' || current === 'member';
+  return roles === current;
+}
+
+function roleVisibilityLabel(roles: Exclude<RoleVisibility, 'both' | 'all'>): string {
+  const labels: Record<Role, string> = {
+    admin: 'Admin',
+    member: 'Member',
+    kilo_admin: 'Kilo Admin',
+  };
+  return labels[roles];
 }
 
 const ROLE_OPTIONS: { value: Role; label: string; description: string }[] = [
@@ -75,6 +98,11 @@ const ROLE_OPTIONS: { value: Role; label: string; description: string }[] = [
     value: 'member',
     label: 'Member',
     description: 'Regular org member',
+  },
+  {
+    value: 'kilo_admin',
+    label: 'Kilo Admin',
+    description: 'Internal support and ops',
   },
 ];
 
@@ -105,9 +133,9 @@ function Section({
       <header className="space-y-2">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-          {roles !== 'both' && (
+          {roles !== 'both' && roles !== 'all' && (
             <span className="text-muted-foreground border-border rounded-md border px-2 py-0.5 text-[11px] uppercase tracking-wide">
-              {roles} only
+              {roleVisibilityLabel(roles)} only
             </span>
           )}
         </div>
@@ -122,7 +150,7 @@ function Section({
 function Variant({
   label,
   caption,
-  roles = 'both',
+  roles = 'all',
   children,
 }: {
   label: string;
@@ -150,9 +178,52 @@ function Variant({
 // TOC — role-aware
 // ---------------------------------------------------------------------------
 
-// Ordered to follow an admin's journey through the product:
-//   Org dashboard → Subscriptions → Settings → Provisioning → Inside a claw.
+// Ordered by selected role. Customer roles follow the product journey;
+// Kilo Admin follows internal support triage from list → detail → launch health.
 const TOC_ITEMS: { id: string; label: string; url: string; roles: RoleVisibility }[] = [
+  // Kilo Admin — internal support and ops surfaces
+  {
+    id: 'admin-kiloclaw-list',
+    label: 'Admin KiloClaw list and filters',
+    url: '/admin/kiloclaw',
+    roles: 'kilo_admin',
+  },
+  {
+    id: 'admin-kiloclaw-detail',
+    label: 'Instance billing support card',
+    url: '/admin/kiloclaw/[id]',
+    roles: 'kilo_admin',
+  },
+  {
+    id: 'admin-mutation-safety',
+    label: 'Admin mutation guardrails',
+    url: '/admin/kiloclaw/[id] and /admin/users/[id]?tab=kiloclaw',
+    roles: 'kilo_admin',
+  },
+  {
+    id: 'admin-readiness',
+    label: 'Launch/backfill readiness',
+    url: '/admin/kiloclaw',
+    roles: 'kilo_admin',
+  },
+  {
+    id: 'admin-org-support',
+    label: 'Organization support KiloClaw section',
+    url: '/admin/organizations/[id]',
+    roles: 'kilo_admin',
+  },
+  {
+    id: 'admin-user-support',
+    label: 'User support KiloClaw tab',
+    url: '/admin/users/[id]?tab=kiloclaw',
+    roles: 'kilo_admin',
+  },
+  {
+    id: 'admin-observability',
+    label: 'Change logs, filters, support notes',
+    url: '/admin/kiloclaw and related detail pages',
+    roles: 'kilo_admin',
+  },
   // (0) Cross-PR navigation surfaces
   {
     id: 'navigation',
@@ -358,12 +429,12 @@ export default function OrgKcBillingPrototypePage() {
             </h1>
             <p className="text-muted-foreground max-w-2xl text-sm">
               Preview every UI change planned for organization KiloClaw billing before any code
-              ships. Use the role switcher on the left to see what an{' '}
-              <span className="text-foreground font-medium">Admin</span> (organization owner or
-              billing manager) sees versus a regular{' '}
-              <span className="text-foreground font-medium">Member</span>. Admin-only surfaces
-              (Organization Settings, the Subscriptions list, the dashboard alert) are hidden in the
-              Member view.
+              ships. Use the role switcher on the left to compare customer-facing{' '}
+              <span className="text-foreground font-medium">Admin</span> and{' '}
+              <span className="text-foreground font-medium">Member</span> surfaces, or switch to{' '}
+              <span className="text-foreground font-medium">Kilo Admin</span> for the internal
+              support and launch-readiness sections from{' '}
+              <code className="font-mono">.plans/org-kiloclaw-billing-admin.md</code>.
             </p>
           </header>
 
@@ -381,6 +452,111 @@ export default function OrgKcBillingPrototypePage() {
             </aside>
 
             <main className="min-w-0 space-y-20">
+              {/* Kilo Admin · P0/P1/P2 support and ops surfaces ========================== */}
+              <Section
+                id="admin-kiloclaw-list"
+                title="Admin KiloClaw list and filters"
+                description="P0 support-readiness view for /admin/kiloclaw: personal/org split, organization-aware search, org billing health stats, trial kind badges, and operational filters."
+                url="/admin/kiloclaw"
+                roles="kilo_admin"
+              >
+                <Variant label="Org-billing-aware instance list">
+                  <KiloAdminKiloclawListPreview
+                    rows={kiloAdminKiloclawInstanceRowsFixture}
+                    stats={kiloAdminKiloclawStatsFixture}
+                  />
+                </Variant>
+              </Section>
+
+              <Section
+                id="admin-kiloclaw-detail"
+                title="Instance billing support card"
+                description="P0 detail-page support card for /admin/kiloclaw/[id]. Shows normalized org billing state, org funding, parent entitlement, Enterprise opt-out, IDs, links, and change-log access."
+                url="/admin/kiloclaw/[id]"
+                roles="kilo_admin"
+              >
+                <Variant
+                  label="Suspended org instance"
+                  caption="Support can see why access is blocked and which org-owned funding path failed."
+                >
+                  <KiloAdminInstanceBillingSupportPreview
+                    row={kiloAdminKiloclawInstanceRowsFixture[3]}
+                    changeLogs={kiloAdminChangeLogFixture}
+                  />
+                </Variant>
+                <Variant
+                  label="Enterprise opt-out blocked"
+                  caption="The local subscription is active, but enforced Enterprise opt-out blocks access and renewal."
+                >
+                  <KiloAdminInstanceBillingSupportPreview
+                    row={kiloAdminKiloclawInstanceRowsFixture[6]}
+                    changeLogs={kiloAdminChangeLogFixture}
+                  />
+                </Variant>
+              </Section>
+
+              <Section
+                id="admin-mutation-safety"
+                title="Admin mutation guardrails"
+                description="P0 hardening for admin trial/cancel/destroy controls so personal-only actions cannot silently mutate org-funded subscriptions."
+                url="/admin/kiloclaw/[id] and /admin/users/[id]?tab=kiloclaw"
+                roles="kilo_admin"
+              >
+                <Variant label="Org row action states">
+                  <KiloAdminMutationSafetyPreview />
+                </Variant>
+              </Section>
+
+              <Section
+                id="admin-readiness"
+                title="Launch and backfill readiness"
+                description="P0 read-only launch health card for /admin/kiloclaw: launch date, missing subscription rows, backfill integrity, renewal pressure, and incident counts."
+                url="/admin/kiloclaw"
+                roles="kilo_admin"
+              >
+                <Variant label="Launch health with actionable counts">
+                  <KiloAdminBillingReadinessCardPreview
+                    readiness={kiloAdminKiloclawReadinessFixture}
+                  />
+                </Variant>
+              </Section>
+
+              <Section
+                id="admin-org-support"
+                title="Organization support KiloClaw section"
+                description="P1 organization admin page section: aggregate org KC health, active instances, trial split, opt-out value, total renewal cost, credit balance, and per-instance links."
+                url="/admin/organizations/[id]"
+                roles="kilo_admin"
+              >
+                <Variant label="Organization-level support card">
+                  <KiloAdminOrganizationKiloclawPreview summary={kiloAdminOrgSupportFixture} />
+                </Variant>
+              </Section>
+
+              <Section
+                id="admin-user-support"
+                title="User support KiloClaw tab"
+                description="P1 user admin tab updates: personal and organization KiloClaw rows stay separate, org rows show org funding and disable personal-only actions."
+                url="/admin/users/[id]?tab=kiloclaw"
+                roles="kilo_admin"
+              >
+                <Variant label="User tab with separated personal and org rows">
+                  <KiloAdminUserKiloclawPreview summary={kiloAdminUserSupportFixture} />
+                </Variant>
+              </Section>
+
+              <Section
+                id="admin-observability"
+                title="Change logs, incident filters, and support notes"
+                description="P2 convenience and observability: direct change-log access from detail pages, saved incident queues, and inline support copy for org KC billing invariants."
+                url="/admin/kiloclaw and related detail pages"
+                roles="kilo_admin"
+              >
+                <Variant label="Support-focused saved filters and documentation copy">
+                  <KiloAdminObservabilityPreview />
+                </Variant>
+              </Section>
+
               {/* (0) Sidebar + dashboard navigation · PR 1 + PR 4a ======================== */}
               <Section
                 id="navigation"

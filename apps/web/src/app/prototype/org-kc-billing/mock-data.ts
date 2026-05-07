@@ -638,6 +638,455 @@ export const associatedUserFixtures = {
 
 export const VIEWER_USER_ID = 'usr_viewer';
 
+// Kilo Admin — internal support fixtures
+export type KiloAdminKiloclawInstanceRow = {
+  scope: 'personal' | 'organization';
+  instanceId: string;
+  sandboxId: string;
+  instanceName: string | null;
+  organizationId: string | null;
+  organizationName: string | null;
+  organizationPlan: 'teams' | 'enterprise' | null;
+  associatedUserId: string;
+  associatedUserDisplayName: string;
+  associatedUserEmail: string;
+  subscriptionId: string | null;
+  subscriptionStatus: 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid' | null;
+  operationalKind: OrgBillingOperationalState['kind'];
+  blockingReason?: 'org_trial_hard_expired' | 'org_subscription_ended' | null;
+  paymentSource: 'credits' | 'stripe' | null;
+  providerSubscriptionId: string | null;
+  trialKind: '7day_user' | '30day_launch' | null;
+  isLaunchBackfill: boolean;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  creditRenewalAt: string | null;
+  renewalCostMicrodollars: number | null;
+  suspendedAt: string | null;
+  destructionDeadline: string | null;
+  orgCreditBalanceMicrodollars: number | null;
+  orgAutoTopUpEnabled: boolean | null;
+  optOutSetting: boolean | null;
+  optOutEnforced: boolean | null;
+  parentEntitlement: 'active' | 'trialing' | 'hard_expired' | 'ended' | null;
+};
+
+export type KiloAdminKiloclawStats = {
+  totalInstances: number;
+  personalCount: number;
+  organizationCount: number;
+  activePaidOrgCount: number;
+  sevenDayTrialingCount: number;
+  launchTrialingCount: number;
+  pastDueCount: number;
+  suspendedCount: number;
+  cancelingAtPeriodEndCount: number;
+  blockedParentCount: number;
+  blockedOptOutCount: number;
+  destroyedCanceledCount: number;
+};
+
+export const kiloAdminKiloclawInstanceRowsFixture: KiloAdminKiloclawInstanceRow[] = [
+  {
+    scope: 'personal',
+    instanceId: 'inst_personal_17c2',
+    sandboxId: 'fly-kc-nora-personal',
+    instanceName: 'nora-personal',
+    organizationId: null,
+    organizationName: null,
+    organizationPlan: null,
+    associatedUserId: 'usr_nora',
+    associatedUserDisplayName: 'Nora Patel',
+    associatedUserEmail: 'nora@kilocode.ai',
+    subscriptionId: 'sub_kc_user_2281',
+    subscriptionStatus: 'active',
+    operationalKind: 'available',
+    paymentSource: 'credits',
+    providerSubscriptionId: 'sub_stripe_9X3',
+    trialKind: null,
+    isLaunchBackfill: false,
+    currentPeriodStart: '2026-05-14',
+    currentPeriodEnd: '2026-06-14',
+    creditRenewalAt: '2026-06-14',
+    renewalCostMicrodollars: 9_000_000,
+    suspendedAt: null,
+    destructionDeadline: null,
+    orgCreditBalanceMicrodollars: null,
+    orgAutoTopUpEnabled: null,
+    optOutSetting: null,
+    optOutEnforced: null,
+    parentEntitlement: null,
+  },
+  {
+    scope: 'organization',
+    instanceId: detailRowFixtures.active.instanceId,
+    sandboxId: 'fly-kc-acme-alice-dev',
+    instanceName: detailRowFixtures.active.instanceName,
+    organizationId: 'org_acme',
+    organizationName: 'Acme Inc.',
+    organizationPlan: 'enterprise',
+    associatedUserId: detailRowFixtures.active.associatedUserId,
+    associatedUserDisplayName: detailRowFixtures.active.associatedUserDisplayName,
+    associatedUserEmail: detailRowFixtures.active.associatedUserEmail,
+    subscriptionId: 'sub_kc_org_92ad17',
+    subscriptionStatus: 'active',
+    operationalKind: detailRowFixtures.active.operationalKind,
+    paymentSource: 'credits',
+    providerSubscriptionId: null,
+    trialKind: null,
+    isLaunchBackfill: false,
+    currentPeriodStart: '2026-05-12',
+    currentPeriodEnd: detailRowFixtures.active.currentPeriodEnd,
+    creditRenewalAt: detailRowFixtures.active.currentPeriodEnd,
+    renewalCostMicrodollars: detailRowFixtures.active.renewalCostMicrodollars,
+    suspendedAt: null,
+    destructionDeadline: null,
+    orgCreditBalanceMicrodollars: 250_000_000,
+    orgAutoTopUpEnabled: true,
+    optOutSetting: false,
+    optOutEnforced: false,
+    parentEntitlement: 'active',
+  },
+  {
+    scope: 'organization',
+    instanceId: detailRowFixtures.trialing30day.instanceId,
+    sandboxId: 'fly-kc-acme-bob-staging',
+    instanceName: detailRowFixtures.trialing30day.instanceName,
+    organizationId: 'org_acme',
+    organizationName: 'Acme Inc.',
+    organizationPlan: 'enterprise',
+    associatedUserId: detailRowFixtures.trialing30day.associatedUserId,
+    associatedUserDisplayName: detailRowFixtures.trialing30day.associatedUserDisplayName,
+    associatedUserEmail: detailRowFixtures.trialing30day.associatedUserEmail,
+    subscriptionId: 'sub_kc_org_launch_14',
+    subscriptionStatus: 'trialing',
+    operationalKind: detailRowFixtures.trialing30day.operationalKind,
+    paymentSource: 'credits',
+    providerSubscriptionId: null,
+    trialKind: '30day_launch',
+    isLaunchBackfill: true,
+    currentPeriodStart: '2026-05-06',
+    currentPeriodEnd: detailRowFixtures.trialing30day.currentPeriodEnd,
+    creditRenewalAt: detailRowFixtures.trialing30day.currentPeriodEnd,
+    renewalCostMicrodollars: detailRowFixtures.trialing30day.renewalCostMicrodollars,
+    suspendedAt: null,
+    destructionDeadline: null,
+    orgCreditBalanceMicrodollars: 250_000_000,
+    orgAutoTopUpEnabled: true,
+    optOutSetting: false,
+    optOutEnforced: false,
+    parentEntitlement: 'active',
+  },
+  {
+    scope: 'organization',
+    instanceId: detailRowFixtures.pastDue.instanceId,
+    sandboxId: 'fly-kc-acme-carol-claw',
+    instanceName: detailRowFixtures.pastDue.instanceName,
+    organizationId: 'org_acme',
+    organizationName: 'Acme Inc.',
+    organizationPlan: 'enterprise',
+    associatedUserId: detailRowFixtures.pastDue.associatedUserId,
+    associatedUserDisplayName: detailRowFixtures.pastDue.associatedUserDisplayName,
+    associatedUserEmail: detailRowFixtures.pastDue.associatedUserEmail,
+    subscriptionId: 'sub_kc_org_pastdue_31',
+    subscriptionStatus: 'past_due',
+    operationalKind: 'past_due',
+    paymentSource: 'credits',
+    providerSubscriptionId: null,
+    trialKind: null,
+    isLaunchBackfill: false,
+    currentPeriodStart: '2026-04-04',
+    currentPeriodEnd: detailRowFixtures.pastDue.currentPeriodEnd,
+    creditRenewalAt: detailRowFixtures.pastDue.currentPeriodEnd,
+    renewalCostMicrodollars: detailRowFixtures.pastDue.renewalCostMicrodollars,
+    suspendedAt: '2026-05-18T09:00:00Z',
+    destructionDeadline: '2026-05-25T09:00:00Z',
+    orgCreditBalanceMicrodollars: 12_000_000,
+    orgAutoTopUpEnabled: false,
+    optOutSetting: false,
+    optOutEnforced: false,
+    parentEntitlement: 'active',
+  },
+  {
+    scope: 'organization',
+    instanceId: detailRowFixtures.canceling.instanceId,
+    sandboxId: 'fly-kc-acme-dan-experiments',
+    instanceName: detailRowFixtures.canceling.instanceName,
+    organizationId: 'org_acme',
+    organizationName: 'Acme Inc.',
+    organizationPlan: 'enterprise',
+    associatedUserId: detailRowFixtures.canceling.associatedUserId,
+    associatedUserDisplayName: detailRowFixtures.canceling.associatedUserDisplayName,
+    associatedUserEmail: detailRowFixtures.canceling.associatedUserEmail,
+    subscriptionId: 'sub_kc_org_canceling_44',
+    subscriptionStatus: 'active',
+    operationalKind: 'canceling_at_period_end',
+    paymentSource: 'credits',
+    providerSubscriptionId: null,
+    trialKind: null,
+    isLaunchBackfill: false,
+    currentPeriodStart: '2026-05-12',
+    currentPeriodEnd: detailRowFixtures.canceling.currentPeriodEnd,
+    creditRenewalAt: detailRowFixtures.canceling.currentPeriodEnd,
+    renewalCostMicrodollars: detailRowFixtures.canceling.renewalCostMicrodollars,
+    suspendedAt: null,
+    destructionDeadline: null,
+    orgCreditBalanceMicrodollars: 250_000_000,
+    orgAutoTopUpEnabled: true,
+    optOutSetting: false,
+    optOutEnforced: false,
+    parentEntitlement: 'active',
+  },
+  {
+    scope: 'organization',
+    instanceId: detailRowFixtures.blockedParentSubEnded.instanceId,
+    sandboxId: 'fly-kc-northwind-grace-platform',
+    instanceName: detailRowFixtures.blockedParentSubEnded.instanceName,
+    organizationId: 'org_northwind',
+    organizationName: 'Northwind Labs',
+    organizationPlan: 'teams',
+    associatedUserId: detailRowFixtures.blockedParentSubEnded.associatedUserId,
+    associatedUserDisplayName: detailRowFixtures.blockedParentSubEnded.associatedUserDisplayName,
+    associatedUserEmail: detailRowFixtures.blockedParentSubEnded.associatedUserEmail,
+    subscriptionId: 'sub_kc_org_parent_ended_08',
+    subscriptionStatus: 'active',
+    operationalKind: 'blocked_parent_entitlement',
+    blockingReason: 'org_subscription_ended',
+    paymentSource: 'credits',
+    providerSubscriptionId: null,
+    trialKind: null,
+    isLaunchBackfill: false,
+    currentPeriodStart: '2026-05-01',
+    currentPeriodEnd: detailRowFixtures.blockedParentSubEnded.currentPeriodEnd,
+    creditRenewalAt: detailRowFixtures.blockedParentSubEnded.currentPeriodEnd,
+    renewalCostMicrodollars: detailRowFixtures.blockedParentSubEnded.renewalCostMicrodollars,
+    suspendedAt: null,
+    destructionDeadline: null,
+    orgCreditBalanceMicrodollars: 0,
+    orgAutoTopUpEnabled: false,
+    optOutSetting: false,
+    optOutEnforced: false,
+    parentEntitlement: 'ended',
+  },
+  {
+    scope: 'organization',
+    instanceId: detailRowFixtures.blockedOptOut.instanceId,
+    sandboxId: 'fly-kc-contoso-iris-tooling',
+    instanceName: detailRowFixtures.blockedOptOut.instanceName,
+    organizationId: 'org_contoso',
+    organizationName: 'Contoso Enterprise',
+    organizationPlan: 'enterprise',
+    associatedUserId: detailRowFixtures.blockedOptOut.associatedUserId,
+    associatedUserDisplayName: detailRowFixtures.blockedOptOut.associatedUserDisplayName,
+    associatedUserEmail: detailRowFixtures.blockedOptOut.associatedUserEmail,
+    subscriptionId: 'sub_kc_org_optout_02',
+    subscriptionStatus: 'active',
+    operationalKind: 'blocked_opt_out',
+    paymentSource: 'credits',
+    providerSubscriptionId: null,
+    trialKind: null,
+    isLaunchBackfill: false,
+    currentPeriodStart: '2026-05-01',
+    currentPeriodEnd: detailRowFixtures.blockedOptOut.currentPeriodEnd,
+    creditRenewalAt: detailRowFixtures.blockedOptOut.currentPeriodEnd,
+    renewalCostMicrodollars: detailRowFixtures.blockedOptOut.renewalCostMicrodollars,
+    suspendedAt: null,
+    destructionDeadline: null,
+    orgCreditBalanceMicrodollars: 900_000_000,
+    orgAutoTopUpEnabled: true,
+    optOutSetting: true,
+    optOutEnforced: true,
+    parentEntitlement: 'active',
+  },
+];
+
+export const kiloAdminKiloclawStatsFixture: KiloAdminKiloclawStats = {
+  totalInstances: 742,
+  personalCount: 611,
+  organizationCount: 131,
+  activePaidOrgCount: 84,
+  sevenDayTrialingCount: 18,
+  launchTrialingCount: 21,
+  pastDueCount: 6,
+  suspendedCount: 2,
+  cancelingAtPeriodEndCount: 4,
+  blockedParentCount: 3,
+  blockedOptOutCount: 5,
+  destroyedCanceledCount: 41,
+};
+
+export type KiloAdminKiloclawReadiness = {
+  launchDate: string | null;
+  activeOrgInstancesWithoutSubscription: number;
+  launchBackfillRowsMissingFlag: number;
+  launchTrialRows: number;
+  commonLaunchTrialEnd: string | null;
+  orgRowsDueWithin7Days: number;
+  pastDueCount: number;
+  suspendedCount: number;
+  lastBackfillSweepAt: string | null;
+};
+
+export const kiloAdminKiloclawReadinessFixture: KiloAdminKiloclawReadiness = {
+  launchDate: '2026-05-06T00:00:00Z',
+  activeOrgInstancesWithoutSubscription: 2,
+  launchBackfillRowsMissingFlag: 1,
+  launchTrialRows: 21,
+  commonLaunchTrialEnd: '2026-06-05T00:00:00Z',
+  orgRowsDueWithin7Days: 9,
+  pastDueCount: 6,
+  suspendedCount: 2,
+  lastBackfillSweepAt: '2026-05-07T09:15:00Z',
+};
+
+export type KiloAdminOrgSupportSummary = {
+  organization: {
+    id: string;
+    name: string;
+    plan: 'teams' | 'enterprise';
+    creditBalanceMicrodollars: number;
+    autoTopUpEnabled: boolean;
+    kiloclawOptOut: boolean;
+    parentEntitlement: 'active' | 'trialing' | 'hard_expired' | 'ended';
+  };
+  health: {
+    activeInstanceCount: number;
+    activePaidCount: number;
+    sevenDayTrialingCount: number;
+    launchTrialingCount: number;
+    pastDueCount: number;
+    suspendedCount: number;
+    cancelingAtPeriodEndCount: number;
+    blockedParentCount: number;
+    blockedOptOutCount: number;
+    totalRenewalCostMicrodollars: number;
+  };
+  rows: KiloClawOrgSubscriptionRow[];
+};
+
+export const kiloAdminOrgSupportFixture: KiloAdminOrgSupportSummary = {
+  organization: {
+    id: 'org_acme',
+    name: 'Acme Inc.',
+    plan: 'enterprise',
+    creditBalanceMicrodollars: 250_000_000,
+    autoTopUpEnabled: true,
+    kiloclawOptOut: false,
+    parentEntitlement: 'active',
+  },
+  health: {
+    activeInstanceCount: 6,
+    activePaidCount: 3,
+    sevenDayTrialingCount: 1,
+    launchTrialingCount: 1,
+    pastDueCount: 1,
+    suspendedCount: 0,
+    cancelingAtPeriodEndCount: 1,
+    blockedParentCount: 0,
+    blockedOptOutCount: 0,
+    totalRenewalCostMicrodollars: 294_000_000,
+  },
+  rows: subscriptionRowsFixture,
+};
+
+export type KiloAdminUserSupportSummary = {
+  user: {
+    id: string;
+    displayName: string;
+    email: string;
+  };
+  personal: {
+    activeInstanceId: string | null;
+    instanceName: string | null;
+    subscriptionStatus: 'active' | 'trialing' | 'past_due' | 'canceled' | null;
+    currentPeriodEnd: string | null;
+    actionsEnabled: boolean;
+  };
+  organizationRows: Array<
+    KiloClawOrgSubscriptionRow & {
+      organizationId: string;
+      organizationName: string;
+      organizationPlan: 'teams' | 'enterprise';
+      orgFundedLabel: string;
+      personalActionsDisabledReason: string;
+    }
+  >;
+};
+
+export const kiloAdminUserSupportFixture: KiloAdminUserSupportSummary = {
+  user: {
+    id: 'usr_alice',
+    displayName: 'Alice Chen',
+    email: 'alice@kilocode.ai',
+  },
+  personal: {
+    activeInstanceId: null,
+    instanceName: null,
+    subscriptionStatus: null,
+    currentPeriodEnd: null,
+    actionsEnabled: false,
+  },
+  organizationRows: [
+    {
+      ...detailRowFixtures.active,
+      organizationId: 'org_acme',
+      organizationName: 'Acme Inc.',
+      organizationPlan: 'enterprise',
+      orgFundedLabel: 'Funded by Acme Inc. credits',
+      personalActionsDisabledReason: 'Org KiloClaw uses destroy-only customer cancellation.',
+    },
+    {
+      ...detailRowFixtures.blockedOptOut,
+      organizationId: 'org_contoso',
+      organizationName: 'Contoso Enterprise',
+      organizationPlan: 'enterprise',
+      orgFundedLabel: 'Funded by Contoso Enterprise credits',
+      personalActionsDisabledReason:
+        'Opt-out is org-owned; personal trial/cancel overrides are disabled.',
+    },
+  ],
+};
+
+export type KiloAdminChangeLogEntry = {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: string;
+  reason: string;
+  before: string;
+  after: string;
+};
+
+export const kiloAdminChangeLogFixture: KiloAdminChangeLogEntry[] = [
+  {
+    id: 'log_01',
+    timestamp: '2026-05-18T09:00:00Z',
+    actor: 'kiloclaw-billing',
+    action: 'suspended',
+    reason: 'past_due_grace_elapsed',
+    before: 'past_due · suspended_at=null',
+    after: 'past_due · suspended_at=2026-05-18',
+  },
+  {
+    id: 'log_02',
+    timestamp: '2026-05-04T08:13:00Z',
+    actor: 'credit-renewal-sweep',
+    action: 'status_changed',
+    reason: 'insufficient_org_credits',
+    before: 'active · renewal_at=2026-05-04',
+    after: 'past_due · past_due_since=2026-05-04',
+  },
+  {
+    id: 'log_03',
+    timestamp: '2026-04-04T08:13:00Z',
+    actor: 'kiloclaw-billing',
+    action: 'period_advanced',
+    reason: 'org_credit_renewal',
+    before: 'active · period_end=2026-04-04',
+    after: 'active · period_end=2026-05-04',
+  },
+];
+
 // Helpers
 export function formatMicrodollars(microdollars: number): string {
   const dollars = microdollars / 1_000_000;

@@ -84,7 +84,6 @@ export const linearRouter = createTRPCRouter({
   uninstallApp: baseProcedure.input(optionalOrgInput).mutation(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
-      await requireActiveSubscriptionOrTrial(input.organizationId);
     }
     const owner = await resolveAuthorizedOwner(ctx, input?.organizationId);
     const result = await linearService.uninstallApp(owner, {

@@ -112,4 +112,17 @@ describe('linearRouter authorization', () => {
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
   });
+
+  describe('uninstallApp', () => {
+    test('org without active subscription / trial can still uninstall', async () => {
+      // The trial-expired org has no Linear installation, so uninstall should
+      // surface NOT_FOUND from the service layer rather than FORBIDDEN from
+      // the subscription middleware. This proves the subscription gate is
+      // not in the way of uninstall.
+      const caller = await createCallerForUser(owner.id);
+      await expect(
+        caller.linear.uninstallApp({ organizationId: trialExpiredOrg.id })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+  });
 });

@@ -803,12 +803,21 @@ export function provisionClawMetrySync(env: EnvLike, deps: BootstrapDeps = defau
   deps.writeFileSync(CLAWMETRY_CONFIG_PATH, JSON.stringify(config, null, 2));
   deps.chmodSync(CLAWMETRY_CONFIG_PATH, 0o600);
 
-  // Self-decrypting dashboard URL. The `#fragment` is never sent to any
-  // server (browsers strip it from outgoing requests) — the dashboard JS
-  // reads it client-side and stashes the enc_key in localStorage. KiloClaw's
-  // web UI should fetch this file via a controller endpoint and render it
-  // as a "View Observability Dashboard" link.
-  const dashboardUrl = `${apiBase}/cloud#key=${encodeURIComponent(encryptionKey)}&node=${encodeURIComponent(nodeId)}`;
+  // Self-decrypting dashboard URL via the /d/<dashboard_id> redirect, which
+  // resolves server-side to /cloud?token=cm_xxx so the dashboard JS sees a
+  // CLOUD_TOKEN to namespace the localStorage enc_key under. The browser
+  // preserves the `#fragment` across the 302 → ends up at
+  // /cloud?token=cm_xxx#key=<enc>&node=<id>, where the dashboard's bridge
+  // script reads the fragment, stashes the enc_key in localStorage, and
+  // strips the fragment from the URL. The fragment is never sent to any
+  // server (browsers strip fragments from outgoing requests).
+  const dashboardId = registered.dashboard_id;
+  const dashboardUrl = dashboardId
+    ? `${apiBase}/d/${dashboardId}#key=${encodeURIComponent(encryptionKey)}&node=${encodeURIComponent(nodeId)}`
+    : // Fallback if /api/register didn't return a dashboard_id (older cloud
+      // versions). The user will land on /cloud unauthenticated and have to
+      // sign in via OTP, which is suboptimal but doesn't break anything.
+      `${apiBase}/cloud#key=${encodeURIComponent(encryptionKey)}&node=${encodeURIComponent(nodeId)}`;
   deps.writeFileSync(CLAWMETRY_DASHBOARD_URL_PATH, dashboardUrl + '\n');
   deps.chmodSync(CLAWMETRY_DASHBOARD_URL_PATH, 0o600);
 

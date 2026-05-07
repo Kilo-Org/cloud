@@ -51,6 +51,62 @@ function sanitizeGitOutput(output: string): string {
   return output.replace(/(oauth2|x-access-token|x-token-auth):([^@]+)@/gi, '$1:***@');
 }
 
+/**
+ * Thrown when a git remote returns "repository not found" during clone.
+ * Caused by a missing repo or a token without access — a user error, not infra.
+ */
+export class GitRepositoryNotFoundError extends Error {
+  constructor(gitUrl: string) {
+    super(`Repository not found: ${gitUrl}`);
+    this.name = 'GitRepositoryNotFoundError';
+  }
+}
+
+/**
+ * Thrown for clone failures other than "repository not found"
+ * (LFS smudge errors, network issues, etc.). Distinct from
+ * GitRepositoryNotFoundError so callers can map only the user-error
+ * cases to BAD_REQUEST.
+ */
+export class GitCloneFailedError extends Error {
+  constructor(gitUrl: string, reason: string) {
+    super(`Failed to clone repository from ${gitUrl}: ${reason}`);
+    this.name = 'GitCloneFailedError';
+  }
+}
+
+/**
+ * Thrown when an upstream branch does not exist locally or remotely.
+ * This is a user error (caller asked for a non-existent branch).
+ */
+export class BranchNotFoundError extends Error {
+  constructor(branchName: string) {
+    super(
+      `Branch "${branchName}" not found in repository. Please ensure the branch exists remotely.`
+    );
+    this.name = 'BranchNotFoundError';
+  }
+}
+
+// Detect "remote repository not found" in git stderr. The two patterns we
+// care about, observed from GitHub/GitLab/Bitbucket:
+//   "remote: Repository not found."
+//   "fatal: repository '...' not found"
+// We deliberately avoid an unanchored `.*` so the regex can't match
+// unrelated git messages that happen to contain both words.
+const REPO_NOT_FOUND_PATTERN = /repository '[^']*' not found|remote:\s+repository not found/i;
+
+/**
+ * Best-effort extraction of `stderr` from sandbox SDK errors that expose it
+ * (e.g., GitCheckoutError). Returns empty string when not present.
+ */
+function extractStderr(err: unknown): string {
+  if (err && typeof err === 'object' && 'stderr' in err && typeof err.stderr === 'string') {
+    return err.stderr;
+  }
+  return '';
+}
+
 const SESSION_HOME_ROOT = `/home`;
 const KILOCODE_DIR = `.kilocode`;
 const CLI_DIR = `${KILOCODE_DIR}/cli`;
@@ -557,8 +613,9 @@ export async function cloneGitRepo(
     logger.info('Successfully cloned generic git repository');
   } catch (err) {
     // Log actual error for debugging
+    const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error('Git clone failed', {
-      error: err instanceof Error ? err.message : String(err),
+      error: sanitizeGitOutput(errorMessage),
       gitUrl: sanitizedGitUrl,
     });
 
@@ -566,8 +623,24 @@ export async function cloneGitRepo(
       throw err;
     }
 
-    // Throw generic error to avoid leaking token in response
-    throw new Error(`Failed to clone repository from ${sanitizedGitUrl}`);
+    // Detect "repository not found" — a user-caused error (bad repo or
+    // missing access). The sandbox SDK surfaces git stderr in the error
+    // message, including patterns like:
+    //   "remote: Repository not found."
+    //   "fatal: repository '...' not found"
+    // We also pull stderr from a typed GitCheckoutError if present.
+    const stderr = extractStderr(err);
+    const haystack = `${errorMessage}\n${stderr}`;
+    if (REPO_NOT_FOUND_PATTERN.test(haystack)) {
+      throw new GitRepositoryNotFoundError(sanitizedGitUrl);
+    }
+
+    // All other failures (LFS, network, timeouts, etc.) — wrap as a
+    // typed clone-failure error. Defense-in-depth: tokens shouldn't reach
+    // this point (the SDK strips them and `sanitizedGitUrl` has been
+    // masked), but we still run `sanitizeGitOutput` in case a future code
+    // path inlines an authenticated URL into the error message.
+    throw new GitCloneFailedError(sanitizedGitUrl, sanitizeGitOutput(errorMessage));
   }
 }
 
@@ -856,9 +929,7 @@ export async function manageBranch(
         return branchName;
       }
 
-      throw new Error(
-        `Branch "${branchName}" not found in repository. Please ensure the branch exists remotely.`
-      );
+      throw new BranchNotFoundError(branchName);
     }
     await createNewBranch(session, workspacePath, branchName);
   }

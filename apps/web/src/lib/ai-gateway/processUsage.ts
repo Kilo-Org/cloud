@@ -899,7 +899,7 @@ async function processTokenData(
   const provider = Object.values(PROVIDERS).find(p => p.id === usageContext.provider);
   const generation =
     provider &&
-    useGenerationLookup(provider.id, usageStats) &&
+    useGenerationLookup(usageStats, usageContext) &&
     usageStats.messageId &&
     (await fetchGeneration(usageStats.messageId, provider));
   if (usageStats.messageId) {
@@ -970,12 +970,17 @@ function useAnthropicStyleTokenCounting(requestedModel: string, provider: Provid
   return provider === 'vercel' && (isClaudeModel(requestedModel) || isMinimaxModel(requestedModel));
 }
 
-function useGenerationLookup(provider: ProviderId, usageStats: MicrodollarUsageStats | null) {
-  // vercel has requested to not hammer their generation endpoint,
-  // so only do it when we didn't get the usage data inline
-  return (
-    provider === 'openrouter' || (provider === 'vercel' && (usageStats?.inputTokens ?? 0) === 0)
-  );
+function useGenerationLookup(
+  usageStats: MicrodollarUsageStats | null,
+  usageContext: MicrodollarUsageContext
+) {
+  const isGatewayProvider =
+    usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
+  const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
+  const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
+  const hasCostWhenPaid =
+    isFreeModel(usageContext.requested_model) || (usageStats?.cost_mUsd ?? 0) > 0;
+  return isGatewayProvider && isSuccessStatusCode && (!hasOutputTokens || !hasCostWhenPaid);
 }
 
 export const mapToUsageStats = (

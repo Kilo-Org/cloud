@@ -14,6 +14,7 @@ import { logger, withLogTags } from '../../logger.js';
 import {
   generateSessionId,
   SessionService,
+  SetupCommandFailedError,
   determineBranchName,
   runSetupCommands,
   writeAuthFile,
@@ -31,11 +32,13 @@ import {
 } from '../schemas.js';
 import { generateSandboxId, getSandboxNamespace } from '../../sandbox-id.js';
 import {
+  BranchNotFoundError,
   checkDiskAndCleanBeforeSetup,
-  setupWorkspace,
   cloneGitHubRepo,
   cloneGitRepo,
+  GitRepositoryNotFoundError,
   manageBranch,
+  setupWorkspace,
 } from '../../workspace.js';
 import { WrapperClient } from '../../kilo/wrapper-client.js';
 import { withDORetry } from '../../utils/do-retry.js';
@@ -474,52 +477,66 @@ const prepareSessionHandler = internalApiProtectedProcedure
         // 7. Clone repository
         const cloneOptions = input.shallow ? { shallow: true } : undefined;
         logger.info('Cloning repository');
-        if (input.gitUrl) {
-          await cloneGitRepo(
-            session,
-            workspacePath,
-            input.gitUrl,
-            resolvedGitToken,
-            undefined,
-            cloneOptions
-          );
-        } else if (input.githubRepo) {
-          await cloneGitHubRepo(
-            session,
-            workspacePath,
-            input.githubRepo,
-            resolvedGithubToken,
-            {
-              GITHUB_APP_SLUG: ctx.env.GITHUB_APP_SLUG,
-              GITHUB_APP_BOT_USER_ID: ctx.env.GITHUB_APP_BOT_USER_ID,
-            },
-            cloneOptions
-          );
-        } else {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Either githubRepo or gitUrl must be provided',
-          });
+        try {
+          if (input.gitUrl) {
+            await cloneGitRepo(
+              session,
+              workspacePath,
+              input.gitUrl,
+              resolvedGitToken,
+              undefined,
+              cloneOptions
+            );
+          } else if (input.githubRepo) {
+            await cloneGitHubRepo(
+              session,
+              workspacePath,
+              input.githubRepo,
+              resolvedGithubToken,
+              {
+                GITHUB_APP_SLUG: ctx.env.GITHUB_APP_SLUG,
+                GITHUB_APP_BOT_USER_ID: ctx.env.GITHUB_APP_BOT_USER_ID,
+              },
+              cloneOptions
+            );
+          } else {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Either githubRepo or gitUrl must be provided',
+            });
+          }
+        } catch (error) {
+          if (error instanceof GitRepositoryNotFoundError) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
+          }
+          throw error;
         }
 
         // 8. Branch management
         logger
           .withFields({ branchName, upstreamBranch: input.upstreamBranch })
           .info('Managing branch');
-        if (input.upstreamBranch) {
-          // For upstream branches, use manageBranch (verifies exists remotely)
-          await manageBranch(session, workspacePath, branchName, true);
-        } else {
-          // For session branches, create directly (can't exist remotely with UUID-based name)
-          const result = await session.exec(
-            `cd ${workspacePath} && git checkout -b '${branchName}'`
-          );
-          if (result.exitCode !== 0) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: `Failed to create branch ${branchName}: ${result.stderr || result.stdout}`,
-            });
+        try {
+          if (input.upstreamBranch) {
+            // For upstream branches, use manageBranch (verifies exists remotely)
+            await manageBranch(session, workspacePath, branchName, true);
+          } else {
+            // For session branches, create directly (can't exist remotely with UUID-based name)
+            const result = await session.exec(
+              `cd ${workspacePath} && git checkout -b '${branchName}'`
+            );
+            if (result.exitCode !== 0) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: `Failed to create branch ${branchName}: ${result.stderr || result.stdout}`,
+              });
+            }
           }
+        } catch (error) {
+          if (error instanceof BranchNotFoundError) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
+          }
+          throw error;
         }
 
         // 9. Run setup commands
@@ -527,7 +544,14 @@ const prepareSessionHandler = internalApiProtectedProcedure
           logger
             .withFields({ count: effective.setupCommands.length })
             .info('Running setup commands');
-          await runSetupCommands(session, context, effective.setupCommands, true); // fail-fast
+          try {
+            await runSetupCommands(session, context, effective.setupCommands, true); // fail-fast
+          } catch (error) {
+            if (error instanceof SetupCommandFailedError) {
+              throw new TRPCError({ code: 'BAD_REQUEST', message: error.message });
+            }
+            throw error;
+          }
         }
 
         // 10. Write auth file for session ingest, plus global rules.

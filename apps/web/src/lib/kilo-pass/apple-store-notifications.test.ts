@@ -9,7 +9,7 @@ import {
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { KiloPassAuditLogAction, KiloPassPaymentProvider } from './enums';
+import { KiloPassAuditLogAction, KiloPassPaymentProvider, KiloPassTier } from './enums';
 import { processAppStoreKiloPassNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
@@ -245,6 +245,50 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(subscription?.status).toBe('active');
     expect(subscription?.cancel_at_period_end).toBe(true);
     expect(subscription?.ended_at).toBeNull();
+  });
+
+  it('applies App Store upgrade renewal preference notifications immediately', async () => {
+    const user = await insertTestUser();
+    const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'upgrade-initial-buy',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          appAccountToken: user.app_store_account_token,
+        }),
+    });
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'upgrade',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'upgrade',
+          notificationType: NotificationTypeV2.DID_CHANGE_RENEWAL_PREF,
+          subtype: Subtype.UPGRADE,
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          originalTransactionId: providerSubscriptionId,
+          transactionId: `tx-${crypto.randomUUID()}`,
+          productId: 'kilopass.tier49.monthly.v1',
+          appAccountToken: user.app_store_account_token,
+        }),
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.provider_subscription_id, providerSubscriptionId),
+    });
+    expect(subscription?.tier).toBe(KiloPassTier.Tier49);
+    expect(subscription?.status).toBe('active');
   });
 
   it('records failed-renewal notifications without ending the subscription', async () => {

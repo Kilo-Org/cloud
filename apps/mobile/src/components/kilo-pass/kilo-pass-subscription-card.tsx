@@ -27,10 +27,21 @@ export function KiloPassSubscriptionCard() {
 
   const subscription = stateQuery.data?.subscription;
   const cardState = getKiloPassSubscriptionCardState(subscription);
+  const invalidateKiloPassState = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),
+      queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter()),
+      queryClient.invalidateQueries(trpc.user.getCreditBlocks.pathFilter()),
+      queryClient.invalidateQueries(trpc.kiloPass.getCreditHistory.pathFilter()),
+    ]);
+  };
   const openAppStoreManagement = async () => {
     try {
       await showManageSubscriptionsIOS();
-      await queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter());
+      await invalidateKiloPassState();
+      setTimeout(() => {
+        void invalidateKiloPassState();
+      }, 2000);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to open App Store subscription management.'

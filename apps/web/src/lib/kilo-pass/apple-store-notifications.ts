@@ -42,6 +42,16 @@ const RENEWAL_TYPES = new Set<string>([
 const EXPIRED_TYPES = new Set<string>([NotificationTypeV2.EXPIRED]);
 const REFUND_TYPES = new Set<string>([NotificationTypeV2.REFUND, NotificationTypeV2.REVOKE]);
 
+function isImmediateStorePurchaseNotification(
+  notification: AppleStoreDecodedNotification
+): boolean {
+  return (
+    RENEWAL_TYPES.has(notification.notificationType) ||
+    (notification.notificationType === NotificationTypeV2.DID_CHANGE_RENEWAL_PREF &&
+      notification.subtype === Subtype.UPGRADE)
+  );
+}
+
 const AppleStoreNotificationPayloadSchema = z
   .object({
     notificationUUID: z.string().min(1),
@@ -202,7 +212,7 @@ export async function processAppStoreKiloPassNotification(params: {
     }
   }
 
-  if (purchase && RENEWAL_TYPES.has(notification.notificationType)) {
+  if (purchase && isImmediateStorePurchaseNotification(notification)) {
     const user = await getUserForStoreRenewal({
       providerSubscriptionId: purchase.providerSubscriptionId,
       appAccountToken: purchase.appAccountToken,

@@ -19,6 +19,8 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
+import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
+import { deleteInstallationByOrganizationId } from '@/lib/integrations/linear-service';
 import { createLinearWebhookHandler } from './linear-webhook';
 
 const WEBHOOK_SECRET = 'test-webhook-secret';
@@ -120,5 +122,49 @@ describe('createLinearWebhookHandler signature verification', () => {
     const response = await handler(request);
 
     expect(response.status).toBe(401);
+  });
+});
+
+describe('createLinearWebhookHandler OAuthApp revoked handling', () => {
+  let chat: Chat;
+  let linearAdapter: LinearAdapter;
+  let handler: (request: Request) => Promise<Response>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    chat = makeChatStub();
+    linearAdapter = makeLinearAdapterStub();
+    handler = createLinearWebhookHandler(chat, linearAdapter);
+  });
+
+  function makeRevokedRequest(organizationId: string): Request {
+    const body = JSON.stringify({ type: 'OAuthApp', action: 'revoked', organizationId });
+    return makeRequest(body, {
+      'linear-signature': signLinearBody(body),
+      'linear-timestamp': Date.now().toString(),
+    });
+  }
+
+  test('cleans up local installation after upstream delete succeeds', async () => {
+    const response = await handler(makeRevokedRequest('org-123'));
+
+    expect(response.status).toBe(200);
+    expect(linearAdapter.deleteInstallation).toHaveBeenCalledWith('org-123');
+    expect(deleteInstallationByOrganizationId).toHaveBeenCalledWith('org-123');
+    expect(unlinkTeamKiloUsers).toHaveBeenCalled();
+    expect(linearAdapter.handleWebhook).not.toHaveBeenCalled();
+  });
+
+  test('preserves local installation row when upstream delete fails', async () => {
+    (linearAdapter.deleteInstallation as jest.Mock).mockRejectedValueOnce(
+      new Error('upstream boom')
+    );
+
+    const response = await handler(makeRevokedRequest('org-456'));
+
+    expect(response.status).toBe(200);
+    expect(linearAdapter.deleteInstallation).toHaveBeenCalledWith('org-456');
+    expect(deleteInstallationByOrganizationId).not.toHaveBeenCalled();
+    expect(unlinkTeamKiloUsers).not.toHaveBeenCalled();
   });
 });

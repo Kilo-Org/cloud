@@ -81,11 +81,13 @@ async function handleLinearOAuthAppRevoked(
   linearAdapter: LinearAdapter
 ): Promise<void> {
   try {
-    await deleteInstallationByOrganizationId(organizationId);
-    // Adapter already handles this internally on revoked events, but calling
-    // it explicitly is idempotent and keeps the cleanup behaviour consistent
+    // Delete the upstream adapter installation first so that if it fails we
+    // keep our own `platform_integrations` row around and can retry. Adapter
+    // already handles this internally on revoked events, but calling it
+    // explicitly is idempotent and keeps the cleanup behaviour consistent
     // with the Slack webhook handler.
     await linearAdapter.deleteInstallation(organizationId);
+    await deleteInstallationByOrganizationId(organizationId);
     await unlinkTeamKiloUsers(chat.getState(), PLATFORM.LINEAR, organizationId);
   } catch (error) {
     captureException(error, {

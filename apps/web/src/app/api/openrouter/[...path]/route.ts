@@ -132,13 +132,13 @@ function extractPromptInfo(requestBodyParsed: GatewayRequest): PromptInfo {
   return extractChatCompletionsPromptInfo(requestBodyParsed.body);
 }
 
-function determineFallbackFeature(requestBodyParsed: GatewayRequest): 'direct-gateway' | null {
+function determineFallbackFeature(requestBodyParsed: GatewayRequest): 'direct-gateway' | '' {
   const { system_prompt_prefix } = extractPromptInfo(requestBodyParsed);
   if (
     system_prompt_prefix.includes('You are Kilo') ||
     system_prompt_prefix.includes('You are a personal assistant running inside OpenClaw')
   ) {
-    return null;
+    return '';
   }
   return 'direct-gateway';
 }
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
   const feature = validateFeatureHeader(
-    request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed) || ''
+    request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
   );
 
   const authPromise = getUserFromAuth({ adminOnly: false });

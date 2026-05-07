@@ -147,12 +147,16 @@ const SettingsResponseSchema = z.object({
 
 export const organizationsSettingsRouter = createTRPCRouter({
   listAvailableModels: organizationMemberProcedure
-    .input(OrganizationIdInputSchema)
+    .input(
+      OrganizationIdInputSchema.extend({
+        outputModalities: z.literal('embeddings').optional(),
+      })
+    )
     .output(z.custom<OpenRouterModelsResponse>())
     .query(async ({ input }) => {
-      const { organizationId } = input;
+      const { organizationId, outputModalities } = input;
 
-      const result = await getAvailableModelsForOrganization(organizationId);
+      const result = await getAvailableModelsForOrganization(organizationId, { outputModalities });
       if (!result) {
         throw new TRPCError({
           code: 'NOT_FOUND',

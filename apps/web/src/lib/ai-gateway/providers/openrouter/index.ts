@@ -82,18 +82,19 @@ function formatName(model: OpenRouterModel, preferredIndex: number) {
   return model.name;
 }
 
-function enhancedModelList(models: OpenRouterModel[]) {
-  const autoModels = buildAutoModels();
+function enhancedModelList(models: OpenRouterModel[], includeKiloModels: boolean) {
+  const autoModels = includeKiloModels ? buildAutoModels() : [];
+  const exclusiveModels = includeKiloModels
+    ? kiloExclusiveModels
+        .filter(m => m.status === 'public')
+        .map(model => convertFromKiloExclusiveModel(model))
+    : [];
   const enhancedModels = models
     .filter(
       (model: OpenRouterModel) =>
         !kiloExclusiveModels.some(m => m.public_id === model.id) && !isForbiddenFreeModel(model.id)
     )
-    .concat(
-      kiloExclusiveModels
-        .filter(m => m.status === 'public')
-        .map(model => convertFromKiloExclusiveModel(model))
-    )
+    .concat(exclusiveModels)
     .concat(autoModels)
     .map((model: OpenRouterModel) => {
       const preferredIndex = preferredModels.indexOf(model.id);
@@ -197,5 +198,6 @@ export async function getEnhancedOpenRouterModels(
     return rawResponse;
   }
 
-  return { data: enhancedModelList(rawResponse.data) };
+  const includeKiloModels = !options.outputModalities;
+  return { data: enhancedModelList(rawResponse.data, includeKiloModels) };
 }

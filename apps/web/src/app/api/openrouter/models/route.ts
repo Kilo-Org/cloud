@@ -26,7 +26,17 @@ export async function GET(
   request: NextRequest
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
-  const outputModalities = request.nextUrl.searchParams.get('output_modalities') ?? undefined;
+  const rawOutputModalities = request.nextUrl.searchParams.get('output_modalities');
+  if (rawOutputModalities !== null && rawOutputModalities !== 'embeddings') {
+    return NextResponse.json(
+      {
+        error: 'Invalid output_modalities',
+        message: "Only 'embeddings' is supported for output_modalities",
+      },
+      { status: 400 }
+    );
+  }
+  const outputModalities = rawOutputModalities ?? undefined;
   const auth = await tryGetUserFromAuth();
   try {
     const result = auth?.organizationId

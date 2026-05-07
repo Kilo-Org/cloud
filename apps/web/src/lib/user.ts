@@ -796,9 +796,13 @@ export async function softDeleteUser(userId: string) {
       );
     }
 
+    // Pre-0090 users can have NULL normalized_email but a real google_user_email.
+    // Fall back to google_user_email so the tombstone hash still gets recorded
+    // before the row below anonymizes both columns; otherwise a previously
+    // deleted user could re-register and qualify as a referee.
     await createDeletedUserEmailTombstone({
       database: tx,
-      normalizedEmail: user.normalized_email,
+      normalizedEmail: user.normalized_email ?? user.google_user_email ?? null,
     });
 
     // ── 1. Anonymize the user row ────────────────────────────────────────

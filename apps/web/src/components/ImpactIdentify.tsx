@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useUser } from '@/hooks/useUser';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
 import { IMPACT_CUSTOM_PROFILE_ID_STORAGE_KEY } from '@/lib/impact-referral-utils';
 
 async function sha1Hex(value: string): Promise<string> {
@@ -36,15 +37,9 @@ export function ImpactIdentify() {
 
       if (typeof window.ire !== 'function') {
         if (retriesRemaining <= 0) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log(
-              '[impact-referral-debug]',
-              'Impact UTT identify skipped; window.ire unavailable',
-              {
-                userId: user?.id ?? null,
-              }
-            );
-          }
+          logImpactReferralDebug('Impact UTT identify skipped; window.ire unavailable', {
+            userId: user?.id ?? null,
+          });
           return;
         }
 
@@ -60,14 +55,12 @@ export function ImpactIdentify() {
 
       if (cancelled || typeof window.ire !== 'function') return;
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[impact-referral-debug]', 'Calling Impact UTT identify', {
-          userId: user?.id ?? null,
-          customerIdPresent: Boolean(customerId),
-          customerEmailHashPresent: Boolean(customerEmail),
-          customProfileIdPresent: Boolean(customProfileId),
-        });
-      }
+      logImpactReferralDebug('Calling Impact UTT identify', {
+        userId: user?.id ?? null,
+        customerIdPresent: Boolean(customerId),
+        customerEmailHashPresent: Boolean(customerEmail),
+        customProfileIdPresent: Boolean(customProfileId),
+      });
 
       window.ire('identify', {
         customerId,

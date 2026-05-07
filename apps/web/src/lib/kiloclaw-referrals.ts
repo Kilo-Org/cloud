@@ -529,23 +529,19 @@ function getNumberProperty(record: unknown, keys: string[]): number | null {
   return null;
 }
 
-function getNestedObjectProperty(record: unknown, key: string): unknown {
-  return getCaseInsensitiveObjectProperty(record, key);
-}
-
 function rewardHasUnit(reward: unknown, unit: string): boolean {
   const unitValue =
     getStringProperty(reward, ['unit', 'Unit', 'currency']) ??
-    getStringProperty(getNestedObjectProperty(reward, 'credit'), ['unit', 'Unit']) ??
-    getStringProperty(getNestedObjectProperty(reward, 'value'), ['unit', 'Unit']);
+    getStringProperty(getCaseInsensitiveObjectProperty(reward, 'credit'), ['unit', 'Unit']) ??
+    getStringProperty(getCaseInsensitiveObjectProperty(reward, 'value'), ['unit', 'Unit']);
   return !unitValue || unitValue.toLowerCase() === unit.toLowerCase();
 }
 
 function rewardHasAmount(reward: unknown, amount: number): boolean {
   const amountValue =
     getNumberProperty(reward, ['amount', 'Amount', 'remainingAmount', 'RemainingAmount']) ??
-    getNumberProperty(getNestedObjectProperty(reward, 'credit'), ['amount', 'Amount']) ??
-    getNumberProperty(getNestedObjectProperty(reward, 'value'), ['amount', 'Amount']);
+    getNumberProperty(getCaseInsensitiveObjectProperty(reward, 'credit'), ['amount', 'Amount']) ??
+    getNumberProperty(getCaseInsensitiveObjectProperty(reward, 'value'), ['amount', 'Amount']);
   return amountValue === null || amountValue >= amount;
 }
 
@@ -740,9 +736,25 @@ async function applyReferralRewardById(
 
     if (!subscription || !hasActiveEligibleSubscriptionRow(subscription)) {
       if (reward.status === KiloClawReferralRewardStatus.Earned) {
+        // Mirror the conversion-time invariant: a Referrer reward that lands
+        // in Pending because the referrer is no longer on an eligible paid
+        // personal subscription MUST carry the 12-month expiry from earned_at
+        // (see .specs/kiloclaw-referrals.md rule 66). Without this back-fill,
+        // a reward earned during a brief eligible window and then orphaned
+        // when the referrer churns would have expires_at = NULL forever.
+        const shouldBackfillExpiresAt =
+          reward.beneficiary_role === KiloClawReferralBeneficiaryRole.Referrer &&
+          reward.expires_at === null;
         await tx
           .update(kiloclaw_referral_rewards)
-          .set({ status: KiloClawReferralRewardStatus.Pending })
+          .set({
+            status: KiloClawReferralRewardStatus.Pending,
+            ...(shouldBackfillExpiresAt
+              ? {
+                  expires_at: addMonths(new Date(reward.earned_at), 12).toISOString(),
+                }
+              : {}),
+          })
           .where(eq(kiloclaw_referral_rewards.id, reward.id));
       }
       return 'pending';
@@ -1016,6 +1028,17 @@ type ImpactAdvocateRewardRedemptionRequestPayload = {
     unit: string;
   };
 };
+
+function isImpactConversionPayload(payload: unknown): payload is ImpactConversionPayload {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    typeof getObjectProperty(payload, 'CampaignId') === 'string' &&
+    typeof getObjectProperty(payload, 'ActionTrackerId') === 'number' &&
+    typeof getObjectProperty(payload, 'EventDate') === 'string' &&
+    typeof getObjectProperty(payload, 'OrderId') === 'string'
+  );
+}
 
 function isRewardRedemptionRequestPayload(
   payload: unknown
@@ -1484,10 +1507,8 @@ async function persistImpactConversionReportResult(params: {
         response_payload: {
           delivery: params.result.delivery ?? null,
           responseBody: params.result.responseBody ?? null,
-          ...(params.result.ok && 'actionId' in params.result
-            ? { actionId: params.result.actionId }
-            : {}),
-          ...(params.result.ok && 'submissionUri' in params.result
+          ...('actionId' in params.result ? { actionId: params.result.actionId } : {}),
+          ...('submissionUri' in params.result
             ? { submissionUri: params.result.submissionUri }
             : {}),
         } satisfies Record<string, unknown>,
@@ -1539,17 +1560,20 @@ async function dispatchImpactConversionReportById(
     return 'failed';
   }
 
-  const payload = report.request_payload as ImpactConversionPayload | null;
-  if (!payload) {
+  if (!isImpactConversionPayload(report.request_payload)) {
     await db
       .update(impact_conversion_reports)
       .set({
         state: ImpactConversionReportState.Failed,
-        response_payload: { error: 'missing_request_payload' } satisfies Record<string, unknown>,
+        response_payload: {
+          error:
+            report.request_payload === null ? 'missing_request_payload' : 'invalid_request_payload',
+        } satisfies Record<string, unknown>,
       })
       .where(eq(impact_conversion_reports.id, report.id));
     return 'failed';
   }
+  const payload = report.request_payload;
 
   const result = await sendImpactConversionPayload(payload);
   await persistImpactConversionReportResult({ reportId: report.id, result });

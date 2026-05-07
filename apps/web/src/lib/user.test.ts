@@ -548,6 +548,29 @@ describe('User', () => {
       expect(conversionCount.count).toBe(0);
     });
 
+    it('falls back to google_user_email when normalized_email is null', async () => {
+      // Pre-0090 users can have NULL normalized_email but a real google_user_email.
+      // Soft-delete must still record a tombstone so a re-registration of the
+      // same email cannot bypass the previously-deleted-referee guard.
+      const legacyUser = await insertTestUser({
+        google_user_email: 'legacy-no-normalized@example.com',
+        normalized_email: null,
+      });
+
+      await softDeleteUser(legacyUser.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(deleted_user_email_tombstones)
+        .where(
+          eq(
+            deleted_user_email_tombstones.normalized_email_hash,
+            hashNormalizedEmailForDeletionTombstone('legacy-no-normalized@example.com')
+          )
+        );
+      expect(tombstone).toBeDefined();
+    });
+
     it('should delete auth providers', async () => {
       const user = await insertTestUser();
       await db.insert(user_auth_provider).values({

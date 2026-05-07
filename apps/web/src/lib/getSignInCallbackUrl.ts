@@ -38,30 +38,24 @@ export default function getSignInCallbackUrl(searchParams?: NextAppSearchParams)
     callbackParams.set('source', searchParams?.source);
   }
 
-  if (typeof searchParams?.im_ref === 'string' && searchParams?.im_ref) {
-    callbackParams.set('im_ref', searchParams.im_ref);
-  }
-
-  if (typeof searchParams?._saasquatch === 'string' && searchParams?._saasquatch) {
-    callbackParams.set('_saasquatch', searchParams._saasquatch);
-  }
-
-  if (typeof searchParams?.rsCode === 'string' && searchParams?.rsCode) {
-    callbackParams.set('rsCode', searchParams.rsCode);
-  }
-
-  if (typeof searchParams?.rsShareMedium === 'string' && searchParams?.rsShareMedium) {
-    callbackParams.set('rsShareMedium', searchParams.rsShareMedium);
-  }
-
-  if (typeof searchParams?.rsEngagementMedium === 'string' && searchParams?.rsEngagementMedium) {
-    callbackParams.set('rsEngagementMedium', searchParams.rsEngagementMedium);
-  }
-
-  for (const utmParam of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']) {
-    const value = searchParams?.[utmParam];
+  // Order matters: tests assert this exact emission order through the
+  // sign-in callback redirect (see getSignInCallbackUrl.test.ts).
+  const trackingParams = [
+    'im_ref',
+    '_saasquatch',
+    'rsCode',
+    'rsShareMedium',
+    'rsEngagementMedium',
+    'utm_source',
+    'utm_medium',
+    'utm_campaign',
+    'utm_term',
+    'utm_content',
+  ] as const;
+  for (const trackingParam of trackingParams) {
+    const value = searchParams?.[trackingParam];
     if (typeof value === 'string' && value) {
-      callbackParams.set(utmParam, value);
+      callbackParams.set(trackingParam, value);
     }
   }
 

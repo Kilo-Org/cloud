@@ -179,14 +179,6 @@ function getDebuggableVerifiedAccessTokenPayload(
   };
 }
 
-function logImpactAdvocateDebug(message: string, details: Record<string, unknown>): void {
-  // Delegates to the unified Impact debug logger so a single env
-  // (IMPACT_REFERRAL_DEBUG=true, or NODE_ENV=development) lights up every
-  // outbound Impact call site. IMPACT_ADVOCATE_DEBUG_LOGGING is still
-  // honored as a legacy alias inside the unified gate.
-  logImpactReferralDebug(message, details);
-}
-
 function getImpactAdvocateWidgetPath(widgetId: string, programId: string): string {
   const trimmedWidgetId = widgetId.trim();
   if (!trimmedWidgetId) return `p/${programId}/w/${IMPACT_ADVOCATE_WIDGET_NAME}`;
@@ -283,7 +275,7 @@ export function buildImpactAdvocateRegisterParticipantPayload(params: {
     ...(params.countryCode ? { countryCode: params.countryCode } : {}),
   };
 
-  logImpactAdvocateDebug('[impact-advocate] built register participant payload', {
+  logImpactReferralDebug('[impact-advocate] built register participant payload', {
     payload: getDebuggableRegisterParticipantPayload(payload),
   });
 
@@ -424,7 +416,7 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
     const sanitizedPayload = sanitizeRegisterParticipantPayloadForWire(
       payload as unknown as Record<string, unknown>
     );
-    logImpactAdvocateDebug('[impact-advocate] sending register participant request', {
+    logImpactReferralDebug('[impact-advocate] sending register participant request', {
       url: getDebuggableImpactAdvocateRegisterParticipantUrl(config),
       method: 'PUT',
       headers: {
@@ -448,7 +440,7 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
     });
 
     const responseBody = await response.text();
-    logImpactAdvocateDebug('[impact-advocate] register participant response', {
+    logImpactReferralDebug('[impact-advocate] register participant response', {
       url: getDebuggableImpactAdvocateRegisterParticipantUrl(config),
       ok: response.ok,
       statusCode: response.status,
@@ -470,7 +462,7 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
       responseBody,
     };
   } catch (error) {
-    logImpactAdvocateDebug('[impact-advocate] register participant network error', {
+    logImpactReferralDebug('[impact-advocate] register participant network error', {
       error: error instanceof Error ? error.message : String(error),
     });
     return {
@@ -495,7 +487,7 @@ export async function sendImpactAdvocateRewardLookupPayload(
 
   try {
     const url = getImpactAdvocateRewardsUrl(config, payload);
-    logImpactAdvocateDebug('[impact-advocate] sending reward lookup request', {
+    logImpactReferralDebug('[impact-advocate] sending reward lookup request', {
       url: getDebuggableImpactAdvocateRewardsUrl(config, payload),
       method: 'GET',
       accountIdPresent: Boolean(payload.accountId.trim()),
@@ -512,7 +504,7 @@ export async function sendImpactAdvocateRewardLookupPayload(
     });
     const responseBody = await response.text();
 
-    logImpactAdvocateDebug('[impact-advocate] reward lookup response', {
+    logImpactReferralDebug('[impact-advocate] reward lookup response', {
       url: getDebuggableImpactAdvocateRewardsUrl(config, payload),
       ok: response.ok,
       statusCode: response.status,
@@ -535,7 +527,7 @@ export async function sendImpactAdvocateRewardLookupPayload(
       responseBody,
     };
   } catch (error) {
-    logImpactAdvocateDebug('[impact-advocate] reward lookup network error', {
+    logImpactReferralDebug('[impact-advocate] reward lookup network error', {
       error: error instanceof Error ? error.message : String(error),
     });
     return {
@@ -564,7 +556,7 @@ export async function sendImpactAdvocateRewardRedemptionPayload(
       amount: payload.amount,
       unit: payload.unit,
     };
-    logImpactAdvocateDebug('[impact-advocate] sending reward redemption request', {
+    logImpactReferralDebug('[impact-advocate] sending reward redemption request', {
       url,
       method: 'POST',
       rewardIdPresent: Boolean(payload.rewardId.trim()),
@@ -583,7 +575,7 @@ export async function sendImpactAdvocateRewardRedemptionPayload(
     });
     const responseBody = await response.text();
 
-    logImpactAdvocateDebug('[impact-advocate] reward redemption response', {
+    logImpactReferralDebug('[impact-advocate] reward redemption response', {
       url,
       ok: response.ok,
       statusCode: response.status,
@@ -605,7 +597,7 @@ export async function sendImpactAdvocateRewardRedemptionPayload(
       responseBody,
     };
   } catch (error) {
-    logImpactAdvocateDebug('[impact-advocate] reward redemption network error', {
+    logImpactReferralDebug('[impact-advocate] reward redemption network error', {
       error: error instanceof Error ? error.message : String(error),
     });
     return {
@@ -638,7 +630,7 @@ export function issueImpactAdvocateVerifiedAccessToken(
   };
   const token = jwt.sign(payload, config.authToken, options);
 
-  logImpactAdvocateDebug('[impact-advocate] issued verified access token', {
+  logImpactReferralDebug('[impact-advocate] issued verified access token', {
     jwtHeader: header,
     jwtPayload: getDebuggableVerifiedAccessTokenPayload(payload),
     signOptions: {

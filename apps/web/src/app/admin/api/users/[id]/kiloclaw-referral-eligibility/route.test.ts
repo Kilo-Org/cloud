@@ -1,9 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
+import {
+  insertKiloClawSubscriptionChangeLog,
+  type KiloClawSubscription,
+  type User,
+} from '@kilocode/db';
 
 import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
 import { getUserFromAuth } from '@/lib/user.server';
+
+// Test-fixture boundary: only the fields the route actually reads are
+// populated. Casting via Partial<T> -> T (rather than `as never` or
+// `as unknown as T`) keeps the structural type relationship intact, so any
+// required field the route starts to read in the future will surface as a
+// concrete TS error here instead of silently `undefined`.
+function adminUserFixture(overrides: Partial<User> & Pick<User, 'id'>): User {
+  return overrides as Partial<User> as User;
+}
+
+function subscriptionFixture(
+  overrides: Partial<KiloClawSubscription> & Pick<KiloClawSubscription, 'id'>
+): KiloClawSubscription {
+  return overrides as Partial<KiloClawSubscription> as KiloClawSubscription;
+}
 
 jest.mock('@/lib/user.server', () => ({
   getUserFromAuth: jest.fn(),
@@ -49,17 +68,17 @@ describe('POST /admin/api/users/[id]/kiloclaw-referral-eligibility', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetUserFromAuth.mockResolvedValue({
-      user: { id: 'admin_123' } as never,
+      user: adminUserFixture({ id: 'admin_123' }),
       authFailedResponse: null,
     });
     mockResolveCurrentPersonalSubscriptionRow.mockResolvedValue({
-      subscription: {
+      subscription: subscriptionFixture({
         id: 'subscription_123',
         user_id: 'user_123',
         plan: 'standard',
         status: 'active',
-      },
-    } as never);
+      }),
+    } as Awaited<ReturnType<typeof resolveCurrentPersonalSubscriptionRow>>);
     mockInsertKiloClawSubscriptionChangeLog.mockResolvedValue(undefined);
     mockProcessPersonalKiloClawPaidConversion.mockResolvedValue({
       shouldEnqueueAffiliateSale: false,
@@ -72,13 +91,16 @@ describe('POST /admin/api/users/[id]/kiloclaw-referral-eligibility', () => {
   it('returns authFailedResponse for unauthorized operators', async () => {
     mockGetUserFromAuth.mockResolvedValue({
       user: null,
-      authFailedResponse: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) as never,
+      authFailedResponse: NextResponse.json(
+        { success: false as const, error: 'Unauthorized' },
+        { status: 401 }
+      ),
     });
 
     const response = await POST(createRequest({}), { params: Promise.resolve({ id: 'user_123' }) });
 
     expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+    await expect(response.json()).resolves.toEqual({ success: false, error: 'Unauthorized' });
   });
 
   it('records an admin override and processes the conversion with overrideEligible=true', async () => {

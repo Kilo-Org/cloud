@@ -36,3 +36,7 @@ pnpm dev:start
 
 - [Vercel project](https://vercel.com/kilocode/kilocode-app)
 - [Google Cloud OAuth](https://console.cloud.google.com/auth/clients?project=kilocode)
+
+## Acknowledgments
+
+Special thanks to **Marius** and **Mark** for their hard work and contributions to the Kilo Code cloud platform.

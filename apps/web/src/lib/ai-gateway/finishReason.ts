@@ -1,7 +1,5 @@
-// The two lists below enumerate every distinct finish_reason / stop_reason /
-// Responses API status value observed in production microdollar_usage logs,
-// spanning OpenAI & OpenRouter chat completions, Vercel AI SDK, Anthropic
-// Messages, and the OpenAI Responses API.
+// The two lists below enumerate every distinct value observed for the
+// `finish_reason` column in production `microdollar_usage` logs.
 // `unknown` / `other` are kept as non-error catch-alls so a novel upstream
 // value does not immediately inflate the error rate.
 

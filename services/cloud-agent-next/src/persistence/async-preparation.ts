@@ -25,6 +25,7 @@ import { WrapperClient } from '../kilo/wrapper-client.js';
 import type { PreparingStep } from '../shared/protocol.js';
 import type { PreparationInput } from './schemas.js';
 import { readProfileBundle } from '../session-profile.js';
+import { withSandboxInternalServerErrorRecovery } from '../sandbox-recovery.js';
 import type { Env as WorkerEnv, SandboxId, SessionId as AgentSessionId } from '../types.js';
 
 type EmitProgress = (step: PreparingStep, message: string) => void;
@@ -118,143 +119,153 @@ export async function executePreparationSteps(
   const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId, {
     sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS,
   });
-  await checkDiskAndCleanBeforeSetup(sandbox, input.orgId, input.userId, input.sessionId);
+  return withSandboxInternalServerErrorRecovery(
+    {
+      sandbox,
+      sandboxId,
+      sessionId: input.sessionId,
+      phase: 'asyncPreparation',
+    },
+    async () => {
+      await checkDiskAndCleanBeforeSetup(sandbox, input.orgId, input.userId, input.sessionId);
 
-  // 3. Workspace setup
-  emitProgress('workspace_setup', 'Setting up workspace…');
-  const { workspacePath, sessionHome } = await setupWorkspace(
-    sandbox,
-    input.userId,
-    input.orgId,
-    input.sessionId
-  );
+      // 3. Workspace setup
+      emitProgress('workspace_setup', 'Setting up workspace…');
+      const { workspacePath, sessionHome } = await setupWorkspace(
+        sandbox,
+        input.userId,
+        input.orgId,
+        input.sessionId
+      );
 
-  // 4. Clone repository
-  emitProgress('cloning', 'Cloning repository…');
-  const branchName = determineBranchName(input.sessionId, input.upstreamBranch);
-  const sessionId = input.sessionId as AgentSessionId;
-  const context = sessionService.buildContext({
-    sandboxId,
-    orgId: input.orgId,
-    userId: input.userId,
-    sessionId,
-    workspacePath,
-    sessionHome,
-    githubRepo: input.githubRepo,
-    githubToken: resolvedGithubToken,
-    gitUrl: input.gitUrl,
-    gitToken: resolvedGitToken,
-    platform: input.platform,
-    upstreamBranch: input.upstreamBranch,
-    botId: input.botId,
-  });
+      // 4. Clone repository
+      emitProgress('cloning', 'Cloning repository…');
+      const branchName = determineBranchName(input.sessionId, input.upstreamBranch);
+      const sessionId = input.sessionId as AgentSessionId;
+      const context = sessionService.buildContext({
+        sandboxId,
+        orgId: input.orgId,
+        userId: input.userId,
+        sessionId,
+        workspacePath,
+        sessionHome,
+        githubRepo: input.githubRepo,
+        githubToken: resolvedGithubToken,
+        gitUrl: input.gitUrl,
+        gitToken: resolvedGitToken,
+        platform: input.platform,
+        upstreamBranch: input.upstreamBranch,
+        botId: input.botId,
+      });
 
-  const session = await sessionService.getOrCreateSession({
-    sandbox,
-    context,
-    env,
-    originalToken: input.authToken,
-    kilocodeModel: input.model,
-    originalOrgId: input.orgId,
-    createdOnPlatform: input.createdOnPlatform,
-    appendSystemPrompt: input.appendSystemPrompt,
-    profile: readProfileBundle(input),
-  });
+      const session = await sessionService.getOrCreateSession({
+        sandbox,
+        context,
+        env,
+        originalToken: input.authToken,
+        kilocodeModel: input.model,
+        originalOrgId: input.orgId,
+        createdOnPlatform: input.createdOnPlatform,
+        appendSystemPrompt: input.appendSystemPrompt,
+        profile: readProfileBundle(input),
+      });
 
-  const cloneOptions = input.shallow ? { shallow: true } : undefined;
-  if (input.gitUrl) {
-    await cloneGitRepo(
-      session,
-      workspacePath,
-      input.gitUrl,
-      resolvedGitToken,
-      undefined,
-      cloneOptions
-    );
-  } else if (input.githubRepo) {
-    await cloneGitHubRepo(
-      session,
-      workspacePath,
-      input.githubRepo,
-      resolvedGithubToken,
-      {
-        GITHUB_APP_SLUG: env.GITHUB_APP_SLUG,
-        GITHUB_APP_BOT_USER_ID: env.GITHUB_APP_BOT_USER_ID,
-      },
-      cloneOptions
-    );
-  }
+      const cloneOptions = input.shallow ? { shallow: true } : undefined;
+      if (input.gitUrl) {
+        await cloneGitRepo(
+          session,
+          workspacePath,
+          input.gitUrl,
+          resolvedGitToken,
+          undefined,
+          cloneOptions
+        );
+      } else if (input.githubRepo) {
+        await cloneGitHubRepo(
+          session,
+          workspacePath,
+          input.githubRepo,
+          resolvedGithubToken,
+          {
+            GITHUB_APP_SLUG: env.GITHUB_APP_SLUG,
+            GITHUB_APP_BOT_USER_ID: env.GITHUB_APP_BOT_USER_ID,
+          },
+          cloneOptions
+        );
+      }
 
-  // 5. Branch management
-  emitProgress('branch', 'Setting up branch…');
-  await manageBranch(session, workspacePath, branchName, !!input.upstreamBranch);
+      // 5. Branch management
+      emitProgress('branch', 'Setting up branch…');
+      await manageBranch(session, workspacePath, branchName, !!input.upstreamBranch);
 
-  // 6. Setup commands
-  const inputSetupCommands = readProfileBundle(input).setupCommands;
-  if (inputSetupCommands && inputSetupCommands.length > 0) {
-    emitProgress('setup_commands', 'Running setup commands…');
-    await runSetupCommands(session, context, inputSetupCommands, true);
-  }
+      // 6. Setup commands
+      const inputSetupCommands = readProfileBundle(input).setupCommands;
+      if (inputSetupCommands && inputSetupCommands.length > 0) {
+        emitProgress('setup_commands', 'Running setup commands…');
+        await runSetupCommands(session, context, inputSetupCommands, true);
+      }
 
-  // 7. Write auth file and global rules (runtime skills are written by getOrCreateSession above)
-  await writeAuthFile(sandbox, sessionHome, input.authToken);
-  await writeGlobalRules(sandbox, sessionHome, input.sessionId);
+      // 7. Write auth file and global rules (runtime skills are written by getOrCreateSession above)
+      await writeAuthFile(sandbox, sessionHome, input.authToken);
+      await writeGlobalRules(sandbox, sessionHome, input.sessionId);
 
-  // 8. Import pre-generated session into CLI's SQLite so the wrapper picks it up
-  if (input.kiloSessionId) {
-    emitProgress('kilo_session', 'Importing session…');
-    const now = Date.now();
-    const defaultTitle = 'New session - ' + new Date(now).toISOString();
-    const minimalSessionJson = JSON.stringify({
-      info: {
-        id: input.kiloSessionId,
-        slug: '',
-        projectID: '',
-        directory: '',
-        title: defaultTitle,
-        version: '2',
-        time: { created: now, updated: now },
-      },
-      messages: [],
-    });
-    const importFilePath = `/tmp/kilo-empty-session-${input.kiloSessionId}.json`;
-    await sandbox.writeFile(importFilePath, minimalSessionJson);
-    const escapedFile = importFilePath.replaceAll("'", "'\\''");
-    const escapedId = input.kiloSessionId.replaceAll("'", "'\\''");
-    const escapedWorkspace = workspacePath.replaceAll("'", "'\\''");
-    const restoreResult = await session.exec(
-      `bun /usr/local/bin/kilo-restore-session.js --file '${escapedFile}' '${escapedId}' '${escapedWorkspace}'`,
-      { cwd: dirname(workspacePath) }
-    );
-    if (restoreResult.exitCode !== 0) {
-      const stdout = restoreResult.stdout?.trim() ?? '';
-      logger
-        .withFields({ exitCode: restoreResult.exitCode, stdout })
-        .error('Session import failed');
-      emitProgress('failed', `Session import failed (exit ${restoreResult.exitCode})`);
-      return undefined;
+      // 8. Import pre-generated session into CLI's SQLite so the wrapper picks it up
+      if (input.kiloSessionId) {
+        emitProgress('kilo_session', 'Importing session…');
+        const now = Date.now();
+        const defaultTitle = 'New session - ' + new Date(now).toISOString();
+        const minimalSessionJson = JSON.stringify({
+          info: {
+            id: input.kiloSessionId,
+            slug: '',
+            projectID: '',
+            directory: '',
+            title: defaultTitle,
+            version: '2',
+            time: { created: now, updated: now },
+          },
+          messages: [],
+        });
+        const importFilePath = `/tmp/kilo-empty-session-${input.kiloSessionId}.json`;
+        await sandbox.writeFile(importFilePath, minimalSessionJson);
+        const escapedFile = importFilePath.replaceAll("'", "'\\''");
+        const escapedId = input.kiloSessionId.replaceAll("'", "'\\''");
+        const escapedWorkspace = workspacePath.replaceAll("'", "'\\''");
+        const restoreResult = await session.exec(
+          `bun /usr/local/bin/kilo-restore-session.js --file '${escapedFile}' '${escapedId}' '${escapedWorkspace}'`,
+          { cwd: dirname(workspacePath) }
+        );
+        if (restoreResult.exitCode !== 0) {
+          const stdout = restoreResult.stdout?.trim() ?? '';
+          logger
+            .withFields({ exitCode: restoreResult.exitCode, stdout })
+            .error('Session import failed');
+          emitProgress('failed', `Session import failed (exit ${restoreResult.exitCode})`);
+          return undefined;
+        }
+      }
+
+      // 9. Start wrapper (with --session-id if pre-imported)
+      emitProgress('kilo_server', 'Starting Kilo…');
+      const { sessionId: wrapperSessionId } = await WrapperClient.ensureWrapper(sandbox, session, {
+        agentSessionId: input.sessionId,
+        userId: input.userId,
+        workspacePath,
+        sessionId: input.kiloSessionId,
+      });
+
+      return {
+        sandboxId,
+        workspacePath,
+        sessionHome,
+        branchName,
+        kiloSessionId: input.kiloSessionId ?? wrapperSessionId,
+        resolvedInstallationId,
+        resolvedGithubAppType,
+        resolvedGithubToken: input.githubRepo ? resolvedGithubToken : undefined,
+        resolvedGitToken,
+        gitlabTokenManaged,
+      };
     }
-  }
-
-  // 9. Start wrapper (with --session-id if pre-imported)
-  emitProgress('kilo_server', 'Starting Kilo…');
-  const { sessionId: wrapperSessionId } = await WrapperClient.ensureWrapper(sandbox, session, {
-    agentSessionId: input.sessionId,
-    userId: input.userId,
-    workspacePath,
-    sessionId: input.kiloSessionId,
-  });
-
-  return {
-    sandboxId,
-    workspacePath,
-    sessionHome,
-    branchName,
-    kiloSessionId: input.kiloSessionId ?? wrapperSessionId,
-    resolvedInstallationId,
-    resolvedGithubAppType,
-    resolvedGithubToken: input.githubRepo ? resolvedGithubToken : undefined,
-    resolvedGitToken,
-    gitlabTokenManaged,
-  };
+  );
 }

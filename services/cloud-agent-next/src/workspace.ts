@@ -12,6 +12,7 @@ import {
   withSandboxOperationTimeoutLog,
 } from './sandbox-timeout-logging.js';
 import { withTimeout } from '@kilocode/worker-utils';
+import { isSandboxInternalServerError } from './sandbox-recovery.js';
 
 /**
  * Minimal interface for running shell commands.
@@ -121,7 +122,8 @@ export type SessionPaths = {
 /**
  * Check disk space and clean up stale workspaces if low, using the sandbox
  * directly so it can run before any session or workspace directory exists.
- * Errors are caught and logged — never rethrown — so cleanup failure never blocks setup.
+ * Errors are caught and logged so cleanup failure never blocks setup, except
+ * sandbox 500s which indicate a bad container that should be destroyed.
  */
 export async function checkDiskAndCleanBeforeSetup(
   sandbox: SandboxInstance,
@@ -136,6 +138,13 @@ export async function checkDiskAndCleanBeforeSetup(
       await cleanupStaleWorkspaces(sandbox, getBaseWorkspacePath(orgId, userId), sessionId);
     }
   } catch (error) {
+    if (isSandboxInternalServerError(error)) {
+      logger
+        .withFields({ error: error instanceof Error ? error.message : String(error) })
+        .error('Pre-setup disk check hit sandbox 500, aborting workspace setup');
+      throw error;
+    }
+
     // Log and continue — a failed disk check should not block workspace setup.
     // The worst case is that mkdir fails (which it would have anyway without cleanup).
     logger
@@ -157,7 +166,8 @@ export async function setupWorkspace(
     await sandbox.mkdir(sessionWorkspacePath, { recursive: true });
   } catch (error) {
     throw new Error(
-      `Failed to create workspace directory: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to create workspace directory: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 
@@ -165,7 +175,8 @@ export async function setupWorkspace(
     await sandbox.mkdir(sessionHome, { recursive: true });
   } catch (error) {
     throw new Error(
-      `Failed to prepare session home: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to prepare session home: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error }
     );
   }
 
@@ -550,6 +561,11 @@ export async function cloneGitRepo(
       error: err instanceof Error ? err.message : String(err),
       gitUrl: sanitizedGitUrl,
     });
+
+    if (isSandboxInternalServerError(err)) {
+      throw err;
+    }
+
     // Throw generic error to avoid leaking token in response
     throw new Error(`Failed to clone repository from ${sanitizedGitUrl}`);
   }

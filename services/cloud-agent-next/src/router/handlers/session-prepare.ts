@@ -47,6 +47,7 @@ import {
 } from '../../services/git-token-service-client.js';
 import { getPgDb } from '../../db/pg.js';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
+import { destroySandboxAfterInternalServerError } from '../../sandbox-recovery.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
@@ -421,125 +422,151 @@ const prepareSessionHandler = internalApiProtectedProcedure
         sleepAfter: SANDBOX_SLEEP_AFTER_SECONDS,
       });
 
-      // 4. Check disk space before creating directories; clean stale workspaces if low
-      await checkDiskAndCleanBeforeSetup(
-        sandbox,
-        input.kilocodeOrganizationId,
-        ctx.userId,
-        cloudAgentSessionId
-      );
-
-      // 5. Setup workspace directories
-      logger.info('Setting up workspace directories');
-      const { workspacePath, sessionHome } = await setupWorkspace(
-        sandbox,
-        ctx.userId,
-        input.kilocodeOrganizationId,
-        cloudAgentSessionId
-      );
-
-      // 6. Build context and create execution session
-      const branchName = determineBranchName(cloudAgentSessionId, input.upstreamBranch);
-      const context = sessionService.buildContext({
-        sandboxId,
-        orgId: input.kilocodeOrganizationId,
-        userId: ctx.userId,
-        sessionId: cloudAgentSessionId,
-        workspacePath,
-        sessionHome,
-        githubRepo: input.githubRepo,
-        githubToken: resolvedGithubToken, // Use resolved token (from input or generated from installation)
-        gitUrl: input.gitUrl,
-        gitToken: resolvedGitToken,
-        platform: input.platform,
-        upstreamBranch: input.upstreamBranch,
-        botId: ctx.botId,
-      });
-
-      logger.info('Creating execution session');
-      const session = await sessionService.getOrCreateSession({
-        sandbox,
-        context,
-        env: ctx.env,
-        originalToken: ctx.authToken,
-        kilocodeModel: input.model,
-        originalOrgId: input.kilocodeOrganizationId,
-        createdOnPlatform: input.createdOnPlatform,
-        appendSystemPrompt: input.appendSystemPrompt,
-        profile: effective,
-      });
-
-      // 7. Clone repository
-      const cloneOptions = input.shallow ? { shallow: true } : undefined;
-      logger.info('Cloning repository');
-      if (input.gitUrl) {
-        await cloneGitRepo(
-          session,
-          workspacePath,
-          input.gitUrl,
-          resolvedGitToken,
-          undefined,
-          cloneOptions
+      const prepareWorkspace = async () => {
+        // 4. Check disk space before creating directories; clean stale workspaces if low
+        await checkDiskAndCleanBeforeSetup(
+          sandbox,
+          input.kilocodeOrganizationId,
+          ctx.userId,
+          cloudAgentSessionId
         );
-      } else if (input.githubRepo) {
-        await cloneGitHubRepo(
-          session,
-          workspacePath,
-          input.githubRepo,
-          resolvedGithubToken,
-          {
-            GITHUB_APP_SLUG: ctx.env.GITHUB_APP_SLUG,
-            GITHUB_APP_BOT_USER_ID: ctx.env.GITHUB_APP_BOT_USER_ID,
-          },
-          cloneOptions
+
+        // 5. Setup workspace directories
+        logger.info('Setting up workspace directories');
+        const { workspacePath, sessionHome } = await setupWorkspace(
+          sandbox,
+          ctx.userId,
+          input.kilocodeOrganizationId,
+          cloudAgentSessionId
         );
-      } else {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Either githubRepo or gitUrl must be provided',
+
+        // 6. Build context and create execution session
+        const branchName = determineBranchName(cloudAgentSessionId, input.upstreamBranch);
+        const context = sessionService.buildContext({
+          sandboxId,
+          orgId: input.kilocodeOrganizationId,
+          userId: ctx.userId,
+          sessionId: cloudAgentSessionId,
+          workspacePath,
+          sessionHome,
+          githubRepo: input.githubRepo,
+          githubToken: resolvedGithubToken, // Use resolved token (from input or generated from installation)
+          gitUrl: input.gitUrl,
+          gitToken: resolvedGitToken,
+          platform: input.platform,
+          upstreamBranch: input.upstreamBranch,
+          botId: ctx.botId,
         });
-      }
 
-      // 8. Branch management
-      logger
-        .withFields({ branchName, upstreamBranch: input.upstreamBranch })
-        .info('Managing branch');
-      if (input.upstreamBranch) {
-        // For upstream branches, use manageBranch (verifies exists remotely)
-        await manageBranch(session, workspacePath, branchName, true);
-      } else {
-        // For session branches, create directly (can't exist remotely with UUID-based name)
-        const result = await session.exec(`cd ${workspacePath} && git checkout -b '${branchName}'`);
-        if (result.exitCode !== 0) {
+        logger.info('Creating execution session');
+        const session = await sessionService.getOrCreateSession({
+          sandbox,
+          context,
+          env: ctx.env,
+          originalToken: ctx.authToken,
+          kilocodeModel: input.model,
+          originalOrgId: input.kilocodeOrganizationId,
+          createdOnPlatform: input.createdOnPlatform,
+          appendSystemPrompt: input.appendSystemPrompt,
+          profile: effective,
+        });
+
+        // 7. Clone repository
+        const cloneOptions = input.shallow ? { shallow: true } : undefined;
+        logger.info('Cloning repository');
+        if (input.gitUrl) {
+          await cloneGitRepo(
+            session,
+            workspacePath,
+            input.gitUrl,
+            resolvedGitToken,
+            undefined,
+            cloneOptions
+          );
+        } else if (input.githubRepo) {
+          await cloneGitHubRepo(
+            session,
+            workspacePath,
+            input.githubRepo,
+            resolvedGithubToken,
+            {
+              GITHUB_APP_SLUG: ctx.env.GITHUB_APP_SLUG,
+              GITHUB_APP_BOT_USER_ID: ctx.env.GITHUB_APP_BOT_USER_ID,
+            },
+            cloneOptions
+          );
+        } else {
           throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: `Failed to create branch ${branchName}: ${result.stderr || result.stdout}`,
+            code: 'BAD_REQUEST',
+            message: 'Either githubRepo or gitUrl must be provided',
           });
         }
+
+        // 8. Branch management
+        logger
+          .withFields({ branchName, upstreamBranch: input.upstreamBranch })
+          .info('Managing branch');
+        if (input.upstreamBranch) {
+          // For upstream branches, use manageBranch (verifies exists remotely)
+          await manageBranch(session, workspacePath, branchName, true);
+        } else {
+          // For session branches, create directly (can't exist remotely with UUID-based name)
+          const result = await session.exec(
+            `cd ${workspacePath} && git checkout -b '${branchName}'`
+          );
+          if (result.exitCode !== 0) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Failed to create branch ${branchName}: ${result.stderr || result.stdout}`,
+            });
+          }
+        }
+
+        // 9. Run setup commands
+        if (effective.setupCommands && effective.setupCommands.length > 0) {
+          logger
+            .withFields({ count: effective.setupCommands.length })
+            .info('Running setup commands');
+          await runSetupCommands(session, context, effective.setupCommands, true); // fail-fast
+        }
+
+        // 10. Write auth file for session ingest, plus global rules.
+        // (runtime skills were written by getOrCreateSession above)
+        await writeAuthFile(sandbox, sessionHome, ctx.authToken);
+        await writeGlobalRules(sandbox, sessionHome, cloudAgentSessionId);
+
+        // 11. Start wrapper (which starts kilo server in-process and creates session)
+        logger.info('Starting wrapper');
+        const { client: _wrapperClient, sessionId: kiloSessionId } =
+          await WrapperClient.ensureWrapper(sandbox, session, {
+            agentSessionId: cloudAgentSessionId,
+            userId: ctx.userId,
+            workspacePath,
+          });
+
+        logger.setTags({ kiloSessionId });
+        logger.info('Wrapper started, kilo session created');
+
+        return { workspacePath, sessionHome, branchName, kiloSessionId };
+      };
+
+      let preparedWorkspace: Awaited<ReturnType<typeof prepareWorkspace>>;
+      try {
+        preparedWorkspace = await prepareWorkspace();
+      } catch (error) {
+        await destroySandboxAfterInternalServerError(
+          {
+            sandbox,
+            sandboxId,
+            sessionId: cloudAgentSessionId,
+            phase: 'prepareSession',
+          },
+          error
+        );
+        throw error;
       }
 
-      // 9. Run setup commands
-      if (effective.setupCommands && effective.setupCommands.length > 0) {
-        logger.withFields({ count: effective.setupCommands.length }).info('Running setup commands');
-        await runSetupCommands(session, context, effective.setupCommands, true); // fail-fast
-      }
-
-      // 10. Write auth file for session ingest, plus global rules.
-      // (runtime skills were written by getOrCreateSession above)
-      await writeAuthFile(sandbox, sessionHome, ctx.authToken);
-      await writeGlobalRules(sandbox, sessionHome, cloudAgentSessionId);
-
-      // 11. Start wrapper (which starts kilo server in-process and creates session)
-      logger.info('Starting wrapper');
-      const { client: _wrapperClient, sessionId: kiloSessionId } =
-        await WrapperClient.ensureWrapper(sandbox, session, {
-          agentSessionId: cloudAgentSessionId,
-          userId: ctx.userId,
-          workspacePath,
-        });
-
-      logger.setTags({ kiloSessionId });
-      logger.info('Wrapper started, kilo session created');
+      const { workspacePath, sessionHome, branchName, kiloSessionId } = preparedWorkspace;
 
       // 13. Create cli_sessions_v2 record via session-ingest RPC (blocking)
       logger.info('Creating cli_sessions_v2 record via session-ingest');

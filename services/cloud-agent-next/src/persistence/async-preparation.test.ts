@@ -2,12 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
 import type { PreparationInput } from './schemas.js';
 
+const { ensureWrapperMock } = vi.hoisted(() => ({
+  ensureWrapperMock: vi.fn(),
+}));
+
 const fakeSession = {
   exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
 };
 
 const fakeSandbox = {
   writeFile: vi.fn().mockResolvedValue(undefined),
+  destroy: vi.fn().mockResolvedValue(undefined),
 };
 
 vi.mock('@cloudflare/sandbox', () => ({
@@ -45,16 +50,23 @@ vi.mock('../session-service.js', () => ({
 
 vi.mock('../kilo/wrapper-client.js', () => ({
   WrapperClient: {
-    ensureWrapper: vi.fn().mockResolvedValue({ sessionId: 'ses_wrapper_123' }),
+    ensureWrapper: ensureWrapperMock,
   },
 }));
 
 import { cloneGitHubRepo, cloneGitRepo } from '../workspace.js';
 import { executePreparationSteps } from './async-preparation.js';
 
+const wrapperResult = {
+  client: {},
+  sessionId: 'ses_wrapper_123',
+};
+
 describe('executePreparationSteps', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fakeSandbox.destroy.mockResolvedValue(undefined);
+    ensureWrapperMock.mockResolvedValue(wrapperResult);
   });
 
   it('skips managed GitLab token resolution when caller already resolved it', async () => {
@@ -181,5 +193,38 @@ describe('executePreparationSteps', () => {
       { GITHUB_APP_SLUG: 'kilo-connect', GITHUB_APP_BOT_USER_ID: '12345' },
       undefined
     );
+  });
+
+  it('destroys the sandbox when preparation hits a sandbox 500', async () => {
+    const env = {
+      Sandbox: {} as Env['Sandbox'],
+      SandboxSmall: {} as Env['SandboxSmall'],
+      GIT_TOKEN_SERVICE: {
+        getTokenForRepo: vi.fn(),
+      },
+      PER_SESSION_SANDBOX_ORG_IDS: '',
+      GITHUB_APP_SLUG: 'kilo-connect',
+      GITHUB_APP_BOT_USER_ID: '12345',
+    } as unknown as Env;
+    const emitProgress = vi.fn();
+    const input = {
+      sessionId: 'agent_test',
+      userId: 'test-user',
+      orgId: 'test-org',
+      authToken: 'kilo-token',
+      githubRepo: 'acme/repo',
+      githubToken: 'github-token',
+      prompt: 'Fix bug',
+      mode: 'code',
+      model: 'kilo/test-model',
+      autoInitiate: false,
+    } satisfies PreparationInput;
+    const error = new Error('HTTP error! status: 500');
+    Object.assign(error, { name: 'SandboxError' });
+    ensureWrapperMock.mockRejectedValueOnce(error);
+
+    await expect(executePreparationSteps(input, env, emitProgress)).rejects.toBe(error);
+
+    expect(fakeSandbox.destroy).toHaveBeenCalledOnce();
   });
 });

@@ -26,6 +26,7 @@ import { withDORetry } from '../utils/do-retry.js';
 import { normalizeAgentMode } from '../schema.js';
 import { buildImagePromptParts, downloadImagePromptParts } from './image-prompt-parts.js';
 import { withTimeout } from '@kilocode/worker-utils';
+import { withSandboxInternalServerErrorRecovery } from '../sandbox-recovery.js';
 
 /** Maximum time allowed for workspace preparation (resume, init, fast path). */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -137,56 +138,71 @@ export class ExecutionOrchestrator {
       );
     }
 
-    // 2. Workspace preparation (may throw WORKSPACE_SETUP_FAILED)
-    const prepared = await this.prepareWorkspace(sandbox, plan, options?.onProgress);
+    const prepareExecution = async () => {
+      // 2. Workspace preparation (may throw WORKSPACE_SETUP_FAILED)
+      const prepared = await this.prepareWorkspace(sandbox, plan, options?.onProgress);
 
-    // 3. Update git remote token if needed (resume path with token overrides)
-    if (!workspace.shouldPrepare) {
-      const resumeContext = workspace.resumeContext;
-      if (resumeContext.githubToken || resumeContext.gitToken) {
-        await this.updateTokenOverrides(prepared, workspace);
+      // 3. Update git remote token if needed (resume path with token overrides)
+      if (!workspace.shouldPrepare) {
+        const resumeContext = workspace.resumeContext;
+        if (resumeContext.githubToken || resumeContext.gitToken) {
+          await this.updateTokenOverrides(prepared, workspace);
+        }
       }
-    }
 
-    // 4. Ensure wrapper is running (starts kilo server in-process)
-    let wrapperClient: WrapperClient;
-    let kiloSessionId: string;
-    try {
-      const result = await WrapperClient.ensureWrapper(sandbox, prepared.session, {
-        agentSessionId: sessionId,
-        userId,
-        workspacePath: prepared.context.workspacePath,
-        sessionId: wrapper.kiloSessionId,
+      // 4. Ensure wrapper is running (starts kilo server in-process)
+      let wrapperClient: WrapperClient;
+      let kiloSessionId: string;
+      try {
+        const result = await WrapperClient.ensureWrapper(sandbox, prepared.session, {
+          agentSessionId: sessionId,
+          userId,
+          workspacePath: prepared.context.workspacePath,
+          sessionId: wrapper.kiloSessionId,
+        });
+        wrapperClient = result.client;
+        kiloSessionId = result.sessionId;
+      } catch (error) {
+        throw ExecutionError.wrapperStartFailed(
+          `Failed to start wrapper: ${error instanceof Error ? error.message : String(error)}`,
+          error
+        );
+      }
+
+      // 5. Record activity for idle timeout tracking
+      try {
+        await withDORetry(
+          () => this.deps.getSessionStub(userId, sessionId),
+          stub => stub.recordKiloServerActivity(),
+          'recordKiloServerActivity'
+        );
+      } catch {
+        // Non-fatal - log but continue
+        logger.warn('Failed to record kilo server activity');
+      }
+
+      // 6. Download images from R2 to sandbox if provided
+      const fileParts = await downloadImagePromptParts({
+        env: this.deps.env,
+        session: prepared.session,
+        userId: plan.userId,
+        images: plan.images,
+        createdOnPlatform: this.getCreatedOnPlatform(plan),
       });
-      wrapperClient = result.client;
-      kiloSessionId = result.sessionId;
-    } catch (error) {
-      throw ExecutionError.wrapperStartFailed(
-        `Failed to start wrapper: ${error instanceof Error ? error.message : String(error)}`,
-        error
-      );
-    }
 
-    // 5. Record activity for idle timeout tracking
-    try {
-      await withDORetry(
-        () => this.deps.getSessionStub(userId, sessionId),
-        stub => stub.recordKiloServerActivity(),
-        'recordKiloServerActivity'
-      );
-    } catch {
-      // Non-fatal - log but continue
-      logger.warn('Failed to record kilo server activity');
-    }
+      return { prepared, wrapperClient, kiloSessionId, fileParts };
+    };
 
-    // 6. Download images from R2 to sandbox if provided
-    const fileParts = await downloadImagePromptParts({
-      env: this.deps.env,
-      session: prepared.session,
-      userId: plan.userId,
-      images: plan.images,
-      createdOnPlatform: this.getCreatedOnPlatform(plan),
-    });
+    const { prepared, wrapperClient, kiloSessionId, fileParts } =
+      await withSandboxInternalServerErrorRecovery(
+        {
+          sandbox,
+          sandboxId,
+          sessionId,
+          phase: 'executionWorkspacePreparation',
+        },
+        prepareExecution
+      );
 
     // 7. Send prompt with execution binding (async - returns messageId immediately)
     const ingestUrl = this.deps.getIngestUrl(sessionId, userId);

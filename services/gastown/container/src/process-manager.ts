@@ -2615,8 +2615,11 @@ async function fetchMayorAgentId(
   }
 }
 
-function buildPrewarmEnvFromProcessEnv(): Record<string, string> {
-  const env: Record<string, string> = {};
+function buildPrewarmEnv(mayorAgentId: string): Record<string, string> {
+  const env: Record<string, string> = {
+    KILO_TEST_HOME: `/tmp/agent-home-${mayorAgentId}`,
+    XDG_DATA_HOME: `/tmp/agent-home-${mayorAgentId}/.local/share`,
+  };
   const keys = [
     'GASTOWN_API_URL',
     'GASTOWN_CONTAINER_TOKEN',
@@ -2627,8 +2630,6 @@ function buildPrewarmEnvFromProcessEnv(): Record<string, string> {
     'GASTOWN_ORGANIZATION_ID',
     'KILO_API_URL',
     'KILO_OPENROUTER_BASE',
-    'KILO_TEST_HOME',
-    'XDG_DATA_HOME',
   ];
   for (const key of keys) {
     const value = process.env[key];
@@ -2654,7 +2655,7 @@ async function prewarmMayorSDK(
 
   await hydrateDbFromSnapshot(mayorAgentId, apiUrl, token, `mayor-${townId}`, townId);
 
-  const env = buildPrewarmEnvFromProcessEnv();
+  const env = buildPrewarmEnv(mayorAgentId);
 
   const existing = sdkInstances.get(workdir);
   if (existing) {

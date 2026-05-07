@@ -728,17 +728,24 @@ function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
     return;
   }
 
-  const before = JSON.stringify(parsed);
+  const initial = JSON.stringify(parsed);
+  const applied: string[] = [];
+
   sanitizeLegacyStreamChatConfig(parsed);
+  let snapshot = JSON.stringify(parsed);
+  if (snapshot !== initial) applied.push('streamChat');
+
   ensureInboundEmailHookFlags(parsed);
-  const serialized = JSON.stringify(parsed, null, 2);
-  if (JSON.stringify(parsed) === before) {
+  const final = JSON.stringify(parsed);
+  if (final !== snapshot) applied.push('inboundEmailFlags');
+
+  if (applied.length === 0) {
     return;
   }
 
   atomicWrite(
     CONFIG_PATH,
-    serialized,
+    JSON.stringify(parsed, null, 2),
     {
       writeFileSync: deps.writeFileSync,
       renameSync: deps.renameSync,
@@ -747,7 +754,7 @@ function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
     },
     { mode: 0o600 }
   );
-  console.log('Sanitized existing config before doctor');
+  console.log(`Sanitized existing config before doctor: [${applied.join(', ')}]`);
 }
 
 export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {

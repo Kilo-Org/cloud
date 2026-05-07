@@ -114,6 +114,13 @@ type EnvLike = Record<string, string | undefined>;
 // `{{payload.sessionKey}}` so the platform worker can pre-compute a stable
 // key like `inbound-email:YYYY-MM-DD-<slug>` that coalesces emails on the
 // same thread into one agent session.
+//
+// Force-overrides any prior value (including `false`) on purpose: the
+// inbound-email mapping is canonical config — generateBaseConfig
+// unconditionally installs/overwrites it on every run — so the flag it
+// requires must converge to true alongside the mapping. If an admin needs
+// to disable inbound email handling, the right lever is the
+// kiloclaw_instances.inbound_email_enabled column, not flipping this flag.
 export function ensureInboundEmailHookFlags(config: ConfigObject): void {
   if (config.hooks && typeof config.hooks === 'object' && !Array.isArray(config.hooks)) {
     config.hooks.allowRequestSessionKey = true;

@@ -25,4 +25,4 @@ To make logs reach Axiom, the worker needs **both** flags in `wrangler.jsonc`:
 "logpush": true,
 ```
 
-The account-level Logpush job is set to "all logs", but Cloudflare still requires each worker to opt in via `logpush: true`. `observability.enabled` alone isn't enough — without `logpush: true`, the worker's trace events stay inside Cloudflare and never reach the `cloudflare-logpush` Axiom dataset. Check `ScriptName == "<your-worker>"` in Axiom after deploy to confirm.
+The account-level Logpush job is set to "all logs", but Cloudflare still requires each worker to opt in via `logpush: true`. `observability.enabled` alone isn't enough: without `logpush: true`, the worker's trace events stay inside Cloudflare and never reach the `cloudflare-logpush` Axiom dataset. Check `ScriptName == "<your-worker>"` in Axiom after deploy to confirm.

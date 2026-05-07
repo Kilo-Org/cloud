@@ -1313,6 +1313,15 @@ describe('ensureInboundEmailHookFlags', () => {
     ensureInboundEmailHookFlags(config);
     expect(config.hooks.allowRequestSessionKey).toBe(true);
   });
+
+  it('overrides allowRequestSessionKey: false back to true', () => {
+    // Canonical-config policy: the inbound-email mapping is force-installed
+    // on every run, so the flag it requires must converge to true alongside
+    // it. An explicit `false` is treated as drift, not as admin intent.
+    const config = { hooks: { allowRequestSessionKey: false } };
+    ensureInboundEmailHookFlags(config);
+    expect(config.hooks.allowRequestSessionKey).toBe(true);
+  });
 });
 
 describe('setNestedValue', () => {

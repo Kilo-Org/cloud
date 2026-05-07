@@ -121,6 +121,22 @@ export type ImpactAdvocateDispatchResult =
       error?: string;
     };
 
+export type ImpactAdvocateRewardLookupPayload = {
+  accountId: string;
+  userId?: string;
+  rewardTypeFilter?: 'CREDIT';
+};
+
+export type ImpactAdvocateRewardRedemptionPayload = {
+  rewardId: string;
+  amount: number;
+  unit: string;
+};
+
+export type ImpactAdvocateRewardListResult = ImpactAdvocateDispatchResult & {
+  rewards?: unknown[];
+};
+
 function getDebuggableRegisterParticipantPayload(
   payload: ImpactAdvocateRegisterParticipantPayload
 ) {
@@ -251,6 +267,51 @@ function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getCaseInsensitiveProperty(record: Record<string, unknown>, key: string): unknown {
+  if (Object.prototype.hasOwnProperty.call(record, key)) {
+    return record[key];
+  }
+
+  const lowerKey = key.toLowerCase();
+  const matchedKey = Object.keys(record).find(candidate => candidate.toLowerCase() === lowerKey);
+  return matchedKey ? record[matchedKey] : undefined;
+}
+
+export function extractImpactAdvocateRewards(responseBody: string | null | undefined): unknown[] {
+  if (!responseBody) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(responseBody);
+  } catch {
+    return [];
+  }
+
+  if (Array.isArray(parsed)) return parsed;
+  if (!isRecord(parsed)) return [];
+
+  const candidateKeys = [
+    'rewards',
+    'Rewards',
+    'data',
+    'Data',
+    'items',
+    'Items',
+    'results',
+    'Results',
+  ];
+  for (const key of candidateKeys) {
+    const candidate = getCaseInsensitiveProperty(parsed, key);
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  return [];
+}
+
 /**
  * SaaSquatch (Impact Advocate) Upsert User REST endpoint.
  *
@@ -268,6 +329,28 @@ function getImpactAdvocateRegisterParticipantUrl(
   const accountId = encodeURIComponent(payload.accountId);
   const userId = encodeURIComponent(payload.id);
   return `${base}/api/v1/${tenant}/open/account/${accountId}/user/${userId}`;
+}
+
+function getImpactAdvocateRewardsUrl(
+  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>,
+  payload: ImpactAdvocateRewardLookupPayload
+): string {
+  const base = trimTrailingSlashes(IMPACT_ADVOCATE_API_BASE_URL);
+  const tenant = encodeURIComponent(config.tenantAlias);
+  const url = new URL(`${base}/api/v1/${tenant}/reward`);
+  url.searchParams.set('accountId', payload.accountId);
+  if (payload.userId) url.searchParams.set('userId', payload.userId);
+  if (payload.rewardTypeFilter) url.searchParams.set('rewardTypeFilter', payload.rewardTypeFilter);
+  return url.toString();
+}
+
+function getImpactAdvocateRedeemRewardUrl(
+  config: NonNullable<ReturnType<typeof getImpactAdvocateConfig>>,
+  rewardId: string
+): string {
+  const base = trimTrailingSlashes(IMPACT_ADVOCATE_API_BASE_URL);
+  const tenant = encodeURIComponent(config.tenantAlias);
+  return `${base}/api/v1/${tenant}/credit/${encodeURIComponent(rewardId)}/redeem`;
 }
 
 export async function sendImpactAdvocateRegisterParticipantPayload(
@@ -334,6 +417,141 @@ export async function sendImpactAdvocateRegisterParticipantPayload(
     };
   } catch (error) {
     logImpactAdvocateDebug('[impact-advocate] register participant network error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      ok: false,
+      failureKind: 'network',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function sendImpactAdvocateRewardLookupPayload(
+  payload: ImpactAdvocateRewardLookupPayload
+): Promise<ImpactAdvocateRewardListResult> {
+  const config = getImpactAdvocateConfig();
+  if (!config) {
+    return {
+      ok: false,
+      failureKind: 'http_4xx',
+      error: 'Impact Advocate is unconfigured',
+    };
+  }
+
+  try {
+    const url = getImpactAdvocateRewardsUrl(config, payload);
+    logImpactAdvocateDebug('[impact-advocate] sending reward lookup request', {
+      url,
+      method: 'GET',
+      accountIdPresent: Boolean(payload.accountId.trim()),
+      userIdPresent: Boolean(payload.userId?.trim()),
+      rewardTypeFilter: payload.rewardTypeFilter ?? null,
+    });
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: getImpactAdvocateAuthorizationHeader(config),
+        Accept: 'application/json',
+      },
+    });
+    const responseBody = await response.text();
+
+    logImpactAdvocateDebug('[impact-advocate] reward lookup response', {
+      url,
+      ok: response.ok,
+      statusCode: response.status,
+      responseBody: truncateForLog(responseBody),
+    });
+
+    if (response.ok) {
+      return {
+        ok: true,
+        statusCode: response.status,
+        responseBody,
+        rewards: extractImpactAdvocateRewards(responseBody),
+      };
+    }
+
+    return {
+      ok: false,
+      failureKind: response.status >= 500 ? 'http_5xx' : 'http_4xx',
+      statusCode: response.status,
+      responseBody,
+    };
+  } catch (error) {
+    logImpactAdvocateDebug('[impact-advocate] reward lookup network error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      ok: false,
+      failureKind: 'network',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function sendImpactAdvocateRewardRedemptionPayload(
+  payload: ImpactAdvocateRewardRedemptionPayload
+): Promise<ImpactAdvocateDispatchResult> {
+  const config = getImpactAdvocateConfig();
+  if (!config) {
+    return {
+      ok: false,
+      failureKind: 'http_4xx',
+      error: 'Impact Advocate is unconfigured',
+    };
+  }
+
+  try {
+    const url = getImpactAdvocateRedeemRewardUrl(config, payload.rewardId);
+    const body = {
+      amount: payload.amount,
+      unit: payload.unit,
+    };
+    logImpactAdvocateDebug('[impact-advocate] sending reward redemption request', {
+      url,
+      method: 'POST',
+      rewardIdPresent: Boolean(payload.rewardId.trim()),
+      amount: payload.amount,
+      unit: payload.unit,
+    });
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: getImpactAdvocateAuthorizationHeader(config),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const responseBody = await response.text();
+
+    logImpactAdvocateDebug('[impact-advocate] reward redemption response', {
+      url,
+      ok: response.ok,
+      statusCode: response.status,
+      responseBody: truncateForLog(responseBody),
+    });
+
+    if (response.ok) {
+      return {
+        ok: true,
+        statusCode: response.status,
+        responseBody,
+      };
+    }
+
+    return {
+      ok: false,
+      failureKind: response.status >= 500 ? 'http_5xx' : 'http_4xx',
+      statusCode: response.status,
+      responseBody,
+    };
+  } catch (error) {
+    logImpactAdvocateDebug('[impact-advocate] reward redemption network error', {
       error: error instanceof Error ? error.message : String(error),
     });
     return {

@@ -310,6 +310,16 @@ export const ImpactConversionReportState = {
 export type ImpactConversionReportState =
   (typeof ImpactConversionReportState)[keyof typeof ImpactConversionReportState];
 
+export const ImpactAdvocateRewardRedemptionState = {
+  Queued: 'queued',
+  Retrying: 'retrying',
+  Redeemed: 'redeemed',
+  Failed: 'failed',
+} as const;
+
+export type ImpactAdvocateRewardRedemptionState =
+  (typeof ImpactAdvocateRewardRedemptionState)[keyof typeof ImpactAdvocateRewardRedemptionState];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',

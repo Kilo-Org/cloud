@@ -58,6 +58,7 @@ import {
   KiloClawReferralDecisionOutcome,
   KiloClawReferralRewardStatus,
   ImpactConversionReportState,
+  ImpactAdvocateRewardRedemptionState,
 } from './schema-types';
 import type {
   CustomLlmDefinition,
@@ -150,6 +151,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloClawReferralDecisionOutcome,
   KiloClawReferralRewardStatus,
   ImpactConversionReportState,
+  ImpactAdvocateRewardRedemptionState,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -829,6 +831,62 @@ export const kiloclaw_referral_reward_applications = pgTable(
 
 export type KiloClawReferralRewardApplication =
   typeof kiloclaw_referral_reward_applications.$inferSelect;
+
+export const impact_advocate_reward_redemptions = pgTable(
+  'impact_advocate_reward_redemptions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    reward_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_referral_rewards.id, {
+        onDelete: 'cascade',
+        onUpdate: 'cascade',
+      }),
+    dedupe_key: text().notNull(),
+    beneficiary_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    state: text()
+      .notNull()
+      .$type<ImpactAdvocateRewardRedemptionState>()
+      .default(ImpactAdvocateRewardRedemptionState.Queued),
+    impact_reward_id: text(),
+    request_payload: jsonb().$type<Record<string, unknown> | null>(),
+    lookup_response_payload: jsonb().$type<Record<string, unknown> | null>(),
+    redeem_response_payload: jsonb().$type<Record<string, unknown> | null>(),
+    response_status_code: integer(),
+    attempt_count: integer().notNull().default(0),
+    next_retry_at: timestamp({ withTimezone: true, mode: 'string' }),
+    redeemed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_impact_advocate_reward_redemptions_reward_id').on(table.reward_id),
+    unique('UQ_impact_advocate_reward_redemptions_dedupe_key').on(table.dedupe_key),
+    index('IDX_impact_advocate_reward_redemptions_beneficiary_user_id').on(
+      table.beneficiary_user_id
+    ),
+    index('IDX_impact_advocate_reward_redemptions_state').on(table.state),
+    enumCheck(
+      'impact_advocate_reward_redemptions_state_check',
+      table.state,
+      ImpactAdvocateRewardRedemptionState
+    ),
+    check(
+      'impact_advocate_reward_redemptions_attempt_count_non_negative_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+  ]
+);
+
+export type ImpactAdvocateRewardRedemption = typeof impact_advocate_reward_redemptions.$inferSelect;
 
 export const impact_conversion_reports = pgTable(
   'impact_conversion_reports',

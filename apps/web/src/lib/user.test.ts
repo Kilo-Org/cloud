@@ -61,6 +61,7 @@ import {
   kiloclaw_referral_reward_decisions,
   kiloclaw_referral_rewards,
   kiloclaw_referral_reward_applications,
+  impact_advocate_reward_redemptions,
   impact_conversion_reports,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
@@ -101,6 +102,7 @@ describe('User', () => {
     await db.delete(impact_advocate_registration_attempts);
     await db.delete(impact_advocate_participants);
     await db.delete(impact_conversion_reports);
+    await db.delete(impact_advocate_reward_redemptions);
     await db.delete(kiloclaw_referral_reward_applications);
     await db.delete(kiloclaw_referral_rewards);
     await db.delete(kiloclaw_referral_reward_decisions);
@@ -486,6 +488,20 @@ describe('User', () => {
         new_renewal_boundary: '2026-06-01T00:00:00.000Z',
         applied_at: '2026-04-23T00:00:00.000Z',
       });
+      await db.insert(impact_advocate_reward_redemptions).values({
+        reward_id: rewardId,
+        dedupe_key: 'reward-redemption-dedupe',
+        beneficiary_user_id: user.id,
+        state: 'queued',
+        request_payload: {
+          lookup: {
+            accountId: user.google_user_email,
+            userId: user.google_user_email,
+            rewardTypeFilter: 'CREDIT',
+          },
+          redemption: { amount: 1, unit: 'free-months' },
+        },
+      });
       await db.insert(impact_conversion_reports).values({
         conversion_id: conversionId,
         dedupe_key: 'impact-report-dedupe',
@@ -518,6 +534,12 @@ describe('User', () => {
         .from(impact_advocate_participants)
         .where(eq(impact_advocate_participants.user_id, user.id));
       expect(participantCount.count).toBe(0);
+
+      const [redemptionCount] = await db
+        .select({ count: count() })
+        .from(impact_advocate_reward_redemptions)
+        .where(eq(impact_advocate_reward_redemptions.beneficiary_user_id, user.id));
+      expect(redemptionCount.count).toBe(0);
 
       const [conversionCount] = await db
         .select({ count: count() })

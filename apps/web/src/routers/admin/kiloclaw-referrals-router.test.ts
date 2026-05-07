@@ -5,6 +5,7 @@ import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  impact_advocate_reward_redemptions,
   impact_conversion_reports,
   kiloclaw_attribution_touches,
   kiloclaw_referral_conversions,
@@ -113,6 +114,14 @@ async function insertReferralInvestigationRow(params: {
       new_renewal_boundary: '2026-06-01T00:00:00.000Z',
       applied_at: '2026-04-10T00:05:00.000Z',
     });
+    await db.insert(impact_advocate_reward_redemptions).values({
+      reward_id: reward.id,
+      dedupe_key: `reward-redemption-${params.sourcePaymentId}`,
+      beneficiary_user_id: referrer.id,
+      state: 'redeemed',
+      impact_reward_id: `impact-reward-${params.sourcePaymentId}`,
+      redeemed_at: '2026-04-10T00:06:00.000Z',
+    });
   }
 
   await db.insert(impact_conversion_reports).values({
@@ -177,6 +186,7 @@ describe('admin kiloclaw referrals investigation', () => {
             }),
           ],
           impactReports: [expect.objectContaining({ state: 'delivered' })],
+          impactRewardRedemptions: [expect.objectContaining({ state: 'redeemed' })],
         }),
         expect.objectContaining({
           referee: expect.objectContaining({
@@ -190,6 +200,7 @@ describe('admin kiloclaw referrals investigation', () => {
           rewardDecisions: [expect.objectContaining({ outcome: 'disqualified' })],
           rewardApplications: [],
           impactReports: [expect.objectContaining({ state: 'failed' })],
+          impactRewardRedemptions: [],
         }),
       ])
     );

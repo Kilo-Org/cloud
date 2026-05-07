@@ -131,6 +131,77 @@ describe('impact advocate', () => {
     });
   });
 
+  it('looks up account rewards with account and user filters', async () => {
+    process.env.IMPACT_ADVOCATE_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
+    process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
+    process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
+    const fetchMock = jest.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ rewards: [{ id: 'reward-123', type: 'CREDIT' }] }), {
+        status: 200,
+      })
+    );
+    global.fetch = fetchMock;
+
+    const { sendImpactAdvocateRewardLookupPayload } = await import('@/lib/impact-advocate');
+    const result = await sendImpactAdvocateRewardLookupPayload({
+      accountId: 'user@example.com',
+      userId: 'user@example.com',
+      rewardTypeFilter: 'CREDIT',
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      statusCode: 200,
+      responseBody: '{"rewards":[{"id":"reward-123","type":"CREDIT"}]}',
+      rewards: [{ id: 'reward-123', type: 'CREDIT' }],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://app.referralsaasquatch.com/api/v1/tenant-alias/reward?accountId=user%40example.com&userId=user%40example.com&rewardTypeFilter=CREDIT'
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: 'GET',
+      headers: expect.objectContaining({
+        Authorization: 'Basic ' + Buffer.from('impact-account-sid:secret').toString('base64'),
+        Accept: 'application/json',
+      }),
+    });
+  });
+
+  it('redeems a credit reward with amount and unit', async () => {
+    process.env.IMPACT_ADVOCATE_PROGRAM_ID = '51699';
+    process.env.IMPACT_ADVOCATE_TENANT_ALIAS = 'tenant-alias';
+    process.env.IMPACT_ADVOCATE_AUTH_TOKEN = 'secret';
+    process.env.IMPACT_ADVOCATE_ACCOUNT_SID = 'impact-account-sid';
+    const fetchMock = jest
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response('{"ok":true}', { status: 200 }));
+    global.fetch = fetchMock;
+
+    const { sendImpactAdvocateRewardRedemptionPayload } = await import('@/lib/impact-advocate');
+    const result = await sendImpactAdvocateRewardRedemptionPayload({
+      rewardId: 'reward-123',
+      amount: 1,
+      unit: 'free-months',
+    });
+
+    expect(result).toEqual({ ok: true, statusCode: 200, responseBody: '{"ok":true}' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://app.referralsaasquatch.com/api/v1/tenant-alias/credit/reward-123/redeem'
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({
+        Authorization: 'Basic ' + Buffer.from('impact-account-sid:secret').toString('base64'),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      }),
+      body: '{"amount":1,"unit":"free-months"}',
+    });
+  });
+
   it('strips legacy programId and normalises locale at send time', async () => {
     const { sanitizeRegisterParticipantPayloadForWire } = await import('@/lib/impact-advocate');
 

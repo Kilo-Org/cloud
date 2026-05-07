@@ -5,6 +5,7 @@ import { desc, eq, inArray, or } from 'drizzle-orm';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
+  impact_advocate_reward_redemptions,
   impact_conversion_reports,
   kiloclaw_attribution_touches,
   kiloclaw_referral_conversions,
@@ -102,6 +103,18 @@ const ReferralInvestigationOutputSchema = z.object({
           actionTrackerId: z.number(),
           orderId: z.string(),
           deliveredAt: NullableString,
+          nextRetryAt: NullableString,
+          responseStatusCode: z.number().nullable(),
+        })
+      ),
+      impactRewardRedemptions: z.array(
+        z.object({
+          id: z.string().uuid(),
+          rewardId: z.string().uuid(),
+          beneficiaryUserId: z.string(),
+          state: z.string(),
+          impactRewardId: NullableString,
+          redeemedAt: NullableString,
           nextRetryAt: NullableString,
           responseStatusCode: z.number().nullable(),
         })
@@ -263,6 +276,27 @@ async function investigateReferrer(search: string): Promise<ReferralInvestigatio
         .where(inArray(impact_conversion_reports.conversion_id, conversionIds))
         .orderBy(desc(impact_conversion_reports.created_at))
     : [];
+  const impactRewardRedemptions = conversionIds.length
+    ? await db
+        .select({
+          conversionId: kiloclaw_referral_rewards.conversion_id,
+          id: impact_advocate_reward_redemptions.id,
+          rewardId: impact_advocate_reward_redemptions.reward_id,
+          beneficiaryUserId: impact_advocate_reward_redemptions.beneficiary_user_id,
+          state: impact_advocate_reward_redemptions.state,
+          impactRewardId: impact_advocate_reward_redemptions.impact_reward_id,
+          redeemedAt: impact_advocate_reward_redemptions.redeemed_at,
+          nextRetryAt: impact_advocate_reward_redemptions.next_retry_at,
+          responseStatusCode: impact_advocate_reward_redemptions.response_status_code,
+        })
+        .from(impact_advocate_reward_redemptions)
+        .innerJoin(
+          kiloclaw_referral_rewards,
+          eq(kiloclaw_referral_rewards.id, impact_advocate_reward_redemptions.reward_id)
+        )
+        .where(inArray(kiloclaw_referral_rewards.conversion_id, conversionIds))
+        .orderBy(desc(impact_advocate_reward_redemptions.created_at))
+    : [];
 
   return {
     referrer: {
@@ -354,6 +388,18 @@ async function investigateReferrer(search: string): Promise<ReferralInvestigatio
               deliveredAt: normalizeTimestamp(report.deliveredAt),
               nextRetryAt: normalizeTimestamp(report.nextRetryAt),
               responseStatusCode: report.responseStatusCode,
+            }))
+          : [],
+        impactRewardRedemptions: conversionId
+          ? listByConversionId(impactRewardRedemptions, conversionId).map(redemption => ({
+              id: redemption.id,
+              rewardId: redemption.rewardId,
+              beneficiaryUserId: redemption.beneficiaryUserId,
+              state: redemption.state,
+              impactRewardId: redemption.impactRewardId,
+              redeemedAt: normalizeTimestamp(redemption.redeemedAt),
+              nextRetryAt: normalizeTimestamp(redemption.nextRetryAt),
+              responseStatusCode: redemption.responseStatusCode,
             }))
           : [],
       };

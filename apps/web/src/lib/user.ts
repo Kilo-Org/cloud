@@ -70,6 +70,7 @@ import {
   kiloclaw_referral_reward_decisions,
   kiloclaw_referral_rewards,
   kiloclaw_referral_reward_applications,
+  impact_advocate_reward_redemptions,
   impact_conversion_reports,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
@@ -844,6 +845,9 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(kiloclaw_referral_reward_applications)
       .where(eq(kiloclaw_referral_reward_applications.beneficiary_user_id, userId));
+    await tx
+      .delete(impact_advocate_reward_redemptions)
+      .where(eq(impact_advocate_reward_redemptions.beneficiary_user_id, userId));
     await tx
       .delete(kiloclaw_referral_rewards)
       .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, userId));

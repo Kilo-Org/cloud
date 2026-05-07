@@ -14,7 +14,12 @@ import {
   type ImpactConversionPayload,
   type ImpactDispatchResult,
 } from '@/lib/impact';
-import { isImpactAdvocateConfigured } from '@/lib/impact-advocate';
+import {
+  isImpactAdvocateConfigured,
+  sendImpactAdvocateRewardLookupPayload,
+  sendImpactAdvocateRewardRedemptionPayload,
+  type ImpactAdvocateDispatchResult,
+} from '@/lib/impact-advocate';
 import { logImpactReferralDebug } from '@/lib/impact-debug';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact-referral';
 import { resolveCurrentPersonalSubscriptionRow } from '@/lib/kiloclaw/current-personal-subscription';
@@ -24,6 +29,7 @@ import {
   credit_transactions,
   deleted_user_email_tombstones,
   impact_advocate_participants,
+  impact_advocate_reward_redemptions,
   impact_conversion_reports,
   kiloclaw_attribution_touches,
   kiloclaw_referral_conversions,
@@ -39,6 +45,7 @@ import {
   type KiloClawSubscription,
 } from '@kilocode/db/schema';
 import {
+  ImpactAdvocateRewardRedemptionState,
   ImpactConversionReportState,
   KiloClawAttributionTouchType,
   KiloClawReferralBeneficiaryRole,
@@ -88,6 +95,13 @@ export type ReferralRewardProcessingSummary = {
   failed: number;
 };
 
+export type ImpactAdvocateRewardRedemptionDispatchSummary = {
+  claimed: number;
+  redeemed: number;
+  retried: number;
+  failed: number;
+};
+
 export type AdverseReferralPaymentReason = 'chargeback' | 'refund' | 'fraud';
 
 export type PaidConversionQualificationContext = {
@@ -108,6 +122,7 @@ const REFERRAL_REWARD_ACTOR = {
 } as const;
 
 const SIGNUP_REFERRAL_TOUCH_CAPTURE_GRACE_MS = 10 * 60 * 1000;
+const IMPACT_ADVOCATE_REWARD_UNIT = 'free-months';
 
 function getDatabaseClient(database?: DatabaseClient): DatabaseClient {
   return database ?? db;
@@ -484,6 +499,118 @@ function getObjectProperty(record: unknown, key: string): unknown {
   return Reflect.get(record, key);
 }
 
+function getCaseInsensitiveObjectProperty(record: unknown, key: string): unknown {
+  if (typeof record !== 'object' || record === null) {
+    return undefined;
+  }
+
+  const keys = Object.keys(record);
+  const matchedKey = keys.find(candidate => candidate.toLowerCase() === key.toLowerCase());
+  return matchedKey ? Reflect.get(record, matchedKey) : undefined;
+}
+
+function getStringProperty(record: unknown, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = getCaseInsensitiveObjectProperty(record, key);
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function getNumberProperty(record: unknown, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = getCaseInsensitiveObjectProperty(record, key);
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
+}
+
+function getNestedObjectProperty(record: unknown, key: string): unknown {
+  return getCaseInsensitiveObjectProperty(record, key);
+}
+
+function rewardHasUnit(reward: unknown, unit: string): boolean {
+  const unitValue =
+    getStringProperty(reward, ['unit', 'Unit', 'currency']) ??
+    getStringProperty(getNestedObjectProperty(reward, 'credit'), ['unit', 'Unit']) ??
+    getStringProperty(getNestedObjectProperty(reward, 'value'), ['unit', 'Unit']);
+  return !unitValue || unitValue.toLowerCase() === unit.toLowerCase();
+}
+
+function rewardHasAmount(reward: unknown, amount: number): boolean {
+  const amountValue =
+    getNumberProperty(reward, ['amount', 'Amount', 'remainingAmount', 'RemainingAmount']) ??
+    getNumberProperty(getNestedObjectProperty(reward, 'credit'), ['amount', 'Amount']) ??
+    getNumberProperty(getNestedObjectProperty(reward, 'value'), ['amount', 'Amount']);
+  return amountValue === null || amountValue >= amount;
+}
+
+function rewardIsCredit(reward: unknown): boolean {
+  const type = getStringProperty(reward, ['type', 'Type', 'rewardType', 'RewardType']);
+  return !type || type.toUpperCase() === 'CREDIT';
+}
+
+function rewardIsRedeemable(reward: unknown): boolean {
+  const status = getStringProperty(reward, ['status', 'Status', 'state', 'State']);
+  if (status) {
+    const normalizedStatus = status.toUpperCase().replaceAll(' ', '_');
+    if (
+      normalizedStatus === 'REDEEMED' ||
+      normalizedStatus === 'CANCELLED' ||
+      normalizedStatus === 'CANCELED'
+    ) {
+      return false;
+    }
+  }
+
+  const redeemed = getCaseInsensitiveObjectProperty(reward, 'redeemed');
+  if (redeemed === true) return false;
+
+  const terminalTimestamps = [
+    'redeemedAt',
+    'dateRedeemed',
+    'cancelledAt',
+    'canceledAt',
+    'dateCancelled',
+    'dateCanceled',
+  ];
+  return !terminalTimestamps.some(key => Boolean(getCaseInsensitiveObjectProperty(reward, key)));
+}
+
+function getImpactAdvocateRewardId(reward: unknown): string | null {
+  return getStringProperty(reward, ['id', 'Id', 'ID', 'rewardId', 'RewardId']);
+}
+
+function selectImpactAdvocateRewardId(params: {
+  rewards: unknown[];
+  amount: number;
+  unit: string;
+}): string | null {
+  for (const reward of params.rewards) {
+    const rewardId = getImpactAdvocateRewardId(reward);
+    if (
+      rewardId &&
+      rewardIsCredit(reward) &&
+      rewardHasUnit(reward, params.unit) &&
+      rewardHasAmount(reward, params.amount) &&
+      rewardIsRedeemable(reward)
+    ) {
+      return rewardId;
+    }
+  }
+
+  return null;
+}
+
+function isAlreadyRedeemedResponse(responseBody: string | null | undefined): boolean {
+  const normalized = responseBody?.toLowerCase() ?? '';
+  return normalized.includes('already') && normalized.includes('redeem');
+}
+
 function getImpactActionIdFromResponsePayload(payload: unknown): string | null {
   const value = getObjectProperty(payload, 'actionId');
   return typeof value === 'string' && value.trim() ? value : null;
@@ -755,6 +882,8 @@ async function applyReferralRewardById(
       });
     }
 
+    await queueImpactAdvocateRewardRedemption({ rewardId: reward.id, database: tx });
+
     return 'applied';
   });
 
@@ -817,6 +946,318 @@ export async function processQueuedKiloClawReferralRewards(params?: {
         summary.pending++;
       }
     } catch {
+      summary.failed++;
+    }
+  }
+
+  return summary;
+}
+
+async function queueImpactAdvocateRewardRedemption(params: {
+  rewardId: string;
+  database: DatabaseClient;
+}): Promise<void> {
+  const [reward] = await params.database
+    .select({
+      id: kiloclaw_referral_rewards.id,
+      beneficiaryUserId: kiloclaw_referral_rewards.beneficiary_user_id,
+      monthsGranted: kiloclaw_referral_rewards.months_granted,
+      status: kiloclaw_referral_rewards.status,
+      email: kilocode_users.google_user_email,
+    })
+    .from(kiloclaw_referral_rewards)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_referral_rewards.beneficiary_user_id))
+    .where(eq(kiloclaw_referral_rewards.id, params.rewardId))
+    .limit(1);
+
+  if (!reward || reward.status !== KiloClawReferralRewardStatus.Applied) {
+    return;
+  }
+
+  const accountId = reward.email.trim();
+  if (!accountId) {
+    console.error('[kiloclaw-referrals] missing beneficiary email for Impact reward redemption', {
+      rewardId: params.rewardId,
+      beneficiaryUserId: reward.beneficiaryUserId,
+    });
+    return;
+  }
+
+  await params.database
+    .insert(impact_advocate_reward_redemptions)
+    .values({
+      reward_id: reward.id,
+      dedupe_key: `impact-advocate-reward-redemption:${reward.id}`,
+      beneficiary_user_id: reward.beneficiaryUserId,
+      state: ImpactAdvocateRewardRedemptionState.Queued,
+      request_payload: {
+        lookup: {
+          accountId,
+          userId: accountId,
+          rewardTypeFilter: 'CREDIT',
+        },
+        redemption: {
+          amount: reward.monthsGranted,
+          unit: IMPACT_ADVOCATE_REWARD_UNIT,
+        },
+      } satisfies Record<string, unknown>,
+    })
+    .onConflictDoNothing({ target: [impact_advocate_reward_redemptions.reward_id] });
+}
+
+type ImpactAdvocateRewardRedemptionRequestPayload = {
+  lookup: {
+    accountId: string;
+    userId: string;
+    rewardTypeFilter: 'CREDIT';
+  };
+  redemption: {
+    amount: number;
+    unit: string;
+  };
+};
+
+function isRewardRedemptionRequestPayload(
+  payload: unknown
+): payload is ImpactAdvocateRewardRedemptionRequestPayload {
+  const lookup = getObjectProperty(payload, 'lookup');
+  const redemption = getObjectProperty(payload, 'redemption');
+  return (
+    typeof lookup === 'object' &&
+    lookup !== null &&
+    typeof redemption === 'object' &&
+    redemption !== null &&
+    typeof getObjectProperty(lookup, 'accountId') === 'string' &&
+    typeof getObjectProperty(lookup, 'userId') === 'string' &&
+    getObjectProperty(lookup, 'rewardTypeFilter') === 'CREDIT' &&
+    typeof getObjectProperty(redemption, 'amount') === 'number' &&
+    typeof getObjectProperty(redemption, 'unit') === 'string'
+  );
+}
+
+function buildFailurePayload(result: ImpactAdvocateDispatchResult): Record<string, unknown> {
+  return {
+    failureKind: result.ok ? null : result.failureKind,
+    responseBody: result.responseBody ?? null,
+    error: result.ok ? null : (result.error ?? null),
+  };
+}
+
+async function persistRewardRedemptionFailure(params: {
+  redemptionId: string;
+  attemptCount: number;
+  result: ImpactAdvocateDispatchResult;
+  stage: 'lookup' | 'redeem';
+  terminal?: boolean;
+}): Promise<'retried' | 'failed'> {
+  const terminal =
+    params.terminal ?? (!params.result.ok && params.result.failureKind === 'http_4xx');
+  const responsePayload = buildFailurePayload(params.result);
+  await db
+    .update(impact_advocate_reward_redemptions)
+    .set({
+      state: terminal
+        ? ImpactAdvocateRewardRedemptionState.Failed
+        : ImpactAdvocateRewardRedemptionState.Retrying,
+      attempt_count: params.attemptCount,
+      next_retry_at: terminal ? null : nextReportRetryAt(params.attemptCount),
+      response_status_code: params.result.ok ? null : (params.result.statusCode ?? null),
+      ...(params.stage === 'lookup'
+        ? { lookup_response_payload: responsePayload }
+        : { redeem_response_payload: responsePayload }),
+    })
+    .where(eq(impact_advocate_reward_redemptions.id, params.redemptionId));
+
+  if (terminal) {
+    console.error('[kiloclaw-referrals] Impact Advocate reward redemption failed permanently', {
+      redemptionId: params.redemptionId,
+      stage: params.stage,
+      statusCode: params.result.ok ? null : (params.result.statusCode ?? null),
+      failureKind: params.result.ok ? null : params.result.failureKind,
+    });
+    return 'failed';
+  }
+
+  return 'retried';
+}
+
+async function dispatchImpactAdvocateRewardRedemptionById(
+  redemptionId: string
+): Promise<'redeemed' | 'retried' | 'failed'> {
+  const redemption = await db.query.impact_advocate_reward_redemptions.findFirst({
+    where: eq(impact_advocate_reward_redemptions.id, redemptionId),
+  });
+  if (!redemption) return 'failed';
+  if (redemption.state === ImpactAdvocateRewardRedemptionState.Redeemed) return 'redeemed';
+  if (redemption.state === ImpactAdvocateRewardRedemptionState.Failed) return 'failed';
+
+  const attemptCount = redemption.attempt_count + 1;
+  if (!isRewardRedemptionRequestPayload(redemption.request_payload)) {
+    await db
+      .update(impact_advocate_reward_redemptions)
+      .set({
+        state: ImpactAdvocateRewardRedemptionState.Failed,
+        attempt_count: attemptCount,
+        redeem_response_payload: { error: 'missing_request_payload' } satisfies Record<
+          string,
+          unknown
+        >,
+      })
+      .where(eq(impact_advocate_reward_redemptions.id, redemption.id));
+    return 'failed';
+  }
+
+  const lookupResult = await sendImpactAdvocateRewardLookupPayload(
+    redemption.request_payload.lookup
+  );
+  if (!lookupResult.ok) {
+    return await persistRewardRedemptionFailure({
+      redemptionId: redemption.id,
+      attemptCount,
+      result: lookupResult,
+      stage: 'lookup',
+    });
+  }
+
+  const persistedImpactRewardId = redemption.impact_reward_id?.trim() || null;
+  const impactRewardId =
+    persistedImpactRewardId ??
+    selectImpactAdvocateRewardId({
+      rewards: lookupResult.rewards ?? [],
+      amount: redemption.request_payload.redemption.amount,
+      unit: redemption.request_payload.redemption.unit,
+    });
+  if (!impactRewardId) {
+    await db
+      .update(impact_advocate_reward_redemptions)
+      .set({
+        state: ImpactAdvocateRewardRedemptionState.Retrying,
+        attempt_count: attemptCount,
+        next_retry_at: nextReportRetryAt(attemptCount),
+        response_status_code: lookupResult.statusCode ?? null,
+        lookup_response_payload: {
+          error: 'impact_reward_not_found',
+          responseBody: lookupResult.responseBody ?? null,
+        } satisfies Record<string, unknown>,
+      })
+      .where(eq(impact_advocate_reward_redemptions.id, redemption.id));
+    return 'retried';
+  }
+
+  if (!persistedImpactRewardId) {
+    await db
+      .update(impact_advocate_reward_redemptions)
+      .set({
+        impact_reward_id: impactRewardId,
+        lookup_response_payload: {
+          selectedRewardId: impactRewardId,
+          responseBody: lookupResult.responseBody ?? null,
+        } satisfies Record<string, unknown>,
+      })
+      .where(eq(impact_advocate_reward_redemptions.id, redemption.id));
+  }
+
+  const redeemResult = await sendImpactAdvocateRewardRedemptionPayload({
+    rewardId: impactRewardId,
+    ...redemption.request_payload.redemption,
+  });
+  const isIdempotentAlreadyRedeemed =
+    !redeemResult.ok &&
+    persistedImpactRewardId === impactRewardId &&
+    isAlreadyRedeemedResponse(redeemResult.responseBody);
+  if (!redeemResult.ok && !isIdempotentAlreadyRedeemed) {
+    return await persistRewardRedemptionFailure({
+      redemptionId: redemption.id,
+      attemptCount,
+      result: redeemResult,
+      stage: 'redeem',
+    });
+  }
+
+  await db
+    .update(impact_advocate_reward_redemptions)
+    .set({
+      state: ImpactAdvocateRewardRedemptionState.Redeemed,
+      impact_reward_id: impactRewardId,
+      attempt_count: attemptCount,
+      next_retry_at: null,
+      redeemed_at: new Date().toISOString(),
+      response_status_code: redeemResult.statusCode ?? null,
+      lookup_response_payload: {
+        selectedRewardId: impactRewardId,
+        responseBody: lookupResult.responseBody ?? null,
+      } satisfies Record<string, unknown>,
+      redeem_response_payload: redeemResult.ok
+        ? ({ responseBody: redeemResult.responseBody ?? null } satisfies Record<string, unknown>)
+        : ({
+            alreadyRedeemed: true,
+            responseBody: redeemResult.responseBody ?? null,
+          } satisfies Record<string, unknown>),
+    })
+    .where(eq(impact_advocate_reward_redemptions.id, redemption.id));
+
+  return 'redeemed';
+}
+
+export async function dispatchQueuedImpactAdvocateRewardRedemptions(params?: {
+  limit?: number;
+}): Promise<ImpactAdvocateRewardRedemptionDispatchSummary> {
+  const limit = params?.limit ?? 100;
+  const nowIso = new Date().toISOString();
+  const rows = await db
+    .update(impact_advocate_reward_redemptions)
+    .set({
+      state: ImpactAdvocateRewardRedemptionState.Retrying,
+      next_retry_at: nextReportClaimExpiresAt(),
+    })
+    .where(
+      and(
+        or(
+          eq(impact_advocate_reward_redemptions.state, ImpactAdvocateRewardRedemptionState.Queued),
+          eq(impact_advocate_reward_redemptions.state, ImpactAdvocateRewardRedemptionState.Retrying)
+        ),
+        or(
+          sql`${impact_advocate_reward_redemptions.next_retry_at} IS NULL`,
+          lte(impact_advocate_reward_redemptions.next_retry_at, nowIso)
+        ),
+        sql`${impact_advocate_reward_redemptions.id} IN (
+          SELECT ${impact_advocate_reward_redemptions.id}
+          FROM ${impact_advocate_reward_redemptions}
+          WHERE ${or(
+            eq(
+              impact_advocate_reward_redemptions.state,
+              ImpactAdvocateRewardRedemptionState.Queued
+            ),
+            eq(
+              impact_advocate_reward_redemptions.state,
+              ImpactAdvocateRewardRedemptionState.Retrying
+            )
+          )}
+            AND ${or(
+              sql`${impact_advocate_reward_redemptions.next_retry_at} IS NULL`,
+              lte(impact_advocate_reward_redemptions.next_retry_at, nowIso)
+            )}
+          ORDER BY ${impact_advocate_reward_redemptions.created_at}, ${impact_advocate_reward_redemptions.id}
+          LIMIT ${limit}
+        )`
+      )
+    )
+    .returning({ id: impact_advocate_reward_redemptions.id });
+
+  const summary: ImpactAdvocateRewardRedemptionDispatchSummary = {
+    claimed: rows.length,
+    redeemed: 0,
+    retried: 0,
+    failed: 0,
+  };
+
+  for (const row of rows) {
+    const outcome = await dispatchImpactAdvocateRewardRedemptionById(row.id);
+    if (outcome === 'redeemed') {
+      summary.redeemed++;
+    } else if (outcome === 'retried') {
+      summary.retried++;
+    } else {
       summary.failed++;
     }
   }

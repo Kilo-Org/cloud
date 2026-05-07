@@ -139,6 +139,7 @@ describe('database schema', () => {
         'review_required',
       ],
       ImpactConversionReportState: ['queued', 'retrying', 'delivered', 'failed'],
+      ImpactAdvocateRewardRedemptionState: ['queued', 'retrying', 'redeemed', 'failed'],
     };
 
     const actualEnumValues: Record<string, string[]> = {};

@@ -4,6 +4,7 @@ import { CRON_SECRET } from '@/lib/config.server';
 import { dispatchQueuedAffiliateEvents } from '@/lib/affiliate-events';
 import { dispatchQueuedImpactAdvocateRegistrationAttempts } from '@/lib/impact-referral';
 import {
+  dispatchQueuedImpactAdvocateRewardRedemptions,
   dispatchQueuedImpactConversionReports,
   processQueuedKiloClawReferralRewards,
 } from '@/lib/kiloclaw-referrals';
@@ -32,11 +33,13 @@ export async function GET(request: Request) {
     impactAdvocateRegistrationSummary,
     impactConversionSummary,
     referralRewardSummary,
+    impactAdvocateRewardRedemptionSummary,
   ] = await Promise.all([
     dispatchQueuedAffiliateEvents(),
     dispatchQueuedImpactAdvocateRegistrationAttempts(),
     dispatchQueuedImpactConversionReports(),
     processQueuedKiloClawReferralRewards(),
+    dispatchQueuedImpactAdvocateRewardRedemptions(),
   ]);
 
   return NextResponse.json(
@@ -47,6 +50,7 @@ export async function GET(request: Request) {
         impactAdvocateRegistrations: impactAdvocateRegistrationSummary,
         impactConversionReports: impactConversionSummary,
         referralRewards: referralRewardSummary,
+        impactAdvocateRewardRedemptions: impactAdvocateRewardRedemptionSummary,
       },
       timestamp: new Date().toISOString(),
     },

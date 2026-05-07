@@ -16,6 +16,17 @@ jest.mock('@/lib/impact-advocate', () => {
   return {
     ...actual,
     isImpactAdvocateConfigured: jest.fn(() => true),
+    sendImpactAdvocateRewardLookupPayload: jest.fn(async () => ({
+      ok: true,
+      statusCode: 200,
+      responseBody: JSON.stringify({ rewards: [{ id: 'impact-reward-123', type: 'CREDIT' }] }),
+      rewards: [{ id: 'impact-reward-123', type: 'CREDIT' }],
+    })),
+    sendImpactAdvocateRewardRedemptionPayload: jest.fn(async () => ({
+      ok: true,
+      statusCode: 200,
+      responseBody: '{}',
+    })),
   };
 });
 
@@ -31,6 +42,7 @@ import { db } from '@/lib/drizzle';
 import {
   credit_transactions,
   impact_advocate_participants,
+  impact_advocate_reward_redemptions,
   impact_conversion_reports,
   kiloclaw_attribution_touches,
   kiloclaw_instances,
@@ -47,18 +59,29 @@ import {
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  dispatchQueuedImpactAdvocateRewardRedemptions,
   markPersonalKiloClawReferralPaymentAdverse,
   processPersonalKiloClawPaidConversion,
   processQueuedKiloClawReferralRewards,
   resolveWinningAttributionTouch,
 } from '@/lib/kiloclaw-referrals';
 import { isImpactConfigured, reverseImpactAction, sendImpactConversionPayload } from '@/lib/impact';
-import { isImpactAdvocateConfigured } from '@/lib/impact-advocate';
+import {
+  isImpactAdvocateConfigured,
+  sendImpactAdvocateRewardLookupPayload,
+  sendImpactAdvocateRewardRedemptionPayload,
+} from '@/lib/impact-advocate';
 import { client as stripeClient } from '@/lib/stripe-client';
 
 const mockIsImpactConfigured = jest.mocked(isImpactConfigured);
 const mockIsImpactAdvocateConfigured = jest.mocked(isImpactAdvocateConfigured);
 const mockSendImpactConversionPayload = jest.mocked(sendImpactConversionPayload);
+const mockSendImpactAdvocateRewardLookupPayload = jest.mocked(
+  sendImpactAdvocateRewardLookupPayload
+);
+const mockSendImpactAdvocateRewardRedemptionPayload = jest.mocked(
+  sendImpactAdvocateRewardRedemptionPayload
+);
 const mockReverseImpactAction = jest.mocked(reverseImpactAction);
 const mockStripeSubscriptionUpdate = jest.mocked(stripeClient.subscriptions.update);
 
@@ -146,12 +169,71 @@ async function insertImpactAdvocateParticipant(userId: string, opaqueReferralIde
   return identifier;
 }
 
+async function insertAppliedReferralRewardForUser(userId: string): Promise<string> {
+  const [conversion] = await db
+    .insert(kiloclaw_referral_conversions)
+    .values({
+      referee_user_id: userId,
+      referrer_user_id: null,
+      winning_touch_type: 'none',
+      source_payment_id: `reward-redemption-test:${randomUUID()}`,
+      qualified: true,
+      converted_at: '2026-04-10T00:00:00.000Z',
+    })
+    .returning({ id: kiloclaw_referral_conversions.id });
+
+  if (!conversion) throw new Error('Failed to insert referral conversion');
+
+  const [decision] = await db
+    .insert(kiloclaw_referral_reward_decisions)
+    .values({
+      conversion_id: conversion.id,
+      beneficiary_user_id: userId,
+      beneficiary_role: 'referee',
+      outcome: 'granted',
+      months_granted: 1,
+    })
+    .returning({ id: kiloclaw_referral_reward_decisions.id });
+
+  if (!decision) throw new Error('Failed to insert referral reward decision');
+
+  const [reward] = await db
+    .insert(kiloclaw_referral_rewards)
+    .values({
+      conversion_id: conversion.id,
+      decision_id: decision.id,
+      beneficiary_user_id: userId,
+      beneficiary_role: 'referee',
+      months_granted: 1,
+      status: 'applied',
+      earned_at: '2026-04-10T00:00:00.000Z',
+      applied_at: '2026-04-10T00:05:00.000Z',
+    })
+    .returning({ id: kiloclaw_referral_rewards.id });
+
+  if (!reward) throw new Error('Failed to insert referral reward');
+
+  return reward.id;
+}
+
 describe('kiloclaw referrals', () => {
   afterEach(async () => {
     jest.clearAllMocks();
     mockIsImpactConfigured.mockReturnValue(true);
     mockIsImpactAdvocateConfigured.mockReturnValue(true);
+    mockSendImpactAdvocateRewardLookupPayload.mockResolvedValue({
+      ok: true,
+      statusCode: 200,
+      responseBody: JSON.stringify({ rewards: [{ id: 'impact-reward-123', type: 'CREDIT' }] }),
+      rewards: [{ id: 'impact-reward-123', type: 'CREDIT' }],
+    });
+    mockSendImpactAdvocateRewardRedemptionPayload.mockResolvedValue({
+      ok: true,
+      statusCode: 200,
+      responseBody: '{}',
+    });
     await db.delete(impact_conversion_reports).where(sql`true`);
+    await db.delete(impact_advocate_reward_redemptions).where(sql`true`);
     await db.delete(kiloclaw_referral_reward_applications).where(sql`true`);
     await db.delete(kiloclaw_referral_rewards).where(sql`true`);
     await db.delete(kiloclaw_referral_reward_decisions).where(sql`true`);
@@ -165,6 +247,90 @@ describe('kiloclaw referrals', () => {
     await db.delete(impact_advocate_participants).where(sql`true`);
     await db.delete(referral_codes).where(sql`true`);
     await db.delete(kilocode_users).where(sql`true`);
+  });
+
+  describe('dispatchQueuedImpactAdvocateRewardRedemptions', () => {
+    it('does not treat already-redeemed Impact responses as success before this row has selected the reward', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'first-already-redeemed@example.com',
+        normalized_email: 'first-already-redeemed@example.com',
+      });
+      const rewardId = await insertAppliedReferralRewardForUser(user.id);
+      await db.insert(impact_advocate_reward_redemptions).values({
+        reward_id: rewardId,
+        dedupe_key: `first-already-redeemed:${rewardId}`,
+        beneficiary_user_id: user.id,
+        state: 'queued',
+        request_payload: {
+          lookup: {
+            accountId: user.google_user_email,
+            userId: user.google_user_email,
+            rewardTypeFilter: 'CREDIT',
+          },
+          redemption: { amount: 1, unit: 'free-months' },
+        },
+      });
+      mockSendImpactAdvocateRewardRedemptionPayload.mockResolvedValueOnce({
+        ok: false,
+        failureKind: 'http_4xx',
+        statusCode: 400,
+        responseBody: 'Reward already redeemed',
+      });
+
+      const summary = await dispatchQueuedImpactAdvocateRewardRedemptions();
+
+      expect(summary).toEqual({ claimed: 1, redeemed: 0, retried: 0, failed: 1 });
+      const [redemption] = await db.select().from(impact_advocate_reward_redemptions);
+      expect(redemption).toEqual(
+        expect.objectContaining({
+          state: 'failed',
+          impact_reward_id: 'impact-reward-123',
+          response_status_code: 400,
+        })
+      );
+    });
+
+    it('treats already-redeemed Impact responses as idempotent success for a previously selected reward', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'retry-already-redeemed@example.com',
+        normalized_email: 'retry-already-redeemed@example.com',
+      });
+      const rewardId = await insertAppliedReferralRewardForUser(user.id);
+      await db.insert(impact_advocate_reward_redemptions).values({
+        reward_id: rewardId,
+        dedupe_key: `retry-already-redeemed:${rewardId}`,
+        beneficiary_user_id: user.id,
+        state: 'queued',
+        impact_reward_id: 'impact-reward-123',
+        request_payload: {
+          lookup: {
+            accountId: user.google_user_email,
+            userId: user.google_user_email,
+            rewardTypeFilter: 'CREDIT',
+          },
+          redemption: { amount: 1, unit: 'free-months' },
+        },
+      });
+      mockSendImpactAdvocateRewardRedemptionPayload.mockResolvedValueOnce({
+        ok: false,
+        failureKind: 'http_4xx',
+        statusCode: 400,
+        responseBody: 'Reward already redeemed',
+      });
+
+      const summary = await dispatchQueuedImpactAdvocateRewardRedemptions();
+
+      expect(summary).toEqual({ claimed: 1, redeemed: 1, retried: 0, failed: 0 });
+      const [redemption] = await db.select().from(impact_advocate_reward_redemptions);
+      expect(redemption).toEqual(
+        expect.objectContaining({
+          state: 'redeemed',
+          impact_reward_id: 'impact-reward-123',
+          response_status_code: 400,
+          redeem_response_payload: expect.objectContaining({ alreadyRedeemed: true }),
+        })
+      );
+    });
   });
 
   describe('resolveWinningAttributionTouch', () => {
@@ -1153,6 +1319,51 @@ describe('kiloclaw referrals', () => {
         .from(kiloclaw_referral_rewards)
         .where(eq(kiloclaw_referral_rewards.beneficiary_user_id, referrer.id));
       expect(referrerReward.status).toBe('applied');
+
+      const queuedRedemptions = await db.select().from(impact_advocate_reward_redemptions);
+      expect(queuedRedemptions).toHaveLength(2);
+      expect(queuedRedemptions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ beneficiary_user_id: referee.id, state: 'queued' }),
+          expect.objectContaining({ beneficiary_user_id: referrer.id, state: 'queued' }),
+        ])
+      );
+
+      const redemptionSummary = await dispatchQueuedImpactAdvocateRewardRedemptions();
+      expect(redemptionSummary).toEqual({ claimed: 2, redeemed: 2, retried: 0, failed: 0 });
+      expect(mockSendImpactAdvocateRewardLookupPayload).toHaveBeenCalledTimes(2);
+      expect(mockSendImpactAdvocateRewardLookupPayload).toHaveBeenCalledWith({
+        accountId: 'pending-referee@example.com',
+        userId: 'pending-referee@example.com',
+        rewardTypeFilter: 'CREDIT',
+      });
+      expect(mockSendImpactAdvocateRewardLookupPayload).toHaveBeenCalledWith({
+        accountId: 'pending-referrer@example.com',
+        userId: 'pending-referrer@example.com',
+        rewardTypeFilter: 'CREDIT',
+      });
+      expect(mockSendImpactAdvocateRewardRedemptionPayload).toHaveBeenCalledTimes(2);
+      expect(mockSendImpactAdvocateRewardRedemptionPayload).toHaveBeenCalledWith({
+        rewardId: 'impact-reward-123',
+        amount: 1,
+        unit: 'free-months',
+      });
+
+      const redeemedRedemptions = await db.select().from(impact_advocate_reward_redemptions);
+      expect(redeemedRedemptions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            beneficiary_user_id: referee.id,
+            state: 'redeemed',
+            impact_reward_id: 'impact-reward-123',
+          }),
+          expect.objectContaining({
+            beneficiary_user_id: referrer.id,
+            state: 'redeemed',
+            impact_reward_id: 'impact-reward-123',
+          }),
+        ])
+      );
     });
 
     it('leaves local reward state unchanged when Stripe reward application fails', async () => {

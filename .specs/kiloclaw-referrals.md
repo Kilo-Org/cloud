@@ -12,6 +12,7 @@ and code, not here.
 ## Status
 
 Draft -- created 2026-04-21.
+Updated 2026-05-06 -- require Impact Advocate reward redemption after local reward application.
 
 ## Conventions
 
@@ -486,6 +487,28 @@ interventions, and non-KiloClaw purchases are out of scope.
 120. Before launch, the existing internal referral system MUST be scoped away from KiloClaw, disabled for KiloClaw, or
      migrated into this program's rules to prevent double rewards.
 
+### Impact Reward Redemption
+
+121. When a local free-month reward is applied to KiloClaw billing, the system MUST mark the corresponding Impact Advocate
+     credit reward as redeemed so Impact reporting matches Kilo's fulfillment state.
+
+122. Impact Advocate reward redemption MUST happen asynchronously and MUST NOT block reward application, billing
+     settlement, or user access.
+
+123. Before redeeming an Impact Advocate reward, the system MUST fetch the beneficiary account's rewards from Impact
+     Advocate and select the corresponding credit reward ID.
+
+124. Redeeming an Impact Advocate reward MUST use Impact Advocate's single-reward redemption endpoint with the local
+     reward's granted month count and the configured free-month reward unit.
+
+125. Impact Advocate reward lookup and redemption attempts MUST be idempotently queued per local reward.
+
+126. If the Impact reward is not yet visible when redemption is attempted, the system MUST leave the redemption work in a
+     retryable state.
+
+127. Impact reward redemption state is for reporting and reconciliation only. It MUST NOT be the source of truth for local
+     reward eligibility, application, cancellation, or reversal.
+
 ## Error Handling
 
 1. If referral touch capture fails, the system SHOULD log the failure and continue the primary request.
@@ -512,7 +535,19 @@ interventions, and non-KiloClaw purchases are out of scope.
 8. If required billing state is ambiguous, the system MUST NOT apply a reward. It MUST leave the reward pending and log
    the ambiguity for investigation.
 
+9. If Impact Advocate reward lookup or redemption fails with a server error or timeout, the system MUST leave the
+   redemption work in a retryable state.
+
+10. If Impact Advocate reward lookup or redemption fails with a client error, the system MUST log the error and MUST NOT
+    retry unchanged payloads, except an already-redeemed response MAY be treated as idempotent success.
+
 ## Changelog
+
+### 2026-05-06 -- Redeem applied rewards in Impact Advocate
+
+Added rules requiring local free-month reward application to enqueue asynchronous Impact Advocate reward lookup and
+single-reward redemption, including retry behavior when rewards are not yet visible and idempotent handling for already
+redeemed rewards.
 
 ### 2026-04-21 -- Initial spec
 

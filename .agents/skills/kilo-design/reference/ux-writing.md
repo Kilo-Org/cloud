@@ -89,8 +89,8 @@ expectations: `Provisioning machine. This usually takes 30–60 seconds.`
 Confirm only for truly irreversible or high-stakes actions. Name the
 action in both buttons:
 
-- `Delete workspace permanently?`  
-  Primary: `Delete workspace` (destructive variant).  
+- `Delete workspace permanently?`
+  Primary: `Delete workspace` (destructive variant).
   Secondary: `Keep workspace`.
 
 ### Accessibility copy

@@ -6,18 +6,26 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { TRPCError } from '@trpc/server';
-import type { CloudAgentSessionState, OperationResult, MCPServerConfig } from './types.js';
+import type {
+  CloudAgentSessionState,
+  OperationResult,
+  MCPServerConfig,
+  RuntimeSkill,
+  RuntimeAgent,
+} from './types.js';
 import {
   MetadataSchema,
   PreparationInputSchema,
   type Images,
   type PreparationInput,
+  type SessionProfileBundle,
 } from './schemas.js';
+import { readProfileBundle } from '../session-profile.js';
 import type { EncryptedSecrets } from '../router/schemas.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { logger } from '../logger.js';
-import { Limits } from '../schema.js';
+import { Limits, BUILTIN_AGENT_MODES } from '../schema.js';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
 import { normalizeKilocodeModel } from './model-utils.js';
@@ -124,6 +132,16 @@ type DisconnectGraceState = {
   wsCloseCode: number;
   wsCloseReason: string;
 };
+
+function validateModeAgainstRuntimeAgents(metadata: CloudAgentSessionState): string | null {
+  const mode = metadata.mode;
+  if (!mode || BUILTIN_AGENT_MODES.has(mode)) return null;
+
+  const knownSlugs = new Set((readProfileBundle(metadata).runtimeAgents ?? []).map(m => m.slug));
+  if (knownSlugs.has(mode)) return null;
+
+  return `Mode "${mode}" is not a built-in and does not match any runtimeAgents on this session`;
+}
 
 /**
  * Concatenate text content from assistant message parts.
@@ -870,6 +888,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     encryptedSecrets?: EncryptedSecrets;
     setupCommands?: string[];
     mcpServers?: Record<string, MCPServerConfig>;
+    runtimeSkills?: readonly RuntimeSkill[];
+    runtimeAgents?: readonly RuntimeAgent[];
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
     appendSystemPrompt?: string;
@@ -893,8 +913,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     const now = Date.now();
 
+    const {
+      envVars,
+      encryptedSecrets,
+      setupCommands,
+      mcpServers,
+      runtimeSkills,
+      runtimeAgents,
+      ...rest
+    } = input;
+
     const metadata: CloudAgentSessionState = {
-      ...input,
+      ...rest,
+      profile: {
+        envVars,
+        encryptedSecrets,
+        setupCommands,
+        mcpServers,
+        runtimeSkills: runtimeSkills ? [...runtimeSkills] : undefined,
+        runtimeAgents: runtimeAgents ? [...runtimeAgents] : undefined,
+      },
       version: now,
       timestamp: now,
       preparedAt: now,
@@ -923,6 +961,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Stores minimal metadata WITHOUT setting preparedAt.
    * Makes getMetadata() return non-null so the chat page can distinguish
    * "async prep in progress" from "no DO at all".
+   *
+   * Accepts an optional `profile` bundle so that profile-derived fields the
+   * chat UI needs immediately after navigation (notably `runtimeAgents` for
+   * the custom-mode picker) are readable before the async `prepare()` alarm
+   * fires. Fields like encryptedSecrets/envVars/mcpServers that are only
+   * consumed by workspace setup are intentionally re-written by `prepare()`.
    */
   async registerSession(input: {
     sessionId: string;
@@ -938,6 +982,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     gitUrl?: string;
     platform?: 'github' | 'gitlab';
     initialMessageId?: string;
+    profile?: SessionProfileBundle;
   }): Promise<OperationResult> {
     await this.requireSessionId(input.sessionId as SessionId);
     const existing = await this.ctx.storage.get<CloudAgentSessionState>('metadata');
@@ -960,6 +1005,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       gitUrl: input.gitUrl,
       platform: input.platform,
       initialMessageId: input.initialMessageId,
+      profile: input.profile,
       version: now,
       timestamp: now,
       // NOTE: preparedAt is NOT set — this is the key difference from prepare()
@@ -1068,6 +1114,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       createdKiloSessionId = result.kiloSessionId;
 
       // 10. Store full metadata via prepare() — sets preparedAt
+      const inputProfile = readProfileBundle(input);
       const prepareResult = await this.prepare({
         sessionId: input.sessionId,
         userId: input.userId,
@@ -1087,10 +1134,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         gitToken: result.resolvedGitToken,
         platform: input.platform,
         gitlabTokenManaged: result.gitlabTokenManaged,
-        envVars: input.envVars,
-        encryptedSecrets: input.encryptedSecrets,
-        setupCommands: input.setupCommands,
-        mcpServers: input.mcpServers,
+        envVars: inputProfile.envVars,
+        encryptedSecrets: inputProfile.encryptedSecrets,
+        setupCommands: inputProfile.setupCommands,
+        mcpServers: inputProfile.mcpServers,
+        runtimeSkills: inputProfile.runtimeSkills,
+        runtimeAgents: inputProfile.runtimeAgents,
         upstreamBranch: input.upstreamBranch,
         autoCommit: input.autoCommit,
         condenseOnComplete: input.condenseOnComplete,
@@ -1182,6 +1231,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     encryptedSecrets?: EncryptedSecrets;
     setupCommands?: string[];
     mcpServers?: Record<string, MCPServerConfig>;
+    runtimeSkills?: readonly RuntimeSkill[];
+    runtimeAgents?: readonly RuntimeAgent[];
     callbackTarget?: CallbackTarget | null;
     upstreamBranch?: string | null;
   }): Promise<OperationResult> {
@@ -1202,10 +1253,43 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return { success: false, error: 'Session has already been initiated' };
     }
 
-    // Apply updates (handle null for clearing)
+    // Profile-derived fields are merged into `metadata.profile` (nested).
+    // Everything else (mode, model, tokens, …) lives flat on metadata.
+    // Legacy flat profile fields on the existing record are ignored on
+    // read (via `readProfileBundle`) so we don't bother stripping them —
+    // they go away when the `profile` field and fallback branch are
+    // eventually removed.
+    const PROFILE_UPDATE_KEYS = new Set([
+      'envVars',
+      'encryptedSecrets',
+      'setupCommands',
+      'mcpServers',
+      'runtimeSkills',
+      'runtimeAgents',
+    ]);
+
     const updated = { ...metadata };
+
+    // Seed `updated.profile` from whatever profile the existing record
+    // currently carries (nested or flat); subsequent per-key updates then
+    // apply on top.
+    const baseProfile = readProfileBundle(metadata);
+    const hasBaseProfile = Object.values(baseProfile).some(v => v !== undefined);
+    updated.profile = hasBaseProfile ? { ...baseProfile } : metadata.profile;
+
     for (const [key, value] of Object.entries(updates)) {
-      if (value === null) {
+      if (PROFILE_UPDATE_KEYS.has(key)) {
+        // Lazily materialize updated.profile so we don't emit an empty object
+        // when the caller only clears fields.
+        const nextProfile = { ...(updated.profile ?? {}) } as Record<string, unknown>;
+        if (value === null) {
+          delete nextProfile[key];
+        } else if (value !== undefined) {
+          nextProfile[key] = value;
+        }
+        updated.profile =
+          Object.keys(nextProfile).length > 0 ? (nextProfile as SessionProfileBundle) : undefined;
+      } else if (value === null) {
         delete (updated as Record<string, unknown>)[key];
       } else if (value !== undefined) {
         (updated as Record<string, unknown>)[key] = value;
@@ -1222,6 +1306,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         success: false,
         error: `Invalid metadata after update: ${JSON.stringify(parseResult.error.format())}`,
       };
+    }
+
+    const modeError = validateModeAgainstRuntimeAgents(parseResult.data);
+    if (modeError) {
+      return { success: false, error: modeError };
     }
 
     await this.ctx.storage.put('metadata', parseResult.data);
@@ -2151,25 +2240,31 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     existingMetadata?: CloudAgentSessionState;
     kiloSessionId?: string;
   }): ExecutionPlan {
+    const existingMetadataProfile = params.existingMetadata
+      ? readProfileBundle(params.existingMetadata)
+      : undefined;
+    const existingMetadataView = params.existingMetadata
+      ? {
+          workspacePath: params.existingMetadata.workspacePath ?? '',
+          kiloSessionId: params.existingMetadata.kiloSessionId ?? '',
+          branchName: params.existingMetadata.branchName ?? '',
+          sandboxId: params.existingMetadata.sandboxId,
+          sessionHome: params.existingMetadata.sessionHome,
+          upstreamBranch: params.existingMetadata.upstreamBranch,
+          appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
+          profile: existingMetadataProfile,
+          githubRepo: params.existingMetadata.githubRepo,
+          gitUrl: params.existingMetadata.gitUrl,
+          createdOnPlatform: params.existingMetadata.createdOnPlatform,
+        }
+      : undefined;
+
     const workspace = params.initContext
       ? {
           shouldPrepare: true as const,
           sandboxId: params.sandboxId,
           initContext: params.initContext,
-          existingMetadata: params.existingMetadata
-            ? {
-                workspacePath: params.existingMetadata.workspacePath ?? '',
-                kiloSessionId: params.existingMetadata.kiloSessionId ?? '',
-                branchName: params.existingMetadata.branchName ?? '',
-                sandboxId: params.existingMetadata.sandboxId,
-                sessionHome: params.existingMetadata.sessionHome,
-                upstreamBranch: params.existingMetadata.upstreamBranch,
-                appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
-                githubRepo: params.existingMetadata.githubRepo,
-                gitUrl: params.existingMetadata.gitUrl,
-                createdOnPlatform: params.existingMetadata.createdOnPlatform,
-              }
-            : undefined,
+          existingMetadata: existingMetadataView,
         }
       : {
           shouldPrepare: false as const,
@@ -2184,20 +2279,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             gitToken: params.resumeContext?.gitToken,
             createdOnPlatform: params.existingMetadata?.createdOnPlatform,
           },
-          existingMetadata: params.existingMetadata
-            ? {
-                workspacePath: params.existingMetadata.workspacePath ?? '',
-                kiloSessionId: params.existingMetadata.kiloSessionId ?? '',
-                branchName: params.existingMetadata.branchName ?? '',
-                sandboxId: params.existingMetadata.sandboxId,
-                sessionHome: params.existingMetadata.sessionHome,
-                upstreamBranch: params.existingMetadata.upstreamBranch,
-                appendSystemPrompt: params.existingMetadata.appendSystemPrompt,
-                githubRepo: params.existingMetadata.githubRepo,
-                gitUrl: params.existingMetadata.gitUrl,
-                createdOnPlatform: params.existingMetadata.createdOnPlatform,
-              }
-            : undefined,
+          existingMetadata: existingMetadataView,
         };
 
     return {
@@ -2422,10 +2504,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           githubToken: request.githubToken,
           gitUrl: request.gitUrl,
           gitToken: request.gitToken,
-          envVars: request.envVars,
-          encryptedSecrets: request.encryptedSecrets,
-          setupCommands: request.setupCommands,
-          mcpServers: request.mcpServers,
+          profile: {
+            envVars: request.envVars,
+            encryptedSecrets: request.encryptedSecrets,
+            setupCommands: request.setupCommands,
+            mcpServers: request.mcpServers,
+            runtimeSkills: request.runtimeSkills ? [...request.runtimeSkills] : undefined,
+            runtimeAgents: request.runtimeAgents ? [...request.runtimeAgents] : undefined,
+          },
           upstreamBranch: request.upstreamBranch,
           botId: request.botId,
           platform: request.platform,
@@ -2467,6 +2553,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             'BAD_REQUEST',
             'Session is missing required fields (prompt, mode, model)'
           );
+        }
+
+        const modeError = validateModeAgainstRuntimeAgents(metadata);
+        if (modeError) {
+          return this.buildStartError('BAD_REQUEST', modeError);
         }
 
         // Transition to initiated state
@@ -2515,10 +2606,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           githubToken,
           gitUrl: metadata.gitUrl,
           gitToken,
-          envVars: metadata.envVars,
-          encryptedSecrets: metadata.encryptedSecrets,
-          setupCommands: metadata.setupCommands,
-          mcpServers: metadata.mcpServers,
+          profile: readProfileBundle(metadata),
           upstreamBranch: metadata.upstreamBranch,
           botId: request.botId,
           kiloSessionId: metadata.kiloSessionId,
@@ -2534,7 +2622,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           sessionId,
           userId: metadata.userId as UserId,
           orgId: metadata.orgId,
-          mode: metadata.mode as ExecutionMode,
+          mode: metadata.mode,
           prompt: metadata.prompt,
           model: metadata.model,
           variant: metadata.variant,
@@ -2567,7 +2655,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         await this.updateGitToken(request.tokenOverrides.gitToken);
         metadata.gitToken = request.tokenOverrides.gitToken;
       }
-      const mode = (request.mode ?? metadata.mode ?? 'code') as ExecutionMode;
+      const mode = request.mode ?? metadata.mode ?? 'code';
       const model = normalizeKilocodeModel(request.model ?? metadata.model);
       const variant = request.variant ?? metadata.variant;
       if (!model) {
@@ -2575,6 +2663,20 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           'BAD_REQUEST',
           'No model specified and session has no default model'
         );
+      }
+      // Reject custom slugs that aren't in the session's stored runtimeAgents.
+      // Built-in slugs and `custom` (which sendMessageV2 schema already rejects
+      // at the API boundary) pass through unchanged.
+      if (!BUILTIN_AGENT_MODES.has(mode)) {
+        const knownSlugs = new Set(
+          (readProfileBundle(metadata).runtimeAgents ?? []).map(m => m.slug)
+        );
+        if (!knownSlugs.has(mode)) {
+          return this.buildStartError(
+            'BAD_REQUEST',
+            `Mode "${mode}" is not a built-in and does not match any runtimeAgents on this session`
+          );
+        }
       }
 
       // Token overrides win: only generate from installation ID if no override provided

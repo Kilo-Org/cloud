@@ -2,28 +2,58 @@ import * as z from 'zod';
 import { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema } from '../types.js';
 import {
   MCPServerConfigSchema,
+  MCPSecretValueSchema,
   branchNameSchema,
   modelIdSchema,
   EncryptedSecretEnvelopeSchema,
   EncryptedSecretsSchema,
   CallbackTargetSchema,
   ImagesSchema,
+  RuntimeSkillSchema,
+  RuntimeSkillsSchema,
+  RuntimeAgentSchema,
+  RuntimeAgentsSchema,
 } from '../persistence/schemas.js';
-import { AgentModeSchema, Limits } from '../schema.js';
+import { AgentModeSchema, BUILTIN_AGENT_MODES, Limits } from '../schema.js';
 
 // Re-export schemas from types.ts and persistence/schemas.ts for convenience
 export { sessionIdSchema, githubRepoSchema, gitUrlSchema, envVarsSchema };
-export { MCPServerConfigSchema, branchNameSchema, modelIdSchema };
+export { MCPServerConfigSchema, MCPSecretValueSchema, branchNameSchema, modelIdSchema };
 export { AgentModeSchema, Limits };
 export {
   EncryptedSecretEnvelopeSchema,
   EncryptedSecretsSchema,
   CallbackTargetSchema,
   ImagesSchema,
+  RuntimeSkillSchema,
+  RuntimeSkillsSchema,
+  RuntimeAgentSchema,
+  RuntimeAgentsSchema,
 };
 
 // Re-export types
-export type { EncryptedSecretEnvelope, EncryptedSecrets } from '../persistence/schemas.js';
+export type {
+  EncryptedSecretEnvelope,
+  EncryptedSecrets,
+  MCPSecretValue,
+} from '../persistence/schemas.js';
+export type { RuntimeSkillInput, RuntimeAgentInput } from '../persistence/schemas.js';
+
+/**
+ * Flexible mode slug — built-in agent enum value, `custom`, or any slug
+ * referenced by the session's `runtimeAgents`. Cross-validation against the
+ * runtime modes happens in each handler against the DO state.
+ */
+export const ModeSlugSchema = z
+  .string()
+  .min(1)
+  .max(Limits.MAX_RUNTIME_AGENT_SLUG_LENGTH)
+  .regex(/^[a-z][a-z0-9-]*$/, 'Mode slug must start with a letter');
+
+/** True when the slug is a built-in agent mode (including `custom`). */
+export function isBuiltinMode(slug: string): boolean {
+  return BUILTIN_AGENT_MODES.has(slug);
+}
 
 export type Images = z.infer<typeof ImagesSchema>;
 
@@ -33,7 +63,9 @@ export type Images = z.infer<typeof ImagesSchema>;
  */
 export const PromptPayload = z.object({
   prompt: z.string().min(1, 'Prompt is required').describe('The task prompt for Kilo Code'),
-  mode: AgentModeSchema.describe('Kilo Code execution mode (required)'),
+  mode: ModeSlugSchema.describe(
+    'Kilo Code execution mode (built-in slug or a custom slug from runtimeAgents)'
+  ),
   model: modelIdSchema.describe('AI model to use (required)'),
   variant: z
     .string()
@@ -126,7 +158,9 @@ export const PrepareSessionInput = z
       .min(1)
       .max(Limits.MAX_PROMPT_LENGTH)
       .describe('The task prompt for Kilo Code'),
-    mode: AgentModeSchema.describe('Kilo Code execution mode'),
+    mode: ModeSlugSchema.describe(
+      'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
+    ),
     model: modelIdSchema.describe('AI model to use'),
     variant: z
       .string()
@@ -168,6 +202,12 @@ export const PrepareSessionInput = z
       })
       .optional()
       .describe('MCP server configurations'),
+    runtimeSkills: RuntimeSkillsSchema.optional().describe(
+      'Runtime skills to materialize as SKILL.md files inside the sandbox'
+    ),
+    runtimeAgents: RuntimeAgentsSchema.optional().describe(
+      'Custom kilo agents materialized into KILO_CONFIG_CONTENT.agent.<slug>'
+    ),
     upstreamBranch: branchNameSchema
       .optional()
       .describe('Optional upstream branch to checkout during session initialization'),
@@ -196,6 +236,18 @@ export const PrepareSessionInput = z
       .uuid()
       .optional()
       .describe('Organization ID (UUID, optional)'),
+
+    // Profile resolution — cloud-agent-next resolves the profile stack
+    // (repo binding + default + explicit override) server-side and stacks
+    // the inline fields above as one more layer on top. All six collections
+    // (envVars / setupCommands / encryptedSecrets / mcpServers /
+    // runtimeSkills / runtimeAgents) follow the same precedence: inline
+    // wins on collision with the profile-derived value.
+    profileId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe('Profile ID to resolve (repo binding + default still apply on top)'),
 
     // Image attachments
     images: ImagesSchema.optional().describe(
@@ -261,7 +313,7 @@ export const UpdateSessionInput = z
     cloudAgentSessionId: sessionIdSchema.describe('Cloud-agent session ID to update'),
 
     // Scalar fields - null to clear, value to set, undefined to skip
-    mode: AgentModeSchema.nullable().optional().describe('Mode to set (null to clear)'),
+    mode: ModeSlugSchema.nullable().optional().describe('Mode to set (null to clear)'),
     model: modelIdSchema.nullable().optional().describe('Model to set (null to clear)'),
     variant: z
       .string()
@@ -305,6 +357,10 @@ export const UpdateSessionInput = z
       })
       .optional()
       .describe('MCP servers (empty object to clear)'),
+    runtimeSkills: RuntimeSkillsSchema.optional().describe('Runtime skills (empty array to clear)'),
+    runtimeAgents: RuntimeAgentsSchema.optional().describe(
+      'Custom kilo agents (empty array to clear)'
+    ),
     callbackTarget: CallbackTargetSchema.nullable()
       .optional()
       .describe('Callback target (null to clear, value to set, undefined to skip)'),
@@ -312,6 +368,24 @@ export const UpdateSessionInput = z
   .refine(requiresAppendSystemPrompt, {
     message: 'appendSystemPrompt is required when mode is custom',
     path: ['appendSystemPrompt'],
+  })
+  .superRefine((data, ctx) => {
+    // If the caller sets `mode`, it must resolve against the incoming runtimeAgents
+    // (or the existing session's runtimeAgents — checked at handler level). At schema
+    // time we only cross-check within this payload to catch obvious mistakes.
+    if (data.mode === null || data.mode === undefined) return;
+    if (isBuiltinMode(data.mode)) return;
+    if (data.runtimeAgents !== undefined) {
+      const slugs = new Set(data.runtimeAgents.map(a => a.slug));
+      if (!slugs.has(data.mode)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['mode'],
+          message: `Mode "${data.mode}" is not a built-in slug and does not match any runtimeAgents[].slug in this update payload`,
+        });
+      }
+    }
+    // If runtimeAgents not provided, handler validates against session state.
   });
 
 /** Output schema for updateSession endpoint */
@@ -374,16 +448,27 @@ export const GetSessionOutput = z.object({
 
   // Execution params
   prompt: z.string().optional().describe('Task prompt'),
-  mode: AgentModeSchema.optional().describe('Execution mode'),
+  mode: z.string().optional().describe('Execution mode (built-in or custom slug)'),
   model: z.string().optional().describe('AI model'),
   variant: z.string().optional().describe('Thinking effort variant'),
   autoCommit: z.boolean().optional().describe('Auto-commit setting'),
   upstreamBranch: z.string().optional().describe('Upstream branch name'),
 
-  // Configuration metadata (counts only, no values)
-  envVarCount: z.number().optional().describe('Number of environment variables configured'),
-  setupCommandCount: z.number().optional().describe('Number of setup commands configured'),
-  mcpServerCount: z.number().optional().describe('Number of MCP servers configured'),
+  runtimeAgents: z
+    .array(
+      z.object({
+        slug: z.string(),
+        name: z.string(),
+        /** Optional model override so the chat UI can lock its model picker. */
+        model: z.string().optional(),
+        /** Optional thinking-effort variant override so the chat UI can lock its variant picker. */
+        variant: z.string().optional(),
+      })
+    )
+    .optional()
+    .describe(
+      'Custom agents available on this session (slug + name, plus optional model and thinking-effort overrides)'
+    ),
 
   // Execution status (grouped for cleaner API)
   execution: ExecutionStatusSchema,

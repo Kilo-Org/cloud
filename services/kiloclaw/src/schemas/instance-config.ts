@@ -5,6 +5,7 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
+import { InstanceTierKeySchema, InstanceTypeSchema } from '@kilocode/kiloclaw-instance-tiers';
 import { IMAGE_TAG_RE, IMAGE_TAG_MAX_LENGTH } from '../lib/image-tag-validation';
 
 export const EncryptedEnvelopeSchema = z.object({
@@ -172,6 +173,7 @@ export const InstanceConfigSchema = z.object({
   googleWorkspaceConfigSyncError: z.string().nullable().optional(),
   googleWorkspaceConfigSyncedAt: z.number().nullable().optional(),
   machineSize: MachineSizeSchema.optional(),
+  instanceType: InstanceTierKeySchema.optional(),
   // Region for Fly Volume/Machine. Comma-separated priority list of region codes or aliases.
   // Examples: "us,eu" (try US first, then Europe), "lhr" (London only).
   // If omitted, falls back to the FLY_REGION env var.
@@ -323,6 +325,26 @@ export const PersistedStateSchema = z.object({
   flyVolumeId: z.string().nullable().default(null),
   flyRegion: z.string().nullable().default(null),
   machineSize: MachineSizeSchema.nullable().default(null),
+  instanceType: InstanceTypeSchema.nullable().default(null),
+  volumeSizeGb: z.number().int().min(1).max(500).nullable().default(null),
+  /**
+   * Admin-only temporary CPU/RAM override. When non-null, wins over
+   * `machineSize` for runtime-spec construction (Fly guest, docker
+   * Memory/NanoCpus). Does NOT touch `instanceType` or `volumeSizeGb` —
+   * billing reality stays on the tier. Cleared by an explicit admin
+   * action or by a tier resize. See
+   * `~/fd-plans/kiloclaw/admin-machine-size-override.md`.
+   */
+  adminMachineSizeOverride: MachineSizeSchema.nullable().default(null),
+  adminMachineSizeOverrideMetadata: z
+    .object({
+      reason: z.string().min(1).max(500),
+      actorId: z.string().min(1),
+      actorEmail: z.string().email(),
+      setAt: z.number().int(),
+    })
+    .nullable()
+    .default(null),
   // Health check tracking
   healthCheckFailCount: z.number().default(0),
   // Two-phase destroy: IDs pending deletion on Fly. Cleared once Fly confirms.
@@ -425,12 +447,6 @@ export const PersistedStateSchema = z.object({
   // Metadata for custom (non-catalog) secrets: env var name → { configPath? }.
   // configPath is a JSON dot-notation path for patching into openclaw.json at boot.
   customSecretMeta: z.record(z.string(), CustomSecretMetaSchema).nullable().default(null),
-  // Stream Chat default channel (auto-provisioned on first instance creation).
-  // Null on existing instances (pre-Stream Chat) and when STREAM_CHAT_API_KEY is not set.
-  streamChatApiKey: z.string().nullable().default(null),
-  streamChatBotUserId: z.string().nullable().default(null),
-  streamChatBotUserToken: z.string().nullable().default(null),
-  streamChatChannelId: z.string().nullable().default(null),
   // Vector memory: whether the builtin embedding-backed memory search is enabled.
   vectorMemoryEnabled: z.boolean().default(false),
   // Vector memory: embedding model ID (e.g. "mistralai/mistral-embed-2312").

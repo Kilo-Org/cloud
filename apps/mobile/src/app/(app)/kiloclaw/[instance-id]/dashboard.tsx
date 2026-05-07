@@ -1,7 +1,15 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { CreditCard, Newspaper, Pencil } from 'lucide-react-native';
-import { useState } from 'react';
-import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import {
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  View,
+} from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { BillingBanner } from '@/components/kiloclaw/billing-banner';
@@ -55,6 +63,38 @@ export default function DashboardScreen() {
   const isLoading = statusQuery.isPending || (isPersonal && billingQuery.isPending);
 
   const [renameVisible, setRenameVisible] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const refetchStatus = statusQuery.refetch;
+  const refetchBilling = billingQuery.refetch;
+  const refetchServiceDegraded = serviceDegradedQuery.refetch;
+  const refetchGateway = gatewayQuery.refetch;
+  const refetchConfig = configQuery.refetch;
+
+  const handleRefresh = useCallback(() => {
+    void (async () => {
+      setManualRefreshing(true);
+      try {
+        const refreshes = [
+          refetchStatus(),
+          refetchConfig(),
+          refetchServiceDegraded(),
+          ...(isRunning ? [refetchGateway()] : []),
+          ...(isPersonal ? [refetchBilling()] : []),
+        ];
+        await Promise.all(refreshes);
+      } finally {
+        setManualRefreshing(false);
+      }
+    })();
+  }, [
+    refetchBilling,
+    refetchConfig,
+    refetchGateway,
+    refetchServiceDegraded,
+    refetchStatus,
+    isPersonal,
+    isRunning,
+  ]);
 
   if (isLoading) {
     return (
@@ -126,7 +166,19 @@ export default function DashboardScreen() {
           </Pressable>
         }
       />
-      <ScrollView contentContainerClassName="pb-8" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="flex-grow pb-8"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={manualRefreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.mutedForeground]}
+            tintColor={colors.mutedForeground}
+          />
+        }
+      >
         <Animated.View entering={FadeIn.duration(200)} className="gap-4">
           <DashboardHero
             name={instanceName}

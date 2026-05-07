@@ -36,8 +36,7 @@ export function useOrganizationConfiguration(organizationId: string) {
 
   const settings = organizationData.settings;
   const modelDenyList = settings?.model_deny_list ?? [];
-  const providerAllowList =
-    settings?.provider_policy_mode === 'allow' ? settings.provider_allow_list : undefined;
+  const providerAllowList = settings?.provider_allow_list;
 
   const allModelsAllowed = modelDenyList.length === 0;
   const allProvidersEnabled = providerAllowList === undefined;

@@ -14,6 +14,14 @@
 #                              against the last pushed hash (FLY_IMAGE_CONTENT_HASH
 #                              in .dev.vars). After the push, you must restart/
 #                              redeploy your instance from the dashboard.
+#   --local-openclaw-image     Build/push the controller image with Dockerfile.local
+#                              and the single openclaw-build/openclaw-*.tgz tarball.
+#                              Also implied by FLY_IMAGE_CONTENT_MODE=local in
+#                              .dev.vars from a previous local image push.
+#   --production-openclaw-image
+#                              Build/push the controller image with the production
+#                              Dockerfile even if .dev.vars currently records local
+#                              image mode.
 #   --tunnel-name <name>       Use a named Cloudflare tunnel instead of a
 #                              temporary quick tunnel. Named tunnels have a
 #                              stable hostname that doesn't change between restarts.
@@ -48,6 +56,8 @@ OS_TYPE="$(uname -s)"
 # ---------- Defaults (overridden by .dev-start.conf, then by CLI flags) ----------
 
 HAS_CONTROLLER_CHANGES=false
+LOCAL_OPENCLAW_IMAGE=false
+PRODUCTION_OPENCLAW_IMAGE=false
 TUNNEL_NAME=""
 TUNNEL_HOSTNAME=""
 DISPLAY_MODE="tabs"
@@ -70,6 +80,14 @@ while [[ $# -gt 0 ]]; do
       HAS_CONTROLLER_CHANGES=true
       shift
       ;;
+    --local-openclaw-image)
+      LOCAL_OPENCLAW_IMAGE=true
+      shift
+      ;;
+    --production-openclaw-image)
+      PRODUCTION_OPENCLAW_IMAGE=true
+      shift
+      ;;
     --tunnel-name)
       TUNNEL_NAME="$2"
       shift 2
@@ -84,12 +102,17 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 [--has-controller-changes] [--tunnel-name <name>] [--display <mode>] [--with-replica]"
+      echo "Usage: $0 [--has-controller-changes] [--local-openclaw-image] [--production-openclaw-image] [--tunnel-name <name>] [--display <mode>] [--with-replica]"
       echo "Display modes: tabs (default), split (macOS/iTerm2), tmux"
       exit 1
       ;;
   esac
 done
+
+if [ "$LOCAL_OPENCLAW_IMAGE" = true ] && [ "$PRODUCTION_OPENCLAW_IMAGE" = true ]; then
+  echo "ERROR: --local-openclaw-image and --production-openclaw-image cannot be used together."
+  exit 1
+fi
 
 # Validate DISPLAY_MODE
 case "$DISPLAY_MODE" in
@@ -519,30 +542,31 @@ fi
 
 # ---------- Detect controller image changes ----------
 
-# Compute a content hash of all files baked into the Docker image (mirrors
-# the CI hash in deploy-kiloclaw.yml).  Resolve the sha command once so
-# xargs can invoke it (shell functions are invisible to xargs).
-if command -v sha256sum &>/dev/null; then
-  _SHA="sha256sum"
-else
-  _SHA="shasum -a 256"
+# shellcheck source=services/kiloclaw/scripts/dev-image-mode.sh
+source "$KILOCLAW_DIR/scripts/dev-image-mode.sh"
+
+REQUESTED_IMAGE_MODE=""
+if [ "$LOCAL_OPENCLAW_IMAGE" = true ]; then
+  REQUESTED_IMAGE_MODE="local"
+elif [ "$PRODUCTION_OPENCLAW_IMAGE" = true ]; then
+  REQUESTED_IMAGE_MODE="production"
 fi
 
-compute_image_hash() {
-  (cd "$KILOCLAW_DIR" \
-    && find Dockerfile controller/ container/ skills/ \
-         openclaw-pairing-list.js openclaw-device-pairing-list.js \
-         -type f 2>/dev/null \
-    | sort \
-    | xargs $_SHA \
-    | $_SHA \
-    | cut -d' ' -f1 \
-    | cut -c1-12)
-}
-
-CURRENT_IMAGE_HASH="$(compute_image_hash)"
+IMAGE_PLAN="$(kiloclaw_dev_image_plan "$KILOCLAW_DIR" "$REQUESTED_IMAGE_MODE")"
+IMAGE_CONTENT_MODE="$(printf '%s\n' "$IMAGE_PLAN" | sed -n '1p')"
+CURRENT_IMAGE_HASH="$(printf '%s\n' "$IMAGE_PLAN" | sed -n '2p')"
+LOCAL_OPENCLAW_TARBALL="$(printf '%s\n' "$IMAGE_PLAN" | sed -n '3p')"
+INFERRED_LOCAL_IMAGE_MODE="$(printf '%s\n' "$IMAGE_PLAN" | sed -n '4p')"
 STORED_IMAGE_HASH="$(grep '^FLY_IMAGE_CONTENT_HASH=' "$KILOCLAW_DIR/.dev.vars" \
   | head -1 | sed 's/^[^=]*=//' | sed 's/^"//;s/"$//' || true)"
+
+if [ "$IMAGE_CONTENT_MODE" = "local" ]; then
+  echo "==> Using local OpenClaw controller image mode with $(basename "$LOCAL_OPENCLAW_TARBALL")."
+  if [ "$INFERRED_LOCAL_IMAGE_MODE" = "true" ]; then
+    echo "    Inferred local mode from the stored image hash; recording FLY_IMAGE_CONTENT_MODE=local."
+    set_or_append_dev_var FLY_IMAGE_CONTENT_MODE local
+  fi
+fi
 
 if [ "$CURRENT_IMAGE_HASH" != "$STORED_IMAGE_HASH" ]; then
   if [ "$HAS_CONTROLLER_CHANGES" = false ]; then
@@ -564,7 +588,11 @@ fi
 if [ "$HAS_CONTROLLER_CHANGES" = true ]; then
   echo "==> Building and pushing controller image..."
   echo ""
-  "$KILOCLAW_DIR/scripts/push-dev.sh"
+  PUSH_DEV_ARGS=()
+  if [ "$IMAGE_CONTENT_MODE" = "local" ]; then
+    PUSH_DEV_ARGS+=(--local)
+  fi
+  "$KILOCLAW_DIR/scripts/push-dev.sh" "${PUSH_DEV_ARGS[@]}"
   echo ""
   echo "============================================================"
   echo "  IMAGE PUSHED — ACTION REQUIRED"

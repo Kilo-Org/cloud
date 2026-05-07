@@ -3,11 +3,12 @@ import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
+import { useCurrentUserId } from '@/components/kilo-chat/hooks/use-current-user-id';
+import { advanceBadgeFreshnessEpoch } from '@/lib/badge-freshness';
 import { parseNotificationData } from '@/lib/notifications';
-import { useTRPC } from '@/lib/trpc';
 
 /**
- * Keeps the `user.getUnreadCounts` cache in sync with real-time notification
+ * Keeps the `['badges', userId]` cache in sync with real-time notification
  * traffic so per-instance badges on the dashboard reflect pushes received while
  * the app is open or resumed from background.
  *
@@ -15,25 +16,29 @@ import { useTRPC } from '@/lib/trpc';
  * - App returns to active state → invalidate (pushes received while
  *   backgrounded don't fire the received-listener).
  *
- * Mounted once inside `RootLayoutNav` so it covers every screen, including
- * when the dashboard is not rendered yet.
+ * Mounted once inside the authenticated app layout so it can read the
+ * Kilo Chat current-user context while still covering dashboard and chat
+ * screens.
  */
 export function useUnreadCountsInvalidation() {
   const queryClient = useQueryClient();
-  const trpc = useTRPC();
+  const userId = useCurrentUserId();
 
   useEffect(() => {
-    // `trpc` is stable (memoized inside TRPCProvider) but `queryKey()` returns
-    // a fresh array on each call, so we resolve it inside each invalidation.
+    if (userId === null) {
+      return undefined;
+    }
+
     const invalidate = () => {
+      advanceBadgeFreshnessEpoch();
       void queryClient.invalidateQueries({
-        queryKey: trpc.user.getUnreadCounts.queryKey(),
+        queryKey: ['badges', userId],
       });
     };
 
     const received = Notifications.addNotificationReceivedListener(notification => {
       const data = parseNotificationData(notification.request.content.data);
-      if (data?.type === 'chat') {
+      if (data?.type === 'chat.message') {
         invalidate();
       }
     });
@@ -48,5 +53,5 @@ export function useUnreadCountsInvalidation() {
       received.remove();
       appStateSubscription.remove();
     };
-  }, [queryClient, trpc]);
+  }, [queryClient, userId]);
 }

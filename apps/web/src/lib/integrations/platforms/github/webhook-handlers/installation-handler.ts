@@ -23,6 +23,9 @@ import type {
 import { buildInstallationData } from '../webhook-helpers';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
+import { captureException } from '@sentry/nextjs';
+import { bot } from '@/lib/bot';
+import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 
 /**
  * GitHub Installation Event Handlers
@@ -119,6 +122,16 @@ export async function handleInstallationDeleted(payload: InstallationDeletedPayl
     PLATFORM.GITHUB,
     installationIdStr
   );
+
+  try {
+    await bot.initialize();
+    await unlinkTeamKiloUsers(bot.getState(), PLATFORM.GITHUB, installationIdStr);
+  } catch (error) {
+    captureException(error, {
+      tags: { component: 'kilo-bot', op: 'github-installation-deleted-unlink' },
+      extra: { installationId: installationIdStr },
+    });
+  }
 
   if (integrationToDelete) {
     // Determine owner from the integration record

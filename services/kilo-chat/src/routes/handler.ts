@@ -29,10 +29,12 @@ import type {
   EditMessageResponse,
   OkResponse,
   AddReactionResponse,
+  RemoveReactionResponse,
   MessageListResponse,
   BotGetMembersResponse,
   BotListConversationsResponse,
   CreateConversationResponse,
+  ExecuteActionResponse,
 } from '@kilocode/kilo-chat';
 import {
   ulidSchema,
@@ -48,6 +50,7 @@ import {
   deleteMessageQuerySchema,
   messageDeliveryFailedRequestSchema,
   actionDeliveryFailedRequestSchema,
+  actionGroupIdSchema,
   decodeConversationCursor,
 } from '@kilocode/kilo-chat';
 
@@ -130,7 +133,11 @@ export async function handleCreateMessage(c: HonoCtx) {
     return c.json({ error: result.error }, 500);
   }
   return c.json(
-    { messageId: result.messageId, clientId: result.clientId } satisfies CreateMessageResponse,
+    {
+      messageId: result.messageId,
+      clientId: result.clientId,
+      message: result.message,
+    } satisfies CreateMessageResponse,
     201
   );
 }
@@ -193,7 +200,7 @@ export async function handleDeleteMessage(c: HonoCtx) {
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 500);
   }
-  return new Response(null, { status: 204 });
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 // ─── executeAction ──────────────────────────────────────────────────────────
@@ -229,7 +236,7 @@ export async function handleExecuteAction(c: HonoCtx) {
     return c.json({ error: result.error }, 500);
   }
 
-  return c.json({ ok: true } satisfies OkResponse);
+  return c.json(result satisfies ExecuteActionResponse);
 }
 
 // ─── messageDeliveryFailed (bot-reported) ───────────────────────────────────
@@ -244,20 +251,29 @@ export async function handleMessageDeliveryFailed(c: HonoCtx) {
   const membership = await assertCallerIsMember(c, convId.data, callerId);
   if (!membership.ok) return membership.response;
 
-  // Accept empty body. Validate when present but never fail on shape.
+  // Existing clients may omit this diagnostic body; validate it when supplied.
   let body: unknown = {};
-  try {
-    body = await c.req.json();
-  } catch {
-    body = {};
+  const rawBody = await c.req.text();
+  if (rawBody.length > 0) {
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return c.json({ error: 'Invalid JSON' }, 400);
+    }
   }
-  messageDeliveryFailedRequestSchema.safeParse(body);
+  const parsed = messageDeliveryFailedRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request', issues: parsed.error.issues }, 400);
+  }
 
-  await notifyMessageDeliveryFailed(c.env, {
+  const result = await notifyMessageDeliveryFailed(c.env, {
     conversationId: convId.data,
     messageId: msgId.data,
   });
-  return c.json({}, 202);
+  if (!result.ok) {
+    return c.json({ error: result.error }, 404);
+  }
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 // ─── actionDeliveryFailed (bot-reported) ────────────────────────────────────
@@ -266,8 +282,8 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
   const convId = parseConversationId(c);
   if (!convId.ok) return convId.response;
 
-  const groupIdRaw = c.req.param('groupId');
-  if (!groupIdRaw) {
+  const groupId = actionGroupIdSchema.safeParse(c.req.param('groupId'));
+  if (!groupId.success) {
     return c.json({ error: 'Invalid groupId' }, 400);
   }
 
@@ -288,9 +304,12 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
 
   const { messageId } = parsed.data;
   const convStub = c.env.CONVERSATION_DO.get(c.env.CONVERSATION_DO.idFromName(convId.data));
-  const result = await convStub.revertActionResolution({ messageId, groupId: groupIdRaw });
+  const result = await convStub.revertActionResolution({ messageId, groupId: groupId.data });
   if (!result.ok) {
     return c.json({ error: result.error }, 404);
+  }
+  if (!result.reverted) {
+    return c.json({ ok: true } satisfies OkResponse);
   }
 
   const ctx = await getConversationContext(c.env, convId.data);
@@ -301,10 +320,10 @@ export async function handleActionDeliveryFailed(c: HonoCtx) {
       ctx.sandboxId,
       ctx.humanMemberIds,
       'action.delivery_failed',
-      { conversationId: convId.data, messageId, groupId: groupIdRaw }
+      { conversationId: convId.data, messageId, groupId: groupId.data }
     );
   }
-  return c.json({}, 202);
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 // ─── addReaction ─────────────────────────────────────────────────────────────
@@ -365,7 +384,10 @@ export async function handleRemoveReaction(c: HonoCtx) {
     if (result.code === 'not_found') return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 500);
   }
-  return new Response(null, { status: 204 });
+  const response = result.removed
+    ? ({ removed: true, id: result.removed_id } satisfies RemoveReactionResponse)
+    : ({ removed: false, id: result.id } satisfies RemoveReactionResponse);
+  return c.json(response, 200);
 }
 
 // ─── listMessages ────────────────────────────────────────────────────────────
@@ -399,7 +421,7 @@ export async function handleListMessages(c: HonoCtx) {
     return c.json({ error: 'Forbidden' }, 403);
   }
 
-  return c.json({ messages: result.messages } satisfies MessageListResponse);
+  return c.json(result satisfies MessageListResponse);
 }
 
 // ─── getMembers ──────────────────────────────────────────────────────────────
@@ -445,7 +467,7 @@ export async function handleSetTyping(c: HonoCtx) {
   if (!result.ok) {
     return c.json({ error: result.error }, 403);
   }
-  return new Response(null, { status: 204 });
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 export async function handleStopTyping(c: HonoCtx) {
@@ -457,7 +479,7 @@ export async function handleStopTyping(c: HonoCtx) {
   if (!result.ok) {
     return c.json({ error: result.error }, 403);
   }
-  return new Response(null, { status: 204 });
+  return c.json({ ok: true } satisfies OkResponse);
 }
 
 // ─── listBotConversations ────────────────────────────────────────────────────
@@ -557,7 +579,10 @@ export async function handleCreateBotConversation(c: HonoCtx) {
   }
 
   return c.json(
-    { conversationId: result.conversationId } satisfies CreateConversationResponse,
+    {
+      conversationId: result.conversationId,
+      conversation: result.conversation,
+    } satisfies CreateConversationResponse,
     201
   );
 }

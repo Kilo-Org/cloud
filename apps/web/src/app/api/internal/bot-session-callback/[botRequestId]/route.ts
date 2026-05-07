@@ -24,7 +24,7 @@ import {
 } from '@/lib/bot/request-logging';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { runBotAgent, type BotAgentMessageLike } from '@/lib/bot/agent-runner';
-import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
+import { botPlatforms } from '@/lib/bot/platforms';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
 import { findUserById } from '@/lib/user';
 import type { Thread } from 'chat';
@@ -157,10 +157,10 @@ async function postBotThreadMessage(params: {
     platformIntegrationId: params.platformIntegration.id,
   });
 
-  const posted = await withBotPlatformAuthContext(
-    params.platformIntegration,
-    async () => await params.thread.post({ markdown: params.markdown })
-  );
+  const posted = await botPlatforms.require(params.platformIntegration.platform).withAuthContext({
+    platformIntegration: params.platformIntegration,
+    fn: async () => await params.thread.post({ markdown: params.markdown }),
+  });
   logCallback('Callback thread message posted', {
     threadId: params.thread.id,
     messageId: posted.id,
@@ -172,10 +172,10 @@ async function startBotThreadTyping(params: {
   thread: Thread;
   platformIntegration: PlatformIntegration;
 }): Promise<void> {
-  await withBotPlatformAuthContext(
-    params.platformIntegration,
-    async () => await params.thread.startTyping('Processing Cloud Agent result...')
-  );
+  await botPlatforms.require(params.platformIntegration.platform).withAuthContext({
+    platformIntegration: params.platformIntegration,
+    fn: async () => await params.thread.startTyping('Processing Cloud Agent result...'),
+  });
 }
 
 async function continueBotAgentAfterCallback(params: {
@@ -192,46 +192,49 @@ async function continueBotAgentAfterCallback(params: {
     throw new Error(`Bot callback could not find user ${params.requestRow.created_by}`);
   }
 
-  return await withBotPlatformAuthContext(params.platformIntegration, async () => {
-    const originalMessage = params.requestRow.platform_message_id
-      ? await Promise.resolve(
-          params.thread.adapter.fetchMessage?.(
-            params.thread.id,
-            params.requestRow.platform_message_id
-          ) ?? null
-        ).catch(error => {
-          console.warn('[BotSessionCallback] Failed to fetch original platform message:', {
-            error,
-            platform: params.platformIntegration.platform,
-            threadId: params.thread.id,
-            messageId: params.requestRow.platform_message_id,
-          });
-          return null;
-        })
-      : null;
+  return await botPlatforms.require(params.platformIntegration.platform).withAuthContext({
+    platformIntegration: params.platformIntegration,
+    fn: async () => {
+      const originalMessage = params.requestRow.platform_message_id
+        ? await Promise.resolve(
+            params.thread.adapter.fetchMessage?.(
+              params.thread.id,
+              params.requestRow.platform_message_id
+            ) ?? null
+          ).catch(error => {
+            console.warn('[BotSessionCallback] Failed to fetch original platform message:', {
+              error,
+              platform: params.platformIntegration.platform,
+              threadId: params.thread.id,
+              messageId: params.requestRow.platform_message_id,
+            });
+            return null;
+          })
+        : null;
 
-    const callbackMessage: BotAgentMessageLike = {
-      author: originalMessage?.author ?? {
-        fullName: 'Cloud Agent Callback',
-        isBot: false,
-        isMe: false,
-        userId: params.requestRow.created_by,
-        userName: 'cloud-agent-callback',
-      },
-      id: `${params.botRequestId}:callback`,
-      text: params.continuationPrompt,
-    };
+      const callbackMessage: BotAgentMessageLike = {
+        author: originalMessage?.author ?? {
+          fullName: 'Cloud Agent Callback',
+          isBot: false,
+          isMe: false,
+          userId: params.requestRow.created_by,
+          userName: 'cloud-agent-callback',
+        },
+        id: `${params.botRequestId}:callback`,
+        text: params.continuationPrompt,
+      };
 
-    return await runBotAgent({
-      thread: params.thread,
-      message: callbackMessage,
-      platformIntegration: params.platformIntegration,
-      user,
-      botRequestId: params.botRequestId,
-      prompt: params.continuationPrompt,
-      completedStepCount: params.completedStepCount,
-      initialSteps: params.requestRow.steps ?? [],
-    });
+      return await runBotAgent({
+        thread: params.thread,
+        message: callbackMessage,
+        platformIntegration: params.platformIntegration,
+        user,
+        botRequestId: params.botRequestId,
+        prompt: params.continuationPrompt,
+        completedStepCount: params.completedStepCount,
+        initialSteps: params.requestRow.steps ?? [],
+      });
+    },
   });
 }
 
@@ -881,7 +884,6 @@ export async function POST(
           requestRow.platform_integration_id
         );
         await bot.initialize();
-        bot.registerSingleton();
         const thread = bot.thread(requestRow.platform_thread_id);
 
         if (childSessionStatus && trackedCallbackSession) {

@@ -1,4 +1,5 @@
 const mockLimit = jest.fn();
+const mockIsOrganizationMember = jest.fn();
 
 jest.mock('@/lib/drizzle', () => ({
   db: {
@@ -11,18 +12,24 @@ jest.mock('@/lib/drizzle', () => ({
     })),
   },
 }));
+jest.mock('@/lib/organizations/organizations', () => ({
+  isOrganizationMember: (organizationId: string, kiloUserId: string) =>
+    mockIsOrganizationMember(organizationId, kiloUserId),
+}));
 
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
-  getBotDocumentationUrl,
+  canKiloUserAccessPlatformIntegration,
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
   getPlatformIntegrationById,
 } from './platform-helpers';
+import type { PlatformIntegration } from '@kilocode/db';
 
 describe('platform helpers', () => {
   beforeEach(() => {
     mockLimit.mockReset();
+    mockIsOrganizationMember.mockReset();
   });
 
   it('returns the platform integration for a given identity', async () => {
@@ -95,12 +102,29 @@ describe('platform helpers', () => {
     expect(mockLimit).not.toHaveBeenCalled();
   });
 
-  it('returns platform-specific bot documentation URLs', () => {
-    expect(getBotDocumentationUrl(PLATFORM.SLACK)).toBe(
-      'https://kilo.ai/docs/code-with-ai/platforms/slack'
-    );
-    expect(getBotDocumentationUrl(PLATFORM.DISCORD)).toBe(
-      'https://kilo.ai/docs/code-with-ai/platforms/slack'
-    );
+  describe('canKiloUserAccessPlatformIntegration', () => {
+    it('allows access to user-owned integrations only for the owner', async () => {
+      const integration = { owned_by_user_id: 'user-1' } as PlatformIntegration;
+
+      await expect(canKiloUserAccessPlatformIntegration(integration, 'user-1')).resolves.toBe(true);
+      await expect(canKiloUserAccessPlatformIntegration(integration, 'user-2')).resolves.toBe(
+        false
+      );
+      expect(mockIsOrganizationMember).not.toHaveBeenCalled();
+    });
+
+    it('checks organization membership for org-owned integrations', async () => {
+      const integration = { owned_by_organization_id: 'org-1' } as PlatformIntegration;
+      mockIsOrganizationMember.mockResolvedValue(true);
+
+      await expect(canKiloUserAccessPlatformIntegration(integration, 'user-1')).resolves.toBe(true);
+      expect(mockIsOrganizationMember).toHaveBeenCalledWith('org-1', 'user-1');
+    });
+
+    it('denies integrations without ownership data', async () => {
+      await expect(
+        canKiloUserAccessPlatformIntegration({} as PlatformIntegration, 'user-1')
+      ).resolves.toBe(false);
+    });
   });
 });

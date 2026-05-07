@@ -15,10 +15,15 @@ import {
   ChannelsPatchSchema,
   GoogleCredentialsSchema,
   GoogleOAuthConnectionSchema,
+  MachineSizeSchema,
   SecretsPatchSchema,
   InstanceIdParam,
-  MachineSizeSchema,
 } from '../schemas/instance-config';
+import {
+  DEFAULT_INSTANCE_TIER,
+  InstanceTierKeySchema,
+  isOfferedTier,
+} from '@kilocode/kiloclaw-instance-tiers';
 import { ImageVersionEntrySchema, imageVersionKey } from '../schemas/image-version';
 import { listAllVersions, resolveLatestVersion, updateTagIndex } from '../lib/image-version';
 import {
@@ -29,6 +34,7 @@ import {
 } from '../lib/version-rollout';
 import { setKiloclawEarlyAccess, lookupKiloclawEarlyAccessByInstanceId } from '../lib/user-flags';
 import { upsertCatalogVersion } from '../lib/catalog-registration';
+import { runScheduledActionNoticesSweep } from '../scheduled/scheduled-action-notices';
 import { flattenError, z } from 'zod';
 import {
   KiloclawStartReasonSchema,
@@ -49,7 +55,6 @@ import { deriveGatewayToken } from '../auth/gateway-token';
 import { sandboxIdFromUserId } from '../auth/sandbox-id';
 import { writeEvent } from '../utils/analytics';
 import { deriveHttpEventName } from '../middleware/analytics';
-import { sendMessage } from '../stream-chat/client';
 import { assertAvailableProvider } from '../providers';
 import type { ProviderCapability } from '../providers/types';
 import {
@@ -389,6 +394,7 @@ async function insertProvisionedInstanceRecord(params: {
   sandboxId: string;
   orgId: string | null;
   provider: ProviderId;
+  instanceType: string;
 }): Promise<ProvisionedInstanceRecord> {
   const connectionString = params.env.HYPERDRIVE?.connectionString;
   if (!connectionString) {
@@ -425,6 +431,7 @@ async function insertProvisionedInstanceRecord(params: {
           sandbox_id: params.sandboxId,
           provider: params.provider,
           organization_id: params.orgId,
+          instance_type: params.instanceType,
         })
         .onConflictDoNothing({ target: kiloclaw_instances.id })
         .returning({
@@ -871,13 +878,25 @@ platform.post('/provision', async c => {
     kilocodeDefaultModel,
     userTimezone,
     userLocation,
-    machineSize,
+    instanceType: requestedInstanceType,
     region,
     pinnedImageTag,
   } = result.data;
+  if (requestedInstanceType && !isOfferedTier(requestedInstanceType)) {
+    return c.json({ error: 'instanceType must be an offered tier' }, 400);
+  }
   const provisionedInstanceId = instanceId ?? crypto.randomUUID();
   const shouldInsertInstanceRecord = !instanceId;
   const shouldBootstrapSubscription = !instanceId || bootstrapSubscription === true;
+  // Only default to the catalog tier on FRESH inserts. On re-provision (config
+  // updates with an existing instanceId), pass `undefined` so the DO's
+  // `inferredInstanceType` path preserves existing tier / machineSize /
+  // volumeSizeGb. `provision()` is overloaded as the entrypoint for both
+  // fresh-create and config-update flows; defaulting unconditionally would
+  // silently overwrite custom (e.g. extend-volume) and legacy tiers on the
+  // next config change.
+  const instanceType =
+    requestedInstanceType ?? (shouldInsertInstanceRecord ? DEFAULT_INSTANCE_TIER : undefined);
   const provisionDoKey = await resolveInstanceDoKey(c.env, userId, provisionedInstanceId);
   const provisionRoute = '/api/platform/provision';
   const provisionStartedAt = performance.now();
@@ -914,7 +933,7 @@ platform.post('/provision', async c => {
             kilocodeDefaultModel,
             userTimezone,
             userLocation,
-            machineSize,
+            instanceType,
             region,
             pinnedImageTag,
           },
@@ -954,6 +973,11 @@ platform.post('/provision', async c => {
         sandboxId: provision.sandboxId,
         orgId: orgId ?? null,
         provider: selectedProvider ?? 'fly',
+        // Inside this branch `shouldInsertInstanceRecord` is true, so the
+        // worker-side tier default has already been applied to `instanceType`
+        // — but TS can't narrow `string | undefined` from the broader scope.
+        // Re-derive locally so the helper signature stays `string`.
+        instanceType: requestedInstanceType ?? DEFAULT_INSTANCE_TIER,
       });
       writeEvent(c.env, {
         event: 'instance.record_inserted',
@@ -1993,10 +2017,21 @@ platform.get('/morning-briefing/status', async c => {
       'getMorningBriefingStatus'
     );
     if (!result) {
-      return jsonError(
-        'Morning Briefing unavailable (controller too old)',
-        404,
-        'controller_route_unavailable'
+      // Controller predates this route. The dashboard polls status every 30s,
+      // so a 404 here would generate continuous user-facing errors. Return a
+      // typed "unavailable" payload at 200 instead — same shape pattern as
+      // the gateway_warming_up branch below.
+      return c.json(
+        {
+          ok: false,
+          enabled: false,
+          desiredEnabled: false,
+          observedEnabled: false,
+          reconcileState: 'idle',
+          code: 'controller_route_unavailable',
+          error: 'Morning Briefing unavailable (controller too old)',
+        },
+        200
       );
     }
     return c.json(result, 200);
@@ -2747,31 +2782,6 @@ platform.get('/status', async c => {
   }
 });
 
-// GET /api/platform/stream-chat-credentials?userId=...&instanceId=...
-platform.get('/stream-chat-credentials', async c => {
-  const userId = setValidatedQueryUserId(c);
-  if (!userId) {
-    return c.json({ error: 'userId query parameter is required' }, 400);
-  }
-  const iidResult = parseInstanceIdQuery(c);
-  if ('error' in iidResult) return iidResult.error;
-  const { instanceId } = iidResult;
-
-  try {
-    const creds = await withResolvedDORetry(
-      c.env,
-      userId,
-      instanceId,
-      stub => stub.getStreamChatCredentials(),
-      'getStreamChatCredentials'
-    );
-    return c.json(creds);
-  } catch (err) {
-    const { message, status } = sanitizeError(err, 'stream-chat-credentials');
-    return jsonError(message, status);
-  }
-});
-
 const MAX_INBOUND_EMAIL_TITLE_SLUG_LENGTH = 80;
 
 const InboundEmailSchema = z.object({
@@ -3051,74 +3061,6 @@ platform.post('/inbound-email', async c => {
   }
 });
 
-// POST /api/platform/send-chat-message
-// Send a message to a KiloClaw instance's Stream Chat channel as the human user.
-// The OpenClaw bot picks it up and responds as if the user typed it.
-const SendChatMessageSchema = z.object({
-  userId: z.string().min(1),
-  instanceId: z.string().uuid().optional(),
-  message: z.string().min(1).max(32_000),
-});
-
-platform.post('/send-chat-message', async c => {
-  const body: unknown = await c.req.json().catch(() => null);
-  const parsed = SendChatMessageSchema.safeParse(body);
-  if (!parsed.success) {
-    return jsonError('Invalid request body: userId and message are required', 400);
-  }
-
-  const { userId, instanceId, message } = parsed.data;
-  c.set('userId', userId);
-
-  const apiKey = c.env.STREAM_CHAT_API_KEY;
-  const apiSecret = c.env.STREAM_CHAT_API_SECRET;
-  if (!apiKey || !apiSecret) {
-    return jsonError('Stream Chat is not configured', 503);
-  }
-
-  try {
-    // Use instanceId as the DO key when available (matches how other endpoints resolve DOs).
-    // Falls back to userId for backward compatibility with triggers that predate instanceId.
-    const creds = await withResolvedDORetry(
-      c.env,
-      userId,
-      instanceId,
-      stub => stub.getStreamChatCredentials(),
-      'getStreamChatCredentials'
-    );
-
-    if (!creds) {
-      return jsonError('Stream Chat is not set up for this instance', 404);
-    }
-
-    await sendMessage(apiKey, apiSecret, creds.channelId, creds.userId, message);
-
-    writeEvent(c.env, {
-      event: 'instance.webhook_chat_message_sent',
-      delivery: 'http',
-      route: '/api/platform/send-chat-message',
-      userId,
-      instanceId: instanceId ?? undefined,
-      channelId: creds.channelId,
-    });
-
-    return c.json({ success: true, channelId: creds.channelId });
-  } catch (err) {
-    const { message: errMsg, status } = sanitizeError(err, 'send-chat-message');
-
-    writeEvent(c.env, {
-      event: 'instance.webhook_chat_message_failed',
-      delivery: 'http',
-      route: '/api/platform/send-chat-message',
-      userId,
-      instanceId: instanceId ?? undefined,
-      error: errMsg,
-    });
-
-    return jsonError(errMsg, status);
-  }
-});
-
 // GET /api/platform/debug-status?userId=...&instanceId=...
 // Internal/admin-only debug status that includes DO destroy internals.
 platform.get('/debug-status', async c => {
@@ -3340,7 +3282,7 @@ platform.post('/reassociate-volume', async c => {
 // Updates the machine size for an instance. Takes effect on next start/restart.
 const ResizeMachineSchema = z.object({
   userId: z.string().min(1),
-  machineSize: MachineSizeSchema,
+  instanceType: InstanceTierKeySchema,
 });
 
 platform.post('/resize-machine', async c => {
@@ -3355,12 +3297,87 @@ platform.post('/resize-machine', async c => {
       c.env,
       result.data.userId,
       iidResult.instanceId,
-      stub => stub.resizeMachine(result.data.machineSize),
+      stub => stub.resizeMachine(result.data.instanceType),
       'resizeMachine'
     );
     return c.json(response);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'resize-machine');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/admin-size-override/set
+// Admin-only: set a temporary CPU/RAM override that wins over the
+// tier-derived machineSize until cleared. Does NOT change instanceType
+// or volumeSizeGb (billing stays on the tier). Stopped-machine-only.
+const SetAdminSizeOverrideSchema = z.object({
+  userId: z.string().min(1),
+  size: MachineSizeSchema,
+  reason: z.string().min(10).max(500),
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
+});
+
+platform.post('/admin-size-override/set', async c => {
+  const result = await parseBody(c, SetAdminSizeOverrideSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub =>
+        stub.setAdminMachineSizeOverride({
+          size: result.data.size,
+          reason: result.data.reason,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
+      'setAdminMachineSizeOverride'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'admin-size-override-set');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/admin-size-override/clear
+const ClearAdminSizeOverrideSchema = z.object({
+  userId: z.string().min(1),
+  reason: z.string().min(10).max(500),
+  actorId: z.string().min(1),
+  actorEmail: z.string().email(),
+});
+
+platform.post('/admin-size-override/clear', async c => {
+  const result = await parseBody(c, ClearAdminSizeOverrideSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  try {
+    const response = await withResolvedDORetry(
+      c.env,
+      result.data.userId,
+      iidResult.instanceId,
+      stub =>
+        stub.clearAdminMachineSizeOverride({
+          reason: result.data.reason,
+          actorId: result.data.actorId,
+          actorEmail: result.data.actorEmail,
+        }),
+      'clearAdminMachineSizeOverride'
+    );
+    return c.json(response);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'admin-size-override-clear');
     return jsonError(message, status);
   }
 });
@@ -3880,8 +3897,10 @@ platform.post('/destroy-fly-machine', async c => {
 });
 
 // POST /api/platform/extend-volume
-// Temporary workaround: extend a Fly volume to exactly 15 GB.
-const EXTEND_VOLUME_TARGET_SIZE_GB = 15;
+// Admin workaround for granting users temporary additional storage.
+// Fly volumes can grow but cannot shrink, so once extended an instance
+// is effectively pinned to the larger size — flips DO instanceType to
+// 'custom' to reflect that.
 const ExtendVolumeSchema = z.object({
   userId: z.string().min(1),
   appName: z
@@ -3893,6 +3912,7 @@ const ExtendVolumeSchema = z.object({
     .string()
     .min(1)
     .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+  targetSizeGb: z.number().int().min(1).max(500),
 });
 
 const FlyExtendVolumeResponseSchema = z.object({
@@ -3906,7 +3926,7 @@ platform.post('/extend-volume', async c => {
   const iidResult = parseInstanceIdQuery(c);
   if ('error' in iidResult) return iidResult.error;
 
-  const { appName, volumeId } = result.data;
+  const { appName, volumeId, targetSizeGb, userId } = result.data;
   const apiToken = c.env.FLY_API_TOKEN;
   if (!apiToken) {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
@@ -3917,13 +3937,13 @@ platform.post('/extend-volume', async c => {
     const resp = await fetch(url, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ size_gb: EXTEND_VOLUME_TARGET_SIZE_GB }),
+      body: JSON.stringify({ size_gb: targetSizeGb }),
     });
 
     if (!resp.ok) {
       const body = await resp.text();
       console.error(
-        `[platform] extend-volume failed (${resp.status}) volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}:`,
+        `[platform] extend-volume failed (${resp.status}) volume=${volumeId} size=${targetSizeGb}:`,
         body
       );
       return jsonError(`Fly API error (${resp.status}): ${body}`, resp.status);
@@ -3939,8 +3959,42 @@ platform.post('/extend-volume', async c => {
     }
     // Default to true so the admin always sees the redeploy warning when Fly omits the flag
     const needsRestart = extendParsed.data.needs_restart ?? true;
+
+    // Catch the DO up to the new on-disk size so resize-policy comparisons stay honest.
+    try {
+      await withResolvedDORetry(
+        c.env,
+        userId,
+        iidResult.instanceId,
+        stub => stub.recordVolumeExtend(targetSizeGb),
+        'recordVolumeExtend'
+      );
+    } catch (err) {
+      // Don't fail the whole request — Fly is already extended; the request
+      // would have to be retried anyway and the Fly extend is idempotent
+      // (re-extending to the same size is a no-op on Fly).
+      //
+      // RECOVERY: there is no alarm-driven volume-size observation today
+      // (the alarm reconciles `machineSize` from `getMachine` but does not
+      // call `getVolume`), so this divergence does NOT auto-heal. The
+      // admin re-runs `/extend-volume` with the same target size — both
+      // calls are idempotent on retry. The "Has size override" / list
+      // tooling is not affected because volumeSizeGb is not surfaced in
+      // those filters.
+      //
+      // FOLLOW-UP: a later PR could add `getVolume`-driven volume-size
+      // reconciliation to `backfillMachineSizeFromFlyConfig` so this
+      // self-heals on the next alarm tick.
+      console.error(
+        `[platform] extend-volume: Fly extended succeeded but DO recordVolumeExtend failed for ` +
+          `volume=${volumeId} targetSizeGb=${targetSizeGb}. ` +
+          `DO state will lag until admin re-runs this route.`,
+        err
+      );
+    }
+
     console.log(
-      `[platform] extend-volume ok: volume=${volumeId} size=${EXTEND_VOLUME_TARGET_SIZE_GB}GB (target total) needsRestart=${needsRestart}`
+      `[platform] extend-volume ok: volume=${volumeId} size=${targetSizeGb}GB needsRestart=${needsRestart}`
     );
     return c.json({ ok: true as const, needsRestart });
   } catch (err) {
@@ -3984,6 +4038,23 @@ platform.post('/scheduled-action/wake', async c => {
     return c.json(woken);
   } catch (err) {
     const { message, status } = sanitizeError(err, 'scheduled-action-wake');
+    return jsonError(message, status);
+  }
+});
+
+// POST /api/platform/scheduled-action/run-notice-sweep
+//
+// Synchronously runs the notice sweep that the cron normally drives.
+// Useful for local dev (where wrangler does not fire scheduled() on
+// the cron cadence) and for ad-hoc admin testing in production. The
+// sweep is idempotent and bounded (MAX_NOTIFICATIONS_PER_TICK), so
+// invoking it on demand is safe.
+platform.post('/scheduled-action/run-notice-sweep', async c => {
+  try {
+    const result = await runScheduledActionNoticesSweep(c.env);
+    return c.json(result);
+  } catch (err) {
+    const { message, status } = sanitizeError(err, 'scheduled-action-run-notice-sweep');
     return jsonError(message, status);
   }
 });

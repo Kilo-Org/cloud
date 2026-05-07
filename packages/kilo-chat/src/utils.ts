@@ -1,4 +1,8 @@
 import { decodeTime } from 'ulid';
+import type { z } from 'zod';
+
+import { conversationCursorSchema } from './schemas';
+import type { ReplyToMessageSnapshot } from './types';
 
 /** Extract the millisecond timestamp encoded in a ULID. */
 export function ulidToTimestamp(ulid: string): number {
@@ -14,11 +18,11 @@ export function ulidToTimestamp(ulid: string): number {
  * `coalesce(last_activity_at, joined_at)`. `c` is the conversation_id
  * (ULID) tie-breaker.
  */
-export type ConversationCursor = { t: number; c: string };
+export type ConversationCursor = z.infer<typeof conversationCursorSchema>;
 
 function base64urlEncode(bytes: Uint8Array): string {
   let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
@@ -40,18 +44,8 @@ export function decodeConversationCursor(encoded: string): ConversationCursor | 
   try {
     const json = new TextDecoder().decode(base64urlDecode(encoded));
     const parsed: unknown = JSON.parse(json);
-    if (
-      parsed !== null &&
-      typeof parsed === 'object' &&
-      't' in parsed &&
-      'c' in parsed &&
-      typeof (parsed as { t: unknown }).t === 'number' &&
-      typeof (parsed as { c: unknown }).c === 'string'
-    ) {
-      const { t, c } = parsed as { t: number; c: string };
-      return { t, c };
-    }
-    return null;
+    const cursor = conversationCursorSchema.safeParse(parsed);
+    return cursor.success ? cursor.data : null;
   } catch {
     return null;
   }
@@ -71,4 +65,33 @@ export function contentBlocksToText(content: Array<{ type: string; text?: string
     .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
     .map(b => b.text)
     .join('');
+}
+
+const REPLY_PREVIEW_MAX_CHARS = 160;
+
+type ReplySnapshotParent = {
+  senderId: string;
+  deleted: boolean;
+  content: Array<{ type: string; text?: string }>;
+};
+
+export function buildReplyToMessageSnapshot(
+  messageId: string,
+  parent: ReplySnapshotParent | null | undefined
+): ReplyToMessageSnapshot {
+  if (!parent) {
+    return { messageId, senderId: null, deleted: true, previewText: null };
+  }
+
+  if (parent.deleted) {
+    return { messageId, senderId: parent.senderId, deleted: true, previewText: null };
+  }
+
+  const preview = contentBlocksToText(parent.content).trim();
+  return {
+    messageId,
+    senderId: parent.senderId,
+    deleted: false,
+    previewText: (preview || 'Message').slice(0, REPLY_PREVIEW_MAX_CHARS),
+  };
 }

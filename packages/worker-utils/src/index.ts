@@ -79,3 +79,6 @@ export type {
   KiloclawStopReason,
   KiloclawDestroyReason,
 } from './kiloclaw-lifecycle-reasons.js';
+
+export { isValidGitUrl, sanitizeGitUrl, parseGitUrl, repoFullNameFromGitUrl } from './git-url.js';
+export type { RepoCoordinates } from './git-url.js';

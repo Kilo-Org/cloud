@@ -40,7 +40,6 @@ export const SLACK_SCOPES = [
   'channels:read',
   'chat:write',
   'files:read',
-  'files:write',
   'groups:history',
   'groups:read',
   'im:history',
@@ -51,7 +50,6 @@ export const SLACK_SCOPES = [
   'reactions:write',
   'team:read',
   'users:read',
-  'users:read.email',
 ];
 
 export function getMissingSlackScopes(installedScopes: string[] | null): string[] {

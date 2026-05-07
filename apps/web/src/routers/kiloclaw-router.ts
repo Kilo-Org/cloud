@@ -29,12 +29,17 @@ import {
   kiloclaw_instances,
   kiloclaw_email_log,
   kiloclaw_cli_runs,
+  kiloclaw_scheduled_actions,
+  kiloclaw_scheduled_action_notifications,
+  kiloclaw_scheduled_action_stages,
+  kiloclaw_scheduled_action_targets,
   kilocode_users,
   cloud_agent_webhook_triggers,
   credit_transactions,
   organizations,
 } from '@kilocode/db/schema';
-import { and, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
+import { and, eq, ne, asc, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
 import { sentryLogger } from '@/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
@@ -878,6 +883,92 @@ type KiloCodeConfigPublicResponse = Pick<
   | 'dreamingEnabled'
 >;
 
+/**
+ * Soonest pending scheduled action targeting this instance, or null.
+ * Powers the in-workspace "upcoming X at Y" banner on getStatus.
+ *
+ * The banner is gated on the (target, kind='notice', channel='webapp')
+ * notification row, NOT just on target/action existence — admins who
+ * schedule with `notify: false` or who drop 'webapp' from
+ * `noticeChannels` should NOT see a banner. The notification row also
+ * has to be in 'pending' or 'sent' (not 'failed' — voided on cancel
+ * or by the orphaned-user guard) and the notice lead-time window has
+ * to have opened so the banner appears at the same moment the email
+ * fires, not the instant the schedule is created.
+ */
+async function getUpcomingScheduledActionForInstance(
+  instanceId: string
+): Promise<KiloClawDashboardStatus['scheduledAction']> {
+  const targetCatalog = alias(kiloclaw_image_catalog, 'target_catalog');
+  const [row] = await db
+    .select({
+      scheduled_action_id: kiloclaw_scheduled_actions.id,
+      action_type: kiloclaw_scheduled_actions.action_type,
+      scheduled_at: kiloclaw_scheduled_action_stages.scheduled_at,
+      target_image_tag: kiloclaw_scheduled_action_targets.target_image_tag,
+      target_openclaw_version: targetCatalog.openclaw_version,
+    })
+    .from(kiloclaw_scheduled_action_targets)
+    .innerJoin(
+      kiloclaw_scheduled_actions,
+      eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
+    )
+    .innerJoin(
+      kiloclaw_scheduled_action_stages,
+      eq(kiloclaw_scheduled_action_stages.id, kiloclaw_scheduled_action_targets.stage_id)
+    )
+    // INNER join — no webapp/notice row means the admin opted out of
+    // the in-app banner (notify=false, or dropped 'webapp' from
+    // noticeChannels). The unique (target_id, kind, channel) index
+    // makes this an O(1) lookup.
+    .innerJoin(
+      kiloclaw_scheduled_action_notifications,
+      and(
+        eq(kiloclaw_scheduled_action_notifications.target_id, kiloclaw_scheduled_action_targets.id),
+        eq(kiloclaw_scheduled_action_notifications.kind, 'notice'),
+        eq(kiloclaw_scheduled_action_notifications.channel, 'webapp')
+      )
+    )
+    .leftJoin(
+      targetCatalog,
+      eq(targetCatalog.image_tag, kiloclaw_scheduled_action_targets.target_image_tag)
+    )
+    .where(
+      and(
+        eq(kiloclaw_scheduled_action_targets.instance_id, instanceId),
+        // Just 'pending' here — not 'pending' OR 'running' — so this
+        // hits the partial index IDX_kiloclaw_scheduled_action_targets_pending_by_instance
+        // (predicate WHERE status='pending'). The 'running' state is a
+        // transient ~seconds-long claim window between the DO's CAS
+        // and the recordOutcome write; the banner being null during
+        // that window is fine because the action is about to fire
+        // (or just did) regardless.
+        eq(kiloclaw_scheduled_action_targets.status, 'pending'),
+        inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running']),
+        // Banner-visible iff the notice row is queued or already sent.
+        // 'failed' covers cancellation-voided rows and orphaned-user
+        // guard rows — neither should drive a banner.
+        inArray(kiloclaw_scheduled_action_notifications.status, ['pending', 'sent']),
+        // Honor notice_lead_hours. Without this, the banner pops the
+        // moment an admin schedules (potentially weeks before the
+        // action fires), but the email/push wouldn't fire until
+        // scheduled_at - lead_hours. They should appear together.
+        sql`now() >= (${kiloclaw_scheduled_action_stages.scheduled_at}::timestamptz - (${kiloclaw_scheduled_actions.notice_lead_hours} * interval '1 hour'))`
+      )
+    )
+    .orderBy(asc(kiloclaw_scheduled_action_stages.scheduled_at))
+    .limit(1);
+
+  if (!row) return null;
+  return {
+    scheduledActionId: row.scheduled_action_id,
+    actionType: row.action_type,
+    scheduledAt: row.scheduled_at,
+    targetImageTag: row.target_image_tag ?? null,
+    targetOpenclawVersion: row.target_openclaw_version ?? null,
+  };
+}
+
 function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDashboardStatus {
   return {
     userId,
@@ -898,6 +989,8 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
     flyVolumeId: null,
     flyRegion: null,
     machineSize: null,
+    instanceType: null,
+    volumeSizeGb: null,
     openclawVersion: null,
     imageVariant: null,
     trackedImageTag: null,
@@ -920,6 +1013,7 @@ function createNoInstanceStatus(userId: string, workerUrl: string): KiloClawDash
     instanceId: null,
     inboundEmailAddress: null,
     inboundEmailEnabled: false,
+    scheduledAction: null,
   } satisfies KiloClawDashboardStatus;
 }
 
@@ -2323,9 +2417,13 @@ export const kiloclawRouter = createTRPCRouter({
     const results = await Promise.all(
       instances.map(async instance => {
         let status: string | null = null;
+        let botName: string | null = null;
+        let botEmoji: string | null = null;
         try {
           const workerStatus = await client.getStatus(ctx.user.id, workerInstanceId(instance));
           status = workerStatus.status;
+          botName = workerStatus.botName;
+          botEmoji = workerStatus.botEmoji;
         } catch {
           // Worker unreachable — show as null (unknown)
         }
@@ -2337,6 +2435,8 @@ export const kiloclawRouter = createTRPCRouter({
           organizationName: instance.organizationId
             ? (orgNameMap.get(instance.organizationId) ?? null)
             : null,
+          botName,
+          botEmoji,
           status,
         };
       })
@@ -2357,9 +2457,10 @@ export const kiloclawRouter = createTRPCRouter({
     }
 
     const client = new KiloClawInternalClient();
-    const [status, inboundEmailAddress] = await Promise.all([
+    const [status, inboundEmailAddress, scheduledAction] = await Promise.all([
       client.getStatus(ctx.user.id, workerInstanceId(instance)),
       getInboundEmailAddressForInstance(instance.id),
+      getUpcomingScheduledActionForInstance(instance.id),
     ]);
 
     const workerUrl = workerUrlForInstance({
@@ -2379,6 +2480,7 @@ export const kiloclawRouter = createTRPCRouter({
       instanceId: workerInstanceId(instance) ? instance.id : null,
       inboundEmailAddress,
       inboundEmailEnabled: instance.inboundEmailEnabled,
+      scheduledAction,
     } satisfies KiloClawDashboardStatus;
   }),
 
@@ -2426,78 +2528,6 @@ export const kiloclawRouter = createTRPCRouter({
     const instance = await getActiveInstance(ctx.user.id);
     return instance ? { instanceId: instance.id } : null;
   }),
-
-  getStreamChatCredentials: clawAccessProcedure.query(async ({ ctx }) => {
-    const instance = await getActiveInstance(ctx.user.id);
-    const client = new KiloClawInternalClient();
-    return client.getStreamChatCredentials(ctx.user.id, workerInstanceId(instance));
-  }),
-
-  sendChatMessage: clawAccessProcedure
-    .input(
-      z.object({
-        instanceId: z.string().uuid().optional(),
-        message: z.string().min(1).max(32_000),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      if (input.instanceId) {
-        // Explicit instanceId: verify ownership and non-destroyed
-        const [row] = await db
-          .select({ id: kiloclaw_instances.id })
-          .from(kiloclaw_instances)
-          .where(
-            and(
-              eq(kiloclaw_instances.id, input.instanceId),
-              eq(kiloclaw_instances.user_id, ctx.user.id),
-              isNull(kiloclaw_instances.destroyed_at)
-            )
-          )
-          .limit(1);
-        if (!row) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'No active KiloClaw instance found',
-          });
-        }
-      } else {
-        // No instanceId: verify the user has any active instance
-        const instance = await getActiveInstance(ctx.user.id);
-        if (!instance) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'No active KiloClaw instance found',
-          });
-        }
-      }
-
-      const client = new KiloClawInternalClient();
-      try {
-        return await client.sendChatMessage(ctx.user.id, input.message, input.instanceId);
-      } catch (err) {
-        if (err instanceof KiloClawApiError) {
-          const { message } = getKiloClawApiErrorPayload(err);
-          const code =
-            err.statusCode === 400
-              ? 'BAD_REQUEST'
-              : err.statusCode === 403
-                ? 'FORBIDDEN'
-                : err.statusCode === 404
-                  ? 'NOT_FOUND'
-                  : err.statusCode === 503
-                    ? 'PRECONDITION_FAILED'
-                    : 'INTERNAL_SERVER_ERROR';
-          throw new TRPCError({
-            code,
-            message: message ?? 'Failed to send chat message',
-          });
-        }
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to send chat message',
-        });
-      }
-    }),
 
   getMorningBriefingStatus: clawAccessProcedure.query(async ({ ctx }) => {
     const instance = await getActiveInstance(ctx.user.id);

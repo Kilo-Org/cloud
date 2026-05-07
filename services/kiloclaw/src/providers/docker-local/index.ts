@@ -293,6 +293,16 @@ function buildHostConfig(config: {
     RestartPolicy: {
       Name: 'no',
     },
+    // docker-local consumes machineSize from runtimeSpec but never observes the
+    // running container's actual HostConfig limits and writes them back to DO
+    // state. That means a legacy instance whose DO state has machineSize=null
+    // and instanceType=null cannot be auto-backfilled by the alarm — the Fly
+    // backfill paths (reconcile.ts, fly-machines.ts, restartMachine) read live
+    // machine.config.guest, but there's no docker-local equivalent. Cure for
+    // legacy docker-local instances is re-provision (writes the default tier)
+    // or admin resize (writes the chosen tier). docker-local is dev-only so
+    // this gap is acceptable; a real observation path would be an extra docker
+    // API call per alarm tick on every dev machine for marginal payoff.
     ...(runtimeSpec.machineSize
       ? {
           Memory: runtimeSpec.machineSize.memory_mb * 1024 * 1024,

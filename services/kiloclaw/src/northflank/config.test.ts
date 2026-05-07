@@ -17,6 +17,11 @@ describe('getNorthflankConfig', () => {
       teamId: null,
       region: 'us-central',
       deploymentPlan: 'nf-compute-200',
+      deploymentPlans: {
+        'perf-1-3': 'nf-compute-200',
+        'perf-4-8': 'nf-compute-200',
+        'perf-4-16': 'nf-compute-200',
+      },
       storageClassName: 'nf-multi-rw',
       storageAccessMode: 'ReadWriteMany',
       volumeSizeMb: 10240,
@@ -47,6 +52,11 @@ describe('getNorthflankConfig', () => {
       teamId: 'team-1',
       region: 'us-central',
       deploymentPlan: 'nf-compute-200',
+      deploymentPlans: {
+        'perf-1-3': 'nf-compute-200',
+        'perf-4-8': 'nf-compute-200',
+        'perf-4-16': 'nf-compute-200',
+      },
       storageClassName: 'nf-ssd-rwo',
       storageAccessMode: 'ReadWriteOnce',
       volumeSizeMb: 20480,

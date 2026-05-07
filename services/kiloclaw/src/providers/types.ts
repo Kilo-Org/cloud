@@ -46,7 +46,7 @@ export type ProviderObservation = {
 
 export type ProviderResult<TProviderState extends ProviderState = ProviderState> = {
   providerState: TProviderState;
-  corePatch?: Partial<Pick<PersistedState, 'machineSize' | 'restartUpdateSent'>>;
+  corePatch?: Partial<Pick<PersistedState, 'machineSize' | 'restartUpdateSent' | 'instanceType'>>;
   observation?: ProviderObservation;
 };
 

@@ -74,7 +74,6 @@ describe('computeRelevantChangesForOrg', () => {
   test('allow-list mode: new model from already-allowed provider is relevant', () => {
     const org = buildEnterpriseOrg({
       settings: {
-        provider_policy_mode: 'allow',
         provider_allow_list: ['z-ai'],
       },
     });
@@ -92,7 +91,6 @@ describe('computeRelevantChangesForOrg', () => {
   test('allow-list mode: new model from non-allowed provider is NOT relevant', () => {
     const org = buildEnterpriseOrg({
       settings: {
-        provider_policy_mode: 'allow',
         provider_allow_list: ['z-ai'],
       },
     });
@@ -111,7 +109,6 @@ describe('computeRelevantChangesForOrg', () => {
   test('allow-list mode: brand-new provider with new model is NOT relevant', () => {
     const org = buildEnterpriseOrg({
       settings: {
-        provider_policy_mode: 'allow',
         provider_allow_list: ['z-ai'],
       },
     });
@@ -130,7 +127,6 @@ describe('computeRelevantChangesForOrg', () => {
   test('allow-list mode: new model on the deny list is NOT relevant', () => {
     const org = buildEnterpriseOrg({
       settings: {
-        provider_policy_mode: 'allow',
         provider_allow_list: ['z-ai'],
         model_deny_list: ['z-ai/glm-5.1'],
       },
@@ -144,7 +140,7 @@ describe('computeRelevantChangesForOrg', () => {
     expect(relevantChangesIsEmpty(changes)).toBe(true);
   });
 
-  test('legacy deny-list mode (empty deny lists): new model from any provider is relevant', () => {
+  test('no allow list: new model from any provider is relevant', () => {
     const org = buildEnterpriseOrg({ settings: {} });
     const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
     const newSnapshot = buildSnapshot([
@@ -158,25 +154,9 @@ describe('computeRelevantChangesForOrg', () => {
     expect(changes.addedByReasonProvider.get('new-provider')).toEqual(['new-provider/foo']);
   });
 
-  test('legacy deny-list mode: new model from denied provider is NOT relevant', () => {
-    const org = buildEnterpriseOrg({
-      settings: { provider_deny_list: ['bad-corp'] },
-    });
-    const oldSnapshot = buildSnapshot([{ slug: 'bad-corp', models: ['bad-corp/old'] }]);
-    const newSnapshot = buildSnapshot([
-      { slug: 'bad-corp', models: ['bad-corp/old', 'bad-corp/new'] },
-    ]);
-
-    const diff = computeSnapshotDiff(oldSnapshot, newSnapshot);
-    const changes = computeRelevantChangesForOrg(org, diff);
-
-    expect(relevantChangesIsEmpty(changes)).toBe(true);
-  });
-
   test('removed from catalog: model that was accessible is recorded', () => {
     const org = buildEnterpriseOrg({
       settings: {
-        provider_policy_mode: 'allow',
         provider_allow_list: ['z-ai'],
       },
     });
@@ -193,7 +173,6 @@ describe('computeRelevantChangesForOrg', () => {
   test('removed from allowed providers: model still in catalog but only via denied providers', () => {
     const org = buildEnterpriseOrg({
       settings: {
-        provider_policy_mode: 'allow',
         provider_allow_list: ['openai'],
       },
     });
@@ -216,7 +195,6 @@ describe('computeRelevantChangesForOrg', () => {
   test('removed model that was denied is NOT relevant', () => {
     const org = buildEnterpriseOrg({
       settings: {
-        provider_policy_mode: 'allow',
         provider_allow_list: ['z-ai'],
         model_deny_list: ['z-ai/glm-4.0'],
       },
@@ -233,7 +211,6 @@ describe('computeRelevantChangesForOrg', () => {
   test('removed model still offered by another allowed provider is NOT relevant', () => {
     const org = buildEnterpriseOrg({
       settings: {
-        provider_policy_mode: 'allow',
         provider_allow_list: ['openai', 'azure'],
       },
     });
@@ -255,7 +232,6 @@ describe('computeRelevantChangesForOrg', () => {
   test('deterministic reason provider: picks first alphabetical allowed provider', () => {
     const org = buildEnterpriseOrg({
       settings: {
-        provider_policy_mode: 'allow',
         provider_allow_list: ['azure', 'openai'],
       },
     });

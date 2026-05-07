@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
+import { kiloclawConversationContext } from '@kilocode/event-service';
 import type { AuthContext } from '../auth';
 import { botAuthMiddleware } from '../auth-bot';
 import { registerBotRoutes } from '../routes/bot-messages';
@@ -246,7 +247,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/conversations/:cid/conversation-stat
     expect(pushEvent).toHaveBeenCalledTimes(1);
     expect(pushEvent).toHaveBeenCalledWith(
       userId,
-      `/kiloclaw/${sandboxId}/${conversationId}`,
+      kiloclawConversationContext(sandboxId, conversationId),
       'conversation.status',
       {
         conversationId,

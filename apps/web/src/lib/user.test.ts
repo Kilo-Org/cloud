@@ -38,6 +38,7 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_email_log,
+  transactional_email_log,
   kiloclaw_cli_runs,
   bot_requests,
   bot_request_cloud_agent_sessions,
@@ -48,6 +49,9 @@ import {
   user_push_tokens,
   security_advisor_scans,
   credit_campaigns,
+  agent_environment_profiles,
+  agent_environment_profile_mcp_servers,
+  agent_environment_profile_skills,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -116,6 +120,7 @@ describe('User', () => {
     await db.delete(stytch_fingerprints);
     await db.delete(kiloclaw_cli_runs);
     await db.delete(kiloclaw_email_log);
+    await db.delete(transactional_email_log);
     await db.delete(kiloclaw_version_pins);
     await db.delete(kiloclaw_image_catalog);
     await db.delete(kiloclaw_subscriptions);
@@ -858,6 +863,94 @@ describe('User', () => {
       expect(targets[0].status).toBe('applied');
     });
 
+    it('should clear admin_size_override on the deleted user\u2019s destroyed instances and on instances where the deleted user was the admin actor', async () => {
+      // The kiloclaw_instances.admin_size_override JSONB carries the admin's
+      // email and free-form reason text — both PII. Clear it on:
+      //   (a) the deleted user's own destroyed instances (retained for audit)
+      //   (b) ANY instance where the deleted user was the admin actor —
+      //       their email/reason is their PII regardless of which user's
+      //       instance it targeted.
+      const targetUser = await insertTestUser();
+      const adminUser = await insertTestUser();
+      const otherCustomer = await insertTestUser();
+
+      // (a) target user's own destroyed instance with an override set
+      const [targetInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: targetUser.id,
+          sandbox_id: `test-sdu-override-target-${Date.now()}`,
+          destroyed_at: new Date().toISOString(),
+          admin_size_override: {
+            size: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+            reason: 'OOM ticket #1234 mentioning sensitive context',
+            actorId: adminUser.id,
+            actorEmail: adminUser.google_user_email,
+            setAt: 1700000000000,
+          },
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // (b) someone else's active instance where adminUser was the actor
+      const [otherInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: otherCustomer.id,
+          sandbox_id: `test-sdu-override-other-${Date.now()}`,
+          admin_size_override: {
+            size: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+            reason: 'support upgrade by adminUser',
+            actorId: adminUser.id,
+            actorEmail: adminUser.google_user_email,
+            setAt: 1700000000000,
+          },
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // Control: an unrelated instance with a different admin actor.
+      const unrelatedAdmin = await insertTestUser();
+      const [unrelatedInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: otherCustomer.id,
+          sandbox_id: `test-sdu-override-unrelated-${Date.now()}`,
+          admin_size_override: {
+            size: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+            reason: 'unrelated override',
+            actorId: unrelatedAdmin.id,
+            actorEmail: unrelatedAdmin.google_user_email,
+            setAt: 1700000000001,
+          },
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // Soft-delete the target user (case a) AND the admin user (case b).
+      await softDeleteUser(targetUser.id);
+      await softDeleteUser(adminUser.id);
+
+      const [targetRow] = await db
+        .select({ override: kiloclaw_instances.admin_size_override })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, targetInstance.id));
+      expect(targetRow?.override).toBeNull();
+
+      const [otherRow] = await db
+        .select({ override: kiloclaw_instances.admin_size_override })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, otherInstance.id));
+      expect(otherRow?.override).toBeNull();
+
+      // Control row's override is untouched — different admin actor.
+      const [unrelatedRow] = await db
+        .select({ override: kiloclaw_instances.admin_size_override })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, unrelatedInstance.id));
+      expect(unrelatedRow).toBeDefined();
+      expect(unrelatedRow.override).not.toBeNull();
+      const unrelatedOverride = unrelatedRow.override as { actorId: string };
+      expect(unrelatedOverride.actorId).toBe(unrelatedAdmin.id);
+    });
+
     it('should anonymize credit_campaigns created_by_kilo_user_id', async () => {
       const creator = await insertTestUser();
       const otherAdmin = await insertTestUser();
@@ -1124,6 +1217,66 @@ describe('User', () => {
       expect(pms[0].address_city).toBeNull();
       // stripe_fingerprint preserved for fraud detection
       expect(pms[0].stripe_fingerprint).toBe(pm.stripe_fingerprint);
+    });
+
+    it('should cascade-delete agent environment profile MCPs and skills', async () => {
+      const user = await insertTestUser();
+
+      const [profile] = await db
+        .insert(agent_environment_profiles)
+        .values({
+          owned_by_user_id: user.id,
+          name: 'test-profile',
+        })
+        .returning();
+
+      const [mcpServer] = await db
+        .insert(agent_environment_profile_mcp_servers)
+        .values({
+          profile_id: profile.id,
+          name: 'demo',
+          type: 'local',
+          enabled: true,
+          config: {
+            command: ['node', 'server.js'],
+            environment: {
+              API_KEY: {
+                encryptedData: 'ciphertext',
+                encryptedDEK: 'key',
+                algorithm: 'rsa-aes-256-gcm',
+                version: 1,
+              },
+            },
+          },
+        })
+        .returning();
+
+      await db.insert(agent_environment_profile_skills).values({
+        profile_id: profile.id,
+        name: 'test-skill',
+        source_type: 'custom',
+        raw_markdown: '---\nname: test-skill\n---\nBody',
+      });
+
+      await softDeleteUser(user.id);
+
+      const profiles = await db
+        .select()
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.owned_by_user_id, user.id));
+      expect(profiles).toHaveLength(0);
+
+      const mcpServers = await db
+        .select()
+        .from(agent_environment_profile_mcp_servers)
+        .where(eq(agent_environment_profile_mcp_servers.id, mcpServer.id));
+      expect(mcpServers).toHaveLength(0);
+
+      const skills = await db
+        .select()
+        .from(agent_environment_profile_skills)
+        .where(eq(agent_environment_profile_skills.profile_id, profile.id));
+      expect(skills).toHaveLength(0);
     });
 
     it('should nullify user_feedback FK', async () => {
@@ -1711,6 +1864,26 @@ describe('User', () => {
           .select({ count: count() })
           .from(kiloclaw_email_log)
           .where(eq(kiloclaw_email_log.user_id, user.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should retain transactional_email_log rows for the user', async () => {
+      const user = await insertTestUser();
+
+      await db.insert(transactional_email_log).values({
+        user_id: user.id,
+        email_type: 'credits_top_up_confirmation',
+        idempotency_key: `ch_retain_${randomUUID()}`,
+      });
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(transactional_email_log)
+          .where(eq(transactional_email_log.user_id, user.id))
           .then(r => r[0].count)
       ).toBe(1);
     });

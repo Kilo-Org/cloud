@@ -56,6 +56,9 @@ import type {
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
   KiloClawScheduledActionTargetStatus,
+  KiloClawScheduledActionNotificationStatus,
+  KiloClawScheduledActionNotificationChannel,
+  KiloClawScheduledActionNotificationKind,
 } from './schema-types';
 import type {
   OrganizationModeConfig,
@@ -81,6 +84,7 @@ import type {
   ContributorChampionTier,
 } from './schema-types';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
+import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
 
 /**
  * Generates a complete check constraint for an enum column.
@@ -1247,7 +1251,7 @@ export const stytch_fingerprints = pgTable(
     index('idx_fingerprint_data').on(table.fingerprint_data),
     index('idx_hardware_fingerprint').on(table.hardware_fingerprint),
     index('idx_kilo_user_id').on(table.kilo_user_id),
-    index('idx_reasons').on(table.reasons),
+    index('idx_stytch_fingerprints_reasons_gin').using('gin', table.reasons),
     index('idx_verdict_action').on(table.verdict_action),
     index('idx_visitor_fingerprint').on(table.visitor_fingerprint),
   ]
@@ -2770,7 +2774,7 @@ export const app_builder_project_sessions = pgTable(
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     ended_at: timestamp({ withTimezone: true, mode: 'string' }), // null = current/active session
     reason: text().notNull(), // 'initial', 'github_migration', 'upgrade', etc.
-    worker_version: text().notNull().default('v1'), // 'v1' (old cloud-agent) or 'v2' (cloud-agent-next)
+    worker_version: text().notNull().default('v2'), // 'v1' (legacy/R2 only) or 'v2' (cloud-agent-next)
   },
   table => [
     index('IDX_app_builder_project_sessions_project_id').on(table.project_id),
@@ -3557,6 +3561,7 @@ export const agent_environment_profiles = pgTable(
     // Ownership: exactly one must be set (org OR user) - matches platform_integrations pattern
     owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    created_by_user_id: text(), // Audit trail: the user who created this profile (useful for org-owned profiles)
 
     name: text().notNull(),
     description: text(),
@@ -3586,6 +3591,7 @@ export const agent_environment_profiles = pgTable(
     // Indexes
     index('IDX_agent_env_profiles_org_id').on(table.owned_by_organization_id),
     index('IDX_agent_env_profiles_user_id').on(table.owned_by_user_id),
+    index('IDX_agent_env_profiles_created_by_user_id').on(table.created_by_user_id),
     // Owner check constraint (exactly one must be set)
     check(
       'agent_env_profiles_owner_check',
@@ -3696,6 +3702,123 @@ export type AgentEnvironmentProfileRepoBinding =
 export type NewAgentEnvironmentProfileRepoBinding =
   typeof agent_environment_profile_repo_bindings.$inferInsert;
 
+// ============ AGENT ENVIRONMENT PROFILE MCP SERVERS ============
+// MCP servers configured on an environment profile. Materialized into the
+// CLI-native KILO_CONFIG_CONTENT.mcp block at session preparation time.
+
+export const agent_environment_profile_mcp_servers = pgTable(
+  'agent_environment_profile_mcp_servers',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    type: text({ enum: ['local', 'remote'] }).notNull(),
+    enabled: boolean().notNull().default(true),
+    timeout: integer(),
+    // CLI-native MCP config as jsonb. Non-secret fields (command, args, url, env/header keys)
+    // are stored as plain values. Each env/header *value* is stored as an RSA+AES envelope
+    // object ({ encryptedData, encryptedDEK, algorithm, version }) using the same format as
+    // agent_environment_profile_vars. Decryption happens only on the cloud-agent-next worker
+    // at session preparation time.
+    config: jsonb().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_mcp_servers_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_mcp_servers_profile_name').on(table.profile_id, table.name),
+  ]
+);
+
+export type AgentEnvironmentProfileMcpServer =
+  typeof agent_environment_profile_mcp_servers.$inferSelect;
+
+// ============ AGENT ENVIRONMENT PROFILE SKILLS ============
+// Kilo Code skills attached to an environment profile. Materialized into
+// ${SESSION_HOME}/.kilocode/skills/<name>/SKILL.md at session preparation time.
+
+export const agent_environment_profile_skills = pgTable(
+  'agent_environment_profile_skills',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    // Skill slug — must match the frontmatter `name` and is used as the directory name
+    name: text().notNull(),
+    description: text(),
+    source_type: text({ enum: ['marketplace', 'custom'] }).notNull(),
+    // URL the skill was imported from (marketplace entry URL, or null for 'custom')
+    source_url: text(),
+    raw_markdown: text().notNull(),
+    // Companion files for a multi-file skill. Map of relative path → file
+    // contents (text). Excludes SKILL.md itself (lives in raw_markdown).
+    // Materialized under ${sessionHome}/.kilocode/skills/<name>/<relativePath>.
+    files: jsonb().$type<Record<string, string>>().notNull().default({}),
+    enabled: boolean().notNull().default(true),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_skills_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_skills_profile_name').on(table.profile_id, table.name),
+  ]
+);
+
+export type AgentEnvironmentProfileSkill = typeof agent_environment_profile_skills.$inferSelect;
+
+// ============ AGENT ENVIRONMENT PROFILE AGENTS ============
+// Kilo "agents" (the modern successor to legacy custom modes) attached to an
+// environment profile. Materialized into KILO_CONFIG_CONTENT.agent.<slug> at
+// session preparation time; the stored `config` jsonb already matches the
+// CLI's AgentConfig shape so we pass through untransformed.
+
+export const agent_environment_profile_agents = pgTable(
+  'agent_environment_profile_agents',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    profile_id: uuid()
+      .notNull()
+      .references(() => agent_environment_profiles.id, { onDelete: 'cascade' }),
+    // Agent slug — used as KILO_CONFIG_CONTENT.agent.<slug>.
+    slug: text().notNull(),
+    // Display name shown in the picker.
+    name: text().notNull(),
+    // AgentConfig shape: prompt, description, mode, model, temperature, top_p,
+    // steps, hidden, disable, color, variant, permission, options. See
+    // AgentConfigSchema in schema-types.ts for the authoritative validator.
+    config: jsonb().notNull().default({}),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_agent_env_profile_agents_profile_id').on(table.profile_id),
+    unique('UQ_agent_env_profile_agents_profile_slug').on(table.profile_id, table.slug),
+  ]
+);
+
+export type AgentEnvironmentProfileAgent = typeof agent_environment_profile_agents.$inferSelect;
+
 // ============ APP BUILDER FEEDBACK ============
 
 export const app_builder_feedback = pgTable(
@@ -3792,6 +3915,16 @@ export const kiloclaw_instances = pgTable(
     // can filter populations by current running version via SQL. Up to ~30min stale on
     // idle instances (matches the longest alarm interval).
     tracked_image_tag: text(),
+    // Denormalized copy of the DO's instanceType. Source of truth remains the DO;
+    // this column exists so admin tooling and future billing work can filter by tier.
+    instance_type: text(),
+    // Denormalized copy of the DO's `adminMachineSizeOverride` + metadata. Non-null
+    // means the instance is currently running with admin-supplied CPU/RAM that
+    // diverge from its billable tier hardware (`machineSize` / `instance_type`).
+    // Source of truth is the DO; written by the worker on explicit admin
+    // set/clear, plus auto-cleared as part of a tier resize.
+    // Shape: { size: { cpus, memory_mb, cpu_kind? }, reason, actorId, actorEmail, setAt }.
+    admin_size_override: jsonb(),
   },
   table => [
     // One active instance per user+sandbox combination.
@@ -3808,6 +3941,21 @@ export const kiloclaw_instances = pgTable(
     index('IDX_kiloclaw_instances_tracked_image_tag')
       .on(table.tracked_image_tag)
       .where(isNull(table.destroyed_at)),
+    index('IDX_kiloclaw_instances_instance_type')
+      .on(table.instance_type)
+      .where(isNull(table.destroyed_at)),
+    check(
+      'CHK_kiloclaw_instances_instance_type',
+      sql`${table.instance_type} IS NULL OR ${table.instance_type} IN (${sql.join(
+        INSTANCE_TYPE_VALUES.map(value => sql.raw(`'${value}'`)),
+        sql.raw(', ')
+      )})`
+    ),
+    // Powers the admin "outstanding overrides" filter. Partial (active rows
+    // only) so the index stays small.
+    index('IDX_kiloclaw_instances_admin_size_override')
+      .on(table.id)
+      .where(sql`${table.admin_size_override} IS NOT NULL AND ${table.destroyed_at} IS NULL`),
   ]
 );
 
@@ -4233,6 +4381,65 @@ export type KiloClawScheduledActionTarget = typeof kiloclaw_scheduled_action_tar
 export type NewKiloClawScheduledActionTarget =
   typeof kiloclaw_scheduled_action_targets.$inferInsert;
 
+// Per-target, per-channel notification rows. Channels dispatch and
+// persist independently — knowing email succeeded but mobile push
+// failed matters for retry and debug. Adding a new channel later is a
+// new value in the enum, not a schema change.
+//
+// kind='notice' is the heads-up dispatched ahead of the scheduled time;
+// kind='cancelled' is the follow-up emitted when an admin cancels the
+// action AFTER a notice was already sent for that (target, channel).
+// We never insert a 'cancelled' row for a (target, channel) that has
+// no prior sent 'notice' — surfacing a cancellation to a user who
+// never got the original heads-up would be confusing.
+export const kiloclaw_scheduled_action_notifications = pgTable(
+  'kiloclaw_scheduled_action_notifications',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    target_id: uuid()
+      .notNull()
+      .references(() => kiloclaw_scheduled_action_targets.id, { onDelete: 'cascade' }),
+
+    channel: text().$type<KiloClawScheduledActionNotificationChannel>().notNull(),
+
+    kind: text().$type<KiloClawScheduledActionNotificationKind>().notNull().default('notice'),
+
+    status: text().$type<KiloClawScheduledActionNotificationStatus>().notNull().default('pending'),
+
+    // Set when the sweep CAS-claims the row (pending → sending). Used
+    // by the next tick to detect and recover stuck claims left behind
+    // by a sweep that crashed mid-dispatch.
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    error_message: text(),
+  },
+  table => [
+    // One notification per (target, kind, channel). A target may have
+    // both kinds (notice sent, then cancellation queued).
+    uniqueIndex('UQ_kiloclaw_scheduled_action_notifications_target_kind_channel').on(
+      table.target_id,
+      table.kind,
+      table.channel
+    ),
+    // Sweep lookup: notifications still pending dispatch. The partial
+    // predicate keeps the index small (only pending rows). Keyed on
+    // target_id so the sweep's join into kiloclaw_scheduled_action_targets
+    // can use it for the inner-join lookup. Point lookups by id (markSent,
+    // markFailed) hit the primary key index directly.
+    index('IDX_kiloclaw_scheduled_action_notifications_pending')
+      .on(table.target_id)
+      .where(sql`${table.status} = 'pending'`),
+  ]
+);
+
+export type KiloClawScheduledActionNotification =
+  typeof kiloclaw_scheduled_action_notifications.$inferSelect;
+export type NewKiloClawScheduledActionNotification =
+  typeof kiloclaw_scheduled_action_notifications.$inferInsert;
+
 // KiloClaw Early Bird Purchases — records one-time earlybird payments.
 // Unique on user_id enforces at most one purchase per user.
 // Unique on stripe_charge_id provides webhook idempotency.
@@ -4374,6 +4581,13 @@ export const kiloclaw_subscription_change_log = pgTable(
 export type KiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferSelect;
 export type NewKiloClawSubscriptionChangeLog = typeof kiloclaw_subscription_change_log.$inferInsert;
 
+// KiloClaw subscription-started emails are per paid activation, not per
+// instance lifetime. Cancel+resubscribe reuses the same subscription row (we
+// UPDATE the existing row in place), so only `period_start` — which advances
+// on every fresh activation — distinguishes activation events. `period_start`
+// defaults to the Unix epoch so the unique-index math works for any future
+// per-instance email type that has no natural per-activation boundary: those
+// callers pass no value and collapse to one row per (user, instance, type).
 export const kiloclaw_email_log = pgTable(
   'kiloclaw_email_log',
   {
@@ -4386,14 +4600,17 @@ export const kiloclaw_email_log = pgTable(
       .references(() => kilocode_users.id),
     instance_id: uuid().references(() => kiloclaw_instances.id),
     email_type: text().notNull(),
+    period_start: timestamp({ withTimezone: true, mode: 'string' })
+      .notNull()
+      .default(sql`'epoch'`),
     sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
     uniqueIndex('UQ_kiloclaw_email_log_user_type_global')
       .on(table.user_id, table.email_type)
       .where(isNull(table.instance_id)),
-    uniqueIndex('UQ_kiloclaw_email_log_user_instance_type')
-      .on(table.user_id, table.instance_id, table.email_type)
+    uniqueIndex('UQ_kiloclaw_email_log_user_instance_type_period')
+      .on(table.user_id, table.instance_id, table.email_type, table.period_start)
       .where(isNotNull(table.instance_id)),
     index('IDX_kiloclaw_email_log_type_sent_instance')
       .on(table.email_type, table.sent_at, table.instance_id, table.user_id)
@@ -4402,6 +4619,36 @@ export const kiloclaw_email_log = pgTable(
 );
 
 export type KiloClawEmailLog = typeof kiloclaw_email_log.$inferSelect;
+
+// Outbox marker for transactional emails that need durable idempotency beyond
+// their triggering side effect. For top-up confirmations, `processTopUp`
+// commits the credit_transactions row before firing the email via `after()`;
+// if the process exits between those steps, a webhook retry can observe that
+// the transactional email marker is missing and recover the email exactly once.
+export const transactional_email_log = pgTable(
+  'transactional_email_log',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id),
+    email_type: text().notNull(),
+    idempotency_key: text().notNull(),
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_transactional_email_log_type_idempotency_key').on(
+      table.email_type,
+      table.idempotency_key
+    ),
+    index('IDX_transactional_email_log_user_id').on(table.user_id),
+  ]
+);
+
+export type TransactionalEmailLog = typeof transactional_email_log.$inferSelect;
 
 // Bot Request Logs — tracks each message handled by the new bot (src/lib/bot.ts).
 // Rows are created as 'pending' on receipt and updated as processing progresses.
@@ -4780,29 +5027,4 @@ export const security_advisor_content = pgTable('security_advisor_content', {
 export type SecurityAdvisorContent = typeof security_advisor_content.$inferSelect;
 export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferInsert;
 
-// ============ CHANNEL BADGE COUNTS ============
-// Per-user per-channel unread notification counts for mobile app badge display.
-// (user_id, channel_id) is the composite PK — one row per user per chat channel.
-// Keyed by channel rather than instance to support multiple channels per instance
-// in future. The notification service increments badge_count on each push and sums
-// across all channels to get the total badge count to include in the push payload.
-// The mobile client resets a channel's count (to 0) when the user views that chat.
-
-export const channel_badge_counts = pgTable(
-  'channel_badge_counts',
-  {
-    user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    channel_id: text().notNull(),
-    badge_count: integer().notNull().default(0),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [primaryKey({ columns: [table.user_id, table.channel_id] })]
-);
-
-export type ChannelBadgeCount = typeof channel_badge_counts.$inferSelect;
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;

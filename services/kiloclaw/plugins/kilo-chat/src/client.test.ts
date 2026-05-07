@@ -1,11 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createKiloChatClient } from './client';
 
+function createMessageResponse(messageId = 'm1') {
+  return {
+    messageId,
+    message: {
+      id: messageId,
+      senderId: 'bot-1',
+      content: [{ type: 'text' as const, text: 'hello' }],
+      inReplyToMessageId: null,
+      replyTo: null,
+      updatedAt: null,
+      clientUpdatedAt: null,
+      deleted: false,
+      deliveryFailed: false,
+      reactions: [],
+    },
+  };
+}
+
 describe('createKiloChatClient', () => {
   it('posts to controller /_kilo/kilo-chat/send with gateway token and conversation id', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ messageId: 'm1' }), {
+        new Response(JSON.stringify(createMessageResponse()), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
@@ -65,7 +83,7 @@ describe('createKiloChatClient', () => {
   it('createMessage includes inReplyToMessageId in request body when provided', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ messageId: 'm1' }), {
+        new Response(JSON.stringify(createMessageResponse()), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
@@ -90,7 +108,7 @@ describe('createKiloChatClient', () => {
   it('createMessage omits inReplyToMessageId from request body when not provided', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ messageId: 'm1' }), {
+        new Response(JSON.stringify(createMessageResponse()), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
@@ -114,7 +132,7 @@ describe('createKiloChatClient', () => {
   it('createMessage posts to /_kilo/kilo-chat/send and returns messageId', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ messageId: 'm1' }), {
+        new Response(JSON.stringify(createMessageResponse()), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
@@ -137,7 +155,7 @@ describe('createKiloChatClient', () => {
     expect(init2.method).toBe('POST');
     const body = JSON.parse(init2.body as string);
     expect(body).toEqual({ conversationId: 'c1', content: [{ type: 'text', text: 'hello' }] });
-    expect(result).toEqual({ messageId: 'm1' });
+    expect(result.messageId).toBe('m1');
   });
 });
 
@@ -145,7 +163,7 @@ describe('editMessage', () => {
   it('PATCHes /_kilo/kilo-chat/messages/:id with conversationId, text, timestamp', async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ messageId: 'm1' }), {
+        new Response(JSON.stringify(createMessageResponse()), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         })
@@ -398,6 +416,7 @@ describe('listMessages', () => {
         senderId: 'u1',
         content: [{ type: 'text', text: 'hello' }],
         inReplyToMessageId: null,
+        replyTo: null,
         updatedAt: null,
         clientUpdatedAt: null,
         deleted: false,
@@ -408,7 +427,14 @@ describe('listMessages', () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
-      return new Response(JSON.stringify({ messages }), { status: 200 });
+      return new Response(
+        JSON.stringify({
+          messages,
+          hasMore: true,
+          nextCursor: 'cursor-next',
+        }),
+        { status: 200 }
+      );
     }) as typeof fetch;
 
     const client = createKiloChatClient({
@@ -418,7 +444,7 @@ describe('listMessages', () => {
     });
 
     const result = await client.listMessages({ conversationId: 'C1' });
-    expect(result).toEqual({ messages });
+    expect(result).toEqual({ messages, hasMore: true, nextCursor: 'cursor-next' });
     expect(calls[0].url).toBe('http://ctrl/_kilo/kilo-chat/conversations/C1/messages');
     expect(calls[0].init.method).toBe('GET');
     const headers = calls[0].init.headers as Record<string, string>;
@@ -429,7 +455,9 @@ describe('listMessages', () => {
     const calls: Array<string> = [];
     const fetchImpl = (async (url: string | URL) => {
       calls.push(String(url));
-      return new Response(JSON.stringify({ messages: [] }), { status: 200 });
+      return new Response(JSON.stringify({ messages: [], hasMore: false, nextCursor: null }), {
+        status: 200,
+      });
     }) as typeof fetch;
 
     const client = createKiloChatClient({
@@ -588,12 +616,22 @@ describe('listConversations', () => {
 
 describe('createConversation', () => {
   const TEST_ULID = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+  const createConversationResponse = {
+    conversationId: TEST_ULID,
+    conversation: {
+      conversationId: TEST_ULID,
+      title: 'My Chat',
+      lastActivityAt: null,
+      lastReadAt: null,
+      joinedAt: 123,
+    },
+  };
 
   it('POSTs to /_kilo/kilo-chat/conversations and returns conversationId', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
-      return new Response(JSON.stringify({ conversationId: TEST_ULID }), {
+      return new Response(JSON.stringify(createConversationResponse), {
         status: 201,
         headers: { 'content-type': 'application/json' },
       });
@@ -613,11 +651,11 @@ describe('createConversation', () => {
     expect(body).toEqual({ title: 'My Chat' });
   });
 
-  it('includes additionalMembers in body when provided', async () => {
+  it('does not include unsupported additionalMembers in body when provided', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
       calls.push({ url: String(url), init: init ?? {} });
-      return new Response(JSON.stringify({ conversationId: TEST_ULID }), { status: 201 });
+      return new Response(JSON.stringify(createConversationResponse), { status: 201 });
     }) as typeof fetch;
 
     const client = createKiloChatClient({
@@ -626,12 +664,13 @@ describe('createConversation', () => {
       fetchImpl,
     });
 
-    await client.createConversation({
+    const params = {
       title: 'Group',
       additionalMembers: ['user_1', 'user_2'],
-    });
+    };
+    await client.createConversation(params);
     const body = JSON.parse(String(calls[0].init.body));
-    expect(body.additionalMembers).toEqual(['user_1', 'user_2']);
+    expect(body).toEqual({ title: 'Group' });
   });
 
   it('throws on non-2xx response', async () => {

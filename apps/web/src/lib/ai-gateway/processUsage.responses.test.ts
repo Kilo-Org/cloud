@@ -97,6 +97,36 @@ describe('processResponsesApiUsage', () => {
     expect(result.inputTokens).toBe(0);
     expect(result.outputTokens).toBe(0);
   });
+
+  test('extracts is_byok=true from Vercel modelAttempts credentialType', () => {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      total_tokens: 15,
+      input_tokens_details: { cached_tokens: 0 },
+      output_tokens_details: { reasoning_tokens: 0 },
+    };
+    const providerMetadata = {
+      gateway: {
+        routing: {
+          finalProvider: 'openai',
+          modelAttempts: [
+            {
+              success: true,
+              providerAttempts: [{ provider: 'openai', credentialType: 'byok', success: true }],
+            },
+          ],
+        },
+        cost: '0',
+        marketCost: '0.0001',
+      },
+    };
+
+    const result = processResponsesApiUsage(usage, providerMetadata, coreProps);
+
+    expect(result.is_byok).toBe(true);
+    expect(result.cost_mUsd).toBe(100);
+  });
 });
 
 describe('parseMicrodollarUsageFromStream approval tests', () => {

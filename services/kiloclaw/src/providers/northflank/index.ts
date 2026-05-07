@@ -1,8 +1,11 @@
 import type { CreateSecretRequest, CreateServiceDeploymentRequest } from '@northflank/js-client';
 import type { NorthflankProviderState } from '../../schemas/instance-config';
+import type { InstanceMutableState } from '../../durable-objects/kiloclaw-instance/types';
 import { getNorthflankProviderState } from '../../durable-objects/kiloclaw-instance/state';
 import type { RuntimeSpec, InstanceProviderAdapter } from '../types';
 import { northflankClientConfig } from '../../northflank/config';
+import { DEFAULT_INSTANCE_TIER } from '@kilocode/kiloclaw-instance-tiers';
+import { resolveNorthflankPlan } from '../../northflank/config';
 import {
   createDeploymentService,
   createProject,
@@ -34,11 +37,78 @@ import { northflankResourceNames } from './names';
 const NORTHFLANK_PORT_NAME = 'p01';
 const NORTHFLANK_STARTUP_TIMEOUT_SECONDS = 240;
 const NORTHFLANK_TERMINATION_GRACE_PERIOD_SECONDS = 60;
+const NORTHFLANK_OFFERED_TIER_KEYS = ['perf-1-3', 'perf-4-8', 'perf-4-16'] as const;
+
+function isNorthflankOfferedTier(
+  tier: InstanceMutableState['instanceType']
+): tier is (typeof NORTHFLANK_OFFERED_TIER_KEYS)[number] {
+  return NORTHFLANK_OFFERED_TIER_KEYS.some(key => key === tier);
+}
 
 type NorthflankProvisioningNames = Awaited<ReturnType<typeof northflankResourceNames>>;
 
 function logNorthflank(message: string, details: Record<string, unknown>): void {
   console.info(`[northflank] ${message}`, details);
+}
+
+/**
+ * Resolve the storage size to provision for this instance, in MB.
+ *
+ * Mirrors the deployment-plan path: when the DO has a tier-derived
+ * `volumeSizeGb` (set by the provision flow from `INSTANCE_TIERS`), use
+ * it so the actual Northflank volume matches what the DO and customer
+ * dashboard advertise. Without this, a fresh `perf-4-8` Northflank
+ * instance gets DO state `volumeSizeGb=20` but a 10 GB
+ * (`NF_VOLUME_SIZE_MB`) volume — the customer fills past 10 GB and
+ * hits disk-full errors with no signal that the persisted state and
+ * reality have diverged.
+ *
+ * Falls back to `config.volumeSizeMb` when `state.volumeSizeGb` is null
+ * (legacy / pre-tier instances) so existing deployments keep their
+ * current size.
+ */
+function storageSizeMbForState(
+  state: InstanceMutableState,
+  config: NorthflankClientConfig
+): number {
+  // `state.volumeSizeGb` is typed `number | null`, but the existing tests
+  // (and any state that hasn't been migrated through `loadState`) may pass
+  // `undefined`. Treat both as "no tier-derived size" and fall back to the
+  // global default — preserves legacy behaviour without surfacing NaN.
+  if (typeof state.volumeSizeGb === 'number' && state.volumeSizeGb > 0) {
+    return state.volumeSizeGb * 1024;
+  }
+  return config.volumeSizeMb;
+}
+
+function resolveNorthflankDeploymentPlan(
+  config: NorthflankClientConfig,
+  instanceType: InstanceMutableState['instanceType'],
+  sandboxId: string | null
+): string {
+  if (!instanceType || instanceType === 'custom') {
+    if (instanceType === 'custom') {
+      console.warn(
+        '[northflank] Custom instance tier has no Northflank plan mapping; using default',
+        {
+          sandboxId,
+          fallbackTier: DEFAULT_INSTANCE_TIER,
+        }
+      );
+    }
+    return resolveNorthflankPlan(config, DEFAULT_INSTANCE_TIER);
+  }
+  if (!isNorthflankOfferedTier(instanceType)) {
+    console.warn(
+      '[northflank] Legacy instance tier has no Northflank plan mapping; using default',
+      {
+        sandboxId,
+        instanceType,
+      }
+    );
+    return config.deploymentPlan;
+  }
+  return resolveNorthflankPlan(config, instanceType);
 }
 
 function northflankServiceSummary(service: NorthflankService): Record<string, unknown> {
@@ -208,12 +278,13 @@ function buildServicePayload(
   runtimeSpec: RuntimeSpec,
   serviceName: string,
   volumeName: string,
-  instances: number
+  instances: number,
+  deploymentPlan: string
 ): CreateServiceDeploymentRequest['data'] {
   return {
     name: serviceName,
     billing: {
-      deploymentPlan: config.deploymentPlan,
+      deploymentPlan,
     },
     deployment: {
       instances,
@@ -475,7 +546,7 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     const targetRegion = region ?? providerState.region ?? config.region;
     const project = await ensureProject(config, providerState, names, targetRegion);
     const volume = await ensureVolumeResource(config, project.id, providerState, names, {
-      storageSizeMb: config.volumeSizeMb,
+      storageSizeMb: storageSizeMbForState(state, config),
       storageClassName: config.storageClassName,
       accessMode: config.storageAccessMode,
     });
@@ -518,7 +589,7 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     const volume =
       existingVolume ??
       (await ensureVolumeResource(config, project.id, providerState, names, {
-        storageSizeMb: config.volumeSizeMb,
+        storageSizeMb: storageSizeMbForState(state, config),
         storageClassName: config.storageClassName,
         accessMode: config.storageAccessMode,
       }));
@@ -534,6 +605,11 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     let providerState = getNorthflankProviderState(state);
     const projectId = providerState.projectId;
     const volumeName = providerState.volumeName ?? names.volumeName;
+    const deploymentPlan = resolveNorthflankDeploymentPlan(
+      config,
+      state.instanceType,
+      state.sandboxId
+    );
     if (!projectId || !providerState.volumeId) {
       throw new Error('Northflank startRuntime requires project and volume provisioning first');
     }
@@ -555,7 +631,7 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
         (await createDeploymentService(
           config,
           projectId,
-          buildServicePayload(config, runtimeSpec, names.serviceName, volumeName, 0)
+          buildServicePayload(config, runtimeSpec, names.serviceName, volumeName, 0, deploymentPlan)
         ));
     }
 
@@ -619,7 +695,7 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
       config,
       projectId,
       service.id,
-      buildServicePayload(config, runtimeSpec, names.serviceName, volumeName, 1)
+      buildServicePayload(config, runtimeSpec, names.serviceName, volumeName, 1, deploymentPlan)
     );
     const started = await waitForDeploymentCompleted(
       config,
@@ -676,6 +752,11 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
     const serviceId = providerState.serviceId;
 
     const volumeName = providerState.volumeName ?? names.volumeName;
+    const deploymentPlan = resolveNorthflankDeploymentPlan(
+      config,
+      state.instanceType,
+      state.sandboxId
+    );
     const secret = await ensureSecret(
       config,
       projectId,
@@ -725,7 +806,8 @@ export const northflankProviderAdapter: InstanceProviderAdapter = {
         runtimeSpec,
         providerState.serviceName ?? names.serviceName,
         volumeName,
-        1
+        1,
+        deploymentPlan
       )
     );
     await onProviderResult?.({ providerState, corePatch: { restartUpdateSent: true } });

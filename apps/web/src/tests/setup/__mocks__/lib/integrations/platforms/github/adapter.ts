@@ -17,6 +17,13 @@ export async function deleteGitHubInstallation(_installationId: string): Promise
   return;
 }
 
+export async function exchangeGitHubOAuthCode(
+  _code: string,
+  _appType: GitHubAppType = 'standard'
+): Promise<{ id: string; login: string }> {
+  return { id: '12345', login: 'octocat' };
+}
+
 export async function getCollaboratorPermissionLevel(
   _installationId: string,
   _owner: string,

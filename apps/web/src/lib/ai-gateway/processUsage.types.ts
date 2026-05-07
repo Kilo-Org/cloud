@@ -19,8 +19,26 @@ export type OpenRouterUsage = {
   total_tokens: number;
 }; //ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
 
+export type VercelProviderAttempt = {
+  provider?: string;
+  credentialType?: string;
+  success?: boolean;
+};
+
+export type VercelModelAttempt = {
+  success?: boolean;
+  providerAttempts?: VercelProviderAttempt[];
+};
+
 export type VercelProviderMetaData = {
-  gateway?: { routing?: { finalProvider?: string }; cost?: string; marketCost?: string };
+  gateway?: {
+    routing?: {
+      finalProvider?: string;
+      modelAttempts?: VercelModelAttempt[];
+    };
+    cost?: string;
+    marketCost?: string;
+  };
 };
 
 export type MaybeHasVercelProviderMetaData = {

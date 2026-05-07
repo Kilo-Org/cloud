@@ -49,7 +49,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { formatRelativeTime } from '../KiloclawInstances/shared';
-import { defaultScheduledAt } from '@/lib/kiloclaw/scheduled-action-form';
+import {
+  defaultScheduledAt,
+  defaultNotifyFormState,
+  type NotifyFormState,
+} from '@/lib/kiloclaw/scheduled-action-form';
+import { ScheduleNotifyFields } from './ScheduleNotifyFields';
 
 // Per design.md: every status badge is `bg-{color}-500/20 text-{color}-400
 // ring-1 ring-{color}-500/20`. Color assignments are fixed by domain —
@@ -74,6 +79,7 @@ export function KiloclawSchedulerTab() {
   const [restartInstanceId, setRestartInstanceId] = useState('');
   const [restartScheduledAt, setRestartScheduledAt] = useState(defaultScheduledAt);
   const [restartReason, setRestartReason] = useState('');
+  const [restartNotify, setRestartNotify] = useState<NotifyFormState>(defaultNotifyFormState);
 
   // Version-change form state
   const [vcInstanceId, setVcInstanceId] = useState('');
@@ -81,6 +87,7 @@ export function KiloclawSchedulerTab() {
   const [vcOverridePins, setVcOverridePins] = useState(false);
   const [vcScheduledAt, setVcScheduledAt] = useState(defaultScheduledAt);
   const [vcReason, setVcReason] = useState('');
+  const [vcNotify, setVcNotify] = useState<NotifyFormState>(defaultNotifyFormState);
 
   // Client-side sort over the current page of listScheduledActions.
   // The list is paginated server-side (limit 50) and ordered by
@@ -174,6 +181,14 @@ export function KiloclawSchedulerTab() {
     })
   );
 
+  // Manual notice-sweep trigger. Calls the kiloclaw worker route that
+  // synchronously runs runScheduledActionNoticesSweep. Used to verify
+  // notice copy in dev (where the cron does not fire) and on demand
+  // in production after creating a test schedule.
+  const runNoticeSweep = useMutation(
+    trpc.admin.kiloclawInstances.runNoticeSweepNow.mutationOptions()
+  );
+
   const onSubmitRestart = (e: React.FormEvent) => {
     e.preventDefault();
     // Convert datetime-local (no zone) to ISO with the user's local zone
@@ -186,6 +201,11 @@ export function KiloclawSchedulerTab() {
         instanceIds: [restartInstanceId.trim()],
         scheduledAt: local.toISOString(),
         reason: restartReason.trim() || undefined,
+        notify: restartNotify.notify,
+        noticeLeadHours: restartNotify.noticeLeadHours,
+        noticeSubject: restartNotify.noticeSubject,
+        noticeBody: restartNotify.noticeBody,
+        noticeChannels: restartNotify.noticeChannels,
       },
       {
         onSuccess: () => {
@@ -206,6 +226,11 @@ export function KiloclawSchedulerTab() {
         overridePins: vcOverridePins,
         scheduledAt: local.toISOString(),
         reason: vcReason.trim() || undefined,
+        notify: vcNotify.notify,
+        noticeLeadHours: vcNotify.noticeLeadHours,
+        noticeSubject: vcNotify.noticeSubject,
+        noticeBody: vcNotify.noticeBody,
+        noticeChannels: vcNotify.noticeChannels,
       },
       {
         onSuccess: () => {
@@ -232,9 +257,9 @@ export function KiloclawSchedulerTab() {
             hibernated). Treat the chosen time as a "no earlier than" bound, not an exact fire time.
           </div>
           <div className="mt-2">
-            <strong>Notifications:</strong> not implemented yet. End users get no warning before
-            their session is interrupted at the scheduled time. Use cautiously on customer instances
-            until the notifications work lands.
+            <strong>Notifications:</strong> email, in-app banner, and mobile push are dispatched by
+            the notice sweep at a 1-minute cadence. Configure or disable per schedule using the
+            "Notify users" controls below.
           </div>
         </AlertDescription>
       </Alert>
@@ -277,6 +302,12 @@ export function KiloclawSchedulerTab() {
                 />
               </div>
             </div>
+            <ScheduleNotifyFields
+              idPrefix="restart"
+              state={restartNotify}
+              onChange={setRestartNotify}
+              disabled={schedule.isPending}
+            />
             <div>
               <Button type="submit" disabled={schedule.isPending}>
                 {schedule.isPending ? 'Scheduling…' : 'Schedule restart'}
@@ -358,6 +389,12 @@ export function KiloclawSchedulerTab() {
                 change isn't blocked)
               </Label>
             </div>
+            <ScheduleNotifyFields
+              idPrefix="vc"
+              state={vcNotify}
+              onChange={setVcNotify}
+              disabled={schedule.isPending}
+            />
             <div>
               <Button type="submit" disabled={schedule.isPending || !vcImageTag}>
                 {schedule.isPending ? 'Scheduling…' : 'Schedule version change'}
@@ -378,7 +415,40 @@ export function KiloclawSchedulerTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent scheduled actions</CardTitle>
+          <div className="flex flex-row items-center justify-between gap-3">
+            <div>
+              <CardTitle>Recent scheduled actions</CardTitle>
+              <p className="text-muted-foreground mt-1 text-xs">
+                The notice sweep normally runs every minute via the kiloclaw worker cron. Use "Run
+                notice sweep now" to dispatch any due notifications immediately (useful in{' '}
+                <code className="font-mono">wrangler dev</code>, where{' '}
+                <code className="font-mono">scheduled()</code> does not fire on its cadence, and for
+                verifying notice copy on demand).
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => runNoticeSweep.mutate()}
+              disabled={runNoticeSweep.isPending}
+            >
+              {runNoticeSweep.isPending ? 'Running…' : 'Run notice sweep now'}
+            </Button>
+          </div>
+          {runNoticeSweep.data && (
+            <p className="text-muted-foreground mt-2 font-mono text-xs">
+              Last run: processed={runNoticeSweep.data.processed}, sent=
+              {runNoticeSweep.data.sent}, failed={runNoticeSweep.data.failed}, recovered=
+              {runNoticeSweep.data.recovered}, voidedStale={runNoticeSweep.data.voidedStale}
+            </p>
+          )}
+          {runNoticeSweep.error && (
+            <p className="mt-2 font-mono text-xs text-red-400">
+              {runNoticeSweep.error instanceof Error
+                ? runNoticeSweep.error.message
+                : 'Unknown error'}
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border">

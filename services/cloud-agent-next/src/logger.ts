@@ -13,8 +13,8 @@ export type CloudAgentTags = {
   botId?: string;
   inflightId?: string;
 
-  // Execution context
-  mode?: 'plan' | 'code' | 'debug' | 'build' | 'orchestrator' | 'architect' | 'ask' | 'custom';
+  // Execution context — built-in slug or a profile-defined custom slug
+  mode?: string;
   model?: string;
   isResume?: boolean;
 

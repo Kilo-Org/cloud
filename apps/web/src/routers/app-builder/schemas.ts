@@ -44,11 +44,10 @@ export const getImageUploadUrlSchema = z.object({
   contentLength: z.number().int().positive().max(APP_BUILDER_IMAGE_MAX_SIZE_BYTES),
 });
 
-// Schema for prepareLegacySession
-export const prepareLegacySessionBaseSchema = z.object({
+// Schema for fetching historical messages for a legacy v1 session
+export const legacySessionMessagesBaseSchema = z.object({
   projectId: z.uuid(),
-  model: z.string().min(1),
-  prompt: z.string().min(1),
+  cloudAgentSessionId: z.string().min(1),
 });
 
 // Schema for migrateToGitHub

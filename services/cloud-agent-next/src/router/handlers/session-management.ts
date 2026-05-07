@@ -5,7 +5,8 @@ import { logger, withLogTags } from '../../logger.js';
 import { generateSandboxId, getSandboxNamespace } from '../../sandbox-id.js';
 import type { SessionId, InterruptResult } from '../../types.js';
 import type { SandboxId } from '../../types.js';
-import type { AgentMode } from '../../schema.js';
+import type { CloudAgentSessionState } from '../../persistence/types.js';
+import { readProfileBundle } from '../../session-profile.js';
 import {
   InvalidSessionMetadataError,
   SessionService,
@@ -239,13 +240,13 @@ export function createSessionManagementHandlers() {
             );
 
             // Get or create the session to use for killing processes
-            const session = await sessionService.getOrCreateSession(
+            const session = await sessionService.getOrCreateSession({
               sandbox,
               context,
               env,
-              ctx.authToken,
-              metadata.orgId
-            );
+              originalToken: ctx.authToken,
+              originalOrgId: metadata.orgId,
+            });
 
             // Kill all kilocode processes in this session
             // Use pkill method as a temporary workaround for sandbox API reliability issues
@@ -320,8 +321,14 @@ export function createSessionManagementHandlers() {
           const getStub = () =>
             env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
 
-          // Fetch metadata with retry
-          const metadata = await withDORetry(getStub, s => s.getMetadata(), 'getMetadata');
+          // Fetch metadata with retry. Explicit generic annotation works around
+          // a tsgo inference hiccup — without it `metadata` collapses to
+          // `null` alone, which makes the downstream narrowing collapse
+          // to `never` after the `if (!metadata)` check.
+          const metadata = await withDORetry<
+            ReturnType<typeof getStub>,
+            CloudAgentSessionState | null
+          >(getStub, s => s.getMetadata(), 'getMetadata');
 
           // Handle not found
           if (!metadata) {
@@ -385,6 +392,8 @@ export function createSessionManagementHandlers() {
           logger.setTags({ sandboxId, orgId: metadata.orgId ?? '(personal)' });
           logger.info('Session metadata retrieved successfully');
 
+          const metadataProfile = readProfileBundle(metadata);
+
           // Compute execution health if there's an active execution
           const executionHealth =
             execution && activeExecutionStatus
@@ -411,20 +420,26 @@ export function createSessionManagementHandlers() {
 
             prompt: metadata.prompt,
             // mode is validated by zod (AgentModeSchema) at storage time
-            mode: metadata.mode as AgentMode | undefined,
+            mode: metadata.mode,
             model: metadata.model,
             variant: metadata.variant,
             autoCommit: metadata.autoCommit,
             upstreamBranch: metadata.upstreamBranch,
 
-            // Counts only, no actual values
-            envVarCount:
-              metadata.envVars === undefined ? undefined : Object.keys(metadata.envVars).length,
-            setupCommandCount: metadata.setupCommands?.length,
-            mcpServerCount:
-              metadata.mcpServers === undefined
-                ? undefined
-                : Object.keys(metadata.mcpServers).length,
+            // Only surface agents that would appear in the chat picker: not
+            // subagent-only, not hidden, not disabled. Matches the extension's
+            // `available = agents.filter(a => a.mode !== 'subagent' && !a.hidden)`.
+            runtimeAgents: metadataProfile.runtimeAgents
+              ?.filter(a => a.config.mode !== 'subagent' && !a.config.hidden && !a.config.disable)
+              .map(a => ({
+                slug: a.slug,
+                name: a.name,
+                // Surface model + variant overrides so the chat UI can lock
+                // its model and thinking-effort pickers when this agent is
+                // selected. Other config fields stay server-side.
+                model: typeof a.config.model === 'string' ? a.config.model : undefined,
+                variant: a.config.variant,
+              })),
 
             // Execution status (grouped for cleaner API)
             execution:
@@ -547,13 +562,13 @@ export function createSessionManagementHandlers() {
             botId: sessionService.metadata?.botId,
           });
 
-          const session = await sessionService.getOrCreateSession(
+          const session = await sessionService.getOrCreateSession({
             sandbox,
             context,
             env,
-            ctx.authToken,
-            sessionService.metadata?.orgId
-          );
+            originalToken: ctx.authToken,
+            originalOrgId: sessionService.metadata?.orgId,
+          });
 
           // Discover all log files from the sandbox
           const logPaths: string[] = [];

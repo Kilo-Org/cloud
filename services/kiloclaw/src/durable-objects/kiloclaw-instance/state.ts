@@ -290,6 +290,10 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
       applyProviderState(s, s.providerState);
     }
     s.machineSize = d.machineSize;
+    s.instanceType = d.instanceType;
+    s.volumeSizeGb = d.volumeSizeGb;
+    s.adminMachineSizeOverride = d.adminMachineSizeOverride;
+    s.adminMachineSizeOverrideMetadata = d.adminMachineSizeOverrideMetadata;
     s.healthCheckFailCount = d.healthCheckFailCount;
     s.pendingDestroyMachineId = d.pendingDestroyMachineId;
     s.pendingDestroyVolumeId = d.pendingDestroyVolumeId;
@@ -340,10 +344,6 @@ export async function loadState(ctx: DurableObjectState, s: InstanceMutableState
     s.startFailurePushSentForAttempt =
       'startFailurePushSentForAttempt' in raw ? d.startFailurePushSentForAttempt : true;
     s.customSecretMeta = d.customSecretMeta;
-    s.streamChatApiKey = d.streamChatApiKey;
-    s.streamChatBotUserId = d.streamChatBotUserId;
-    s.streamChatBotUserToken = d.streamChatBotUserToken;
-    s.streamChatChannelId = d.streamChatChannelId;
     s.vectorMemoryEnabled = d.vectorMemoryEnabled;
     s.vectorMemoryModel = d.vectorMemoryModel;
     s.dreamingEnabled = d.dreamingEnabled;
@@ -398,6 +398,10 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.flyVolumeId = null;
   s.flyRegion = null;
   s.machineSize = null;
+  s.instanceType = null;
+  s.volumeSizeGb = null;
+  s.adminMachineSizeOverride = null;
+  s.adminMachineSizeOverrideMetadata = null;
   s.healthCheckFailCount = 0;
   s.pendingDestroyMachineId = null;
   s.pendingDestroyVolumeId = null;
@@ -440,10 +444,6 @@ export function resetMutableState(s: InstanceMutableState): void {
   s.preRestoreStatus = null;
   s.pendingRestoreVolumeId = null;
   Object.assign(s, LIFECYCLE_NOTIFICATION_RESET);
-  s.streamChatApiKey = null;
-  s.streamChatBotUserId = null;
-  s.streamChatBotUserToken = null;
-  s.streamChatChannelId = null;
   s.vectorMemoryEnabled = false;
   s.vectorMemoryModel = null;
   s.dreamingEnabled = false;
@@ -492,6 +492,10 @@ export function createMutableState(): InstanceMutableState {
     flyVolumeId: null,
     flyRegion: null,
     machineSize: null,
+    instanceType: null,
+    volumeSizeGb: null,
+    adminMachineSizeOverride: null,
+    adminMachineSizeOverrideMetadata: null,
     healthCheckFailCount: 0,
     pendingDestroyMachineId: null,
     pendingDestroyVolumeId: null,
@@ -535,10 +539,6 @@ export function createMutableState(): InstanceMutableState {
     pendingRestoreVolumeId: null,
     ...LIFECYCLE_NOTIFICATION_RESET,
     customSecretMeta: null,
-    streamChatApiKey: null,
-    streamChatBotUserId: null,
-    streamChatBotUserToken: null,
-    streamChatChannelId: null,
     vectorMemoryEnabled: false,
     vectorMemoryModel: null,
     dreamingEnabled: false,

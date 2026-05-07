@@ -50,6 +50,8 @@ const fakeStatus = {
   flyVolumeId: 'fake-volume',
   flyRegion: 'iad',
   machineSize: null,
+  instanceType: null,
+  volumeSizeGb: null,
   openclawVersion: 'fake',
   imageVariant: null,
   trackedImageTag: null,
@@ -72,6 +74,7 @@ const fakeStatus = {
   instanceId: 'fake-instance',
   inboundEmailAddress: null,
   inboundEmailEnabled: false,
+  scheduledAction: null,
 } satisfies PopulatedClawStatus;
 
 export function ClawOnboardingFakeWalkthrough({
@@ -270,7 +273,7 @@ function renderFakeStep({
       );
     }
     case 'complete':
-      return <ClawSetupCompleteStep status={fakeStatus} gatewayReady basePath={basePath} />;
+      return <ClawSetupCompleteStep gatewayReady />;
     case 'error':
       return <ClawSetupErrorStep basePath={basePath} />;
   }

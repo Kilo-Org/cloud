@@ -29,7 +29,6 @@ import {
   Settings,
   CreditCard,
   MessageSquare,
-  MessagesSquare,
   Sparkles,
   ChevronLeft,
   ChevronRight,
@@ -51,7 +50,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
-  const isKiloChatEnabled = useFeatureFlagEnabled('kilo-chat-feature');
+  const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Dashboard group
@@ -90,9 +89,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: MessageSquare,
       url: '/claw/chat',
     },
-    ...(isKiloChatEnabled || isDevelopment
-      ? [{ title: 'Kilo Chat', icon: MessagesSquare, url: '/claw/kilo-chat' }]
-      : []),
     {
       title: 'Subscription',
       icon: CreditCard,
@@ -117,11 +113,15 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     url: string;
     className?: string;
   }> = [
-    {
-      title: 'App Builder',
-      icon: Plus,
-      url: '/app-builder',
-    },
+    ...(isAppBuilderEnabled || isDevelopment
+      ? [
+          {
+            title: 'App Builder',
+            icon: Plus,
+            url: '/app-builder',
+          },
+        ]
+      : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,
@@ -147,13 +147,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Shield,
       url: '/security-agent',
     },
-    {
-      title: 'Auto Triage',
-      icon: ListChecks,
-      url: '/auto-triage',
-    },
     ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [{ title: 'Auto Fix', icon: Wrench, url: '/auto-fix' }]
+      ? [
+          { title: 'Auto Triage', icon: ListChecks, url: '/auto-triage' },
+          { title: 'Auto Fix', icon: Wrench, url: '/auto-fix' },
+        ]
       : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [

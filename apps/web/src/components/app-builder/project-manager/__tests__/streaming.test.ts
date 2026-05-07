@@ -1,7 +1,7 @@
 /**
  * V1 Streaming Module Tests
  *
- * Tests for the V1 WebSocket-based streaming coordinator.
+ * Tests for the legacy V1 coordinator.
  */
 
 import { createV1StreamingCoordinator, type V1StreamingConfig } from '../sessions/v1/streaming';
@@ -9,20 +9,6 @@ import { formatStreamError } from '../logging';
 import type { V1SessionState } from '../sessions/types';
 import type { CloudMessage } from '@/components/cloud-agent/types';
 import { TRPCClientError } from '@trpc/client';
-
-// Mock the V1 websocket-streaming module
-jest.mock('../sessions/v1/websocket-streaming', () => ({
-  createV1WebSocketStreamingCoordinator: jest.fn(() => ({
-    connectToStream: jest.fn().mockResolvedValue(undefined),
-    interrupt: jest.fn(),
-    destroy: jest.fn(),
-    getConnectionState: jest.fn(() => ({ status: 'disconnected' })),
-  })),
-}));
-
-// Mock fetch for stream ticket
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
 
 // Helper to create a mock V1 session store for testing
 function createMockStore(): {
@@ -82,13 +68,13 @@ function createMockTrpcClient() {
         mutate: jest.fn(async () => ({ cloudAgentSessionId: 'session-123' })),
       },
       sendMessage: {
-        mutate: jest.fn(async () => ({ cloudAgentSessionId: 'session-123' })),
+        mutate: jest.fn(async () => ({
+          cloudAgentSessionId: 'session-123',
+          workerVersion: 'v2' as const,
+        })),
       },
       interruptSession: {
         mutate: jest.fn(async () => ({ success: true })),
-      },
-      prepareLegacySession: {
-        mutate: jest.fn(async () => ({ cloudAgentSessionId: 'session-123' })),
       },
     },
     organizations: {
@@ -97,13 +83,13 @@ function createMockTrpcClient() {
           mutate: jest.fn(async () => ({ cloudAgentSessionId: 'session-456' })),
         },
         sendMessage: {
-          mutate: jest.fn(async () => ({ cloudAgentSessionId: 'session-456' })),
+          mutate: jest.fn(async () => ({
+            cloudAgentSessionId: 'session-456',
+            workerVersion: 'v2' as const,
+          })),
         },
         interruptSession: {
           mutate: jest.fn(async () => ({ success: true })),
-        },
-        prepareLegacySession: {
-          mutate: jest.fn(async () => ({ cloudAgentSessionId: 'session-456' })),
         },
       },
     },
@@ -113,7 +99,6 @@ function createMockTrpcClient() {
 describe('createV1StreamingCoordinator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFetch.mockReset();
   });
 
   describe('Configuration', () => {
@@ -124,7 +109,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: createMockTrpcClient() as unknown as V1StreamingConfig['trpcClient'],
         store: createMockStore(),
         cloudAgentSessionId: 'session-123',
-        sessionPrepared: true,
       };
 
       expect(config.cloudAgentSessionId).toBe('session-123');
@@ -137,7 +121,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: createMockTrpcClient() as unknown as V1StreamingConfig['trpcClient'],
         store: createMockStore(),
         cloudAgentSessionId: null,
-        sessionPrepared: null,
       };
 
       expect(config.cloudAgentSessionId).toBeNull();
@@ -155,7 +138,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.sendMessage('Hello, AI!');
@@ -181,7 +163,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.sendMessage('Hello from org!');
@@ -207,7 +188,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.sendMessage('Hello!');
@@ -230,12 +210,41 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.sendMessage('Hello!');
 
       expect(store.stateUpdates).toContainEqual({ isStreaming: true });
+    });
+
+    it('moves optimistic message to upgraded session when backend returns v2 session', async () => {
+      const store = createMockStore();
+      const trpcClient = createMockTrpcClient();
+      trpcClient.appBuilder.sendMessage.mutate.mockResolvedValue({
+        cloudAgentSessionId: 'session-v2',
+        workerVersion: 'v2',
+      });
+      const onSessionChanged = jest.fn();
+
+      const coordinator = createV1StreamingCoordinator({
+        projectId: 'project-1',
+        organizationId: null,
+        trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
+        store,
+        cloudAgentSessionId: 'session-v1',
+        onSessionChanged,
+      });
+
+      coordinator.sendMessage('Upgrade me');
+
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      expect(store.getState().messages).toHaveLength(0);
+      expect(store.stateUpdates).toContainEqual({ isStreaming: false });
+      expect(onSessionChanged).toHaveBeenCalledWith('session-v2', {
+        text: 'Upgrade me',
+        images: undefined,
+      });
     });
 
     it('does not send when destroyed', () => {
@@ -248,7 +257,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.destroy();
@@ -268,7 +276,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.sendMessage('Check this image', images);
@@ -285,7 +292,7 @@ describe('createV1StreamingCoordinator', () => {
   });
 
   describe('startInitialStreaming', () => {
-    it('calls startSession mutation for user projects', async () => {
+    it('does not call startSession mutation for legacy sessions', async () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
@@ -295,19 +302,16 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.startInitialStreaming();
 
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      expect(trpcClient.appBuilder.startSession.mutate).toHaveBeenCalledWith({
-        projectId: 'project-1',
-      });
+      expect(trpcClient.appBuilder.startSession.mutate).not.toHaveBeenCalled();
     });
 
-    it('calls organization startSession for org projects', async () => {
+    it('does not call organization startSession for legacy sessions', async () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
@@ -317,20 +321,16 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.startInitialStreaming();
 
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      expect(trpcClient.organizations.appBuilder.startSession.mutate).toHaveBeenCalledWith({
-        projectId: 'project-1',
-        organizationId: 'org-123',
-      });
+      expect(trpcClient.organizations.appBuilder.startSession.mutate).not.toHaveBeenCalled();
     });
 
-    it('sets isStreaming to true', () => {
+    it('does not set isStreaming to true', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
@@ -340,12 +340,11 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.startInitialStreaming();
 
-      expect(store.stateUpdates).toContainEqual({ isStreaming: true });
+      expect(store.stateUpdates).not.toContainEqual({ isStreaming: true });
     });
 
     it('does not start when destroyed', () => {
@@ -358,7 +357,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.destroy();
@@ -379,7 +377,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.interrupt();
@@ -397,7 +394,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.interrupt();
@@ -415,7 +411,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.interrupt();
@@ -433,7 +428,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.destroy();
@@ -444,7 +438,7 @@ describe('createV1StreamingCoordinator', () => {
   });
 
   describe('connectToExistingSession', () => {
-    it('sets isStreaming to true', () => {
+    it('does not connect for legacy sessions loaded from R2', () => {
       const store = createMockStore();
       const trpcClient = createMockTrpcClient();
 
@@ -454,12 +448,11 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.connectToExistingSession('session-123');
 
-      expect(store.stateUpdates).toContainEqual({ isStreaming: true });
+      expect(store.stateUpdates).not.toContainEqual({ isStreaming: true });
     });
 
     it('does not connect when destroyed', () => {
@@ -472,7 +465,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.destroy();
@@ -495,7 +487,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       coordinator.destroy();
@@ -520,7 +511,6 @@ describe('createV1StreamingCoordinator', () => {
         trpcClient: trpcClient as unknown as V1StreamingConfig['trpcClient'],
         store,
         cloudAgentSessionId: null,
-        sessionPrepared: true,
       });
 
       // Should not throw when called multiple times

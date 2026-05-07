@@ -673,49 +673,58 @@ export function configureLinear(env: EnvLike): void {
 
 const CLAWMETRY_DIR = '/root/.clawmetry';
 const CLAWMETRY_TOKEN_PATH = '/root/.clawmetry/token';
-const CLAWMETRY_PROVISION_TIMEOUT_MS = 8_000;
+const CLAWMETRY_REGISTER_TIMEOUT_MS = 8_000;
 
-type ClawMetryProvisionResponse = {
+type ClawMetryRegisterResponse = {
   ok?: boolean;
-  cm_token?: string;
+  api_key?: string;
   error?: string;
 };
 
 /**
- * Provision ClawMetry sync for this instance and start the daemon.
+ * Register this instance with ClawMetry and start the sync daemon.
  *
- * ClawMetry is a free observability dashboard for OpenClaw runtimes
- * (https://clawmetry.com). The Python package is pre-installed in the image;
- * this step (a) auto-creates a free ClawMetry account for the user via the
- * partner provisioning endpoint, (b) writes the returned token to
- * `~/.clawmetry/token`, and (c) spawns the sync daemon (detached) so events
- * flow to app.clawmetry.com.
+ * ClawMetry (https://clawmetry.com) is a free observability dashboard for
+ * OpenClaw runtimes. The Python package is pre-installed in the image; this
+ * step (a) calls the public `/api/register` endpoint to get a free per-
+ * machine cm_token, (b) writes it to `~/.clawmetry/token`, (c) spawns the
+ * sync daemon (detached) so events flow to app.clawmetry.com.
  *
- * Gated on CLAWMETRY_PARTNER_KEY — until the operator sets that env var on
- * the instance, this is a silent no-op (zero behavior change). KILOCLAW_USER_EMAIL
- * (or GITHUB_EMAIL as fallback) identifies the account to provision.
+ * Same flow any user installing clawmetry on a fresh OpenClaw box would
+ * use — no special endpoint, no partner key, no secrets to manage. Tokens
+ * are scoped to the Fly machine ID (or HOSTNAME fallback) so each instance
+ * gets its own ClawMetry account; users with multiple instances can link
+ * them later via the standard OTP flow.
  *
- * Failures here NEVER block boot — observability is nice-to-have. We log,
- * skip, and let the gateway start normally.
+ * Failures NEVER block boot — observability is best-effort. Operators can
+ * set `KILOCLAW_CLAWMETRY_DISABLED=true` to skip entirely.
  */
 export function provisionClawMetrySync(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {
   if (env.KILOCLAW_CLAWMETRY_DISABLED === 'true') {
     console.log('ClawMetry: disabled via KILOCLAW_CLAWMETRY_DISABLED');
     return;
   }
-  const partnerKey = env.CLAWMETRY_PARTNER_KEY;
-  if (!partnerKey) {
-    console.log('ClawMetry: not configured (CLAWMETRY_PARTNER_KEY missing)');
-    return;
-  }
-  const userEmail = env.KILOCLAW_USER_EMAIL ?? env.GITHUB_EMAIL;
-  if (!userEmail) {
-    console.warn('ClawMetry: skipping — neither KILOCLAW_USER_EMAIL nor GITHUB_EMAIL is set');
-    return;
-  }
 
+  const machineId = env.FLY_MACHINE_ID || env.HOSTNAME;
+  if (!machineId) {
+    console.warn('ClawMetry: skipping — no FLY_MACHINE_ID or HOSTNAME to identify the machine');
+    return;
+  }
+  const hostname = env.HOSTNAME || machineId;
+  const userEmail = env.KILOCLAW_USER_EMAIL ?? env.GITHUB_EMAIL;
   const apiBase = env.CLAWMETRY_API_BASE ?? 'https://app.clawmetry.com';
-  const provisionUrl = `${apiBase}/api/partner/kiloclaw/provision`;
+  const registerUrl = `${apiBase}/api/register`;
+
+  // Build the same payload the standard `clawmetry connect` flow would.
+  // Email is optional; account is keyed on machine_id either way.
+  const payload: { hostname: string; machine_id: string; platform: string; email?: string } = {
+    hostname,
+    machine_id: machineId,
+    platform: 'Linux',
+  };
+  if (userEmail) {
+    payload.email = userEmail;
+  }
 
   let token: string;
   try {
@@ -724,28 +733,26 @@ export function provisionClawMetrySync(env: EnvLike, deps: BootstrapDeps = defau
       [
         '-sS',
         '--max-time',
-        String(Math.ceil(CLAWMETRY_PROVISION_TIMEOUT_MS / 1000)),
+        String(Math.ceil(CLAWMETRY_REGISTER_TIMEOUT_MS / 1000)),
         '-X',
         'POST',
         '-H',
         'Content-Type: application/json',
-        '-H',
-        `X-Partner-Key: ${partnerKey}`,
         '-d',
-        JSON.stringify({ email: userEmail, source: 'kiloclaw' }),
-        provisionUrl,
+        JSON.stringify(payload),
+        registerUrl,
       ],
       { stdio: 'pipe' }
     );
-    const parsed = JSON.parse(String(result)) as ClawMetryProvisionResponse;
-    if (!parsed.ok || !parsed.cm_token) {
-      console.warn(`ClawMetry: provisioning failed — ${parsed.error ?? 'no token in response'}`);
+    const parsed = JSON.parse(String(result)) as ClawMetryRegisterResponse;
+    if (!parsed.api_key) {
+      console.warn(`ClawMetry: register returned no api_key — ${parsed.error ?? 'unknown error'}`);
       return;
     }
-    token = parsed.cm_token;
+    token = parsed.api_key;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn(`ClawMetry: provisioning request failed — ${message}`);
+    console.warn(`ClawMetry: register request failed — ${message}`);
     return;
   }
 
@@ -768,7 +775,7 @@ export function provisionClawMetrySync(env: EnvLike, deps: BootstrapDeps = defau
       ],
       { stdio: 'pipe' }
     );
-    console.log(`ClawMetry: sync daemon started for ${userEmail}`);
+    console.log(`ClawMetry: sync daemon started (machine=${machineId})`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`ClawMetry: failed to start sync daemon — ${message}`);

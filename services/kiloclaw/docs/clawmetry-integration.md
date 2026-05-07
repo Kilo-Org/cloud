@@ -1,73 +1,48 @@
 # ClawMetry observability integration
 
-[ClawMetry](https://clawmetry.com) is a real-time observability dashboard for OpenClaw agents (sessions, token usage, cost, tool timeline, channels, alerts). Every KiloClaw instance ships with the ClawMetry sync daemon pre-installed — when enabled, agent activity flows to a per-user free ClawMetry account at `app.clawmetry.com`.
+[ClawMetry](https://clawmetry.com) is a real-time observability dashboard for OpenClaw agents (sessions, token usage, cost, tool timeline, channels, alerts). Every KiloClaw instance ships with the ClawMetry sync daemon pre-installed and auto-registers on first boot — agent activity flows to a per-instance free ClawMetry account at `app.clawmetry.com`.
 
 ## What this gives the user
 
 - A real-time dashboard of their agent's sessions, token spend, and tool activity
 - Free tier: one node (their KiloClaw instance), 90-day session retention
-- Optional Pro upgrade ($5/mo, redeemable via KiloCredits) — multi-node, unlimited retention, alerts, approvals
+- No setup required — works out of the box on every new instance
 
-The integration is **opt-in by env var** — it ships dormant. When `CLAWMETRY_PARTNER_KEY` is set on the instance, bootstrap auto-provisions a free account and starts the sync daemon. Until then, the package is installed but inert.
+## How it works
 
-## Versioning
+The bootstrap step `provisionClawMetrySync` (controller, [bootstrap.ts](../controller/src/bootstrap.ts)) does the same thing any user installing ClawMetry on a fresh OpenClaw box would do:
 
-ClawMetry is installed via the upstream one-line installer (`curl -fsSL https://clawmetry.com/install.sh | bash`), not a PyPI version pin. This means:
-
-- Every fresh image build picks up the **latest** ClawMetry release at build time.
-- ClawMetry can ship updates (new features, install-script changes) without requiring a PR back to this repo. Trigger a KiloClaw image rebuild to pick them up.
-- Builds are **not bit-reproducible** across rebuilds — different builds may install different ClawMetry versions. That's intentional: the integration is best-effort observability, and the sync daemon is fail-soft (see `provisionClawMetrySync` in `controller/src/bootstrap.ts`).
-
-If a specific version is ever needed for an incident or hotfix, override at build time:
-
-```bash
-docker build --build-arg CLAWMETRY_INSTALL_OVERRIDE='pip install --break-system-packages clawmetry==<version>' ...
-```
-
-(That build arg doesn't exist today — file an issue if you need it.)
-
-## Activation
-
-Set these env vars on the KiloClaw instance (typically via the controller's normal env-var injection path; both can be `KILOCLAW_ENC_*` encrypted):
-
-| Variable                      | Required                | Purpose                                                                                                            |
-| ----------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `CLAWMETRY_PARTNER_KEY`       | yes                     | Service-to-service key issued by ClawMetry to KiloClaw. Without it, the integration is a no-op.                    |
-| `KILOCLAW_USER_EMAIL`         | yes (or `GITHUB_EMAIL`) | Email used to provision the free ClawMetry account. Falls back to `GITHUB_EMAIL` if unset.                         |
-| `CLAWMETRY_API_BASE`          | no                      | Override the ClawMetry endpoint (default `https://app.clawmetry.com`). Useful for staging / self-hosted ClawMetry. |
-| `KILOCLAW_CLAWMETRY_DISABLED` | no                      | Set to `'true'` to disable even when partner key is present (escape hatch).                                        |
-
-## What bootstrap does
-
-The `clawmetry-sync` phase in `bootstrapNonCritical` (controller, [bootstrap.ts](../controller/src/bootstrap.ts)):
-
-1. POSTs `{email, source: 'kiloclaw'}` to `${CLAWMETRY_API_BASE}/api/partner/kiloclaw/provision` with `X-Partner-Key` header
-2. Receives `{ok: true, cm_token: 'cm_...'}` (existing account if email matches; new free account otherwise)
+1. POSTs `{hostname, machine_id, platform: 'Linux', email?}` to `${CLAWMETRY_API_BASE}/api/register` (a public, idempotent endpoint)
+2. Receives `{api_key: 'cm_...'}` back — a per-machine token
 3. Writes the token to `/root/.clawmetry/token` (mode 0600)
 4. Spawns `clawmetry sync` as a detached background process — events flow to ClawMetry cloud from then on
 
+No special endpoint. No partner key. No secrets to manage. Tokens are scoped to `machine_id` (Fly machine ID, falling back to HOSTNAME), so each instance gets its own ClawMetry account. Users with multiple KiloClaw instances can link them later via the standard `clawmetry connect` OTP flow.
+
 Failures are warned and skipped — they NEVER block boot. Observability is best-effort; the gateway is the critical path.
 
-## Cloud-side prerequisite
+## Versioning
 
-This integration depends on a ClawMetry endpoint that does not exist at the time of writing:
+ClawMetry is installed via the upstream one-line installer (`curl -fsSL https://clawmetry.com/install.sh | bash`), not a PyPI version pin. Every fresh image build picks up the latest ClawMetry release at build time. ClawMetry can ship updates without requiring a PR back to this repo — trigger a KiloClaw image rebuild to pick them up.
 
-```
-POST /api/partner/kiloclaw/provision
-Headers: X-Partner-Key: <issued-key>
-Body:    {"email": "<user>", "source": "kiloclaw"}
+Trade-off: builds are not bit-reproducible across rebuilds. That's intentional; the integration is best-effort observability.
 
-Response (201): {"ok": true, "cm_token": "cm_..."}
-Response (400): {"ok": false, "error": "..."}
-```
+## Env vars
 
-Until ClawMetry ships this route + issues a partner key, leave `CLAWMETRY_PARTNER_KEY` unset on KiloClaw instances. The integration is dormant — there is zero behavior change.
+All optional:
 
-Tracking: contact `vivek@clawmetry.com` to coordinate partner-key issuance.
+| Variable                      | Default                     | Purpose                                                                          |
+| ----------------------------- | --------------------------- | -------------------------------------------------------------------------------- |
+| `CLAWMETRY_API_BASE`          | `https://app.clawmetry.com` | Override for staging / self-hosted ClawMetry                                     |
+| `KILOCLAW_USER_EMAIL`         | unset                       | Email attached to the account for recovery (optional — account works without it) |
+| `GITHUB_EMAIL`                | unset                       | Fallback when `KILOCLAW_USER_EMAIL` is absent                                    |
+| `KILOCLAW_CLAWMETRY_DISABLED` | unset                       | Set to `'true'` to disable the integration entirely (escape hatch)               |
+
+`FLY_MACHINE_ID` and `HOSTNAME` are read directly from the runtime env (Fly auto-injects them); they don't need to be set.
 
 ## Verifying
 
-After enabling on a test instance:
+After deploying a new KiloClaw image:
 
 ```bash
 fly ssh console -s --app <kiloclaw-app>
@@ -76,7 +51,7 @@ ps -ef | grep 'clawmetry sync'   # daemon should be running
 tail -f /var/log/clawmetry-sync.log
 ```
 
-Then visit `https://app.clawmetry.com/cloud` and sign in with the same email — the user's KiloClaw instance shows up as a node within ~1 minute.
+Then visit `https://app.clawmetry.com/cloud` and sign in with the email that was attached (via `clawmetry connect` OTP flow) — the user's KiloClaw instance shows up as a node within ~1 minute.
 
 ## Disabling
 

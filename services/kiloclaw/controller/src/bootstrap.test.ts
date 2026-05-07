@@ -570,65 +570,45 @@ describe('configureLinear', () => {
 // ---- provisionClawMetrySync ----
 
 describe('provisionClawMetrySync', () => {
-  it('skips silently when CLAWMETRY_PARTNER_KEY is missing', () => {
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { deps, execCalls, writeCalls } = fakeDeps();
-
-    provisionClawMetrySync({ KILOCLAW_USER_EMAIL: 'a@b.c' }, deps);
-
-    expect(execCalls).toEqual([]);
-    expect(writeCalls).toEqual([]);
-    expect(logSpy).toHaveBeenCalledWith(
-      'ClawMetry: not configured (CLAWMETRY_PARTNER_KEY missing)'
-    );
-    logSpy.mockRestore();
-  });
-
-  it('skips when KILOCLAW_CLAWMETRY_DISABLED=true even with key + email', () => {
+  it('skips when KILOCLAW_CLAWMETRY_DISABLED=true', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const { deps, execCalls } = fakeDeps();
 
-    provisionClawMetrySync(
-      {
-        KILOCLAW_CLAWMETRY_DISABLED: 'true',
-        CLAWMETRY_PARTNER_KEY: 'pk_test',
-        KILOCLAW_USER_EMAIL: 'a@b.c',
-      },
-      deps
-    );
+    provisionClawMetrySync({ KILOCLAW_CLAWMETRY_DISABLED: 'true', FLY_MACHINE_ID: 'm1' }, deps);
 
     expect(execCalls).toEqual([]);
     expect(logSpy).toHaveBeenCalledWith('ClawMetry: disabled via KILOCLAW_CLAWMETRY_DISABLED');
     logSpy.mockRestore();
   });
 
-  it('warns and exits when no email is available', () => {
+  it('warns and exits when no machine_id can be derived', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { deps, execCalls } = fakeDeps();
 
-    provisionClawMetrySync({ CLAWMETRY_PARTNER_KEY: 'pk_test' }, deps);
+    provisionClawMetrySync({}, deps);
 
     expect(execCalls).toEqual([]);
     expect(warnSpy).toHaveBeenCalledWith(
-      'ClawMetry: skipping — neither KILOCLAW_USER_EMAIL nor GITHUB_EMAIL is set'
+      'ClawMetry: skipping — no FLY_MACHINE_ID or HOSTNAME to identify the machine'
     );
     warnSpy.mockRestore();
   });
 
-  it('provisions a token, writes it to disk with 600, and starts the daemon', () => {
+  it('registers via /api/register, writes token with 600, and starts the daemon', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const { deps, execCalls, writeCalls, chmodCalls, mkdirCalls } = fakeDeps();
     deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
       execCalls.push({ cmd, args });
       if (cmd === 'curl') {
-        return JSON.stringify({ ok: true, cm_token: 'cm_abc123' });
+        return JSON.stringify({ ok: true, api_key: 'cm_abc123' });
       }
       return '';
     });
 
     provisionClawMetrySync(
       {
-        CLAWMETRY_PARTNER_KEY: 'pk_test',
+        FLY_MACHINE_ID: 'fly-machine-abc',
+        HOSTNAME: 'agent-vivek-fly',
         KILOCLAW_USER_EMAIL: 'user@kilocode.ai',
       },
       deps
@@ -636,9 +616,18 @@ describe('provisionClawMetrySync', () => {
 
     const curlCall = execCalls.find(c => c.cmd === 'curl');
     expect(curlCall).toBeDefined();
-    expect(curlCall?.args).toContain('https://app.clawmetry.com/api/partner/kiloclaw/provision');
-    expect(curlCall?.args).toContain('X-Partner-Key: pk_test');
-    expect(curlCall?.args.some(a => a.includes('user@kilocode.ai'))).toBe(true);
+    expect(curlCall?.args).toContain('https://app.clawmetry.com/api/register');
+    // Public endpoint — no X-Partner-Key header anywhere
+    expect(curlCall?.args.every(a => !a.includes('X-Partner-Key'))).toBe(true);
+    // Payload carries machine_id, hostname, platform, email
+    const payload = curlCall?.args.find(a => a.includes('machine_id')) ?? '';
+    const parsed = JSON.parse(payload);
+    expect(parsed).toEqual({
+      hostname: 'agent-vivek-fly',
+      machine_id: 'fly-machine-abc',
+      platform: 'Linux',
+      email: 'user@kilocode.ai',
+    });
 
     expect(mkdirCalls).toContain('/root/.clawmetry');
     expect(writeCalls).toEqual([{ path: '/root/.clawmetry/token', data: 'cm_abc123' }]);
@@ -649,28 +638,61 @@ describe('provisionClawMetrySync', () => {
     expect(daemonCall?.args[1]).toContain('clawmetry sync');
     expect(daemonCall?.args[1]).toContain('nohup');
 
-    expect(logSpy).toHaveBeenCalledWith('ClawMetry: sync daemon started for user@kilocode.ai');
+    expect(logSpy).toHaveBeenCalledWith('ClawMetry: sync daemon started (machine=fly-machine-abc)');
     logSpy.mockRestore();
+  });
+
+  it('omits email from payload when neither KILOCLAW_USER_EMAIL nor GITHUB_EMAIL is set', () => {
+    const { deps, execCalls } = fakeDeps();
+    deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
+      execCalls.push({ cmd, args });
+      if (cmd === 'curl') return JSON.stringify({ api_key: 'cm_x' });
+      return '';
+    });
+
+    provisionClawMetrySync({ FLY_MACHINE_ID: 'm1', HOSTNAME: 'h1' }, deps);
+
+    const curlCall = execCalls.find(c => c.cmd === 'curl');
+    const payload = JSON.parse(curlCall?.args.find(a => a.includes('machine_id')) ?? '{}');
+    expect(payload.email).toBeUndefined();
+    expect(payload.machine_id).toBe('m1');
   });
 
   it('falls back to GITHUB_EMAIL when KILOCLAW_USER_EMAIL is absent', () => {
     const { deps, execCalls } = fakeDeps();
     deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
       execCalls.push({ cmd, args });
-      if (cmd === 'curl') return JSON.stringify({ ok: true, cm_token: 'cm_x' });
+      if (cmd === 'curl') return JSON.stringify({ api_key: 'cm_x' });
       return '';
     });
 
     provisionClawMetrySync(
-      { CLAWMETRY_PARTNER_KEY: 'pk_test', GITHUB_EMAIL: 'fallback@x.com' },
+      { FLY_MACHINE_ID: 'm1', HOSTNAME: 'h1', GITHUB_EMAIL: 'fallback@x.com' },
       deps
     );
 
     const curlCall = execCalls.find(c => c.cmd === 'curl');
-    expect(curlCall?.args.some(a => a.includes('fallback@x.com'))).toBe(true);
+    const payload = JSON.parse(curlCall?.args.find(a => a.includes('machine_id')) ?? '{}');
+    expect(payload.email).toBe('fallback@x.com');
   });
 
-  it('warns but does not throw when provisioning request errors', () => {
+  it('falls back to HOSTNAME when FLY_MACHINE_ID is absent', () => {
+    const { deps, execCalls } = fakeDeps();
+    deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
+      execCalls.push({ cmd, args });
+      if (cmd === 'curl') return JSON.stringify({ api_key: 'cm_x' });
+      return '';
+    });
+
+    provisionClawMetrySync({ HOSTNAME: 'standalone-host' }, deps);
+
+    const curlCall = execCalls.find(c => c.cmd === 'curl');
+    const payload = JSON.parse(curlCall?.args.find(a => a.includes('machine_id')) ?? '{}');
+    expect(payload.machine_id).toBe('standalone-host');
+    expect(payload.hostname).toBe('standalone-host');
+  });
+
+  it('warns but does not throw when register request errors', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { deps, execCalls, writeCalls } = fakeDeps();
     deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
@@ -680,34 +702,33 @@ describe('provisionClawMetrySync', () => {
     });
 
     expect(() =>
-      provisionClawMetrySync(
-        { CLAWMETRY_PARTNER_KEY: 'pk_test', KILOCLAW_USER_EMAIL: 'a@b.c' },
-        deps
-      )
+      provisionClawMetrySync({ FLY_MACHINE_ID: 'm1', HOSTNAME: 'h1' }, deps)
     ).not.toThrow();
     expect(writeCalls).toEqual([]);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('ClawMetry: provisioning request failed')
+      expect.stringContaining('ClawMetry: register request failed')
     );
     warnSpy.mockRestore();
   });
 
-  it('warns and skips daemon spawn when partner endpoint returns ok:false', () => {
+  it('warns and skips daemon spawn when register returns no api_key', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { deps, execCalls, writeCalls } = fakeDeps();
     deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
       execCalls.push({ cmd, args });
       if (cmd === 'curl') {
-        return JSON.stringify({ ok: false, error: 'partner key invalid' });
+        return JSON.stringify({ ok: false, error: 'invalid payload' });
       }
       return '';
     });
 
-    provisionClawMetrySync({ CLAWMETRY_PARTNER_KEY: 'pk_bad', KILOCLAW_USER_EMAIL: 'a@b.c' }, deps);
+    provisionClawMetrySync({ FLY_MACHINE_ID: 'm1', HOSTNAME: 'h1' }, deps);
 
     expect(writeCalls).toEqual([]);
     expect(execCalls.find(c => c.cmd === 'sh')).toBeUndefined();
-    expect(warnSpy).toHaveBeenCalledWith('ClawMetry: provisioning failed — partner key invalid');
+    expect(warnSpy).toHaveBeenCalledWith(
+      'ClawMetry: register returned no api_key — invalid payload'
+    );
     warnSpy.mockRestore();
   });
 
@@ -715,23 +736,21 @@ describe('provisionClawMetrySync', () => {
     const { deps, execCalls } = fakeDeps();
     deps.execFileSync = vi.fn((cmd: string, args: string[]) => {
       execCalls.push({ cmd, args });
-      if (cmd === 'curl') return JSON.stringify({ ok: true, cm_token: 'cm_x' });
+      if (cmd === 'curl') return JSON.stringify({ api_key: 'cm_x' });
       return '';
     });
 
     provisionClawMetrySync(
       {
-        CLAWMETRY_PARTNER_KEY: 'pk_test',
-        KILOCLAW_USER_EMAIL: 'a@b.c',
+        FLY_MACHINE_ID: 'm1',
+        HOSTNAME: 'h1',
         CLAWMETRY_API_BASE: 'https://staging.clawmetry.com',
       },
       deps
     );
 
     const curlCall = execCalls.find(c => c.cmd === 'curl');
-    expect(curlCall?.args).toContain(
-      'https://staging.clawmetry.com/api/partner/kiloclaw/provision'
-    );
+    expect(curlCall?.args).toContain('https://staging.clawmetry.com/api/register');
   });
 });
 

@@ -18,6 +18,11 @@ Cloudflare Email Routing
 
 ## Observability
 
-`observability.enabled` in `wrangler.jsonc` only turns on script logs at the runtime level. Logs flow into Axiom only when the script is **also added to the account-level Logpush job's script-name filter** (configured in the Cloudflare dashboard, not in this repo).
+To make logs reach Axiom, the worker needs **both** flags in `wrangler.jsonc`:
 
-Any new worker added to this repo must be added to that filter or its logs will be invisible in Axiom — even if `observability.enabled = true`. Check the `cloudflare-logpush` Axiom dataset for `ScriptName == "<your-worker>"` after deploy to confirm.
+```jsonc
+"observability": { "enabled": true },
+"logpush": true,
+```
+
+The account-level Logpush job is set to "all logs", but Cloudflare still requires each worker to opt in via `logpush: true`. `observability.enabled` alone isn't enough — without `logpush: true`, the worker's trace events stay inside Cloudflare and never reach the `cloudflare-logpush` Axiom dataset. Check `ScriptName == "<your-worker>"` in Axiom after deploy to confirm.

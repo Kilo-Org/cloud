@@ -15,6 +15,7 @@ import path from 'node:path';
 import { execFileSync as nodeExecFileSync } from 'node:child_process';
 import {
   generateBaseConfig,
+  ensureInboundEmailHookFlags,
   sanitizeLegacyStreamChatConfig,
   writeBaseConfig,
   writeMcporterConfig,
@@ -729,6 +730,7 @@ function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
 
   const before = JSON.stringify(parsed);
   sanitizeLegacyStreamChatConfig(parsed);
+  ensureInboundEmailHookFlags(parsed);
   const serialized = JSON.stringify(parsed, null, 2);
   if (JSON.stringify(parsed) === before) {
     return;
@@ -745,7 +747,7 @@ function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
     },
     { mode: 0o600 }
   );
-  console.log('Removed legacy Stream Chat config before doctor');
+  console.log('Sanitized existing config before doctor');
 }
 
 export function runOnboardOrDoctor(env: EnvLike, deps: BootstrapDeps = defaultDeps): void {

@@ -3034,12 +3034,23 @@ platform.post('/inbound-email', async c => {
     }
 
     const error = await response.text().catch(() => '');
+    let controllerErrorMessage: string | undefined;
+    try {
+      const parsed: unknown = JSON.parse(error);
+      if (parsed && typeof parsed === 'object' && 'error' in parsed) {
+        const candidate = (parsed as { error: unknown }).error;
+        if (typeof candidate === 'string') controllerErrorMessage = candidate;
+      }
+    } catch {
+      // body wasn't JSON; the raw `error` field below preserves it
+    }
     const controllerFailure = {
       ...logContext,
       userId: instance.userId,
       doKey,
       status: response.status,
-      error: error.slice(0, 500),
+      error: error.slice(0, 2000),
+      controllerErrorMessage,
       durationMs: performance.now() - startedAt,
     };
     if (response.status >= 500) {

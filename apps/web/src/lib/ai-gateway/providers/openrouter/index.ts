@@ -134,8 +134,14 @@ function enhancedModelList(models: OpenRouterModel[]) {
  * Fetch raw, unfiltered models from OpenRouter API
  * Use this for syncing model stats where you need complete data including :free variants
  */
-export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
-  const response = await fetch(`${PROVIDERS.OPENROUTER.apiUrl}/models`, {
+export async function getRawOpenRouterModels(
+  options: { outputModalities?: string } = {}
+): Promise<OpenRouterModelsResponse> {
+  const url = new URL(`${PROVIDERS.OPENROUTER.apiUrl}/models`);
+  if (options.outputModalities) {
+    url.searchParams.set('output_modalities', options.outputModalities);
+  }
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${PROVIDERS.OPENROUTER.apiKey}`,
@@ -181,8 +187,10 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
  * Fetch enhanced models from OpenRouter API with filtering and UI enhancements
  * Use this for user-facing model selection where you want filtered, sorted models
  */
-export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsResponse> {
-  const rawResponse = await getRawOpenRouterModels();
+export async function getEnhancedOpenRouterModels(
+  options: { outputModalities?: string } = {}
+): Promise<OpenRouterModelsResponse> {
+  const rawResponse = await getRawOpenRouterModels(options);
 
   // If data is not in expected format (e.g., validation failed), return as-is
   if (!rawResponse.data || !Array.isArray(rawResponse.data)) {

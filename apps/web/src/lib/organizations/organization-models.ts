@@ -11,7 +11,8 @@ import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 
 export async function getAvailableModelsForOrganization(
-  organizationId: string
+  organizationId: string,
+  options: { outputModalities?: string } = {}
 ): Promise<OpenRouterModelsResponse | null> {
   const organization = await getOrganizationById(organizationId);
   if (!organization) {
@@ -24,7 +25,7 @@ export async function getAvailableModelsForOrganization(
     restrictions = getEffectiveModelRestrictions(organization);
   }
 
-  const responseData = await getEnhancedOpenRouterModels();
+  const responseData = await getEnhancedOpenRouterModels(options);
 
   let filteredModels = responseData.data;
   if (hasActiveModelRestrictions(restrictions)) {

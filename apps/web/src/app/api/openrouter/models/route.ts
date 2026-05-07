@@ -26,10 +26,11 @@ export async function GET(
   request: NextRequest
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
+  const outputModalities = request.nextUrl.searchParams.get('output_modalities') ?? undefined;
   const auth = await tryGetUserFromAuth();
   try {
     const result = auth?.organizationId
-      ? await getAvailableModelsForOrganization(auth.organizationId)
+      ? await getAvailableModelsForOrganization(auth.organizationId, { outputModalities })
       : null;
     if (result) {
       return NextResponse.json({
@@ -38,7 +39,7 @@ export async function GET(
       });
     }
 
-    const data = await getEnhancedOpenRouterModels();
+    const data = await getEnhancedOpenRouterModels({ outputModalities });
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }

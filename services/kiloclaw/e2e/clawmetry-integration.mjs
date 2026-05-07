@@ -32,6 +32,7 @@
  */
 import { chromium } from 'playwright';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 
 const API_BASE = process.env.CLAWMETRY_API_BASE || 'https://app.clawmetry.com';
 const HEADLESS = process.env.HEADLESS !== '0';
@@ -244,7 +245,29 @@ async function main() {
   check('free-tier "24 hours" copy is shown', state.bodyText.includes('Showing last 24 hours'));
 
   console.log('\n▸ Walking key feature tabs');
-  for (const tab of ['Brain', 'Tokens', 'Crons']) {
+  const screenshotDir = process.env.SCREENSHOT_DIR;
+  if (screenshotDir) {
+    await fs.promises.mkdir(screenshotDir, { recursive: true });
+    await page.screenshot({ path: `${screenshotDir}/00_landing.png` });
+  }
+  // Real free-tier tabs as rendered by the cloud dashboard (verified in
+  // browser). Pro adds more tabs but the integration only ever lands users
+  // on Free, so this is the correct surface to assert against.
+  const TABS = [
+    'Flow',
+    'Brain',
+    'Overview',
+    'Approvals',
+    'Alerts',
+    'Notifications',
+    'Context',
+    'Tokens',
+    'Crons',
+    'Memory',
+  ];
+  let tabIdx = 0;
+  for (const tab of TABS) {
+    tabIdx++;
     const errBefore = errors.length;
     const t = page.locator(`.nav-tab:has-text("${tab}"), [role="tab"]:has-text("${tab}")`).first();
     const visible = (await t.count()) > 0;
@@ -260,12 +283,20 @@ async function main() {
         bodyLen: text.length,
         hasUnlock: text.toLowerCase().includes('enter your secret key'),
         hasDecryptFail: text.toLowerCase().includes('could not decrypt activity'),
+        snippet: text.replace(/\s+/g, ' ').slice(0, 140),
       };
     });
+    if (screenshotDir) {
+      await page
+        .screenshot({
+          path: `${screenshotDir}/${String(tabIdx).padStart(2, '0')}_${tab.toLowerCase()}.png`,
+        })
+        .catch(() => undefined);
+    }
     check(
       `${tab}: tab opens (body > 200 chars)`,
       tabState.bodyLen > 200,
-      `body=${tabState.bodyLen}`
+      `body=${tabState.bodyLen} snippet="${tabState.snippet}"`
     );
     check(`${tab}: no unlock prompt`, !tabState.hasUnlock);
     check(`${tab}: no decrypt failure`, !tabState.hasDecryptFail);

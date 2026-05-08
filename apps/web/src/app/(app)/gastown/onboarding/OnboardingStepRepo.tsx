@@ -65,6 +65,7 @@ export function OnboardingStepRepo() {
   const githubAppName = process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
 
   const handleInstallGithub = useCallback(() => {
+    if (!orgId && !user?.id) return;
     const owner = orgId ? `org_${orgId}` : `user_${user?.id}`;
     const returnPath = `/gastown/onboarding?step=repo${orgId ? `&orgId=${orgId}` : ''}`;
     const state = `${owner}|return=${encodeURIComponent(returnPath)}`;
@@ -148,6 +149,8 @@ export function OnboardingStepRepo() {
               type="button"
               variant="outline"
               onClick={handleInstallGithub}
+              disabled={!orgId && !user?.id}
+              aria-label={!orgId && !user?.id ? 'Loading user info…' : undefined}
               className="w-full gap-2 border-white/10 text-white/70 hover:text-white/90"
             >
               <ExternalLink className="size-4" />

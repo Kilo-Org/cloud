@@ -18,7 +18,7 @@ esac
 
 # Exclude the root package so the recursive workspace typecheck does not invoke
 # this script again.
-workspace_typecheck_filters=(--filter '!kilocode-monorepo' --filter '!web' --filter '!@kilocode/trpc')
+workspace_typecheck_filters=(--filter '!kilocode-monorepo' --filter '!web' --filter '!@kilocode/trpc' --filter '!@kilocode/prototypes')
 
 base=""
 if $changes_only; then
@@ -81,6 +81,7 @@ while IFS= read -r dir; do
   [ -z "$name" ] && continue
   [[ "$name" == "web" ]] && continue
   [[ "$name" == "@kilocode/trpc" ]] && continue
+  [[ "$name" == "@kilocode/prototypes" ]] && continue
   pnpm_filters+=(--filter "$name...")
 done <<< "$changed_dirs"
 

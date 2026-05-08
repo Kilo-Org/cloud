@@ -254,8 +254,12 @@ describe('batch-review-decisions', () => {
 
       triggerBatchReviewDecisionFetchIfNeeded(true, testOwner);
 
-      // Give it a tick for any resolved promises
-      await new Promise(r => setTimeout(r, 0));
+      // triggerBatchReviewDecisionFetchIfNeeded is fire-and-forget; poll until
+      // the async chain reaches getIntegrationForOwner (after the DB claim).
+      const deadline = Date.now() + 5000;
+      while (mockGetIntegration.mock.calls.length === 0 && Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 25));
+      }
 
       expect(mockGetIntegration).toHaveBeenCalled();
     });

@@ -254,8 +254,15 @@ describe('batch-review-decisions', () => {
 
       triggerBatchReviewDecisionFetchIfNeeded(true, testOwner);
 
-      // Give it a tick for any resolved promises
-      await new Promise(r => setTimeout(r, 0));
+      // triggerBatchReviewDecisionFetchIfNeeded is fire-and-forget; internally
+      // it must first await the claimPendingReviewRows Postgres UPDATE before
+      // it reaches getIntegrationForOwner. A single macrotask tick is enough
+      // on a fast local DB but not on CI's slower Postgres, so poll-wait for
+      // the observable signal instead of guessing a tick count.
+      const deadline = Date.now() + 5000;
+      while (mockGetIntegration.mock.calls.length === 0 && Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 10));
+      }
 
       expect(mockGetIntegration).toHaveBeenCalled();
     });

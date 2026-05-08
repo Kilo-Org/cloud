@@ -173,7 +173,7 @@ console.log(`[drizzle-query-rename] total: ${hits.length} hit(s) in ${byFile.siz
 
 if (CHECK) {
   console.error(
-    '[drizzle-query-rename] failing: use `pnpm drizzle:rename` or `oxlint --fix` to migrate.'
+    '[drizzle-query-rename] failing: use `pnpm drizzle:query-rename` or `oxlint --fix` to migrate.'
   );
   process.exit(1);
 }

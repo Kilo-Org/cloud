@@ -128,6 +128,9 @@ jobs:
       - name: Lint
         run: scripts/lint-all.sh
 
+      - name: Drizzle _query enforcement
+        run: pnpm run drizzle:query-check
+
   format-check:
     needs: changes
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}

@@ -39,6 +39,9 @@ async function requireGatewayControllerContext(
   if (!state.sandboxId) {
     throw new GatewayControllerError(409, 'Instance not provisioned');
   }
+  if (state.status !== 'running') {
+    throw new GatewayControllerError(409, 'Instance is not running');
+  }
 
   let routingTarget: ProviderRoutingTarget;
   try {
@@ -281,6 +284,7 @@ function isMorningBriefingWarmupControllerError(error: unknown): boolean {
   return (
     message.includes('instance has no machine id') ||
     message.includes('instance not provisioned') ||
+    message.includes('instance is not running') ||
     message.includes('gateway not running') ||
     message.includes('failed to reach gateway') ||
     message.includes('operation was aborted due to timeout')

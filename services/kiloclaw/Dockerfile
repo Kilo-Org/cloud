@@ -1,12 +1,18 @@
 # Global build args — declared before any FROM so they're available to all stages.
 ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
+# Bump APT_CACHE_BUST (any value change) to invalidate the base apt layer and
+# pick up the latest chromium / 1password-cli / etc. from Debian + vendor repos.
+# Last bumped 2026-05-08 to pull chromium 148.x (CVE-2026-7908, CVE-2026-7910).
+ARG APT_CACHE_BUST=2026-05-08
 
 FROM debian:trixie-slim AS runtime
 
 # Install Node.js 24 (required by OpenClaw)
 ENV NODE_VERSION=24.15.0
-RUN apt-get update \
+ARG APT_CACHE_BUST
+RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \
        build-essential python3 ffmpeg tmux chromium \

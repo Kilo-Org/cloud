@@ -159,6 +159,12 @@ export type CreateVolumeRequest =
 export type CreateVolumeRequestWithoutRegion = Omit<CreateVolumeBaseRequest, 'region'> &
   (CreateFreshVolumeRequest | CreateForkedVolumeRequest | CreateSnapshotVolumeRequest);
 
+export type ExtendVolumeRequest = {
+  size_gb: number;
+};
+
+export type ExtendVolumeResponse = FlyVolume;
+
 // -- Volume snapshot types --
 
 export type FlyVolumeSnapshot = {

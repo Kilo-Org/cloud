@@ -16,6 +16,8 @@ export function isValidCallbackPath(path: string): boolean {
     path.startsWith('/get-started') ||
     path.startsWith('/welcome/landing') ||
     path.startsWith('/organizations/') ||
+    path === '/claw' ||
+    path.startsWith('/claw/') ||
     path.startsWith('/cloud') ||
     path.startsWith('/integrations/') ||
     // Admin-managed URL bonus campaigns. Stricter shape enforcement
@@ -36,8 +38,25 @@ export default function getSignInCallbackUrl(searchParams?: NextAppSearchParams)
     callbackParams.set('source', searchParams?.source);
   }
 
-  if (typeof searchParams?.im_ref === 'string' && searchParams?.im_ref) {
-    callbackParams.set('im_ref', searchParams.im_ref);
+  // Order matters: tests assert this exact emission order through the
+  // sign-in callback redirect (see getSignInCallbackUrl.test.ts).
+  const trackingParams = [
+    'im_ref',
+    '_saasquatch',
+    'rsCode',
+    'rsShareMedium',
+    'rsEngagementMedium',
+    'utm_source',
+    'utm_medium',
+    'utm_campaign',
+    'utm_term',
+    'utm_content',
+  ] as const;
+  for (const trackingParam of trackingParams) {
+    const value = searchParams?.[trackingParam];
+    if (typeof value === 'string' && value) {
+      callbackParams.set(trackingParam, value);
+    }
   }
 
   // Always route through /users/after-sign-in to ensure stytch verification check

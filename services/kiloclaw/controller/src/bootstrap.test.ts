@@ -25,6 +25,7 @@ import {
   LINEAR_SECTION_CONFIG,
   KILOCLAW_MITIGATIONS_SECTION_CONFIG,
   PLUGIN_INSTALL_SECTION_CONFIG,
+  PROCESS_MODEL_SECTION_CONFIG,
   buildGatewayArgs,
   bootstrapCritical,
   bootstrapNonCritical,
@@ -1563,6 +1564,7 @@ describe('TOOLS.md section configs', () => {
     LINEAR_SECTION_CONFIG,
     KILOCLAW_MITIGATIONS_SECTION_CONFIG,
     PLUGIN_INSTALL_SECTION_CONFIG,
+    PROCESS_MODEL_SECTION_CONFIG,
   ];
 
   for (const config of configs) {
@@ -1596,6 +1598,22 @@ describe('TOOLS.md section configs', () => {
     // old "OpenClaw Security Advisor" copy.
     expect(section).toContain('ShellSecurity plugin bundled with KiloClaw');
     expect(section).not.toContain('OpenClaw Security Advisor');
+  });
+
+  it('Process Model: pins systemd ban directives', () => {
+    const section = PROCESS_MODEL_SECTION_CONFIG.section;
+    // The lede must be unambiguous so an agent skimming the section
+    // does not skip past it.
+    expect(section).toContain('does NOT use systemd');
+    // Explain WHY systemctl exists on disk despite not being usable, so
+    // the agent does not treat `which systemctl` as evidence systemd works.
+    expect(section).toContain('which systemctl');
+    // The ban list — agents must not propose any of these.
+    expect(section).toContain('Do not suggest `systemctl`');
+    expect(section).toContain('`journalctl`');
+    expect(section).toContain('unit files');
+    // Tell the agent where process management actually lives.
+    expect(section).toContain('supervised by the controller');
   });
 
   it('Plugin Install: references the CLI command and plugins.allow field', () => {

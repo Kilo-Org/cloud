@@ -1,4 +1,5 @@
 import type { EncryptedEnvelope } from '@/lib/encryption';
+import type { InstanceTierKey, InstanceType } from '@kilocode/kiloclaw-instance-tiers';
 import type { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
 
 /** Mirrors the worker's ImageVersionEntry schema (KV stored version metadata) */
@@ -34,6 +35,7 @@ export type ProvisionInput = {
   userTimezone?: string | null;
   userLocation?: string | null;
   pinnedImageTag?: string;
+  instanceType?: InstanceTierKey;
 };
 
 export type KiloCodeConfigPatchInput = {
@@ -204,6 +206,8 @@ export type PlatformStatusResponse = {
   flyVolumeId: string | null;
   flyRegion: string | null;
   machineSize: MachineSize | null;
+  instanceType: InstanceType | null;
+  volumeSizeGb: number | null;
   openclawVersion: string | null;
   imageVariant: string | null;
   trackedImageTag: string | null;
@@ -257,6 +261,14 @@ export type RegistryEntriesResponse = {
 /** Response from GET /api/platform/debug-status (internal/admin only). */
 export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   orgId: string | null;
+  /**
+   * Active admin CPU/RAM override (admin-only). When non-null, the
+   * runtime spec uses this instead of `machineSize`. Customer dashboard
+   * (`PlatformStatusResponse`) deliberately does not expose this — billing
+   * stays on the tier.
+   */
+  adminMachineSizeOverride: MachineSize | null;
+  adminMachineSizeOverrideMetadata: AdminMachineSizeOverrideMetadata | null;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
   pendingPostgresMarkOnFinalize: boolean;
@@ -559,10 +571,34 @@ export type ReassociateVolumeResponse = {
   newRegion: string;
 };
 
+/** Metadata persisted alongside an active admin size override. */
+export type AdminMachineSizeOverrideMetadata = {
+  reason: string;
+  actorId: string;
+  actorEmail: string;
+  setAt: number;
+};
+
 /** Response from POST /api/platform/resize-machine */
 export type ResizeMachineResponse = {
-  previousSize: { cpus: number; memory_mb: number; cpu_kind?: string } | null;
-  newSize: { cpus: number; memory_mb: number; cpu_kind?: string };
+  previousTier: InstanceType | null;
+  newTier: InstanceTierKey;
+  previousVolumeSizeGb: number | null;
+  newVolumeSizeGb: number;
+  machineSize: MachineSize;
+  /** When the resize cleared a pre-existing admin override, captured for audit. */
+  clearedOverride: { size: MachineSize; metadata: AdminMachineSizeOverrideMetadata } | null;
+};
+
+/** Response from POST /api/platform/admin-size-override/set */
+export type SetAdminMachineSizeOverrideResponse = {
+  previousOverride: MachineSize | null;
+  newOverride: MachineSize;
+};
+
+/** Response from POST /api/platform/admin-size-override/clear */
+export type ClearAdminMachineSizeOverrideResponse = {
+  previousOverride: MachineSize | null;
 };
 
 /** Response from GET /api/platform/regions */

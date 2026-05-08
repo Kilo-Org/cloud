@@ -351,6 +351,7 @@ export function KiloclawInstancesPage() {
       search: searchParams.get('search') || '',
       status: (searchParams.get('status') || 'all') as StatusFilter,
       imageTag: searchParams.get('imageTag') || '',
+      hasSizeOverride: searchParams.get('hasSizeOverride') === '1',
     }),
     [searchParams]
   );
@@ -370,6 +371,7 @@ export function KiloclawInstancesPage() {
       search: queryStringState.search,
       status: queryStringState.status,
       imageTag: queryStringState.imageTag || undefined,
+      hasSizeOverride: queryStringState.hasSizeOverride || undefined,
     })
   );
 
@@ -601,6 +603,21 @@ export function KiloclawInstancesPage() {
           </SelectContent>
         </Select>
 
+        <Button
+          type="button"
+          variant={queryStringState.hasSizeOverride ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => pushWith({ hasSizeOverride: !queryStringState.hasSizeOverride, page: 1 })}
+          className={
+            queryStringState.hasSizeOverride
+              ? 'border-amber-500 bg-amber-500/15 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400'
+              : ''
+          }
+          title="Filter to instances with an active admin size override"
+        >
+          Has size override
+        </Button>
+
         <DevNukeAllButton />
       </div>
 
@@ -720,22 +737,33 @@ export function KiloclawInstancesPage() {
                     </Link>
                   </TableCell>
                   <TableCell>
-                    {instance.organization_id ? (
-                      <Badge
-                        variant="outline"
-                        className="border-blue-500/30 bg-blue-500/15 text-blue-400"
-                        title={instance.organization_id}
-                      >
-                        Org
-                      </Badge>
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className="border-gray-500/30 bg-gray-500/10 text-gray-400"
-                      >
-                        Personal
-                      </Badge>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {instance.organization_id ? (
+                        <Badge
+                          variant="outline"
+                          className="border-blue-500/30 bg-blue-500/15 text-blue-400"
+                          title={instance.organization_id}
+                        >
+                          Org
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="border-gray-500/30 bg-gray-500/10 text-gray-400"
+                        >
+                          Personal
+                        </Badge>
+                      )}
+                      {instance.admin_size_override && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/40 bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          title={`Admin size override: ${instance.admin_size_override.size.cpus}× ${instance.admin_size_override.size.cpu_kind ?? 'shared'}, ${instance.admin_size_override.size.memory_mb}MB. Set by ${instance.admin_size_override.actorEmail} — ${instance.admin_size_override.reason}`}
+                        >
+                          Override
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-xs">
                     {instance.tracked_image_tag ? (

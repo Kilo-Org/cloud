@@ -24,33 +24,31 @@ type CreateBotRequestParams = {
 
 /**
  * Insert a pending bot_requests row at the start of message handling.
- * Returns the row ID on success, or undefined if the insert fails
- * (logging should never break the main flow).
+ * Throws on DB failure so the caller can capture context-rich Sentry
+ * events and surface a user-facing error — the callback pipeline depends
+ * on this row existing, so a silent failure here would drop the result.
  */
-export async function createBotRequest(
-  params: CreateBotRequestParams
-): Promise<string | undefined> {
-  try {
-    const [row] = await db
-      .insert(bot_requests)
-      .values({
-        created_by: params.createdBy,
-        organization_id: params.organizationId,
-        platform_integration_id: params.platformIntegrationId,
-        platform: params.platform,
-        platform_thread_id: params.platformThreadId,
-        platform_message_id: params.platformMessageId ?? null,
-        user_message: params.userMessage,
-        model_used: params.modelUsed ?? null,
-        status: 'pending',
-      })
-      .returning({ id: bot_requests.id });
+export async function createBotRequest(params: CreateBotRequestParams): Promise<string> {
+  const [row] = await db
+    .insert(bot_requests)
+    .values({
+      created_by: params.createdBy,
+      organization_id: params.organizationId,
+      platform_integration_id: params.platformIntegrationId,
+      platform: params.platform,
+      platform_thread_id: params.platformThreadId,
+      platform_message_id: params.platformMessageId ?? null,
+      user_message: params.userMessage,
+      model_used: params.modelUsed ?? null,
+      status: 'pending',
+    })
+    .returning({ id: bot_requests.id });
 
-    return row?.id;
-  } catch (error) {
-    captureException(error, { tags: { component: 'bot-request-log', op: 'create' } });
-    return undefined;
+  if (!row) {
+    throw new Error('createBotRequest: insert returned no row');
   }
+
+  return row.id;
 }
 
 type UpdateBotRequestParams = {

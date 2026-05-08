@@ -50,7 +50,10 @@ import {
 } from '../../services/git-token-service-client.js';
 import { getPgDb } from '../../db/pg.js';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
-import { destroySandboxAfterInternalServerError } from '../../sandbox-recovery.js';
+import {
+  destroySandboxAfterInternalServerError,
+  isSandboxInternalServerError,
+} from '../../sandbox-recovery.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
@@ -578,6 +581,7 @@ const prepareSessionHandler = internalApiProtectedProcedure
       try {
         preparedWorkspace = await prepareWorkspace();
       } catch (error) {
+        const sandboxInternalServerError = isSandboxInternalServerError(error);
         await destroySandboxAfterInternalServerError(
           {
             sandbox,
@@ -587,6 +591,13 @@ const prepareSessionHandler = internalApiProtectedProcedure
           },
           error
         );
+        if (sandboxInternalServerError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Sandbox returned 500 during workspace preparation',
+            cause: { error: 'sandbox_internal_server_error', retryable: true },
+          });
+        }
         throw error;
       }
 

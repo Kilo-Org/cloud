@@ -55,6 +55,7 @@ const NorthflankSecretDetailsSchema = z.object({ id: z.string(), name: z.string(
 const ProjectResponseSchema = z.object({ data: NorthflankProjectSchema });
 const VolumeResponseSchema = z.object({ data: NorthflankVolumeSchema });
 const VolumeListResponseSchema = z.object({ data: z.array(NorthflankVolumeSchema) });
+const EmptyDataResponseSchema = z.object({ data: z.object({}).passthrough() });
 const ServiceResponseSchema = z.object({ data: NorthflankServiceSchema });
 const ServiceListResponseSchema = z.object({
   data: z.object({ services: z.array(NorthflankServiceSchema) }).passthrough(),
@@ -417,6 +418,26 @@ export async function getVolume(
     'getVolume'
   );
   return response.data;
+}
+
+export async function updateVolume(
+  config: NorthflankClientConfig,
+  projectId: string,
+  volumeId: string,
+  input: { storageSizeMb: number }
+): Promise<void> {
+  await requestJson(
+    config,
+    `/projects/${encodeURIComponent(projectId)}/volumes/${encodeURIComponent(volumeId)}`,
+    jsonInit('POST', {
+      spec: {
+        storageSize: input.storageSizeMb,
+      },
+    }),
+    EmptyDataResponseSchema,
+    [200],
+    'updateVolume'
+  );
 }
 
 export async function deleteVolume(

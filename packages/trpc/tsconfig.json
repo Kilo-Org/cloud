@@ -25,6 +25,7 @@
   "include": [
     "src/**/*",
     "../../apps/web/src/types/next-auth.d.ts",
-    "../../apps/web/src/types/next-page.d.ts"
+    "../../apps/web/src/types/next-page.d.ts",
+    "../../packages/db/src/**/*"
   ]
 }

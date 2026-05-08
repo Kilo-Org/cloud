@@ -117,6 +117,7 @@ const defaultFetchedSession = {
   isPreparingAsync: false,
   prompt: null,
   initialMessageId: null,
+  associatedPr: null,
 } satisfies FetchedSessionData;
 
 function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): SessionManagerConfig {

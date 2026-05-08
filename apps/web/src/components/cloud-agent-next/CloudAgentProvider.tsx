@@ -271,6 +271,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           prompt: rs?.prompt ?? null,
           initialMessageId: rs?.initialMessageId ?? null,
           runtimeAgents: rs?.runtimeAgents,
+          associatedPr: sessionResult.associatedPr,
         };
       },
 

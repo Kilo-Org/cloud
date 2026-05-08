@@ -30,7 +30,9 @@
     "dev:env": "tsx dev/local/cli.ts env",
     "dev:seed": "tsx dev/seed/index.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
-    "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts"
+    "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts",
+    "prototype:start": "pnpm --filter @kilocode/prototypes dev",
+    "prototype:deploy": "vercel link --project=kilocode-prototypes --yes && vercel deploy"
   },
   "packageManager": "pnpm@10.33.2",
   "devDependencies": {

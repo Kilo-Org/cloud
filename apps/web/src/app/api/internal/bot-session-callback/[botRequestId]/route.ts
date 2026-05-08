@@ -871,7 +871,37 @@ export async function POST(
           requestRow.platform_integration_id
         );
         await bot.initialize();
-        const { thread, message } = await getRehydratedBotRequestMessageState(botRequestId);
+        let rehydrated: Awaited<ReturnType<typeof getRehydratedBotRequestMessageState>>;
+        try {
+          rehydrated = await getRehydratedBotRequestMessageState(botRequestId);
+        } catch (error) {
+          captureException(error, {
+            tags: {
+              source: 'bot-session-callback-api',
+              op: 'rehydrate-message-state',
+            },
+            extra: {
+              botRequestId,
+              callbackSessionId,
+              status: payload.status,
+            },
+          });
+          const updated = await failBotRequest({
+            botRequestId,
+            errorMessage:
+              'Cloud Agent callback could not recover message state for this bot request.',
+            responseTimeMs: Date.now() - startedAt,
+          });
+          logCallback(
+            'Failed to rehydrate message state for callback; marked bot request as error',
+            {
+              botRequestId,
+              updated: Boolean(updated),
+            }
+          );
+          return;
+        }
+        const { thread, message } = rehydrated;
 
         logCallback('Resolved callback chat context', {
           botRequestId,

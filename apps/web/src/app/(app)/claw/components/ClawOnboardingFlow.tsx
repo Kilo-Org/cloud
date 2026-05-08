@@ -309,15 +309,17 @@ function ClawOnboardingFlowInner({
     const stepParam = searchParams?.get('step');
     if (stepParam !== 'calendar') return;
     // The OAuth round-trip is a full-page reload, so `useUser` starts fresh
-    // and `currentUser` is undefined for the first render(s). Wait until the
-    // query resolves before deciding what to do — otherwise an admin
-    // returning from a successful OAuth would be treated as a non-admin,
-    // have `?step=calendar` stripped immediately, and never see the success
-    // toast or the calendar step again.
-    if (currentUser === undefined) return;
-    // Calendar is admin-only; a non-admin landing here (e.g. via a stale
-    // shared URL) shouldn't trigger calendar-specific toasts or set
-    // onboardingStep to 'calendar'. Just strip the params and move on.
+    // and the query is in-flight on the first render(s). Gate on `isPending`
+    // (not `currentUser === undefined`) so that a `/api/user` fetch that
+    // settles in error after retries — `data` stays undefined, `isPending`
+    // flips to false — still falls through to the cleanup branch below
+    // instead of stranding the URL params forever.
+    if (isUserPending) return;
+    // Calendar is admin-only; a non-admin (or any user we couldn't classify
+    // as admin, e.g. /api/user errored after retries) landing here shouldn't
+    // trigger calendar-specific toasts or set onboardingStep to 'calendar'.
+    // Strip the params and move on. An admin who just completed OAuth but
+    // had /api/user error can re-verify the connection in settings.
     if (!hasCalendarStep) {
       hasResumedFromQuery.current = true;
       cleanupResumeQueryParams();
@@ -345,7 +347,14 @@ function ClawOnboardingFlowInner({
       toast.error('Could not connect calendar — please try again or skip for now.');
     }
     cleanupResumeQueryParams();
-  }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams, hasCalendarStep, currentUser]);
+  }, [
+    searchParams,
+    botIdentity,
+    posthog,
+    cleanupResumeQueryParams,
+    hasCalendarStep,
+    isUserPending,
+  ]);
 
   // Watchdog: if `?step=calendar` is in the URL but botIdentity hydration
   // never completes (e.g. patchBotIdentity hadn't propagated to the DB

@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { resetToProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
 import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
@@ -22,8 +24,13 @@ function formatStorePrice(product: AppStoreKiloPassProduct): string {
 export function KiloPassSubscriptionScreen() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const productsQuery = useStoreKiloPassProducts();
-  const purchase = useStoreKiloPassPurchase();
+  const purchase = useStoreKiloPassPurchase({
+    onPurchaseCompleted: () => {
+      resetToProfileAfterKiloPassPurchase(router);
+    },
+  });
   const handleProductPress = (product: AppStoreKiloPassProduct) => {
     void Haptics.selectionAsync();
     void purchase.purchase(product);

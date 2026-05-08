@@ -1,28 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { resetToProfileAfterKiloPassPurchase } from './navigation';
+import { ensureProfileAfterKiloPassPurchase } from './navigation';
 
-describe('resetToProfileAfterKiloPassPurchase', () => {
-  it('resets to home and opens profile like the home profile button', () => {
-    const calls: unknown[] = [];
-    const router: Parameters<typeof resetToProfileAfterKiloPassPurchase>[0] = {
-      dismissAll: vi.fn(() => {
-        calls.push('dismissAll');
-      }),
-      navigate: href => {
-        calls.push(['navigate', href]);
-      },
-      replace: href => {
-        calls.push(['replace', href]);
+describe('ensureProfileAfterKiloPassPurchase', () => {
+  it('makes profile the top route without resetting the tab stack', () => {
+    const routes: unknown[] = [];
+    const router: Parameters<typeof ensureProfileAfterKiloPassPurchase>[0] = {
+      dismissTo: href => {
+        routes.push(href);
       },
     };
 
-    resetToProfileAfterKiloPassPurchase(router);
+    ensureProfileAfterKiloPassPurchase(router);
 
-    expect(calls).toEqual([
-      'dismissAll',
-      ['replace', '/(app)/(tabs)/(0_home)'],
-      ['navigate', '/(app)/profile'],
-    ]);
+    expect(routes).toEqual(['/(app)/profile']);
   });
 });

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { resetToProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
+import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
 import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
@@ -28,7 +28,7 @@ export function KiloPassSubscriptionScreen() {
   const productsQuery = useStoreKiloPassProducts();
   const purchase = useStoreKiloPassPurchase({
     onPurchaseCompleted: () => {
-      resetToProfileAfterKiloPassPurchase(router);
+      ensureProfileAfterKiloPassPurchase(router);
     },
   });
   const handleProductPress = (product: AppStoreKiloPassProduct) => {

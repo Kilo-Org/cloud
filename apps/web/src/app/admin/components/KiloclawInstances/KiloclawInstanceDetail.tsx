@@ -2025,6 +2025,14 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const startDoctorControllerMutation = useMutation(
     trpc.admin.kiloclawInstances.startDoctorViaController.mutationOptions({
+      onSuccess: async (_result, variables) => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.doctorViaControllerStatus.queryKey({
+            userId: variables.userId,
+            instanceId: variables.instanceId,
+          }),
+        });
+      },
       onError: err => {
         toast.error(`Failed to start doctor (controller): ${err.message}`);
       },

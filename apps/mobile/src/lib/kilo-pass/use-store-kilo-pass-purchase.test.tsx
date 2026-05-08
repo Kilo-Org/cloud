@@ -89,6 +89,23 @@ function createDeferredPromise() {
   return { promise, resolve: resolvePromise };
 }
 
+function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
+  return {
+    id: 'purchase-1',
+    ids: null,
+    isAutoRenewing: true,
+    platform: 'ios',
+    productId: product.appleProductId,
+    purchaseState: 'purchased',
+    purchaseToken: 'signed-jws',
+    quantity: 1,
+    store: 'apple',
+    transactionDate: Date.now(),
+    transactionId: 'tx-1',
+    ...overrides,
+  };
+}
+
 describe('createAppStoreKiloPassPurchaseActions', () => {
   it('requests an App Store subscription purchase', async () => {
     const requestPurchase = vi.fn().mockResolvedValue(null);
@@ -142,19 +159,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       finishTransaction,
     });
 
-    await actions.handlePurchaseSuccess({
-      id: 'purchase-1',
-      ids: null,
-      isAutoRenewing: true,
-      platform: 'ios',
-      productId: product.appleProductId,
-      purchaseState: 'purchased',
-      purchaseToken: 'signed-jws',
-      quantity: 1,
-      store: 'apple',
-      transactionDate: Date.now(),
-      transactionId: 'tx-1',
-    });
+    await actions.handlePurchaseSuccess(createPurchase());
 
     expect(finishTransaction).not.toHaveBeenCalled();
   });
@@ -163,19 +168,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const finishTransaction = vi.fn();
     const invalidateAfterCompletion = vi.fn();
     const onPurchaseCompleted = vi.fn();
-    const purchase = {
-      id: 'purchase-1',
-      ids: null,
-      isAutoRenewing: true,
-      platform: 'ios',
-      productId: product.appleProductId,
-      purchaseState: 'purchased',
-      purchaseToken: 'signed-jws',
-      quantity: 1,
-      store: 'apple',
-      transactionDate: Date.now(),
-      transactionId: 'tx-1',
-    } satisfies Purchase;
+    const purchase = createPurchase();
     const actions = createActions({
       completeAppStorePurchase: vi.fn().mockResolvedValue({ alreadyProcessed: false }),
       finishTransaction,
@@ -201,19 +194,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       },
     });
 
-    await actions.handlePurchaseSuccess({
-      id: 'purchase-1',
-      ids: null,
-      isAutoRenewing: true,
-      platform: 'ios',
-      productId: product.appleProductId,
-      purchaseState: 'purchased',
-      purchaseToken: 'signed-jws',
-      quantity: 1,
-      store: 'apple',
-      transactionDate: Date.now(),
-      transactionId: 'tx-1',
-    });
+    await actions.handlePurchaseSuccess(createPurchase());
 
     expect(onPurchaseCompleted).not.toHaveBeenCalled();
   });
@@ -222,19 +203,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const finishTransaction = vi.fn();
     const completeAppStorePurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
     const onPurchaseCompleted = vi.fn();
-    const purchase = {
-      id: 'purchase-1',
-      ids: null,
-      isAutoRenewing: true,
-      platform: 'ios',
-      productId: product.appleProductId,
-      purchaseState: 'purchased',
-      purchaseToken: 'signed-jws',
-      quantity: 1,
-      store: 'apple',
-      transactionDate: Date.now(),
-      transactionId: 'tx-1',
-    } satisfies Purchase;
+    const purchase = createPurchase();
     const actions = createActions({
       completeAppStorePurchase,
       finishTransaction,
@@ -271,19 +240,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const completeAppStorePurchase = vi.fn().mockReturnValue(backendCompletion.promise);
     const finishTransaction = vi.fn();
     const onPurchaseCompleted = vi.fn();
-    const purchase = {
-      id: 'purchase-1',
-      ids: null,
-      isAutoRenewing: true,
-      platform: 'ios',
-      productId: product.appleProductId,
-      purchaseState: 'purchased',
-      purchaseToken: 'signed-jws',
-      quantity: 1,
-      store: 'apple',
-      transactionDate: Date.now(),
-      transactionId: 'tx-1',
-    } satisfies Purchase;
+    const purchase = createPurchase();
     const actions = createActions({
       completeAppStorePurchase,
       finishTransaction,
@@ -299,6 +256,44 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
     expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
     expect(finishTransaction).toHaveBeenCalledTimes(1);
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('coalesces completion across separate Kilo Pass purchase hook instances', async () => {
+    const backendCompletion = createDeferredPromise();
+    const completeFromRecovery = vi.fn().mockReturnValue(backendCompletion.promise);
+    const completeFromSheet = vi.fn().mockResolvedValue({ alreadyProcessed: true });
+    const finishFromRecovery = vi.fn();
+    const finishFromSheet = vi.fn();
+    const onPurchaseCompleted = vi.fn();
+    const purchase = createPurchase();
+    const recoveryActions = createAppStoreKiloPassPurchaseActions({
+      completeAppStorePurchase: completeFromRecovery,
+      finishTransaction: finishFromRecovery,
+      invalidateAfterCompletion: vi.fn(),
+      requestPurchase: vi.fn(),
+      showError: () => undefined,
+    });
+    const sheetActions = createAppStoreKiloPassPurchaseActions({
+      completeAppStorePurchase: completeFromSheet,
+      finishTransaction: finishFromSheet,
+      invalidateAfterCompletion: vi.fn(),
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+      requestPurchase: vi.fn(),
+      showError: () => undefined,
+    });
+
+    const recovery = recoveryActions.handlePurchaseSuccess(purchase, { notifyCompletion: false });
+    const liveCallback = sheetActions.handlePurchaseSuccess(purchase);
+    backendCompletion.resolve({ alreadyProcessed: false });
+    await Promise.all([recovery, liveCallback]);
+
+    expect(completeFromRecovery).toHaveBeenCalledTimes(1);
+    expect(completeFromSheet).not.toHaveBeenCalled();
+    expect(finishFromRecovery).toHaveBeenCalledTimes(1);
+    expect(finishFromSheet).not.toHaveBeenCalled();
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
   });
 });

@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { StoreKiloPassPurchaseRecoveryMount } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 
 export default function AppLayout() {
   const colors = useThemeColors();
@@ -10,6 +11,7 @@ export default function AppLayout() {
   return (
     <KiloChatProvider>
       <KiloChatPresenceMount>
+        <StoreKiloPassPurchaseRecoveryMount />
         <Stack
           screenOptions={{
             contentStyle: { backgroundColor: colors.background },

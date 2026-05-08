@@ -21,9 +21,11 @@ type AppStoreKiloPassPurchaseActionsDeps = {
   finishTransaction: (params: { purchase: Purchase; isConsumable: false }) => Promise<void>;
   invalidateAfterCompletion: () => Promise<void> | void;
   onPurchaseCompleted?: () => void;
-  purchaseCompletions: RefObject<Map<string, Promise<boolean>>>;
+  purchaseCompletions?: RefObject<Map<string, Promise<boolean>>>;
   showError: (message: string) => void;
 };
+
+const sharedPurchaseCompletions = new Map<string, Promise<boolean>>();
 
 function isRecoverableKiloPassPurchase(purchase: Purchase): boolean {
   if (purchase.purchaseState === 'pending') {
@@ -67,15 +69,16 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
 
   async function completePurchaseOnce(purchase: Purchase): Promise<boolean> {
     const purchaseId = getPurchaseCompletionId(purchase);
-    const existingCompletion = deps.purchaseCompletions.current.get(purchaseId);
+    const purchaseCompletions = deps.purchaseCompletions?.current ?? sharedPurchaseCompletions;
+    const existingCompletion = purchaseCompletions.get(purchaseId);
     if (existingCompletion) {
       return existingCompletion;
     }
 
     const completion = completePurchase(purchase);
-    deps.purchaseCompletions.current.set(purchaseId, completion);
+    purchaseCompletions.set(purchaseId, completion);
     const completed = await completion;
-    deps.purchaseCompletions.current.delete(purchaseId);
+    purchaseCompletions.delete(purchaseId);
     return completed;
   }
 
@@ -233,4 +236,9 @@ export function useStoreKiloPassPurchase(options: { onPurchaseCompleted?: () => 
     purchase: startPurchase,
     isPending: isRequestingPurchase || completeAppStorePurchase.isPending,
   };
+}
+
+export function StoreKiloPassPurchaseRecoveryMount() {
+  useStoreKiloPassPurchase();
+  return null;
 }

@@ -161,7 +161,8 @@ async function processKiloclawChatMessage(
 
   const sandboxId = await findActiveSandboxIdForInstance(
     getWorkerDb(env.HYPERDRIVE.connectionString),
-    triggerConfig.kiloclawInstanceId
+    triggerConfig.kiloclawInstanceId,
+    userId
   );
   if (!sandboxId) {
     await failRequest(

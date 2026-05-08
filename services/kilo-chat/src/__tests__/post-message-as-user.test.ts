@@ -132,6 +132,38 @@ describe('postMessageAsUser', () => {
     expect(result.code).toBe('forbidden');
   });
 
+  it('rejects forbidden even when a stale conversation already exists', async () => {
+    const userId = `user-${crypto.randomUUID()}`;
+    const sandboxId = `sandbox-${crypto.randomUUID()}`;
+    const testEnv = makeEnv();
+
+    // Seed: grant ownership long enough to create a conversation.
+    grantSandbox(userId, sandboxId);
+    const seed = await runPost(testEnv, {
+      userId,
+      sandboxId,
+      message: 'seed message',
+      source: 'webhook',
+    });
+    expect(seed.ok).toBe(true);
+
+    // Revoke ownership (simulates instance destroyed / reassigned). The
+    // conversation still exists in MEMBERSHIP_DO, so the existing-conversation
+    // path runs without the create-time ownership check.
+    ownershipMap.get(userId)?.delete(sandboxId);
+
+    const result = await runPost(testEnv, {
+      userId,
+      sandboxId,
+      message: 'should now be forbidden',
+      source: 'webhook',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('forbidden');
+  });
+
   it('rejects empty messages with invalid_request before any side effects', async () => {
     const userId = `user-${crypto.randomUUID()}`;
     const sandboxId = `sandbox-${crypto.randomUUID()}`;

@@ -1,50 +1,22 @@
 /**
- * RPC method types for the KILO_CHAT service binding.
+ * KILO_CHAT service-binding shape.
  *
- * `wrangler types` generates a generic `Service` for service bindings; the
- * actual RPC shape comes from the kilo-chat worker's WorkerEntrypoint and is
- * declared here so the generated file can be regenerated freely.
- *
- * Keep in sync with: services/kilo-chat/src/services/post-message-as-user.ts
- * and services/kilo-chat/src/index.ts (KiloChatService).
+ * The RPC contract types live in `@kilocode/kilo-chat` (rpc-types.ts) so
+ * producer (services/kilo-chat) and consumers (this worker, others) share
+ * one source of truth. wrangler-generated types only emit a generic
+ * `Service` for service bindings, which is why we still need to declare
+ * the local binding shape here and cast at the call site.
  */
 
-export type PostMessageAsUserCorrelation = {
-  triggerId?: string;
-  webhookRequestId?: string;
-  reason?: string;
-};
-
-export type PostMessageAsUserParams = {
-  userId: string;
-  sandboxId: string;
-  message: string;
-  source: string;
-  autoCreateConversation?: boolean;
-  correlation?: PostMessageAsUserCorrelation;
-};
-
-export type PostMessageAsUserResult =
-  | {
-      ok: true;
-      conversationId: string;
-      messageId: string;
-      conversationCreated: boolean;
-    }
-  | {
-      ok: false;
-      code: 'invalid_request' | 'no_conversation' | 'forbidden' | 'internal';
-      error: string;
-    };
+import type { PostMessageAsUserParams, PostMessageAsUserResult } from '@kilocode/kilo-chat';
 
 export type KiloChatBinding = Fetcher & {
   postMessageAsUser(params: PostMessageAsUserParams): Promise<PostMessageAsUserResult>;
 };
 
 /**
- * Cast helper. wrangler types generates `Service` for the binding; the actual
- * RPC shape lives in this file. Centralizing the cast avoids scattering
- * `as unknown as KiloChatBinding` across call sites.
+ * Cast helper. Centralizes the `as KiloChatBinding` cast so call sites
+ * stay clean.
  */
 export function getKiloChat(env: { KILO_CHAT: unknown }): KiloChatBinding {
   return env.KILO_CHAT as KiloChatBinding;

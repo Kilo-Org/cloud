@@ -9,42 +9,23 @@
 import { logger } from '../util/logger';
 import { createMessageFor, type DeferCtx } from './messages';
 import { createConversationFor } from './conversations';
+import { userOwnsSandbox } from './sandbox-ownership';
 import { withDORetry } from '@kilocode/worker-utils';
-import { textBlockSchema } from '@kilocode/kilo-chat';
+import {
+  textBlockSchema,
+  type PostMessageAsUserParams,
+  type PostMessageAsUserResult,
+} from '@kilocode/kilo-chat';
 
-export type PostMessageAsUserCorrelation = {
-  triggerId?: string;
-  webhookRequestId?: string;
-  reason?: string;
-};
-
-export type PostMessageAsUserParams = {
-  userId: string;
-  sandboxId: string;
-  message: string;
-  // Origin identifier for diagnostics (e.g. "webhook", "onboarding-warmup").
-  // Logged so Axiom can attribute new conversations to a specific source.
-  source: string;
-  // Default true. Pass false to fail the call if the user has never opened
-  // a chat with this bot.
-  autoCreateConversation?: boolean;
-  correlation?: PostMessageAsUserCorrelation;
-};
-
-export type PostMessageAsUserOk = {
-  ok: true;
-  conversationId: string;
-  messageId: string;
-  conversationCreated: boolean;
-};
-
-export type PostMessageAsUserErr = {
-  ok: false;
-  code: 'invalid_request' | 'no_conversation' | 'forbidden' | 'internal';
-  error: string;
-};
-
-export type PostMessageAsUserResult = PostMessageAsUserOk | PostMessageAsUserErr;
+// Re-export the shared RPC contract types so callers within this worker
+// can import them from a single place alongside the implementation.
+export type {
+  PostMessageAsUserCorrelation,
+  PostMessageAsUserParams,
+  PostMessageAsUserOk,
+  PostMessageAsUserErr,
+  PostMessageAsUserResult,
+} from '@kilocode/kilo-chat';
 
 export async function postMessageAsUser(
   env: Env,
@@ -72,6 +53,24 @@ export async function postMessageAsUser(
       ok: false,
       code: 'invalid_request',
       error: 'Message is empty or exceeds the maximum chat message length',
+    };
+  }
+
+  // Unconditional ownership check. createConversationFor would catch this on
+  // the create path, but a stale or cross-user (userId, sandboxId) pair with
+  // a pre-existing conversation would otherwise post successfully — the
+  // ConversationDO membership check is not equivalent to current sandbox
+  // ownership. Run it here so every internal caller gets the same guard.
+  const owns = await userOwnsSandbox(env, userId, sandboxId);
+  if (!owns) {
+    logger.warn('postMessageAsUser: caller does not own sandbox', {
+      source,
+      ...correlation,
+    });
+    return {
+      ok: false,
+      code: 'forbidden',
+      error: 'You do not have access to this sandbox',
     };
   }
 

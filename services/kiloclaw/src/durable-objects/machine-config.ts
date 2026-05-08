@@ -1,4 +1,5 @@
 import type { MachineSize, ProviderId } from '../schemas/instance-config';
+import { MachineSizeSchema } from '../schemas/instance-config';
 import { OPENCLAW_PORT, DEFAULT_MACHINE_GUEST } from '../config';
 import type { RuntimeSpec } from '../providers/types';
 import type { FlyMachineConfig } from '../fly/types';
@@ -68,6 +69,46 @@ export function guestFromSize(machineSize: MachineSize | null): FlyMachineConfig
     memory_mb: machineSize.memory_mb,
     cpu_kind: machineSize.cpu_kind ?? 'shared',
   };
+}
+
+/**
+ * Validate a Fly-observed guest shape against `MachineSizeSchema` before
+ * writing it to DO state. Returns null when the shape doesn't conform —
+ * e.g. an unexpected `cpu_kind` value Fly may introduce in the future.
+ *
+ * Centralizes the validation so all three backfill sites (reconcile alarm,
+ * `startExistingMachine`, the user-facing live-check) use the same rules.
+ * Avoids the `as 'shared' | 'performance' | undefined` cast that would
+ * otherwise let unknown vocabulary into DO state where downstream
+ * `tierFromMachineSize` would silently mark the instance as `'custom'`.
+ */
+export function parseMachineSizeFromFlyGuest(guest: {
+  cpus: number;
+  memory_mb: number;
+  cpu_kind?: string;
+}): MachineSize | null {
+  const parsed = MachineSizeSchema.safeParse({
+    cpus: guest.cpus,
+    memory_mb: guest.memory_mb,
+    cpu_kind: guest.cpu_kind,
+  });
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Hardware that should drive the runtime spec for this instance right now.
+ *
+ * Returns `adminMachineSizeOverride` if set (admin temporary CPU/RAM bump
+ * for support workflows), otherwise the tier-derived `machineSize`. The
+ * billable tier (`instanceType`/`volumeSizeGb`) and any tier comparisons
+ * must continue reading `state.machineSize` directly — `effectiveMachineSize`
+ * is for runtime spec / Fly guest construction only.
+ */
+export function effectiveMachineSize(state: {
+  machineSize: MachineSize | null;
+  adminMachineSizeOverride: MachineSize | null;
+}): MachineSize | null {
+  return state.adminMachineSizeOverride ?? state.machineSize;
 }
 
 // ============================================================================

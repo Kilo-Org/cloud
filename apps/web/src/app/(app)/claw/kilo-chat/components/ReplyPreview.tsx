@@ -8,7 +8,7 @@ type ReplyPreviewProps = {
   message: Message;
   onCancel: () => void;
   assistantName?: string;
-  currentUserId: string;
+  currentUserId: string | null;
 };
 
 export function ReplyPreview({

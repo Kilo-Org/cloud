@@ -2,7 +2,8 @@ import { NextResponse, type NextResponse as NextResponseType } from 'next/server
 import { type NextRequest } from 'next/server';
 import { isOpenCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
-import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/ai-gateway/processUsage';
+import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
+import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import type {
   OpenRouterChatCompletionRequest,
@@ -78,9 +79,7 @@ import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
 import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
-import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
-import { extractResponsesPromptInfo } from '@/lib/ai-gateway/processUsage.responses';
-import { extractMessagesPromptInfo } from '@/lib/ai-gateway/processUsage.messages';
+import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import {
   enableReasoningSummaries,
   fixResponsesRequest,
@@ -114,16 +113,6 @@ function validatePath(
     return { path: pathSuffix };
   }
   return { errorResponse: invalidPathResponse() };
-}
-
-function extractPromptInfo(requestBodyParsed: GatewayRequest): PromptInfo {
-  if (requestBodyParsed.kind === 'messages') {
-    return extractMessagesPromptInfo(requestBodyParsed.body);
-  }
-  if (requestBodyParsed.kind === 'responses') {
-    return extractResponsesPromptInfo(requestBodyParsed.body);
-  }
-  return extractChatCompletionsPromptInfo(requestBodyParsed.body);
 }
 
 async function resolveRateLimit(
@@ -198,10 +187,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
-  const isLegacyOpenRouterPath = url.pathname.includes('/openrouter');
 
   const feature = validateFeatureHeader(
-    request.headers.get(FEATURE_HEADER) || (isLegacyOpenRouterPath ? '' : 'direct-gateway')
+    request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
   );
 
   const authPromise = getUserFromAuth({ adminOnly: false });

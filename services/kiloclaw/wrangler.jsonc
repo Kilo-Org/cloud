@@ -122,6 +122,13 @@
       "entrypoint": "NotificationsService",
     },
   ],
+  "triggers": {
+    // 1-minute cadence sweep for the scheduled-action notice fan-out.
+    // Selects pending notification rows whose dispatch window has
+    // opened and POSTs each to the backend's internal side-effects
+    // endpoint. See services/kiloclaw/src/scheduled/scheduled-action-notices.ts.
+    "crons": ["* * * * *"],
+  },
   "vars": {
     "FLY_APP_NAME": "kiloclaw-machines", // Legacy fallback for existing instances
     "FLY_REGISTRY_APP": "kiloclaw-machines", // Shared Docker image registry
@@ -131,6 +138,10 @@
     "NF_TEAM_ID": "kilo-prod",
     "NF_REGION": "us-central",
     "NF_DEPLOYMENT_PLAN": "nf-compute-200",
+    // getNorthflankConfig has source-level defaults for tier compute plans:
+    // perf-1-3=nf-compute-200, perf-4-8=nf-compute-400,
+    // perf-4-16=nf-compute-400-16. Override NF_DEPLOYMENT_PLAN_PERF_*
+    // only if an environment needs different Northflank plan slugs.
     "NF_EDGE_HEADER_NAME": "x-kiloclaw-northflank-edge-prod",
     "NF_IMAGE_PATH_TEMPLATE": "ghcr.io/kilo-org/kiloclaw:{tag}",
     "NF_IMAGE_CREDENTIALS_ID": "kiloclaw",

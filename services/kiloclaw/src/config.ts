@@ -61,8 +61,7 @@ export const DEFAULT_MACHINE_GUEST = {
   cpu_kind: 'performance' as const,
 };
 
-/** Default Fly Volume size in GB */
-export const DEFAULT_VOLUME_SIZE_GB = 10;
+export { DEFAULT_VOLUME_SIZE_GB } from '@kilocode/kiloclaw-instance-tiers';
 
 /** Default Fly region priority list when FLY_REGION env var is not set. */
 export const DEFAULT_FLY_REGION = 'eu,us';

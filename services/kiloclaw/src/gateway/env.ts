@@ -83,8 +83,6 @@ export type EnvVarsBuild = {
 const SENSITIVE_KEYS = new Set([
   'KILOCODE_API_KEY',
   'OPENCLAW_GATEWAY_TOKEN',
-  // Stream Chat bot token is auto-provisioned and must stay encrypted in transit
-  'STREAM_CHAT_BOT_USER_TOKEN',
   ...ALL_SECRET_ENV_VARS,
   ...INTERNAL_SENSITIVE_ENV_VARS,
 ]);

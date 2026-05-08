@@ -289,24 +289,6 @@ export function useKiloClawSecretCatalog(organizationId?: string | null) {
   return isOrg ? org : personal;
 }
 
-export function useStreamChatCredentials(organizationId?: string | null, enabled = true) {
-  const trpc = useTRPC();
-  const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId, enabled);
-  const personal = useQuery(
-    trpc.kiloclaw.getStreamChatCredentials.queryOptions(undefined, {
-      enabled: personalEnabled,
-      staleTime: 5 * 60_000,
-    })
-  );
-  const org = useQuery(
-    trpc.organizations.kiloclaw.getStreamChatCredentials.queryOptions(orgInput, {
-      enabled: orgEnabled,
-      staleTime: 5 * 60_000,
-    })
-  );
-  return isOrg ? org : personal;
-}
-
 export function useKiloClawConfig(organizationId?: string | null) {
   const trpc = useTRPC();
   const { isOrg, personalEnabled, orgEnabled, orgInput } = resolveContext(organizationId);

@@ -49,13 +49,13 @@ async function resolveWrapperClient(opts: {
     botId: metadata.botId,
   });
 
-  const session = await sessionService.getOrCreateSession(
+  const session = await sessionService.getOrCreateSession({
     sandbox,
     context,
     env,
-    authToken,
-    metadata.orgId
-  );
+    originalToken: authToken,
+    originalOrgId: metadata.orgId,
+  });
 
   return new WrapperClient({ session, port: wrapperInfo.port });
 }

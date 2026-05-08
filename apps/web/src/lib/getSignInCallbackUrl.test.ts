@@ -217,6 +217,34 @@ describe('getSignInCallbackUrl', () => {
 
       expect(result).toBe('/users/after-sign-in?source=extension&im_ref=impact-click-id-123');
     });
+
+    test('preserves referral query params through the auth callback', () => {
+      const result = getSignInCallbackUrl({
+        _saasquatch: 'opaque-referral-cookie',
+        rsCode: 'ref-code',
+        rsShareMedium: 'email',
+        rsEngagementMedium: 'link',
+      });
+
+      expect(result).toBe(
+        '/users/after-sign-in?_saasquatch=opaque-referral-cookie&rsCode=ref-code&rsShareMedium=email&rsEngagementMedium=link'
+      );
+    });
+
+    test('preserves KiloClaw callback paths and referral UTM metadata', () => {
+      const result = getSignInCallbackUrl({
+        callbackPath: '/claw/new',
+        _saasquatch: 'opaque-referral-cookie',
+        rsCode: 'ref-code',
+        utm_source: 'invite',
+        utm_medium: 'link',
+        utm_campaign: 'saasquatch',
+      });
+
+      expect(result).toBe(
+        '/users/after-sign-in?_saasquatch=opaque-referral-cookie&rsCode=ref-code&utm_source=invite&utm_medium=link&utm_campaign=saasquatch&callbackPath=%2Fclaw%2Fnew'
+      );
+    });
   });
 
   describe('stripHost', () => {

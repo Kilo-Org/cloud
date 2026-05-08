@@ -1,6 +1,10 @@
 import { env } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { ulidToTimestamp } from '@kilocode/kilo-chat';
+import { badgeBucketForConversation } from '@kilocode/notifications';
+import { ulid } from 'ulid';
 import type { ConversationDO } from '../do/conversation-do';
+import { postCommitFanOut } from '../services/messages';
 import { makeApp } from './helpers';
 
 function getConvStub(convId: string): DurableObjectStub<ConversationDO> {
@@ -15,6 +19,16 @@ type RecordingKiloclaw = typeof env.KILOCLAW & {
   __clearWebhookCalls(): Promise<void>;
 };
 const recordingKiloclaw = env.KILOCLAW as RecordingKiloclaw;
+
+type RecordingNotifications = typeof env.NOTIFICATIONS & {
+  __incrementBadgeBucket(input: {
+    userId: string;
+    badgeBucket: string;
+    delta: number;
+  }): Promise<void>;
+  __listNonZeroBuckets(userId: string): Promise<Array<{ badgeBucket: string; badgeCount: number }>>;
+};
+const recordingNotifications = env.NOTIFICATIONS as RecordingNotifications;
 
 async function waitForWebhookCalls(
   predicate: (calls: Array<Record<string, unknown>>) => boolean,
@@ -59,6 +73,55 @@ async function createConversation(userSuffix: string) {
   const { conversationId } = await res.json<{ conversationId: string }>();
 
   return { conversationId, userId, botId, sandboxId, userApp, botApp };
+}
+
+async function createMultiHumanConversation(userSuffix: string) {
+  const userId = `user-${userSuffix}`;
+  const recipientId = `recipient-${userSuffix}`;
+  const sandboxId = `sandbox-${userSuffix}`;
+  const botId = `bot:kiloclaw:${sandboxId}`;
+  const conversationId = ulid();
+  const joinedAt = Date.now();
+  const members: Array<{ id: string; kind: 'user' | 'bot' }> = [
+    { id: userId, kind: 'user' },
+    { id: recipientId, kind: 'user' },
+    { id: botId, kind: 'bot' },
+  ];
+
+  const convStub = getConvStub(conversationId);
+  const initResult = await convStub.initialize({
+    id: conversationId,
+    title: `Chat ${userSuffix}`,
+    createdBy: userId,
+    createdAt: joinedAt,
+    members,
+  });
+  expect(initResult).toEqual({ ok: true });
+
+  for (const member of members) {
+    await env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)).addConversation({
+      conversationId,
+      title: `Chat ${userSuffix}`,
+      sandboxId,
+      joinedAt,
+    });
+  }
+
+  const deliveredEventService = {
+    fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+    connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+    pushEvent: async () => true,
+  } satisfies Env['EVENT_SERVICE'];
+
+  return {
+    conversationId,
+    userId,
+    recipientId,
+    sandboxId,
+    userApp: makeApp(userId, 'user'),
+    recipientApp: makeApp(recipientId, 'user'),
+    deliveredEnv: { ...env, EVENT_SERVICE: deliveredEventService } satisfies Env,
+  };
 }
 
 const sampleContent = [{ type: 'text', text: 'Hello world' }];
@@ -226,22 +289,35 @@ describe('GET /v1/conversations/:id/messages', () => {
       env
     );
     expect(page1Res.status).toBe(200);
-    const page1 = await page1Res.json<{ messages: Array<{ id: string }> }>();
+    const page1 = await page1Res.json<{
+      messages: Array<{ id: string }>;
+      hasMore: boolean;
+      nextCursor: string | null;
+    }>();
     expect(page1.messages.length).toBe(2);
+    expect(page1.hasMore).toBe(true);
+    expect(page1.nextCursor).toBe(page1.messages[1]?.id);
 
     // Paginate using cursor
-    const cursor = page1.messages[page1.messages.length - 1].id;
+    const cursor = page1.nextCursor;
+    expect(cursor).not.toBeNull();
     const page2Res = await userApp.request(
       `/v1/conversations/${conversationId}/messages?limit=2&before=${cursor}`,
       {},
       env
     );
     expect(page2Res.status).toBe(200);
-    const page2 = await page2Res.json<{ messages: Array<{ id: string }> }>();
+    const page2 = await page2Res.json<{
+      messages: Array<{ id: string }>;
+      hasMore: boolean;
+      nextCursor: string | null;
+    }>();
     expect(page2.messages.length).toBe(1);
+    expect(page2.hasMore).toBe(false);
+    expect(page2.nextCursor).toBeNull();
     // All page2 ids should be less than cursor
     for (const msg of page2.messages) {
-      expect(msg.id < cursor).toBe(true);
+      expect(cursor && msg.id < cursor).toBe(true);
     }
   });
 
@@ -337,6 +413,37 @@ describe('PATCH /v1/messages/:id', () => {
     expect(editRes.status).toBe(409);
   });
 
+  it('returns 400 when edit content includes caller-supplied action resolution', async () => {
+    const { conversationId, userApp } = await createConversation('msg-edit-resolved-actions');
+
+    const editRes = await userApp.request(
+      '/v1/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'actions',
+              groupId: 'approval-1',
+              actions: [],
+              resolved: {
+                value: 'deny',
+                resolvedBy: 'user-1',
+                resolvedAt: 1,
+              },
+            },
+          ],
+          timestamp: Date.now(),
+        }),
+      },
+      env
+    );
+
+    expect(editRes.status).toBe(400);
+  });
+
   it('returns 403 when non-sender tries to edit', async () => {
     const {
       conversationId,
@@ -375,10 +482,49 @@ describe('PATCH /v1/messages/:id', () => {
 
     expect(editRes.status).toBe(403);
   });
+
+  it('returns 403 when a former member tries to edit their message', async () => {
+    const { conversationId, userApp } = await createConversation('msg-edit-left');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      env
+    );
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const leaveRes = await userApp.request(
+      `/v1/conversations/${conversationId}/leave`,
+      { method: 'POST' },
+      env
+    );
+    expect(leaveRes.status).toBe(200);
+    await expect(leaveRes.json()).resolves.toEqual({ ok: true });
+
+    const editRes = await userApp.request(
+      `/v1/messages/${messageId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Edited after leaving' }],
+          timestamp: Date.now(),
+        }),
+      },
+      env
+    );
+
+    expect(editRes.status).toBe(403);
+  });
 });
 
 describe('DELETE /v1/messages/:id', () => {
-  it('soft-deletes a message and returns 204', async () => {
+  it('soft-deletes a message and returns ok', async () => {
     const { conversationId, userApp } = await createConversation('msg-delete-1');
 
     // Create a message
@@ -404,7 +550,8 @@ describe('DELETE /v1/messages/:id', () => {
       env
     );
 
-    expect(deleteRes.status).toBe(204);
+    expect(deleteRes.status).toBe(200);
+    await expect(deleteRes.json()).resolves.toEqual({ ok: true });
 
     // Verify message is soft-deleted (appears in list but marked deleted)
     const convStub = getConvStub(conversationId);
@@ -438,6 +585,41 @@ describe('DELETE /v1/messages/:id', () => {
     // Bot tries to delete user's message
     const delQs = new URLSearchParams({ conversationId });
     const deleteRes = await botApp.request(
+      `/v1/messages/${messageId}?${delQs.toString()}`,
+      {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+      },
+      env
+    );
+
+    expect(deleteRes.status).toBe(403);
+  });
+
+  it('returns 403 when a former member tries to delete their message', async () => {
+    const { conversationId, userApp } = await createConversation('msg-delete-left');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      env
+    );
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const leaveRes = await userApp.request(
+      `/v1/conversations/${conversationId}/leave`,
+      { method: 'POST' },
+      env
+    );
+    expect(leaveRes.status).toBe(200);
+    await expect(leaveRes.json()).resolves.toEqual({ ok: true });
+
+    const delQs = new URLSearchParams({ conversationId });
+    const deleteRes = await userApp.request(
       `/v1/messages/${messageId}?${delQs.toString()}`,
       {
         method: 'DELETE',
@@ -819,6 +1001,497 @@ describe('sender conversation read state after sending', () => {
   });
 });
 
+describe('recipient conversation read state after message delivery', () => {
+  it('does not mark delivered recipient sockets as read without an explicit read call', async () => {
+    const { conversationId, recipientId, sandboxId, userApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-hidden');
+
+    const res = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      deliveredEnv
+    );
+    expect(res.status).toBe(201);
+
+    const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
+    const after = await recipientMemberStub.listConversations({ sandboxId });
+    const conversation = after.conversations.find(c => c.conversationId === conversationId);
+    if (!conversation) {
+      throw new Error('Expected recipient membership conversation');
+    }
+    expect(conversation.lastActivityAt).not.toBeNull();
+    expect(conversation.lastReadAt).toBeNull();
+  });
+
+  it('marks recipients read when the visible client explicitly marks the conversation read', async () => {
+    const { conversationId, recipientId, sandboxId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-visible');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      deliveredEnv
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const markReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: messageId }),
+      },
+      deliveredEnv
+    );
+    expect(markReadRes.status).toBe(200);
+    await expect(markReadRes.json()).resolves.toEqual({
+      ok: true,
+      applied: true,
+      lastReadAt: ulidToTimestamp(messageId),
+      badgeClear: {
+        badgeBucket: badgeBucketForConversation(sandboxId, conversationId),
+        badgeCount: 0,
+      },
+    });
+
+    const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
+    const after = await recipientMemberStub.listConversations({ sandboxId });
+    const conversation = after.conversations.find(c => c.conversationId === conversationId);
+    if (!conversation) {
+      throw new Error('Expected recipient membership conversation');
+    }
+    const lastActivityAt = conversation.lastActivityAt;
+    const lastReadAt = conversation.lastReadAt;
+    if (lastActivityAt === null || lastReadAt === null) {
+      throw new Error('Expected recipient conversation activity and read state');
+    }
+    expect(lastActivityAt).toBe(ulidToTimestamp(messageId));
+    expect(lastReadAt).toBe(ulidToTimestamp(messageId));
+    expect(lastReadAt).toBeGreaterThanOrEqual(lastActivityAt);
+  });
+
+  it('marks recipients read only through the latest message the client observed', async () => {
+    const { conversationId, recipientId, sandboxId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-stale-read');
+
+    const firstMessageRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Message A' }],
+        }),
+      },
+      deliveredEnv
+    );
+    expect(firstMessageRes.status).toBe(201);
+    const { messageId: firstMessageId } = await firstMessageRes.json<{ messageId: string }>();
+
+    await new Promise(resolve => setTimeout(resolve, 2));
+
+    const secondMessageRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Message B' }],
+        }),
+      },
+      deliveredEnv
+    );
+    expect(secondMessageRes.status).toBe(201);
+
+    const markReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: firstMessageId }),
+      },
+      deliveredEnv
+    );
+    expect(markReadRes.status).toBe(200);
+    await expect(markReadRes.json()).resolves.toEqual({
+      ok: true,
+      applied: true,
+      lastReadAt: ulidToTimestamp(firstMessageId),
+      badgeClear: null,
+    });
+
+    const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
+    const after = await recipientMemberStub.listConversations({ sandboxId });
+    const conversation = after.conversations.find(c => c.conversationId === conversationId);
+    if (!conversation) {
+      throw new Error('Expected recipient membership conversation');
+    }
+    const lastActivityAt = conversation.lastActivityAt;
+    if (lastActivityAt === null) {
+      throw new Error('Expected recipient conversation activity');
+    }
+    expect(conversation.lastReadAt).toBe(ulidToTimestamp(firstMessageId));
+    expect(conversation.lastReadAt).toBeLessThan(lastActivityAt);
+  });
+
+  it('does not clear notification buckets when marking read through a stale message', async () => {
+    const { conversationId, recipientId, sandboxId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-stale-badge');
+
+    const firstMessageRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Message A' }],
+        }),
+      },
+      deliveredEnv
+    );
+    expect(firstMessageRes.status).toBe(201);
+    const { messageId: firstMessageId } = await firstMessageRes.json<{ messageId: string }>();
+
+    await new Promise(resolve => setTimeout(resolve, 2));
+
+    const secondMessageRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'Message B' }],
+        }),
+      },
+      deliveredEnv
+    );
+    expect(secondMessageRes.status).toBe(201);
+
+    const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
+    await recordingNotifications.__incrementBadgeBucket({
+      userId: recipientId,
+      badgeBucket,
+      delta: 1,
+    });
+
+    const markReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: firstMessageId }),
+      },
+      deliveredEnv
+    );
+    expect(markReadRes.status).toBe(200);
+    await expect(markReadRes.json()).resolves.toEqual({
+      ok: true,
+      applied: true,
+      lastReadAt: ulidToTimestamp(firstMessageId),
+      badgeClear: null,
+    });
+
+    const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
+    const after = await recipientMemberStub.listConversations({ sandboxId });
+    const conversation = after.conversations.find(c => c.conversationId === conversationId);
+    if (!conversation) {
+      throw new Error('Expected recipient membership conversation');
+    }
+    const lastActivityAt = conversation.lastActivityAt;
+    if (lastActivityAt === null) {
+      throw new Error('Expected recipient conversation activity');
+    }
+    expect(conversation.lastReadAt).toBe(ulidToTimestamp(firstMessageId));
+    expect(conversation.lastReadAt).toBeLessThan(lastActivityAt);
+    await expect(recordingNotifications.__listNonZeroBuckets(recipientId)).resolves.toEqual([
+      { badgeBucket, badgeCount: 1 },
+    ]);
+  });
+
+  it('clears notification buckets when marking read through a deleted final message', async () => {
+    const { conversationId, recipientId, sandboxId, userId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-deleted-badge-clear');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      deliveredEnv
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
+    await recordingNotifications.__incrementBadgeBucket({
+      userId: recipientId,
+      badgeBucket,
+      delta: 1,
+    });
+
+    const deleteQs = new URLSearchParams({ conversationId });
+    const deleteRes = await userApp.request(
+      `/v1/messages/${messageId}?${deleteQs.toString()}`,
+      {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+      },
+      deliveredEnv
+    );
+    expect(deleteRes.status).toBe(200);
+    await expect(deleteRes.json()).resolves.toEqual({ ok: true });
+
+    const markReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: messageId }),
+      },
+      deliveredEnv
+    );
+    expect(markReadRes.status).toBe(200);
+    await expect(markReadRes.json()).resolves.toEqual({
+      ok: true,
+      applied: true,
+      lastReadAt: ulidToTimestamp(messageId),
+      badgeClear: { badgeBucket, badgeCount: 0 },
+    });
+
+    await expect(recordingNotifications.__listNonZeroBuckets(recipientId)).resolves.toEqual([]);
+    await expect(recordingNotifications.__listNonZeroBuckets(userId)).resolves.toEqual([]);
+  });
+
+  it('clears stale notification buckets when recipients mark a conversation read', async () => {
+    const { conversationId, recipientId, sandboxId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-badge-clear');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      deliveredEnv
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const firstMarkReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: messageId }),
+      },
+      deliveredEnv
+    );
+    expect(firstMarkReadRes.status).toBe(200);
+    const badgeBucket = badgeBucketForConversation(sandboxId, conversationId);
+    await expect(firstMarkReadRes.json()).resolves.toEqual({
+      ok: true,
+      applied: true,
+      lastReadAt: ulidToTimestamp(messageId),
+      badgeClear: { badgeBucket, badgeCount: 0 },
+    });
+
+    await recordingNotifications.__incrementBadgeBucket({
+      userId: recipientId,
+      badgeBucket,
+      delta: 1,
+    });
+    await expect(recordingNotifications.__listNonZeroBuckets(recipientId)).resolves.toEqual([
+      { badgeBucket, badgeCount: 1 },
+    ]);
+
+    const secondMarkReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: messageId }),
+      },
+      deliveredEnv
+    );
+    expect(secondMarkReadRes.status).toBe(200);
+    await expect(secondMarkReadRes.json()).resolves.toEqual({
+      ok: true,
+      applied: false,
+      lastReadAt: ulidToTimestamp(messageId),
+      badgeClear: { badgeBucket, badgeCount: 0 },
+    });
+
+    await expect(recordingNotifications.__listNonZeroBuckets(recipientId)).resolves.toEqual([]);
+  });
+
+  it('returns retryable failure when required badge clearing fails', async () => {
+    const { conversationId, recipientId, userApp, recipientApp, deliveredEnv } =
+      await createMultiHumanConversation('msg-recipient-badge-clear-fails');
+
+    const createRes = await userApp.request(
+      '/v1/messages',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conversationId, content: sampleContent }),
+      },
+      deliveredEnv
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const failingNotifications = {
+      ...deliveredEnv.NOTIFICATIONS,
+      clearBadgeBucketForUser: async () => {
+        throw new Error('notifications unavailable');
+      },
+    } as Env['NOTIFICATIONS'];
+    const failingEnv = { ...deliveredEnv, NOTIFICATIONS: failingNotifications } satisfies Env;
+
+    const markReadRes = await recipientApp.request(
+      `/v1/conversations/${conversationId}/mark-read`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastSeenMessageId: messageId }),
+      },
+      failingEnv
+    );
+
+    expect(markReadRes.status).toBe(503);
+    await expect(markReadRes.json()).resolves.toEqual({
+      error: 'Failed to clear notification badge',
+    });
+
+    const recipientMemberStub = env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(recipientId));
+    const after = await recipientMemberStub.listConversations({});
+    const conversation = after.conversations.find(c => c.conversationId === conversationId);
+    expect(conversation?.lastReadAt).toBe(ulidToTimestamp(messageId));
+  });
+});
+
+describe('POST /v1/conversations/:conversationId/messages/:messageId/execute-action', () => {
+  it('returns the canonical resolved action content', async () => {
+    const { conversationId, userApp, botId } = await createConversation('execute-action-result');
+    const convStub = getConvStub(conversationId);
+    const create = await convStub.createMessage({
+      senderId: botId,
+      content: [
+        {
+          type: 'actions',
+          groupId: 'approval',
+          actions: [
+            { value: 'allow-once', label: 'Allow', style: 'primary' },
+            { value: 'deny', label: 'Deny', style: 'danger' },
+          ],
+        },
+      ],
+    });
+    expect(create.ok).toBe(true);
+    if (!create.ok) return;
+
+    const beforeExecute = Date.now();
+    const res = await userApp.request(
+      `/v1/conversations/${conversationId}/messages/${create.messageId}/execute-action`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ groupId: 'approval', value: 'deny' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{
+      ok: true;
+      messageId: string;
+      content: Array<{
+        type: string;
+        groupId?: string;
+        resolved?: { value: string; resolvedBy: string; resolvedAt: number };
+      }>;
+      resolved: { groupId: string; value: string; resolvedBy: string; resolvedAt: number };
+    }>();
+    expect(body.messageId).toBe(create.messageId);
+    expect(body.resolved.groupId).toBe('approval');
+    expect(body.resolved.value).toBe('deny');
+    expect(body.resolved.resolvedBy).toBe('user-execute-action-result');
+    expect(body.resolved.resolvedAt).toBeGreaterThanOrEqual(beforeExecute);
+    expect(body.content.find(block => block.type === 'actions')?.resolved).toEqual({
+      value: 'deny',
+      resolvedBy: 'user-execute-action-result',
+      resolvedAt: body.resolved.resolvedAt,
+    });
+  });
+
+  it('does not enqueue action.executed when the author bot has left', async () => {
+    await recordingKiloclaw.__clearWebhookCalls();
+    const conversationId = ulid();
+    const userId = 'user-execute-left-author';
+    const authorBotId = 'bot:kiloclaw:sandbox-execute-left-author';
+    const activeBotId = 'bot:kiloclaw:sandbox-execute-still-active';
+    const userApp = makeApp(userId, 'user');
+    const convStub = getConvStub(conversationId);
+    await convStub.initialize({
+      id: conversationId,
+      title: 'Action Chat',
+      createdBy: userId,
+      createdAt: Date.now(),
+      members: [
+        { id: userId, kind: 'user' },
+        { id: authorBotId, kind: 'bot' },
+        { id: activeBotId, kind: 'bot' },
+      ],
+    });
+    const create = await convStub.createMessage({
+      senderId: authorBotId,
+      content: [
+        {
+          type: 'actions',
+          groupId: 'approval',
+          actions: [{ value: 'deny', label: 'Deny', style: 'danger' }],
+        },
+      ],
+    });
+    expect(create.ok).toBe(true);
+    if (!create.ok) return;
+    await convStub.leaveMember(authorBotId);
+
+    const res = await userApp.request(
+      `/v1/conversations/${conversationId}/messages/${create.messageId}/execute-action`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ groupId: 'approval', value: 'deny' }),
+      },
+      env
+    );
+
+    expect(res.status).toBe(200);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const calls = await recordingKiloclaw.__recordedWebhookCalls();
+    expect(
+      calls.some(call => call.conversationId === conversationId && call.type === 'action.executed')
+    ).toBe(false);
+  });
+});
+
 describe('auto-title on first message', () => {
   it('auto-titles an untitled conversation from first message text', async () => {
     const userId = 'user-autotitle';
@@ -863,5 +1536,260 @@ describe('auto-title on first message', () => {
 
     const { messages } = await convStub.listMessages({ limit: 10 });
     expect(messages).toHaveLength(1);
+  });
+
+  it('keeps the first auto-title when a later fan-out also observed no title', async () => {
+    const userId = 'user-autotitle-race';
+    const sandboxId = 'sandbox-autotitle-race';
+    const botId = `bot:kiloclaw:${sandboxId}`;
+    const conversationId = ulid();
+    const joinedAt = Date.now();
+    const members: Array<{ id: string; kind: 'user' | 'bot' }> = [
+      { id: userId, kind: 'user' },
+      { id: botId, kind: 'bot' },
+    ];
+
+    const convStub = getConvStub(conversationId);
+    const initResult = await convStub.initialize({
+      id: conversationId,
+      title: null,
+      createdBy: userId,
+      createdAt: joinedAt,
+      members,
+    });
+    expect(initResult).toEqual({ ok: true });
+
+    for (const member of members) {
+      await env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)).addConversation({
+        conversationId,
+        title: null,
+        sandboxId,
+        joinedAt,
+      });
+    }
+
+    const staleInfo = {
+      id: conversationId,
+      title: null,
+      createdBy: userId,
+      createdAt: joinedAt,
+      members,
+    };
+    const pushedEvents: Array<{ event: string; payload: unknown }> = [];
+    const pushEvent = vi.fn(
+      async (_userId: string, _context: string, event: string, payload: unknown) => {
+        pushedEvents.push({ event, payload });
+        return true;
+      }
+    );
+    const eventEnv = {
+      ...env,
+      EVENT_SERVICE: {
+        fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+        connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+        pushEvent,
+      },
+    } satisfies Env;
+
+    await postCommitFanOut(
+      eventEnv,
+      staleInfo,
+      userId,
+      conversationId,
+      ulid(),
+      [{ type: 'text', text: 'First title' }],
+      undefined,
+      undefined
+    );
+    await postCommitFanOut(
+      eventEnv,
+      staleInfo,
+      userId,
+      conversationId,
+      ulid(),
+      [{ type: 'text', text: 'Second title' }],
+      undefined,
+      undefined
+    );
+
+    const infoAfter = await convStub.getInfo();
+    expect(infoAfter!.title).toBe('First title');
+
+    const userMembership = await env.MEMBERSHIP_DO.get(
+      env.MEMBERSHIP_DO.idFromName(userId)
+    ).listConversations({ sandboxId });
+    const botMembership = await env.MEMBERSHIP_DO.get(
+      env.MEMBERSHIP_DO.idFromName(botId)
+    ).listConversations({ sandboxId });
+    expect(userMembership.conversations[0].title).toBe('First title');
+    expect(botMembership.conversations[0].title).toBe('First title');
+
+    const renamedPayloads = pushedEvents
+      .filter(pushedEvent => pushedEvent.event === 'conversation.renamed')
+      .map(pushedEvent => pushedEvent.payload);
+    expect(renamedPayloads).toEqual([{ conversationId, title: 'First title' }]);
+  });
+
+  it('publishes reply snapshots on message.created events', async () => {
+    const { conversationId, userId } = await createMultiHumanConversation('reply-event-snapshot');
+    const convStub = getConvStub(conversationId);
+    const info = await convStub.getInfo();
+    expect(info).not.toBeNull();
+    if (!info) return;
+
+    const parent = await convStub.createMessage({
+      senderId: 'recipient-reply-event-snapshot',
+      content: [{ type: 'text', text: 'Parent context' }],
+    });
+    expect(parent.ok).toBe(true);
+    if (!parent.ok) return;
+
+    const replyMessageId = ulid();
+    const pushedEvents: Array<{ event: string; payload: unknown }> = [];
+    const pushEvent = vi.fn(
+      async (_userId: string, _context: string, event: string, payload: unknown) => {
+        pushedEvents.push({ event, payload });
+        return true;
+      }
+    );
+    const eventEnv = {
+      ...env,
+      EVENT_SERVICE: {
+        fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+        connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+        pushEvent,
+      },
+    } satisfies Env;
+
+    await postCommitFanOut(
+      eventEnv,
+      info,
+      userId,
+      conversationId,
+      replyMessageId,
+      [{ type: 'text', text: 'Reply body' }],
+      parent.messageId,
+      undefined
+    );
+
+    const createdPayloads = pushedEvents
+      .filter(pushedEvent => pushedEvent.event === 'message.created')
+      .map(pushedEvent => pushedEvent.payload);
+    expect(createdPayloads).toEqual([
+      {
+        messageId: replyMessageId,
+        senderId: userId,
+        content: [{ type: 'text', text: 'Reply body' }],
+        inReplyToMessageId: parent.messageId,
+        replyTo: {
+          messageId: parent.messageId,
+          senderId: 'recipient-reply-event-snapshot',
+          deleted: false,
+          previewText: 'Parent context',
+        },
+        clientId: null,
+      },
+      {
+        messageId: replyMessageId,
+        senderId: userId,
+        content: [{ type: 'text', text: 'Reply body' }],
+        inReplyToMessageId: parent.messageId,
+        replyTo: {
+          messageId: parent.messageId,
+          senderId: 'recipient-reply-event-snapshot',
+          deleted: false,
+          previewText: 'Parent context',
+        },
+        clientId: null,
+      },
+    ]);
+  });
+
+  it('shares the reply parent lookup across webhook and message events', async () => {
+    const { conversationId, userId } = await createMultiHumanConversation('reply-shared-parent');
+    const convStub = getConvStub(conversationId);
+    const info = await convStub.getInfo();
+    expect(info).not.toBeNull();
+    if (!info) return;
+
+    const parent = await convStub.createMessage({
+      senderId: 'recipient-reply-shared-parent',
+      content: [{ type: 'text', text: 'Parent context' }],
+    });
+    expect(parent.ok).toBe(true);
+    if (!parent.ok) return;
+
+    const getMessage = vi.fn((messageId: string) => convStub.getMessage(messageId));
+    const countedConvStub = Object.assign(Object.create(convStub) as typeof convStub, {
+      getMessage,
+    });
+    const countedConversationDo = Object.assign(
+      Object.create(env.CONVERSATION_DO) as typeof env.CONVERSATION_DO,
+      {
+        get: () => countedConvStub,
+        idFromName: (name: string) => env.CONVERSATION_DO.idFromName(name),
+      }
+    );
+    const eventEnv = {
+      ...env,
+      CONVERSATION_DO: countedConversationDo,
+      EVENT_SERVICE: {
+        fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+        connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+        pushEvent: async () => true,
+      },
+    } satisfies Env;
+
+    await postCommitFanOut(
+      eventEnv,
+      info,
+      userId,
+      conversationId,
+      ulid(),
+      [{ type: 'text', text: 'Reply body' }],
+      parent.messageId,
+      undefined
+    );
+
+    expect(getMessage).toHaveBeenCalledOnce();
+  });
+
+  it('does not publish automatic typing.stop events for human messages', async () => {
+    const { conversationId, userId } = await createMultiHumanConversation('human-message-events');
+    const convStub = getConvStub(conversationId);
+    const info = await convStub.getInfo();
+    expect(info).not.toBeNull();
+    if (!info) return;
+
+    const pushedEvents: Array<{ event: string; userId: string }> = [];
+    const pushEvent = vi.fn(async (eventUserId: string, _context: string, event: string) => {
+      pushedEvents.push({ event, userId: eventUserId });
+      return true;
+    });
+    const eventEnv = {
+      ...env,
+      EVENT_SERVICE: {
+        fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+        connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+        pushEvent,
+      },
+    } satisfies Env;
+
+    await postCommitFanOut(
+      eventEnv,
+      info,
+      userId,
+      conversationId,
+      ulid(),
+      [{ type: 'text', text: 'Hello humans' }],
+      undefined,
+      undefined
+    );
+
+    expect(pushedEvents.filter(pushedEvent => pushedEvent.event === 'message.created')).toEqual([
+      { event: 'message.created', userId },
+      { event: 'message.created', userId: 'recipient-human-message-events' },
+    ]);
+    expect(pushedEvents.some(pushedEvent => pushedEvent.event === 'typing.stop')).toBe(false);
   });
 });

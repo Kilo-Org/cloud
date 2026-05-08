@@ -2,24 +2,6 @@ import { getWorkerDb } from '@kilocode/db';
 import { kiloclaw_instances } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 
-const TTL_MS = 5 * 60 * 1000;
-
-type CacheEntry =
-  | { kind: 'owner'; value: string | null; expiresAt: number }
-  | { kind: 'owns'; value: boolean; expiresAt: number };
-
-const cache = new Map<string, CacheEntry>();
-
-function readFresh(key: string): CacheEntry | undefined {
-  const entry = cache.get(key);
-  if (!entry) return undefined;
-  if (entry.expiresAt <= Date.now()) {
-    cache.delete(key);
-    return undefined;
-  }
-  return entry;
-}
-
 async function queryOwnsSandbox(
   connectionString: string,
   userId: string,
@@ -57,48 +39,23 @@ async function querySandboxOwner(
 
 /**
  * Returns true if the user owns an active (non-destroyed) instance for the
- * given sandbox. Positive results are cached in-memory for 5 minutes; `false`
- * is treated as a cache miss so a freshly-provisioned sandbox starts
- * returning true as soon as the DB reflects it.
+ * given sandbox.
  */
 export async function userOwnsSandbox(
   env: Env,
   userId: string,
   sandboxId: string
 ): Promise<boolean> {
-  const key = `owns:${userId}\0${sandboxId}`;
-  const hit = readFresh(key);
-  if (hit && hit.kind === 'owns') return hit.value;
-
-  const value = await queryOwnsSandbox(env.HYPERDRIVE.connectionString, userId, sandboxId);
-  if (value) {
-    cache.set(key, { kind: 'owns', value, expiresAt: Date.now() + TTL_MS });
-  }
-  return value;
+  return await queryOwnsSandbox(env.HYPERDRIVE.connectionString, userId, sandboxId);
 }
 
 /**
  * Returns the user_id of the sandbox owner (active, non-destroyed instance),
- * or null if no active instance exists. Resolved owner ids are cached
- * in-memory for 5 minutes; `null` is treated as a cache miss so a
- * freshly-provisioned sandbox resolves its owner on the very next call.
+ * or null if no active instance exists.
  */
 export async function lookupSandboxOwnerUserId(
   env: Env,
   sandboxId: string
 ): Promise<string | null> {
-  const key = `owner:${sandboxId}`;
-  const hit = readFresh(key);
-  if (hit && hit.kind === 'owner') return hit.value;
-
-  const value = await querySandboxOwner(env.HYPERDRIVE.connectionString, sandboxId);
-  if (value !== null) {
-    cache.set(key, { kind: 'owner', value, expiresAt: Date.now() + TTL_MS });
-  }
-  return value;
-}
-
-/** Test-only: reset the shared ownership cache. */
-export function clearSandboxOwnershipCacheForTest(): void {
-  cache.clear();
+  return await querySandboxOwner(env.HYPERDRIVE.connectionString, sandboxId);
 }

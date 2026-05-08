@@ -18,3 +18,7 @@ export const APPSFLYER_APP_ID: string = required('appsFlyerAppId');
 
 export const CLOUD_AGENT_WS_URL: string = required('cloudAgentWsUrl');
 export const SESSION_INGEST_WS_URL: string = required('sessionIngestWsUrl');
+
+export const KILO_CHAT_URL: string = required('kiloChatUrl');
+export const EVENT_SERVICE_URL: string = required('eventServiceUrl');
+export const NOTIFICATIONS_URL: string = required('notificationsUrl');

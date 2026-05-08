@@ -38,6 +38,7 @@ import {
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
   kiloclaw_email_log,
+  transactional_email_log,
   kiloclaw_cli_runs,
   bot_requests,
   bot_request_cloud_agent_sessions,
@@ -48,6 +49,21 @@ import {
   user_push_tokens,
   security_advisor_scans,
   credit_campaigns,
+  agent_environment_profiles,
+  agent_environment_profile_mcp_servers,
+  agent_environment_profile_skills,
+  deleted_user_email_tombstones,
+  kiloclaw_attribution_touches,
+  impact_advocate_participants,
+  impact_advocate_registration_attempts,
+  kiloclaw_referrals,
+  kiloclaw_referral_conversions,
+  kiloclaw_referral_reward_decisions,
+  kiloclaw_referral_rewards,
+  kiloclaw_referral_reward_applications,
+  impact_advocate_reward_redemptions,
+  impact_conversion_reports,
+  github_branch_pull_requests,
 } from '@kilocode/db/schema';
 import { eq, count } from 'drizzle-orm';
 import {
@@ -57,6 +73,7 @@ import {
   findUsersByIds,
   createOrUpdateUser,
 } from './user';
+import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact-referral';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
@@ -82,6 +99,17 @@ describe('User', () => {
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
+    await db.delete(kiloclaw_attribution_touches);
+    await db.delete(impact_advocate_registration_attempts);
+    await db.delete(impact_advocate_participants);
+    await db.delete(impact_conversion_reports);
+    await db.delete(impact_advocate_reward_redemptions);
+    await db.delete(kiloclaw_referral_reward_applications);
+    await db.delete(kiloclaw_referral_rewards);
+    await db.delete(kiloclaw_referral_reward_decisions);
+    await db.delete(kiloclaw_referral_conversions);
+    await db.delete(kiloclaw_referrals);
+    await db.delete(deleted_user_email_tombstones);
     await db.delete(payment_methods);
     await db.delete(kilo_pass_issuance_items);
     await db.delete(kilo_pass_issuances);
@@ -116,11 +144,16 @@ describe('User', () => {
     await db.delete(stytch_fingerprints);
     await db.delete(kiloclaw_cli_runs);
     await db.delete(kiloclaw_email_log);
+    await db.delete(transactional_email_log);
     await db.delete(kiloclaw_version_pins);
     await db.delete(kiloclaw_image_catalog);
     await db.delete(kiloclaw_subscriptions);
     await db.delete(kiloclaw_earlybird_purchases);
     await db.delete(kiloclaw_instances);
+    await db.delete(agent_environment_profile_skills);
+    await db.delete(agent_environment_profile_mcp_servers);
+    await db.delete(agent_environment_profiles);
+    await db.delete(github_branch_pull_requests);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -371,6 +404,173 @@ describe('User', () => {
         '2026-01-15T12:00:00.000Z'
       );
       expect(blockedUserAfter!.blocked_by_kilo_user_id).toBeNull();
+    });
+
+    it('should tombstone normalized email hashes and delete referral program records', async () => {
+      const referrer = await insertTestUser({
+        id: 'referrer-user',
+        google_user_email: 'referrer@example.com',
+        normalized_email: 'referrer@example.com',
+      });
+      const user = await insertTestUser({
+        id: 'referee-user',
+        google_user_email: 'referee@example.com',
+        normalized_email: 'referee@example.com',
+      });
+      const touchId = randomUUID();
+      const participantId = randomUUID();
+      const conversionId = randomUUID();
+      const decisionId = randomUUID();
+      const rewardId = randomUUID();
+
+      await db.insert(kiloclaw_attribution_touches).values({
+        id: touchId,
+        dedupe_key: 'touch-dedupe',
+        user_id: user.id,
+        touch_type: 'referral',
+        provider: 'impact_advocate',
+        opaque_tracking_value: 'sq-cookie',
+        tracking_value_length: 9,
+        is_tracking_value_accepted: true,
+        touched_at: '2026-04-23T00:00:00.000Z',
+        expires_at: '2026-05-23T00:00:00.000Z',
+      });
+      await db.insert(impact_advocate_participants).values({
+        id: participantId,
+        user_id: user.id,
+        advocate_id: user.id,
+        advocate_account_id: user.id,
+        contact_email: user.google_user_email,
+        registration_state: 'pending',
+      });
+      await db.insert(impact_advocate_registration_attempts).values({
+        participant_id: participantId,
+        dedupe_key: 'registration-dedupe',
+        opaque_cookie_value: 'sq-cookie',
+        cookie_value_length: 9,
+        delivery_state: 'queued',
+      });
+      await db.insert(kiloclaw_referrals).values({
+        referee_user_id: user.id,
+        referrer_user_id: referrer.id,
+        source_touch_id: touchId,
+      });
+      await db.insert(kiloclaw_referral_conversions).values({
+        id: conversionId,
+        referee_user_id: user.id,
+        referrer_user_id: referrer.id,
+        source_touch_id: touchId,
+        winning_touch_type: 'referral',
+        source_payment_id: 'payment-123',
+        qualified: true,
+        converted_at: '2026-04-23T00:00:00.000Z',
+      });
+      await db.insert(kiloclaw_referral_reward_decisions).values({
+        id: decisionId,
+        conversion_id: conversionId,
+        beneficiary_user_id: user.id,
+        beneficiary_role: 'referee',
+        outcome: 'granted',
+        months_granted: 1,
+      });
+      await db.insert(kiloclaw_referral_rewards).values({
+        id: rewardId,
+        conversion_id: conversionId,
+        decision_id: decisionId,
+        beneficiary_user_id: user.id,
+        beneficiary_role: 'referee',
+        months_granted: 1,
+        status: 'pending',
+        earned_at: '2026-04-23T00:00:00.000Z',
+      });
+      await db.insert(kiloclaw_referral_reward_applications).values({
+        reward_id: rewardId,
+        beneficiary_user_id: user.id,
+        previous_renewal_boundary: '2026-05-01T00:00:00.000Z',
+        new_renewal_boundary: '2026-06-01T00:00:00.000Z',
+        applied_at: '2026-04-23T00:00:00.000Z',
+      });
+      await db.insert(impact_advocate_reward_redemptions).values({
+        reward_id: rewardId,
+        dedupe_key: 'reward-redemption-dedupe',
+        beneficiary_user_id: user.id,
+        state: 'queued',
+        request_payload: {
+          lookup: {
+            accountId: user.google_user_email,
+            userId: user.google_user_email,
+            rewardTypeFilter: 'CREDIT',
+          },
+          redemption: { amount: 1, unit: 'free-months' },
+        },
+      });
+      await db.insert(impact_conversion_reports).values({
+        conversion_id: conversionId,
+        dedupe_key: 'impact-report-dedupe',
+        action_tracker_id: 71659,
+        order_id: 'payment-123',
+        state: 'queued',
+      });
+
+      await softDeleteUser(user.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(deleted_user_email_tombstones)
+        .where(
+          eq(
+            deleted_user_email_tombstones.normalized_email_hash,
+            hashNormalizedEmailForDeletionTombstone('referee@example.com')
+          )
+        );
+      expect(tombstone).toBeDefined();
+
+      const [touchCount] = await db
+        .select({ count: count() })
+        .from(kiloclaw_attribution_touches)
+        .where(eq(kiloclaw_attribution_touches.user_id, user.id));
+      expect(touchCount.count).toBe(0);
+
+      const [participantCount] = await db
+        .select({ count: count() })
+        .from(impact_advocate_participants)
+        .where(eq(impact_advocate_participants.user_id, user.id));
+      expect(participantCount.count).toBe(0);
+
+      const [redemptionCount] = await db
+        .select({ count: count() })
+        .from(impact_advocate_reward_redemptions)
+        .where(eq(impact_advocate_reward_redemptions.beneficiary_user_id, user.id));
+      expect(redemptionCount.count).toBe(0);
+
+      const [conversionCount] = await db
+        .select({ count: count() })
+        .from(kiloclaw_referral_conversions)
+        .where(eq(kiloclaw_referral_conversions.referee_user_id, user.id));
+      expect(conversionCount.count).toBe(0);
+    });
+
+    it('falls back to google_user_email when normalized_email is null', async () => {
+      // Pre-0090 users can have NULL normalized_email but a real google_user_email.
+      // Soft-delete must still record a tombstone so a re-registration of the
+      // same email cannot bypass the previously-deleted-referee guard.
+      const legacyUser = await insertTestUser({
+        google_user_email: 'legacy-no-normalized@example.com',
+        normalized_email: null,
+      });
+
+      await softDeleteUser(legacyUser.id);
+
+      const [tombstone] = await db
+        .select()
+        .from(deleted_user_email_tombstones)
+        .where(
+          eq(
+            deleted_user_email_tombstones.normalized_email_hash,
+            hashNormalizedEmailForDeletionTombstone('legacy-no-normalized@example.com')
+          )
+        );
+      expect(tombstone).toBeDefined();
     });
 
     it('should delete auth providers', async () => {
@@ -858,6 +1058,94 @@ describe('User', () => {
       expect(targets[0].status).toBe('applied');
     });
 
+    it('should clear admin_size_override on the deleted user\u2019s destroyed instances and on instances where the deleted user was the admin actor', async () => {
+      // The kiloclaw_instances.admin_size_override JSONB carries the admin's
+      // email and free-form reason text — both PII. Clear it on:
+      //   (a) the deleted user's own destroyed instances (retained for audit)
+      //   (b) ANY instance where the deleted user was the admin actor —
+      //       their email/reason is their PII regardless of which user's
+      //       instance it targeted.
+      const targetUser = await insertTestUser();
+      const adminUser = await insertTestUser();
+      const otherCustomer = await insertTestUser();
+
+      // (a) target user's own destroyed instance with an override set
+      const [targetInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: targetUser.id,
+          sandbox_id: `test-sdu-override-target-${Date.now()}`,
+          destroyed_at: new Date().toISOString(),
+          admin_size_override: {
+            size: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+            reason: 'OOM ticket #1234 mentioning sensitive context',
+            actorId: adminUser.id,
+            actorEmail: adminUser.google_user_email,
+            setAt: 1700000000000,
+          },
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // (b) someone else's active instance where adminUser was the actor
+      const [otherInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: otherCustomer.id,
+          sandbox_id: `test-sdu-override-other-${Date.now()}`,
+          admin_size_override: {
+            size: { cpus: 4, memory_mb: 16384, cpu_kind: 'performance' },
+            reason: 'support upgrade by adminUser',
+            actorId: adminUser.id,
+            actorEmail: adminUser.google_user_email,
+            setAt: 1700000000000,
+          },
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // Control: an unrelated instance with a different admin actor.
+      const unrelatedAdmin = await insertTestUser();
+      const [unrelatedInstance] = await db
+        .insert(kiloclaw_instances)
+        .values({
+          user_id: otherCustomer.id,
+          sandbox_id: `test-sdu-override-unrelated-${Date.now()}`,
+          admin_size_override: {
+            size: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' },
+            reason: 'unrelated override',
+            actorId: unrelatedAdmin.id,
+            actorEmail: unrelatedAdmin.google_user_email,
+            setAt: 1700000000001,
+          },
+        })
+        .returning({ id: kiloclaw_instances.id });
+
+      // Soft-delete the target user (case a) AND the admin user (case b).
+      await softDeleteUser(targetUser.id);
+      await softDeleteUser(adminUser.id);
+
+      const [targetRow] = await db
+        .select({ override: kiloclaw_instances.admin_size_override })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, targetInstance.id));
+      expect(targetRow?.override).toBeNull();
+
+      const [otherRow] = await db
+        .select({ override: kiloclaw_instances.admin_size_override })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, otherInstance.id));
+      expect(otherRow?.override).toBeNull();
+
+      // Control row's override is untouched — different admin actor.
+      const [unrelatedRow] = await db
+        .select({ override: kiloclaw_instances.admin_size_override })
+        .from(kiloclaw_instances)
+        .where(eq(kiloclaw_instances.id, unrelatedInstance.id));
+      expect(unrelatedRow).toBeDefined();
+      expect(unrelatedRow.override).not.toBeNull();
+      const unrelatedOverride = unrelatedRow.override as { actorId: string };
+      expect(unrelatedOverride.actorId).toBe(unrelatedAdmin.id);
+    });
+
     it('should anonymize credit_campaigns created_by_kilo_user_id', async () => {
       const creator = await insertTestUser();
       const otherAdmin = await insertTestUser();
@@ -1021,6 +1309,7 @@ describe('User', () => {
           created_by: user1.id,
           platform: 'slack',
           platform_thread_id: 'slack:T123:C456:thread1',
+          platform_message_id: 'slack:T123:C456:msg1',
           user_message: 'Hello from user1',
           status: 'completed',
         })
@@ -1030,6 +1319,7 @@ describe('User', () => {
         created_by: user2.id,
         platform: 'slack',
         platform_thread_id: 'slack:T123:C456:thread2',
+        platform_message_id: 'slack:T123:C456:msg2',
         user_message: 'Hello from user2',
         status: 'completed',
       });
@@ -1077,6 +1367,7 @@ describe('User', () => {
           created_by: user.id,
           platform: 'slack',
           platform_thread_id: 'slack:T123:C456:multi-child',
+          platform_message_id: 'slack:T123:C456:multi-child:msg',
           user_message: 'multi-session test',
           status: 'pending',
         })
@@ -1126,6 +1417,66 @@ describe('User', () => {
       expect(pms[0].stripe_fingerprint).toBe(pm.stripe_fingerprint);
     });
 
+    it('should cascade-delete agent environment profile MCPs and skills', async () => {
+      const user = await insertTestUser();
+
+      const [profile] = await db
+        .insert(agent_environment_profiles)
+        .values({
+          owned_by_user_id: user.id,
+          name: 'test-profile',
+        })
+        .returning();
+
+      const [mcpServer] = await db
+        .insert(agent_environment_profile_mcp_servers)
+        .values({
+          profile_id: profile.id,
+          name: 'demo',
+          type: 'local',
+          enabled: true,
+          config: {
+            command: ['node', 'server.js'],
+            environment: {
+              API_KEY: {
+                encryptedData: 'ciphertext',
+                encryptedDEK: 'key',
+                algorithm: 'rsa-aes-256-gcm',
+                version: 1,
+              },
+            },
+          },
+        })
+        .returning();
+
+      await db.insert(agent_environment_profile_skills).values({
+        profile_id: profile.id,
+        name: 'test-skill',
+        source_type: 'custom',
+        raw_markdown: '---\nname: test-skill\n---\nBody',
+      });
+
+      await softDeleteUser(user.id);
+
+      const profiles = await db
+        .select()
+        .from(agent_environment_profiles)
+        .where(eq(agent_environment_profiles.owned_by_user_id, user.id));
+      expect(profiles).toHaveLength(0);
+
+      const mcpServers = await db
+        .select()
+        .from(agent_environment_profile_mcp_servers)
+        .where(eq(agent_environment_profile_mcp_servers.id, mcpServer.id));
+      expect(mcpServers).toHaveLength(0);
+
+      const skills = await db
+        .select()
+        .from(agent_environment_profile_skills)
+        .where(eq(agent_environment_profile_skills.profile_id, profile.id));
+      expect(skills).toHaveLength(0);
+    });
+
     it('should nullify user_feedback FK', async () => {
       const user = await insertTestUser();
       await db.insert(user_feedback).values({
@@ -1171,6 +1522,24 @@ describe('User', () => {
         .from(user_push_tokens)
         .where(eq(user_push_tokens.user_id, user.id));
       expect(tokens).toHaveLength(0);
+    });
+
+    it('should delete github_branch_pull_requests owned by user', async () => {
+      const user = await insertTestUser();
+      await db.insert(github_branch_pull_requests).values({
+        git_url: 'https://github.com/acme/repo',
+        git_branch: 'main',
+        owned_by_user_id: user.id,
+        owned_by_organization_id: null,
+      });
+
+      await softDeleteUser(user.id);
+
+      const rows = await db
+        .select()
+        .from(github_branch_pull_requests)
+        .where(eq(github_branch_pull_requests.owned_by_user_id, user.id));
+      expect(rows).toHaveLength(0);
     });
 
     it('should nullify free_model_usage FK', async () => {
@@ -1713,6 +2082,34 @@ describe('User', () => {
           .where(eq(kiloclaw_email_log.user_id, user.id))
           .then(r => r[0].count)
       ).toBe(1);
+    });
+
+    it('should retain transactional_email_log rows for the user', async () => {
+      const user = await insertTestUser();
+      const orgId = randomUUID();
+
+      await db.insert(organizations).values({
+        id: orgId,
+        name: 'Transactional Email Retention Org',
+        stripe_customer_id: `stripe-org-${orgId}`,
+        plan: 'teams',
+      });
+
+      await db.insert(transactional_email_log).values({
+        user_id: user.id,
+        organization_id: orgId,
+        email_type: 'organization_credits_top_up_confirmation',
+        idempotency_key: `ch_retain_${randomUUID()}`,
+      });
+
+      await softDeleteUser(user.id);
+
+      const retainedLogs = await db
+        .select()
+        .from(transactional_email_log)
+        .where(eq(transactional_email_log.user_id, user.id));
+      expect(retainedLogs).toHaveLength(1);
+      expect(retainedLogs[0].organization_id).toBe(orgId);
     });
 
     it('should throw SoftDeletePreconditionError for active KiloClaw subscription', async () => {

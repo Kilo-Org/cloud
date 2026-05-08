@@ -26,11 +26,25 @@ export async function queue(batch: MessageBatch<ReceiptCheckMessage>, env: Env):
 
 async function processReceiptCheck(env: Env, message: ReceiptCheckMessage): Promise<void> {
   const accessToken = await env.EXPO_ACCESS_TOKEN.get();
-  const staleTokens = await checkPushReceipts(message.ticketTokenPairs, accessToken);
+  const { staleTokens, receiptErrors } = await checkPushReceipts(
+    message.ticketTokenPairs,
+    accessToken
+  );
 
   if (staleTokens.length > 0) {
     const db = getWorkerDb(env.HYPERDRIVE.connectionString);
     await db.delete(user_push_tokens).where(inArray(user_push_tokens.token, staleTokens));
     console.log(`Receipt check: cleaned up ${staleTokens.length} stale push token(s)`);
+  }
+
+  if (receiptErrors.length > 0) {
+    console.warn('Receipt check returned non-stale Expo receipt error(s)', {
+      errorCount: receiptErrors.length,
+      errors: receiptErrors.map(error => ({
+        ticketId: error.ticketId,
+        errorCode: error.errorCode,
+        message: error.message,
+      })),
+    });
   }
 }

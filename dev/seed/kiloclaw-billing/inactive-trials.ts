@@ -10,6 +10,7 @@ import {
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
+import type { SeedResult } from '../index';
 
 type SeedUser = typeof kilocode_users.$inferInsert;
 type SeedInstance = typeof kiloclaw_instances.$inferInsert;
@@ -30,6 +31,12 @@ const MARKED_INSTANCE_ID = '7e6dfbd9-fb9d-4e1b-b18d-e4513cc83f40';
 const MARKED_SUBSCRIPTION_ID = 'c90dc5ea-bd1e-442e-a16c-5f3d0d6143dd';
 const RECENT_INSTANCE_ID = '7bfef6d2-5250-4c73-a470-8bfd21cb9455';
 const RECENT_SUBSCRIPTION_ID = '3a2fbd7f-5d44-4fd4-8a5f-0e6d59eaa3f2';
+
+function printUsage(): void {
+  console.log('Usage: pnpm dev:seed kiloclaw-billing:inactive-trials');
+  console.log('');
+  console.log('Seeds one provisioned inactive trial candidate and DB-only comparison fixtures.');
+}
 
 const seedUsers = [
   {
@@ -358,7 +365,16 @@ async function loadEligibleFixtureSummary(): Promise<{
   };
 }
 
-export async function run(): Promise<void> {
+export async function run(...args: string[]): Promise<SeedResult | void> {
+  if (args.includes('--help') || args.includes('-h')) {
+    printUsage();
+    return;
+  }
+  if (args.length > 0) {
+    printUsage();
+    throw new Error(`Unexpected arguments: ${args.join(' ')}`);
+  }
+
   console.log(`[${SEED_SCOPE}] Resetting existing seed data`);
   await destroySeedInstancesBestEffort();
   await cleanupExistingSeedRows();
@@ -374,27 +390,23 @@ export async function run(): Promise<void> {
   await insertAdditionalSeedRows();
 
   const eligible = await loadEligibleFixtureSummary();
+  const recentUser = seedUsers.find(user => user.id === RECENT_USER_ID);
+  const markedUser = seedUsers.find(user => user.id === MARKED_USER_ID);
 
   console.log('');
-  console.log(`[${SEED_SCOPE}] Seed complete`);
-  console.log('');
-  console.log('Eligible stop candidate (real provisioned local instance):');
-  console.log(`  email: ${eligible.user.google_user_email}`);
-  console.log(`  userId: ${eligible.user.id}`);
-  console.log(`  instanceId: ${eligible.instance.id}`);
-  console.log(`  subscriptionId: ${eligible.subscriptionId}`);
-  console.log(`  sandboxId: ${eligible.instance.sandbox_id}`);
-  console.log(`  createdAt: ${eligible.instance.created_at}`);
-  console.log('');
-  console.log('Comparison fixtures (DB-only):');
-  console.log(
-    `  recent trial user: ${seedUsers.find(user => user.id === RECENT_USER_ID)?.google_user_email}`
-  );
-  console.log(
-    `  inactive-trial-stopped user: ${seedUsers.find(user => user.id === MARKED_USER_ID)?.google_user_email}`
-  );
-  console.log('');
   console.log('You can now run:');
-  console.log('  pnpm dev:seed kiloclaw-billing inactive-trials');
   console.log('  curl "http://localhost:8807/__scheduled?cron=0+8+*+*+*"');
+
+  return {
+    eligibleUserId: eligible.user.id,
+    eligibleEmail: eligible.user.google_user_email,
+    eligibleInstanceId: eligible.instance.id,
+    eligibleSubscriptionId: eligible.subscriptionId,
+    eligibleSandboxId: eligible.instance.sandbox_id,
+    eligibleCreatedAt: eligible.instance.created_at,
+    recentUserId: RECENT_USER_ID,
+    recentEmail: recentUser?.google_user_email ?? null,
+    markedUserId: MARKED_USER_ID,
+    markedEmail: markedUser?.google_user_email ?? null,
+  };
 }

@@ -4,11 +4,14 @@
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/index");
-		durableNamespaces: "UserSessionDO";
+		durableNamespaces: "UserSessionDO" | "ConnectionTicketDO";
 	}
 	interface Env {
+		HYPERDRIVE: Hyperdrive;
 		NEXTAUTH_SECRET: SecretsStoreSecret;
+		WORKER_ENV: "production";
 		USER_SESSION_DO: DurableObjectNamespace<import("./src/index").UserSessionDO>;
+		CONNECTION_TICKET_DO: DurableObjectNamespace<import("./src/index").ConnectionTicketDO>;
 	}
 }
 interface Env extends Cloudflare.Env {}

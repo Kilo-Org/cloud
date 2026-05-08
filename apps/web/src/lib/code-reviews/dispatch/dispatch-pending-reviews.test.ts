@@ -1,10 +1,12 @@
 const mockDispatchReview = jest.fn();
+const mockGetReviewStatus = jest.fn();
 const mockGetAgentConfigForOwner = jest.fn();
 const mockPrepareReviewPayload = jest.fn();
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
     dispatchReview: (...args: unknown[]) => mockDispatchReview(...args),
+    getReviewStatus: (...args: unknown[]) => mockGetReviewStatus(...args),
   },
 }));
 
@@ -58,6 +60,7 @@ describe('tryDispatchPendingReviews', () => {
 
   beforeEach(() => {
     mockDispatchReview.mockResolvedValue(undefined);
+    mockGetReviewStatus.mockResolvedValue(null);
     mockGetAgentConfigForOwner.mockResolvedValue({ id: 'test-agent-config', config: {} });
     mockPrepareReviewPayload.mockImplementation((params: { reviewId: string }) => ({
       reviewId: params.reviewId,
@@ -69,6 +72,7 @@ describe('tryDispatchPendingReviews', () => {
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
     mockDispatchReview.mockReset();
+    mockGetReviewStatus.mockReset();
     mockGetAgentConfigForOwner.mockReset();
     mockPrepareReviewPayload.mockReset();
   });
@@ -461,5 +465,131 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockPrepareReviewPayload).not.toHaveBeenCalledWith(
       expect.objectContaining({ reviewId: staleQueuedReview.id })
     );
+  });
+
+  it('keeps a dispatch timeout claimed when the Worker status probe finds queued DO state', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    mockDispatchReview.mockRejectedValue(new Error('Request timeout after 10000ms'));
+    mockGetReviewStatus.mockResolvedValue({ reviewId: 'unused', status: 'queued' });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({
+      dispatched: 1,
+      pending: 0,
+      activeCount: 1,
+    });
+    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id);
+    expect(storedReview?.status).toBe('queued');
+  });
+
+  it('releases a dispatch timeout claim when the Worker status probe finds no DO state', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    mockDispatchReview.mockRejectedValue(new Error('Request timeout after 10000ms'));
+    mockGetReviewStatus.mockResolvedValue(null);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({
+      dispatched: 0,
+      pending: 1,
+      activeCount: 0,
+    });
+    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id);
+    expect(storedReview?.status).toBe('pending');
+  });
+
+  it('keeps a dispatch timeout claim when the Worker status probe also fails', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    mockDispatchReview.mockRejectedValue(new Error('Request timeout after 10000ms'));
+    mockGetReviewStatus.mockRejectedValue(new Error('status probe timeout'));
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, review.id),
+    });
+
+    expect(result).toEqual({
+      dispatched: 0,
+      pending: 1,
+      activeCount: 0,
+    });
+    expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id);
+    expect(storedReview?.status).toBe('queued');
   });
 });

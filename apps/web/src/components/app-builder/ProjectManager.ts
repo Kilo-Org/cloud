@@ -10,12 +10,10 @@ import type {
   ProjectSessionInfo,
   ProjectWithMessages,
   SessionDisplayInfo,
-  WorkerVersion,
 } from '@/lib/app-builder/types';
 import type { Images } from '@/lib/images-schema';
 import type { TRPCClient } from '@trpc/client';
 import type { RootRouter } from '@/routers/root-router';
-import type { CloudMessage } from '@/components/cloud-agent/types';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
 import type { UserMessage, TextPart } from '@/types/opencode.gen';
 import { createLogger } from './project-manager/logging';
@@ -87,7 +85,8 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
   }
 
   function createStaticSession(info: ProjectSessionInfo): AppBuilderSession {
-    // Pass streaming config so ended sessions can load messages via WebSocket replay
+    // Pass streaming config so ended sessions can load messages on demand
+    // (v2: WebSocket replay, v1: getLegacySessionMessages tRPC query).
     const streamingConfig = {
       info: toDisplayInfo(info),
       initialMessages: [] as never[],
@@ -98,7 +97,7 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     if (info.worker_version === 'v2') {
       return createV2Session(streamingConfig);
     }
-    return createV1Session({ ...streamingConfig, sessionPrepared: true });
+    return createV1Session(streamingConfig);
   }
 
   function getActiveSession(): AppBuilderSession | undefined {
@@ -154,8 +153,6 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
             projectId,
             organizationId,
             trpcClient,
-            sessionPrepared: info.prepared,
-            onStreamComplete: () => startPreviewPollingIfNeeded(),
             onSessionChanged: handleSessionChanged,
           })
         );
@@ -169,10 +166,9 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
 
   function handleSessionChanged(
     newSessionId: string,
-    workerVersion: WorkerVersion,
     userMessage: { text: string; images?: Images }
   ): void {
-    logger.log('Session changed', { newSessionId, workerVersion });
+    logger.log('Session changed', { newSessionId });
 
     const currentActive = getActiveSession();
     if (currentActive) {
@@ -187,27 +183,15 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
       title: null,
     };
 
-    const newSession =
-      workerVersion === 'v2'
-        ? createV2Session({
-            info: newInfo,
-            initialMessages: [makeOptimisticV2UserMessage(newSessionId, userMessage.text)],
-            projectId,
-            organizationId,
-            trpcClient,
-            onStreamComplete: () => startPreviewPollingIfNeeded(),
-            onSessionChanged: handleSessionChanged,
-          })
-        : createV1Session({
-            info: newInfo,
-            initialMessages: [makeOptimisticV1UserMessage(userMessage.text, userMessage.images)],
-            projectId,
-            organizationId,
-            trpcClient,
-            sessionPrepared: true,
-            onStreamComplete: () => startPreviewPollingIfNeeded(),
-            onSessionChanged: handleSessionChanged,
-          });
+    const newSession = createV2Session({
+      info: newInfo,
+      initialMessages: [makeOptimisticV2UserMessage(newSessionId, userMessage)],
+      projectId,
+      organizationId,
+      trpcClient,
+      onStreamComplete: () => startPreviewPollingIfNeeded(),
+      onSessionChanged: handleSessionChanged,
+    });
 
     subscribeToSession(newSession);
 
@@ -221,17 +205,14 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     newSession.connectToExistingSession(newSessionId);
   }
 
-  function makeOptimisticV1UserMessage(text: string, images?: Images): CloudMessage {
-    return {
-      ts: Date.now(),
-      type: 'user',
-      text,
-      partial: false,
-      images,
-    };
-  }
-
-  function makeOptimisticV2UserMessage(sessionId: string, text: string): StoredMessage {
+  function makeOptimisticV2UserMessage(
+    sessionId: string,
+    userMessage: { text: string; images?: Images }
+  ): StoredMessage {
+    // Image parts are intentionally omitted: the Images payload only contains R2
+    // paths/filenames (no public URLs), so emitting FileParts with empty URLs
+    // would render broken-image placeholders. WebSocket replay will populate the
+    // real FileParts once the session streams.
     const messageId = `optimistic-${Date.now()}`;
     const now = Date.now();
     const info: UserMessage = {
@@ -247,7 +228,7 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
       sessionID: sessionId,
       messageID: messageId,
       type: 'text',
-      text,
+      text: userMessage.text,
     };
     return { info, parts: [textPart] };
   }
@@ -381,7 +362,7 @@ export function createProjectManager(config: ProjectManagerConfig): ProjectManag
     void mutationPromise
       .then(result => {
         if (destroyed) return;
-        handleSessionChanged(result.cloudAgentSessionId, result.workerVersion, {
+        handleSessionChanged(result.cloudAgentSessionId, {
           text: message,
           images,
         });

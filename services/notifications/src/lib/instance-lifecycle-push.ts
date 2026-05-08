@@ -4,41 +4,23 @@
  * pulling in the Hyperdrive/pg client chain.
  */
 
-import { z } from 'zod';
+import {
+  type InstanceLifecycleEvent,
+  type PushData,
+  type SendInstanceLifecycleNotificationParams,
+  type SendInstanceLifecycleNotificationResult,
+} from '@kilocode/notifications';
 
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from './expo-push';
 
-export type InstanceLifecycleEvent = 'ready' | 'start_failed';
-
-export type SendInstanceLifecycleNotificationParams = {
-  userId: string;
-  /** Chat route id surfaced on the device. Currently this is the instance sandboxId. */
-  instanceId: string;
-  /** Included for worker-side logs only. */
-  sandboxId: string;
-  event: InstanceLifecycleEvent;
-  instanceName: string | null;
-  /** Failure body only. Caller is expected to keep this short (~100 chars). */
-  errorMessage?: string;
-};
-
-export type SendInstanceLifecycleNotificationResult = {
-  tokenCount: number;
-  sent: number;
-  staleTokens: number;
-  receiptCount: number;
-};
-
-export const ParamsSchema = z.object({
-  userId: z.string().min(1),
-  instanceId: z.string().min(1),
-  sandboxId: z.string(),
-  event: z.enum(['ready', 'start_failed']),
-  instanceName: z.string().nullable(),
-  errorMessage: z.string().optional(),
-});
+export type {
+  InstanceLifecycleEvent,
+  SendInstanceLifecycleNotificationParams,
+  SendInstanceLifecycleNotificationResult,
+} from '@kilocode/notifications';
 
 const BODY_MAX_LENGTH = 100;
+const EMPTY_TICKET_ERRORS = { total: 0, retryable: 0, terminal: 0 } as const;
 
 function truncate(text: string, max = BODY_MAX_LENGTH): string {
   if (text.length <= max) return text;
@@ -67,19 +49,22 @@ export function buildInstanceLifecycleMessages(
   const title = buildTitle(params.event, params.instanceName);
   const body = buildBody(params.event, params.errorMessage);
 
-  return tokens.map(token => ({
-    to: token,
-    title,
-    body,
-    // Keep in sync with NotificationData in apps/mobile/src/lib/notifications.ts
-    data: {
+  return tokens.map(token => {
+    const data = {
       type: 'instance-lifecycle',
       event: params.event,
-      instanceId: params.instanceId,
-    },
-    sound: 'default' as const,
-    priority: 'high' as const,
-  }));
+      sandboxId: params.sandboxId,
+    } satisfies PushData;
+
+    return {
+      to: token,
+      title,
+      body,
+      data,
+      sound: 'default',
+      priority: 'high',
+    } satisfies ExpoPushMessage;
+  });
 }
 
 export type LifecycleDispatchDeps = {
@@ -97,15 +82,19 @@ export async function dispatchInstanceLifecyclePush(
   params: SendInstanceLifecycleNotificationParams,
   deps: LifecycleDispatchDeps
 ): Promise<SendInstanceLifecycleNotificationResult> {
-  const parsed = ParamsSchema.parse(params);
-
-  const tokens = await deps.getTokens(parsed.userId);
+  const tokens = await deps.getTokens(params.userId);
   if (tokens.length === 0) {
-    return { tokenCount: 0, sent: 0, staleTokens: 0, receiptCount: 0 };
+    return {
+      tokenCount: 0,
+      sent: 0,
+      staleTokens: 0,
+      receiptCount: 0,
+      ticketErrors: EMPTY_TICKET_ERRORS,
+    } satisfies SendInstanceLifecycleNotificationResult;
   }
 
-  const messages = buildInstanceLifecycleMessages(tokens, parsed);
-  const { ticketTokenPairs, staleTokens } = await deps.sendPush(messages);
+  const messages = buildInstanceLifecycleMessages(tokens, params);
+  const { ticketTokenPairs, staleTokens, ticketErrors } = await deps.sendPush(messages);
 
   if (staleTokens.length > 0) {
     await deps.deleteStaleTokens(staleTokens);
@@ -120,5 +109,10 @@ export async function dispatchInstanceLifecyclePush(
     sent: ticketTokenPairs.length,
     staleTokens: staleTokens.length,
     receiptCount: ticketTokenPairs.length,
-  };
+    ticketErrors: {
+      total: ticketErrors.length,
+      retryable: ticketErrors.filter(ticketError => ticketError.retryable).length,
+      terminal: ticketErrors.filter(ticketError => !ticketError.retryable).length,
+    },
+  } satisfies SendInstanceLifecycleNotificationResult;
 }

@@ -4,7 +4,6 @@ import { renderPromptTemplate } from './util/prompt-template';
 import { logger } from './util/logger';
 import { withDORetry } from './util/do-retry';
 import { getTokenMintingService } from './services/token-minting-service.js';
-import { getProfileResolutionService } from './services/profile-resolution-service.js';
 import { classifyInitiateResponse } from './initiate-response';
 import { z } from 'zod';
 
@@ -355,7 +354,10 @@ async function processWebhookMessage(
         },
       };
 
-      // Resolve profile at runtime via Hyperdrive if profileId is set
+      // Profile resolution (repo binding + default + explicit override) happens
+      // inside cloud-agent-next. A trigger must still have a profile assigned;
+      // cloud-agent-next returns 404 if the id is stale/revoked and we let that
+      // flow through the existing non-5xx failure path below.
       if (!triggerProfileId) {
         logger.error('No Agent Env Profile found.', {
           triggerId: triggerConfig.triggerId,
@@ -366,30 +368,6 @@ async function processWebhookMessage(
         return;
       }
 
-      logger.debug('Resolving profile for trigger', {
-        triggerId: triggerConfig.triggerId,
-        profileId: triggerProfileId,
-      });
-
-      const profileService = getProfileResolutionService(env);
-      const resolvedProfile = await profileService.resolveProfileConfig({
-        profileId: triggerProfileId,
-        userId: triggerConfig.userId,
-        orgId: triggerConfig.orgId,
-      });
-
-      if (!resolvedProfile) {
-        logger.error('No Agent Env Profile found.', {
-          triggerId: triggerConfig.triggerId,
-          profileId: triggerProfileId,
-          requestId: webhook.requestId,
-        });
-        await failRequest(stub, webhook.requestId, 'No Agent Env Profile found.');
-        message.ack();
-        return;
-      }
-
-      // Build prepareSession body with resolved profile values
       const prepareSessionBody: {
         prompt: string;
         mode: string;
@@ -397,12 +375,7 @@ async function processWebhookMessage(
         githubRepo: string;
         kilocodeOrganizationId?: string;
         callbackTarget: { url: string; headers: Record<string, string> };
-        envVars?: Record<string, string>;
-        encryptedSecrets?: Record<
-          string,
-          { encryptedData: string; encryptedDEK: string; algorithm: string; version: number }
-        >;
-        setupCommands?: string[];
+        profileId: string;
         autoCommit?: boolean;
         condenseOnComplete?: boolean;
         createdOnPlatform: string;
@@ -412,22 +385,12 @@ async function processWebhookMessage(
         model: triggerModel,
         githubRepo: triggerGithubRepo,
         callbackTarget,
+        profileId: triggerProfileId,
         createdOnPlatform: request.method === 'SCHEDULED' ? 'scheduled' : 'webhook',
       };
 
       if (triggerConfig.orgId) {
         prepareSessionBody.kilocodeOrganizationId = triggerConfig.orgId;
-      }
-
-      // Pass resolved profile values to cloud-agent
-      if (Object.keys(resolvedProfile.envVars).length > 0) {
-        prepareSessionBody.envVars = resolvedProfile.envVars;
-      }
-      if (Object.keys(resolvedProfile.encryptedSecrets).length > 0) {
-        prepareSessionBody.encryptedSecrets = resolvedProfile.encryptedSecrets;
-      }
-      if (resolvedProfile.setupCommands.length > 0) {
-        prepareSessionBody.setupCommands = resolvedProfile.setupCommands;
       }
 
       // Behavior flags from trigger config (not profile-related)

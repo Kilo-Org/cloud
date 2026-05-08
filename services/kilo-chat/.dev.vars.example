@@ -1,0 +1,2 @@
+# Local worker auth must match Kilo JWTs minted by the Next.js dev server.
+WORKER_ENV=development

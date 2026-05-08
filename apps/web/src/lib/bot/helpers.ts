@@ -1,20 +1,6 @@
-import type { SlackAdapter, SlackEvent } from '@chat-adapter/slack';
-import type { Thread, Message } from 'chat';
+import type { SlackAdapter } from '@chat-adapter/slack';
 import { APP_URL } from '@/lib/constants';
 import type { PlatformIntegration } from '@kilocode/db';
-
-export function isChannelLevelMessage(thread: Thread, message: Message): boolean {
-  const platform = thread.id.split(':')[0];
-
-  switch (platform) {
-    case 'slack': {
-      const raw = (message as Message<SlackEvent>).raw;
-      return !raw.thread_ts || raw.thread_ts === raw.ts;
-    }
-    default:
-      return false;
-  }
-}
 
 export type SlackWebApiPlatformError = {
   code: 'slack_webapi_platform_error';

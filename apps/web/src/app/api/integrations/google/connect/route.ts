@@ -6,7 +6,10 @@ import { APP_URL } from '@/lib/constants';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
-import { createGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
+import {
+  createGoogleOAuthState,
+  isSafeGoogleOAuthReturnTo,
+} from '@/lib/integrations/google/oauth-state';
 import { DEFAULT_GOOGLE_CAPABILITIES } from '@/lib/integrations/google/capabilities';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -74,11 +77,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL(redirectPath, APP_URL));
     }
 
+    const returnToParam = request.nextUrl.searchParams.get('returnTo');
+    const returnTo =
+      returnToParam && isSafeGoogleOAuthReturnTo(returnToParam) ? returnToParam : undefined;
+
     const state = createGoogleOAuthState(
       {
         owner,
         instanceId: instance.id,
         capabilities,
+        ...(returnTo ? { returnTo } : {}),
       },
       user.id
     );

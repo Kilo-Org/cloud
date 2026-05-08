@@ -34,6 +34,7 @@ export const GITHUB_EVENT = {
 
   // Issue events
   ISSUES: 'issues',
+  ISSUE_COMMENT: 'issue_comment',
 
   // Pull request events
   PULL_REQUEST: 'pull_request',
@@ -147,6 +148,7 @@ export const PLATFORM = {
   GITLAB: 'gitlab',
   SLACK: 'slack',
   DISCORD: 'discord',
+  LINEAR: 'linear',
 } as const;
 
 /**

@@ -1,22 +1,13 @@
-import type { ClientMessage, EventServiceConfig } from './types';
-import { serverMessageSchema } from './schemas';
+import type { ClientMessage, ConnectTicketQuery, EventServiceConfig } from './types';
+import { connectTicketResponseSchema, serverMessageSchema } from './schemas';
 
-/**
- * Subprotocol format used to carry the JWT on the WebSocket handshake:
- *   "kilo.jwt.<base64url-encoded-jwt>"
- *
- * JWTs contain '.' (which is a valid HTTP token char), but base64 encodings
- * produce '/' and '+' which are not — so we base64url-encode the token before
- * embedding it in a subprotocol identifier.
- */
-const SUBPROTOCOL_PREFIX = 'kilo.jwt.';
+const WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 
 /**
  * Thrown (and surfaced via {@link EventServiceConfig.onUnauthorized}) when the
- * Event Service rejects the WebSocket upgrade with 401/403. Browsers do not
- * expose the HTTP status of a failed WebSocket handshake, so the client
- * treats any pre-open 'error' event as a potential auth failure and relies on
- * the callback to trigger token refresh/sign-out.
+ * Event Service rejects connection-ticket minting with 401/403. Browsers do not
+ * expose the HTTP status of a failed WebSocket handshake, so pre-open socket
+ * errors are treated as generic reconnectable failures.
  */
 export class WebSocketAuthError extends Error {
   constructor(message = 'WebSocket authentication failed') {
@@ -33,25 +24,62 @@ export class HandshakeTimeoutError extends Error {
 }
 
 const HANDSHAKE_TIMEOUT_MS = 10_000;
+const MAX_AUTH_RECOVERY_ATTEMPTS = 1;
 
-function encodeBase64Url(input: string): string {
-  // btoa handles each char as a single byte; JWTs are ASCII so this is safe.
-  const base64 = btoa(input);
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function baseUrlWithPath(base: string, path: string): URL {
+  return new URL(path, base.endsWith('/') ? base : `${base}/`);
+}
+
+function ticketEndpointFor(wsBase: string): string {
+  const url = baseUrlWithPath(wsBase, 'connect-ticket');
+  if (url.protocol === 'ws:') {
+    url.protocol = 'http:';
+  } else if (url.protocol === 'wss:') {
+    url.protocol = 'https:';
+  }
+  return url.toString();
+}
+
+function connectUrlFor(wsBase: string, ticket: string): string {
+  const url = baseUrlWithPath(wsBase, 'connect');
+  const query = { ticket } satisfies ConnectTicketQuery;
+  url.searchParams.set('ticket', query.ticket);
+  return url.toString();
+}
+
+async function fetchConnectionTicket(wsBase: string, token: string): Promise<string> {
+  const response = await fetch(ticketEndpointFor(wsBase), {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401 || response.status === 403) {
+    throw new WebSocketAuthError();
+  }
+  if (!response.ok) {
+    throw new Error('Failed to mint WebSocket connection ticket');
+  }
+
+  const body = connectTicketResponseSchema.parse(await response.json());
+  return body.ticket;
 }
 
 export class EventServiceClient {
   private readonly url: string;
   private readonly getToken: () => Promise<string>;
-  private readonly onUnauthorized: (() => void) | undefined;
+  private readonly onUnauthorized: EventServiceConfig['onUnauthorized'];
 
   private ws: WebSocket | null = null;
   private connected = false;
   private eventHandlers = new Map<string, Set<(context: string, payload: unknown) => void>>();
-  private activeContexts = new Set<string>();
+  // Refcounted so multiple consumers can independently subscribe to and
+  // unsubscribe from the same context without trampling each other. The wire
+  // `context.subscribe`/`context.unsubscribe` messages are only sent on the
+  // 0↔1 transitions; intermediate refcount churn stays client-side.
+  private activeContexts = new Map<string, number>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
   private reconnectAttempts = 0;
+  private authRecoveryAttempts = 0;
   private hasConnectedBefore = false;
   private reconnectHandlers = new Set<() => void>();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -67,6 +95,7 @@ export class EventServiceClient {
   async connect(): Promise<void> {
     this.destroyed = false;
     this.reconnectAttempts = 0;
+    this.authRecoveryAttempts = 0;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -74,24 +103,40 @@ export class EventServiceClient {
     try {
       await this.connectOnce();
     } catch (err) {
-      if (this.handleAuthFailure(err)) return;
+      if (await this.handleAuthFailure(err)) return;
       if (!this.destroyed) {
         this.scheduleReconnect();
       }
     }
   }
 
-  private handleAuthFailure(err: unknown): boolean {
-    if (err instanceof WebSocketAuthError) {
-      this.destroyed = true;
-      if (this.reconnectTimer !== null) {
-        clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = null;
-      }
-      this.onUnauthorized?.();
+  private async handleAuthFailure(err: unknown): Promise<boolean> {
+    if (!(err instanceof WebSocketAuthError) || !this.onUnauthorized) {
+      return false;
+    }
+
+    if (this.authRecoveryAttempts >= MAX_AUTH_RECOVERY_ATTEMPTS) {
+      this.stopAfterUnauthorized();
       return true;
     }
-    return false;
+
+    const decision = await this.onUnauthorized();
+    if (decision === 'stop' || this.destroyed) {
+      this.stopAfterUnauthorized();
+      return true;
+    }
+
+    this.authRecoveryAttempts++;
+    this.scheduleReconnect();
+    return true;
+  }
+
+  private stopAfterUnauthorized(): void {
+    this.destroyed = true;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
   }
 
   private async connectOnce(): Promise<void> {
@@ -103,10 +148,15 @@ export class EventServiceClient {
     }
 
     const token = await this.getToken();
-    const subprotocol = `${SUBPROTOCOL_PREFIX}${encodeBase64Url(token)}`;
+    if (this.destroyed) return;
+    const ticket = await fetchConnectionTicket(this.url, token);
+    // disconnect() may have run while we were awaiting the token. Bail before
+    // creating the socket so we don't leak a WebSocket + ping timer past
+    // provider unmount (e.g. sign-out, navigation, strict-mode remount).
+    if (this.destroyed) return;
 
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`${this.url}/connect`, [subprotocol]);
+      const ws = new WebSocket(connectUrlFor(this.url, ticket), [WEBSOCKET_PROTOCOL]);
       this.ws = ws;
 
       // Guard against double-resolution: the handshake timeout, the
@@ -145,6 +195,7 @@ export class EventServiceClient {
         this.connected = true;
         this.hasConnectedBefore = true;
         this.reconnectAttempts = 0;
+        this.authRecoveryAttempts = 0;
         this.resubscribeContexts();
         if (isReconnect) {
           for (const handler of this.reconnectHandlers) {
@@ -172,12 +223,11 @@ export class EventServiceClient {
       ws.addEventListener('error', () => {
         if (this.ws !== ws) return;
         // error is always followed by close, so we only need to reject the
-        // connect promise here if we never opened. The browser does not
-        // expose the HTTP status of a failed upgrade, so treat pre-open
-        // errors as potential auth failures and surface them via
-        // onUnauthorized. Callers can refresh the token and reconnect.
+        // connect promise here if we never opened. The browser does not expose
+        // the HTTP status of a failed upgrade, so reconnect and reserve auth
+        // recovery for the preceding connection-ticket HTTP request.
         if (!this.connected) {
-          settleReject(new WebSocketAuthError());
+          settleReject(new Error('WebSocket connection failed'));
         }
       });
     });
@@ -215,20 +265,39 @@ export class EventServiceClient {
   }
 
   subscribe(contexts: string[]): void {
+    const newlyActive: string[] = [];
     for (const ctx of contexts) {
-      this.activeContexts.add(ctx);
+      const next = (this.activeContexts.get(ctx) ?? 0) + 1;
+      this.activeContexts.set(ctx, next);
+      if (next === 1) newlyActive.push(ctx);
     }
-    if (this.isConnected()) {
-      this.send({ type: 'context.subscribe', contexts });
+    if (newlyActive.length > 0 && this.isConnected()) {
+      const message = {
+        type: 'context.subscribe',
+        contexts: newlyActive,
+      } satisfies ClientMessage;
+      this.send(message);
     }
   }
 
   unsubscribe(contexts: string[]): void {
+    const released: string[] = [];
     for (const ctx of contexts) {
-      this.activeContexts.delete(ctx);
+      const current = this.activeContexts.get(ctx);
+      if (current === undefined) continue;
+      if (current <= 1) {
+        this.activeContexts.delete(ctx);
+        released.push(ctx);
+      } else {
+        this.activeContexts.set(ctx, current - 1);
+      }
     }
-    if (this.isConnected()) {
-      this.send({ type: 'context.unsubscribe', contexts });
+    if (released.length > 0 && this.isConnected()) {
+      const message = {
+        type: 'context.unsubscribe',
+        contexts: released,
+      } satisfies ClientMessage;
+      this.send(message);
     }
   }
 
@@ -309,10 +378,11 @@ export class EventServiceClient {
 
   private resubscribeContexts(): void {
     if (this.activeContexts.size > 0) {
-      this.send({
+      const message = {
         type: 'context.subscribe',
-        contexts: Array.from(this.activeContexts),
-      });
+        contexts: Array.from(this.activeContexts.keys()),
+      } satisfies ClientMessage;
+      this.send(message);
     }
   }
 
@@ -324,12 +394,15 @@ export class EventServiceClient {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connectOnce().catch(err => {
-        // If the handshake failed with auth rejection, stop reconnecting.
-        if (this.handleAuthFailure(err)) return;
-        if (!this.destroyed) {
-          this.scheduleReconnect();
-        }
+        void this.handleReconnectFailure(err);
       });
     }, delay);
+  }
+
+  private async handleReconnectFailure(err: unknown): Promise<void> {
+    if (await this.handleAuthFailure(err)) return;
+    if (!this.destroyed) {
+      this.scheduleReconnect();
+    }
   }
 }

@@ -19,7 +19,11 @@ import { eq, and, or, count, gte, lt, sql } from 'drizzle-orm';
 import type { Owner } from '../core';
 import { prepareReviewPayload } from '../triggers/prepare-review-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
-import { updateCodeReviewStatus } from '../db/code-reviews';
+import {
+  releaseQueuedReviewClaim,
+  updateCodeReviewStatus,
+  updateCodeReviewStatusIfNonTerminal,
+} from '../db/code-reviews';
 import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
@@ -282,9 +286,7 @@ async function dispatchReview(
   }
 
   // 4. Dispatch to Cloudflare Worker to create CodeReviewOrchestrator DO.
-  //    If this fails, keep the claim in `queued` and rely on stale-claim
-  //    recovery. A transport failure is ambiguous: the worker may have
-  //    created the DO even if this request did not observe the response.
+  //    If this fails, probe DO state before deciding whether to release the claim.
   const agentVersion = 'v2';
   try {
     await codeReviewWorkerClient.dispatchReview({
@@ -301,7 +303,7 @@ async function dispatchReview(
       tags: { operation: 'dispatch-review-worker-call' },
       extra: { reviewId: review.id, owner },
     });
-    return false;
+    return handleAmbiguousDispatchFailure(review, owner);
   }
 
   // 5. Record which agent version was dispatched without rewriting status.
@@ -328,4 +330,54 @@ async function dispatchReview(
   });
 
   return true;
+}
+
+async function handleAmbiguousDispatchFailure(
+  review: CloudAgentCodeReview,
+  owner: Owner
+): Promise<boolean> {
+  try {
+    const workerStatus = await codeReviewWorkerClient.getReviewStatus(review.id);
+
+    if (!workerStatus) {
+      const released = await releaseQueuedReviewClaim(review.id);
+      logExceptInTest('[dispatchReview] Worker has no DO state after dispatch failure', {
+        reviewId: review.id,
+        released,
+      });
+      return false;
+    }
+
+    if (workerStatus.status === 'queued' || workerStatus.status === 'running') {
+      logExceptInTest('[dispatchReview] Worker accepted review despite dispatch failure', {
+        reviewId: review.id,
+        status: workerStatus.status,
+      });
+      return true;
+    }
+
+    const mirrored = await updateCodeReviewStatusIfNonTerminal(review.id, workerStatus.status, {
+      sessionId: workerStatus.sessionId,
+      cliSessionId: workerStatus.cliSessionId,
+      errorMessage: workerStatus.errorMessage,
+      completedAt: workerStatus.completedAt ? new Date(workerStatus.completedAt) : undefined,
+    });
+
+    logExceptInTest('[dispatchReview] Mirrored terminal Worker status after dispatch failure', {
+      reviewId: review.id,
+      status: workerStatus.status,
+      mirrored,
+    });
+    return true;
+  } catch (statusError) {
+    errorExceptInTest('[dispatchReview] Worker status probe failed, leaving review queued', {
+      reviewId: review.id,
+      error: statusError,
+    });
+    captureException(statusError, {
+      tags: { operation: 'dispatch-review-worker-status-probe' },
+      extra: { reviewId: review.id, owner },
+    });
+    return false;
+  }
 }

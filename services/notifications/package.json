@@ -6,7 +6,7 @@
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "start": "wrangler dev",
-    "test": "vitest",
+    "test": "vitest run",
     "cf-typegen": "wrangler types",
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/notifications/src"
@@ -22,11 +22,13 @@
   },
   "dependencies": {
     "@kilocode/db": "workspace:*",
+    "@kilocode/event-service": "workspace:*",
+    "@kilocode/notifications": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "expo-server-sdk": "^6.1.0",
     "hono": "catalog:",
-    "stream-chat": "catalog:",
+    "workers-tagged-logger": "catalog:",
     "zod": "catalog:"
   }
 }

@@ -30,7 +30,6 @@ type Availability = { allowed: boolean; reasonProvider: string | null };
 type PrecomputedRestrictions = {
   modelDenySet: Set<string>;
   providerAllowSet: Set<string> | undefined;
-  providerDenySet: Set<string>;
 };
 
 function precompute(restrictions: ModelRestrictions): PrecomputedRestrictions {
@@ -39,7 +38,6 @@ function precompute(restrictions: ModelRestrictions): PrecomputedRestrictions {
     providerAllowSet: restrictions.providerAllowList
       ? new Set(restrictions.providerAllowList)
       : undefined,
-    providerDenySet: new Set(restrictions.providerDenyList),
   };
 }
 
@@ -72,10 +70,7 @@ function checkAvailability(
       : { allowed: false, reasonProvider: null };
   }
 
-  const nonDeniedProvider = sortedProviders.find(slug => !precomputed.providerDenySet.has(slug));
-  return nonDeniedProvider
-    ? { allowed: true, reasonProvider: nonDeniedProvider }
-    : { allowed: false, reasonProvider: null };
+  return { allowed: true, reasonProvider: sortedProviders[0] };
 }
 
 /**

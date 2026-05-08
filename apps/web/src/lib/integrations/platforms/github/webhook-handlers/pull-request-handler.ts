@@ -104,7 +104,10 @@ export async function handlePullRequestCodeReview(
         ownedByUserId: integration.owned_by_user_id,
         kiloRequesterId: integration.kilo_requester_user_id,
       });
-      return NextResponse.json({ message: 'Integration missing user context' }, { status: 500 });
+      return NextResponse.json(
+        { message: 'Code review user context not configured' },
+        { status: 200 }
+      );
     }
 
     // 2. Check if code review agent is enabled for this owner

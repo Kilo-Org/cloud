@@ -32,7 +32,7 @@ vi.mock('./util/ingest-limits', () => ({
   MAX_SINGLE_ITEM_BYTES: 50,
 }));
 
-import { createItemExtractor } from './queue-consumer';
+import { createItemExtractor, computeSessionMetadataUpdates } from './queue-consumer';
 
 const encoder = new TextEncoder();
 
@@ -127,5 +127,64 @@ describe('createItemExtractor', () => {
 
     expect(ext.pending).toHaveLength(1);
     expect(ext.pending[0]).toEqual({ type: 'included', data: {} });
+  });
+});
+
+describe('computeSessionMetadataUpdates', () => {
+  const fixedNow = () => '2026-05-05T00:00:00.000Z';
+
+  it('normalizes gitUrl to the canonical form before persisting', () => {
+    const updates = computeSessionMetadataUpdates(
+      new Map([['gitUrl', 'https://GitHub.com/ACME/Widgets.git']]),
+      fixedNow
+    );
+    expect(updates.git_url).toBe('https://github.com/acme/widgets');
+  });
+
+  it('collapses scp-style and ssh:// URLs to the same normalized form as https', () => {
+    const fromScp = computeSessionMetadataUpdates(
+      new Map([['gitUrl', 'git@github.com:acme/widgets.git']]),
+      fixedNow
+    );
+    const fromSsh = computeSessionMetadataUpdates(
+      new Map([['gitUrl', 'ssh://git@github.com/acme/widgets.git']]),
+      fixedNow
+    );
+    const fromHttps = computeSessionMetadataUpdates(
+      new Map([['gitUrl', 'https://github.com/acme/widgets']]),
+      fixedNow
+    );
+    expect(fromScp.git_url).toBe('https://github.com/acme/widgets');
+    expect(fromSsh.git_url).toBe(fromScp.git_url);
+    expect(fromHttps.git_url).toBe(fromScp.git_url);
+  });
+
+  it('writes null git_url when the ingest cleared the field', () => {
+    const updates = computeSessionMetadataUpdates(new Map([['gitUrl', null]]), fixedNow);
+    expect(updates.git_url).toBeNull();
+  });
+
+  it('does not set git_url when the change does not include it', () => {
+    const updates = computeSessionMetadataUpdates(
+      new Map([
+        ['gitBranch', 'feature/x'],
+        ['title', 'hello'],
+      ]),
+      fixedNow
+    );
+    expect('git_url' in updates).toBe(false);
+    expect(updates.git_branch).toBe('feature/x');
+    expect(updates.title).toBe('hello');
+  });
+
+  it('stamps status_updated_at when status changes', () => {
+    const updates = computeSessionMetadataUpdates(new Map([['status', 'running']]), fixedNow);
+    expect(updates.status).toBe('running');
+    expect(updates.status_updated_at).toBe('2026-05-05T00:00:00.000Z');
+  });
+
+  it('ignores a null "platform" change (creation value stays sticky)', () => {
+    const updates = computeSessionMetadataUpdates(new Map([['platform', null]]), fixedNow);
+    expect('created_on_platform' in updates).toBe(false);
   });
 });

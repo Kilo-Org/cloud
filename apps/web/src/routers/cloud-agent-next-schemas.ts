@@ -48,27 +48,108 @@ export const agentModeNextSchema = z.enum([
   'custom',
 ]);
 
-// Local MCP server configuration (runs a command)
+// Encrypted envelope shape (re-defined here to avoid importing server-only code).
+const encryptedEnvelopeInputSchema = z.object({
+  encryptedData: z.string(),
+  encryptedDEK: z.string(),
+  algorithm: z.literal('rsa-aes-256-gcm'),
+  version: z.literal(1),
+});
+
+// MCP env / remote-header value: plain string or encrypted envelope. Plain
+// strings pass straight through to the sandbox; envelopes are decrypted
+// per key by the worker before materializing KILO_CONFIG_CONTENT.mcp.
+const mcpSecretValueSchema = z.union([z.string().max(4096), encryptedEnvelopeInputSchema]);
+
+// Local MCP server configuration (runs a command).
 const mcpLocalServerConfigSchema = z
   .object({
     type: z.literal('local'),
     command: z.string().array().min(1, 'Command array must have at least one element'),
-    environment: z.record(z.string(), z.string()).optional(),
+    environment: z.record(z.string(), mcpSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
   .strict();
 
-// Remote MCP server configuration (connects to a URL)
+// Remote MCP server configuration (connects to a URL).
 const mcpRemoteServerConfigSchema = z
   .object({
     type: z.literal('remote'),
     url: z.string().url('URL must be a valid URL format'),
-    headers: z.record(z.string(), z.string()).optional(),
+    headers: z.record(z.string(), mcpSecretValueSchema).optional(),
     enabled: z.boolean().optional(),
     timeout: z.number().min(1).max(3_600_000).optional(),
   })
   .strict();
+
+// Runtime skill input (materialized to SKILL.md + companion files in the sandbox)
+const runtimeSkillSchemaMax = 100_000;
+export const runtimeSkillInputSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'Skill name must be a slug'),
+  rawMarkdown: z.string().min(1).max(runtimeSkillSchemaMax),
+  /** Companion files keyed by relative path, excluding SKILL.md. */
+  files: z.record(z.string().max(200), z.string().max(runtimeSkillSchemaMax)).optional(),
+});
+
+/** Permission schema — mirrors the CLI's AgentConfig.permission shape. */
+const permissionActionSchema = z.enum(['allow', 'ask', 'deny']);
+const permissionActionOrNullSchema = z.union([permissionActionSchema, z.null()]);
+const permissionRuleSchema = z.union([
+  permissionActionOrNullSchema,
+  z.record(z.string(), permissionActionOrNullSchema),
+]);
+const permissionConfigSchema = z.union([
+  permissionActionSchema,
+  z.record(z.string(), permissionRuleSchema),
+]);
+
+/** Runtime agent input (materialized to KILO_CONFIG_CONTENT.agent.<slug>) */
+export const runtimeAgentInputSchema = z.object({
+  slug: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z][a-z0-9-]*$/, 'Agent slug must start with a letter'),
+  name: z.string().min(1).max(100),
+  config: z
+    .object({
+      prompt: z.string().max(50_000).optional(),
+      description: z.string().max(2_000).optional(),
+      mode: z.enum(['subagent', 'primary', 'all']).optional(),
+      model: z.string().max(200).nullable().optional(),
+      variant: z.string().max(50).optional(),
+      temperature: z.number().optional(),
+      top_p: z.number().optional(),
+      steps: z.number().int().positive().optional(),
+      hidden: z.boolean().optional(),
+      disable: z.boolean().optional(),
+      color: z.string().max(50).optional(),
+      permission: permissionConfigSchema.optional(),
+      options: z.record(z.string(), z.unknown()).optional(),
+    })
+    // Variant keys are model-specific, so a variant without a model has no
+    // anchor — mirror the AgentConfigSchema invariant from @kilocode/db.
+    .refine(c => !c.variant || (typeof c.model === 'string' && c.model.length > 0), {
+      message: 'variant requires a model — variants are model-specific',
+      path: ['variant'],
+    }),
+});
+
+/**
+ * Mode field accepted by prepare/update-session calls. Allows built-in
+ * enum values plus any custom slug — cloud-agent-next cross-validates the
+ * slug against the session's `runtimeAgents` list.
+ */
+export const preparedSessionModeSchema = z
+  .string()
+  .min(1)
+  .max(50)
+  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug');
 
 // Combined MCP server configuration schema — CLI-native local/remote format
 export const mcpServerConfigNextSchema = z.discriminatedUnion('type', [
@@ -95,7 +176,7 @@ export const basePrepareSessionNextSchema = z
 
     // Execution params (required)
     prompt: z.string().min(1).max(100_000),
-    mode: agentModeNextSchema,
+    mode: preparedSessionModeSchema,
     model: z.string().min(1),
     variant: z
       .string()
@@ -103,13 +184,18 @@ export const basePrepareSessionNextSchema = z
       .regex(/^[a-zA-Z]+$/)
       .optional(),
 
-    // Optional environment profile name (resolved server-side)
-    profileName: z.string().max(100).optional(),
+    /**
+     * Optional environment profile id. When omitted, the effective default
+     * profile (personal default wins over org default) is used.
+     */
+    profileId: z.uuid().optional(),
 
     // Optional configuration
     envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
     setupCommands: z.array(z.string().max(500)).max(20).optional(),
     mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
+    runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
+    runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),
     upstreamBranch: z.string().optional(),
     autoCommit: z.boolean().optional(),
     autoInitiate: z.boolean().optional(),
@@ -135,11 +221,21 @@ export const baseInitiateFromPreparedSessionNextSchema = z.object({
   cloudAgentSessionId: z.string(),
 });
 
-// Agent mode for sendMessage (excludes custom - use prepareSession/updateSession for custom mode)
-export const agentModeSendMessageSchema = z.enum(['code', 'plan', 'debug', 'orchestrator', 'ask']);
+/**
+ * Mode field for sendMessage. Built-in enum slugs plus any custom slug —
+ * cloud-agent-next cross-validates against the session's stored runtimeAgents.
+ * The reserved slug `custom` is still rejected here (requires prepare).
+ */
+export const agentModeSendMessageSchema = z
+  .string()
+  .min(1)
+  .max(50)
+  .regex(/^[a-z][a-z0-9-]*$/, 'Mode must be a slug')
+  .refine(mode => mode !== 'custom', {
+    message: 'Custom mode requires prepareSession/updateSession, not sendMessage',
+  });
 
 // Schema for sending a message (V2 - uses cloudAgentSessionId)
-// Note: custom mode is not allowed for sendMessage - use prepareSession/updateSession instead
 export const baseSendMessageNextSchema = z.object({
   cloudAgentSessionId: z.string(),
   prompt: z.string().min(1),
@@ -200,16 +296,25 @@ export const baseGetSessionNextOutputSchema = z.object({
 
   // Execution params
   prompt: z.string().optional(),
-  mode: agentModeNextSchema.optional(),
+  mode: z.string().optional(),
   model: z.string().optional(),
   variant: z.string().optional(),
   autoCommit: z.boolean().optional(),
   upstreamBranch: z.string().optional(),
 
-  // Configuration metadata (counts only, no values)
-  envVarCount: z.number().optional(),
-  setupCommandCount: z.number().optional(),
-  mcpServerCount: z.number().optional(),
+  /** Custom agents stored on this session (shown in the chat picker). */
+  runtimeAgents: z
+    .array(
+      z.object({
+        slug: z.string(),
+        name: z.string(),
+        /** Optional model override so the chat UI can lock its model picker. */
+        model: z.string().optional(),
+        /** Optional thinking-effort variant override so the chat UI can lock its variant picker. */
+        variant: z.string().optional(),
+      })
+    )
+    .optional(),
 
   // Execution status (grouped for cleaner API)
   execution: executionStatusNextSchema,

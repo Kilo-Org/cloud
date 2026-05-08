@@ -91,6 +91,97 @@ describe('processMessagesApiUsage', () => {
     expect(result.cacheWriteTokens).toBe(0);
   });
 
+  test('extracts is_byok=true from Vercel modelAttempts credentialType', () => {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+    };
+    const providerMetadata = {
+      gateway: {
+        routing: {
+          finalProvider: 'bedrock',
+          modelAttempts: [
+            {
+              success: true,
+              providerAttempts: [{ provider: 'bedrock', credentialType: 'byok', success: true }],
+            },
+          ],
+        },
+        cost: '0',
+        marketCost: '0.000402',
+      },
+    };
+
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+
+    expect(result.is_byok).toBe(true);
+    expect(result.cost_mUsd).toBe(402);
+  });
+
+  test('extracts is_byok=false from Vercel system credentialType', () => {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+    };
+    const providerMetadata = {
+      gateway: {
+        routing: {
+          finalProvider: 'bedrock',
+          modelAttempts: [
+            {
+              success: true,
+              providerAttempts: [{ provider: 'bedrock', credentialType: 'system', success: true }],
+            },
+          ],
+        },
+        cost: '0',
+        marketCost: '0.000402',
+      },
+    };
+
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+
+    expect(result.is_byok).toBe(false);
+  });
+
+  test('picks the successful provider attempt when earlier attempts failed', () => {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+    };
+    const providerMetadata = {
+      gateway: {
+        routing: {
+          finalProvider: 'anthropic',
+          modelAttempts: [
+            {
+              success: true,
+              providerAttempts: [
+                { provider: 'bedrock', credentialType: 'byok', success: false },
+                { provider: 'anthropic', credentialType: 'system', success: true },
+              ],
+            },
+          ],
+        },
+        cost: '0',
+        marketCost: '0.000402',
+      },
+    };
+
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+
+    expect(result.is_byok).toBe(false);
+  });
+
   test('returns zero cost when no usage or metadata is provided', () => {
     const result = processMessagesApiUsage(null, null, coreProps);
 

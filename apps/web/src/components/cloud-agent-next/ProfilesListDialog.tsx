@@ -794,7 +794,7 @@ function ProfileEditPanel({ profileId, organizationId }: ProfileEditPanelProps) 
           onClick={() => setActiveTab('commands')}
         >
           <Terminal className="mr-1.5 inline-block h-4 w-4" />
-          Commands ({profile?.commands.length || 0})
+          Setup Commands ({profile?.commands.length || 0})
         </button>
       </div>
 

@@ -29,8 +29,8 @@ import {
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
+import { resolvePendingNotificationNavigation } from '@/lib/pending-notification-navigation';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
-import { useUnreadCountsInvalidation } from '@/lib/hooks/use-unread-counts-invalidation';
 import { queryClient } from '@/lib/query-client';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
@@ -80,8 +80,6 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
 
-  useUnreadCountsInvalidation();
-
   useEffect(() => {
     if (fontsError) {
       Sentry.captureException(fontsError);
@@ -128,9 +126,9 @@ function RootLayoutNav() {
     } else {
       void SplashScreen.hideAsync();
       // Navigate to pending notification deep link (cold start / background tap)
-      const pendingLink = getPendingNotificationLink();
-      if (pendingLink) {
-        router.push(pendingLink as Href);
+      const pendingNavigation = resolvePendingNotificationNavigation(getPendingNotificationLink());
+      if (pendingNavigation) {
+        router.replace(pendingNavigation.href as Href);
       }
     }
   }, [token, isLoading, updateRequired, inAuthGroup, inForceUpdate, router]);

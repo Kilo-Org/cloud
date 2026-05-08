@@ -98,6 +98,7 @@ describe('CloudAgentNextFetchClient billing error detection', () => {
       expect(error).toBeInstanceOf(CloudAgentNextBillingError);
       const billingError = error as CloudAgentNextBillingError;
       expect(billingError.terminalReason).toBe('billing');
+      expect(billingError.procedure).toBe('prepareSession');
       expect(billingError.status).toBe(402);
     }
   });
@@ -129,6 +130,29 @@ describe('CloudAgentNextFetchClient billing error detection', () => {
     ).rejects.not.toThrow(CloudAgentNextBillingError);
   });
 
+  it('preserves procedure metadata on generic errors', async () => {
+    vi.stubGlobal('fetch', mockFetch(500, 'Internal Server Error'));
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+
+    try {
+      await client.prepareSession(
+        {},
+        {
+          prompt: 'test',
+          mode: 'code',
+          model: 'test-model',
+        }
+      );
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(CloudAgentNextError);
+      const cloudAgentError = error as CloudAgentNextError;
+      expect(cloudAgentError.procedure).toBe('prepareSession');
+      expect(cloudAgentError.status).toBe(500);
+      expect(cloudAgentError.body).toBe('Internal Server Error');
+    }
+  });
+
   it('throws generic CloudAgentNextError for 404', async () => {
     vi.stubGlobal('fetch', mockFetch(404, 'Not found'));
     const client = createCloudAgentNextFetchClient(BASE_URL);
@@ -156,5 +180,65 @@ describe('CloudAgentNextFetchClient billing error detection', () => {
         }
       )
     ).rejects.not.toThrow(CloudAgentNextBillingError);
+  });
+});
+
+describe('CloudAgentNextFetchClient getSessionHealth', () => {
+  it('posts to getSessionHealth and parses a healthy response', async () => {
+    const fetchMock = mockFetch(200, {
+      result: {
+        data: {
+          cloudAgentSessionId: 'agent_123',
+          sandboxId: 'ses-abc123',
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        },
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+
+    const result = await client.getSessionHealth(
+      { Authorization: 'Bearer token' },
+      { cloudAgentSessionId: 'agent_123' }
+    );
+
+    expect(result).toEqual({
+      cloudAgentSessionId: 'agent_123',
+      sandboxId: 'ses-abc123',
+      sandboxStatus: 'healthy',
+      executionHealth: 'none',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${BASE_URL}/trpc/getSessionHealth`,
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token',
+        },
+        body: JSON.stringify({ cloudAgentSessionId: 'agent_123' }),
+      })
+    );
+  });
+
+  it('rejects malformed health responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        result: {
+          data: {
+            cloudAgentSessionId: 'agent_123',
+            sandboxStatus: 'on-fire',
+            executionHealth: 'none',
+          },
+        },
+      })
+    );
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+
+    await expect(client.getSessionHealth({}, { cloudAgentSessionId: 'agent_123' })).rejects.toThrow(
+      'Unexpected getSessionHealth response shape'
+    );
   });
 });

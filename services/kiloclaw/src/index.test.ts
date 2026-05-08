@@ -321,6 +321,39 @@ describe('kilo-chat webhook delivery', () => {
     expect(init.headers.get('fly-force-instance-id')).toBe('machine-1');
     expect(init.headers.get('content-type')).toBe('application/json');
   });
+
+  it('rejects targetBotId suffixes that are not valid sandboxIds before routing', async () => {
+    for (const targetBotId of ['bot:kiloclaw:', 'bot:kiloclaw:bad$sandbox']) {
+      const registryStub = { listInstances: vi.fn().mockResolvedValue([]) };
+      const registryNamespace = {
+        idFromName: vi.fn().mockReturnValue('registry-id'),
+        get: vi.fn().mockReturnValue(registryStub),
+      };
+      const instanceNamespace = {
+        idFromName: vi.fn().mockReturnValue('instance-id'),
+        get: vi.fn(),
+      };
+
+      const worker = new WorkerEntrypoint(
+        {
+          KILOCLAW_INSTANCE: instanceNamespace,
+          KILOCLAW_REGISTRY: registryNamespace,
+          GATEWAY_TOKEN_SECRET: 'gateway-secret',
+        } as never,
+        {} as never
+      );
+
+      await expect(
+        worker.deliverChatWebhook({
+          type: 'bot.status_request',
+          targetBotId,
+        })
+      ).rejects.toThrow(/Invalid sandboxId derived from targetBotId/);
+
+      expect(registryNamespace.idFromName).not.toHaveBeenCalled();
+      expect(instanceNamespace.idFromName).not.toHaveBeenCalled();
+    }
+  });
 });
 
 describe('proxy routing target usage', () => {

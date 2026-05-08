@@ -6,6 +6,7 @@ import type {
   textBlockSchema,
   contentBlockSchema,
   reactionSummarySchema,
+  replyToMessageSnapshotSchema,
   messageSchema,
   conversationListItemSchema,
   conversationDetailSchema,
@@ -18,13 +19,18 @@ import type {
   editMessageRequestSchema,
   editMessageResponseSchema,
   deleteMessageRequestSchema,
+  markConversationReadRequestSchema,
+  markConversationReadResponseSchema,
   renameConversationRequestSchema,
   conversationListResponseSchema,
   messageListResponseSchema,
   conversationDetailResponseSchema,
   okResponseSchema,
+  typingRequestSchema,
   addReactionResponseSchema,
+  removeReactionResponseSchema,
   executeActionRequestSchema,
+  executeActionResponseSchema,
   execApprovalDecisionSchema,
   botListConversationsResponseSchema,
   botListMessagesResponseSchema,
@@ -61,6 +67,7 @@ export type KiloChatClientConfig = {
   eventService: EventServiceClient;
   baseUrl: string;
   getToken: () => Promise<string>;
+  onUnauthorized?: () => Promise<'retry' | 'stop'> | 'retry' | 'stop';
   fetch?: typeof globalThis.fetch;
 };
 
@@ -82,6 +89,7 @@ export type BotConversationSummary = z.infer<typeof botConversationSummarySchema
 
 // ── Messages ────────────────────────────────────────────────────────
 export type Message = z.infer<typeof messageSchema>;
+export type ReplyToMessageSnapshot = z.infer<typeof replyToMessageSnapshotSchema>;
 
 // ── Events ──────────────────────────────────────────────────────────
 export type MessageCreatedEvent = z.infer<typeof messageCreatedEventSchema>;
@@ -109,10 +117,15 @@ export type CreateMessageResponse = z.infer<typeof createMessageResponseSchema>;
 export type EditMessageRequest = z.infer<typeof editMessageRequestSchema>;
 export type EditMessageResponse = z.infer<typeof editMessageResponseSchema>;
 export type DeleteMessageRequest = z.infer<typeof deleteMessageRequestSchema>;
+export type MarkConversationReadRequest = z.infer<typeof markConversationReadRequestSchema>;
+export type MarkConversationReadResponse = z.infer<typeof markConversationReadResponseSchema>;
 export type RenameConversationRequest = z.infer<typeof renameConversationRequestSchema>;
 export type OkResponse = z.infer<typeof okResponseSchema>;
+export type TypingRequest = z.infer<typeof typingRequestSchema>;
 export type AddReactionResponse = z.infer<typeof addReactionResponseSchema>;
+export type RemoveReactionResponse = z.infer<typeof removeReactionResponseSchema>;
 export type ExecuteActionRequest = z.infer<typeof executeActionRequestSchema>;
+export type ExecuteActionResponse = z.infer<typeof executeActionResponseSchema>;
 export type ExecApprovalDecision = z.infer<typeof execApprovalDecisionSchema>;
 export type ConversationListResponse = z.infer<typeof conversationListResponseSchema>;
 export type MessageListResponse = z.infer<typeof messageListResponseSchema>;

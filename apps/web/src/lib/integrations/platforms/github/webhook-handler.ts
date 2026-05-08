@@ -12,6 +12,7 @@ import {
   PullRequestPayloadSchema,
   IssuePayloadSchema,
   PullRequestReviewCommentPayloadSchema,
+  PullRequestReviewPayloadSchema,
 } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { findIntegrationByInstallationId } from '@/lib/integrations/db/platform-integrations';
 import {
@@ -24,6 +25,8 @@ import {
   handlePullRequest,
   handleIssue,
   handlePRReviewComment,
+  upsertCliSessionPullRequestsFromWebhook,
+  upsertCliSessionPullRequestReviewFromWebhook,
 } from '@/lib/integrations/platforms/github/webhook-handlers';
 import { PLATFORM, GITHUB_EVENT, GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
@@ -391,26 +394,74 @@ export async function handleGitHubWebhook(
 
       const action = parseResult.data.action;
 
-      // Filter out closed events - we don't log or process them
-      if (action === GITHUB_ACTION.CLOSED) {
-        return NextResponse.json({ message: 'Event received' }, { status: 200 });
-      }
-
-      // Log webhook event for both user and organization-owned integrations
+      // Log webhook event (also for `closed`, so that closed/merged deliveries
+      // are deduplicated before the upsert mutates pr_state below). Dedup has
+      // to sit above the upsert — otherwise a redelivered older
+      // `opened`/`synchronize` event could stomp a later `closed`/`merged`
+      // terminal state back to `open`.
       const logResult = await logWebhook(integration, action);
       if (logResult.isDuplicate) {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
 
+      // Side-effect: upsert the PR summary onto any cloud-agent-next sessions
+      // whose (git_url, git_branch) matches AND that are owned by this
+      // installation's tenant. Runs for all pull_request actions (including
+      // `closed`), independently of the code-review routing below. The upsert
+      // itself guards against demoting `closed`/`merged` back to `open` so
+      // that even out-of-order deliveries stay monotonic. Wrapped in after()
+      // to avoid blocking the webhook response — when a matching session is on
+      // a supported platform the function makes an outbound GitHub GraphQL
+      // call, which can add significant latency.
+      const upsertOwner = integration.owned_by_organization_id
+        ? ({
+            kind: 'organization',
+            organizationId: integration.owned_by_organization_id,
+          } as const)
+        : integration.owned_by_user_id
+          ? ({ kind: 'user', userId: integration.owned_by_user_id } as const)
+          : null;
+
+      // `closed` events are not routed to the code-review pipeline.
+      if (action === GITHUB_ACTION.CLOSED) {
+        if (upsertOwner) {
+          after(async () => {
+            await upsertCliSessionPullRequestsFromWebhook(parseResult.data, upsertOwner);
+            if (logResult.webhookEventId) {
+              try {
+                await updateWebhookEvent(logResult.webhookEventId, {
+                  processed: true,
+                  processed_at: new Date().toISOString(),
+                  handlers_triggered: ['cli_session_pr_upsert'],
+                  errors: null,
+                });
+              } catch (error) {
+                logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
+              }
+            }
+          });
+        }
+        return NextResponse.json({ message: 'Event received' }, { status: 200 });
+      }
+
+      if (upsertOwner) {
+        after(async () => {
+          await upsertCliSessionPullRequestsFromWebhook(parseResult.data, upsertOwner);
+        });
+      }
+
       const result = await handlePullRequest(parseResult.data, integration);
 
-      // Mark webhook event as processed
+      // Mark webhook event as processed. `cli_session_pr_upsert` is logged
+      // optimistically — the upsert runs in after() so it may not have
+      // completed yet, but errors are swallowed internally and the dedup entry
+      // was already committed by logWebhook above.
       if (logResult.webhookEventId) {
         try {
           await updateWebhookEvent(logResult.webhookEventId, {
             processed: true,
             processed_at: new Date().toISOString(),
-            handlers_triggered: ['code_review'],
+            handlers_triggered: ['code_review', 'cli_session_pr_upsert'],
             errors: null,
           });
         } catch (error) {
@@ -419,6 +470,72 @@ export async function handleGitHubWebhook(
       }
 
       return result;
+    }
+
+    // Handle pull_request_review events — update cached review decision.
+    if (eventType === GITHUB_EVENT.PULL_REQUEST_REVIEW) {
+      const parseResult = PullRequestReviewPayloadSchema.safeParse(payload);
+      if (!parseResult.success) {
+        logExceptInTest(`Invalid pull_request_review payload${logSuffix}:`, parseResult.error);
+        captureException(parseResult.error, {
+          tags: { source: `${sentryPrefix}webhook_validation`, event: 'pull_request_review' },
+        });
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      }
+
+      const action = parseResult.data.action;
+
+      const logResult = await logWebhook(integration, action);
+      if (logResult.isDuplicate) {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+
+      const upsertOwner = integration.owned_by_organization_id
+        ? ({ kind: 'organization', organizationId: integration.owned_by_organization_id } as const)
+        : integration.owned_by_user_id
+          ? ({ kind: 'user', userId: integration.owned_by_user_id } as const)
+          : null;
+
+      if (upsertOwner) {
+        after(async () => {
+          try {
+            await upsertCliSessionPullRequestReviewFromWebhook(parseResult.data, upsertOwner);
+            if (logResult.webhookEventId) {
+              await updateWebhookEvent(logResult.webhookEventId, {
+                processed: true,
+                processed_at: new Date().toISOString(),
+                handlers_triggered: ['cli_session_pr_review_upsert'],
+                errors: null,
+              });
+            }
+          } catch (error) {
+            logExceptInTest(`Error handling pull_request_review${logSuffix}:`, error);
+            captureException(error, {
+              tags: { source: `${sentryPrefix}webhook_pr_review` },
+            });
+            if (logResult.webhookEventId) {
+              try {
+                await updateWebhookEvent(logResult.webhookEventId, {
+                  processed: true,
+                  processed_at: new Date().toISOString(),
+                  handlers_triggered: ['cli_session_pr_review_upsert'],
+                  errors: [
+                    {
+                      message: error instanceof Error ? error.message : String(error),
+                      handler: 'cli_session_pr_review_upsert',
+                      stack: error instanceof Error ? error.stack : undefined,
+                    },
+                  ],
+                });
+              } catch {
+                // Best-effort logging
+              }
+            }
+          }
+        });
+      }
+
+      return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }
 
     // Handle pull_request_review_comment events

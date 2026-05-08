@@ -2034,7 +2034,21 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         });
         setDoctorControllerDialogOpen(true);
       },
-      onError: err => {
+      onError: (err, variables) => {
+        if (
+          err instanceof TRPCClientError &&
+          err.data?.code === 'CONFLICT' &&
+          err.message.includes('already in progress')
+        ) {
+          setDoctorControllerDialogOpen(true);
+          void queryClient.invalidateQueries({
+            queryKey: trpc.admin.kiloclawInstances.doctorViaControllerStatus.queryKey({
+              userId: variables.userId,
+              instanceId: variables.instanceId,
+            }),
+          });
+          return;
+        }
         toast.error(`Failed to start doctor (controller): ${err.message}`);
       },
     })

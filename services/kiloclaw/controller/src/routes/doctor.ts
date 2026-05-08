@@ -44,6 +44,7 @@ type ActiveRun = {
   runId: string;
   outputBytes: number;
   outputTruncated: boolean;
+  finalStatus: DoctorRunStatus | null;
   timeoutTimer: ReturnType<typeof setTimeout> | null;
   killTimer: ReturnType<typeof setTimeout> | null;
   metadataFlushTimer: ReturnType<typeof setTimeout> | null;
@@ -274,6 +275,8 @@ function finalizeRun(run: ActiveRun, exitCode: number | null, status: DoctorRunS
   const metadata = readMetadata();
   if (!metadata || metadata.runId !== run.runId || metadata.status !== 'running') return;
 
+  run.finalStatus = status;
+
   writeMetadata({
     ...metadata,
     outputBytes: run.outputBytes,
@@ -291,7 +294,13 @@ function finalizeRun(run: ActiveRun, exitCode: number | null, status: DoctorRunS
     clearTimeout(run.metadataFlushTimer);
     run.metadataFlushTimer = null;
   }
-  activeRun = null;
+  if (run.terminated) {
+    if (run.killTimer) {
+      clearTimeout(run.killTimer);
+      run.killTimer = null;
+    }
+    activeRun = null;
+  }
 }
 
 function markInterruptedRunIfNeeded(): DoctorRunMetadata | null {
@@ -419,6 +428,7 @@ export function registerDoctorRoutes(app: Hono, expectedToken: string): void {
         runId,
         outputBytes: 0,
         outputTruncated: false,
+        finalStatus: null,
         timeoutTimer: null,
         killTimer: null,
         metadataFlushTimer: null,
@@ -443,9 +453,18 @@ export function registerDoctorRoutes(app: Hono, expectedToken: string): void {
       child.once('close', (code, signal) => {
         run.terminated = true;
         const metadata = readMetadata();
-        if (!metadata || metadata.runId !== run.runId || metadata.status !== 'running') return;
         console.log(`[doctor] Process exited: code=${code} signal=${signal}`);
-        finalizeRun(run, code, code === 0 ? 'completed' : 'failed');
+        if (metadata?.runId === run.runId && metadata.status === 'running') {
+          finalizeRun(run, code, code === 0 ? 'completed' : 'failed');
+          return;
+        }
+        if (activeRun?.runId === run.runId && run.finalStatus !== null) {
+          if (run.killTimer) {
+            clearTimeout(run.killTimer);
+            run.killTimer = null;
+          }
+          activeRun = null;
+        }
       });
 
       run.timeoutTimer = setTimeout(() => {

@@ -221,6 +221,14 @@ describe('/_kilo/doctor routes', () => {
       status: 'cancelled',
       output: expect.stringContaining('cancelled by operator'),
     });
+    expect(_getActiveRun()).not.toBeNull();
+    const retry = await app.request('/_kilo/doctor/start', {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    expect(retry.status).toBe(409);
+
+    currentChild.emit('close', null, 'SIGTERM');
     expect(_getActiveRun()).toBeNull();
   });
 
@@ -249,9 +257,19 @@ describe('/_kilo/doctor routes', () => {
         timedOut: true,
         output: expect.stringContaining('timed out'),
       });
+      expect(_getActiveRun()).not.toBeNull();
+
+      const retry = await app.request('/_kilo/doctor/start', {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      expect(retry.status).toBe(409);
 
       await vi.advanceTimersByTimeAsync(5_000);
       expect(currentChild.kill).toHaveBeenCalledWith('SIGKILL');
+
+      currentChild.emit('close', null, 'SIGKILL');
+      expect(_getActiveRun()).toBeNull();
     } finally {
       vi.useRealTimers();
     }

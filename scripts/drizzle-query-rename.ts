@@ -16,7 +16,6 @@
  */
 
 import { Project, Node, SyntaxKind } from 'ts-morph';
-import { readFileSync } from 'node:fs';
 import { globSync } from 'node:fs';
 import path from 'node:path';
 

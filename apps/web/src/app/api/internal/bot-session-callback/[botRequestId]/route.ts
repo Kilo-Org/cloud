@@ -28,8 +28,7 @@ import { getRehydratedBotRequestMessageState } from '@/lib/bot/message-state';
 import { botPlatforms } from '@/lib/bot/platforms';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
 import { findUserById } from '@/lib/user';
-import type { Message } from 'chat';
-import { type Thread } from 'chat';
+import type { Message, Thread } from 'chat';
 
 type ExecutionCallbackPayload = {
   sessionId: string;

@@ -376,7 +376,7 @@ export function mayorWorkdirForTown(townId: string): string {
   return `/workspace/rigs/mayor-${townId}/mayor-workspace`;
 }
 
-async function createLightweightWorkspace(label: string, rigId: string): Promise<string> {
+export async function createLightweightWorkspace(label: string, rigId: string): Promise<string> {
   const { mkdir: mkdirAsync } = await import('node:fs/promises');
   const { existsSync } = await import('node:fs');
   const path = await import('node:path');

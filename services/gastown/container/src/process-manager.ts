@@ -11,7 +11,7 @@ import { z } from 'zod';
 import * as fs from 'node:fs/promises';
 import type { ManagedAgent, StartAgentRequest } from './types';
 import { reportAgentCompleted, reportMayorWaiting } from './completion-reporter';
-import { buildKiloConfigContent, mayorWorkdirForTown } from './agent-runner';
+import { buildKiloConfigContent, mayorWorkdirForTown, createLightweightWorkspace } from './agent-runner';
 import {
   getCurrentTownConfig,
   getLastAppliedEnvVarKeys,
@@ -2691,6 +2691,8 @@ async function prewarmMayorSDK(
   }
 
   const workdir = mayorWorkdirForTown(townId);
+
+  await createLightweightWorkspace('mayor', `mayor-${townId}`);
 
   await hydrateDbFromSnapshot(mayorAgentId, apiUrl, token, `mayor-${townId}`, townId);
 

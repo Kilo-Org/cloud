@@ -7,9 +7,15 @@ import {
   kiloclaw_email_log,
   kiloclaw_cli_runs,
   kiloclaw_version_pins,
+  kiloclaw_image_catalog,
+  kiloclaw_scheduled_actions,
+  kiloclaw_scheduled_action_stages,
+  kiloclaw_scheduled_action_targets,
+  kiloclaw_scheduled_action_notifications,
   kilocode_users,
 } from '@kilocode/db/schema';
 import type { KiloClawSubscriptionStatus } from '@kilocode/db/schema-types';
+import type { NewKiloClawScheduledActionNotification } from '@kilocode/db/schema';
 import {
   cycleInboundEmailAddressForInstance,
   getInboundEmailAddressForInstance,
@@ -42,6 +48,13 @@ import type {
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import { InstanceTierKeySchema } from '@kilocode/kiloclaw-instance-tiers';
+import {
+  AdminSizeOverridePayloadSchema,
+  AdminSizeOverridePresetSchema,
+  presetToMachineSize,
+  type AdminSizeOverridePayload,
+} from '@/lib/kiloclaw/admin-size-override';
 import { alias } from 'drizzle-orm/pg-core';
 import {
   eq,
@@ -60,6 +73,32 @@ import {
 } from 'drizzle-orm';
 
 const initiatingAdminUsers = alias(kilocode_users, 'initiating_admin_users');
+const pinnedByUsers = alias(kilocode_users, 'pinned_by_users');
+
+/**
+ * Validate the JSONB `admin_size_override` column via the shared Zod
+ * schema. Bad payloads return null and emit a warn so DO/Postgres
+ * divergence surfaces (the DO is the only writer; a malformed payload
+ * means schema drift or a manually-edited row).
+ */
+function parseAdminSizeOverride(value: unknown): AdminSizeOverrideRow | null {
+  if (value === null || value === undefined) return null;
+  const parsed = AdminSizeOverridePayloadSchema.safeParse(value);
+  if (!parsed.success) {
+    console.warn('[admin-kiloclaw] Dropping malformed admin_size_override payload', {
+      value,
+      issues: parsed.error.issues,
+    });
+    return null;
+  }
+  return parsed.data;
+}
+
+/**
+ * Sentinel for `imageTag` filter — matches rows where `tracked_image_tag IS NULL`
+ * (DO alarm hasn't ticked yet, hibernated DOs).
+ */
+const IMAGE_TAG_FILTER_UNKNOWN = '__unknown__';
 
 const ListInstancesSchema = z.object({
   offset: z.number().min(0).default(0),
@@ -70,6 +109,14 @@ const ListInstancesSchema = z.object({
   status: z
     .enum(['all', 'active', 'inactive_trial_stopped', 'suspended', 'destroyed'])
     .default('all'),
+  imageTag: z.string().max(128).optional(),
+  /**
+   * When true, restrict the list to instances with an active admin
+   * `admin_size_override`. Powered by the partial index on
+   * `kiloclaw_instances.admin_size_override`. Used by the admin list
+   * page's "Has size override" filter.
+   */
+  hasSizeOverride: z.boolean().optional(),
 });
 
 const DetectOrphansSchema = z.object({
@@ -324,7 +371,33 @@ export type AdminKiloclawInstance = {
    * `kilocode_users` (per user, applies across all of their instances).
    */
   user_kiloclaw_early_access: boolean;
+  /**
+   * The image tag the DO last reported running. Denormalized from DO state by
+   * the alarm reconciler. Null when the DO hasn't ticked since the column was
+   * added (≤30min after first deploy) or for hibernated DOs.
+   */
+  tracked_image_tag: string | null;
+  /**
+   * Active version pin, if any. Null when the instance has no pin row.
+   */
+  pin: {
+    image_tag: string;
+    pinned_by_user_id: string;
+    is_admin_pin: boolean;
+  } | null;
+  /**
+   * Active admin size override, if any. Mirrors the DO's
+   * `adminMachineSizeOverride` + metadata. Non-null means the instance is
+   * running on hardware that diverges from its billable tier.
+   */
+  admin_size_override: AdminSizeOverrideRow | null;
 };
+
+// Re-export the shared payload as the row type so the router and the lib
+// share a single canonical schema. The shape is whatever
+// `AdminSizeOverridePayloadSchema` enforces (validated at the JSONB column
+// boundary by `parseAdminSizeOverride`).
+export type AdminSizeOverrideRow = AdminSizeOverridePayload;
 
 export type AdminKiloclawInstanceDetail = AdminKiloclawInstance & {
   inbound_email_address: string | null;
@@ -342,6 +415,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         suspended_at: kiloclaw_subscriptions.suspended_at,
         subscription_id: kiloclaw_subscriptions.id,
         subscription_status: kiloclaw_subscriptions.status,
+        pin_image_tag: kiloclaw_version_pins.image_tag,
+        pin_pinned_by: kiloclaw_version_pins.pinned_by,
+        pin_pinned_by_is_admin: pinnedByUsers.is_admin,
       })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
@@ -349,6 +425,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         kiloclaw_subscriptions,
         eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       )
+      .leftJoin(kiloclaw_version_pins, eq(kiloclaw_version_pins.instance_id, kiloclaw_instances.id))
+      .leftJoin(pinnedByUsers, eq(pinnedByUsers.id, kiloclaw_version_pins.pinned_by))
       .where(eq(kiloclaw_instances.id, input.id))
       .limit(1);
 
@@ -375,6 +453,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       subscription_id: result.subscription_id ?? null,
       subscription_status: result.subscription_status ?? null,
       user_kiloclaw_early_access: result.user_kiloclaw_early_access ?? false,
+      tracked_image_tag: result.instance.tracked_image_tag,
+      pin:
+        result.pin_image_tag && result.pin_pinned_by
+          ? {
+              image_tag: result.pin_image_tag,
+              pinned_by_user_id: result.pin_pinned_by,
+              is_admin_pin: result.pin_pinned_by_is_admin ?? false,
+            }
+          : null,
+      admin_size_override: parseAdminSizeOverride(result.instance.admin_size_override),
     };
 
     const inboundEmailAddress = await getInboundEmailAddressForInstance(instance.id);
@@ -461,7 +549,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
     }),
 
   list: adminProcedure.input(ListInstancesSchema).query(async ({ input }) => {
-    const { offset, limit, sortBy, sortOrder, search, status } = input;
+    const { offset, limit, sortBy, sortOrder, search, status, imageTag, hasSizeOverride } = input;
     const searchTerm = search?.trim() || '';
 
     const conditions: SQL[] = [];
@@ -501,6 +589,20 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       conditions.push(isNotNull(kiloclaw_instances.destroyed_at));
     }
 
+    if (imageTag === IMAGE_TAG_FILTER_UNKNOWN) {
+      conditions.push(isNull(kiloclaw_instances.tracked_image_tag));
+    } else if (imageTag) {
+      conditions.push(eq(kiloclaw_instances.tracked_image_tag, imageTag));
+    }
+
+    if (hasSizeOverride) {
+      // Match the partial-index predicate exactly so the planner can use it.
+      // Intent is "outstanding overrides on live instances" — a destroyed
+      // instance with a leftover override is not actionable for support.
+      conditions.push(isNotNull(kiloclaw_instances.admin_size_override));
+      conditions.push(isNull(kiloclaw_instances.destroyed_at));
+    }
+
     const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
 
     const orderFunction = sortOrder === 'asc' ? asc : desc;
@@ -514,6 +616,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         suspended_at: kiloclaw_subscriptions.suspended_at,
         subscription_id: kiloclaw_subscriptions.id,
         subscription_status: kiloclaw_subscriptions.status,
+        pin_image_tag: kiloclaw_version_pins.image_tag,
+        pin_pinned_by: kiloclaw_version_pins.pinned_by,
+        pin_pinned_by_is_admin: pinnedByUsers.is_admin,
       })
       .from(kiloclaw_instances)
       .leftJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
@@ -521,6 +626,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         kiloclaw_subscriptions,
         eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id)
       )
+      .leftJoin(kiloclaw_version_pins, eq(kiloclaw_version_pins.instance_id, kiloclaw_instances.id))
+      .leftJoin(pinnedByUsers, eq(pinnedByUsers.id, kiloclaw_version_pins.pinned_by))
       .where(whereCondition)
       .orderBy(orderCondition)
       .limit(limit)
@@ -558,6 +665,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       subscription_id: row.subscription_id ?? null,
       subscription_status: row.subscription_status ?? null,
       user_kiloclaw_early_access: row.user_kiloclaw_early_access ?? false,
+      tracked_image_tag: row.instance.tracked_image_tag,
+      pin:
+        row.pin_image_tag && row.pin_pinned_by
+          ? {
+              image_tag: row.pin_image_tag,
+              pinned_by_user_id: row.pin_pinned_by,
+              is_admin_pin: row.pin_pinned_by_is_admin ?? false,
+            }
+          : null,
+      admin_size_override: parseAdminSizeOverride(row.instance.admin_size_override),
     }));
 
     return {
@@ -1319,6 +1436,1197 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * Apply a version change across many instances in one call. Thin partition +
+   * concurrency layer over the same primitive `restartMachine` uses
+   * (pin-clear + worker restart). Synchronous: returns when every instance has
+   * been processed.
+   *
+   * Partition order matters — an instance with multiple disqualifying
+   * conditions reports the most actionable reason. `destroyed` outranks
+   * `pinned_*`, `pinned_*` outranks `already_on_target`.
+   */
+  bulkChangeVersion: adminProcedure
+    .input(
+      z.object({
+        // Practical limit: the UI only allows per-page selection, so 500
+        // leaves ample headroom while keeping the inArray clause performant.
+        // If a future "select all across pages" feature lands, revisit.
+        instanceIds: z.array(z.string().uuid()).min(1).max(500),
+        imageTag: z
+          .string()
+          .min(1)
+          .max(128, 'Image tag too long')
+          .regex(
+            /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/,
+            'Image tag must be alphanumeric with dots, hyphens, or underscores'
+          ),
+        // When true, deletes any existing pin (user-set OR admin-set) before
+        // restarting. Same semantics as restartMachine.acknowledgeOverride —
+        // single toggle covers both pin types per Phase 1.5 Decision #5.
+        overridePins: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // 1. Validate target tag in catalog. Worker would happily redeploy a
+      // disabled tag, so the explicit guard lives here.
+      const [catalogEntry] = await db
+        .select({
+          image_tag: kiloclaw_image_catalog.image_tag,
+          status: kiloclaw_image_catalog.status,
+        })
+        .from(kiloclaw_image_catalog)
+        .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag))
+        .limit(1);
+
+      if (!catalogEntry) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Target image tag not found in catalog: ${input.imageTag}`,
+        });
+      }
+      if (catalogEntry.status === 'disabled') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Target image tag is disabled: ${input.imageTag}`,
+        });
+      }
+
+      // 2. One SELECT to gather instance + pin + admin-status per id.
+      // is_admin lives on kilocode_users — there is no separate admin_users
+      // table.
+      const rows = await db
+        .select({
+          instance_id: kiloclaw_instances.id,
+          user_id: kiloclaw_instances.user_id,
+          sandbox_id: kiloclaw_instances.sandbox_id,
+          destroyed_at: kiloclaw_instances.destroyed_at,
+          tracked_image_tag: kiloclaw_instances.tracked_image_tag,
+          pin_id: kiloclaw_version_pins.id,
+          pin_pinned_by: kiloclaw_version_pins.pinned_by,
+          pin_updated_at: kiloclaw_version_pins.updated_at,
+          pin_pinned_by_is_admin: pinnedByUsers.is_admin,
+        })
+        .from(kiloclaw_instances)
+        .leftJoin(
+          kiloclaw_version_pins,
+          eq(kiloclaw_version_pins.instance_id, kiloclaw_instances.id)
+        )
+        .leftJoin(pinnedByUsers, eq(pinnedByUsers.id, kiloclaw_version_pins.pinned_by))
+        .where(inArray(kiloclaw_instances.id, input.instanceIds));
+
+      // Look up owning users in one shot — generateApiToken needs a full
+      // kilocode_users row. Map by id for O(1) lookup in the apply loop.
+      const ownerUserIds = Array.from(new Set(rows.map(r => r.user_id)));
+      const ownerUsers =
+        ownerUserIds.length > 0
+          ? await db.select().from(kilocode_users).where(inArray(kilocode_users.id, ownerUserIds))
+          : [];
+      const ownerUserById = new Map(ownerUsers.map(u => [u.id, u]));
+
+      // 3. Partition. Order: destroyed → pinned_by_admin → pinned_by_user →
+      // already_on_target → apply.
+      type ApplyTarget = (typeof rows)[number] & { ownerUserRecord: (typeof ownerUsers)[number] };
+      type SkipReason =
+        | 'destroyed'
+        | 'pinned_by_user'
+        | 'pinned_by_admin'
+        | 'already_on_target'
+        | 'pin_changed_in_flight';
+
+      type ApplyOutcome = { status: 'applied' } | { status: 'skipped'; reason: SkipReason };
+
+      const applied: string[] = [];
+      const skipped: Array<{ instanceId: string; reason: SkipReason }> = [];
+      const failed: Array<{ instanceId: string; error: string }> = [];
+      const applyQueue: ApplyTarget[] = [];
+
+      // Track which input ids matched a row — anything missing surfaces in
+      // failed[{ error: 'not_found' }].
+      const seenIds = new Set(rows.map(r => r.instance_id));
+      for (const id of input.instanceIds) {
+        if (!seenIds.has(id)) {
+          failed.push({ instanceId: id, error: 'not_found' });
+        }
+      }
+
+      for (const row of rows) {
+        if (row.destroyed_at) {
+          skipped.push({ instanceId: row.instance_id, reason: 'destroyed' });
+          continue;
+        }
+        if (row.pin_id && !input.overridePins) {
+          skipped.push({
+            instanceId: row.instance_id,
+            reason: row.pin_pinned_by_is_admin ? 'pinned_by_admin' : 'pinned_by_user',
+          });
+          continue;
+        }
+        if (row.tracked_image_tag === input.imageTag) {
+          skipped.push({ instanceId: row.instance_id, reason: 'already_on_target' });
+          continue;
+        }
+        const ownerUserRecord = ownerUserById.get(row.user_id);
+        if (!ownerUserRecord) {
+          failed.push({
+            instanceId: row.instance_id,
+            error: 'owner user not found',
+          });
+          continue;
+        }
+        applyQueue.push({ ...row, ownerUserRecord });
+      }
+
+      // 4. Apply with bounded concurrency. Manual chunking matches the
+      // detectOrphans pattern already in this router.
+      const CONCURRENCY = 10;
+
+      const applyOne = async (target: ApplyTarget): Promise<ApplyOutcome> => {
+        if (target.pin_id && input.overridePins) {
+          // Atomic delete tied to id + updated_at — same three-predicate
+          // guard restartMachine uses. Catches both replacement (different
+          // id) and in-place updates (same id, newer updated_at).
+          const deleted = await db
+            .delete(kiloclaw_version_pins)
+            .where(
+              and(
+                eq(kiloclaw_version_pins.instance_id, target.instance_id),
+                eq(kiloclaw_version_pins.id, target.pin_id),
+                target.pin_updated_at
+                  ? eq(kiloclaw_version_pins.updated_at, target.pin_updated_at)
+                  : isNull(kiloclaw_version_pins.updated_at)
+              )
+            )
+            .returning({ id: kiloclaw_version_pins.id });
+
+          // CAS miss: a new pin row was written between the partition
+          // SELECT and this delete (the user replaced or updated their
+          // pin). Skip rather than override the user's fresh write.
+          // Surfacing as `pin_changed_in_flight` keeps DB pin and DO
+          // state aligned and lets the admin re-run with the now-current
+          // pin information visible in the table.
+          if (deleted.length === 0) {
+            return { status: 'skipped', reason: 'pin_changed_in_flight' };
+          }
+          await pushPinToWorker(target.user_id, target.instance_id, null);
+        }
+
+        const token = generateApiToken(target.ownerUserRecord, undefined, {
+          expiresIn: TOKEN_EXPIRY.fiveMinutes,
+        });
+        const client = new KiloClawUserClient(token);
+        await client.restartMachine(
+          { imageTag: input.imageTag },
+          {
+            userId: target.user_id,
+            instanceId: workerInstanceId({
+              id: target.instance_id,
+              sandbox_id: target.sandbox_id,
+            }),
+          }
+        );
+        return { status: 'applied' };
+      };
+
+      for (let i = 0; i < applyQueue.length; i += CONCURRENCY) {
+        const batch = applyQueue.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(batch.map(applyOne));
+        for (let j = 0; j < batch.length; j += 1) {
+          const target = batch[j];
+          const r = results[j];
+          if (r.status === 'fulfilled') {
+            if (r.value.status === 'applied') {
+              applied.push(target.instance_id);
+            } else {
+              skipped.push({ instanceId: target.instance_id, reason: r.value.reason });
+            }
+          } else {
+            const err = r.reason;
+            const message =
+              err instanceof KiloClawApiError
+                ? getKiloclawApiErrorPayload(err, 'restart failed').message
+                : err instanceof Error
+                  ? err.message
+                  : 'restart failed';
+            failed.push({ instanceId: target.instance_id, error: message });
+          }
+        }
+      }
+
+      // Audit log: bulk version changes can touch up to 500 user instances
+      // and override pins. Record the action for accountability. The audit
+      // log uses target_user_id = ctx.user.id (the actor) since the
+      // schema column is non-null and this is a multi-user action; the
+      // applied/skipped/failed instance ids land in metadata. Fire-and-
+      // forget pattern matches the rest of this router.
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.instances.bulk_change_version',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: ctx.user.id,
+          message: `Bulk version change: tag=${input.imageTag} overridePins=${input.overridePins} applied=${applied.length} skipped=${skipped.length} failed=${failed.length}`,
+          metadata: {
+            imageTag: input.imageTag,
+            overridePins: input.overridePins,
+            requestedInstanceIds: input.instanceIds,
+            appliedInstanceIds: applied,
+            skipped,
+            failed,
+          },
+        });
+      } catch (auditErr) {
+        console.error('Failed to write audit log for bulkChangeVersion:', auditErr);
+      }
+
+      return { applied, skipped, failed };
+    }),
+
+  /**
+   * Schedule an admin action against a single instance to fire at a
+   * future time.
+   *
+   * PR 1: only `actionType='scheduled_restart'` is implemented. The
+   * input shape is structured as a discriminated union so future action
+   * types (`version_change` in PR 3) slot in without breaking callers.
+   *
+   * Notice config (lead hours, subject, body) is collected here even
+   * though PR 1 doesn't dispatch notifications — PR 2 lights up the
+   * notification fan-out using these fields.
+   */
+  scheduleAction: adminProcedure
+    .input(
+      z.discriminatedUnion('actionType', [
+        z.object({
+          actionType: z.literal('scheduled_restart'),
+          // One parent + one stage + N targets per call. min(1) keeps the
+          // shape consistent for single-instance UIs (which pass an array
+          // of length 1). Cap mirrors bulkChangeVersion's batch ceiling.
+          instanceIds: z.array(z.string().uuid()).min(1).max(500),
+          // Must be in the future. Loose lower bound (>= now() + 1 min)
+          // is enforced in the procedure body since Zod can't compare to
+          // wall-clock time.
+          scheduledAt: z.string().datetime(),
+          reason: z.string().max(256).optional(),
+          // Notice config. notify defaults true — admin must explicitly
+          // opt out (uncommon: dev/internal instances with no real user).
+          // When notify=false we skip all notification row inserts and
+          // the action fires silently.
+          notify: z.boolean().default(true),
+          // How far ahead of scheduled_at to dispatch the notice. The
+          // sweep selects pending notifications where now() >= stage.scheduled_at - lead_hours.
+          // Range matches the parent column constraint.
+          noticeLeadHours: z.number().int().min(0).max(168).default(24),
+          noticeSubject: z.string().max(120).default(''),
+          noticeBody: z.string().max(2000).default(''),
+          // Channels default to all available. Admin can narrow at
+          // schedule time. 'agent' is excluded from the v1 enum here —
+          // the dispatcher would 501 anyway and we want admins to know
+          // it's not yet supported.
+          //
+          // min(1) is enforced even when notify=false: callers that
+          // want "no notifications" should set notify:false and let
+          // the default fill the array, rather than passing []. The
+          // backend ignores channels entirely when notify=false (the
+          // notification-row insert is gated on notify), so the
+          // constraint never affects runtime behavior — it just keeps
+          // the validator simple and rejects accidentally-empty
+          // arrays from API callers who DID intend notify:true.
+          noticeChannels: z
+            .array(z.enum(['email', 'webapp', 'mobile_push']))
+            .min(1)
+            .default(['email', 'webapp', 'mobile_push']),
+        }),
+        z.object({
+          actionType: z.literal('version_change'),
+          instanceIds: z.array(z.string().uuid()).min(1).max(500),
+          // The image_tag the worker should redeploy on at the scheduled
+          // time. Must exist in kiloclaw_image_catalog with status='available'
+          // (validated in the procedure body, mirrors bulkChangeVersion).
+          imageTag: z
+            .string()
+            .min(1)
+            .max(128)
+            .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),
+          // Whether to delete an existing pin row at apply time. Same
+          // semantics as bulkChangeVersion.overridePins. Without this,
+          // a pinned instance is recorded as skipped:pinned at apply.
+          overridePins: z.boolean().default(false),
+          scheduledAt: z.string().datetime(),
+          reason: z.string().max(256).optional(),
+          notify: z.boolean().default(true),
+          noticeLeadHours: z.number().int().min(0).max(168).default(24),
+          noticeSubject: z.string().max(120).default(''),
+          noticeBody: z.string().max(2000).default(''),
+          noticeChannels: z
+            .array(z.enum(['email', 'webapp', 'mobile_push']))
+            .min(1)
+            .default(['email', 'webapp', 'mobile_push']),
+        }),
+      ])
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Validate scheduledAt > now() + 1 minute so admins can't
+      // accidentally schedule something that fires immediately.
+      const scheduledAtMs = new Date(input.scheduledAt).getTime();
+      if (scheduledAtMs - Date.now() < 60_000) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'scheduledAt must be at least 1 minute in the future',
+        });
+      }
+
+      // For version_change, validate the target image tag matches the
+      // catalog rules bulkChangeVersion uses (must exist + status='available').
+      // We do this BEFORE inserting any rows so a bad tag fails fast.
+      if (input.actionType === 'version_change') {
+        const [catalogEntry] = await db
+          .select({
+            image_tag: kiloclaw_image_catalog.image_tag,
+            status: kiloclaw_image_catalog.status,
+          })
+          .from(kiloclaw_image_catalog)
+          .where(eq(kiloclaw_image_catalog.image_tag, input.imageTag))
+          .limit(1);
+
+        if (!catalogEntry) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Target image tag not found in catalog: ${input.imageTag}`,
+          });
+        }
+        if (catalogEntry.status === 'disabled') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Target image tag is disabled: ${input.imageTag}`,
+          });
+        }
+      }
+
+      // Dedupe instance ids — duplicate target rows would violate
+      // UQ_kiloclaw_scheduled_action_targets_parent_instance.
+      const uniqueInstanceIds = Array.from(new Set(input.instanceIds));
+
+      // Resolve all instances + owners in one query so we can stamp
+      // source_image_tag and user_id per target.
+      const instanceRows = await db
+        .select({
+          instance: kiloclaw_instances,
+          owner_id: kilocode_users.id,
+        })
+        .from(kiloclaw_instances)
+        .innerJoin(kilocode_users, eq(kiloclaw_instances.user_id, kilocode_users.id))
+        .where(inArray(kiloclaw_instances.id, uniqueInstanceIds));
+
+      const resolvedById = new Map(instanceRows.map(r => [r.instance.id, r]));
+      const missing = uniqueInstanceIds.filter(id => !resolvedById.has(id));
+      if (missing.length > 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Instance not found: ${missing.join(', ')}`,
+        });
+      }
+
+      // Silently drop destroyed instances. Mirrors bulkChangeVersion's
+      // partition shape (destroyed surfaces as `skipped:destroyed` in
+      // its result), but for the schedule path we just filter — there's
+      // no apply-time partition until the action fires. The bulk dialog
+      // already shows the destroyed count in its summary panel so the
+      // admin sees what's being filtered. If every instance is destroyed
+      // we have nothing to schedule; reject with a clear message.
+      const liveInstanceRows = instanceRows.filter(r => !r.instance.destroyed_at);
+      if (liveInstanceRows.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'All target instances are destroyed; nothing to schedule',
+        });
+      }
+      const liveInstanceIds = liveInstanceRows.map(r => r.instance.id);
+      const liveResolvedById = new Map(liveInstanceRows.map(r => [r.instance.id, r]));
+
+      // version_change-specific parent/target columns. Null for other action types.
+      const parentTargetImageTag = input.actionType === 'version_change' ? input.imageTag : null;
+      const parentOverridePins = input.actionType === 'version_change' ? input.overridePins : false;
+
+      // Conflict check + parent/stage/target inserts run in one
+      // SERIALIZABLE transaction. Without serialization, two concurrent
+      // schedule requests on the same instance can both observe "no
+      // pending" outside any transaction and then both insert separate
+      // scheduled actions, violating the one-pending-action-per-instance
+      // invariant. SSI in Postgres detects the conflict and aborts the
+      // losing tx with 40001; the admin retries (the click) and the
+      // second attempt sees the now-committed pending row and rejects
+      // with the normal CONFLICT message. We don't add an in-procedure
+      // retry loop — admin-initiated path, low contention, retry-by-
+      // clicking is fine.
+      const result = await db.transaction(
+        async tx => {
+          // Filter must include 'running' as well as 'pending'. The DO
+          // apply path flips the target to 'running' via
+          // claimScheduledActionTarget right before invoking the side
+          // effect; if a second schedule request lands during that
+          // window and we filter on 'pending' alone, we'd miss the
+          // in-flight target and create a duplicate parent action.
+          const existingPending = await tx
+            .select({
+              instance_id: kiloclaw_scheduled_action_targets.instance_id,
+              scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
+            })
+            .from(kiloclaw_scheduled_action_targets)
+            .innerJoin(
+              kiloclaw_scheduled_actions,
+              eq(
+                kiloclaw_scheduled_actions.id,
+                kiloclaw_scheduled_action_targets.scheduled_action_id
+              )
+            )
+            .where(
+              and(
+                inArray(kiloclaw_scheduled_action_targets.instance_id, liveInstanceIds),
+                inArray(kiloclaw_scheduled_action_targets.status, ['pending', 'running']),
+                inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+              )
+            );
+
+          if (existingPending.length > 0) {
+            const conflictIds = Array.from(new Set(existingPending.map(e => e.instance_id)));
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message:
+                conflictIds.length === 1
+                  ? `Instance ${conflictIds[0]} already has a pending or in-flight scheduled action; cancel it first`
+                  : `${conflictIds.length} instances already have pending or in-flight scheduled actions; cancel those first: ${conflictIds.join(', ')}`,
+            });
+          }
+
+          const [parentRow] = await tx
+            .insert(kiloclaw_scheduled_actions)
+            .values({
+              action_type: input.actionType,
+              target_image_tag: parentTargetImageTag,
+              override_pins: parentOverridePins,
+              notice_lead_hours: input.noticeLeadHours,
+              notice_subject: input.noticeSubject,
+              notice_body: input.noticeBody,
+              reason: input.reason ?? null,
+              status: 'scheduled',
+              created_by: ctx.user.id,
+              total_count: liveInstanceIds.length,
+            })
+            .returning({ id: kiloclaw_scheduled_actions.id });
+
+          const [stageRow] = await tx
+            .insert(kiloclaw_scheduled_action_stages)
+            .values({
+              scheduled_action_id: parentRow.id,
+              stage_index: 0,
+              scheduled_at: input.scheduledAt,
+              status: 'pending',
+            })
+            .returning({ id: kiloclaw_scheduled_action_stages.id });
+
+          const insertedTargets = await tx
+            .insert(kiloclaw_scheduled_action_targets)
+            .values(
+              liveInstanceIds.map(id => {
+                const row = liveResolvedById.get(id);
+                // liveResolvedById is built from liveInstanceRows (filtered
+                // above), so every id resolves.
+                if (!row) throw new Error(`unresolved instance ${id}`);
+                return {
+                  scheduled_action_id: parentRow.id,
+                  stage_id: stageRow.id,
+                  instance_id: row.instance.id,
+                  source_image_tag: row.instance.tracked_image_tag,
+                  // For version_change targets we stamp the target tag so the
+                  // DO apply path can read it from the target row directly
+                  // without having to join back to the parent.
+                  target_image_tag: parentTargetImageTag,
+                  user_id: row.owner_id,
+                  status: 'pending' as const,
+                };
+              })
+            )
+            .returning({
+              id: kiloclaw_scheduled_action_targets.id,
+              instance_id: kiloclaw_scheduled_action_targets.instance_id,
+            });
+
+          // Fan out one notification row per (target, channel) when
+          // notify=true. The sweep selects pending rows whose stage's
+          // (scheduled_at - notice_lead_hours) is in the past. Channels
+          // dispatch independently; one failed channel doesn't poison
+          // the others.
+          if (input.notify && input.noticeChannels.length > 0) {
+            const notificationRows: NewKiloClawScheduledActionNotification[] = [];
+            for (const target of insertedTargets) {
+              for (const channel of input.noticeChannels) {
+                notificationRows.push({
+                  target_id: target.id,
+                  channel,
+                  kind: 'notice',
+                  status: 'pending',
+                });
+              }
+            }
+            await tx.insert(kiloclaw_scheduled_action_notifications).values(notificationRows);
+          }
+
+          return { id: parentRow.id, stageId: stageRow.id };
+        },
+        { isolationLevel: 'serializable' }
+      );
+
+      // Audit log fire-and-forget. Multi-user actions still use the
+      // actor's id as the target_user_id sentinel since the column is
+      // notNull; the actual targeted instances are in metadata.
+      try {
+        const messageDetail =
+          input.actionType === 'version_change'
+            ? `version_change → ${input.imageTag}${input.overridePins ? ' (override_pins=true)' : ''}`
+            : 'scheduled_restart';
+        const countLabel =
+          liveInstanceIds.length === 1
+            ? `instance ${liveInstanceIds[0]}`
+            : `${liveInstanceIds.length} instances`;
+        // Surface the silent-filter in metadata so an audit reader can
+        // see what was dropped.
+        const filteredDestroyed = uniqueInstanceIds.filter(id => !liveResolvedById.has(id));
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.scheduled_action.created',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          // target_user_id is notNull. For single-instance use the owner;
+          // for bulk fall back to the actor (sentinel — real owners are
+          // in metadata.instanceIds).
+          target_user_id:
+            liveInstanceIds.length === 1
+              ? (liveResolvedById.get(liveInstanceIds[0])?.owner_id ?? ctx.user.id)
+              : ctx.user.id,
+          message: `Scheduled ${messageDetail} for ${countLabel} at ${input.scheduledAt}`,
+          metadata: {
+            scheduledActionId: result.id,
+            actionType: input.actionType,
+            instanceIds: liveInstanceIds,
+            ...(filteredDestroyed.length > 0
+              ? { filteredDestroyedInstanceIds: filteredDestroyed }
+              : {}),
+            scheduledAt: input.scheduledAt,
+            reason: input.reason ?? null,
+            // Action-type-specific metadata. For version_change we also
+            // capture each instance's tracked tag at schedule time so
+            // the audit trail records the from→to per instance, even if
+            // the targets table is later mutated or hard-deleted.
+            ...(input.actionType === 'version_change'
+              ? {
+                  imageTag: input.imageTag,
+                  overridePins: input.overridePins,
+                  instanceSourceTags: Object.fromEntries(
+                    liveInstanceRows.map(r => [r.instance.id, r.instance.tracked_image_tag ?? null])
+                  ),
+                }
+              : {}),
+          },
+        });
+      } catch (auditErr) {
+        console.error('Failed to write audit log for scheduleAction:', auditErr);
+      }
+
+      // Wake the target instances' DOs so each re-arms its alarm with a
+      // fresh future timestamp. Without this, the wedge in alarm() never
+      // gets a chance to run the new action — the DO's alarm may be
+      // stale (in wrangler dev) or future-but-distant (in prod), and we
+      // need it pointing at "soon" so the sweep happens promptly.
+      // Best-effort + parallel: a failure on one wake doesn't block any
+      // other wake or the schedule's existence — the next user-initiated
+      // activity on the instance will eventually re-arm.
+      const internalClient = new KiloClawInternalClient();
+      // Batched concurrency. With the 500-instance cap, a flat
+      // Promise.all could open 500 outbound sockets simultaneously
+      // against the CF Worker. Keep the burst bounded so we don't
+      // exhaust Node's pool or hold 500 futures open under a slow
+      // worker. Best-effort + per-batch try/catch — a failure on one
+      // wake doesn't block any other.
+      const wakeConcurrency = 20;
+      for (let i = 0; i < liveInstanceRows.length; i += wakeConcurrency) {
+        const batch = liveInstanceRows.slice(i, i + wakeConcurrency);
+        await Promise.all(
+          batch.map(async r => {
+            try {
+              await internalClient.wakeScheduledAction(r.owner_id, r.instance.id);
+            } catch (wakeErr) {
+              console.error(
+                `Failed to wake DO after scheduleAction (instance=${r.instance.id}):`,
+                wakeErr
+              );
+            }
+          })
+        );
+      }
+
+      return { id: result.id, stageId: result.stageId };
+    }),
+
+  /**
+   * List scheduled actions, paginated, optionally filtered by status or
+   * action_type.
+   */
+  listScheduledActions: adminProcedure
+    .input(
+      z.object({
+        offset: z.number().int().min(0).default(0),
+        limit: z.number().int().min(1).max(100).default(25),
+        status: z.enum(['scheduled', 'running', 'completed', 'cancelled', 'failed']).optional(),
+        actionType: z.enum(['scheduled_restart', 'version_change']).optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      const conditions: SQL[] = [];
+      if (input.status) {
+        conditions.push(eq(kiloclaw_scheduled_actions.status, input.status));
+      }
+      if (input.actionType) {
+        conditions.push(eq(kiloclaw_scheduled_actions.action_type, input.actionType));
+      }
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const rows = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(whereCondition)
+        .orderBy(desc(kiloclaw_scheduled_actions.created_at))
+        .limit(input.limit)
+        .offset(input.offset);
+
+      // For each parent action, we want a compact summary for the list
+      // view: the total number of instances + a representative
+      // instance_id when there's only one. The full target list lives
+      // in `getScheduledAction`. Aggregate via GROUP BY so the response
+      // size stays bounded even for bulk schedules touching hundreds
+      // of instances.
+      const actionIds = rows.map(r => r.id);
+      const targetSummaryRows =
+        actionIds.length > 0
+          ? await db
+              .select({
+                scheduled_action_id: kiloclaw_scheduled_action_targets.scheduled_action_id,
+                count: sql<number>`COUNT(*)::int`,
+                // Deterministic single-instance preview: oldest target
+                // (lowest id under uuid v4 ordering is fine — we just
+                // need *some* stable choice).
+                first_instance_id: sql<string>`MIN(${kiloclaw_scheduled_action_targets.instance_id}::text)`,
+              })
+              .from(kiloclaw_scheduled_action_targets)
+              .where(inArray(kiloclaw_scheduled_action_targets.scheduled_action_id, actionIds))
+              .groupBy(kiloclaw_scheduled_action_targets.scheduled_action_id)
+          : [];
+      const targetSummaryByAction = new Map(
+        targetSummaryRows.map(t => [
+          t.scheduled_action_id,
+          { count: t.count, first_instance_id: t.first_instance_id },
+        ])
+      );
+
+      // Earliest stage's scheduled_at — surfaces the "fire no earlier than"
+      // bound in the list view. v1 has one stage per action so this is
+      // unambiguous. With multi-stage rollouts (post-PR-4) consider
+      // returning min(scheduled_at) and "+ N stages" instead.
+      const stageRows =
+        actionIds.length > 0
+          ? await db
+              .select({
+                scheduled_action_id: kiloclaw_scheduled_action_stages.scheduled_action_id,
+                scheduled_at: kiloclaw_scheduled_action_stages.scheduled_at,
+              })
+              .from(kiloclaw_scheduled_action_stages)
+              .where(inArray(kiloclaw_scheduled_action_stages.scheduled_action_id, actionIds))
+              .orderBy(asc(kiloclaw_scheduled_action_stages.scheduled_at))
+          : [];
+      const scheduledAtByAction = new Map<string, string>();
+      for (const s of stageRows) {
+        // First stage we see per action wins (rows are ordered ascending
+        // so this captures the earliest scheduled_at).
+        if (!scheduledAtByAction.has(s.scheduled_action_id)) {
+          scheduledAtByAction.set(s.scheduled_action_id, s.scheduled_at);
+        }
+      }
+
+      const totalCountResult = await db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(kiloclaw_scheduled_actions)
+        .where(whereCondition);
+
+      const total = totalCountResult[0]?.count ?? 0;
+
+      return {
+        items: rows.map(r => {
+          const summary = targetSummaryByAction.get(r.id);
+          return {
+            ...r,
+            target_count: summary?.count ?? 0,
+            // Only meaningful when target_count === 1; UI shows
+            // "N instances" otherwise.
+            first_instance_id: summary?.first_instance_id ?? null,
+            scheduled_at: scheduledAtByAction.get(r.id) ?? null,
+          };
+        }),
+        pagination: {
+          offset: input.offset,
+          limit: input.limit,
+          total,
+          totalPages: Math.ceil(total / input.limit),
+        },
+      };
+    }),
+
+  /**
+   * Fetch one scheduled action with its stages and targets.
+   */
+  getScheduledAction: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const [parent] = await db
+        .select()
+        .from(kiloclaw_scheduled_actions)
+        .where(eq(kiloclaw_scheduled_actions.id, input.id))
+        .limit(1);
+
+      if (!parent) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Scheduled action not found' });
+      }
+
+      const stages = await db
+        .select()
+        .from(kiloclaw_scheduled_action_stages)
+        .where(eq(kiloclaw_scheduled_action_stages.scheduled_action_id, input.id))
+        .orderBy(asc(kiloclaw_scheduled_action_stages.stage_index));
+
+      // Target fetch is intentionally unpaginated: scheduleAction caps
+      // instanceIds at 500, so the worst-case response here is 500 rows
+      // joined to kilocode_users and kiloclaw_instances. If that cap is
+      // ever raised significantly, paginate here.
+      const targets = await db
+        .select({
+          target: kiloclaw_scheduled_action_targets,
+          user_email: kilocode_users.google_user_email,
+          instance_sandbox_id: kiloclaw_instances.sandbox_id,
+        })
+        .from(kiloclaw_scheduled_action_targets)
+        .leftJoin(kilocode_users, eq(kilocode_users.id, kiloclaw_scheduled_action_targets.user_id))
+        .leftJoin(
+          kiloclaw_instances,
+          eq(kiloclaw_instances.id, kiloclaw_scheduled_action_targets.instance_id)
+        )
+        .where(eq(kiloclaw_scheduled_action_targets.scheduled_action_id, input.id));
+
+      return {
+        action: parent,
+        stages,
+        targets: targets.map(t => ({
+          ...t.target,
+          user_email: t.user_email,
+          instance_sandbox_id: t.instance_sandbox_id,
+        })),
+      };
+    }),
+
+  /**
+   * Pending scheduled actions for a single instance. Powers the
+   * "upcoming scheduled action" indicator on the instance detail page.
+   * Returns the per-target row joined to its parent action and stage,
+   * filtered to pending targets whose parent is still actionable.
+   * Ordered by scheduled_at ascending so the soonest is first.
+   */
+  /**
+   * Synchronously runs the scheduled-action notice sweep that the cron
+   * normally drives at 1-minute cadence. Powers the admin Scheduler
+   * tab "Run notice sweep now" button — useful in `wrangler dev` (where
+   * scheduled() does not fire on cadence) and as an on-demand verifier
+   * in production after creating a test notification. The sweep is
+   * idempotent and bounded; calling it on demand is safe.
+   */
+  runNoticeSweepNow: adminProcedure.mutation(async () => {
+    const internalClient = new KiloClawInternalClient();
+    return internalClient.runScheduledActionNoticeSweep();
+  }),
+
+  listUpcomingScheduledActionsForInstance: adminProcedure
+    .input(z.object({ instanceId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      // Two aliased joins on kiloclaw_image_catalog so the response
+      // can include openclaw_version for both source and target tags
+      // — drives the "source (OpenClaw vX) → target (OpenClaw vY)"
+      // display. Left joins because the catalog row could be missing
+      // (deleted) for an old source tag.
+      const sourceCatalog = alias(kiloclaw_image_catalog, 'source_catalog');
+      const targetCatalog = alias(kiloclaw_image_catalog, 'target_catalog');
+
+      const rows = await db
+        .select({
+          target: kiloclaw_scheduled_action_targets,
+          action: kiloclaw_scheduled_actions,
+          stage: kiloclaw_scheduled_action_stages,
+          source_openclaw_version: sourceCatalog.openclaw_version,
+          target_openclaw_version: targetCatalog.openclaw_version,
+        })
+        .from(kiloclaw_scheduled_action_targets)
+        .innerJoin(
+          kiloclaw_scheduled_actions,
+          eq(kiloclaw_scheduled_actions.id, kiloclaw_scheduled_action_targets.scheduled_action_id)
+        )
+        .leftJoin(
+          kiloclaw_scheduled_action_stages,
+          eq(kiloclaw_scheduled_action_stages.id, kiloclaw_scheduled_action_targets.stage_id)
+        )
+        .leftJoin(
+          sourceCatalog,
+          eq(sourceCatalog.image_tag, kiloclaw_scheduled_action_targets.source_image_tag)
+        )
+        .leftJoin(
+          targetCatalog,
+          eq(targetCatalog.image_tag, kiloclaw_scheduled_action_targets.target_image_tag)
+        )
+        .where(
+          and(
+            eq(kiloclaw_scheduled_action_targets.instance_id, input.instanceId),
+            eq(kiloclaw_scheduled_action_targets.status, 'pending'),
+            inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+          )
+        )
+        .orderBy(asc(kiloclaw_scheduled_action_stages.scheduled_at));
+
+      // Per-action total target count so the UI can distinguish single
+      // vs bulk and offer "cancel only this instance" vs "cancel entire
+      // batch". Pulled from the parent's stamped total_count rather than
+      // a fresh COUNT(*) — admin-cancel-target paths decrement it as
+      // they go (TBD), but for now total_count is the at-schedule-time
+      // size, which is what the UX needs.
+      return {
+        items: rows.map(r => ({
+          scheduled_action_id: r.action.id,
+          action_type: r.action.action_type,
+          target_image_tag: r.target.target_image_tag ?? r.action.target_image_tag,
+          target_openclaw_version: r.target_openclaw_version,
+          source_image_tag: r.target.source_image_tag,
+          source_openclaw_version: r.source_openclaw_version,
+          override_pins: r.action.override_pins,
+          scheduled_at: r.stage?.scheduled_at ?? null,
+          parent_status: r.action.status,
+          target_count: r.action.total_count,
+        })),
+      };
+    }),
+
+  /**
+   * Cancel a single target row inside a scheduled action. Used by the
+   * per-instance "Upcoming scheduled action" indicator when the admin
+   * wants to drop just one instance from a bulk schedule (the parent
+   * action keeps running for the other targets).
+   *
+   * Atomic CAS on (scheduled_action_id, instance_id, status='pending').
+   * Bumps the parent + stage skipped counters and runs the same
+   * promotion sweep as the DO alarm path so that an action whose
+   * targets are *all* individually cancelled here doesn't stay in
+   * 'scheduled' forever (the alarm-path sweep only fires when due
+   * rows are processed).
+   */
+  cancelScheduledActionTarget: adminProcedure
+    .input(
+      z.object({
+        scheduledActionId: z.string().uuid(),
+        instanceId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await db.transaction(async tx => {
+        const [updated] = await tx
+          .update(kiloclaw_scheduled_action_targets)
+          .set({
+            status: 'skipped',
+            skip_reason: 'cancelled',
+          })
+          .where(
+            and(
+              eq(kiloclaw_scheduled_action_targets.scheduled_action_id, input.scheduledActionId),
+              eq(kiloclaw_scheduled_action_targets.instance_id, input.instanceId),
+              eq(kiloclaw_scheduled_action_targets.status, 'pending')
+            )
+          )
+          .returning({
+            id: kiloclaw_scheduled_action_targets.id,
+            stage_id: kiloclaw_scheduled_action_targets.stage_id,
+          });
+
+        if (!updated) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'No pending scheduled-action target for this (action, instance)',
+          });
+        }
+
+        if (updated.stage_id) {
+          await tx
+            .update(kiloclaw_scheduled_action_stages)
+            .set({
+              skipped_count: sql`${kiloclaw_scheduled_action_stages.skipped_count} + 1`,
+            })
+            .where(eq(kiloclaw_scheduled_action_stages.id, updated.stage_id));
+        }
+
+        await tx
+          .update(kiloclaw_scheduled_actions)
+          .set({
+            skipped_count: sql`${kiloclaw_scheduled_actions.skipped_count} + 1`,
+          })
+          .where(eq(kiloclaw_scheduled_actions.id, input.scheduledActionId));
+
+        // Queue cancellation notifications for THIS target only —
+        // mirrors the bulk-cancel logic. ON CONFLICT keeps repeat calls
+        // safe. We only queue from notices that have already reached
+        // 'sent' here. For notices that are still 'sending' at this
+        // moment (the sweep is mid-dispatch), the markSent finalization
+        // step queues the cancellation in the same UPDATE if it sees
+        // parent.action.status = 'cancelled'. That coupling guarantees
+        // we never queue an orphan cancellation for a notice that
+        // ultimately failed to deliver.
+        await tx.execute(sql`
+          INSERT INTO kiloclaw_scheduled_action_notifications
+            (target_id, channel, kind, status)
+          SELECT n.target_id, n.channel, 'cancelled', 'pending'
+          FROM kiloclaw_scheduled_action_notifications n
+          WHERE n.target_id = ${updated.id}
+            AND n.kind = 'notice'
+            AND n.status = 'sent'
+          ON CONFLICT (target_id, kind, channel) DO NOTHING
+        `);
+
+        // Void any pending notice rows for this target so the sweep
+        // doesn't deliver a "your bot will restart soon" message after
+        // the action has been cancelled. Without this, an admin who
+        // cancels before the notice lead-time window opens (e.g.
+        // notice_lead_hours=24, cancel at hour 18) still sees the
+        // notice fire after hour 24 — selectDueNotifications filters
+        // only on notification.status, not on parent action/target
+        // status. We deliberately leave 'sending' rows alone: the
+        // sweep already committed to dispatching them, and overwriting
+        // mid-flight would race with markSent.
+        await tx
+          .update(kiloclaw_scheduled_action_notifications)
+          .set({
+            status: 'failed',
+            error_message: 'action cancelled before notice was dispatched',
+          })
+          .where(
+            and(
+              eq(kiloclaw_scheduled_action_notifications.target_id, updated.id),
+              eq(kiloclaw_scheduled_action_notifications.kind, 'notice'),
+              eq(kiloclaw_scheduled_action_notifications.status, 'pending')
+            )
+          );
+
+        // Promote stage + parent if no pending targets remain. Without
+        // this, an action whose targets are all individually cancelled
+        // via this path stays in 'scheduled' forever — the DO alarm
+        // path's findDueScheduledActionTargetsForInstance returns 0
+        // rows so its post-pass promotion sweep never runs. Mirrors
+        // services/kiloclaw/src/db/index.ts maybePromoteScheduledActionsToCompleted
+        // (kept inline rather than imported because that helper takes
+        // a WorkerDb, not a tx).
+        // NOT EXISTS treats both 'pending' and 'running' as unresolved
+        // — see comment on maybePromoteScheduledActionsToCompleted in
+        // services/kiloclaw/src/db/index.ts for why.
+        await tx.execute(sql`
+          UPDATE kiloclaw_scheduled_action_stages s
+          SET status = CASE
+                WHEN s.applied_count > 0 OR s.skipped_count > 0 THEN 'completed'
+                ELSE 'failed'
+              END,
+              completed_at = COALESCE(s.completed_at, now())
+          WHERE s.scheduled_action_id = ${input.scheduledActionId}
+            AND s.status IN ('pending', 'running')
+            AND NOT EXISTS (
+              SELECT 1 FROM kiloclaw_scheduled_action_targets t
+              WHERE t.stage_id = s.id AND t.status IN ('pending', 'running')
+            )
+        `);
+        await tx.execute(sql`
+          UPDATE kiloclaw_scheduled_actions a
+          SET status = CASE
+                WHEN a.applied_count > 0 OR a.skipped_count > 0 THEN 'completed'
+                ELSE 'failed'
+              END,
+              completed_at = COALESCE(a.completed_at, now())
+          WHERE a.id = ${input.scheduledActionId}
+            AND a.status IN ('scheduled', 'running')
+            AND NOT EXISTS (
+              SELECT 1 FROM kiloclaw_scheduled_action_targets t
+              WHERE t.scheduled_action_id = a.id AND t.status IN ('pending', 'running')
+            )
+        `);
+
+        return { cancelled: true as const };
+      });
+
+      // Audit. Reuses the existing 'cancelled' action with metadata
+      // indicating per-target scope.
+      try {
+        await createKiloClawAdminAuditLog({
+          action: 'kiloclaw.scheduled_action.cancelled',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          target_user_id: ctx.user.id,
+          message: `Cancelled scheduled action ${input.scheduledActionId} for instance ${input.instanceId} only`,
+          metadata: {
+            scope: 'target',
+            scheduledActionId: input.scheduledActionId,
+            instanceId: input.instanceId,
+          },
+        });
+      } catch (auditErr) {
+        console.error('Failed to write audit log for cancelScheduledActionTarget:', auditErr);
+      }
+
+      return result;
+    }),
+
+  /**
+   * Cancel a scheduled action. Pending stages move to 'cancelled';
+   * pending targets get marked skipped:cancelled. Already-applied
+   * targets stay applied.
+   *
+   * No notifications are sent in PR 1 (no notification fan-out yet);
+   * PR 2 adds cancellation notifications for targets whose original
+   * notice was already dispatched.
+   */
+  cancelScheduledAction: adminProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      const result = await db.transaction(async tx => {
+        const [updated] = await tx
+          .update(kiloclaw_scheduled_actions)
+          .set({
+            status: 'cancelled',
+            cancelled_at: sql`now()`,
+          })
+          .where(
+            and(
+              eq(kiloclaw_scheduled_actions.id, input.id),
+              inArray(kiloclaw_scheduled_actions.status, ['scheduled', 'running'])
+            )
+          )
+          .returning({ id: kiloclaw_scheduled_actions.id });
+
+        if (!updated) {
+          // Either the row doesn't exist or it's already in a terminal
+          // state. Distinguish via a follow-up SELECT for a clean error.
+          const [existing] = await tx
+            .select({ status: kiloclaw_scheduled_actions.status })
+            .from(kiloclaw_scheduled_actions)
+            .where(eq(kiloclaw_scheduled_actions.id, input.id))
+            .limit(1);
+          if (!existing) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Scheduled action not found',
+            });
+          }
+          // Already in terminal state — return cancelled:false (no-op)
+          return { cancelled: false as const, status: existing.status };
+        }
+
+        await tx
+          .update(kiloclaw_scheduled_action_stages)
+          .set({ status: 'cancelled' })
+          .where(
+            and(
+              eq(kiloclaw_scheduled_action_stages.scheduled_action_id, input.id),
+              eq(kiloclaw_scheduled_action_stages.status, 'pending')
+            )
+          );
+
+        await tx
+          .update(kiloclaw_scheduled_action_targets)
+          .set({
+            status: 'skipped',
+            skip_reason: 'cancelled',
+          })
+          .where(
+            and(
+              eq(kiloclaw_scheduled_action_targets.scheduled_action_id, input.id),
+              eq(kiloclaw_scheduled_action_targets.status, 'pending')
+            )
+          );
+
+        // Queue cancellation notifications for (target, channel) pairs
+        // that already had a 'notice' row in 'sent' status. If the
+        // user never received a heads-up we do not surface a
+        // cancellation either. ON CONFLICT DO NOTHING keeps repeat
+        // cancels idempotent.
+        //
+        // The race between this cancel and an in-flight 'sending'
+        // notice is closed in the sweep's markSent: when markSent
+        // moves a row from 'sending' to 'sent' AND the parent action
+        // is already in 'cancelled', it inserts a cancellation row in
+        // the same step. That makes the cancellation creation
+        // contingent on the notice actually reaching the user; a
+        // dispatch failure leaves no orphan cancellation pending.
+        await tx.execute(sql`
+          INSERT INTO kiloclaw_scheduled_action_notifications
+            (target_id, channel, kind, status)
+          SELECT n.target_id, n.channel, 'cancelled', 'pending'
+          FROM kiloclaw_scheduled_action_notifications n
+          INNER JOIN kiloclaw_scheduled_action_targets t
+            ON t.id = n.target_id
+          WHERE t.scheduled_action_id = ${input.id}
+            AND n.kind = 'notice'
+            AND n.status = 'sent'
+          ON CONFLICT (target_id, kind, channel) DO NOTHING
+        `);
+
+        // Void any pending notice rows so the sweep doesn't deliver a
+        // notice for a now-cancelled action. The sweep's selectDue
+        // query filters only on notification.status, not on parent
+        // status, so without this an admin who cancels before the
+        // notice lead-time window opens still sees the original
+        // notice fire on a later tick. Leave 'sending' rows alone —
+        // see the per-target version of this for the same reasoning.
+        await tx.execute(sql`
+          UPDATE kiloclaw_scheduled_action_notifications
+          SET status = 'failed',
+              error_message = 'action cancelled before notice was dispatched'
+          WHERE target_id IN (
+            SELECT id FROM kiloclaw_scheduled_action_targets
+            WHERE scheduled_action_id = ${input.id}
+          )
+            AND kind = 'notice'
+            AND status = 'pending'
+        `);
+
+        return { cancelled: true as const, status: 'cancelled' as const };
+      });
+
+      if (result.cancelled) {
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.scheduled_action.cancelled',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: ctx.user.id, // multi-user action sentinel
+            message: `Cancelled scheduled action ${input.id}`,
+            metadata: { scheduledActionId: input.id },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for cancelScheduledAction:', auditErr);
+        }
+      }
+
+      return result;
+    }),
+
   destroyFlyMachine: adminProcedure
     .input(
       z.object({
@@ -1412,13 +2720,22 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           .string()
           .min(1)
           .regex(/^vol_[a-zA-Z0-9]+$/, 'Invalid Fly volume ID'),
+        targetSizeGb: z.number().int().min(1).max(500),
       })
     )
     .mutation(async ({ input, ctx }) => {
       console.log(
-        `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} size=15GB`
+        `[admin-kiloclaw] extendVolume triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) app=${input.appName} volume=${input.volumeId} targetSizeGb=${input.targetSizeGb}`
       );
       const instance = await resolveInstance(input.userId, input.instanceId);
+      // Same ownership-check pattern as resizeMachine /
+      // setAdminMachineSizeOverride / clearAdminMachineSizeOverride.
+      // resolveInstance(userId, instanceId) does NOT filter by user_id when
+      // instanceId is supplied — without this assert, an admin passing
+      // userId=A + instanceId=B (B owned by user C) would extend C's
+      // volume while the audit log records target_user_id=A. Fly volumes
+      // can grow but cannot shrink, so the storage change is permanent.
+      assertInstanceBelongsToUser(instance, input.userId);
       const client = new KiloClawInternalClient();
       const instanceId = workerInstanceId(instance);
 
@@ -1441,6 +2758,13 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           message: `Fly resource mismatch: expected app=${status.flyAppName} volume=${status.flyVolumeId}, got app=${input.appName} volume=${input.volumeId}`,
         });
       }
+      const currentSizeGb = status.volumeSizeGb ?? 10;
+      if (input.targetSizeGb <= currentSizeGb) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Target size must be greater than current size (${currentSizeGb} GB)`,
+        });
+      }
 
       const fallbackMessage = 'Failed to extend Fly volume';
       try {
@@ -1448,6 +2772,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
           input.userId,
           input.appName,
           input.volumeId,
+          input.targetSizeGb,
           instanceId
         );
 
@@ -1458,11 +2783,12 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
             target_user_id: input.userId,
-            message: `Fly volume extended to 15GB: app=${input.appName} volume=${input.volumeId}`,
+            message: `Fly volume extended to ${input.targetSizeGb}GB: app=${input.appName} volume=${input.volumeId}`,
             metadata: {
               appName: input.appName,
               volumeId: input.volumeId,
-              sizeGb: 15,
+              previousSizeGb: currentSizeGb,
+              sizeGb: input.targetSizeGb,
             },
           });
         } catch (auditErr) {
@@ -1698,37 +3024,41 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       z.object({
         userId: z.string().min(1),
         instanceId: z.string().uuid().optional(),
-        machineSize: z.object({
-          cpus: z.number().int().min(1).max(8),
-          memory_mb: z.number().int().min(256).max(16384),
-          cpu_kind: z.enum(['shared', 'performance']).optional(),
-        }),
+        instanceType: InstanceTierKeySchema,
       })
     )
     .mutation(async ({ input, ctx }): Promise<ResizeMachineResponse> => {
       console.log(
-        `[admin-kiloclaw] Machine resize triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: ${JSON.stringify(input.machineSize)}`
+        `[admin-kiloclaw] Machine resize triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: ${input.instanceType}`
       );
       try {
         const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
         const client = new KiloClawInternalClient();
         const result = await client.resizeMachine(
           input.userId,
-          input.machineSize,
+          input.instanceType,
           workerInstanceId(instance)
         );
 
         try {
+          const clearedOverrideMessage = result.clearedOverride
+            ? ` (cleared admin override: ${result.clearedOverride.size.cpus}× ${result.clearedOverride.size.cpu_kind ?? 'shared'}, ${result.clearedOverride.size.memory_mb}MB)`
+            : '';
           await createKiloClawAdminAuditLog({
             action: 'kiloclaw.machine.resize',
             actor_id: ctx.user.id,
             actor_email: ctx.user.google_user_email,
             actor_name: ctx.user.google_user_name,
             target_user_id: input.userId,
-            message: `Machine resized: ${JSON.stringify(result.previousSize)} → ${JSON.stringify(result.newSize)}`,
+            message: `Machine resized: ${result.previousTier ?? 'unknown'} → ${result.newTier}${clearedOverrideMessage}`,
             metadata: {
-              previousSize: result.previousSize,
-              newSize: result.newSize,
+              previousTier: result.previousTier,
+              newTier: result.newTier,
+              previousVolumeSizeGb: result.previousVolumeSizeGb,
+              newVolumeSizeGb: result.newVolumeSizeGb,
+              machineSize: result.machineSize,
+              clearedOverride: result.clearedOverride,
             },
           });
         } catch (auditErr) {
@@ -1739,6 +3069,114 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       } catch (err) {
         console.error('Failed to resize machine for user:', input.userId, err);
         throwKiloclawAdminError(err, 'Failed to resize machine');
+      }
+    }),
+
+  setAdminMachineSizeOverride: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        preset: AdminSizeOverridePresetSchema,
+        reason: z.string().min(10).max(500),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      console.log(
+        `[admin-kiloclaw] Admin size override SET by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}: preset=${input.preset}`
+      );
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
+        const size = presetToMachineSize(input.preset);
+        const client = new KiloClawInternalClient();
+        const result = await client.setAdminMachineSizeOverride(
+          input.userId,
+          {
+            size,
+            reason: input.reason,
+            actorId: ctx.user.id,
+            actorEmail: ctx.user.google_user_email,
+          },
+          workerInstanceId(instance)
+        );
+
+        try {
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.admin_size_override.set',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Admin size override set: preset=${input.preset} (${size.cpus}× ${size.cpu_kind ?? 'shared'}, ${size.memory_mb}MB). Reason: ${input.reason}`,
+            metadata: {
+              preset: input.preset,
+              previousOverride: result.previousOverride,
+              newOverride: result.newOverride,
+              reason: input.reason,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for admin size override set:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error('Failed to set admin size override for user:', input.userId, err);
+        throwKiloclawAdminError(err, 'Failed to set admin size override');
+      }
+    }),
+
+  clearAdminMachineSizeOverride: adminProcedure
+    .input(
+      z.object({
+        userId: z.string().min(1),
+        instanceId: z.string().uuid().optional(),
+        reason: z.string().min(10).max(500),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      console.log(
+        `[admin-kiloclaw] Admin size override CLEAR by admin ${ctx.user.id} (${ctx.user.google_user_email}) for user ${input.userId}`
+      );
+      try {
+        const instance = await resolveInstance(input.userId, input.instanceId);
+        assertInstanceBelongsToUser(instance, input.userId);
+        const client = new KiloClawInternalClient();
+        const result = await client.clearAdminMachineSizeOverride(
+          input.userId,
+          {
+            reason: input.reason,
+            actorId: ctx.user.id,
+            actorEmail: ctx.user.google_user_email,
+          },
+          workerInstanceId(instance)
+        );
+
+        try {
+          const previousMessage = result.previousOverride
+            ? `${result.previousOverride.cpus}× ${result.previousOverride.cpu_kind ?? 'shared'}, ${result.previousOverride.memory_mb}MB`
+            : 'none';
+          await createKiloClawAdminAuditLog({
+            action: 'kiloclaw.admin_size_override.clear',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            target_user_id: input.userId,
+            message: `Admin size override cleared (previous: ${previousMessage}). Reason: ${input.reason}`,
+            metadata: {
+              previousOverride: result.previousOverride,
+              reason: input.reason,
+            },
+          });
+        } catch (auditErr) {
+          console.error('Failed to write audit log for admin size override clear:', auditErr);
+        }
+
+        return result;
+      } catch (err) {
+        console.error('Failed to clear admin size override for user:', input.userId, err);
+        throwKiloclawAdminError(err, 'Failed to clear admin size override');
       }
     }),
 

@@ -3,6 +3,9 @@ import type {
   ProfileDetails,
   ProfileVar,
   ProfileCommand,
+  ProfileMcpServer,
+  ProfileSkill,
+  ProfileAgent,
 } from '@/hooks/useCloudAgentProfiles';
 
 /**
@@ -52,6 +55,74 @@ export const mockProfileCommands: ProfileCommand[] = [
   { sequence: 1, command: 'npm run build' },
 ];
 
+export const mockProfileMcpServers: ProfileMcpServer[] = [
+  {
+    id: 'mcp-1',
+    name: 'filesystem-tools',
+    type: 'local',
+    enabled: true,
+    timeout: 30,
+    config: {
+      command: ['npx', '@modelcontextprotocol/server-filesystem', '/workspace'],
+      environment: {
+        API_TOKEN: '***',
+      },
+    },
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-02T00:00:00Z',
+  },
+  {
+    id: 'mcp-2',
+    name: 'docs-search',
+    type: 'remote',
+    enabled: true,
+    timeout: null,
+    config: {
+      url: 'https://mcp.example.com/sse',
+      headers: {
+        Authorization: '***',
+      },
+    },
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-02T00:00:00Z',
+  },
+];
+
+export const mockProfileSkills: ProfileSkill[] = [
+  {
+    id: 'skill-1',
+    name: 'Release notes',
+    description: 'Draft concise release notes from merged changes',
+    sourceType: 'custom',
+    sourceUrl: null,
+    rawMarkdown: '# Release notes\n\nSummarize changes for users.',
+    files: {
+      'reference/template.md': '# Template\n\n## Highlights',
+    },
+    enabled: true,
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-02T00:00:00Z',
+  },
+];
+
+export const mockProfileAgents: ProfileAgent[] = [
+  {
+    id: 'agent-1',
+    slug: 'release-engineer',
+    name: 'Release Engineer',
+    config: {
+      prompt: 'Review release readiness and identify rollout risks.',
+      description: 'Checks release notes, migrations, and operational risks.',
+      mode: 'primary',
+      permission: {
+        edit: 'deny',
+      },
+    },
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-02T00:00:00Z',
+  },
+];
+
 export const mockProfiles: ProfileSummary[] = [
   {
     id: 'profile-1',
@@ -62,6 +133,9 @@ export const mockProfiles: ProfileSummary[] = [
     updatedAt: '2025-01-02T00:00:00Z',
     varCount: 5,
     commandCount: 2,
+    mcpServerCount: 2,
+    skillCount: 1,
+    agentCount: 1,
   },
   {
     id: 'profile-2',
@@ -72,6 +146,9 @@ export const mockProfiles: ProfileSummary[] = [
     updatedAt: '2025-01-03T00:00:00Z',
     varCount: 3,
     commandCount: 0,
+    mcpServerCount: 0,
+    skillCount: 0,
+    agentCount: 0,
   },
   {
     id: 'profile-3',
@@ -82,6 +159,9 @@ export const mockProfiles: ProfileSummary[] = [
     updatedAt: '2025-01-05T00:00:00Z',
     varCount: 8,
     commandCount: 3,
+    mcpServerCount: 1,
+    skillCount: 0,
+    agentCount: 0,
   },
   {
     id: 'profile-4',
@@ -92,6 +172,9 @@ export const mockProfiles: ProfileSummary[] = [
     updatedAt: '2025-01-06T00:00:00Z',
     varCount: 10,
     commandCount: 5,
+    mcpServerCount: 0,
+    skillCount: 0,
+    agentCount: 0,
   },
   {
     id: 'profile-5',
@@ -102,6 +185,9 @@ export const mockProfiles: ProfileSummary[] = [
     updatedAt: '2025-01-07T00:00:00Z',
     varCount: 0,
     commandCount: 0,
+    mcpServerCount: 0,
+    skillCount: 0,
+    agentCount: 0,
   },
 ];
 
@@ -114,6 +200,9 @@ export const mockProfileDetails: ProfileDetails = {
   updatedAt: '2025-01-02T00:00:00Z',
   vars: mockProfileVars,
   commands: mockProfileCommands,
+  mcpServers: mockProfileMcpServers,
+  skills: mockProfileSkills,
+  agents: mockProfileAgents,
 };
 
 export const mockEmptyProfileDetails: ProfileDetails = {
@@ -125,6 +214,9 @@ export const mockEmptyProfileDetails: ProfileDetails = {
   updatedAt: '2025-01-07T00:00:00Z',
   vars: [],
   commands: [],
+  mcpServers: [],
+  skills: [],
+  agents: [],
 };
 
 export const mockLocalDevProfileDetails: ProfileDetails = {
@@ -158,6 +250,9 @@ export const mockLocalDevProfileDetails: ProfileDetails = {
     },
   ],
   commands: [],
+  mcpServers: [],
+  skills: [],
+  agents: [],
 };
 
 export const mockStagingProfileDetails: ProfileDetails = {
@@ -195,4 +290,7 @@ export const mockStagingProfileDetails: ProfileDetails = {
     { sequence: 1, command: 'npm run migrate' },
     { sequence: 2, command: 'npm run seed:staging' },
   ],
+  mcpServers: [mockProfileMcpServers[1]],
+  skills: [],
+  agents: [],
 };

@@ -185,6 +185,12 @@ export type Env = {
   R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY?: string;
   /** R2 bucket name for image attachments */
   R2_ATTACHMENTS_BUCKET?: string;
+  /**
+   * Hyperdrive binding for reading Postgres (agent environment profiles).
+   * The `connectionString` is proxied through Hyperdrive so the worker
+   * authenticates against Hyperdrive, not directly against Postgres.
+   */
+  HYPERDRIVE: Hyperdrive;
 };
 
 /** tRPC context passed to all procedures */

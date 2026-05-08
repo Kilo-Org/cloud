@@ -1,9 +1,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
+import { createKiloChatTokenResponse } from '@/lib/kilo-chat/token';
 import { getUserFromAuth } from '@/lib/user.server';
-import { generateApiToken } from '@/lib/tokens';
-
-const ONE_HOUR_SECONDS = 60 * 60;
 
 /**
  * POST /api/kilo-chat/token
@@ -24,12 +22,5 @@ export async function POST() {
   if (authFailedResponse) return authFailedResponse;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const token = generateApiToken(
-    user,
-    { tokenSource: 'kilo-chat' },
-    { expiresIn: ONE_HOUR_SECONDS }
-  );
-  const expiresAt = new Date(Date.now() + ONE_HOUR_SECONDS * 1000).toISOString();
-
-  return NextResponse.json({ token, expiresAt });
+  return NextResponse.json(createKiloChatTokenResponse(user));
 }

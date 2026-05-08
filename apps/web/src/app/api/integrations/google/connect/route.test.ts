@@ -4,6 +4,7 @@ import { getUserFromAuth } from '@/lib/user.server';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import { buildGoogleOAuthUrl } from '@/lib/integrations/google-service';
 import { createGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
+import type * as OAuthStateModule from '@/lib/integrations/google/oauth-state';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { failureResult } from '@/lib/maybe-result';
 
@@ -14,7 +15,19 @@ jest.mock('@/routers/organizations/utils', () => ({
 }));
 jest.mock('@/lib/kiloclaw/instance-registry');
 jest.mock('@/lib/integrations/google-service');
-jest.mock('@/lib/integrations/google/oauth-state');
+// Partial-mock so GOOGLE_OAUTH_RETURN_TO_REGEX (and any other constants) keep
+// their real values; only the createGoogleOAuthState / verifyGoogleOAuthState
+// functions need to be jest.fn() for assertions.
+jest.mock('@/lib/integrations/google/oauth-state', () => {
+  const actual = jest.requireActual<typeof OAuthStateModule>(
+    '@/lib/integrations/google/oauth-state'
+  );
+  return {
+    ...actual,
+    createGoogleOAuthState: jest.fn(),
+    verifyGoogleOAuthState: jest.fn(),
+  };
+});
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
@@ -154,5 +167,167 @@ describe('GET /api/integrations/google/connect', () => {
     expect(response.status).toBe(307);
     expectRedirectLocation(response, '/claw/settings?error=invalid_organization');
     expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+  });
+
+  test('passes a valid returnTo through to the OAuth state', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        '/api/integrations/google/connect?returnTo=%2Fclaw%2Fnew%3Fstep%3Dcalendar'
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: { type: 'user', id: USER_ID },
+        instanceId: INSTANCE_ID,
+        capabilities: ['calendar_read'],
+        returnTo: '/claw/new?step=calendar',
+      }),
+      USER_ID
+    );
+  });
+
+  test('passes organizationId and returnTo through to the OAuth state for org flow', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        `/api/integrations/google/connect?organizationId=${ORG_ID}&returnTo=%2Forganizations%2F${ORG_ID}%2Fclaw%2Fnew%3Fstep%3Dcalendar`
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith({ user: { id: USER_ID } }, ORG_ID);
+    expect(mockedGetActiveOrgInstance).toHaveBeenCalledWith(USER_ID, ORG_ID);
+    expect(mockedCreateGoogleOAuthState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: { type: 'org', id: ORG_ID },
+        instanceId: INSTANCE_ID,
+        capabilities: ['calendar_read'],
+        returnTo: `/organizations/${ORG_ID}/claw/new?step=calendar`,
+      }),
+      USER_ID
+    );
+  });
+
+  test('drops protocol-relative returnTo values to prevent open redirects', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/connect?returnTo=%2F%2Fevil.example.com') as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
+  test('drops absolute-URL returnTo values', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        '/api/integrations/google/connect?returnTo=https%3A%2F%2Fevil.example.com%2Fclaw%2Fnew'
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
+  test('drops returnTo values with path-traversal segments', async () => {
+    // /claw/../admin would normalize to /admin after URL resolution. Even
+    // though the regex permits it, we reject any `.` or `..` segment for
+    // defense in depth.
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/connect?returnTo=%2Fclaw%2F..%2Fadmin') as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
+  test('drops returnTo values with percent-encoded path-traversal segments', async () => {
+    // /claw/%2e%2e/admin decodes to /claw/../admin which would normalize to
+    // /admin in the callback. The decoder-then-segment check must catch this.
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/connect?returnTo=%2Fclaw%2F%2e%2e%2Fadmin') as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
+  test('drops returnTo values starting with a backslash escape', async () => {
+    // WHATWG URL parsing for the https scheme treats `\` as a path separator,
+    // so `/\evil.example.com/path` normalizes to https://evil.example.com/path
+    // when the callback constructs new URL(returnTo, APP_URL).
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest(
+        '/api/integrations/google/connect?returnTo=%2F%5Cevil.example.com%2Fpath'
+      ) as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
+  test('drops returnTo values containing C0 control characters', async () => {
+    // %0A (newline) is silently stripped by WHATWG URL parsing, so a
+    // crafted /%0A/evil.example.com/path would pass a string-shape regex
+    // and then normalize to https://evil.example.com/path in the callback.
+    const { GET } = await import('./route');
+
+    for (const encoded of ['%0A', '%0D', '%09', '%00']) {
+      mockedCreateGoogleOAuthState.mockClear();
+      const response = await GET(
+        makeRequest(
+          `/api/integrations/google/connect?returnTo=%2F${encoded}%2Fevil.example.com%2Fpath`
+        ) as never
+      );
+      expect(response.status).toBe(307);
+      const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+      expect(stateArg).toBeDefined();
+      expect(stateArg).not.toHaveProperty('returnTo');
+    }
+  });
+
+  test('drops returnTo values containing a mid-path backslash', async () => {
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/connect?returnTo=%2Fclaw%5Cevil%2Fpath') as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
+  });
+
+  test('drops returnTo values with a URI fragment', async () => {
+    // Fragments are disallowed by RETURN_TO_REGEX because the helpers in
+    // callback/route.ts append the success/error param using a `?`/`&`
+    // separator; a fragment in the returnTo would push the param past the
+    // `#` where browsers ignore it.
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/connect?returnTo=%2Fclaw%2Fnew%23section') as never
+    );
+
+    expect(response.status).toBe(307);
+    const stateArg = mockedCreateGoogleOAuthState.mock.calls.at(0)?.[0];
+    expect(stateArg).toBeDefined();
+    expect(stateArg).not.toHaveProperty('returnTo');
   });
 });

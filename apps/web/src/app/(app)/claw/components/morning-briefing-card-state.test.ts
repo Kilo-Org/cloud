@@ -35,4 +35,23 @@ describe('deriveMorningBriefingCardState', () => {
     expect(state.desiredEnabled).toBe(true);
     expect(state.observedEnabled).toBe(true);
   });
+
+  test('flags controller_route_unavailable and suppresses warmup state', () => {
+    const state = deriveMorningBriefingCardState({
+      isRunning: true,
+      actionsReady: true,
+      briefingStatus: {
+        code: 'controller_route_unavailable',
+        enabled: false,
+        desiredEnabled: false,
+        observedEnabled: false,
+        reconcileState: 'idle',
+      },
+    });
+
+    expect(state.isControllerOutOfDate).toBe(true);
+    // Warmup must be suppressed so the upgrade banner is the only signal —
+    // otherwise an out-of-date controller would also render as "warming up".
+    expect(state.isWarmupState).toBe(false);
+  });
 });

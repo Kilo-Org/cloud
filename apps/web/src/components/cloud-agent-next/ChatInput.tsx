@@ -9,9 +9,13 @@ import { Send, Square, Paperclip, Upload } from 'lucide-react';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import { cn } from '@/lib/utils';
 import { BrowseCommandsDialog } from './BrowseCommandsDialog';
-import { ModeCombobox, NEXT_MODE_OPTIONS } from '@/components/shared/ModeCombobox';
+import { ModeCombobox, NEXT_MODE_OPTIONS, type ModeOption } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { formatShortModelDisplayName } from '@/lib/format-model-name';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
+import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
+import { Brain } from 'lucide-react';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
 import { ImagePreviewStrip } from '@/components/shared/ImagePreviewStrip';
 import { useImageUpload, type UseImageUploadOptions } from '@/hooks/useImageUpload';
@@ -53,6 +57,16 @@ type ChatInputProps = {
   showToolbar?: boolean;
   /** Pre-populate the textarea (e.g. to restore text after a failed send) */
   initialValue?: string;
+  /** Custom modes exposed by the session's profile stack (shown in picker) */
+  customModeOptions?: ModeOption<AgentMode>[];
+  /** When true, the model picker is rendered read-only (e.g. agent has a model override). */
+  modelPickerDisabled?: boolean;
+  /** Explanatory tooltip shown alongside the locked model picker. */
+  modelPickerTooltip?: string;
+  /** When true, the variant picker is rendered read-only (e.g. agent has a thinking-effort override). */
+  variantPickerDisabled?: boolean;
+  /** Explanatory tooltip shown alongside the locked variant picker. */
+  variantPickerTooltip?: string;
 };
 
 export function ChatInput({
@@ -74,6 +88,11 @@ export function ChatInput({
   showToolbar = false,
   initialValue,
   imageUploadOptions,
+  customModeOptions,
+  modelPickerDisabled,
+  modelPickerTooltip,
+  variantPickerDisabled,
+  variantPickerTooltip,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
   const [showAutocomplete, setShowAutocomplete] = useState(false);
@@ -100,6 +119,18 @@ export function ChatInput({
     setInputValue(initialValue);
     textareaRef.current?.focus();
   }, [initialValue, setInputValue]);
+
+  // Resolve the pinned model's display name from the allowed models list, so the
+  // locked-read-only toolbar shows the same label as the ModelCombobox. Falls
+  // back to the raw id when the model isn't in the org's allowed list (e.g. an
+  // agent pinned a model that was later restricted).
+  const lockedModelOption = useMemo(
+    () => modelOptions.find(m => m.id === model),
+    [modelOptions, model]
+  );
+  const lockedModelLabel = lockedModelOption
+    ? formatShortModelDisplayName(lockedModelOption.name)
+    : model;
 
   // Filter commands based on current input
   const filteredCommands = useMemo(() => {
@@ -411,7 +442,12 @@ export function ChatInput({
                 availableVariants={availableVariants}
                 onVariantChange={onVariantChange}
                 disabled={disabled || isStreaming}
+                modelPickerDisabled={modelPickerDisabled}
+                modelPickerTooltip={modelPickerTooltip}
+                variantPickerDisabled={variantPickerDisabled}
+                variantPickerTooltip={variantPickerTooltip}
                 className="md:hidden"
+                customModeOptions={customModeOptions}
               />
               {/* Desktop: individual pickers */}
               <div className="hidden md:contents">
@@ -419,28 +455,63 @@ export function ChatInput({
                   value={mode}
                   onValueChange={onModeChange}
                   options={NEXT_MODE_OPTIONS}
+                  customOptions={customModeOptions}
                   variant="compact"
                   disabled={disabled || isStreaming}
                   className="min-w-0"
                 />
-                <ModelCombobox
-                  models={modelOptions}
-                  value={model}
-                  onValueChange={onModelChange}
-                  variant="compact"
-                  isLoading={isLoadingModels}
-                  disabled={disabled || isStreaming}
-                  className="min-w-0"
-                />
-                {availableVariants.length > 0 && onVariantChange && (
-                  <VariantCombobox
-                    variants={availableVariants}
-                    value={variant}
-                    onValueChange={onVariantChange}
+                {modelPickerDisabled ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="text-muted-foreground flex h-9 min-w-0 items-center rounded-md border border-dashed px-2 text-xs">
+                        <span className={cn('truncate', !lockedModelOption && 'font-mono')}>
+                          {lockedModelLabel}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    {modelPickerTooltip && (
+                      <TooltipContent side="top" className="text-xs">
+                        {modelPickerTooltip}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                ) : (
+                  <ModelCombobox
+                    models={modelOptions}
+                    value={model}
+                    onValueChange={onModelChange}
+                    variant="compact"
+                    isLoading={isLoadingModels}
                     disabled={disabled || isStreaming}
                     className="min-w-0"
                   />
                 )}
+                {variantPickerDisabled
+                  ? variant && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="text-muted-foreground flex h-9 min-w-0 items-center gap-1.5 rounded-md border border-dashed px-2 text-xs">
+                            <Brain className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                            <span className="truncate">{thinkingEffortLabel(variant)}</span>
+                          </div>
+                        </TooltipTrigger>
+                        {variantPickerTooltip && (
+                          <TooltipContent side="top" className="text-xs">
+                            {variantPickerTooltip}
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    )
+                  : availableVariants.length > 0 &&
+                    onVariantChange && (
+                      <VariantCombobox
+                        variants={availableVariants}
+                        value={variant}
+                        onValueChange={onVariantChange}
+                        disabled={disabled || isStreaming}
+                        className="min-w-0"
+                      />
+                    )}
               </div>
             </>
           )}

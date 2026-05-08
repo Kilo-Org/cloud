@@ -13,16 +13,23 @@ export function resolveImpactAffiliateTrackingId(params: {
   imRefParam: string | null;
   sharedImpactCookieValue: string | null;
   appTrackedImpactCookieValue: string | null;
+  ignoreImRefParam?: boolean;
 }) {
-  const impactCookieValue = params.imRefParam
+  const ignoredImRefParam = params.ignoreImRefParam ? params.imRefParam : null;
+  const imRefParam = params.ignoreImRefParam ? null : params.imRefParam;
+  const sharedCookieMatchesIgnoredImRef = Boolean(
+    ignoredImRefParam && params.sharedImpactCookieValue === ignoredImRefParam
+  );
+  const impactCookieValue = imRefParam
     ? null
     : params.sharedImpactCookieValue &&
-        params.sharedImpactCookieValue !== params.appTrackedImpactCookieValue
+        params.sharedImpactCookieValue !== params.appTrackedImpactCookieValue &&
+        !sharedCookieMatchesIgnoredImRef
       ? params.sharedImpactCookieValue
       : null;
 
   return {
-    affiliateTrackingId: params.imRefParam || impactCookieValue,
+    affiliateTrackingId: imRefParam || impactCookieValue,
     impactCookieValue,
   };
 }

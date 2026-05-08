@@ -10,7 +10,7 @@ export function isGemmaModel(model: string) {
   return model.includes('gemma');
 }
 
-export const GEMMA_4_31B_IT_ID = 'google/gemma-4-31b-it';
+export const GEMMA_4_26B_A4B_IT_ID = 'google/gemma-4-26b-a4b-it';
 
 export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   public_id: 'google/gemma-4-26b-a4b-it:free',
@@ -20,11 +20,12 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   context_length: 262144,
   max_completion_tokens: 32768,
   status: 'hidden', // usable through kilo-auto
-  flags: ['vision'],
+  flags: ['vision', 'vercel-routing'],
   gateway: 'openrouter',
-  internal_id: 'google/gemma-4-26b-a4b-it',
+  internal_id: GEMMA_4_26B_A4B_IT_ID,
   pricing: null,
   exclusive_to: [],
+  inference_provider_restriction: [],
 };
 
 export function isGemini3Model(model: string) {
@@ -68,3 +69,11 @@ export function applyGoogleModelSettings(provider: ProviderId, requestToMutate: 
     delete lineRanges.items;
   }
 }
+
+export const GEMINI_PRO_CURRENT_MODEL_ID = 'google/gemini-3.1-pro-preview';
+
+export const GEMINI_PRO_CURRENT_VERCEL_MODEL_ID = GEMINI_PRO_CURRENT_MODEL_ID;
+
+export const GEMINI_FLASH_CURRENT_MODEL_ID = 'google/gemini-3-flash';
+
+export const GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID = GEMINI_FLASH_CURRENT_MODEL_ID;

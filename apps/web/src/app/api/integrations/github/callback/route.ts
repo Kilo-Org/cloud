@@ -11,6 +11,7 @@ import {
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   createPendingIntegration,
+  findIntegrationByInstallationId,
   findPendingInstallationByRequesterId,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
@@ -21,6 +22,90 @@ import type {
 } from '@/lib/integrations/core/types';
 import { parseStateReturn } from '@/lib/integrations/validate-return-path';
 import { captureException, captureMessage } from '@sentry/nextjs';
+import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
+import { linkKiloUser } from '@/lib/bot-identity';
+import { bot } from '@/lib/bot';
+import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { botPlatforms } from '@/lib/bot/platforms';
+
+function htmlPage(title: string, message: string, status = 200): Response {
+  return new Response(
+    `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${title}</title></head>
+<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<div style="text-align:center">
+  <h1>${title}</h1>
+  <p>${message}</p>
+</div>
+</body></html>`,
+    { status, headers: { 'content-type': 'text/html; charset=utf-8' } }
+  );
+}
+
+async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: string }) {
+  const searchParams = request.nextUrl.searchParams;
+  const code = searchParams.get('code');
+  const state = verifyGitHubBotLinkState(searchParams.get('state'));
+
+  if (!code || !state) {
+    return htmlPage(
+      'Link Failed',
+      'Invalid or expired GitHub link request. Please try again.',
+      400
+    );
+  }
+
+  if (state.userId !== user.id) {
+    return htmlPage(
+      'Link Failed',
+      'This GitHub link request was started by another Kilo user.',
+      403
+    );
+  }
+
+  const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, state.installationId);
+
+  if (!integration) {
+    return htmlPage('Link Failed', 'No matching GitHub integration was found.', 404);
+  }
+
+  if (!botPlatforms.require(PLATFORM.GITHUB).isEnabledForBot(integration)) {
+    return htmlPage('Link Unavailable', 'GitHub linking is not enabled for this integration.', 404);
+  }
+
+  if (integration.owned_by_organization_id) {
+    const isMember = await isOrganizationMember(integration.owned_by_organization_id, user.id);
+    if (!isMember) {
+      return htmlPage(
+        'Link Failed',
+        'You are not a member of the organization that owns this GitHub integration.',
+        403
+      );
+    }
+  } else if (integration.owned_by_user_id !== user.id) {
+    return htmlPage('Link Failed', 'You are not the owner of this GitHub integration.', 403);
+  }
+
+  const appType = integration.github_app_type ?? 'standard';
+  const githubUser = await exchangeGitHubOAuthCode(code, appType);
+
+  await bot.initialize();
+  await linkKiloUser(
+    bot.getState(),
+    {
+      platform: PLATFORM.GITHUB,
+      teamId: state.installationId,
+      userId: githubUser.id,
+    },
+    user.id
+  );
+
+  return htmlPage(
+    'GitHub account linked',
+    `GitHub account ${githubUser.login} has been linked to your Kilo account.<br>You can return to GitHub and mention Kilo again.`
+  );
+}
 
 /**
  * GitHub App Installation Callback
@@ -43,9 +128,18 @@ export async function GET(request: NextRequest) {
     const setupAction = searchParams.get('setup_action');
     const rawState = searchParams.get('state');
 
-    // 3. Parse owner from state (with optional |return=<path> suffix)
-    const { ownerToken, returnTo } = parseStateReturn(rawState);
+    // 3. Bot-link callback hand-off — runs BEFORE owner parsing because
+    // bot-link state values do not start with `org_`/`user_` and have a
+    // different signature (verifyGitHubBotLinkState).
+    if (rawState && !rawState.startsWith('org_') && !rawState.startsWith('user_')) {
+      const botLinkState = verifyGitHubBotLinkState(rawState);
+      if (botLinkState) {
+        return await handleGitHubBotLinkCallback(request, user);
+      }
+    }
 
+    // 4. Parse owner from state (with optional |return=<path> suffix)
+    const { ownerToken, returnTo } = parseStateReturn(rawState);
     let owner: Owner;
     let ownerId: string;
 

@@ -1140,11 +1140,19 @@ describe('credit renewal sweep affiliate tracking', () => {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
-        case 'enqueue_affiliate_event':
-          return new Response(JSON.stringify({ enqueued: true }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          });
+        case 'process_paid_conversion':
+          return new Response(
+            JSON.stringify({
+              affiliateSaleEnqueued: true,
+              winningTouchType: 'affiliate',
+              conversionId: null,
+              disqualificationReason: null,
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }
+          );
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -1195,14 +1203,12 @@ describe('credit renewal sweep affiliate tracking', () => {
             input: Record<string, unknown>;
           }
       )
-      .find(call => call.action === 'enqueue_affiliate_event');
+      .find(call => call.action === 'process_paid_conversion');
 
     expect(saleCall).toEqual({
-      action: 'enqueue_affiliate_event',
+      action: 'process_paid_conversion',
       input: {
         userId: 'user-1',
-        provider: 'impact',
-        eventType: 'sale',
         dedupeKey: 'affiliate:impact:sale:kiloclaw-subscription:instance-1:2026-04',
         eventDateIso: renewalAt,
         orderId: 'kiloclaw-subscription:instance-1:2026-04',
@@ -1213,6 +1219,86 @@ describe('credit renewal sweep affiliate tracking', () => {
         itemSku: 'price_standard',
       },
     });
+  });
+
+  it('does not roll back or fail renewal when paid conversion side effect fails', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const { db, txUpdates } = createMockDb([
+      [
+        {
+          user_id: 'user-1',
+          email: 'user-1@example.com',
+          instance_id: 'instance-1',
+          id: 'sub-1',
+          instance_row_id: 'instance-1',
+          organization_id: null,
+          instance_destroyed_at: null,
+          plan: 'standard',
+          status: 'active',
+          credit_renewal_at: renewalAt,
+          current_period_end: renewalAt,
+          cancel_at_period_end: false,
+          scheduled_plan: null,
+          commit_ends_at: null,
+          past_due_since: null,
+          suspended_at: null,
+          auto_resume_attempt_count: 0,
+          auto_top_up_triggered_for_period: null,
+          total_microdollars_acquired: 50_000_000,
+          microdollars_used: 0,
+          auto_top_up_enabled: false,
+          kilo_pass_threshold: null,
+          next_credit_expiration_at: null,
+          user_updated_at: '2026-04-09T09:00:00.000Z',
+        },
+      ],
+    ]);
+    mockGetWorkerDb.mockReturnValue(db);
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      vi.fn(async (_request: RequestInfo | URL, init?: RequestInit) => {
+        const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+          action: string;
+        };
+
+        switch (body.action) {
+          case 'project_pending_kilo_pass_bonus':
+            return new Response(JSON.stringify({ projectedBonusMicrodollars: 0 }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          case 'issue_kilo_pass_bonus_from_usage_threshold':
+            return new Response(JSON.stringify({ ok: true }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          case 'process_paid_conversion':
+            return new Response(JSON.stringify({ error: 'temporarily unavailable' }), {
+              status: 503,
+              headers: { 'content-type': 'application/json' },
+            });
+          default:
+            throw new Error(`Unexpected side effect action: ${body.action}`);
+        }
+      })
+    );
+
+    const summary = await runSweep(
+      createEnv(vi.fn()),
+      {
+        runId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        sweep: 'credit_renewal',
+      },
+      1
+    );
+
+    expect(summary.credit_renewals).toBe(1);
+    expect(summary.errors).toBe(0);
+    expect(txUpdates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ current_period_start: renewalAt })])
+    );
+    expect(txUpdates.some(update => 'microdollars_used' in update)).toBe(true);
+    expect(txUpdates).not.toContainEqual(expect.objectContaining({ credit_renewal_at: renewalAt }));
   });
 
   it('re-enqueues the existing sale dedupe key when the renewal deduction already committed', async () => {
@@ -1264,11 +1350,19 @@ describe('credit renewal sweep affiliate tracking', () => {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
-        case 'enqueue_affiliate_event':
-          return new Response(JSON.stringify({ enqueued: true }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          });
+        case 'process_paid_conversion':
+          return new Response(
+            JSON.stringify({
+              affiliateSaleEnqueued: true,
+              winningTouchType: 'affiliate',
+              conversionId: null,
+              disqualificationReason: null,
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }
+          );
         default:
           throw new Error(`Unexpected side effect action: ${body.action}`);
       }
@@ -1308,11 +1402,9 @@ describe('credit renewal sweep affiliate tracking', () => {
         },
       },
       {
-        action: 'enqueue_affiliate_event',
+        action: 'process_paid_conversion',
         input: {
           userId: 'user-1',
-          provider: 'impact',
-          eventType: 'sale',
           dedupeKey: 'affiliate:impact:sale:kiloclaw-subscription:instance-1:2026-04',
           eventDateIso: renewalAt,
           orderId: 'kiloclaw-subscription:instance-1:2026-04',

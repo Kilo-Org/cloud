@@ -7,15 +7,24 @@
  * enqueue, and MembershipDO maintenance in one place.
  */
 
-import type { ContentBlock, ExecApprovalDecision } from '@kilocode/kilo-chat';
+import {
+  buildReplyToMessageSnapshot,
+  ulidToTimestamp,
+  type ContentBlock,
+  type ExecApprovalDecision,
+  type Message,
+  type ReplyToMessageSnapshot,
+} from '@kilocode/kilo-chat';
 import { formatError, withDORetry } from '@kilocode/worker-utils';
 import { logger } from '../util/logger';
 import {
   extractConversationContext,
   pushEventToHumanMembers,
   pushInstanceEvent,
+  pushInstanceEventToUser,
 } from './event-push';
-import type { ConversationInfo } from '../do/conversation-do';
+import { sendConversationMessagePush } from './push-notifications';
+import type { ConversationInfo, GetMessageResult } from '../do/conversation-do';
 
 export type DeferCtx = { waitUntil: (p: Promise<unknown>) => void };
 
@@ -41,6 +50,24 @@ function truncateByGrapheme(text: string, maxGraphemes: number): string {
   return text;
 }
 
+function getReplyToSnapshot(
+  parent: GetMessageResult,
+  inReplyToMessageId: string | undefined
+): ReplyToMessageSnapshot | null {
+  if (!inReplyToMessageId) return null;
+
+  return buildReplyToMessageSnapshot(
+    inReplyToMessageId,
+    parent
+      ? {
+          senderId: parent.senderId,
+          deleted: parent.deleted,
+          content: parent.content,
+        }
+      : null
+  );
+}
+
 // ─── createMessage ──────────────────────────────────────────────────────────
 
 export type CreateMessageParams = {
@@ -50,7 +77,7 @@ export type CreateMessageParams = {
   clientId?: string;
 };
 
-export type CreateMessageOk = { ok: true; messageId: string; clientId?: string };
+export type CreateMessageOk = { ok: true; messageId: string; message: Message; clientId?: string };
 export type CreateMessageErr = {
   ok: false;
   code: 'forbidden' | 'internal';
@@ -78,7 +105,7 @@ export async function createMessageFor(
     return { ok: false, code: 'internal' as const, error: result.error };
   }
 
-  const { messageId, info } = result;
+  const { messageId, message, info } = result;
 
   const fanOut = postCommitFanOut(
     env,
@@ -93,10 +120,10 @@ export async function createMessageFor(
 
   ctx.waitUntil(fanOut);
 
-  return { ok: true, messageId, clientId };
+  return { ok: true, messageId, message, clientId };
 }
 
-async function postCommitFanOut(
+export async function postCommitFanOut(
   env: Env,
   info: ConversationInfo,
   callerId: string,
@@ -108,8 +135,18 @@ async function postCommitFanOut(
 ): Promise<void> {
   const { humanMemberIds, sandboxId } = extractConversationContext(info.members);
   const botMembers = info.members.filter(m => m.kind === 'bot' && m.id !== callerId);
-  const now = Date.now();
+  const activityAt = ulidToTimestamp(messageId);
   const isSenderHuman = humanMemberIds.includes(callerId);
+  let replyParentPromise: Promise<GetMessageResult> | null = null;
+  const getReplyParent = (): Promise<GetMessageResult> | null => {
+    if (inReplyToMessageId === undefined) return null;
+    replyParentPromise ??= withDORetry(
+      () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+      stub => stub.getMessage(inReplyToMessageId),
+      'ConversationDO.getMessage'
+    );
+    return replyParentPromise;
+  };
 
   // ── Block A: Deliver webhook to bot members ──────────────────────────
   // Webhook delivery is enqueued on the ConversationDO's per-conversation
@@ -122,12 +159,9 @@ async function postCommitFanOut(
 
     let inReplyToBody: string | undefined;
     let inReplyToSender: string | undefined;
-    if (inReplyToMessageId) {
-      const parent = await withDORetry(
-        () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-        stub => stub.getMessage(inReplyToMessageId),
-        'ConversationDO.getMessage'
-      );
+    const replyParent = getReplyParent();
+    if (replyParent) {
+      const parent = await replyParent;
       if (parent && !parent.deleted) {
         inReplyToBody = parent.content
           .filter(
@@ -183,24 +217,29 @@ async function postCommitFanOut(
   const autoTitle = computeAutoTitle();
 
   // Persist the auto-title on the ConversationDO in parallel with fan-out.
-  const conversationDoTitleWrite = async () => {
-    if (autoTitle === null) return;
+  const conversationDoTitleWrite = async (): Promise<boolean> => {
+    if (autoTitle === null) return false;
     try {
-      await withDORetry(
+      const result = await withDORetry(
         () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-        stub => stub.updateTitleInternal(autoTitle),
-        'ConversationDO.updateTitleInternal'
+        stub => stub.updateTitleIfNullInternal(autoTitle),
+        'ConversationDO.updateTitleIfNullInternal'
       );
+      return result.applied;
     } catch (err) {
       logger.error('Failed to auto-title conversation on ConversationDO', formatError(err));
+      return false;
     }
   };
 
-  // ── Block B: Push message.created + typing.stop; returns delivery map ─
-  const pushMessageEvents = async (): Promise<Map<string, boolean>> => {
-    if (!sandboxId) return new Map();
+  // ── Block B: Push message.created ────────────────────────────────────
+  const pushMessageEvents = async (): Promise<void> => {
+    if (!sandboxId) return;
+    const replyParent = getReplyParent();
+    const parent = replyParent ? await replyParent : null;
+    const replyTo = getReplyToSnapshot(parent, inReplyToMessageId);
 
-    const deliveryMap = await pushEventToHumanMembers(
+    await pushEventToHumanMembers(
       env,
       conversationId,
       sandboxId,
@@ -211,50 +250,41 @@ async function postCommitFanOut(
         senderId: callerId,
         content,
         inReplyToMessageId: inReplyToMessageId ?? null,
+        replyTo,
         clientId: clientId ?? null,
       }
     );
-
-    if (isSenderHuman) {
-      await pushEventToHumanMembers(env, conversationId, sandboxId, humanMemberIds, 'typing.stop', {
-        memberId: callerId,
-      });
-    }
-
-    return deliveryMap;
   };
 
   // Run webhook delivery, ConversationDO title write, and event push in
-  // parallel; the MembershipDO fan-out needs the delivery map, so it runs
-  // after pushMessageEvents resolves.
-  const [, , deliveryMap] = await Promise.all([
+  // parallel; membership updates run after commit side effects settle.
+  const [, autoTitleApplied] = await Promise.all([
     webhookDelivery(),
     conversationDoTitleWrite(),
     pushMessageEvents(),
   ]);
+  const appliedAutoTitle = autoTitleApplied ? autoTitle : null;
 
   // ── Block C: Single MembershipDO RPC per member ──────────────────────
   // Combines autoTitle, lastActivityAt, and lastReadAt into one round-trip.
   //
   // Per-member semantics:
   // - title      : autoTitle string for every member when auto-titling applied.
-  // - activityAt : always `now`.
-  // - markRead   : true when the member's own WS received the event
-  //                (sender for human-sent messages, or a human recipient with
-  //                an active WS for the delivered message.created event).
+  // - activityAt : timestamp encoded in the committed messageId.
+  // - markRead   : true only for the sender. Recipients advance read state
+  //                through the explicit mark-read endpoint when their client is
+  //                visible/focused.
   const postCommitUpdates = await Promise.allSettled(
     info.members.map(member => {
       const isSender = isSenderHuman && member.id === callerId;
-      const delivered = deliveryMap.get(member.id) === true;
-      const markRead = isSender || delivered;
       return withDORetry(
         () => env.MEMBERSHIP_DO.get(env.MEMBERSHIP_DO.idFromName(member.id)),
         stub =>
           stub.applyPostCommit({
             conversationId,
-            ...(autoTitle !== null && { title: autoTitle }),
-            activityAt: now,
-            markRead,
+            ...(appliedAutoTitle !== null && { title: appliedAutoTitle }),
+            activityAt,
+            markRead: isSender,
           }),
         'MembershipDO.applyPostCommit'
       );
@@ -269,40 +299,54 @@ async function postCommitFanOut(
   // ── Block D: Instance-level conversation events ──────────────────────
   if (sandboxId) {
     const instanceEvents: Promise<unknown>[] = [];
-    if (autoTitle !== null) {
+    if (appliedAutoTitle !== null) {
       instanceEvents.push(
         pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.renamed', {
           conversationId,
-          title: autoTitle,
+          title: appliedAutoTitle,
         })
       );
     }
     // Every member — including the sender — gets a `conversation.activity`
     // event so their sidebar row's `lastActivityAt` advances across tabs.
-    // Independently, anyone who has "read" this message (the sender, who
-    // authored it, or a recipient whose WS subscribed to the conversation
-    // context and delivered `message.created`) gets a `conversation.read`
-    // with their own `memberId`. The client filters `.read` by memberId so
-    // Alice's read marker never leaks into Bob's sidebar.
+    // Independently, the sender gets a targeted `conversation.read`; recipients
+    // must explicitly mark the conversation read from a visible/focused client.
     instanceEvents.push(
       pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.activity', {
         conversationId,
-        lastActivityAt: now,
+        lastActivityAt: activityAt,
       })
     );
     for (const userId of humanMemberIds) {
-      const isSender = userId === callerId;
-      const present = deliveryMap.get(userId) === true;
-      if (!isSender && !present) continue;
+      if (userId !== callerId) continue;
       instanceEvents.push(
-        pushInstanceEvent(env, sandboxId, humanMemberIds, 'conversation.read', {
+        pushInstanceEventToUser(env, sandboxId, userId, 'conversation.read', {
           conversationId,
           memberId: userId,
-          lastReadAt: now,
+          lastReadAt: activityAt,
         })
       );
     }
     await Promise.allSettled(instanceEvents);
+  }
+
+  // ── Block E: Push notification fanout ─────────────────────────────────
+  // User-authored messages notify other human members. Bot-authored message
+  // notifications are gated by ConversationDO state because bot messages
+  // stream through create + edit operations.
+  if (sandboxId !== null && isSenderHuman) {
+    await sendConversationMessagePush(env, {
+      conversationId,
+      sandboxId,
+      title: info.title ?? appliedAutoTitle,
+      humanMemberIds,
+      senderId: callerId,
+      senderIsHuman: true,
+      messageId,
+      content,
+      recipientMode: 'exclude-sender-human',
+      logContext: 'message.created',
+    });
   }
 }
 
@@ -428,7 +472,17 @@ export type ExecuteActionParams = {
 };
 
 export type ExecuteActionResult =
-  | { ok: true }
+  | {
+      ok: true;
+      messageId: string;
+      content: ContentBlock[];
+      resolved: {
+        groupId: string;
+        value: ExecApprovalDecision;
+        resolvedBy: string;
+        resolvedAt: number;
+      };
+    }
   | {
       ok: false;
       code: 'forbidden' | 'not_found' | 'already_resolved' | 'invalid_value' | 'internal';
@@ -455,48 +509,46 @@ export async function executeActionFor(
     return { ok: false, code: result.code, error: result.error };
   }
 
-  // Fetch conversation info once for both event push and webhook delivery
-  const info = await convStub.getInfo();
-  if (info) {
-    const convContext = extractConversationContext(info.members);
+  const convContext = result.memberContext;
+  const sandboxId = convContext.sandboxId;
+  if (sandboxId) {
     const fanOut = async () => {
-      if (convContext.sandboxId) {
-        await pushEventToHumanMembers(
-          env,
-          conversationId,
-          convContext.sandboxId,
-          convContext.humanMemberIds,
-          'message.updated',
-          { messageId, content: result.content, clientUpdatedAt: null }
-        );
+      await pushEventToHumanMembers(
+        env,
+        conversationId,
+        sandboxId,
+        convContext.humanMemberIds,
+        'message.updated',
+        { messageId, content: result.content, clientUpdatedAt: null }
+      );
 
-        // Deliver action.executed webhook only to the bot that authored the
-        // message holding the resolved actions block. Other bots in the
-        // conversation did not present these buttons and must not see the user's
-        // decision. Enqueued on the ConversationDO's chain so it's ordered
-        // relative to any message webhooks in the same conversation.
-        const author = info.members.find(m => m.id === result.messageSenderId && m.kind === 'bot');
-        if (author) {
-          await withDORetry(
-            () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
-            stub =>
-              stub.enqueueActionExecutedWebhook({
-                type: 'action.executed',
-                targetBotId: author.id,
-                conversationId,
-                messageId,
-                groupId,
-                value,
-                executedBy: callerId,
-                executedAt: new Date().toISOString(),
-              }),
-            'ConversationDO.enqueueActionExecutedWebhook'
-          );
-        }
+      // Deliver action.executed webhook only to the active bot that authored
+      // the message holding the resolved actions block. Other bots in the
+      // conversation did not present these buttons and must not see the user's
+      // decision. Enqueued on the ConversationDO's chain so it's ordered
+      // relative to any message webhooks in the same conversation.
+      const targetBotId = result.targetBotId;
+      if (targetBotId) {
+        await withDORetry(
+          () => env.CONVERSATION_DO.get(env.CONVERSATION_DO.idFromName(conversationId)),
+          stub =>
+            stub.enqueueActionExecutedWebhook({
+              type: 'action.executed',
+              targetBotId,
+              conversationId,
+              messageId,
+              groupId,
+              value,
+              executedBy: callerId,
+              executedAt: new Date().toISOString(),
+              convContext,
+            }),
+          'ConversationDO.enqueueActionExecutedWebhook'
+        );
       }
     };
     ctx.waitUntil(fanOut());
   }
 
-  return { ok: true };
+  return { ok: true, messageId, content: result.content, resolved: result.resolved };
 }

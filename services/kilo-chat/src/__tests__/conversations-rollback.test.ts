@@ -140,23 +140,24 @@ describe('createConversationFor — partial-failure rollback', () => {
 });
 
 describe('createBotConversationFor — partial-failure rollback', () => {
-  it('rolls back when one additional member MembershipDO write fails', async () => {
+  it('rejects additional members before writing conversation membership', async () => {
     grantSandbox('user-rb3-owner', 'sandbox-rb3');
     const botId = 'bot:kiloclaw:sandbox-rb3';
-    const failingMember = 'user-rb3-additional-fail';
-    const brokenEnv = envWithFailingAdd(failingMember);
 
-    await expect(
-      createBotConversationFor(brokenEnv, {
-        sandboxId: 'sandbox-rb3',
-        title: 'bot-rollback',
-        additionalMembers: [failingMember, 'user-rb3-additional-ok'],
-      })
-    ).rejects.toThrow(/simulated MembershipDO.addConversation failure/);
+    const result = await createBotConversationFor(env, {
+      sandboxId: 'sandbox-rb3',
+      title: 'bot-rollback',
+      additionalMembers: ['user-rb3-additional'],
+    });
 
-    // None of the memberships should retain a row — the ones that succeeded
-    // (owner, bot, other additional member) must have been rolled back.
-    for (const id of ['user-rb3-owner', botId, 'user-rb3-additional-ok', failingMember]) {
+    expect(result).toEqual({
+      ok: false,
+      code: 'invalid_members',
+      error: 'Bot-created conversations do not support additionalMembers',
+      invalidMembers: ['user-rb3-additional'],
+    });
+
+    for (const id of ['user-rb3-owner', botId, 'user-rb3-additional']) {
       const { conversations } = await getMemberStub(id).listConversations();
       expect(conversations, `member ${id} should have no conversations`).toEqual([]);
     }

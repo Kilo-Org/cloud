@@ -1,10 +1,20 @@
-import { env } from 'cloudflare:test';
+import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import type { ConversationDO } from '../do/conversation-do';
 
 function getStub(convId: string): DurableObjectStub<ConversationDO> {
   const id = env.CONVERSATION_DO.idFromName(convId);
   return env.CONVERSATION_DO.get(id);
+}
+
+async function waitForAlarm(stub: DurableObjectStub<ConversationDO>): Promise<number | null> {
+  const deadline = Date.now() + 1000;
+  for (;;) {
+    const alarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    if (alarm !== null) return alarm;
+    if (Date.now() > deadline) return null;
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
 }
 
 const BASE_PARAMS = {
@@ -40,6 +50,29 @@ describe('ConversationDO', () => {
     expect(await stub.isMember('user-stranger')).toBe(false);
   });
 
+  it('setTyping - returns member context for an active member', async () => {
+    const stub = getStub('conv-typing-active');
+    await stub.initialize(BASE_PARAMS);
+
+    await expect(stub.setTyping('user-alice')).resolves.toEqual({
+      ok: true,
+      memberContext: {
+        humanMemberIds: ['user-alice'],
+        sandboxId: null,
+      },
+    });
+  });
+
+  it('setTyping - rejects a non-member without member context', async () => {
+    const stub = getStub('conv-typing-forbidden');
+    await stub.initialize(BASE_PARAMS);
+
+    await expect(stub.setTyping('user-stranger')).resolves.toEqual({
+      ok: false,
+      error: 'Not a member',
+    });
+  });
+
   it('createMessage - creates message, returns ULID and info', async () => {
     const stub = getStub('conv-create-1');
     await stub.initialize(BASE_PARAMS);
@@ -55,6 +88,39 @@ describe('ConversationDO', () => {
     }
   });
 
+  it('sets an alarm when a bot message is created below the notification threshold', async () => {
+    const stub = getStub('conv-bot-notification-alarm');
+    await stub.initialize({
+      ...BASE_PARAMS,
+      id: 'conv-bot-notification-alarm',
+    });
+
+    const result = await stub.createMessage({
+      senderId: 'bot-1',
+      content: [{ type: 'text', text: 'short bot placeholder' }],
+    });
+
+    expect(result.ok).toBe(true);
+    await expect(waitForAlarm(stub)).resolves.not.toBeNull();
+  });
+
+  it('does not create a bot notification alarm for human messages', async () => {
+    const stub = getStub('conv-human-no-notification-alarm');
+    await stub.initialize({
+      ...BASE_PARAMS,
+      id: 'conv-human-no-notification-alarm',
+    });
+
+    const result = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'human message' }],
+    });
+
+    expect(result.ok).toBe(true);
+    const alarm = await runInDurableObject(stub, (_inst, state) => state.storage.getAlarm());
+    expect(alarm).toBeNull();
+  });
+
   it('createMessage - rejects non-member', async () => {
     const stub = getStub('conv-create-2');
     await stub.initialize(BASE_PARAMS);
@@ -66,6 +132,21 @@ describe('ConversationDO', () => {
     if (!result.ok) {
       expect(result.error).toContain('not a member');
     }
+  });
+
+  it('createMessage - returns internal when conversation is not initialized', async () => {
+    const stub = getStub('conv-create-uninitialized');
+
+    const result = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Hello!' }],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: 'internal',
+      error: 'Conversation not initialized',
+    });
   });
 
   it('listMessages - reverse chronological order', async () => {
@@ -120,6 +201,103 @@ describe('ConversationDO', () => {
     // First message should NOT be included in a page before r1
     const { messages: page2 } = await stub.listMessages({ limit: 10, before: r1.messageId });
     expect(page2).toHaveLength(0);
+  });
+
+  it('listMessages - returns explicit hasMore and nextCursor from a sentinel row', async () => {
+    const stub = getStub('conv-list-page-contract');
+    await stub.initialize(BASE_PARAMS);
+    const r1 = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'First' }],
+    });
+    await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Second' }],
+    });
+    const r3 = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Third' }],
+    });
+    expect(r1.ok).toBe(true);
+    expect(r3.ok).toBe(true);
+    if (!r1.ok || !r3.ok) return;
+
+    const firstPage = await stub.listMessages({ limit: 2 });
+    expect(firstPage.messages).toHaveLength(2);
+    expect(firstPage.hasMore).toBe(true);
+    expect(firstPage.nextCursor).toBe(firstPage.messages[1]?.id);
+
+    const secondPage = await stub.listMessages({ limit: 2, before: firstPage.nextCursor ?? '' });
+    expect(secondPage.messages.map(message => message.id)).toEqual([r1.messageId]);
+    expect(secondPage.hasMore).toBe(false);
+    expect(secondPage.nextCursor).toBeNull();
+  });
+
+  it('listMessages - includes a reply snapshot when parent is outside the page', async () => {
+    const stub = getStub('conv-list-reply-snapshot');
+    await stub.initialize(BASE_PARAMS);
+    const parent = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Parent context' }],
+    });
+    expect(parent.ok).toBe(true);
+    if (!parent.ok) return;
+
+    const reply = await stub.createMessage({
+      senderId: 'bot-1',
+      content: [{ type: 'text', text: 'Reply body' }],
+      inReplyToMessageId: parent.messageId,
+    });
+    expect(reply.ok).toBe(true);
+    if (!reply.ok) return;
+
+    const { messages } = await stub.listMessages({ limit: 1 });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0].id).toBe(reply.messageId);
+    expect(messages[0].replyTo).toEqual({
+      messageId: parent.messageId,
+      senderId: 'user-alice',
+      deleted: false,
+      previewText: 'Parent context',
+    });
+  });
+
+  it('createMessage - returns the canonical created reply message', async () => {
+    const stub = getStub('conv-create-reply-message');
+    await stub.initialize(BASE_PARAMS);
+    const parent = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Parent context' }],
+    });
+    expect(parent.ok).toBe(true);
+    if (!parent.ok) return;
+
+    const reply = await stub.createMessage({
+      senderId: 'bot-1',
+      content: [{ type: 'text', text: 'Reply body' }],
+      inReplyToMessageId: parent.messageId,
+    });
+
+    expect(reply.ok).toBe(true);
+    if (!reply.ok) return;
+    expect(reply.message).toEqual({
+      id: reply.messageId,
+      senderId: 'bot-1',
+      content: [{ type: 'text', text: 'Reply body' }],
+      inReplyToMessageId: parent.messageId,
+      replyTo: {
+        messageId: parent.messageId,
+        senderId: 'user-alice',
+        deleted: false,
+        previewText: 'Parent context',
+      },
+      updatedAt: null,
+      clientUpdatedAt: null,
+      deleted: false,
+      deliveryFailed: false,
+      reactions: [],
+    });
   });
 
   it('editMessage - edits message with newer timestamp', async () => {
@@ -309,6 +487,12 @@ describe('ConversationDO', () => {
       if (r.ok) {
         expect(r.added).toBe(true);
         expect(r.id).toMatch(/^[0-9A-Z]{26}$/);
+        if (r.added) {
+          expect(r.memberContext).toEqual({
+            humanMemberIds: ['user-alice'],
+            sandboxId: null,
+          });
+        }
       }
     });
 
@@ -372,10 +556,7 @@ describe('ConversationDO', () => {
     it('rejects reactions from non-member', async () => {
       const { stub, messageId } = await seed('conv-rx-bad-mem');
       const result = await stub.addReaction({ messageId, memberId: 'user-nonmember', emoji: '👍' });
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.code).toBe('forbidden');
-      }
+      expect(result).toEqual({ ok: false, code: 'forbidden', error: 'Not a member' });
     });
   });
 
@@ -491,6 +672,61 @@ describe('ConversationDO', () => {
     expect(msg!.content).toEqual([]);
   });
 
+  it('resolveMarkRead - rejects non-members and invalid markers', async () => {
+    const stub = getStub('conv-resolve-read-invalid');
+    await stub.initialize(BASE_PARAMS);
+    const created = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Hello!' }],
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    await expect(stub.resolveMarkRead('user-stranger', created.messageId)).resolves.toEqual({
+      ok: false,
+      code: 'forbidden',
+      error: 'Forbidden',
+    });
+    await expect(stub.resolveMarkRead('user-alice', '01KQM1HQZPNQ7RZYFGMSEZ82A8')).resolves.toEqual(
+      {
+        ok: false,
+        code: 'invalid',
+        error: 'Message does not belong to conversation',
+      }
+    );
+  });
+
+  it('resolveMarkRead - accepts deleted markers and returns the latest non-deleted marker', async () => {
+    const stub = getStub('conv-resolve-read-deleted');
+    const sandboxId = 'sandbox-resolve-read-deleted';
+    await stub.initialize({
+      ...BASE_PARAMS,
+      members: [
+        { id: 'user-alice', kind: 'user' as const },
+        { id: `bot:kiloclaw:${sandboxId}`, kind: 'bot' as const },
+      ],
+    });
+    const first = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'First' }],
+    });
+    const second = await stub.createMessage({
+      senderId: 'user-alice',
+      content: [{ type: 'text', text: 'Second' }],
+    });
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) return;
+
+    await stub.deleteMessage({ messageId: second.messageId, senderId: 'user-alice' });
+
+    await expect(stub.resolveMarkRead('user-alice', second.messageId)).resolves.toEqual({
+      ok: true,
+      sandboxId,
+      latestNonDeletedMessageId: first.messageId,
+    });
+  });
+
   describe('executeAction', () => {
     it('returns messageSenderId so caller can target just the author bot', async () => {
       const stub = getStub('conv-execaction-sender');
@@ -531,6 +767,141 @@ describe('ConversationDO', () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.messageSenderId).toBe('bot-primary');
+    });
+
+    it('returns fanout context and active author bot target', async () => {
+      const stub = getStub('conv-execaction-context');
+      await stub.initialize({
+        id: 'conv-execaction-context',
+        title: 'Action Chat',
+        createdBy: 'user-alice',
+        createdAt: 1000,
+        members: [
+          { id: 'user-alice', kind: 'user' as const },
+          { id: 'bot:kiloclaw:sandbox-action-context', kind: 'bot' as const },
+          { id: 'bot:kiloclaw:sandbox-other', kind: 'bot' as const },
+        ],
+      });
+      const create = await stub.createMessage({
+        senderId: 'bot:kiloclaw:sandbox-action-context',
+        content: [
+          {
+            type: 'actions' as const,
+            groupId: 'g1',
+            actions: [{ value: 'allow-once', label: 'Allow', style: 'primary' as const }],
+          },
+        ],
+      });
+      expect(create.ok).toBe(true);
+      if (!create.ok) return;
+
+      const result = await stub.executeAction({
+        messageId: create.messageId,
+        memberId: 'user-alice',
+        groupId: 'g1',
+        value: 'allow-once',
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.memberContext).toEqual({
+        humanMemberIds: ['user-alice'],
+        sandboxId: 'sandbox-action-context',
+      });
+      expect(result.targetBotId).toBe('bot:kiloclaw:sandbox-action-context');
+    });
+
+    it('does not target action webhooks when the author bot is no longer active', async () => {
+      const stub = getStub('conv-execaction-left-author');
+      const authorBotId = 'bot:kiloclaw:sandbox-left-author';
+      await stub.initialize({
+        id: 'conv-execaction-left-author',
+        title: 'Action Chat',
+        createdBy: 'user-alice',
+        createdAt: 1000,
+        members: [
+          { id: 'user-alice', kind: 'user' as const },
+          { id: authorBotId, kind: 'bot' as const },
+          { id: 'bot:kiloclaw:sandbox-still-active', kind: 'bot' as const },
+        ],
+      });
+      const create = await stub.createMessage({
+        senderId: authorBotId,
+        content: [
+          {
+            type: 'actions' as const,
+            groupId: 'g1',
+            actions: [{ value: 'deny', label: 'Deny', style: 'danger' as const }],
+          },
+        ],
+      });
+      expect(create.ok).toBe(true);
+      if (!create.ok) return;
+      await stub.leaveMember(authorBotId);
+
+      const result = await stub.executeAction({
+        messageId: create.messageId,
+        memberId: 'user-alice',
+        groupId: 'g1',
+        value: 'deny',
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.memberContext).toEqual({
+        humanMemberIds: ['user-alice'],
+        sandboxId: 'sandbox-still-active',
+      });
+      expect(result.targetBotId).toBeNull();
+    });
+
+    it('stores server-owned resolution metadata for clients', async () => {
+      const stub = getStub('conv-execaction-resolved-content');
+      await stub.initialize({
+        id: 'conv-execaction-resolved-content',
+        title: 'Action Chat',
+        createdBy: 'user-alice',
+        createdAt: 1000,
+        members: [
+          { id: 'user-alice', kind: 'user' as const },
+          { id: 'bot-primary', kind: 'bot' as const },
+        ],
+      });
+      const create = await stub.createMessage({
+        senderId: 'bot-primary',
+        content: [
+          {
+            type: 'actions' as const,
+            groupId: 'g1',
+            actions: [
+              { value: 'allow-once', label: 'Allow', style: 'primary' as const },
+              { value: 'deny', label: 'Deny', style: 'danger' as const },
+            ],
+          },
+        ],
+      });
+      expect(create.ok).toBe(true);
+      if (!create.ok) return;
+
+      const beforeExecute = Date.now();
+      const result = await stub.executeAction({
+        messageId: create.messageId,
+        memberId: 'user-alice',
+        groupId: 'g1',
+        value: 'deny',
+      });
+      expect(result.ok).toBe(true);
+
+      const after = await stub.listMessages({ limit: 10 });
+      const message = after.messages.find(m => m.id === create.messageId);
+      expect(message).toBeDefined();
+      if (!message) return;
+      const actionsBlock = message.content.find(block => block.type === 'actions');
+      expect(actionsBlock).toBeDefined();
+      if (!actionsBlock || actionsBlock.type !== 'actions') return;
+      expect(actionsBlock.resolved?.value).toBe('deny');
+      expect(actionsBlock.resolved?.resolvedBy).toBe('user-alice');
+      expect(actionsBlock.resolved?.resolvedAt).toBeGreaterThanOrEqual(beforeExecute);
     });
   });
 
@@ -578,6 +949,9 @@ describe('ConversationDO', () => {
 
       const result = await stub.revertActionResolution({ messageId, groupId: 'g1' });
       expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.reverted).toBe(true);
+      }
 
       const after = await stub.listMessages({ limit: 10 });
       const actions = after.messages[0].content.find(b => b.type === 'actions') as {
@@ -590,8 +964,14 @@ describe('ConversationDO', () => {
       const { stub, messageId } = await setupResolved('conv-revert-idem');
       const first = await stub.revertActionResolution({ messageId, groupId: 'g1' });
       expect(first.ok).toBe(true);
+      if (first.ok) {
+        expect(first.reverted).toBe(true);
+      }
       const second = await stub.revertActionResolution({ messageId, groupId: 'g1' });
       expect(second.ok).toBe(true);
+      if (second.ok) {
+        expect(second.reverted).toBe(false);
+      }
     });
 
     it('returns not_found for unknown messageId', async () => {

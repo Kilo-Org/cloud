@@ -250,6 +250,14 @@ export function modelDoesNotExistResponse() {
   );
 }
 
+export function noFreeModelsAvailableResponse() {
+  const error = `No free models are currently available for ${KILO_AUTO_FREE_MODEL.id}. Please try again later, or switch to ${KILO_AUTO_BALANCED_MODEL.id} for affordable paid inference.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.no_free_models_available, message: error },
+    { status: 503 }
+  );
+}
+
 export function featureExclusiveModelResponse(modelId: string) {
   const exclusiveTo = kiloExclusiveModels.find(m => m.public_id === modelId)?.exclusive_to ?? [];
   const error = `${modelId} is only available for ${exclusiveTo.join(', ')}. Use ${KILO_AUTO_FREE_MODEL.id} as a free alternative.`;
@@ -376,11 +384,7 @@ export function checkOrganizationModelRestrictions(params: {
     }
   }
 
-  const providerAllowList =
-    params.settings.provider_policy_mode === 'allow'
-      ? params.settings.provider_allow_list
-      : undefined;
-  const providerDenyList = params.settings.provider_deny_list;
+  const providerAllowList = params.settings.provider_allow_list;
   const dataCollection = params.settings.data_collection;
 
   const providerConfig: OpenRouterProviderConfig = {};
@@ -388,8 +392,6 @@ export function checkOrganizationModelRestrictions(params: {
   if (params.organizationPlan === 'enterprise') {
     if (providerAllowList !== undefined) {
       providerConfig.only = providerAllowList;
-    } else if (providerDenyList && providerDenyList.length > 0) {
-      providerConfig.ignore = providerDenyList;
     }
   }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   backupConfigFile,
+  ensureInboundEmailHookFlags,
   generateBaseConfig,
   setNestedValue,
   writeBaseConfig,
@@ -82,7 +83,7 @@ function minimalEnv(): Record<string, string | undefined> {
 }
 
 describe('generateBaseConfig', () => {
-  it('generates config with gateway and exec defaults, no kilocode provider entry', () => {
+  it('generates config with gateway, exec defaults, and a kilocode provider entry that triggers live discovery', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
@@ -93,8 +94,11 @@ describe('generateBaseConfig', () => {
     expect(config.gateway.auth.token).toBe('test-gw-token');
     expect(config.gateway.controlUi.allowInsecureAuth).toBe(true);
 
-    // No kilocode provider entry in production — built-in provider takes over
-    expect(config.models).toBeUndefined();
+    // The bundled kilocode plugin only loads when this entry is present.
+    // Empty `models` lets live gateway discovery own the catalog.
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.api).toBe('openai-completions');
+    expect(config.models.providers.kilocode.models).toEqual([]);
 
     // No default model override when env var not set, and no memorySearch
     // schema introduced when the feature is off and absent from existing config.
@@ -311,7 +315,7 @@ describe('generateBaseConfig', () => {
     expect(config.gateway.port).toBe(3001);
   });
 
-  it('removes stale kilocode provider with /api/openrouter/ baseUrl', () => {
+  it('removes stale kilocode openrouter entry and rebuilds it pointed at the production gateway', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
@@ -327,16 +331,70 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    // Stale provider deleted, models object cleaned up
-    expect(config.models).toBeUndefined();
+    // Stale entry replaced — old apiKey and models dropped, baseUrl pointed
+    // at the production gateway so the bundled plugin can load.
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.api).toBe('openai-completions');
+    expect(config.models.providers.kilocode.models).toEqual([]);
+    expect(config.models.providers.kilocode.apiKey).toBeUndefined();
   });
 
-  it('removes stale kilocode provider with production /api/gateway/ baseUrl', () => {
+  // Regression: an earlier migration deleted the kilocode provider entry on
+  // personal (non-org) instances, expecting the bundled openclaw kilocode
+  // plugin to auto-activate from KILOCODE_API_KEY alone. It does not — the
+  // plugin only loads when an explicit provider entry is present, so without
+  // it `kilo-auto/balanced` and the rest of the dynamic catalog were never
+  // discovered and the agent failed with "Unknown model".
+  it('keeps kilocode provider entry on personal instances (no KILOCODE_ORGANIZATION_ID) so the bundled plugin loads', () => {
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      KILOCODE_DEFAULT_MODEL: 'kilocode/kilo-auto/balanced',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.api).toBe('openai-completions');
+    expect(config.models.providers.kilocode.models).toEqual([]);
+    expect(config.models.providers.kilocode.headers?.['X-KiloCode-OrganizationId']).toBeUndefined();
+    expect(config.agents.defaults.model.primary).toBe('kilocode/kilo-auto/balanced');
+  });
+
+  it('preserves kilocode provider with production /api/gateway/ baseUrl and clears stale models', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
           kilocode: {
             baseUrl: 'https://api.kilo.ai/api/gateway/',
+            api: 'openai-completions',
+            models: [{ id: 'kilo/auto', name: 'Kilo Auto' }],
+          },
+        },
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    // Entry preserved (so the plugin loads), stale onboard-written models
+    // cleared so live discovery owns the catalog.
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.api).toBe('openai-completions');
+    expect(config.models.providers.kilocode.models).toEqual([]);
+  });
+
+  // Auth must come from `KILOCODE_API_KEY` env, never from a literal `apiKey`
+  // field on disk. The previous deletion-based migration was incidentally
+  // scrubbing the field; this test pins that the new normalization keeps that
+  // scrub so a stale plaintext credential from a legacy onboard run cannot
+  // survive across boots.
+  it('scrubs a stale plaintext apiKey from the kilocode provider entry', () => {
+    const existing = JSON.stringify({
+      models: {
+        providers: {
+          kilocode: {
+            baseUrl: 'https://api.kilo.ai/api/gateway/',
+            api: 'openai-completions',
+            apiKey: 'sk-stale-plaintext',
             models: [],
           },
         },
@@ -345,7 +403,8 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    expect(config.models).toBeUndefined();
+    expect(config.models.providers.kilocode.apiKey).toBeUndefined();
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
   });
 
   it('keeps gateway provider for org-scoped instances but clears static models', () => {
@@ -396,7 +455,7 @@ describe('generateBaseConfig', () => {
     expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
   });
 
-  it('preserves non-kilocode providers when removing stale kilocode entry', () => {
+  it('preserves non-kilocode providers when rebuilding stale kilocode openrouter entry', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
@@ -414,9 +473,9 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    // kilocode removed, openai preserved
-    expect(config.models.providers.kilocode).toBeUndefined();
+    // openai preserved, kilocode rebuilt with production gateway URL
     expect(config.models.providers.openai.baseUrl).toBe('https://api.openai.com/v1');
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
   });
 
   it('creates kilocode provider with baseUrl and models: [] when KILOCODE_API_BASE_URL is set', () => {
@@ -428,7 +487,7 @@ describe('generateBaseConfig', () => {
     expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
-  it('preserves existing models array when overriding baseUrl', () => {
+  it('clears stale models when overriding baseUrl, since live discovery owns the catalog', () => {
     const existing = JSON.stringify({
       models: {
         providers: {
@@ -443,9 +502,10 @@ describe('generateBaseConfig', () => {
     const env = { ...minimalEnv(), KILOCODE_API_BASE_URL: 'https://new-tunnel.example.com/' };
     const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
 
-    // baseUrl updated, existing models preserved
+    // baseUrl updated, stale onboard-written models cleared so live
+    // discovery populates the catalog from the new endpoint.
     expect(config.models.providers.kilocode.baseUrl).toBe('https://new-tunnel.example.com/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('sets X-KiloCode-OrganizationId header when KILOCODE_ORGANIZATION_ID is set', () => {
@@ -465,8 +525,10 @@ describe('generateBaseConfig', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
-    // No kilocode provider entry created when neither baseUrl nor orgId is set
-    expect(config.models).toBeUndefined();
+    // Personal instance: kilocode entry still present (the bundled plugin
+    // requires it to load), but no org header attached.
+    expect(config.models.providers.kilocode.baseUrl).toBe('https://api.kilo.ai/api/gateway/');
+    expect(config.models.providers.kilocode.headers?.['X-KiloCode-OrganizationId']).toBeUndefined();
   });
 
   it('preserves existing kilocode baseUrl and headers when adding org header', () => {
@@ -517,7 +579,8 @@ describe('generateBaseConfig', () => {
     // Other headers and config preserved
     expect(config.models.providers.kilocode.headers['X-Custom']).toBe('preserved');
     expect(config.models.providers.kilocode.baseUrl).toBe('https://tunnel.example.com/');
-    expect(config.models.providers.kilocode.models).toEqual([{ id: 'kept/model', name: 'Kept' }]);
+    // models cleared so live discovery from the (preserved) baseUrl owns the catalog
+    expect(config.models.providers.kilocode.models).toEqual([]);
   });
 
   it('removes agents.defaults.models allowlist left by openclaw onboard', () => {
@@ -607,6 +670,29 @@ describe('generateBaseConfig', () => {
     ]);
   });
 
+  it('passes allowed origins entries through as literal strings', () => {
+    // The config-writer does not interpret entries — whatever openclaw's
+    // origin check understands (exact matches and bare `*`) is what matters.
+    // Per-instance virtual hosting is implemented by the worker appending a
+    // specific `https://<instanceId>.kiloclaw.ai` entry to the list before it
+    // reaches the controller (see services/kiloclaw/src/gateway/env.ts), not
+    // by using a wildcard host pattern here. A wildcard entry would be kept
+    // in the config but would never match a real Origin header.
+    const { deps } = fakeDeps();
+    const env = {
+      ...minimalEnv(),
+      OPENCLAW_ALLOWED_ORIGINS:
+        'https://claw.kilosessions.ai, https://abc.kiloclaw.ai, https://kilo.ai',
+    };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.gateway.controlUi.allowedOrigins).toEqual([
+      'https://claw.kilosessions.ai',
+      'https://abc.kiloclaw.ai',
+      'https://kilo.ai',
+    ]);
+  });
+
   it('always configures the KiloClaw customizer plugin', () => {
     const { deps } = fakeDeps();
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
@@ -646,17 +732,36 @@ describe('generateBaseConfig', () => {
     expect(paths.filter(p => p === morningPluginPath)).toHaveLength(1);
   });
 
-  it('adds KiloClaw customizer to an existing plugin allowlist', () => {
+  it('updates managed plugins in an existing plugin allowlist', () => {
     const existing = JSON.stringify({
+      channels: {
+        streamchat: { enabled: true },
+      },
       plugins: {
+        load: {
+          paths: [
+            '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat',
+            '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer',
+          ],
+        },
         allow: ['openclaw-channel-streamchat', 'telegram', 'kilocode', 'browser'],
+        entries: {
+          'openclaw-channel-streamchat': { enabled: true },
+        },
       },
     });
     const { deps } = fakeDeps(existing);
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
+    expect(config.channels.streamchat).toBeUndefined();
+    expect(config.plugins.load.paths).not.toContain(
+      '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'
+    );
+    expect(config.plugins.entries).not.toHaveProperty('openclaw-channel-streamchat');
+    expect(config.plugins.allow).not.toContain('openclaw-channel-streamchat');
     expect(config.plugins.allow).toContain('kiloclaw-customizer');
     expect(config.plugins.allow).toContain('kiloclaw-morning-briefing');
+    expect(config.plugins.allow).toContain('kilo-chat');
   });
 
   it('configures Telegram channel', () => {
@@ -786,44 +891,6 @@ describe('generateBaseConfig', () => {
     expect(config.channels.slack).toBeUndefined();
   });
 
-  // ─── Stream Chat (default channel) ───────────────────────────────────────
-
-  it('configures Stream Chat channel and plugin when all three vars are set', () => {
-    const { deps } = fakeDeps();
-    const env = {
-      ...minimalEnv(),
-      STREAM_CHAT_API_KEY: 'sc-api-key',
-      STREAM_CHAT_BOT_USER_ID: 'bot-sandbox-abc',
-      STREAM_CHAT_BOT_USER_TOKEN: 'sc-bot-token',
-    };
-    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
-
-    expect(config.channels.streamchat.apiKey).toBe('sc-api-key');
-    expect(config.channels.streamchat.botUserId).toBe('bot-sandbox-abc');
-    expect(config.channels.streamchat.botUserToken).toBe('sc-bot-token');
-    expect(config.channels.streamchat.botUserName).toBe('KiloClaw');
-    expect(config.channels.streamchat.enabled).toBe(true);
-    expect(config.plugins.entries['openclaw-channel-streamchat'].enabled).toBe(true);
-    expect(config.plugins.load.paths).toContain(
-      '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'
-    );
-  });
-
-  it('does not configure Stream Chat when any of the three required vars is missing', () => {
-    const cases = [
-      { STREAM_CHAT_API_KEY: 'key', STREAM_CHAT_BOT_USER_ID: 'bot' },
-      { STREAM_CHAT_API_KEY: 'key', STREAM_CHAT_BOT_USER_TOKEN: 'token' },
-      { STREAM_CHAT_BOT_USER_ID: 'bot', STREAM_CHAT_BOT_USER_TOKEN: 'token' },
-    ];
-
-    for (const partial of cases) {
-      const { deps } = fakeDeps();
-      const env = { ...minimalEnv(), ...partial };
-      const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
-      expect(config.channels.streamchat).toBeUndefined();
-    }
-  });
-
   // ─── Kilo Chat ───────────────────────────────────────────────────────────
 
   it('always configures kilo-chat channel and plugin', () => {
@@ -859,30 +926,6 @@ describe('generateBaseConfig', () => {
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
 
     expect(config.session.dmScope).toBe('per-peer');
-  });
-
-  it('does not duplicate the plugin path on repeated generateBaseConfig calls', () => {
-    const existing = JSON.stringify({
-      channels: { streamchat: { apiKey: 'old-key', enabled: true } },
-      plugins: {
-        load: {
-          paths: ['/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat'],
-        },
-        entries: { 'openclaw-channel-streamchat': { enabled: true } },
-      },
-    });
-    const { deps } = fakeDeps(existing);
-    const env = {
-      ...minimalEnv(),
-      STREAM_CHAT_API_KEY: 'sc-api-key',
-      STREAM_CHAT_BOT_USER_ID: 'bot-sandbox-abc',
-      STREAM_CHAT_BOT_USER_TOKEN: 'sc-bot-token',
-    };
-    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
-
-    const pluginPath = '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
-    const paths = config.plugins.load.paths as string[];
-    expect(paths.filter(p => p === pluginPath)).toHaveLength(1);
   });
 
   it('does not set gateway auth when OPENCLAW_GATEWAY_TOKEN is missing', () => {
@@ -932,6 +975,8 @@ describe('generateBaseConfig', () => {
     expect(config.hooks.enabled).toBe(true);
     expect(config.hooks.token).toBe('test-hooks-token');
     expect(config.hooks.path).toBe('/hooks');
+    expect(config.hooks.allowRequestSessionKey).toBe(true);
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
     expect(config.hooks.presets).toBeUndefined();
     expect(config.hooks.mappings).toContainEqual({
       id: 'cloudflare-email-inbound',
@@ -995,6 +1040,18 @@ describe('generateBaseConfig', () => {
     expect(config.hooks.mappings).toContainEqual(
       expect.objectContaining({ id: 'cloudflare-email-inbound', wakeMode: 'now' })
     );
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['hook:', 'inbound-email:']);
+  });
+
+  it('preserves existing hook session key prefixes without duplicating inbound email', () => {
+    const existing = JSON.stringify({
+      hooks: { allowedSessionKeyPrefixes: ['custom:', 'hook:', 'inbound-email:'] },
+    });
+    const { deps } = fakeDeps(existing);
+    const env = { ...minimalEnv(), KILOCLAW_HOOKS_TOKEN: 'test-hooks-token' };
+    const config = generateBaseConfig(env, '/tmp/openclaw.json', deps);
+
+    expect(config.hooks.allowedSessionKeyPrefixes).toEqual(['custom:', 'hook:', 'inbound-email:']);
   });
 
   it('adds gmail preset when Gog credentials are configured', () => {
@@ -1231,6 +1288,39 @@ describe('generateBaseConfig', () => {
     const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
     expect(config.plugins.entries['memory-core'].config.dreaming).toBeUndefined();
     expect(config.plugins.entries['memory-core'].config.extra).toBe('keep-me');
+  });
+});
+
+describe('ensureInboundEmailHookFlags', () => {
+  it('sets allowRequestSessionKey on a hooks object that lacks it', () => {
+    const config = { hooks: { enabled: true, token: 'tok' } };
+    ensureInboundEmailHookFlags(config);
+    expect(config.hooks).toMatchObject({
+      enabled: true,
+      token: 'tok',
+      allowRequestSessionKey: true,
+    });
+  });
+
+  it('is a no-op when hooks block is absent (instance has no inbound hooks)', () => {
+    const config: Record<string, unknown> = { gateway: {} };
+    ensureInboundEmailHookFlags(config);
+    expect(config.hooks).toBeUndefined();
+  });
+
+  it('is idempotent when allowRequestSessionKey is already true', () => {
+    const config = { hooks: { allowRequestSessionKey: true } };
+    ensureInboundEmailHookFlags(config);
+    expect(config.hooks.allowRequestSessionKey).toBe(true);
+  });
+
+  it('overrides allowRequestSessionKey: false back to true', () => {
+    // Canonical-config policy: the inbound-email mapping is force-installed
+    // on every run, so the flag it requires must converge to true alongside
+    // it. An explicit `false` is treated as drift, not as admin intent.
+    const config = { hooks: { allowRequestSessionKey: false } };
+    ensureInboundEmailHookFlags(config);
+    expect(config.hooks.allowRequestSessionKey).toBe(true);
   });
 });
 

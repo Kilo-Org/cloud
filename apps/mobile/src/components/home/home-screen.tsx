@@ -4,13 +4,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppState, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
+import { badgeBucketForInstance } from '@kilocode/notifications';
+
 import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
 import { AgentsPromoCard } from '@/components/home/agents-promo-card';
 import { buildTimedGreeting, Greeting } from '@/components/home/greeting';
-import { KiloClawCard } from '@/components/home/kiloclaw-card';
 import { KiloClawPromoCard } from '@/components/home/kiloclaw-promo-card';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { SectionHeader } from '@/components/home/section-header';
+import { KiloClawCard } from '@/components/kiloclaw/instance-card';
 import { isTransitionalStatus } from '@/components/kiloclaw/status-badge';
 import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
@@ -79,7 +81,7 @@ export function HomeScreen() {
     isPending: instancesPending,
     isError: instancesError,
   } = useAllKiloClawInstances(pickListPollInterval);
-  const { byChannel: unreadByChannel } = useUnreadCounts();
+  const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
   const {
     storedSessions,
     activeSessions,
@@ -94,7 +96,7 @@ export function HomeScreen() {
   const hasInstance = (instances?.length ?? 0) > 0;
   const isFirstTime = !hasInstance && !hasAnySession && !instancesError;
 
-  const title = isFirstTime ? 'Welcome to Kilo' : buildTimedGreeting(null);
+  const headerTitle = buildTimedGreeting(null);
 
   const handleRefresh = useCallback(() => {
     void (async () => {
@@ -109,14 +111,20 @@ export function HomeScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Kilo" showBackButton={false} headerRight={<ProfileAvatarButton />} />
+      <ScreenHeader
+        title={headerTitle}
+        size="large"
+        showBackButton={false}
+        className="px-[22px]"
+        headerRight={<ProfileAvatarButton />}
+      />
       <ScrollView
         className="flex-1"
         contentContainerClassName="pb-24"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
-        <Greeting title={title} />
+        {isFirstTime ? <Greeting title="Welcome to Kilo" /> : null}
 
         {isLoading ? (
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3 px-4">
@@ -128,7 +136,7 @@ export function HomeScreen() {
             {renderKiloClawSlot({
               instances: instances ?? [],
               instancesError,
-              unreadByChannel,
+              unreadByBadgeBucket,
             })}
 
             {renderSessionsOrPromo({
@@ -151,7 +159,7 @@ export function HomeScreen() {
 function renderKiloClawSlot(params: {
   instances: ClawInstance[];
   instancesError: boolean;
-  unreadByChannel: Map<string, number>;
+  unreadByBadgeBucket: Map<string, number>;
 }) {
   if (params.instances.length > 0) {
     return (
@@ -162,7 +170,9 @@ function renderKiloClawSlot(params: {
             <KiloClawCard
               key={instance.sandboxId}
               instance={instance}
-              unreadCount={params.unreadByChannel.get(instance.sandboxId) ?? 0}
+              unreadCount={
+                params.unreadByBadgeBucket.get(badgeBucketForInstance(instance.sandboxId)) ?? 0
+              }
             />
           ))}
         </View>

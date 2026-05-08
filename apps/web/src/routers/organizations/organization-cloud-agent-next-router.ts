@@ -1,15 +1,10 @@
 import 'server-only';
-import { TRPCError } from '@trpc/server';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   createCloudAgentNextClient,
   rethrowAsPaymentRequired,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateCloudAgentToken } from '@/lib/tokens';
-import {
-  mergeProfileConfiguration,
-  ProfileNotFoundError,
-} from '@/lib/agent/profile-session-config';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -113,61 +108,33 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
-      const {
-        envVars,
-        setupCommands,
-        profileName,
-        gitlabProject,
-        githubRepo,
-        organizationId,
-        ...restInput
-      } = input;
+      const { gitlabProject, githubRepo, organizationId, ...restInput } = input;
+
+      // Profile resolution happens inside cloud-agent-next. Tokens are resolved
+      // there as well via GIT_TOKEN_SERVICE. We forward profileId + inline
+      // envVars/setupCommands/mcpServers overrides unchanged.
+      let gitParams: {
+        githubRepo?: string;
+        gitUrl?: string;
+        platform?: 'github' | 'gitlab';
+      };
+
+      if (gitlabProject) {
+        const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
+        const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
+        gitParams = { gitUrl, platform: PLATFORM.GITLAB };
+      } else {
+        gitParams = { githubRepo, platform: PLATFORM.GITHUB };
+      }
 
       try {
-        const repoFullName = githubRepo ?? gitlabProject;
-        const platform = gitlabProject ? PLATFORM.GITLAB : PLATFORM.GITHUB;
-
-        const merged = await mergeProfileConfiguration({
-          profileName,
-          owner: { type: 'organization', id: organizationId },
-          userId: ctx.user.id,
-          repoFullName,
-          platform,
-          envVars,
-          setupCommands,
-        });
-
-        // Determine git source: GitLab uses gitUrl, GitHub uses githubRepo.
-        // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
-        let gitParams: {
-          githubRepo?: string;
-          gitUrl?: string;
-          platform?: 'github' | 'gitlab';
-        };
-
-        if (gitlabProject) {
-          const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
-          const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
-          gitParams = { gitUrl, platform: PLATFORM.GITLAB };
-        } else {
-          gitParams = { githubRepo, platform: PLATFORM.GITHUB };
-        }
-
-        const result = await client.prepareSession({
+        return await client.prepareSession({
           ...restInput,
           ...gitParams,
           createdOnPlatform: 'cloud-agent-web',
           kilocodeOrganizationId: organizationId,
-          envVars: merged.envVars,
-          encryptedSecrets: merged.encryptedSecrets,
-          setupCommands: merged.setupCommands,
         });
-
-        return result;
       } catch (error) {
-        if (error instanceof ProfileNotFoundError) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: error.message });
-        }
         rethrowAsPaymentRequired(error);
         throw error;
       }

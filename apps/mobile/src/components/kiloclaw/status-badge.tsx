@@ -55,7 +55,7 @@ export function statusLabel(status: StatusValue | string): string {
 export function StatusBadge({
   status,
   className,
-}: Readonly<{ status: StatusValue; className?: string }>) {
+}: Readonly<{ status: StatusValue | string; className?: string }>) {
   const tone = statusTone(status);
   const label = statusLabel(status);
 

@@ -212,6 +212,20 @@ type SideEffectRequest =
       };
     }
   | {
+      action: 'process_paid_conversion';
+      input: {
+        userId: string;
+        dedupeKey: string;
+        eventDateIso: string;
+        orderId: string;
+        amount: number;
+        currencyCode: string;
+        itemCategory: string;
+        itemName: string;
+        itemSku?: string;
+      };
+    }
+  | {
       action: 'project_pending_kilo_pass_bonus';
       input: {
         userId: string;
@@ -232,9 +246,16 @@ type SideEffectResponse<T extends SideEffectRequest> = T['action'] extends 'send
       ? { repaired: boolean }
       : T['action'] extends 'enqueue_affiliate_event'
         ? { enqueued: boolean }
-        : T['action'] extends 'project_pending_kilo_pass_bonus'
-          ? { projectedBonusMicrodollars: number }
-          : { ok: true };
+        : T['action'] extends 'process_paid_conversion'
+          ? {
+              affiliateSaleEnqueued: boolean;
+              winningTouchType: 'referral' | 'affiliate' | 'none';
+              conversionId: string | null;
+              disqualificationReason: string | null;
+            }
+          : T['action'] extends 'project_pending_kilo_pass_bonus'
+            ? { projectedBonusMicrodollars: number }
+            : { ok: true };
 
 export class KiloClawApiError extends Error {
   readonly statusCode: number;
@@ -1004,6 +1025,50 @@ async function enqueueAffiliateEvent(
   );
 }
 
+type PaidConversionParams = {
+  userId: string;
+  dedupeKey: string;
+  eventDateIso: string;
+  orderId: string;
+  amount: number;
+  currencyCode: string;
+  itemCategory: string;
+  itemName: string;
+  itemSku?: string;
+};
+
+async function processPaidConversion(
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  params: PaidConversionParams
+): Promise<void> {
+  await callBillingSideEffect(
+    env,
+    context,
+    {
+      action: 'process_paid_conversion',
+      input: params,
+    },
+    { userId: params.userId }
+  );
+}
+
+async function processPaidConversionBestEffort(
+  env: BillingWorkerEnv,
+  context: SweepExecutionContext,
+  params: PaidConversionParams
+): Promise<void> {
+  try {
+    await processPaidConversion(env, context, params);
+  } catch (error) {
+    log('error', 'Paid conversion side effect failed after credit renewal', {
+      userId: params.userId,
+      dedupeKey: params.dedupeKey,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function autoResumeIfSuspended(
   env: BillingWorkerEnv,
   database: WorkerDb,
@@ -1302,10 +1367,8 @@ async function processCreditRenewalRow(
     });
 
     if (!deductionIsNew) {
-      await enqueueAffiliateEvent(env, context, {
+      await processPaidConversionBestEffort(env, context, {
         userId,
-        provider: 'impact',
-        eventType: 'sale',
         dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
         eventDateIso: renewalAt,
         orderId: deductionCategory,
@@ -1314,12 +1377,12 @@ async function processCreditRenewalRow(
         itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
         itemName: getKiloClawAffiliateItemName(effectivePlan),
         itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
-      }).catch(error => {
-        log('warn', 'Affiliate sale enqueue recovery failed during duplicate credit renewal', {
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
       });
+
+      await database
+        .update(kiloclaw_subscriptions)
+        .set({ credit_renewal_at: newPeriodEnd })
+        .where(eq(kiloclaw_subscriptions.id, row.id));
 
       summary.credit_renewals_skipped_duplicate++;
       return;
@@ -1357,10 +1420,8 @@ async function processCreditRenewalRow(
       });
     }
 
-    await enqueueAffiliateEvent(env, context, {
+    await processPaidConversionBestEffort(env, context, {
       userId,
-      provider: 'impact',
-      eventType: 'sale',
       dedupeKey: `affiliate:impact:sale:${deductionCategory}`,
       eventDateIso: renewalAt,
       orderId: deductionCategory,
@@ -1369,11 +1430,6 @@ async function processCreditRenewalRow(
       itemCategory: getKiloClawAffiliateItemCategory(effectivePlan),
       itemName: getKiloClawAffiliateItemName(effectivePlan),
       itemSku: getKiloClawAffiliateItemSku(env, effectivePlan),
-    }).catch(error => {
-      log('warn', 'Affiliate sale enqueue failed during credit renewal', {
-        userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
     });
 
     summary.credit_renewals++;

@@ -1,17 +1,16 @@
-import { getCachedSecret, verifyKiloToken } from '@kilocode/worker-utils';
+import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 
 export type AuthResult = { userId: string };
+export type AuthEnv = Pick<Env, 'HYPERDRIVE' | 'NEXTAUTH_SECRET' | 'WORKER_ENV'>;
 
 export async function authenticateToken(
   token: string | null,
-  env: Env
+  env: AuthEnv
 ): Promise<AuthResult | null> {
-  if (!token) return null;
-  try {
-    const secret = await getCachedSecret(env.NEXTAUTH_SECRET, 'NEXTAUTH_SECRET');
-    const payload = await verifyKiloToken(token, secret);
-    return { userId: payload.kiloUserId };
-  } catch {
-    return null;
-  }
+  return verifyKiloBearerAgainstCurrentPepper({
+    token,
+    nextAuthSecret: env.NEXTAUTH_SECRET,
+    workerEnv: env.WORKER_ENV,
+    connectionString: env.HYPERDRIVE.connectionString,
+  });
 }

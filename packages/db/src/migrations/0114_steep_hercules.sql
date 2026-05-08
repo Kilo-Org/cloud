@@ -1,0 +1,1 @@
+ALTER TABLE "app_builder_project_sessions" ALTER COLUMN "worker_version" SET DEFAULT 'v2';

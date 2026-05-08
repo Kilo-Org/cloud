@@ -69,14 +69,18 @@ supports only USD for seat billing.
   monthly, Teams annual, Enterprise monthly, Enterprise annual).
   This set is maintained in configuration and MUST be updated
   whenever pricing tiers are added or removed.
-- **Free-seat line item**: A subscription line item whose price is
-  not one of the known paid seat prices. These represent
-  promotional or complimentary seats and are excluded when
-  determining the resubscribe quantity.
-- **Seat metadata**: A subscription line item is considered a seat
-  line item when the associated subscription's metadata `type`
-  field equals `seats`, or when the line item's price ID is one of
-  the known paid seat prices.
+- **Seat line item**: A subscription line item whose associated
+  payment processor price product is the Teams or Enterprise seat
+  product. Paid seat line items use known paid seat prices.
+  Free-seat line items use another price under a seat product.
+- **Free-seat line item**: A seat line item whose price is not one
+  of the known paid seat prices. These represent promotional or
+  complimentary seats and are excluded when determining the
+  resubscribe quantity.
+- **Seat metadata**: Payment processor metadata used to classify
+  subscriptions or invoices as seat-related. Subscription metadata
+  `type` field value `seats` identifies seat subscriptions; known
+  paid seat price IDs can also identify seat invoice lines.
 - **Self-service creation flow**: The user-initiated flow for
   creating a new organization through the standard web UI, as
   opposed to administrative creation (admin panel, scripts, or
@@ -265,17 +269,14 @@ grants billing access without consuming a seat.
 8. The system MUST NOT update the organization's seat count for
    subscriptions in non-active statuses (e.g., incomplete, past
    due); the purchase record MUST still be created.
-9. The system MUST sum quantities across all line items in a
+9. The system MUST sum quantities across all seat line items in a
    subscription to compute the total seat count (to support
-   subscriptions with multiple price tiers). Currently, seat
-   subscriptions contain only seat-type line items (paid and
-   free); if non-seat line items are introduced in the future,
-   the counting logic MUST be updated to filter by seat-type
-   items only.
-10. The system MUST record the subscription amount as the gross total
-    (list-price unit amount times quantity) across all line items.
-    This value does not reflect discounts, promotion codes, or
-    coupons.
+   subscriptions with multiple seat price tiers), and MUST exclude
+   non-seat line items.
+10. The system MUST record the seat subscription amount as the gross
+    total (list-price unit amount times quantity) across all seat
+    line items. This value does not reflect discounts, promotion
+    codes, coupons, or non-seat line items.
 11. The system SHOULD record the net amount actually charged (after
     discounts) rather than the gross list price. This is SHOULD
     rather than MUST because the current payment processor API does
@@ -520,9 +521,9 @@ grants billing access without consuming a seat.
 
 ## Error Handling
 
-1. When a subscription event has no line items or the first line
-   item lacks a period end date, the system MUST reject the event
-   with an error.
+1. When a subscription event has no seat line items or no seat line
+   item has a period end date, the system MUST reject the event with
+   an error.
 2. When subscription metadata is missing or has invalid required
    fields (type, user ID, organization ID, or non-numeric seat
    value), the system MUST reject the event with a validation error.
@@ -558,6 +559,15 @@ in the current codebase:
    purchase records. (Currently records gross only.)
 
 ## Changelog
+
+### 2026-05-05 -- Mixed subscription line-item filtering
+
+- Updated seat line item definitions and Seat Count Updates rules 9-10
+  to require filtering subscription events to seat product line items
+  only, excluding non-seat add-ons from seat counts and recorded seat
+  subscription amount.
+- Updated Error Handling rule 1 to validate seat line item periods
+  rather than the first unfiltered line item.
 
 ### 2026-03-28/29 -- Spec audit and billing compliance
 

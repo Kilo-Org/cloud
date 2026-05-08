@@ -50,6 +50,7 @@ jobs:
       #   - container/         (COPY container/TOOLS.md → /usr/local/share/kiloclaw/)
       #   - plugins/kiloclaw-customizer/ (COPY plugin package for image install)
       #   - plugins/kilo-chat/         (COPY plugin package for image install)
+      #   - plugins/kiloclaw-morning-briefing/ (COPY plugin package for image install)
       #   - openclaw-pairing-list.js, openclaw-device-pairing-list.js (COPY)
       #   - skills/            (COPY skills/ → /root/clawd/skills/)
       #
@@ -70,16 +71,7 @@ jobs:
             fi
           done
 
-          CONTENT_HASH=$(
-            find Dockerfile controller/ container/ plugins/kiloclaw-customizer/ plugins/kilo-chat/ plugins/kiloclaw-morning-briefing/ skills/ \
-              openclaw-pairing-list.js openclaw-device-pairing-list.js \
-              -type f \
-              | sort \
-              | xargs sha256sum \
-              | sha256sum \
-              | cut -d' ' -f1 \
-              | cut -c1-12
-          )
+          CONTENT_HASH="$(scripts/image-content-hash.sh --hash --dockerfile Dockerfile)"
 
           if [ -z "$CONTENT_HASH" ] || [ ${#CONTENT_HASH} -ne 12 ]; then
             echo "::error::Failed to compute valid content hash"
@@ -412,6 +404,7 @@ jobs:
               echo "FLY_IMAGE_DIGEST=${DIGEST}"
             fi
             echo "OPENCLAW_VERSION=${OPENCLAW}"
+            echo "FLY_IMAGE_CONTENT_MODE=production"
             echo "FLY_IMAGE_CONTENT_HASH=${CONTENT}"
             echo '```'
             echo ""

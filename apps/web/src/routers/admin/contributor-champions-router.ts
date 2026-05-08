@@ -8,6 +8,7 @@ import {
   manualEnrollContributor,
   searchKiloUsersByEmail,
   syncContributorChampionData,
+  upgradeContributorChampionTier,
   upsertContributorSelectedTier,
 } from '@/lib/contributor-champions/service';
 import * as z from 'zod';
@@ -69,6 +70,26 @@ export const contributorChampionsRouter = createTRPCRouter({
         success: true,
         enrolledTier: result.enrolledTier,
         creditAmountUsd: result.creditAmountUsd,
+        creditGranted: result.creditGranted,
+      };
+    }),
+
+  upgradeTier: adminProcedure
+    .input(
+      z.object({
+        contributorId: z.string().uuid(),
+        newTier: TierSchema,
+      })
+    )
+    .mutation(async ({ input }) => {
+      const result = await upgradeContributorChampionTier({
+        contributorId: input.contributorId,
+        newTier: input.newTier,
+      });
+      return {
+        success: true,
+        upgradedTier: result.upgradedTier,
+        creditDifferentialUsd: result.creditDifferentialUsd,
         creditGranted: result.creditGranted,
       };
     }),

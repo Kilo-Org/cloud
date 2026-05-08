@@ -26,6 +26,25 @@ type SlackIntegrationDetailsProps = {
   error?: string;
 };
 
+const slackConnectionErrorMessages: Record<string, string> = {
+  workspace_already_connected:
+    'This Slack workspace is already connected to another Kilo account or organization. Disconnect it there before connecting it here.',
+};
+
+const duplicateSlackWorkspaceMigration = 'duplicate_slack_workspace_migration';
+
+function getSlackConnectionErrorMessage(error: string): string {
+  return slackConnectionErrorMessages[error] ?? `Connection failed: ${error}`;
+}
+
+function getSuspendedSlackIntegrationMessage(suspendedBy: string | null): string {
+  if (suspendedBy === duplicateSlackWorkspaceMigration) {
+    return 'This Slack integration was suspended because the workspace was also connected to another Kilo account or organization. It will not receive Slack messages. Disconnect the other Kilo connection for this Slack workspace, then re-install Slack here.';
+  }
+
+  return 'This Slack integration is suspended and will not receive Slack messages. Re-install Slack to restore the connection.';
+}
+
 export function SlackIntegrationDetails({
   organizationId,
   success,
@@ -127,7 +146,7 @@ export function SlackIntegrationDetails({
       toast.success('Slack connected successfully!');
     }
     if (error) {
-      toast.error(`Connection failed: ${error}`);
+      toast.error(getSlackConnectionErrorMessage(error));
     }
   }, [success, error]);
 
@@ -239,10 +258,19 @@ export function SlackIntegrationDetails({
 
   const isInstalled = installationData?.installed;
   const installation = installationData?.installation;
+  const isSuspended = installation?.status === 'suspended';
   const missingScopes = installation?.missingScopes ?? [];
 
   return (
     <div className="space-y-6">
+      {error && (
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Could not connect Slack</AlertTitle>
+          <AlertDescription>{getSlackConnectionErrorMessage(error)}</AlertDescription>
+        </Alert>
+      )}
+
       {isInstalled && missingScopes.length > 0 && (
         <Alert variant="warning">
           <AlertTriangle className="h-4 w-4" />
@@ -264,6 +292,24 @@ export function SlackIntegrationDetails({
         </Alert>
       )}
 
+      {installation && isSuspended && (
+        <Alert variant="warning">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Slack integration suspended</AlertTitle>
+          <AlertDescription className="gap-3">
+            <p>{getSuspendedSlackIntegrationMessage(installation.suspendedBy)}</p>
+            <Button
+              onClick={handleInstall}
+              disabled={isStartingSlackConnection || isFetchingOAuthUrl}
+              className="bg-yellow-400 text-yellow-950 hover:bg-yellow-300"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install Slack'}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Installation Status Card */}
       <Card>
         <CardHeader>
@@ -277,7 +323,12 @@ export function SlackIntegrationDetails({
                 Create PRs, debug code, ask questions about your repos, etc. directly from Slack
               </CardDescription>
             </div>
-            {isInstalled ? (
+            {isSuspended ? (
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Suspended
+              </Badge>
+            ) : isInstalled ? (
               <Badge variant="default" className="flex items-center gap-1">
                 <CheckCircle2 className="h-3 w-3" />
                 Connected
@@ -291,7 +342,7 @@ export function SlackIntegrationDetails({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isInstalled && installation ? (
+          {installation ? (
             <>
               {/* Installation Details */}
               <div className="space-y-3 rounded-lg border p-4">
@@ -319,6 +370,16 @@ export function SlackIntegrationDetails({
                       : 'Unknown'}
                   </span>
                 </div>
+                {isSuspended && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Suspended:</span>
+                    <span className="text-sm">
+                      {installation.suspendedAt
+                        ? new Date(installation.suspendedAt).toLocaleDateString()
+                        : 'Unknown'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Model Selection */}
@@ -345,11 +406,13 @@ export function SlackIntegrationDetails({
                     <RefreshCw className="mr-2 h-4 w-4" />
                     {isStartingSlackConnection || isFetchingOAuthUrl ? 'Loading...' : 'Re-install'}
                   </Button>
-                  <TestConnectionButton
-                    isPending={testConnection.isPending}
-                    state={connectionCheck}
-                    onClick={handleTestConnection}
-                  />
+                  {!isSuspended && (
+                    <TestConnectionButton
+                      isPending={testConnection.isPending}
+                      state={connectionCheck}
+                      onClick={handleTestConnection}
+                    />
+                  )}
                   <Button
                     variant="destructive"
                     onClick={handleUninstall}

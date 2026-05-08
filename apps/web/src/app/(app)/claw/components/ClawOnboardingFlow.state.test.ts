@@ -31,6 +31,8 @@ function createStatus(status: KiloClawDashboardStatus['status']): KiloClawDashbo
     flyVolumeId: null,
     flyRegion: status === null ? null : 'iad',
     machineSize: null,
+    instanceType: null,
+    volumeSizeGb: null,
     openclawVersion: null,
     imageVariant: null,
     trackedImageTag: null,
@@ -48,9 +50,11 @@ function createStatus(status: KiloClawDashboardStatus['status']): KiloClawDashbo
     botVibe: null,
     botEmoji: null,
     workerUrl: 'https://claw.kilo.ai',
+    controllerCapabilitiesVersion: null,
     instanceId: null,
     inboundEmailAddress: null,
     inboundEmailEnabled: false,
+    scheduledAction: null,
   };
 }
 
@@ -123,6 +127,15 @@ describe('ClawOnboardingFlow state machine', () => {
       getClawOnboardingFlowState(
         createInput({
           createSetupStarted: true,
+          onboardingStep: 'calendar',
+          hasBotIdentity: true,
+        })
+      ).renderStep
+    ).toBe('calendar');
+    expect(
+      getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
           onboardingStep: 'channels',
           hasBotIdentity: true,
         })
@@ -157,60 +170,68 @@ describe('ClawOnboardingFlow state machine', () => {
     ).toBe('complete');
   });
 
-  test('uses four steps only when the selected channel requires pairing', () => {
+  test('uses five steps only when the selected channel requires pairing', () => {
     const pairingTelegram = getClawOnboardingFlowState(
       createInput({ selectedChannelId: 'telegram' })
     );
-    expect(pairingTelegram.totalSteps).toBe(4);
+    expect(pairingTelegram.totalSteps).toBe(5);
     expect(pairingTelegram.currentStep).toBe(1);
 
     const pairingDiscord = getClawOnboardingFlowState(
       createInput({ selectedChannelId: 'discord' })
     );
-    expect(pairingDiscord.totalSteps).toBe(4);
+    expect(pairingDiscord.totalSteps).toBe(5);
     expect(pairingDiscord.currentStep).toBe(1);
 
     const noPairingSlack = getClawOnboardingFlowState(createInput({ selectedChannelId: 'slack' }));
-    expect(noPairingSlack.totalSteps).toBe(3);
+    expect(noPairingSlack.totalSteps).toBe(4);
     expect(noPairingSlack.currentStep).toBe(1);
 
     const defaultState = getClawOnboardingFlowState(createInput());
-    expect(defaultState.totalSteps).toBe(3);
+    expect(defaultState.totalSteps).toBe(4);
     expect(defaultState.currentStep).toBe(1);
   });
 
   test('getClawOnboardingStepProgress returns correct live current and total steps', () => {
     expect(getClawOnboardingStepProgress('identity', false)).toEqual({
       currentStep: 1,
-      totalSteps: 3,
+      totalSteps: 4,
+    });
+    expect(getClawOnboardingStepProgress('calendar', false)).toEqual({
+      currentStep: 2,
+      totalSteps: 4,
     });
     expect(getClawOnboardingStepProgress('channels', false)).toEqual({
-      currentStep: 2,
-      totalSteps: 3,
+      currentStep: 3,
+      totalSteps: 4,
     });
     expect(getClawOnboardingStepProgress('provisioning', false)).toEqual({
-      currentStep: 3,
-      totalSteps: 3,
-    });
-    expect(getClawOnboardingStepProgress('done', false)).toEqual({ currentStep: 3, totalSteps: 3 });
-
-    expect(getClawOnboardingStepProgress('identity', true)).toEqual({
-      currentStep: 1,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('channels', true)).toEqual({
-      currentStep: 2,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('provisioning', true)).toEqual({
-      currentStep: 3,
-      totalSteps: 4,
-    });
-    expect(getClawOnboardingStepProgress('pairing', true)).toEqual({
       currentStep: 4,
       totalSteps: 4,
     });
-    expect(getClawOnboardingStepProgress('done', true)).toEqual({ currentStep: 4, totalSteps: 4 });
+    expect(getClawOnboardingStepProgress('done', false)).toEqual({ currentStep: 4, totalSteps: 4 });
+
+    expect(getClawOnboardingStepProgress('identity', true)).toEqual({
+      currentStep: 1,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('calendar', true)).toEqual({
+      currentStep: 2,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('channels', true)).toEqual({
+      currentStep: 3,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('provisioning', true)).toEqual({
+      currentStep: 4,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('pairing', true)).toEqual({
+      currentStep: 5,
+      totalSteps: 5,
+    });
+    expect(getClawOnboardingStepProgress('done', true)).toEqual({ currentStep: 5, totalSteps: 5 });
   });
 
   test.each(CLAW_ONBOARDING_PROVISIONING_STATUSES)(
@@ -309,6 +330,173 @@ describe('ClawOnboardingFlow state machine', () => {
         createInput({ mode: 'post-provisioning', status: createStatus(null) })
       ).renderStep
     ).toBe('provisioning');
+  });
+
+  describe('when calendar step is hidden (non-admin user)', () => {
+    test('drops calendar from total step count', () => {
+      const noCalendarNoPairing = getClawOnboardingFlowState(
+        createInput({ hasCalendarStep: false })
+      );
+      expect(noCalendarNoPairing.totalSteps).toBe(3);
+      expect(noCalendarNoPairing.hasCalendarStep).toBe(false);
+
+      const noCalendarWithPairing = getClawOnboardingFlowState(
+        createInput({ hasCalendarStep: false, selectedChannelId: 'telegram' })
+      );
+      expect(noCalendarWithPairing.totalSteps).toBe(4);
+    });
+
+    test('redirects calendar render step to channels in create-first mode', () => {
+      const state = getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
+          onboardingStep: 'calendar',
+          hasBotIdentity: true,
+          hasCalendarStep: false,
+        })
+      );
+
+      expect(state.renderStep).toBe('channels');
+    });
+
+    test('redirects calendar render step to channels in post-provisioning mode', () => {
+      const state = getClawOnboardingFlowState(
+        createInput({
+          mode: 'post-provisioning',
+          status: createStatus('running'),
+          onboardingStep: 'calendar',
+          hasBotIdentity: true,
+          gatewayState: 'running',
+          hasCalendarStep: false,
+        })
+      );
+
+      expect(state.renderStep).toBe('channels');
+    });
+
+    test('reports channels as step 2 of 3 even when stored onboardingStep is calendar', () => {
+      // A non-admin briefly sitting on onboardingStep='calendar' (e.g. via a
+      // stale URL) gets normalized for both the rendered step and the
+      // progress indicator so the header doesn't read "Step 0 of 3".
+      const state = getClawOnboardingFlowState(
+        createInput({
+          createSetupStarted: true,
+          onboardingStep: 'calendar',
+          hasBotIdentity: true,
+          hasCalendarStep: false,
+        })
+      );
+
+      expect(state.renderStep).toBe('channels');
+      expect(state.currentStep).toBe(2);
+      expect(state.totalSteps).toBe(3);
+    });
+
+    test('getClawOnboardingStepProgress positions remaining steps correctly without calendar', () => {
+      expect(getClawOnboardingStepProgress('identity', false, false)).toEqual({
+        currentStep: 1,
+        totalSteps: 3,
+      });
+      expect(getClawOnboardingStepProgress('channels', false, false)).toEqual({
+        currentStep: 2,
+        totalSteps: 3,
+      });
+      expect(getClawOnboardingStepProgress('provisioning', false, false)).toEqual({
+        currentStep: 3,
+        totalSteps: 3,
+      });
+      expect(getClawOnboardingStepProgress('done', false, false)).toEqual({
+        currentStep: 3,
+        totalSteps: 3,
+      });
+
+      expect(getClawOnboardingStepProgress('identity', true, false)).toEqual({
+        currentStep: 1,
+        totalSteps: 4,
+      });
+      expect(getClawOnboardingStepProgress('pairing', true, false)).toEqual({
+        currentStep: 4,
+        totalSteps: 4,
+      });
+    });
+  });
+
+  test('renders calendar in post-provisioning mode when explicit resume is requested', () => {
+    // After the OAuth full-page reload, the wizard often remounts in
+    // post-provisioning mode because the instance row is now visible.
+    // The resume path sets onboardingStep='calendar' so the user lands
+    // back on the calendar step rather than getting auto-redirected.
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('running'),
+        onboardingStep: 'calendar',
+        hasBotIdentity: true,
+        gatewayState: 'running',
+      })
+    );
+
+    expect(state.renderStep).toBe('calendar');
+  });
+
+  test('renders calendar in post-provisioning mode even before the gateway is ready', () => {
+    // The OAuth round-trip can complete before the gateway boots; respect
+    // the calendar resume regardless of postProvisioningReady.
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('starting'),
+        onboardingStep: 'calendar',
+        hasBotIdentity: true,
+      })
+    );
+
+    expect(state.renderStep).toBe('calendar');
+  });
+
+  test('honors channels onboarding step in post-provisioning mode', () => {
+    // After the OAuth resume lands on calendar and the user clicks
+    // Continue/Skip to advance, onboardingStep flips to 'channels'. The
+    // post-prov branch should respect that rather than auto-completing.
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('running'),
+        onboardingStep: 'channels',
+        hasBotIdentity: true,
+        gatewayState: 'running',
+      })
+    );
+
+    expect(state.renderStep).toBe('channels');
+  });
+
+  test('honors provisioning onboarding step in post-provisioning mode', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('starting'),
+        onboardingStep: 'provisioning',
+        hasBotIdentity: true,
+      })
+    );
+
+    expect(state.renderStep).toBe('provisioning');
+  });
+
+  test('honors pairing onboarding step in post-provisioning mode for pairing channels', () => {
+    const state = getClawOnboardingFlowState(
+      createInput({
+        mode: 'post-provisioning',
+        status: createStatus('running'),
+        onboardingStep: 'pairing',
+        selectedChannelId: 'telegram',
+        hasBotIdentity: true,
+        gatewayState: 'running',
+      })
+    );
+
+    expect(state.renderStep).toBe('pairing');
   });
 
   test('renders complete in post-provisioning mode once the machine is running', () => {

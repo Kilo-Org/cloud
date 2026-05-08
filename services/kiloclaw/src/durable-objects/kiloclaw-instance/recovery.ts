@@ -1,9 +1,14 @@
 import type { PersistedState } from '../../schemas/instance-config';
 import type { KiloClawEnv } from '../../types';
 import * as fly from '../../fly/client';
-import { PREVIOUS_VOLUME_RETENTION_MS } from '../../config';
+import { PREVIOUS_VOLUME_RETENTION_MS, WORKER_CONTROLLER_CAPABILITIES_VERSION } from '../../config';
 import * as regionHelpers from '../regions';
-import { buildRuntimeSpec, guestFromSize, volumeNameFromSandboxId } from '../machine-config';
+import {
+  buildRuntimeSpec,
+  effectiveMachineSize,
+  guestFromSize,
+  volumeNameFromSandboxId,
+} from '../machine-config';
 import type { InstanceMutableState } from './types';
 import { getFlyConfig } from './types';
 import {
@@ -289,6 +294,7 @@ export async function completeUnexpectedStopRecovery(runtime: RecoveryRuntime): 
   state.lastStartedAt = now;
   state.lastRecoveryErrorMessage = null;
   state.lastRecoveryErrorAt = null;
+  state.controllerCapabilitiesVersion = WORKER_CONTROLLER_CAPABILITIES_VERSION;
   await runtime.persist({
     status: 'running',
     flyMachineId: state.flyMachineId,
@@ -302,6 +308,7 @@ export async function completeUnexpectedStopRecovery(runtime: RecoveryRuntime): 
     lastStartedAt: now,
     lastRecoveryErrorMessage: null,
     lastRecoveryErrorAt: null,
+    controllerCapabilitiesVersion: WORKER_CONTROLLER_CAPABILITIES_VERSION,
   });
 
   runtime.emitEvent({
@@ -378,7 +385,7 @@ export async function runUnexpectedStopRecoveryInBackground(
         {
           name: volumeNameFromSandboxId(state.sandboxId),
           source_volume_id: oldVolumeId,
-          compute: guestFromSize(state.machineSize),
+          compute: guestFromSize(effectiveMachineSize(state)),
         },
         regions,
         {
@@ -406,7 +413,7 @@ export async function runUnexpectedStopRecoveryInBackground(
       resolveRuntimeImageRef(state, env),
       envVars,
       bootstrapEnv,
-      state.machineSize,
+      effectiveMachineSize(state),
       identity,
       state.provider
     );

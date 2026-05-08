@@ -1,21 +1,46 @@
-FROM docker.io/cloudflare/sandbox:0.8.9
+FROM docker.io/cloudflare/sandbox:0.9.2
 
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
 ARG KILOCODE_CLI_VERSION="7.1.23"
 
-RUN mkdir -p -m 755 /etc/apt/keyrings \
-	&& out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-	&& cat $out | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
-	&& chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
-	&& mkdir -p -m 755 /etc/apt/sources.list.d \
-	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-	&& apt update \
-	&& apt install gh git-lfs jq -y
+# Install latest stable git + git-lfs from the git-core PPA, GitHub CLI, and supporting tools.
+# The default Ubuntu git (2.34.1 on 22.04) is outdated; the git-core PPA ships the latest
+# stable release. git-lfs is installed from the same PPA so it stays in lockstep with git,
+# and `git lfs install --system` enables LFS smudge/clean filters globally.
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		ca-certificates \
+		gnupg \
+		software-properties-common \
+		wget; \
+	add-apt-repository -y ppa:git-core/ppa; \
+	mkdir -p -m 755 /etc/apt/keyrings; \
+	out=$(mktemp); \
+	wget -nv -O "$out" https://cli.github.com/packages/githubcli-archive-keyring.gpg; \
+	cat "$out" | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null; \
+	chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg; \
+	mkdir -p -m 755 /etc/apt/sources.list.d; \
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+		| tee /etc/apt/sources.list.d/github-cli.list > /dev/null; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		git \
+		git-lfs \
+		gh \
+		jq \
+		openssh-client; \
+	git lfs install --system --skip-repo; \
+	apt-get clean; \
+	rm -rf /var/lib/apt/lists/*
 
-# Install GitLab CLI (glab) - download official .deb from GitLab releases
-RUN GLAB_VERSION="1.80.4" \
+# Install GitLab CLI (glab) - download official .deb from GitLab releases.
+# Version 1.82.0+ is required so OAuth2 access tokens sent via GITLAB_TOKEN are
+# authenticated with `Authorization: Bearer` instead of `PRIVATE-TOKEN` (which
+# GitLab rejects for OAuth tokens). Enabled via `GLAB_IS_OAUTH2=true` at runtime.
+RUN GLAB_VERSION="1.93.0" \
 	&& wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
 	&& dpkg -i /tmp/glab.deb \
 	&& rm /tmp/glab.deb

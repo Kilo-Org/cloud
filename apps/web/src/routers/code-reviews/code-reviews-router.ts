@@ -376,19 +376,44 @@ export const codeReviewRouter = createTRPCRouter({
       // This will: stop stream processing, update DB, and interrupt cloud agent session (kill processes)
       if (['running', 'queued'].includes(review.status)) {
         try {
-          await codeReviewWorkerClient.cancelReview(input.reviewId, 'Cancelled by user');
-          // Worker updates DB status and interrupts cloud agent session
+          const cancelResult = await codeReviewWorkerClient.cancelReview(
+            input.reviewId,
+            'Cancelled by user'
+          );
+          if (!cancelResult.success && review.status === 'queued' && !review.session_id) {
+            logExceptInTest(
+              '[cancel] Worker cancel returned false, cancelling queued review locally',
+              {
+                reviewId: input.reviewId,
+                status: review.status,
+              }
+            );
+            await cancelCodeReview(input.reviewId);
+            try {
+              await cancelPRGateCheck(review);
+            } catch (gateError) {
+              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            }
+            return successResult({ message: 'Code review cancelled successfully' });
+          }
+          if (!cancelResult.success) {
+            return failureResult('Worker could not cancel code review');
+          }
+          // Worker updates DB status and interrupts cloud agent session when cancellation succeeds.
           return successResult({ message: 'Code review cancelled successfully' });
         } catch (workerError) {
-          // If worker call fails, still update DB status as fallback
-          console.error('Worker cancel failed, updating DB directly:', workerError);
-          await cancelCodeReview(input.reviewId);
-          try {
-            await cancelPRGateCheck(review);
-          } catch (gateError) {
-            logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+          if (review.status === 'queued' && !review.session_id) {
+            console.error('Worker cancel failed, updating DB directly:', workerError);
+            await cancelCodeReview(input.reviewId);
+            try {
+              await cancelPRGateCheck(review);
+            } catch (gateError) {
+              logExceptInTest('[cancel] Failed to finalize PR gate check:', gateError);
+            }
+            return successResult({ message: 'Code review cancelled (worker unreachable)' });
           }
-          return successResult({ message: 'Code review cancelled (worker unreachable)' });
+          console.error('Worker cancel failed:', workerError);
+          return failureResult('Worker could not cancel code review');
         }
       }
 

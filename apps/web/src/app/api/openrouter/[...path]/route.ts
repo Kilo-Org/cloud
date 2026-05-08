@@ -2,7 +2,8 @@ import { NextResponse, type NextResponse as NextResponseType } from 'next/server
 import { type NextRequest } from 'next/server';
 import { isOpenCodeBasedClient, stripRequiredPrefix } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
-import { extractPromptInfo as extractChatCompletionsPromptInfo } from '@/lib/ai-gateway/processUsage';
+import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
+import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
 import {
   validateFeatureHeader,
   FEATURE_HEADER,
@@ -17,7 +18,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { openRouterRequest } from '@/lib/ai-gateway/providers/openrouter-request';
+import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user.server';
@@ -42,6 +43,7 @@ import {
   makeErrorReadable,
   modelDoesNotExistResponse,
   extractHeaderAndLimitLength,
+  noFreeModelsAvailableResponse,
   temporarilyUnavailableResponse,
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
@@ -83,9 +85,7 @@ import { isCloudflareIP } from '@/lib/cloudflare-ip';
 import { isKiloAutoModel, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/kilo-auto/resolution';
 import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
-import type { MicrodollarUsageContext, PromptInfo } from '@/lib/ai-gateway/processUsage.types';
-import { extractResponsesPromptInfo } from '@/lib/ai-gateway/processUsage.responses';
-import { extractMessagesPromptInfo } from '@/lib/ai-gateway/processUsage.messages';
+import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import {
   enableReasoningSummaries,
   fixResponsesRequest,
@@ -119,16 +119,6 @@ function validatePath(
     return { path: pathSuffix };
   }
   return { errorResponse: invalidPathResponse() };
-}
-
-function extractPromptInfo(requestBodyParsed: GatewayRequest): PromptInfo {
-  if (requestBodyParsed.kind === 'messages') {
-    return extractMessagesPromptInfo(requestBodyParsed.body);
-  }
-  if (requestBodyParsed.kind === 'responses') {
-    return extractResponsesPromptInfo(requestBodyParsed.body);
-  }
-  return extractChatCompletionsPromptInfo(requestBodyParsed.body);
 }
 
 async function resolveRateLimit(
@@ -216,10 +206,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const requestedModel = requestBodyParsed.body.model.trim();
   const requestedModelLowerCased = requestedModel.toLowerCase();
-  const isLegacyOpenRouterPath = url.pathname.includes('/openrouter');
 
   const feature = validateFeatureHeader(
-    request.headers.get(FEATURE_HEADER) || (isLegacyOpenRouterPath ? '' : 'direct-gateway')
+    request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
   );
 
   const authPromise = getUserFromAuth({ adminOnly: false });
@@ -237,7 +226,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let autoModel: string | null = null;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
-    await applyResolvedAutoModel(
+    const autoResult = await applyResolvedAutoModel(
       {
         model: requestedModelLowerCased,
         modeHeader,
@@ -250,6 +239,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       authPromise.then(res => res.user),
       balanceAndSettingsPromise.then(res => res.balance)
     );
+    if (autoResult.kind === 'no_free_models_available') {
+      return noFreeModelsAvailableResponse();
+    }
   }
 
   const originalModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
@@ -486,7 +478,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
 
   const openrouterRequestSpan = startInactiveSpan({
-    name: 'openrouter-request-start',
+    name: 'upstream-request-start',
     op: 'http.client',
   });
 
@@ -530,7 +522,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     fraudHeaders
   );
 
-  const response = await openRouterRequest({
+  const response = await upstreamRequest({
     path,
     search: url.search,
     method: request.method,

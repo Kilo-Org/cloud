@@ -59,7 +59,7 @@ export type SendMessageInput = {
  */
 export type SendMessageResult = {
   cloudAgentSessionId: string;
-  workerVersion: WorkerVersion;
+  workerVersion: 'v2';
 };
 
 /**
@@ -73,6 +73,8 @@ export type WorkerVersion = 'v1' | 'v2';
  * (the one fetched from the cloud-agent DO). Ended sessions have both as null.
  *
  * Used in ProjectManager.buildSessions() for routing decisions; not stored on sessions.
+ * Historical messages for ended legacy (v1) sessions are loaded lazily via
+ * the `getLegacySessionMessages` tRPC endpoint when the user expands them.
  */
 export type ProjectSessionInfo = {
   id: string;
@@ -88,8 +90,8 @@ export type ProjectSessionInfo = {
    */
   initiated: boolean | null;
   /**
-   * Whether the cloud agent session has been prepared (DO has state stored).
-   * - false: Legacy session — DO has no state, needs prepareLegacySession before messaging
+   * Whether the active cloud-agent-next session has been prepared (DO has state stored).
+   * - false: Session state could not be found or is not prepared
    * - true: Session is prepared and can use WebSocket-based messaging
    * - null: Ended session, unknown, or error state
    */

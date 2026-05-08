@@ -144,67 +144,62 @@ export async function prepareReviewPayload(
       const integration = await getIntegrationById(review.platform_integration_id);
 
       if (platform === 'github' && integration?.platform_installation_id) {
+        // Use the stored app type (defaults to 'standard' for existing integrations)
+        const appType: GitHubAppType = integration.github_app_type || 'standard';
+        // GitHub: Use installation token. Auth failures here (e.g. IP allow list
+        // blocking, suspended/uninstalled app) are hard failures: without a token
+        // we cannot clone private repos or post review comments. Let the error
+        // propagate so the user sees a meaningful failure on the review.
+        const tokenData = await generateGitHubInstallationToken(
+          integration.platform_installation_id,
+          appType
+        );
+        githubToken = tokenData.token;
+
+        // Build complete review state for intelligent update/create decisions
         try {
-          // Use the stored app type (defaults to 'standard' for existing integrations)
-          const appType: GitHubAppType = integration.github_app_type || 'standard';
-          // GitHub: Use installation token
-          const tokenData = await generateGitHubInstallationToken(
-            integration.platform_installation_id,
-            appType
-          );
-          githubToken = tokenData.token;
+          const [repoOwner, repoName] = review.repo_full_name.split('/');
 
-          // Build complete review state for intelligent update/create decisions
-          try {
-            const [repoOwner, repoName] = review.repo_full_name.split('/');
+          // Fetch all state in parallel for efficiency
+          const [summaryComment, inlineComments, headCommitSha] = await Promise.all([
+            findKiloReviewComment(
+              integration.platform_installation_id,
+              repoOwner,
+              repoName,
+              review.pr_number,
+              appType
+            ),
+            fetchPRInlineComments(
+              integration.platform_installation_id,
+              repoOwner,
+              repoName,
+              review.pr_number,
+              appType
+            ),
+            getPRHeadCommit(
+              integration.platform_installation_id,
+              repoOwner,
+              repoName,
+              review.pr_number,
+              appType
+            ),
+          ]);
 
-            // Fetch all state in parallel for efficiency
-            const [summaryComment, inlineComments, headCommitSha] = await Promise.all([
-              findKiloReviewComment(
-                integration.platform_installation_id,
-                repoOwner,
-                repoName,
-                review.pr_number,
-                appType
-              ),
-              fetchPRInlineComments(
-                integration.platform_installation_id,
-                repoOwner,
-                repoName,
-                review.pr_number,
-                appType
-              ),
-              getPRHeadCommit(
-                integration.platform_installation_id,
-                repoOwner,
-                repoName,
-                review.pr_number,
-                appType
-              ),
-            ]);
+          existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
 
-            existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
-
-            logExceptInTest('[prepareReviewPayload] Built GitHub review state', {
-              reviewId,
-              hasSummary: !!summaryComment,
-              inlineCount: inlineComments.length,
-              previousStatus: existingReviewState.previousStatus,
-              headCommitSha: headCommitSha.substring(0, 8),
-            });
-          } catch (stateLookupError) {
-            // Non-critical - continue without state info
-            logExceptInTest('[prepareReviewPayload] Failed to build GitHub review state:', {
-              reviewId,
-              error: stateLookupError,
-            });
-          }
-        } catch (authError) {
-          captureException(authError, {
-            tags: { operation: 'prepareReviewPayload', step: 'get-github-token' },
-            extra: { reviewId, platformIntegrationId: review.platform_integration_id },
+          logExceptInTest('[prepareReviewPayload] Built GitHub review state', {
+            reviewId,
+            hasSummary: !!summaryComment,
+            inlineCount: inlineComments.length,
+            previousStatus: existingReviewState.previousStatus,
+            headCommitSha: headCommitSha.substring(0, 8),
           });
-          // Continue without token - cloud agent may still work with public repos
+        } catch (stateLookupError) {
+          // Non-critical - continue without state info
+          logExceptInTest('[prepareReviewPayload] Failed to build GitHub review state:', {
+            reviewId,
+            error: stateLookupError,
+          });
         }
       } else if (platform === PLATFORM.GITLAB && integration) {
         // GitLab: Use Project Access Token (PrAT) for all operations

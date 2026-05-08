@@ -60,9 +60,11 @@ import {
   Stethoscope,
   CheckCircle2,
   XCircle,
+  Shield,
   ShieldAlert,
   Activity,
   Copy,
+  CalendarClock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -77,9 +79,30 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
+import {
+  canUpgradeTo,
+  DEFAULT_INSTANCE_TIER,
+  formatTierHardware,
+  getTier,
+  INSTANCE_TIERS,
+  InstanceTierKeySchema,
+  OFFERED_TIERS,
+  type InstanceTierKey,
+  type InstanceType,
+} from '@kilocode/kiloclaw-instance-tiers';
+import {
+  ADMIN_SIZE_OVERRIDE_PRESETS,
+  type AdminSizeOverridePreset,
+} from '@/lib/kiloclaw/admin-size-override';
+import {
+  defaultScheduledAt,
+  defaultNotifyFormState,
+  type NotifyFormState,
+} from '@/lib/kiloclaw/scheduled-action-form';
+import { ScheduleNotifyFields } from '../KiloclawScheduler/ScheduleNotifyFields';
 import { AdminFileEditor } from './AdminFileEditor';
 import { KiloCliRunCard } from './KiloCliRunCard';
-import { BumpVolumeTo15GbButton } from './BumpVolumeTo15GbDialog';
+import { ExtendVolumeButton } from './ExtendVolumeDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useKiloclawInstanceEvents,
@@ -97,6 +120,35 @@ function formatEpochTime(epoch: number | null): string {
 function formatEpochRelativeTime(epoch: number | null): string {
   if (epoch === null) return '—';
   return formatDistanceToNow(new Date(epoch), { addSuffix: true });
+}
+
+function InstanceTypeBadge({ instanceType }: { instanceType: InstanceType | null }) {
+  if (!instanceType) {
+    return <Badge variant="outline">Unknown</Badge>;
+  }
+  if (instanceType === 'custom') {
+    return <Badge variant="secondary">Custom</Badge>;
+  }
+  const tier = getTier(instanceType);
+  return tier.status === 'legacy' ? (
+    <Badge variant="secondary">{instanceType} (legacy)</Badge>
+  ) : (
+    <Badge>{instanceType}</Badge>
+  );
+}
+
+function canResizeToTier(
+  current: InstanceType | null,
+  machineSize: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' } | null,
+  volumeSizeGb: number | null,
+  target: InstanceTierKey
+): boolean {
+  return canUpgradeTo({
+    currentType: current,
+    currentSize: machineSize,
+    currentVolumeSizeGb: volumeSizeGb,
+    targetTier: target,
+  });
 }
 
 function useControllerTelemetryDiskUsage(sandboxId: string) {
@@ -1252,10 +1304,17 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [restoreConfigDialogOpen, setRestoreConfigDialogOpen] = useState(false);
   const [destroyMachineDialogOpen, setDestroyMachineDialogOpen] = useState(false);
   const [resizeMachineDialogOpen, setResizeMachineDialogOpen] = useState(false);
-  const [selectedMachineSize, setSelectedMachineSize] = useState<string>('performance-1x');
+  const [selectedInstanceType, setSelectedInstanceType] =
+    useState<InstanceTierKey>(DEFAULT_INSTANCE_TIER);
   const [resizeConfirmText, setResizeConfirmText] = useState('');
   const [changeVersionDialogOpen, setChangeVersionDialogOpen] = useState(false);
   const [changeVersionSelectedTag, setChangeVersionSelectedTag] = useState<string>('');
+  const [changeVersionMode, setChangeVersionMode] = useState<'now' | 'scheduled'>('now');
+  const [changeVersionScheduledAt, setChangeVersionScheduledAt] =
+    useState<string>(defaultScheduledAt);
+  const [changeVersionNotify, setChangeVersionNotify] =
+    useState<NotifyFormState>(defaultNotifyFormState);
+  const [upgradeLatestConfirmOpen, setUpgradeLatestConfirmOpen] = useState(false);
   const [resizePhase, setResizePhase] = useState<
     'idle' | 'stopping' | 'resizing' | 'starting' | 'waiting' | 'done' | 'error'
   >('idle');
@@ -1267,6 +1326,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const [cleanupRecoveryVolumeDialogOpen, setCleanupRecoveryVolumeDialogOpen] = useState(false);
   const [inboundEmailCycleDialogOpen, setInboundEmailCycleDialogOpen] = useState(false);
   const [awaitingRestoreCompletion, setAwaitingRestoreCompletion] = useState(false);
+  const [sizeOverrideDialogOpen, setSizeOverrideDialogOpen] = useState(false);
+  const [sizeOverrideMode, setSizeOverrideMode] = useState<'set' | 'clear'>('set');
+  const [sizeOverridePreset, setSizeOverridePreset] = useState<AdminSizeOverridePreset>('perf-4-8');
+  const [sizeOverrideReason, setSizeOverrideReason] = useState('');
 
   const { data, isLoading, error } = useQuery({
     ...trpc.admin.kiloclawInstances.get.queryOptions({ id: instanceId }),
@@ -1299,6 +1362,17 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
       limit: 100,
     })
   );
+
+  // Pending scheduled actions targeting this instance. Powers the
+  // upcoming-action indicator inside the Runtime Controls card. The
+  // mutation hooks below also invalidate this on success so a freshly
+  // scheduled or cancelled action surfaces immediately.
+  const { data: upcomingScheduledActionsData } = useQuery(
+    trpc.admin.kiloclawInstances.listUpcomingScheduledActionsForInstance.queryOptions({
+      instanceId,
+    })
+  );
+  const upcomingScheduledActions = upcomingScheduledActionsData?.items ?? [];
 
   const sandboxId = data?.sandbox_id;
   const aeDiskUsage = useControllerTelemetryDiskUsage(sandboxId ?? '');
@@ -1347,6 +1421,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const provider = data?.workerStatus?.provider ?? null;
   const isFlyProvider = provider === 'fly';
+  const isNorthflankProvider = provider === 'northflank';
   const runtimeId = data?.workerStatus?.runtimeId ?? null;
   const storageId = data?.workerStatus?.storageId ?? null;
   const flyMachineId = data?.workerStatus?.flyMachineId ?? null;
@@ -1483,6 +1558,16 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     data?.destroyed_at === null &&
     data?.workerStatus?.status !== 'restoring' &&
     data?.workerStatus?.status !== 'recovering';
+  const nextResizeTier = data?.workerStatus
+    ? OFFERED_TIERS.find(tier =>
+        canResizeToTier(
+          data.workerStatus?.instanceType ?? null,
+          data.workerStatus?.machineSize ?? null,
+          data.workerStatus?.volumeSizeGb ?? null,
+          tier
+        )
+      )
+    : undefined;
   const hasRuntime = !!runtimeId;
   const hasFlyMachine = isFlyProvider && !!flyMachineId;
   const canRetryMetadataRecovery =
@@ -1601,6 +1686,78 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     })
   );
 
+  // Scheduled-version-change path. Used by the "Schedule for later" tab
+  // in the Change Version dialog. Routes through scheduleAction with a
+  // single-element instanceIds array.
+  const { mutateAsync: scheduleVersionChange, isPending: isSchedulingVersionChange } = useMutation(
+    trpc.admin.kiloclawInstances.scheduleAction.mutationOptions({
+      onSuccess: () => {
+        toast.success('Version change scheduled');
+        setChangeVersionDialogOpen(false);
+        setChangeVersionSelectedTag('');
+        setChangeVersionMode('now');
+        // Surface the new row in the Scheduler tab list if open.
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.listScheduledActions.queryKey(),
+        });
+        // Refresh the upcoming-action indicator on this page.
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.listUpcomingScheduledActionsForInstance.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to schedule: ${err.message}`);
+      },
+    })
+  );
+
+  // Cancel a scheduled action from the indicator on this page.
+  const { mutate: cancelScheduledAction, isPending: isCancellingScheduledAction } = useMutation(
+    trpc.admin.kiloclawInstances.cancelScheduledAction.mutationOptions({
+      onSuccess: () => {
+        toast.success('Scheduled action cancelled');
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.listUpcomingScheduledActionsForInstance.queryKey(),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.listScheduledActions.queryKey(),
+        });
+      },
+      onError: err => {
+        toast.error(`Failed to cancel: ${err.message}`);
+      },
+    })
+  );
+
+  // Per-target cancel — drops just this instance from a bulk schedule.
+  const { mutate: cancelScheduledActionTarget, isPending: isCancellingScheduledActionTarget } =
+    useMutation(
+      trpc.admin.kiloclawInstances.cancelScheduledActionTarget.mutationOptions({
+        onSuccess: () => {
+          toast.success('Cancelled this instance from the scheduled action');
+          void queryClient.invalidateQueries({
+            queryKey:
+              trpc.admin.kiloclawInstances.listUpcomingScheduledActionsForInstance.queryKey(),
+          });
+          void queryClient.invalidateQueries({
+            queryKey: trpc.admin.kiloclawInstances.listScheduledActions.queryKey(),
+          });
+        },
+        onError: err => {
+          toast.error(`Failed to cancel: ${err.message}`);
+        },
+      })
+    );
+
+  // Cancel-confirm dialog state. Holds the action being cancelled so the
+  // dialog can show the right context (single-instance vs bulk).
+  type CancelDialogTarget = {
+    scheduledActionId: string;
+    actionType: 'scheduled_restart' | 'version_change';
+    targetCount: number;
+  };
+  const [cancelDialogTarget, setCancelDialogTarget] = useState<CancelDialogTarget | null>(null);
+
   const {
     mutateAsync: destroyFlyMachine,
     isPending: isDestroyingFlyMachine,
@@ -1623,12 +1780,69 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     trpc.admin.kiloclawInstances.resizeMachine.mutationOptions()
   );
 
+  const { mutateAsync: setSizeOverrideMutation, isPending: isSettingSizeOverride } = useMutation(
+    trpc.admin.kiloclawInstances.setAdminMachineSizeOverride.mutationOptions({
+      onSuccess: result => {
+        toast.success(
+          `Admin override set: ${result.newOverride.cpus}× ${result.newOverride.cpu_kind ?? 'shared'}, ${result.newOverride.memory_mb}MB`
+        );
+        invalidateMachineQueries();
+        setSizeOverrideDialogOpen(false);
+        setSizeOverrideReason('');
+      },
+      onError: err => {
+        toast.error(`Failed to set admin override: ${err.message}`);
+      },
+    })
+  );
+
+  const { mutateAsync: clearSizeOverrideMutation, isPending: isClearingSizeOverride } = useMutation(
+    trpc.admin.kiloclawInstances.clearAdminMachineSizeOverride.mutationOptions({
+      onSuccess: () => {
+        toast.success('Admin override cleared');
+        invalidateMachineQueries();
+        setSizeOverrideDialogOpen(false);
+        setSizeOverrideReason('');
+      },
+      onError: err => {
+        toast.error(`Failed to clear admin override: ${err.message}`);
+      },
+    })
+  );
+
+  const isMutatingSizeOverride = isSettingSizeOverride || isClearingSizeOverride;
+
+  const handleSizeOverrideSubmit = async () => {
+    if (!data || !userId) return;
+    if (sizeOverrideReason.trim().length < 10) {
+      toast.error('Reason must be at least 10 characters');
+      return;
+    }
+    if (sizeOverrideMode === 'set') {
+      await setSizeOverrideMutation({
+        userId,
+        instanceId,
+        preset: sizeOverridePreset,
+        reason: sizeOverrideReason.trim(),
+      });
+    } else {
+      await clearSizeOverrideMutation({
+        userId,
+        instanceId,
+        reason: sizeOverrideReason.trim(),
+      });
+    }
+  };
+
   const isResizingMachine =
     resizePhase !== 'idle' && resizePhase !== 'done' && resizePhase !== 'error';
 
   // Poll status during resize phases
   const resizePolling =
-    resizePhase === 'stopping' || resizePhase === 'starting' || resizePhase === 'waiting';
+    resizePhase === 'stopping' ||
+    resizePhase === 'starting' ||
+    resizePhase === 'waiting' ||
+    (isNorthflankProvider && resizePhase === 'resizing');
   useQuery({
     queryKey: ['machine-resize-poll', userId, instanceId, resizePolling],
     queryFn: async () => {
@@ -1652,19 +1866,22 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     setResizeConfirmText('');
     setResizeError(null);
 
-    const sizeMap: Record<
-      string,
-      { cpus: number; memory_mb: number; cpu_kind: 'shared' | 'performance' }
-    > = {
-      'shared-cpu-2x': { cpus: 2, memory_mb: 3072, cpu_kind: 'shared' },
-      'shared-cpu-4x': { cpus: 4, memory_mb: 3072, cpu_kind: 'shared' },
-      'performance-1x': { cpus: 1, memory_mb: 3072, cpu_kind: 'performance' },
-      'performance-2x': { cpus: 2, memory_mb: 4096, cpu_kind: 'performance' },
-    };
-    const machineSize = sizeMap[selectedMachineSize];
-    if (!machineSize || !data || !userId) return;
+    if (!data || !userId) return;
 
     try {
+      if (isNorthflankProvider) {
+        setResizePhase('resizing');
+        await resizeMachineMutation({
+          userId,
+          instanceId: data.id,
+          instanceType: selectedInstanceType,
+        });
+        invalidateMachineQueries();
+        setResizePhase('done');
+        toast.success('Northflank resize completed');
+        return;
+      }
+
       // Step 1: Stop if running — retry up to 3 times since Fly can be slow
       if (currentStatus !== 'stopped') {
         setResizePhase('stopping');
@@ -1693,7 +1910,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
       // Step 2: Update DO state
       setResizePhase('resizing');
-      await resizeMachineMutation({ userId, instanceId: data.id, machineSize });
+      await resizeMachineMutation({
+        userId,
+        instanceId: data.id,
+        instanceType: selectedInstanceType,
+      });
 
       // Step 3: Start with new size
       setResizePhase('starting');
@@ -2008,6 +2229,95 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </DetailField>
             </div>
 
+            <div className="flex items-start gap-2">
+              <CalendarClock className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+              <DetailField label="Upcoming scheduled action">
+                {upcomingScheduledActions.length === 0 ? (
+                  <span className="text-muted-foreground">None</span>
+                ) : upcomingScheduledActions.length === 1 ? (
+                  <div className="flex flex-col gap-1">
+                    {/* Row 1: action_type + run-at + Cancel. Yellow on
+                        action_type per design.md status palette
+                        (warnings/attention). Inline emphasis since this
+                        lives in a detail row, not a status pill. */}
+                    <div className="flex flex-wrap items-center gap-x-2">
+                      <code className="font-mono text-sm font-medium text-yellow-400">
+                        {upcomingScheduledActions[0].action_type}
+                      </code>
+                      {upcomingScheduledActions[0].scheduled_at && (
+                        <span
+                          className="text-foreground font-mono text-sm"
+                          title={new Date(
+                            upcomingScheduledActions[0].scheduled_at
+                          ).toLocaleString()}
+                        >
+                          at {new Date(upcomingScheduledActions[0].scheduled_at).toLocaleString()}
+                        </span>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-xs"
+                        onClick={() =>
+                          setCancelDialogTarget({
+                            scheduledActionId: upcomingScheduledActions[0].scheduled_action_id,
+                            actionType: upcomingScheduledActions[0].action_type,
+                            targetCount: upcomingScheduledActions[0].target_count,
+                          })
+                        }
+                        disabled={isCancellingScheduledAction || isCancellingScheduledActionTarget}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                    {/* Row 2: source → target tag (version_change only).
+                        Each tag is rendered as `image_tag (OpenClaw vN)`
+                        when the catalog still has the version. */}
+                    {upcomingScheduledActions[0].target_image_tag && (
+                      <div className="text-muted-foreground font-mono text-xs">
+                        {upcomingScheduledActions[0].source_image_tag ? (
+                          <>
+                            {upcomingScheduledActions[0].source_image_tag}
+                            {upcomingScheduledActions[0].source_openclaw_version && (
+                              <span>
+                                {' '}
+                                (OpenClaw {upcomingScheduledActions[0].source_openclaw_version})
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                        <span className="mx-1">→</span>
+                        {upcomingScheduledActions[0].target_image_tag}
+                        {upcomingScheduledActions[0].target_openclaw_version && (
+                          <span>
+                            {' '}
+                            (OpenClaw {upcomingScheduledActions[0].target_openclaw_version})
+                          </span>
+                        )}
+                        {upcomingScheduledActions[0].override_pins ? (
+                          <span className="ml-2 text-yellow-400">override pins</span>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="flex flex-wrap items-center gap-x-2">
+                    <span className="font-medium text-yellow-400">
+                      {upcomingScheduledActions.length} upcoming
+                    </span>
+                    <Link
+                      href={`/admin/kiloclaw?tab=scheduler`}
+                      className="text-blue-600 text-xs hover:underline"
+                    >
+                      view all
+                    </Link>
+                  </span>
+                )}
+              </DetailField>
+            </div>
+
             <div className="flex items-center gap-2">
               <Calendar className="text-muted-foreground h-4 w-4 shrink-0" />
               <DetailField label="Inactive Trial Stopped At">
@@ -2293,6 +2603,36 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <AlertDescription>{data.workerStatusError}</AlertDescription>
               </Alert>
             )}
+            {data.workerStatus?.adminMachineSizeOverride && (
+              <Alert className="mb-4 border-amber-500/30 bg-amber-500/10">
+                <Shield className="h-4 w-4 text-amber-500" />
+                <AlertDescription className="text-amber-700 dark:text-amber-300">
+                  {/* Wrap in a single <p> so AlertDescription's grid layout
+                      doesn't put each inline child on its own row. */}
+                  <p>
+                    <span className="font-medium">
+                      Admin size override: {data.workerStatus.adminMachineSizeOverride.cpus}×{' '}
+                      {data.workerStatus.adminMachineSizeOverride.cpu_kind ?? 'shared'},{' '}
+                      {data.workerStatus.adminMachineSizeOverride.memory_mb}MB
+                    </span>
+                    {data.workerStatus.adminMachineSizeOverrideMetadata && (
+                      <>
+                        {' · '}
+                        <strong>
+                          {data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail}
+                        </strong>
+                        {', '}
+                        {formatEpochRelativeTime(
+                          data.workerStatus.adminMachineSizeOverrideMetadata.setAt
+                        )}
+                        {' — '}
+                        <em>{data.workerStatus.adminMachineSizeOverrideMetadata.reason}</em>
+                      </>
+                    )}
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
             {data.workerStatus ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <DetailField label="DO Status">
@@ -2349,6 +2689,29 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
                 <div className="flex items-center gap-2">
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <DetailField label="Instance Tier">
+                    <span className="flex items-center gap-2">
+                      <InstanceTypeBadge instanceType={data.workerStatus.instanceType ?? null} />
+                      {data.workerStatus.adminMachineSizeOverride && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                          title={
+                            data.workerStatus.adminMachineSizeOverrideMetadata
+                              ? `Set by ${data.workerStatus.adminMachineSizeOverrideMetadata.actorEmail} — ${data.workerStatus.adminMachineSizeOverrideMetadata.reason}`
+                              : 'Admin override active'
+                          }
+                        >
+                          <Shield className="mr-1 h-3 w-3" />
+                          Override
+                        </Badge>
+                      )}
+                    </span>
+                  </DetailField>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Server className="text-muted-foreground h-4 w-4 shrink-0" />
                   <DetailField label="Machine Size">
                     {data.workerStatus.machineSize ? (
                       <code className="text-sm">
@@ -2361,6 +2724,13 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         default (performance-1x, 3072MB)
                       </span>
                     )}
+                  </DetailField>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <HardDrive className="text-muted-foreground h-4 w-4 shrink-0" />
+                  <DetailField label="Volume Size">
+                    {data.workerStatus.volumeSizeGb ? `${data.workerStatus.volumeSizeGb} GB` : '—'}
                   </DetailField>
                 </div>
 
@@ -2748,7 +3118,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={machineActionPending || machineRestartBlocked || !hasRuntime}
+                    disabled={
+                      machineActionPending ||
+                      machineRestartBlocked ||
+                      !hasRuntime ||
+                      !!data.destroyed_at
+                    }
                     onClick={() => {
                       // Pre-flight: if a pin exists, route through the
                       // Change Version dialog so the admin can see and
@@ -2760,7 +3135,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         setChangeVersionDialogOpen(true);
                         return;
                       }
-                      void machineUpgrade({ instanceId: data.id, imageTag: 'latest' });
+                      // Open the confirm dialog instead of firing
+                      // immediately. This action interrupts the user's
+                      // session with no notice; we want a clear consent
+                      // step before proceeding.
+                      setUpgradeLatestConfirmOpen(true);
                     }}
                   >
                     {isMachineUpgrading ? (
@@ -2768,14 +3147,22 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     ) : (
                       <ArrowUpCircle className="mr-1 h-4 w-4" />
                     )}
-                    Upgrade to Latest
+                    Upgrade to Latest Now
                   </Button>
                 )}
                 {supportsImageTagOverride && (
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={machineActionPending || machineRestartBlocked || !hasRuntime}
+                    // Disable on destroyed instances. The backend rejects
+                    // both immediate and scheduled paths anyway; better to
+                    // not surface a button that always errors out.
+                    disabled={
+                      machineActionPending ||
+                      machineRestartBlocked ||
+                      !hasRuntime ||
+                      !!data.destroyed_at
+                    }
                     onClick={() => setChangeVersionDialogOpen(true)}
                   >
                     {isChangingVersion ? (
@@ -2789,21 +3176,52 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={machineActionPending || isResizingMachine}
+                  disabled={machineActionPending || isResizingMachine || !nextResizeTier}
                   onClick={() => {
-                    const ms = data?.workerStatus?.machineSize;
-                    const key = ms
-                      ? ms.cpu_kind === 'performance'
-                        ? `performance-${ms.cpus}x`
-                        : `shared-cpu-${ms.cpus}x`
-                      : 'performance-1x';
-                    setSelectedMachineSize(key);
+                    if (!nextResizeTier) return;
+                    setSelectedInstanceType(nextResizeTier);
                     setResizeMachineDialogOpen(true);
                   }}
                 >
                   <ArrowUpDown className="mr-1 h-4 w-4" />
                   Resize Runtime
                 </Button>
+                {(isFlyProvider || data?.workerStatus?.provider === 'docker-local') && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={
+                      data?.workerStatus?.adminMachineSizeOverride
+                        ? 'border-amber-500 text-amber-500 hover:bg-amber-500/10'
+                        : ''
+                    }
+                    // Button stays clickable when the instance is running so
+                    // admins can discover the affordance; the dialog itself
+                    // disables Set/Clear until the machine is stopped and
+                    // surfaces an inline "must be stopped" message. The DO RPC
+                    // is the authoritative guard.
+                    disabled={
+                      machineActionPending ||
+                      isResizingMachine ||
+                      isMutatingSizeOverride ||
+                      !hasRuntime ||
+                      !!data?.destroyed_at
+                    }
+                    onClick={() => {
+                      setSizeOverrideMode(
+                        data?.workerStatus?.adminMachineSizeOverride ? 'clear' : 'set'
+                      );
+                      setSizeOverrideReason('');
+                      setSizeOverridePreset('perf-4-8');
+                      setSizeOverrideDialogOpen(true);
+                    }}
+                  >
+                    <Shield className="mr-1 h-4 w-4" />
+                    {data?.workerStatus?.adminMachineSizeOverride
+                      ? 'Clear Size Override'
+                      : 'Size Override…'}
+                  </Button>
+                )}
                 {isFlyProvider && (
                   <Button
                     size="sm"
@@ -2894,7 +3312,10 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                 <div className="space-y-1">
                   <p className="text-sm font-medium">
                     {resizePhase === 'stopping' && 'Stopping machine...'}
-                    {resizePhase === 'resizing' && 'Updating machine size...'}
+                    {resizePhase === 'resizing' &&
+                      (isNorthflankProvider
+                        ? 'Resizing Northflank deployment...'
+                        : 'Updating machine size...')}
                     {resizePhase === 'starting' && 'Starting machine with new size...'}
                     {resizePhase === 'waiting' && 'Waiting for machine to be ready...'}
                   </p>
@@ -2941,9 +3362,11 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               <div className="flex items-center gap-3 rounded border border-green-600/30 bg-green-600/5 p-4">
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
                 <div>
-                  <p className="text-sm font-medium text-green-600">Machine resize complete</p>
+                  <p className="text-sm font-medium text-green-600">Runtime resize complete</p>
                   <p className="text-muted-foreground text-xs">
-                    Machine is running with the new size.
+                    {isNorthflankProvider
+                      ? 'Northflank completed the deployment rollout.'
+                      : 'Machine is running with the new size.'}
                   </p>
                 </div>
                 <Button
@@ -2997,45 +3420,95 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-orange-500">
                 <AlertTriangle className="h-5 w-5" />
-                Resize Machine
+                Resize runtime
               </DialogTitle>
               <DialogDescription className="pt-3">
-                This will stop the machine, update its CPU/memory spec, and restart it. The user
-                will be disconnected during the restart.
+                {isNorthflankProvider
+                  ? 'Northflank will resize this instance by rolling the deployment onto the target compute plan. The instance may restart during the rollout.'
+                  : 'This will stop the machine, update its CPU/memory and storage spec, and restart it. The user will be disconnected during the restart.'}
                 <span className="text-foreground mt-2 block font-medium">
                   User: {data?.user_email ?? data?.user_id}
                 </span>
-                {data?.workerStatus?.machineSize ? (
-                  <span className="mt-2 block text-sm">
-                    Current:{' '}
-                    <code className="text-xs">
-                      {data.workerStatus.machineSize.cpu_kind ?? 'shared'}-cpu-
-                      {data.workerStatus.machineSize.cpus}x,{' '}
-                      {data.workerStatus.machineSize.memory_mb}MB
-                    </code>
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground mt-2 block text-sm">
-                    Current: default (performance-1x, 3072MB)
-                  </span>
-                )}
+                <span className="mt-2 flex items-center gap-2 text-sm">
+                  Current:{' '}
+                  <InstanceTypeBadge instanceType={data?.workerStatus?.instanceType ?? null} />
+                </span>
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <label className="text-sm font-medium">New size</label>
+                <label className="text-sm font-medium">New tier</label>
                 <select
                   className="bg-background border-input mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                  value={selectedMachineSize}
-                  onChange={e => setSelectedMachineSize(e.target.value)}
+                  value={selectedInstanceType}
+                  onChange={e =>
+                    setSelectedInstanceType(InstanceTierKeySchema.parse(e.target.value))
+                  }
                   disabled={isResizingMachine}
                 >
-                  <option value="shared-cpu-2x">shared-cpu-2x, 3GB (~$20/mo)</option>
-                  <option value="shared-cpu-4x">shared-cpu-4x, 3GB (~$24/mo)</option>
-                  <option value="performance-1x">performance-1x, 3GB (~$47/mo)</option>
-                  <option value="performance-2x">performance-2x, 4GB (~$85/mo)</option>
+                  {OFFERED_TIERS.map(tierKey => {
+                    const tier = getTier(tierKey);
+                    return (
+                      <option
+                        key={tierKey}
+                        value={tierKey}
+                        disabled={
+                          !canResizeToTier(
+                            data?.workerStatus?.instanceType ?? null,
+                            data?.workerStatus?.machineSize ?? null,
+                            data?.workerStatus?.volumeSizeGb ?? null,
+                            tierKey
+                          )
+                        }
+                      >
+                        {tierKey} — {formatTierHardware(tier)}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
+              {isNorthflankProvider && (
+                <Alert className="border-muted-foreground/30 bg-muted/30">
+                  <AlertDescription className="text-muted-foreground">
+                    Northflank applies the compute change through a deployment rollout. The worker
+                    waits for Northflank to report completion before saving the new tier.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {data?.workerStatus?.provider === 'fly' &&
+                getTier(selectedInstanceType).volumeSizeGb >
+                  (data?.workerStatus?.volumeSizeGb ?? 10) && (
+                  <Alert className="border-orange-500/30 bg-orange-500/10">
+                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    <AlertDescription className="text-orange-700 dark:text-orange-300">
+                      Fly volume will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB to{' '}
+                      {getTier(selectedInstanceType).volumeSizeGb} GB. Fly volumes can grow but
+                      cannot be shrunk, so you will not be able to downgrade this instance.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              {isNorthflankProvider &&
+                getTier(selectedInstanceType).volumeSizeGb >
+                  (data?.workerStatus?.volumeSizeGb ?? 10) && (
+                  <Alert className="border-orange-500/30 bg-orange-500/10">
+                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    <AlertDescription className="text-orange-700 dark:text-orange-300">
+                      Northflank volume will grow from {data?.workerStatus?.volumeSizeGb ?? 10} GB
+                      to {getTier(selectedInstanceType).volumeSizeGb} GB. Volumes can grow but
+                      cannot be shrunk.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              {data?.workerStatus?.provider === 'docker-local' &&
+                getTier(selectedInstanceType).volumeSizeGb !==
+                  (data?.workerStatus?.volumeSizeGb ?? 10) && (
+                  <Alert className="border-muted-foreground/30 bg-muted/30">
+                    <AlertDescription className="text-muted-foreground">
+                      docker-local uses a host bind mount; storage will stay at its current size
+                      regardless of tier. Only CPU and memory limits will change.
+                    </AlertDescription>
+                  </Alert>
+                )}
               <div>
                 <label className="text-sm font-medium">
                   Type <code className="text-destructive text-xs">RESIZE</code> to confirm
@@ -3067,13 +3540,296 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           </DialogContent>
         </Dialog>
 
+        {/* Admin Size Override Dialog */}
+        <Dialog
+          open={sizeOverrideDialogOpen}
+          onOpenChange={open => {
+            if (isMutatingSizeOverride) return;
+            setSizeOverrideDialogOpen(open);
+            if (!open) setSizeOverrideReason('');
+          }}
+        >
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-500">
+                <Shield className="h-5 w-5" />
+                {sizeOverrideMode === 'set' ? 'Set Temporary Size Override' : 'Clear Size Override'}
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                {sizeOverrideMode === 'set' ? (
+                  <>
+                    Override CPU/RAM without changing the billed tier. Use for OOM recovery and
+                    incident response. Volume size is not affected; the customer continues to be
+                    billed on the original tier.
+                  </>
+                ) : (
+                  <>
+                    This clears the active admin size override. The instance will revert to its tier
+                    hardware on the next start.
+                  </>
+                )}
+                <span className="text-foreground mt-2 block font-medium">
+                  User: {data?.user_email ?? data?.user_id}
+                </span>
+                {currentStatus === 'running' && (
+                  <span className="mt-2 block text-xs text-amber-600 dark:text-amber-400">
+                    Machine is currently running. The change will apply on the next stop/start cycle
+                    (manual restart, customer-initiated, or admin-triggered).
+                  </span>
+                )}
+                {data?.workerStatus?.adminMachineSizeOverride && (
+                  <span className="text-foreground mt-2 block">
+                    Current override:{' '}
+                    <code className="text-xs">
+                      {data.workerStatus.adminMachineSizeOverride.cpus}×{' '}
+                      {data.workerStatus.adminMachineSizeOverride.cpu_kind ?? 'shared'},{' '}
+                      {data.workerStatus.adminMachineSizeOverride.memory_mb}MB
+                    </code>
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {sizeOverrideMode === 'set' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Override hardware</label>
+                  <div className="space-y-2">
+                    {ADMIN_SIZE_OVERRIDE_PRESETS.map(preset => {
+                      const tier = INSTANCE_TIERS[preset];
+                      return (
+                        <label
+                          key={preset}
+                          className="hover:bg-muted/40 flex cursor-pointer items-start gap-2 rounded-md border p-3"
+                        >
+                          <input
+                            type="radio"
+                            name="size-override-preset"
+                            value={preset}
+                            checked={sizeOverridePreset === preset}
+                            onChange={() => setSizeOverridePreset(preset)}
+                            disabled={isMutatingSizeOverride}
+                            className="mt-1"
+                          />
+                          <span>
+                            <span className="font-medium">{preset} hardware</span>
+                            <span className="text-muted-foreground block text-xs">
+                              {tier.machineSize.cpus}× {tier.machineSize.cpu_kind ?? 'shared'},{' '}
+                              {(tier.machineSize.memory_mb / 1024).toFixed(0)} GB RAM
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium">
+                  Reason{' '}
+                  <span className="text-muted-foreground text-xs">
+                    (10–500 chars, e.g. "OOM recovery for ticket #1234")
+                  </span>
+                </label>
+                <Textarea
+                  className="mt-1"
+                  rows={3}
+                  value={sizeOverrideReason}
+                  onChange={e => setSizeOverrideReason(e.target.value)}
+                  disabled={isMutatingSizeOverride}
+                  placeholder="OOM recovery — ticket #…"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isMutatingSizeOverride}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                variant={sizeOverrideMode === 'set' ? 'default' : 'destructive'}
+                disabled={isMutatingSizeOverride || sizeOverrideReason.trim().length < 10}
+                onClick={() => void handleSizeOverrideSubmit()}
+              >
+                {isMutatingSizeOverride ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                {sizeOverrideMode === 'set' ? 'Set Override' : 'Clear Override'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Cancel scheduled action confirm dialog. Single-instance
+            schedules just confirm; bulk schedules give the admin two
+            choices — "cancel only this instance" (drops just this
+            target) or "cancel entire batch" (cancels parent + all
+            targets). The latter is destructive across instances and
+            never something we want to do as a single click. */}
+        <Dialog
+          open={cancelDialogTarget !== null}
+          onOpenChange={open => {
+            if (!open) setCancelDialogTarget(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-[520px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CalendarClock className="h-5 w-5" />
+                Cancel scheduled action
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                {cancelDialogTarget && cancelDialogTarget.targetCount > 1 ? (
+                  <>
+                    This is a bulk{' '}
+                    <code className="font-mono">{cancelDialogTarget.actionType}</code> targeting{' '}
+                    <strong className="text-foreground">
+                      {cancelDialogTarget.targetCount} instances
+                    </strong>
+                    . Choose whether to cancel only this instance or the entire batch.
+                  </>
+                ) : (
+                  <>
+                    Cancel this scheduled{' '}
+                    <code className="font-mono">{cancelDialogTarget?.actionType}</code>?
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            {cancelDialogTarget && cancelDialogTarget.targetCount > 1 ? (
+              // Bulk case: 3 buttons can't fit a single 520px row, so
+              // stack vertically. Each option gets equal visual weight
+              // (full width) and the two cancel choices read as
+              // distinct alternatives rather than one cramped bar.
+              <DialogFooter className="flex flex-col gap-2 sm:flex-col sm:space-x-0">
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  disabled={isCancellingScheduledAction || isCancellingScheduledActionTarget}
+                  onClick={() => {
+                    cancelScheduledAction({ id: cancelDialogTarget.scheduledActionId });
+                    setCancelDialogTarget(null);
+                  }}
+                >
+                  {isCancellingScheduledAction && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                  Cancel entire batch ({cancelDialogTarget.targetCount} instances)
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={isCancellingScheduledAction || isCancellingScheduledActionTarget}
+                  onClick={() => {
+                    cancelScheduledActionTarget({
+                      scheduledActionId: cancelDialogTarget.scheduledActionId,
+                      instanceId,
+                    });
+                    setCancelDialogTarget(null);
+                  }}
+                >
+                  {isCancellingScheduledActionTarget && (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  )}
+                  Cancel only this instance
+                </Button>
+                <DialogClose asChild>
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    disabled={isCancellingScheduledAction || isCancellingScheduledActionTarget}
+                  >
+                    Keep scheduled
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            ) : (
+              // Single-instance case: 2 buttons fit fine on one row.
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="secondary" disabled={isCancellingScheduledAction}>
+                    Keep scheduled
+                  </Button>
+                </DialogClose>
+                <Button
+                  variant="destructive"
+                  disabled={isCancellingScheduledAction}
+                  onClick={() => {
+                    if (!cancelDialogTarget) return;
+                    cancelScheduledAction({ id: cancelDialogTarget.scheduledActionId });
+                    setCancelDialogTarget(null);
+                  }}
+                >
+                  {isCancellingScheduledAction && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                  Cancel scheduled action
+                </Button>
+              </DialogFooter>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Upgrade-to-Latest confirm dialog. The button used to fire
+            immediately; an active end-user session would be interrupted
+            with no warning. The confirm step is a thin gate so it's
+            never a one-click accident. */}
+        <Dialog
+          open={upgradeLatestConfirmOpen}
+          onOpenChange={open => {
+            if (isMachineUpgrading) return;
+            setUpgradeLatestConfirmOpen(open);
+          }}
+        >
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ArrowUpCircle className="h-5 w-5" />
+                Upgrade to latest now
+              </DialogTitle>
+              <DialogDescription className="pt-3">
+                The instance will redeploy on the latest available image tag immediately. The end
+                user gets no notice and any active session is interrupted.
+                <span className="text-foreground mt-2 block font-medium">
+                  User: {data?.user_email ?? data?.user_id}
+                </span>
+                <span className="mt-2 block text-sm">
+                  Current:{' '}
+                  {currentTrackedImageTag ? (
+                    <code className="text-xs">{currentTrackedImageTag}</code>
+                  ) : (
+                    '—'
+                  )}
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <DialogClose asChild>
+                <Button variant="secondary" disabled={isMachineUpgrading}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                onClick={() => {
+                  if (!data) return;
+                  void machineUpgrade({ instanceId: data.id, imageTag: 'latest' }).then(() => {
+                    setUpgradeLatestConfirmOpen(false);
+                  });
+                }}
+                disabled={isMachineUpgrading}
+              >
+                {isMachineUpgrading && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+                Upgrade now
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Change Version Dialog */}
         <Dialog
           open={changeVersionDialogOpen}
           onOpenChange={open => {
-            if (isChangingVersion) return;
+            if (isChangingVersion || isSchedulingVersionChange) return;
             setChangeVersionDialogOpen(open);
-            if (!open) setChangeVersionSelectedTag('');
+            if (!open) {
+              setChangeVersionSelectedTag('');
+              setChangeVersionMode('now');
+              setChangeVersionNotify(defaultNotifyFormState());
+            }
           }}
         >
           <DialogContent className="sm:max-w-[520px]">
@@ -3099,12 +3855,79 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {/* Surface any existing pending scheduled action so the
+                  admin sees the conflict before submitting. The backend
+                  rejects with CONFLICT (one pending schedule per
+                  instance), so we'd hit a confusing error toast
+                  otherwise. */}
+              {upcomingScheduledActions.length > 0 && (
+                <Alert className="border-yellow-500/30 bg-yellow-500/5">
+                  <CalendarClock className="h-4 w-4 text-yellow-400" />
+                  <AlertDescription>
+                    This instance already has a pending{' '}
+                    <code className="font-mono text-xs text-yellow-400">
+                      {upcomingScheduledActions[0].action_type}
+                    </code>
+                    {upcomingScheduledActions[0].scheduled_at ? (
+                      <>
+                        {' '}
+                        scheduled for{' '}
+                        <span className="font-mono">
+                          {`${new Date(upcomingScheduledActions[0].scheduled_at).toLocaleString()}.`}
+                        </span>
+                      </>
+                    ) : (
+                      '.'
+                    )}{' '}
+                    Cancel it on the instance page before scheduling a new one. Apply Now is still
+                    allowed and will run immediately regardless.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <Tabs
+                value={changeVersionMode}
+                onValueChange={v => setChangeVersionMode(v as 'now' | 'scheduled')}
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="now">Now</TabsTrigger>
+                  <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
+                </TabsList>
+                <TabsContent value="now" className="text-muted-foreground mt-3 text-xs">
+                  Applies immediately. End-user session is interrupted with no notice.
+                </TabsContent>
+                <TabsContent value="scheduled" className="mt-3 space-y-3">
+                  <label htmlFor="change-version-scheduled-at" className="text-sm font-medium">
+                    Scheduled at (local time)
+                  </label>
+                  <Input
+                    id="change-version-scheduled-at"
+                    type="datetime-local"
+                    value={changeVersionScheduledAt}
+                    onChange={e => setChangeVersionScheduledAt(e.target.value)}
+                    disabled={isSchedulingVersionChange}
+                    // Without `required`, an admin can clear the field
+                    // and submit; new Date("") below throws RangeError.
+                    required
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Fires on the next instance reconcile alarm tick after this time (cadence ~5
+                    minutes for running instances). Treat as a "no earlier than" bound.
+                  </p>
+                  <ScheduleNotifyFields
+                    idPrefix="change-version"
+                    state={changeVersionNotify}
+                    onChange={setChangeVersionNotify}
+                    disabled={isSchedulingVersionChange}
+                  />
+                </TabsContent>
+              </Tabs>
+
               <div>
                 <label className="text-sm font-medium">Target version</label>
                 <Select
                   value={changeVersionSelectedTag}
                   onValueChange={setChangeVersionSelectedTag}
-                  disabled={isChangingVersion}
+                  disabled={isChangingVersion || isSchedulingVersionChange}
                 >
                   <SelectTrigger className="mt-1 w-full">
                     <SelectValue placeholder="Select a version..." />
@@ -3146,36 +3969,74 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     <strong>
                       {changeVersionPinData.pinned_by_email ?? changeVersionPinData.pinned_by}
                     </strong>
-                    {'. Proceeding will remove the pin.'}
+                    {'. Proceeding will remove the pin'}
+                    {changeVersionMode === 'scheduled' ? ' at the scheduled time.' : '.'}
                   </AlertDescription>
                 </Alert>
               )}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <DialogClose asChild>
-                <Button variant="secondary" disabled={isChangingVersion}>
+                <Button
+                  variant="secondary"
+                  disabled={isChangingVersion || isSchedulingVersionChange}
+                >
                   Cancel
                 </Button>
               </DialogClose>
               <Button
                 onClick={() => {
                   if (!data || !changeVersionSelectedTag) return;
-                  // Only ack what the dialog actually rendered. If
-                  // changeVersionPinData is null (no warning shown), send
-                  // false; the backend gate catches any pin that appeared
-                  // between render and click and surfaces PIN_EXISTS,
-                  // which the onError handler routes back through this
-                  // dialog with the warning.
-                  void machineChangeVersion({
-                    instanceId: data.id,
+                  if (changeVersionMode === 'now') {
+                    // Only ack what the dialog actually rendered. If
+                    // changeVersionPinData is null (no warning shown), send
+                    // false; the backend gate catches any pin that appeared
+                    // between render and click and surfaces PIN_EXISTS,
+                    // which the onError handler routes back through this
+                    // dialog with the warning.
+                    void machineChangeVersion({
+                      instanceId: data.id,
+                      imageTag: changeVersionSelectedTag,
+                      acknowledgeOverride: !!changeVersionPinData,
+                    });
+                    return;
+                  }
+                  // Scheduled path. The datetime-local input is in the
+                  // admin's local zone; convert to UTC ISO for the
+                  // backend. Belt-and-suspenders parse-validity check
+                  // even though the input has `required` — programmatic
+                  // submits can bypass browser validation.
+                  const local = new Date(changeVersionScheduledAt);
+                  if (Number.isNaN(local.getTime())) return;
+                  void scheduleVersionChange({
+                    actionType: 'version_change',
+                    instanceIds: [data.id],
                     imageTag: changeVersionSelectedTag,
-                    acknowledgeOverride: !!changeVersionPinData,
+                    overridePins: !!changeVersionPinData,
+                    scheduledAt: local.toISOString(),
+                    notify: changeVersionNotify.notify,
+                    noticeLeadHours: changeVersionNotify.noticeLeadHours,
+                    noticeSubject: changeVersionNotify.noticeSubject,
+                    noticeBody: changeVersionNotify.noticeBody,
+                    noticeChannels: changeVersionNotify.noticeChannels,
                   });
                 }}
-                disabled={!changeVersionSelectedTag || isChangingVersion}
+                disabled={
+                  !changeVersionSelectedTag ||
+                  isChangingVersion ||
+                  isSchedulingVersionChange ||
+                  // Block submit when scheduled mode has no datetime.
+                  (changeVersionMode === 'scheduled' && !changeVersionScheduledAt) ||
+                  // Block scheduling when a pending action already
+                  // exists. Apply Now stays enabled — that path is
+                  // immediate and orthogonal to the schedule conflict.
+                  (changeVersionMode === 'scheduled' && upcomingScheduledActions.length > 0)
+                }
               >
-                {isChangingVersion && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-                Apply
+                {(isChangingVersion || isSchedulingVersionChange) && (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                )}
+                {changeVersionMode === 'now' ? 'Apply now' : 'Schedule'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -3381,11 +4242,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                     </CardDescription>
                   </div>
                 </div>
-                <BumpVolumeTo15GbButton
+                <ExtendVolumeButton
                   userId={data.user_id}
                   instanceId={data.id}
                   appName={data.workerStatus?.flyAppName}
                   volumeId={volumeId}
+                  currentSizeGb={data.workerStatus?.volumeSizeGb ?? null}
                   userLabel={data.user_email ?? data.user_id}
                   disabled={
                     data.workerStatus?.status === 'recovering' ||

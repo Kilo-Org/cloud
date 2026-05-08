@@ -1,33 +1,8 @@
-import type { PlatformIdentity } from '@/lib/bot-identity';
+import { type PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
 import { eq, and, sql } from 'drizzle-orm';
-import { type SlackEvent } from '@chat-adapter/slack';
-import { platform_integrations } from '@kilocode/db';
-import type { Message, Thread } from 'chat';
-import { PLATFORM } from '@/lib/integrations/core/constants';
-
-export function getSlackTeamId(message: Message<SlackEvent>): string {
-  const teamId = message.raw.team_id ?? message.raw.team;
-  if (!teamId) throw new Error('Expected a teamId in message.raw');
-  return teamId;
-}
-
-/**
- * Extract platform identity coordinates from any adapter's message.
- * Extend the switch for Discord / Teams / Google Chat / etc.
- */
-export function getPlatformIdentity(thread: Thread, message: Message): PlatformIdentity {
-  const platform = thread.id.split(':')[0]; // "slack", "discord", "gchat", "teams", ...
-
-  switch (platform) {
-    case 'slack': {
-      const teamId = getSlackTeamId(message as Message<SlackEvent>);
-      return { platform: PLATFORM.SLACK, teamId, userId: message.author.userId };
-    }
-    default:
-      throw new Error(`PlatformNotSupported: ${platform}`);
-  }
-}
+import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
+import { isOrganizationMember } from '@/lib/organizations/organizations';
 
 /**
  * Look up the platform integration row for a given identity.
@@ -46,6 +21,35 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
     .limit(1);
 
   return integration ?? null;
+}
+
+export async function canKiloUserAccessPlatformIntegration(
+  integration: PlatformIntegration,
+  kiloUserId: string
+): Promise<boolean> {
+  if (integration.owned_by_organization_id) {
+    return await isOrganizationMember(integration.owned_by_organization_id, kiloUserId);
+  }
+
+  if (integration.owned_by_user_id) {
+    return integration.owned_by_user_id === kiloUserId;
+  }
+
+  return false;
+}
+
+export async function getPlatformIntegrationById(platformIntegrationId: string) {
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(eq(platform_integrations.id, platformIntegrationId))
+    .limit(1);
+
+  if (!integration) {
+    throw new Error(`Could not find platform integration ${platformIntegrationId}`);
+  }
+
+  return integration;
 }
 
 export async function getPlatformIntegrationByBotUserId(

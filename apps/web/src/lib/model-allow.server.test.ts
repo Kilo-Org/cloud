@@ -1,6 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
 import {
-  createAllowPredicateFromDenyList,
   createAllowPredicateFromProviderAllowList,
   createAllowPredicateFromRestrictions,
   type ProviderLookup,
@@ -70,47 +69,16 @@ describe('model access predicates', () => {
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(false);
   });
 
-  test('legacy deny lists are used when no provider allow list exists', async () => {
-    const isAllowed = createAllowPredicateFromRestrictions({
-      modelDenyList: ['openai/gpt-4o'],
-      providerDenyList: [],
-    });
-
-    await expect(isAllowed('openai/gpt-4o')).resolves.toBe(false);
-  });
-
-  test('legacy provider deny list is used when no provider allow list exists', async () => {
-    const isAllowed = createAllowPredicateFromRestrictions(
-      {
-        modelDenyList: [],
-        providerDenyList: ['openai'],
-      },
-      lookup({ 'openai/gpt-4o': ['openai'] })
-    );
-
-    await expect(isAllowed('openai/gpt-4o')).resolves.toBe(false);
-  });
-
-  test('provider allow list policy ignores legacy provider deny list', async () => {
+  test('createAllowPredicateFromRestrictions uses provider allow and model deny lists', async () => {
     const isAllowed = createAllowPredicateFromRestrictions(
       {
         providerAllowList: ['openai'],
-        modelDenyList: [],
-        providerDenyList: ['openai'],
+        modelDenyList: ['openai/gpt-4o'],
       },
-      lookup({ 'openai/gpt-4o': ['openai'] })
-    );
-
-    await expect(isAllowed('openai/gpt-4o')).resolves.toBe(true);
-  });
-
-  test('legacy provider deny list still blocks all-denied providers', async () => {
-    const isAllowed = createAllowPredicateFromDenyList(
-      [],
-      ['openai'],
-      lookup({ 'openai/gpt-4o': ['openai'] })
+      lookup({ 'openai/gpt-4o': ['openai'], 'openai/gpt-4.1': ['openai'] })
     );
 
     await expect(isAllowed('openai/gpt-4o')).resolves.toBe(false);
+    await expect(isAllowed('openai/gpt-4.1')).resolves.toBe(true);
   });
 });

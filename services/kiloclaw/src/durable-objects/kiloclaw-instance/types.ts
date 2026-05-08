@@ -89,6 +89,15 @@ export type InstanceMutableState = {
   flyVolumeId: string | null;
   flyRegion: string | null;
   machineSize: MachineSize | null;
+  instanceType: PersistedState['instanceType'];
+  volumeSizeGb: number | null;
+  /**
+   * Admin-only temporary CPU/RAM override. When non-null,
+   * `effectiveMachineSize(state)` returns this instead of `machineSize`.
+   * Does NOT change billable tier (`instanceType`/`volumeSizeGb`).
+   */
+  adminMachineSizeOverride: MachineSize | null;
+  adminMachineSizeOverrideMetadata: PersistedState['adminMachineSizeOverrideMetadata'];
   healthCheckFailCount: number;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
@@ -113,6 +122,7 @@ export type InstanceMutableState = {
   lastRecoveryErrorAt: number | null;
   lastBoundMachineRecoveryAt: number | null;
   instanceFeatures: string[];
+  controllerCapabilitiesVersion: number | null;
   gmailNotificationsEnabled: boolean;
   gmailLastHistoryId: string | null;
   gmailPushOidcEmail: string | null;
@@ -133,11 +143,6 @@ export type InstanceMutableState = {
   instanceReadyEmailSent: boolean;
   startFailurePushSentForAttempt: boolean;
   customSecretMeta: PersistedState['customSecretMeta'];
-  // Stream Chat default channel (auto-provisioned)
-  streamChatApiKey: string | null;
-  streamChatBotUserId: string | null;
-  streamChatBotUserToken: string | null;
-  streamChatChannelId: string | null;
   vectorMemoryEnabled: boolean;
   vectorMemoryModel: string | null;
   dreamingEnabled: boolean;

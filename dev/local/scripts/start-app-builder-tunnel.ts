@@ -4,7 +4,10 @@ import * as path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
 const devVarsPath = path.join(repoRoot, 'services/app-builder/.dev.vars');
-const envDevLocalPath = path.join(repoRoot, '.env.development.local');
+// Next.js dev runs from apps/web and loads apps/web/.env.development.local.
+// That file is a separate file (not a symlink to repo root) when a vercel env pull
+// created it, so we must write there for the Next.js process to pick up the tunnel URL.
+const envDevLocalPath = path.join(repoRoot, 'apps/web/.env.development.local');
 
 function updateEnvValue(filePath: string, key: string, value: string): void {
   let content = '';

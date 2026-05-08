@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kilo-code-review-worker-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CODE_REVIEW_ORCHESTRATOR",
+        "class_name": "CodeReviewOrchestrator",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["CodeReviewOrchestrator"],
+    },
+  ],
+  "vars": {
+    "API_URL": "https://api.example.test",
+    "INTERNAL_API_SECRET": "test-internal-secret",
+    "CLOUD_AGENT_URL": "https://cloud-agent.example.test",
+    "CLOUD_AGENT_NEXT_URL": "https://cloud-agent-next.example.test",
+    "BACKEND_AUTH_TOKEN": "test-backend-token",
+  },
+}

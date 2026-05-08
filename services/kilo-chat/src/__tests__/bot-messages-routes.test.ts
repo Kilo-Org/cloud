@@ -1,11 +1,12 @@
 import { env } from 'cloudflare:test';
+import { kiloclawConversationContext } from '@kilocode/event-service';
 import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { AuthContext } from '../auth';
 import { botAuthMiddleware } from '../auth-bot';
 import { registerBotRoutes } from '../routes/bot-messages';
 import { registerConversationRoutes } from '../routes/conversations';
-import { handleCreateMessage, handleExecuteAction } from '../routes/handler';
+import { handleCreateMessage, handleDeleteMessage, handleExecuteAction } from '../routes/handler';
 import { deriveGatewayToken } from '../lib/gateway-token';
 import { withTestExecutionCtx } from './helpers';
 
@@ -36,8 +37,22 @@ function grantSandbox(userId: string, sandboxId: string) {
 const SECRET = 'test-gateway-secret';
 
 /** Build an env that has all DO bindings from the test harness plus the secret. */
-function makeEnv(): Env {
-  return { ...env, GATEWAY_TOKEN_SECRET: { get: () => Promise.resolve(SECRET) } } as unknown as Env;
+function makeEnv(pushEvent?: ReturnType<typeof vi.fn>): Env {
+  const baseEnv = {
+    ...env,
+    GATEWAY_TOKEN_SECRET: { get: () => Promise.resolve(SECRET) },
+  } as unknown as Env;
+  if (!pushEvent) {
+    return baseEnv;
+  }
+  return {
+    ...baseEnv,
+    EVENT_SERVICE: {
+      fetch: env.EVENT_SERVICE.fetch.bind(env.EVENT_SERVICE),
+      connect: env.EVENT_SERVICE.connect.bind(env.EVENT_SERVICE),
+      pushEvent,
+    } satisfies Env['EVENT_SERVICE'],
+  };
 }
 
 /** App with bot auth middleware + bot routes. Also registers conversation + message
@@ -58,7 +73,7 @@ async function tokenFor(sandboxId: string): Promise<string> {
 /** Helper to create a conversation + optionally a message as a user.
  *  Registers the message create handler directly with a mock-auth app so we
  *  don't need a real JWT. */
-async function setupData(suffix: string) {
+async function setupData(suffix: string, pushEvent?: ReturnType<typeof vi.fn>) {
   const userId = `user-${suffix}`;
   const sandboxId = `sandbox-${suffix}`;
 
@@ -73,9 +88,10 @@ async function setupData(suffix: string) {
   });
   registerConversationRoutes(setupAppBase);
   setupAppBase.post('/v1/messages', handleCreateMessage);
+  setupAppBase.delete('/v1/messages/:messageId', handleDeleteMessage);
   const setupApp = withTestExecutionCtx(setupAppBase);
 
-  const testEnv = makeEnv();
+  const testEnv = makeEnv(pushEvent);
 
   const convRes = await setupApp.request(
     '/v1/conversations',
@@ -104,7 +120,7 @@ async function setupData(suffix: string) {
   expect(msgRes.status).toBe(201);
   const { messageId } = await msgRes.json<{ messageId: string }>();
 
-  return { sandboxId, conversationId, messageId, testEnv };
+  return { sandboxId, conversationId, messageId, testEnv, userApp: setupApp };
 }
 
 const sampleContent = [{ type: 'text', text: 'Hello from bot' }];
@@ -149,15 +165,89 @@ describe('POST /bot/v1/sandboxes/:sandboxId/messages', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('rejects bot create/edit/delete after the last human leaves', async () => {
+    const { sandboxId, conversationId, testEnv, userApp } = await setupData('bot-after-leave');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const createRes = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'bot before leave' }],
+        }),
+      },
+      testEnv
+    );
+    expect(createRes.status).toBe(201);
+    const { messageId } = await createRes.json<{ messageId: string }>();
+
+    const leaveRes = await userApp.request(
+      `/v1/conversations/${conversationId}/leave`,
+      { method: 'POST' },
+      testEnv
+    );
+    expect(leaveRes.status).toBe(200);
+    await expect(leaveRes.json()).resolves.toEqual({ ok: true });
+
+    const createAfterLeaveRes = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'bot after leave' }],
+        }),
+      },
+      testEnv
+    );
+    expect(createAfterLeaveRes.status).toBe(403);
+
+    const editAfterLeaveRes = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [{ type: 'text', text: 'bot edit after leave' }],
+          timestamp: Date.now(),
+        }),
+      },
+      testEnv
+    );
+    expect(editAfterLeaveRes.status).toBe(403);
+
+    const deleteQs = new URLSearchParams({ conversationId });
+    const deleteAfterLeaveRes = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}?${deleteQs.toString()}`,
+      {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      },
+      testEnv
+    );
+    expect(deleteAfterLeaveRes.status).toBe(403);
+  });
 });
 
 // ─── POST .../messages/:messageId/delivery-failed ──────────────────────────
 
 describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-failed', () => {
-  it('flips deliveryFailed and returns 202', async () => {
-    const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-msg-df-ok');
+  it('flips deliveryFailed and returns ok', async () => {
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const { sandboxId, conversationId, messageId, testEnv } = await setupData(
+      'bot-msg-df-ok',
+      pushEvent
+    );
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
+    pushEvent.mockClear();
 
     const res = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
@@ -168,9 +258,17 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
       },
       testEnv
     );
-    expect(res.status).toBe(202);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true });
+    expect(pushEvent).toHaveBeenCalledOnce();
+    expect(pushEvent).toHaveBeenCalledWith(
+      'user-bot-msg-df-ok',
+      kiloclawConversationContext(sandboxId, conversationId),
+      'message.delivery_failed',
+      { messageId }
+    );
 
-    // second call is idempotent (UPDATE is a no-op)
+    pushEvent.mockClear();
     const second = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
       {
@@ -180,7 +278,36 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
       },
       testEnv
     );
-    expect(second.status).toBe(202);
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toEqual({ ok: true });
+    expect(pushEvent).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the diagnostic body has an invalid shape', async () => {
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const { sandboxId, conversationId, messageId, testEnv } = await setupData(
+      'bot-msg-df-invalid-body',
+      pushEvent
+    );
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    pushEvent.mockClear();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason: 123 }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json<{ error: string; issues: unknown[] }>();
+    expect(body.error).toBe('Invalid request');
+    expect(body.issues.length).toBeGreaterThan(0);
+    expect(pushEvent).not.toHaveBeenCalled();
   });
 
   it('returns 401 without auth token', async () => {
@@ -198,12 +325,57 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../messages/:messageId/delivery-fai
     );
     expect(res.status).toBe(401);
   });
+
+  it('returns 404 for a missing target message', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-msg-df-missing');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/01K00000000000000000000000/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: '{}',
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 for a deleted target message', async () => {
+    const { sandboxId, conversationId, messageId, testEnv, userApp } =
+      await setupData('bot-msg-df-deleted');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const deleteRes = await userApp.request(
+      `/v1/messages/${messageId}?${new URLSearchParams({ conversationId }).toString()}`,
+      { method: 'DELETE' },
+      testEnv
+    );
+    expect(deleteRes.status).toBe(200);
+    await expect(deleteRes.json()).resolves.toEqual({ ok: true });
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/messages/${messageId}/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: '{}',
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(404);
+  });
 });
 
 // ─── POST .../actions/:groupId/delivery-failed ─────────────────────────────
 
 describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed', () => {
-  async function setupWithResolvedAction(suffix: string) {
+  async function setupWithResolvedAction(suffix: string, pushEvent?: ReturnType<typeof vi.fn>) {
     const userId = `user-${suffix}`;
     const sandboxId = `sandbox-${suffix}`;
     grantSandbox(userId, sandboxId);
@@ -223,7 +395,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
     );
     const setupApp = withTestExecutionCtx(setupAppBase);
 
-    const testEnv = makeEnv();
+    const testEnv = makeEnv(pushEvent);
 
     const convRes = await setupApp.request(
       '/v1/conversations',
@@ -275,7 +447,7 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
     return { sandboxId, conversationId, messageId, testEnv, token };
   }
 
-  it('reverts resolution and returns 202', async () => {
+  it('reverts resolution and returns ok', async () => {
     const { sandboxId, conversationId, messageId, testEnv, token } =
       await setupWithResolvedAction('bot-act-df-ok');
     const app = makeBotApp();
@@ -289,13 +461,18 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       },
       testEnv
     );
-    expect(res.status).toBe(202);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true });
   });
 
   it('is idempotent when already unresolved', async () => {
-    const { sandboxId, conversationId, messageId, testEnv, token } =
-      await setupWithResolvedAction('bot-act-df-idem');
+    const pushEvent = vi.fn().mockResolvedValue(false);
+    const { sandboxId, conversationId, messageId, testEnv, token } = await setupWithResolvedAction(
+      'bot-act-df-idem',
+      pushEvent
+    );
     const app = makeBotApp();
+    pushEvent.mockClear();
 
     const first = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/g1/delivery-failed`,
@@ -306,7 +483,9 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       },
       testEnv
     );
-    expect(first.status).toBe(202);
+    expect(first.status).toBe(200);
+    await expect(first.json()).resolves.toEqual({ ok: true });
+    expect(pushEvent).toHaveBeenCalledOnce();
 
     const second = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/g1/delivery-failed`,
@@ -317,7 +496,9 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       },
       testEnv
     );
-    expect(second.status).toBe(202);
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toEqual({ ok: true });
+    expect(pushEvent).toHaveBeenCalledOnce();
   });
 
   it('returns 400 for missing messageId body', async () => {
@@ -334,6 +515,25 @@ describe('POST /bot/v1/sandboxes/:sandboxId/.../actions/:groupId/delivery-failed
       },
       testEnv
     );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when groupId path param is invalid', async () => {
+    const { sandboxId, conversationId, messageId, testEnv, token } =
+      await setupWithResolvedAction('bot-act-df-bad-group');
+    const app = makeBotApp();
+    const groupId = 'g'.repeat(201);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations/${conversationId}/actions/${groupId}/delivery-failed`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ messageId }),
+      },
+      testEnv
+    );
+
     expect(res.status).toBe(400);
   });
 
@@ -539,6 +739,39 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 when edit content includes caller-supplied action resolution', async () => {
+    const { sandboxId, conversationId, testEnv } = await setupData('bot-edit-resolved-actions');
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'actions',
+              groupId: 'approval-1',
+              actions: [],
+              resolved: {
+                value: 'deny',
+                resolvedBy: 'user-1',
+                resolvedAt: 1,
+              },
+            },
+          ],
+          timestamp: Date.now(),
+        }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+  });
+
   it("returns 403 when editing another bot's message", async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-edit-forbidden');
     // messageId was created by the user in setupData; the bot is a member but didn't author it
@@ -566,7 +799,7 @@ describe('PATCH /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
 // ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId ─────────────────
 
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
-  it('soft-deletes a bot-owned message and returns 204', async () => {
+  it('soft-deletes a bot-owned message and returns ok', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-del-1');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -592,7 +825,8 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
       testEnv
     );
 
-    expect(delRes.status).toBe(204);
+    expect(delRes.status).toBe(200);
+    await expect(delRes.json()).resolves.toEqual({ ok: true });
   });
 
   it('returns 404 for non-existent message', async () => {
@@ -670,7 +904,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId', () => {
 // ─── POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing ───
 
 describe('POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing', () => {
-  it('returns 204 for a member bot', async () => {
+  it('returns ok for a member bot', async () => {
     const { sandboxId, conversationId, testEnv } = await setupData('bot-typing-ok');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -684,7 +918,8 @@ describe('POST /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/typing
       testEnv
     );
 
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true });
   });
 
   it('returns 403 for non-member bot', async () => {
@@ -935,13 +1170,13 @@ describe('GET /bot/v1/sandboxes/:sandboxId/conversations/:conversationId/members
 // ─── DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions ────────
 
 describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', () => {
-  it('returns 204 after removing a reaction via query params', async () => {
+  it('returns the remove operation id after removing a reaction via query params', async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-1');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
 
     // Add first
-    await app.request(
+    const addRes = await app.request(
       `/bot/v1/sandboxes/${sandboxId}/messages/${messageId}/reactions`,
       {
         method: 'POST',
@@ -950,6 +1185,7 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
       },
       testEnv
     );
+    const addBody = await addRes.json<{ id: string }>();
 
     const qs = new URLSearchParams({ conversationId, emoji: '👍' });
     const res = await app.request(
@@ -961,10 +1197,14 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
       testEnv
     );
 
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    const body = await res.json<{ removed: boolean; id: string | null }>();
+    expect(body.removed).toBe(true);
+    expect(body.id).toMatch(/^[0-9A-Z]{26}$/);
+    expect(body.id).not.toBe(addBody.id);
   });
 
-  it('returns 204 even when reaction never existed (idempotent)', async () => {
+  it('returns an explicit no-op shape when reaction never existed', async () => {
     const { sandboxId, conversationId, messageId, testEnv } = await setupData('bot-rx-del-idem');
     const app = makeBotApp();
     const token = await tokenFor(sandboxId);
@@ -979,7 +1219,8 @@ describe('DELETE /bot/v1/sandboxes/:sandboxId/messages/:messageId/reactions', ()
       testEnv
     );
 
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ removed: false, id: null });
   });
 
   it('returns 403 for non-member bot', async () => {
@@ -1304,6 +1545,101 @@ describe('POST /bot/v1/sandboxes/:sandboxId/conversations', () => {
     );
 
     expect(res.status).toBe(404);
+  });
+
+  it('returns 400 when additionalMembers are provided', async () => {
+    const suffix = 'bot-create-conv-additional-members';
+    const sandboxId = `sandbox-${suffix}`;
+    grantSandbox(`user-${suffix}-owner`, sandboxId);
+
+    const app = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    const testEnv = makeEnv();
+
+    const res = await app.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: 'Group',
+          additionalMembers: [`user-${suffix}-other`],
+        }),
+      },
+      testEnv
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json<{ error: string; invalidMembers?: string[] }>();
+    expect(body.error).toMatch(/additionalMembers/);
+    expect(body.invalidMembers).toEqual([`user-${suffix}-other`]);
+  });
+
+  it('does not let a non-member resolve actions in a bot-created conversation', async () => {
+    const suffix = 'bot-create-conv-action-auth';
+    const sandboxId = `sandbox-${suffix}`;
+    grantSandbox(`user-${suffix}-owner`, sandboxId);
+
+    const botApp = makeBotApp();
+    const token = await tokenFor(sandboxId);
+    const testEnv = makeEnv();
+
+    const convRes = await botApp.request(
+      `/bot/v1/sandboxes/${sandboxId}/conversations`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: 'Actions' }),
+      },
+      testEnv
+    );
+    expect(convRes.status).toBe(201);
+    const { conversationId } = await convRes.json<{ conversationId: string }>();
+
+    const msgRes = await botApp.request(
+      `/bot/v1/sandboxes/${sandboxId}/messages`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          conversationId,
+          content: [
+            {
+              type: 'actions',
+              groupId: 'g1',
+              actions: [{ value: 'allow-once', label: 'Allow', style: 'primary' }],
+            },
+          ],
+        }),
+      },
+      testEnv
+    );
+    expect(msgRes.status).toBe(201);
+    const { messageId } = await msgRes.json<{ messageId: string }>();
+
+    const userAppBase = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+    userAppBase.use('*', async (c, next) => {
+      c.set('callerId', `user-${suffix}-other`);
+      c.set('callerKind', 'user');
+      await next();
+    });
+    userAppBase.post(
+      '/v1/conversations/:conversationId/messages/:messageId/execute-action',
+      handleExecuteAction
+    );
+    const userApp = withTestExecutionCtx(userAppBase);
+
+    const execRes = await userApp.request(
+      `/v1/conversations/${conversationId}/messages/${messageId}/execute-action`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ groupId: 'g1', value: 'allow-once' }),
+      },
+      testEnv
+    );
+
+    expect(execRes.status).toBe(403);
   });
 
   it('returns 400 for invalid JSON', async () => {

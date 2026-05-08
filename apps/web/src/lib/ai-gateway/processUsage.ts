@@ -9,7 +9,7 @@ import type {
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
 } from './providers/openrouter/types';
-import { fetchGeneration } from './providers/openrouter-request';
+import { fetchGeneration } from './providers/upstream-request';
 import PROVIDERS from './providers/provider-definitions';
 import { toMicrodollars } from '../utils';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
@@ -43,6 +43,7 @@ import type {
   OpenRouterUsage,
   PromptInfo,
   UsageMetaData,
+  VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
 import {
   parseResponsesMicrodollarUsageFromStream,
@@ -53,7 +54,12 @@ import {
   parseMessagesMicrodollarUsageFromString,
 } from '@/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
-import { computeOpenRouterCostFields, drainSseStream } from '@/lib/ai-gateway/processUsage.shared';
+import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
+import {
+  computeOpenRouterCostFields,
+  drainSseStream,
+  extractVercelIsByok,
+} from '@/lib/ai-gateway/processUsage.shared';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -195,7 +201,7 @@ export function toInsertableDbUsageRecord(
     message_id: usageStats.messageId ?? '<missing>',
     upstream_id: usageStats.upstream_id,
     finish_reason: usageStats.finish_reason,
-    latency: ttfb_ms,
+    latency: usageStats.latency ?? ttfb_ms,
     moderation_latency: usageStats.moderation_latency,
     generation_time: usageStats.generation_time,
     is_byok: usageStats.is_byok,
@@ -653,7 +659,8 @@ export function countAndStoreUsage(
 
 export function processOpenRouterUsage(
   usage: OpenRouterUsage | null | undefined,
-  coreProps: NotYetCostedUsageStats
+  coreProps: NotYetCostedUsageStats,
+  vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
   const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
@@ -671,7 +678,7 @@ export function processOpenRouterUsage(
       0,
     outputTokens: usage?.completion_tokens ?? 0,
     cost_mUsd,
-    is_byok,
+    is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
   };
 }
 
@@ -703,6 +710,7 @@ export async function parseMicrodollarUsageFromStream(
   let usage: OpenRouterUsage | null = null;
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
+  let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
@@ -744,9 +752,13 @@ export async function parseMicrodollarUsageFromStream(
       messageId = json.id ?? messageId;
       usage = json.usage ?? usage;
       const choice = json.choices?.[0];
+      const chunkProviderMetadata = choice?.delta?.provider_metadata;
+      if (chunkProviderMetadata) {
+        vercelProviderMetadata = chunkProviderMetadata;
+      }
       inference_provider =
         json.provider ??
-        choice?.delta?.provider_metadata?.gateway?.routing?.finalProvider ??
+        chunkProviderMetadata?.gateway?.routing?.finalProvider ??
         inference_provider;
       finish_reason = choice?.finish_reason ?? finish_reason;
 
@@ -774,7 +786,7 @@ export async function parseMicrodollarUsageFromStream(
   const coreProps = {
     kiloUserId,
     messageId,
-    hasError: reportedError || wasAborted,
+    hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
     model,
     responseContent,
     inference_provider,
@@ -788,7 +800,7 @@ export async function parseMicrodollarUsageFromStream(
     status_code: effectiveStatusCode,
   };
 
-  const costs = processOpenRouterUsage(usage, coreProps);
+  const costs = processOpenRouterUsage(usage, coreProps, vercelProviderMetadata);
 
   return { ...coreProps, ...costs };
 }
@@ -811,10 +823,11 @@ export function parseMicrodollarUsageFromString(
     });
   }
   const choice = responseJson?.choices?.[0];
+  const finish_reason = choice?.finish_reason ?? null;
   const coreProps = {
     kiloUserId,
     messageId: responseJson?.id ?? null,
-    hasError: !responseJson?.model || statusCode >= 400,
+    hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
     model: responseJson?.model ?? null,
     responseContent: choice?.message.content ?? '',
     inference_provider:
@@ -822,7 +835,7 @@ export function parseMicrodollarUsageFromString(
       choice?.message?.provider_metadata?.gateway?.routing?.finalProvider ??
       null,
     upstream_id: null,
-    finish_reason: choice?.finish_reason ?? null,
+    finish_reason,
     latency: null,
     moderation_latency: null,
     generation_time: null,
@@ -831,7 +844,11 @@ export function parseMicrodollarUsageFromString(
     status_code: statusCode,
   };
 
-  const costs = processOpenRouterUsage(responseJson?.usage, coreProps);
+  const costs = processOpenRouterUsage(
+    responseJson?.usage,
+    coreProps,
+    choice?.message?.provider_metadata ?? null
+  );
 
   return { ...coreProps, ...costs };
 }
@@ -882,7 +899,7 @@ async function processTokenData(
   const provider = Object.values(PROVIDERS).find(p => p.id === usageContext.provider);
   const generation =
     provider &&
-    useGenerationLookup(provider.id, usageStats) &&
+    useGenerationLookup(usageStats, usageContext) &&
     usageStats.messageId &&
     (await fetchGeneration(usageStats.messageId, provider));
   if (usageStats.messageId) {
@@ -953,12 +970,17 @@ function useAnthropicStyleTokenCounting(requestedModel: string, provider: Provid
   return provider === 'vercel' && (isClaudeModel(requestedModel) || isMinimaxModel(requestedModel));
 }
 
-function useGenerationLookup(provider: ProviderId, usageStats: MicrodollarUsageStats | null) {
-  // vercel has requested to not hammer their generation endpoint,
-  // so only do it when we didn't get the usage data inline
-  return (
-    provider === 'openrouter' || (provider === 'vercel' && (usageStats?.inputTokens ?? 0) === 0)
-  );
+function useGenerationLookup(
+  usageStats: MicrodollarUsageStats | null,
+  usageContext: MicrodollarUsageContext
+) {
+  const isGatewayProvider =
+    usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
+  const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
+  const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
+  const hasCostWhenPaid =
+    isFreeModel(usageContext.requested_model) || (usageStats?.cost_mUsd ?? 0) > 0;
+  return isGatewayProvider && isSuccessStatusCode && (!hasOutputTokens || !hasCostWhenPaid);
 }
 
 export const mapToUsageStats = (

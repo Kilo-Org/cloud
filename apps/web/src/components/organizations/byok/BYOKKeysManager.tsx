@@ -61,7 +61,9 @@ const VERCEL_BYOK_PROVIDER_NAMES = {
   mistral: 'Mistral AI (other models)',
   moonshotai: 'Moonshot AI',
   novita: 'Novita',
+  perplexity: 'Perplexity',
   xai: 'xAI',
+  xiaomi: 'Xiaomi',
   zai: 'Z.ai (pay as you go)',
 } satisfies Record<VercelUserByokInferenceProviderId, string>;
 
@@ -574,8 +576,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         <AlertTriangle className="h-4 w-4 text-amber-500" />
                         <AlertDescription>
                           <p className="font-medium">
-                            Important: You must use a model from{' '}
-                            <strong>{directProvider.name}</strong> to use this key
+                            Important: You must use a model with{' '}
+                            <strong>{directProvider.name}</strong> prefix to use this key
                           </p>
                           <p className="mt-1">
                             In your client, select a model entry from the list above. After saving,

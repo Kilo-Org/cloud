@@ -1,4 +1,5 @@
 import type { EncryptedEnvelope } from '@/lib/encryption';
+import type { InstanceTierKey, InstanceType } from '@kilocode/kiloclaw-instance-tiers';
 import type { SecretFieldKey } from '@kilocode/kiloclaw-secret-catalog';
 
 /** Mirrors the worker's ImageVersionEntry schema (KV stored version metadata) */
@@ -34,6 +35,7 @@ export type ProvisionInput = {
   userTimezone?: string | null;
   userLocation?: string | null;
   pinnedImageTag?: string;
+  instanceType?: InstanceTierKey;
 };
 
 export type KiloCodeConfigPatchInput = {
@@ -204,6 +206,8 @@ export type PlatformStatusResponse = {
   flyVolumeId: string | null;
   flyRegion: string | null;
   machineSize: MachineSize | null;
+  instanceType: InstanceType | null;
+  volumeSizeGb: number | null;
   openclawVersion: string | null;
   imageVariant: string | null;
   trackedImageTag: string | null;
@@ -225,6 +229,15 @@ export type PlatformStatusResponse = {
   botNature: string | null;
   botVibe: string | null;
   botEmoji: string | null;
+  /**
+   * Version of the controller-configuration contract the running machine
+   * was started with. Bumped by the worker whenever the set of env vars /
+   * config it writes into a machine changes in a way callers care about.
+   * `null` means the instance has never been started under a versioned
+   * contract (treat as pre-v1 / legacy). See
+   * `services/kiloclaw/src/config.ts` (`WORKER_CONTROLLER_CAPABILITIES_VERSION`).
+   */
+  controllerCapabilitiesVersion: number | null;
 };
 
 /** A single registry DO's entries + migration status. */
@@ -248,6 +261,14 @@ export type RegistryEntriesResponse = {
 /** Response from GET /api/platform/debug-status (internal/admin only). */
 export type PlatformDebugStatusResponse = PlatformStatusResponse & {
   orgId: string | null;
+  /**
+   * Active admin CPU/RAM override (admin-only). When non-null, the
+   * runtime spec uses this instead of `machineSize`. Customer dashboard
+   * (`PlatformStatusResponse`) deliberately does not expose this — billing
+   * stays on the tier.
+   */
+  adminMachineSizeOverride: MachineSize | null;
+  adminMachineSizeOverrideMetadata: AdminMachineSizeOverrideMetadata | null;
   pendingDestroyMachineId: string | null;
   pendingDestroyVolumeId: string | null;
   pendingPostgresMarkOnFinalize: boolean;
@@ -550,10 +571,34 @@ export type ReassociateVolumeResponse = {
   newRegion: string;
 };
 
+/** Metadata persisted alongside an active admin size override. */
+export type AdminMachineSizeOverrideMetadata = {
+  reason: string;
+  actorId: string;
+  actorEmail: string;
+  setAt: number;
+};
+
 /** Response from POST /api/platform/resize-machine */
 export type ResizeMachineResponse = {
-  previousSize: { cpus: number; memory_mb: number; cpu_kind?: string } | null;
-  newSize: { cpus: number; memory_mb: number; cpu_kind?: string };
+  previousTier: InstanceType | null;
+  newTier: InstanceTierKey;
+  previousVolumeSizeGb: number | null;
+  newVolumeSizeGb: number;
+  machineSize: MachineSize;
+  /** When the resize cleared a pre-existing admin override, captured for audit. */
+  clearedOverride: { size: MachineSize; metadata: AdminMachineSizeOverrideMetadata } | null;
+};
+
+/** Response from POST /api/platform/admin-size-override/set */
+export type SetAdminMachineSizeOverrideResponse = {
+  previousOverride: MachineSize | null;
+  newOverride: MachineSize;
+};
+
+/** Response from POST /api/platform/admin-size-override/clear */
+export type ClearAdminMachineSizeOverrideResponse = {
+  previousOverride: MachineSize | null;
 };
 
 /** Response from GET /api/platform/regions */
@@ -584,17 +629,16 @@ export type UpdateProviderRolloutResponse = {
   availability: ProviderRolloutAvailability;
 };
 
-/** Stream Chat credentials for a user's KiloClaw channel */
-export type ChatCredentials = {
-  apiKey: string;
-  userId: string;
-  userToken: string;
-  channelId: string;
-} | null;
-
 /** Combined status returned by tRPC getStatus */
 export type KiloClawDashboardStatus = PlatformStatusResponse & {
-  /** Worker base URL for constructing the "Open" link. Falls back to claw.kilo.ai. */
+  /**
+   * Worker base URL for constructing the "Open" link.
+   *
+   * When `KILOCLAW_INSTANCE_URL_TEMPLATE` is configured and the instance
+   * is on `controllerCapabilitiesVersion >= 2`, this is the per-instance
+   * virtual host (e.g. `https://i-<hex>.kiloclaw.ai`). Otherwise it falls
+   * back to `KILOCLAW_API_URL` (production: `https://claw.kilo.ai`).
+   */
   workerUrl: string;
   name: string | null;
   /** Postgres row ID. Used to construct /i/{instanceId} proxy paths for instance-keyed instances. */
@@ -602,4 +646,21 @@ export type KiloClawDashboardStatus = PlatformStatusResponse & {
   /** Copyable inbound email address for routing messages into this instance. */
   inboundEmailAddress: string | null;
   inboundEmailEnabled: boolean;
+  /**
+   * Soonest upcoming scheduled action targeting this instance, or null
+   * if none. Drives the in-workspace banner. Cancelled or completed
+   * actions are excluded — a banner that says "your upgrade was
+   * cancelled" comes through email/push, not the live status field.
+   */
+  scheduledAction: KiloClawScheduledActionStatusBlock | null;
+};
+
+export type KiloClawScheduledActionStatusBlock = {
+  scheduledActionId: string;
+  actionType: 'scheduled_restart' | 'version_change';
+  /** When the action will fire (ISO 8601). */
+  scheduledAt: string;
+  /** version_change only — the tag the worker will redeploy on. */
+  targetImageTag: string | null;
+  targetOpenclawVersion: string | null;
 };

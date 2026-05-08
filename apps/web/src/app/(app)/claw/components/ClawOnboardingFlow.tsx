@@ -10,6 +10,7 @@ import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/kilo-auto';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';
 import { useOrgKiloClawGatewayStatus, useOrgKiloClawMutations } from '@/hooks/useOrgKiloClaw';
+import { useUser } from '@/hooks/useUser';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -114,6 +115,12 @@ function ClawOnboardingFlowInner({
   const orgMutations = useOrgKiloClawMutations(organizationId ?? '');
   const mutations = organizationId ? orgMutations : personalMutations;
 
+  const { data: currentUser } = useUser();
+  // Calendar OAuth is admin-only — both `/api/integrations/google/connect` and
+  // `/disconnect` require `adminOnly: true`. Hide the calendar step from
+  // non-admins so the wizard advances identity → channels directly.
+  const hasCalendarStep = currentUser?.is_admin === true;
+
   const gatewayUrl = useGatewayUrl(status);
 
   // Lazy-init onboardingStep from `?step=` in the URL so first render already
@@ -145,6 +152,7 @@ function ClawOnboardingFlowInner({
     onboardingStep,
     hasBotIdentity: botIdentity !== null,
     selectedChannelId,
+    hasCalendarStep,
   };
   const preGatewayFlowState = getClawOnboardingFlowState({
     ...stateInput,
@@ -291,6 +299,14 @@ function ClawOnboardingFlowInner({
     if (hasResumedFromQuery.current) return;
     const stepParam = searchParams?.get('step');
     if (stepParam !== 'calendar') return;
+    // Calendar is admin-only; a non-admin landing here (e.g. via a stale
+    // shared URL) shouldn't trigger calendar-specific toasts or set
+    // onboardingStep to 'calendar'. Just strip the params and move on.
+    if (!hasCalendarStep) {
+      hasResumedFromQuery.current = true;
+      cleanupResumeQueryParams();
+      return;
+    }
     if (botIdentity === null) return;
     const successParam = searchParams?.get('success');
     const errorParamRaw = searchParams?.get('error');
@@ -313,7 +329,7 @@ function ClawOnboardingFlowInner({
       toast.error('Could not connect calendar — please try again or skip for now.');
     }
     cleanupResumeQueryParams();
-  }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams]);
+  }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams, hasCalendarStep]);
 
   // Watchdog: if `?step=calendar` is in the URL but botIdentity hydration
   // never completes (e.g. patchBotIdentity hadn't propagated to the DB
@@ -412,7 +428,12 @@ function ClawOnboardingFlowInner({
             defaulted: true,
           });
           setBotIdentity(identity);
-          setOnboardingStep('calendar');
+          if (hasCalendarStep) {
+            setOnboardingStep('calendar');
+          } else {
+            posthog?.capture('claw_setup_channels_viewed');
+            setOnboardingStep('channels');
+          }
         }}
       />
     );

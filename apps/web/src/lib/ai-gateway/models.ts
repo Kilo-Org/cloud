@@ -43,7 +43,7 @@ export const autoFreeModels = [
   grok_code_fast_1_optimized_free_model.status === 'public'
     ? grok_code_fast_1_optimized_free_model.public_id
     : null,
-  'inclusionai/ling-2.6-1t:free',
+  'inclusionai/ring-2.6-1t:free',
   stepfun_35_flash_free_model.status === 'public' ? stepfun_35_flash_free_model.public_id : null,
 ].filter(m => m !== null);
 

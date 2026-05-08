@@ -993,7 +993,7 @@ importers:
         specifier: ^17.3.1
         version: 17.3.1
       drizzle-kit:
-        specifier: ^0.31.9
+        specifier: 'catalog:'
         version: 0.31.9
       typescript:
         specifier: 'catalog:'

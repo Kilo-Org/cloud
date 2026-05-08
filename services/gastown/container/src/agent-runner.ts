@@ -409,7 +409,7 @@ async function createLightweightWorkspace(label: string, rigId: string): Promise
  * orchestrator that delegates work via tools. But kilo serve requires
  * a git repo in the working directory.
  */
-async function createMayorWorkspace(rigId: string): Promise<string> {
+export async function createMayorWorkspace(rigId: string): Promise<string> {
   return createLightweightWorkspace('mayor', rigId);
 }
 

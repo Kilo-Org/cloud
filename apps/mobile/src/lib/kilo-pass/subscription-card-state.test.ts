@@ -29,6 +29,37 @@ describe('getKiloPassSubscriptionCardState', () => {
     });
   });
 
+  it('shows an informational state while checking App Store ownership', () => {
+    expect(getKiloPassSubscriptionCardState(null, { appStoreOwnership: 'checking' })).toEqual({
+      action: 'none',
+      actionLabel: null,
+      description: 'Checking App Store subscription',
+      title: 'Kilo Pass',
+    });
+  });
+
+  it('shows an informational state when App Store ownership belongs to another account', () => {
+    expect(
+      getKiloPassSubscriptionCardState(null, { appStoreOwnership: 'another-account' })
+    ).toEqual({
+      action: 'none',
+      actionLabel: null,
+      description: 'Kilo Pass subscription is owned by another account',
+      title: 'Kilo Pass',
+    });
+  });
+
+  it('shows an informational state while restoring current-account App Store ownership', () => {
+    expect(
+      getKiloPassSubscriptionCardState(null, { appStoreOwnership: 'current-account' })
+    ).toEqual({
+      action: 'none',
+      actionLabel: null,
+      description: 'Restoring App Store subscription',
+      title: 'Kilo Pass',
+    });
+  });
+
   it('sends App Store-managed Kilo Pass users to App Store management', () => {
     expect(
       getKiloPassSubscriptionCardState({

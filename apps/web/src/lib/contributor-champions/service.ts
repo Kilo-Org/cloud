@@ -833,10 +833,13 @@ export async function upgradeContributorChampionTier(input: {
       .where(eq(contributor_champion_memberships.contributor_id, input.contributorId))
       .limit(1);
 
-    if (!membership?.enrolled_tier) throw new Error('Contributor membership not found');
+    if (!membership) throw new Error('Contributor membership not found');
+    if (!membership.enrolled_tier) throw new Error('Contributor is not currently enrolled');
 
-    const lockedCurrentCreditUsd =
-      TIER_CREDIT_USD[membership.enrolled_tier as ContributorTier] ?? 0;
+    const lockedCurrentTier = parseContributorTier(membership.enrolled_tier);
+    if (!lockedCurrentTier)
+      throw new Error(`Invalid enrolled_tier "${membership.enrolled_tier}" in DB`);
+    const lockedCurrentCreditUsd = TIER_CREDIT_USD[lockedCurrentTier];
     const lockedDifferentialUsd = newCreditUsd - lockedCurrentCreditUsd;
 
     if (lockedDifferentialUsd <= 0) {
@@ -873,7 +876,10 @@ export async function upgradeContributorChampionTier(input: {
           counts_as_selfservice: false,
           dbOrTx: tx,
         });
-        granted = result.success;
+        if (!result.success) {
+          throw new Error('Failed to grant top-up credit; rolling back tier upgrade');
+        }
+        granted = true;
       }
     }
 

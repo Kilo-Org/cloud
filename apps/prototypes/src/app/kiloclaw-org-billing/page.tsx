@@ -28,7 +28,6 @@ import {
   healthSummaryFixtures,
   kiloAdminChangeLogFixture,
   kiloAdminKiloclawInstanceRowsFixture,
-  kiloAdminKiloclawReadinessFixture,
   kiloAdminKiloclawStatsFixture,
   kiloAdminOrgSupportFixture,
   kiloAdminUserSupportFixture,
@@ -41,11 +40,9 @@ import {
   AssociatedUserChip,
   DashboardCTAsPreview,
   InstanceControlsHeaderPreview,
-  KiloAdminBillingReadinessCardPreview,
   KiloAdminInstanceBillingSupportPreview,
   KiloAdminKiloclawListPreview,
   KiloAdminMutationSafetyPreview,
-  KiloAdminObservabilityPreview,
   KiloAdminOrganizationKiloclawPreview,
   KiloAdminUserKiloclawPreview,
   OrgAccessLockedDialogPreview,
@@ -72,6 +69,7 @@ import {
   type PrototypeVisibility,
 } from '@/components/prototype-kit';
 import { OptOutTabClient } from './opt-out-client';
+import roleSwitcherStyles from './role-switcher.module.css';
 
 // ---------------------------------------------------------------------------
 // Role filter
@@ -172,7 +170,7 @@ function Variant({
 // ---------------------------------------------------------------------------
 
 // Ordered by selected role. Customer roles follow the product journey;
-// Kilo Admin follows internal support triage from list → detail → launch health.
+// Kilo Admin follows internal support triage from list → detail → org/user support.
 const REVIEW_SECTIONS: {
   id: string;
   label: string;
@@ -203,13 +201,6 @@ const REVIEW_SECTIONS: {
     visibility: 'kilo_admin',
   },
   {
-    id: 'admin-readiness',
-    label: 'Launch/backfill readiness',
-    title: 'Launch/backfill readiness',
-    url: '/admin/kiloclaw',
-    visibility: 'kilo_admin',
-  },
-  {
     id: 'admin-org-support',
     label: 'Organization support KiloClaw section',
     title: 'Organization support KiloClaw section',
@@ -221,13 +212,6 @@ const REVIEW_SECTIONS: {
     label: 'User support KiloClaw tab',
     title: 'User support KiloClaw tab',
     url: '/admin/users/[id]?tab=kiloclaw',
-    visibility: 'kilo_admin',
-  },
-  {
-    id: 'admin-observability',
-    label: 'Change logs, filters, support notes',
-    title: 'Change logs, filters, support notes',
-    url: '/admin/kiloclaw and related detail pages',
     visibility: 'kilo_admin',
   },
   // (0) Cross-PR navigation surfaces
@@ -271,8 +255,8 @@ const REVIEW_SECTIONS: {
   // (5–6) Org Settings
   {
     id: 'pr4a',
-    label: 'Organization Settings',
-    title: 'Organization Settings',
+    label: 'Organization settings',
+    title: 'Organization settings',
     url: '/organizations/[id]/settings',
     visibility: 'admin',
   },
@@ -339,15 +323,20 @@ function RoleSwitcher({ role, onChange }: { role: Role; onChange: (next: Role) =
     <div className="space-y-2">
       <p className="text-muted-foreground text-xs uppercase tracking-wide">View as</p>
       <Select value={role} onValueChange={value => onChange(value as Role)}>
-        <SelectTrigger className="w-full">
+        <SelectTrigger className={roleSwitcherStyles.trigger}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className={roleSwitcherStyles.content}>
           {ROLE_OPTIONS.map(opt => (
-            <SelectItem key={opt.value} value={opt.value}>
-              <div className="flex flex-col items-start">
-                <span className="text-foreground font-medium">{opt.label}</span>
-                <span className="text-muted-foreground text-xs">{opt.description}</span>
+            <SelectItem
+              key={opt.value}
+              value={opt.value}
+              textValue={opt.label}
+              className={roleSwitcherStyles.item}
+            >
+              <div className={roleSwitcherStyles.itemText}>
+                <span className={roleSwitcherStyles.label}>{opt.label}</span>
+                <span className={roleSwitcherStyles.description}>{opt.description}</span>
               </div>
             </SelectItem>
           ))}
@@ -400,7 +389,7 @@ export default function OrgKcBillingPrototypePage() {
         <Section
           id="admin-kiloclaw-list"
           title="Admin KiloClaw list and filters"
-          description="P0 support-readiness view for /admin/kiloclaw: personal/org split, organization-aware search, org billing health stats, trial kind badges, and operational filters."
+          description="P0 support-readiness view for /admin/kiloclaw: keeps the existing stats, chart, search, filters, bulk selection, version controls, sorting, pagination, and row navigation, then adds org billing context."
           url="/admin/kiloclaw"
           roles="kilo_admin"
         >
@@ -415,7 +404,7 @@ export default function OrgKcBillingPrototypePage() {
         <Section
           id="admin-kiloclaw-detail"
           title="Instance billing support card"
-          description="P0 detail-page support card for /admin/kiloclaw/[id]. Shows normalized org billing state, org funding, parent entitlement, Enterprise opt-out, IDs, links, and change-log access."
+          description="P0 detail-page support card for /admin/kiloclaw/[id]. Keeps existing instance information and destructive/runtime controls, then adds normalized org billing state, org funding, parent entitlement, Enterprise opt-out, IDs, links, and change-log access."
           url="/admin/kiloclaw/[id]"
           roles="kilo_admin"
         >
@@ -452,18 +441,6 @@ export default function OrgKcBillingPrototypePage() {
         </Section>
 
         <Section
-          id="admin-readiness"
-          title="Launch and backfill readiness"
-          description="P0 read-only launch health card for /admin/kiloclaw: launch date, missing subscription rows, backfill integrity, renewal pressure, and incident counts."
-          url="/admin/kiloclaw"
-          roles="kilo_admin"
-        >
-          <Variant label="Launch health with actionable counts">
-            <KiloAdminBillingReadinessCardPreview readiness={kiloAdminKiloclawReadinessFixture} />
-          </Variant>
-        </Section>
-
-        <Section
           id="admin-org-support"
           title="Organization support KiloClaw section"
           description="P1 organization admin page section: aggregate org KC health, active instances, trial split, opt-out value, total renewal cost, credit balance, and per-instance links."
@@ -487,34 +464,26 @@ export default function OrgKcBillingPrototypePage() {
           </Variant>
         </Section>
 
-        <Section
-          id="admin-observability"
-          title="Change logs, incident filters, and support notes"
-          description="P2 convenience and observability: direct change-log access from detail pages, saved incident queues, and inline support copy for org KC billing invariants."
-          url="/admin/kiloclaw and related detail pages"
-          roles="kilo_admin"
-        >
-          <Variant label="Support-focused saved filters and documentation copy">
-            <KiloAdminObservabilityPreview />
-          </Variant>
-        </Section>
-
         {/* (0) Sidebar + dashboard navigation · PR 1 + PR 4a ======================== */}
         <Section
           id="navigation"
           title="Sidebar and dashboard navigation"
-          description="Cross-PR navigation deltas. PR 1 adds a 'Subscription' entry under the KiloClaw sub-nav so the new Subscription tab is reachable in one click. PR 4a renames the org-level 'Providers and models' item to 'Settings' (the existing tab is hosted inside the new Settings page) and adds a second 'Organization Settings' CTA on the dashboard alongside the preserved 'Models & Providers' CTA."
+          description="Cross-PR navigation deltas. PR 1 adds a 'Subscription' entry under the KiloClaw sub-nav so the new Subscription tab is reachable in one click. PR 4a renames the org-level 'Providers and models' item to 'Settings' (the existing tab is hosted inside the new Settings page) and adds a second 'KiloClaw Settings' CTA on the dashboard alongside the preserved 'Models & Providers' CTA."
           url="/organizations/[id]/* (sidebar) and /organizations/[id] (dashboard)"
         >
           <Variant
             label="Organization sidebar after both changes"
-            caption="'Settings' replaces 'Providers and models' at the org level. A new 'Subscription' sub-item appears under the KiloClaw section."
+            caption={
+              role === 'member'
+                ? 'Members see KiloClaw navigation, but not org Subscriptions or org Settings.'
+                : "'Settings' replaces 'Providers and models' at the org level. A new 'Subscription' sub-item appears under the KiloClaw section."
+            }
           >
-            <SidebarPreview />
+            <SidebarPreview role={role === 'member' ? 'member' : 'admin'} />
           </Variant>
           <Variant
             label="Organization dashboard CTAs"
-            caption="'Models & Providers' is preserved (deep-links to Settings with the providers tab pre-selected); a new 'Organization Settings' CTA links to the bare Settings page."
+            caption="'Models & Providers' is preserved (deep-links to Settings with the providers tab pre-selected); a new 'KiloClaw Settings' CTA links to the KiloClaw tab."
             roles="admin"
           >
             <DashboardCTAsPreview />
@@ -736,7 +705,7 @@ export default function OrgKcBillingPrototypePage() {
           </Variant>
           <Variant
             label="Disabled by your organization"
-            caption="Yellow note rather than red — admin-controlled, reversible from settings"
+            caption="Yellow note rather than red, admin-controlled and reversible from settings"
           >
             <OrgKiloClawDetailPreview
               row={detailRowFixtures.blockedOptOut}
@@ -748,8 +717,8 @@ export default function OrgKcBillingPrototypePage() {
         {/* (5) Organization Settings · PR 4a ======================================== */}
         <Section
           id="pr4a"
-          title="Organization Settings (with new tabs)"
-          description="The existing 'Providers and models' page becomes a tab inside a new Organization Settings page. The KiloClaw access controls (next section) slot in as a second tab. The default landing tab is preserved so existing links keep working."
+          title="Organization settings (with new tabs)"
+          description="The existing 'Providers and models' page becomes a tab inside a new organization settings page. The KiloClaw access controls (next section) slot in as a second tab. The default landing tab is preserved so existing links keep working."
           url="/organizations/[id]/settings"
           roles="admin"
         >
@@ -1085,7 +1054,7 @@ export default function OrgKcBillingPrototypePage() {
           </Variant>
           <Variant
             label="Disabled by your organization"
-            caption="An owner turned KiloClaw off in Organization Settings"
+            caption="An owner turned KiloClaw off in organization settings"
             roles="admin"
           >
             <OrgSubscriptionPagePreview status={adminFixtures.blockedOptOut} />

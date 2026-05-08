@@ -8,8 +8,7 @@
 
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { forwardRef, useState } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
@@ -20,11 +19,13 @@ import {
   Cpu,
   CreditCard,
   ExternalLink,
+  FileText,
   KeyRound,
   LayoutDashboard,
   Loader2,
   MessageSquare,
   Receipt,
+  Search,
   Settings,
   ShieldOff,
   Sparkles,
@@ -45,7 +46,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -63,7 +63,6 @@ import {
   type CreditBillingEntry,
   type KiloAdminChangeLogEntry,
   type KiloAdminKiloclawInstanceRow,
-  type KiloAdminKiloclawReadiness,
   type KiloAdminKiloclawStats,
   type KiloAdminOrgSupportSummary,
   type KiloAdminUserSupportSummary,
@@ -80,6 +79,24 @@ import {
 function pluralizeDays(n: number): string {
   return n === 1 ? '1 day' : `${n} days`;
 }
+
+const Link = forwardRef<
+  HTMLAnchorElement,
+  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & { href: string }
+>(function PrototypeLink({ href, onClick, ...props }, ref) {
+  return (
+    <a
+      ref={ref}
+      href={href.startsWith('#') ? href : '#'}
+      data-prototype-href={href}
+      onClick={event => {
+        onClick?.(event);
+        if (!event.defaultPrevented && !href.startsWith('#')) event.preventDefault();
+      }}
+      {...props}
+    />
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Shared chrome
@@ -256,12 +273,10 @@ function SidebarNavRow({
   icon: Icon,
   label,
   indent,
-  badge,
 }: {
   icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
   label: string;
   indent?: boolean;
-  badge?: 'new' | 'renamed';
 }) {
   return (
     <div
@@ -272,23 +287,20 @@ function SidebarNavRow({
     >
       <Icon className="h-4 w-4" aria-hidden />
       <span className="flex-1 truncate">{label}</span>
-      {badge && (
-        <span className="bg-foreground/5 text-foreground ring-foreground/15 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1">
-          {badge}
-        </span>
-      )}
     </div>
   );
 }
 
-export function SidebarPreview() {
+export function SidebarPreview({ role = 'admin' }: { role?: 'admin' | 'member' }) {
+  const canManageOrganization = role === 'admin';
+
   return (
     <div className="bg-muted/10 max-w-[280px] rounded-xl border p-3">
       <p className="text-muted-foreground px-2 pb-2 text-xs uppercase tracking-wide">Acme Inc.</p>
       <div className="space-y-0.5">
         <SidebarNavRow icon={LayoutDashboard} label="Dashboard" />
-        <SidebarNavRow icon={Receipt} label="Subscriptions" />
-        <SidebarNavRow icon={Settings} label="Settings" badge="renamed" />
+        {canManageOrganization && <SidebarNavRow icon={Receipt} label="Subscriptions" />}
+        {canManageOrganization && <SidebarNavRow icon={Settings} label="Settings" />}
       </div>
       <div className="border-border/60 mt-3 space-y-0.5 border-t pt-3">
         <div className="flex items-center gap-2 px-2 py-1">
@@ -296,7 +308,7 @@ export function SidebarPreview() {
           <span className="text-muted-foreground text-xs uppercase tracking-wide">KiloClaw</span>
         </div>
         <SidebarNavRow icon={MessageSquare} label="Chat" indent />
-        <SidebarNavRow icon={CreditCard} label="Subscription" indent badge="new" />
+        <SidebarNavRow icon={CreditCard} label="Subscription" indent />
         <SidebarNavRow icon={Settings} label="Settings" indent />
       </div>
     </div>
@@ -313,9 +325,9 @@ export function DashboardCTAsPreview() {
         </Link>
       </Button>
       <Button variant="outline" asChild>
-        <Link href="/organizations/mock-org/settings">
+        <Link href="/organizations/mock-org/settings?tab=kiloclaw">
           <Settings aria-hidden />
-          Organization Settings
+          KiloClaw Settings
         </Link>
       </Button>
     </div>
@@ -461,7 +473,7 @@ function AdminOrgSubscriptionView({ status }: { status: AdminBillingStatus }) {
               Anyone in your organization can provision an instance.
             </p>
           </div>
-          <Button variant="default" asChild>
+          <Button variant="default" className={KILO_PRIMARY_BUTTON_CLASS} asChild>
             <Link href="/organizations/mock-org/claw/new">
               Provision KiloClaw
               <ChevronRight />
@@ -539,7 +551,7 @@ function AdminOrgSubscriptionView({ status }: { status: AdminBillingStatus }) {
 
         {operational.kind === 'past_due' && (
           <div>
-            <Button variant="default" asChild>
+            <Button variant="default" className={KILO_PRIMARY_BUTTON_CLASS} asChild>
               <Link href="/organizations/mock-org/payment-details">
                 <CreditCard /> Top up organization credits
               </Link>
@@ -551,7 +563,7 @@ function AdminOrgSubscriptionView({ status }: { status: AdminBillingStatus }) {
             <Button variant="outline" asChild>
               <Link href="/organizations/mock-org/subscription">
                 Manage organization subscription
-                <ExternalLink />
+                <ExternalLink className="!size-3.5" />
               </Link>
             </Button>
           </div>
@@ -561,7 +573,7 @@ function AdminOrgSubscriptionView({ status }: { status: AdminBillingStatus }) {
             <Button variant="outline" asChild>
               <Link href="/organizations/mock-org/settings?tab=kiloclaw">
                 Manage in organization settings
-                <ExternalLink />
+                <ExternalLink className="!size-3.5" />
               </Link>
             </Button>
           </div>
@@ -655,6 +667,9 @@ function MemberOrgSubscriptionView({ status }: { status: MemberBillingStatus }) 
 // `bg-amber-500`)? DESIGN.md "Blue Is Inline Rule" prohibits blue and other
 // status colors as button backgrounds. Production banner-button migration is
 // a separate piece of work; this prototype demonstrates the target shape.
+const KILO_PRIMARY_BUTTON_CLASS =
+  'bg-brand-primary text-primary-foreground shadow-none hover:bg-brand-primary/90 focus-visible:ring-brand-primary/40';
+
 const BANNER_BUTTON_CLASS =
   'bg-transparent border border-foreground/20 text-foreground shadow-none hover:bg-foreground/10 hover:text-foreground';
 
@@ -837,7 +852,7 @@ export function OrgBillingBannerPreview({ status }: { status: OrgBillingStatus }
             <Banner.Title>KiloClaw is disabled</Banner.Title>
             <Banner.Description>
               {role === 'admin'
-                ? 'Re-enable in Organization Settings.'
+                ? 'Re-enable in organization settings.'
                 : 'Your administrator turned KiloClaw off for this organization.'}
             </Banner.Description>
           </Banner.Content>
@@ -923,7 +938,7 @@ export function OrgAccessLockedDialogPreview({ status }: { status: OrgBillingSta
         </div>
         <div className="flex w-full max-w-sm flex-col gap-2">
           {content.cta && (
-            <Button variant="default" asChild>
+            <Button variant="default" className={KILO_PRIMARY_BUTTON_CLASS} asChild>
               <Link href={content.cta.href}>{content.cta.label}</Link>
             </Button>
           )}
@@ -964,9 +979,12 @@ export function OrgDestroyConfirmDialogPreview({
         )}
       </ul>
       <div className="flex justify-end gap-2">
-        <Button variant="ghost">Cancel</Button>
-        <Button variant="destructive">
-          <Trash2 /> Destroy
+        <Button variant="outline">Cancel</Button>
+        <Button
+          variant="destructive"
+          className="bg-red-500 text-white hover:bg-red-500/90 focus-visible:ring-red-500/40"
+        >
+          <Trash2 className="size-4" /> Destroy
         </Button>
       </div>
     </div>
@@ -1019,7 +1037,9 @@ export function OrgProvisionPreflightPreview({ preflight }: { preflight: OrgProv
                 </p>
               </div>
             )}
-            <Button variant="default">Create instance</Button>
+            <Button variant="default" className={KILO_PRIMARY_BUTTON_CLASS}>
+              Create instance
+            </Button>
           </CardContent>
         </Card>
       );
@@ -1134,7 +1154,7 @@ function PreflightBlockCard({
           <p className="text-muted-foreground text-sm">{description}</p>
         </div>
         {cta && (
-          <Button variant="default" asChild>
+          <Button variant="default" className={KILO_PRIMARY_BUTTON_CLASS} asChild>
             <Link href={cta.href}>
               {cta.label}
               <ChevronRight />
@@ -1188,6 +1208,8 @@ export function OrgSettingsPagePreview({
   optOut: boolean;
   onOptOutChange: (next: boolean) => void;
 }) {
+  const [settingsTab, setSettingsTab] = useState('providers-and-models');
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -1195,7 +1217,7 @@ export function OrgSettingsPagePreview({
         backLabel="Back to organization"
         title="Organization settings"
       />
-      <Tabs defaultValue="providers-and-models" className="space-y-6">
+      <Tabs value={settingsTab} onValueChange={setSettingsTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="providers-and-models">Providers and models</TabsTrigger>
           <TabsTrigger value="kiloclaw">KiloClaw</TabsTrigger>
@@ -1223,6 +1245,37 @@ export function OrgSettingsPagePreview({
   );
 }
 
+function PrototypeSwitch({
+  checked,
+  onCheckedChange,
+  ariaLabel,
+}: {
+  checked: boolean;
+  onCheckedChange: (next: boolean) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      onClick={() => onCheckedChange(!checked)}
+      className={cn(
+        'focus-visible:ring-ring inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+        checked ? 'bg-brand-primary' : 'bg-input'
+      )}
+    >
+      <span
+        className={cn(
+          'bg-background block h-5 w-5 rounded-full shadow-lg transition-transform',
+          checked ? 'translate-x-5' : 'translate-x-0'
+        )}
+      />
+    </button>
+  );
+}
+
 export function KiloClawTabPreview({
   plan,
   optOut,
@@ -1247,7 +1300,9 @@ export function KiloClawTabPreview({
               KiloClaw access controls are available on Enterprise plans. Contact sales to upgrade.
             </p>
           </div>
-          <Button variant="default">Contact sales</Button>
+          <Button variant="default" className={KILO_PRIMARY_BUTTON_CLASS} asChild>
+            <Link href="/contact-sales">Contact sales</Link>
+          </Button>
         </CardContent>
       </Card>
     );
@@ -1273,7 +1328,7 @@ export function KiloClawTabPreview({
         <CardContent>
           {/* Setting row sits directly inside CardContent: nested cards (Card >
            * CardContent > rounded-xl border) are an absolute ban. Spacing and
-           * the Switch's gravity carry the affordance. */}
+           * the switch control's gravity carry the affordance. */}
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 space-y-1">
               <p className="font-medium">Disable KiloClaw for this organization</p>
@@ -1282,7 +1337,11 @@ export function KiloClawTabPreview({
                 subscriptions remain in their current period and stop at period end.
               </p>
             </div>
-            <Switch checked={optOut} onCheckedChange={handleToggle} aria-label="Disable KiloClaw" />
+            <PrototypeSwitch
+              checked={optOut}
+              onCheckedChange={handleToggle}
+              ariaLabel="Disable KiloClaw"
+            />
           </div>
         </CardContent>
       </Card>
@@ -1368,7 +1427,7 @@ export function OrgKiloClawDetailPreview({
       // from Organization Settings, not a billing failure.
       return {
         tone: 'yellow' as const,
-        copy: 'KiloClaw is disabled for this organization. Re-enable it in Organization Settings to restore access.',
+        copy: 'KiloClaw is disabled for this organization. Re-enable it in organization settings to restore access.',
       };
     return null;
   })();
@@ -1384,7 +1443,7 @@ export function OrgKiloClawDetailPreview({
           <Button variant="outline" size="sm" asChild>
             <Link href="/organizations/mock-org/claw/settings">
               Open KiloClaw settings
-              <ExternalLink />
+              <ExternalLink className="!size-3.5" />
             </Link>
           </Button>
         }
@@ -1397,7 +1456,7 @@ export function OrgKiloClawDetailPreview({
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <CardKV label="Plan">Standard</CardKV>
+            <CardKV label="Plan">Organization</CardKV>
             <CardKV label="Price" mono>
               {formatMicrodollars(row.renewalCostMicrodollars)} / month from credits
             </CardKV>
@@ -1452,7 +1511,7 @@ export function OrgKiloClawDetailPreview({
                     <td className="px-4 py-3">{entry.description}</td>
                     <td className="px-4 py-3 font-mono">
                       {entry.amountMicrodollars === 0
-                        ? '—'
+                        ? 'No charge'
                         : formatMicrodollars(entry.amountMicrodollars)}
                     </td>
                   </tr>
@@ -1465,26 +1524,6 @@ export function OrgKiloClawDetailPreview({
           </Button>
         </CardContent>
       </Card>
-
-      {/*
-       * Internal IDs are operator-debug detail. A full Card here would compete
-       * with primary content; collapse them behind a `<details>` so admins can
-       * pop them open when they need a copy/paste handle.
-       */}
-      <details className="group rounded-md border px-4 py-3">
-        <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center justify-between gap-2 text-xs uppercase tracking-wide [&::-webkit-details-marker]:hidden">
-          Internal IDs
-          <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
-        </summary>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <CardKV label="Instance ID" mono>
-            {row.instanceId}
-          </CardKV>
-          <CardKV label="Subscription ID" mono>
-            sub_kc_org_92ad17
-          </CardKV>
-        </div>
-      </details>
     </div>
   );
 }
@@ -1569,17 +1608,12 @@ function OrgKiloClawSubscriptionRow({ row }: { row: KiloClawOrgSubscriptionRow }
       className={cn('group relative cursor-pointer', row.status === 'canceled' && 'opacity-60')}
     >
       <TableCell className="px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
-            <KiloCrabIcon className="text-foreground h-4 w-4" />
-          </div>
-          <Link
-            href={`/organizations/mock-org/subscriptions/kiloclaw/${row.instanceId}`}
-            className="font-medium before:absolute before:inset-0 group-hover:underline"
-          >
-            {row.instanceName ?? 'Unnamed'}
-          </Link>
-        </div>
+        <Link
+          href={`/organizations/mock-org/subscriptions/kiloclaw/${row.instanceId}`}
+          className="font-medium before:absolute before:inset-0 group-hover:underline"
+        >
+          {row.instanceName ?? 'Unnamed'}
+        </Link>
       </TableCell>
       <TableCell className="py-3">
         <div className="flex flex-wrap gap-1.5">
@@ -1967,6 +2001,26 @@ export function OrgDashboardWithBannerAndTile({
 // Kilo Admin — internal support and ops previews
 // ---------------------------------------------------------------------------
 
+function StatPillLike({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+}) {
+  return (
+    <div className="flex flex-1 flex-col gap-0.5">
+      <span className="text-muted-foreground text-[11px] font-semibold tracking-[0.06em] uppercase">
+        {label}
+      </span>
+      <span className="text-2xl font-bold tabular-nums">{value}</span>
+      {hint && <span className="text-muted-foreground text-xs">{hint}</span>}
+    </div>
+  );
+}
+
 function AdminMetric({
   label,
   value,
@@ -2037,7 +2091,7 @@ function ParentEntitlementBadge({
 }: {
   state: KiloAdminKiloclawInstanceRow['parentEntitlement'];
 }) {
-  if (!state) return <span className="text-muted-foreground">—</span>;
+  if (!state) return <span className="text-muted-foreground">None</span>;
   const className =
     state === 'active'
       ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
@@ -2047,6 +2101,22 @@ function ParentEntitlementBadge({
   return (
     <Badge variant="outline" className={cn('rounded-full border-transparent ring-1', className)}>
       {state.replace('_', ' ')}
+    </Badge>
+  );
+}
+
+function AdminRuntimeBadge({ suspended }: { suspended: boolean }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        'rounded-full border-transparent text-[11px] ring-1',
+        suspended
+          ? 'bg-yellow-500/10 text-yellow-400 ring-yellow-500/20'
+          : 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
+      )}
+    >
+      {suspended ? 'Suspended' : 'Active'}
     </Badge>
   );
 }
@@ -2068,343 +2138,203 @@ export function KiloAdminKiloclawListPreview({
   stats: KiloAdminKiloclawStats;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+        <Card>
+          <CardContent className="flex flex-wrap gap-x-8 gap-y-4 py-4">
+            <StatPillLike
+              label="Total"
+              value={stats.totalInstances.toLocaleString()}
+              hint="existing overview card"
+            />
+            <StatPillLike label="Organization" value={stats.organizationCount} />
+            <StatPillLike label="Personal" value={stats.personalCount} />
+            <StatPillLike
+              label="Needs attention"
+              value={stats.pastDueCount + stats.suspendedCount + stats.blockedParentCount}
+              hint={`${stats.pastDueCount} past due · ${stats.suspendedCount} suspended`}
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm font-medium">Daily instances</CardTitle>
+            <CardDescription className="text-xs">
+              Existing created/destroyed chart remains above the table.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pb-3">
+            <div className="border-border bg-muted/20 flex h-[96px] items-end gap-2 rounded-lg border px-4 py-3">
+              {[28, 52, 36, 68, 44, 82, 56, 72, 38, 64, 48, 78].map((height, index) => (
+                <div key={index} className="flex flex-1 items-end gap-1">
+                  <span className="block w-full rounded-sm bg-emerald-500/70" style={{ height }} />
+                  <span
+                    className="block w-full rounded-sm bg-red-500/60"
+                    style={{ height: Math.max(12, height - 24) }}
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <CardTitle>All KiloClaw instances</CardTitle>
               <CardDescription>
-                Org-aware list, filters, search, and support metadata for `/admin/kiloclaw`.
+                Existing admin list with org-billing columns added; search, filters, selection,
+                version controls, sorting, and pagination stay intact.
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm">
-              Export filtered CSV
+            <Button variant="destructive" size="sm">
+              Nuke all (dev)
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-            <div className="border-input bg-background flex h-9 items-center gap-2 rounded-md border px-3 text-sm">
-              <SearchIcon />
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="border-input bg-background flex h-9 min-w-[320px] flex-1 items-center gap-2 rounded-md border px-3 text-sm">
+              <Search className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
               <span className="text-muted-foreground truncate">
-                Search instance, user email, organization ID/name…
+                Search by user ID, sandbox ID, or instance ID…
               </span>
             </div>
-            <ReadonlyFilterPill label="Scope" value="All · Personal · Organization" />
-            <ReadonlyFilterPill label="Status" value="active, trialing, past due" />
-            <ReadonlyFilterPill label="Operational" value="blocked / opt-out / canceling" />
+            <Button variant="secondary" size="sm">
+              Search
+            </Button>
+            <ReadonlyFilterPill label="Status" value="All instances" />
+            <ReadonlyFilterPill label="Version" value="All versions" />
+            <Button variant="outline" size="sm">
+              Has size override
+            </Button>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <AdminMetric
-              label="Total instances"
-              value={stats.totalInstances}
-              hint="personal + org"
-            />
-            <AdminMetric
-              label="Organization"
-              value={stats.organizationCount}
-              hint={`${stats.personalCount} personal`}
-            />
-            <AdminMetric
-              label="Org paid active"
-              value={stats.activePaidOrgCount}
-              hint={`${stats.launchTrialingCount} launch trials · ${stats.sevenDayTrialingCount} 7-day trials`}
-              tone="success"
-            />
-            <AdminMetric
-              label="Needs attention"
-              value={
-                stats.pastDueCount +
-                stats.suspendedCount +
-                stats.blockedParentCount +
-                stats.blockedOptOutCount
-              }
-              hint={`${stats.pastDueCount} past due · ${stats.suspendedCount} suspended`}
-              tone="warning"
-            />
-            <AdminMetric label="Canceling" value={stats.cancelingAtPeriodEndCount} />
-            <AdminMetric label="Parent blocked" value={stats.blockedParentCount} tone="danger" />
-            <AdminMetric label="Opt-out blocked" value={stats.blockedOptOutCount} tone="danger" />
-            <AdminMetric label="Destroyed/canceled" value={stats.destroyedCanceledCount} />
+          <div className="text-muted-foreground border-border/60 flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs">
+            <AlertCircle className="h-3 w-3 opacity-60" />
+            <span>Use the checkboxes to select rows for bulk version changes.</span>
           </div>
 
-          <div className="overflow-hidden rounded-xl border">
+          <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableHead className="px-4">Instance</TableHead>
-                  <TableHead>Organization</TableHead>
-                  <TableHead>Associated user</TableHead>
+                <TableRow>
+                  <TableHead className="w-[40px] px-4">
+                    <input type="checkbox" aria-label="Select all visible instances" />
+                  </TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Org</TableHead>
+                  <TableHead>Version</TableHead>
+                  <TableHead>Pin</TableHead>
                   <TableHead>Subscription</TableHead>
-                  <TableHead>Operational</TableHead>
-                  <TableHead>Renews</TableHead>
-                  <TableHead className="w-8 px-4" aria-label="Open" />
+                  <TableHead>Org billing</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Sandbox ID</TableHead>
+                  <TableHead>Destroyed</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map(row => (
-                  <TableRow key={row.instanceId} className="group relative cursor-pointer">
+                {rows.map((row, index) => (
+                  <TableRow key={row.instanceId} className="hover:bg-muted/50 group cursor-pointer">
                     <TableCell className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
-                          <KiloCrabIcon className="text-foreground h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <Link
-                            href={`/admin/kiloclaw/${row.instanceId}`}
-                            className="font-medium before:absolute before:inset-0 group-hover:underline"
-                          >
-                            {row.instanceName ?? 'Unnamed instance'}
-                          </Link>
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            <ScopeBadge scope={row.scope} />
-                            <span className="text-muted-foreground font-mono text-xs">
-                              {row.instanceId}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                      <input type="checkbox" aria-label={`Select instance ${row.sandboxId}`} />
                     </TableCell>
                     <TableCell className="py-3">
-                      {row.organizationId ? (
-                        <div className="flex flex-col leading-tight">
+                      <Link
+                        href={`/admin/users/${row.associatedUserId}`}
+                        className="relative z-10 hover:underline"
+                      >
+                        {row.associatedUserEmail}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <ScopeBadge scope={row.scope} />
+                        {row.organizationId && (
                           <Link
                             href={`/admin/organizations/${row.organizationId}`}
-                            className="relative z-10 text-sm font-medium hover:underline"
+                            className="relative z-10 text-xs hover:underline"
                           >
                             {row.organizationName}
                           </Link>
-                          <span className="text-muted-foreground text-xs capitalize">
-                            {row.organizationPlan}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">Personal</span>
-                      )}
+                        )}
+                      </div>
                     </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex flex-col leading-tight">
-                        <Link
-                          href={`/admin/users/${row.associatedUserId}`}
-                          className="relative z-10 text-sm font-medium hover:underline"
-                        >
-                          {row.associatedUserDisplayName}
-                        </Link>
-                        <span className="text-muted-foreground text-xs">
-                          {row.associatedUserEmail}
+                    <TableCell className="py-3 text-xs">
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          v2026.05.{String(index + 8).padStart(2, '0')}
+                        </span>
+                        <span className="text-muted-foreground font-mono">
+                          openclaw-{index + 31}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell className="py-3">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap gap-1.5">
-                          {row.subscriptionStatus ? (
-                            <Badge variant="outline" className="rounded-full text-[11px]">
-                              {row.subscriptionStatus.replace('_', ' ')}
-                            </Badge>
-                          ) : (
-                            <Badge variant="destructive" className="rounded-full text-[11px]">
-                              missing row
-                            </Badge>
-                          )}
-                          <TrialBadge
-                            trialKind={row.trialKind}
-                            isLaunchBackfill={row.isLaunchBackfill}
-                          />
-                        </div>
-                        <p className="text-muted-foreground text-xs">
-                          {row.paymentSource === 'credits'
-                            ? row.providerSubscriptionId
-                              ? 'hybrid credits'
-                              : 'pure credits'
-                            : 'Stripe'}
-                        </p>
-                      </div>
+                      {index % 3 === 0 ? (
+                        <Badge
+                          variant="outline"
+                          className="border-transparent bg-purple-500/20 text-purple-400 ring-1 ring-purple-500/20"
+                        >
+                          Admin pin
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">None</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      {row.subscriptionStatus ? (
+                        <Badge variant="outline" className="rounded-full text-[11px]">
+                          {row.subscriptionStatus.replace('_', ' ')}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Missing</span>
+                      )}
                     </TableCell>
                     <TableCell className="py-3">
                       <div className="flex flex-wrap gap-1.5">
                         <OperationalBadge kind={row.operationalKind} />
-                        {row.suspendedAt && <StatusBadge kind="past_due" />}
+                        <TrialBadge
+                          trialKind={row.trialKind}
+                          isLaunchBackfill={row.isLaunchBackfill}
+                        />
                       </div>
                     </TableCell>
-                    <TableCell className="py-3 font-mono text-sm tabular-nums">
-                      {formatDate(row.creditRenewalAt ?? row.currentPeriodEnd)}
+                    <TableCell className="py-3">
+                      <AdminRuntimeBadge suspended={Boolean(row.suspendedAt)} />
                     </TableCell>
-                    <TableCell className="w-8 px-4 py-3 text-right">
-                      <ChevronRight className="text-muted-foreground h-4 w-4" />
+                    <TableCell className="text-muted-foreground py-3 text-sm">2d ago</TableCell>
+                    <TableCell className="text-muted-foreground max-w-[130px] truncate py-3 font-mono text-xs">
+                      {row.sandboxId}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground py-3 text-sm">
+                      {row.subscriptionStatus === 'canceled' ? '12d ago' : 'Not destroyed'}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
-function SearchIcon() {
-  return (
-    <svg
-      className="text-muted-foreground h-4 w-4 shrink-0"
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
-    </svg>
-  );
-}
-
-export function KiloAdminBillingReadinessCardPreview({
-  readiness,
-}: {
-  readiness: KiloAdminKiloclawReadiness;
-}) {
-  const hasLaunchRisks =
-    readiness.activeOrgInstancesWithoutSubscription > 0 ||
-    readiness.launchBackfillRowsMissingFlag > 0;
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <CardTitle>Launch and backfill readiness</CardTitle>
-            <CardDescription>
-              Read-only health check for `KILOCLAW_ORG_BILLING_LAUNCH_DATE` and launch backfill.
-            </CardDescription>
-          </div>
-          <Badge
-            variant="outline"
-            className={cn(
-              'rounded-full border-transparent ring-1',
-              hasLaunchRisks
-                ? 'bg-yellow-500/10 text-yellow-400 ring-yellow-500/20'
-                : 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
-            )}
-          >
-            {hasLaunchRisks ? 'Needs review' : 'Ready'}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <AdminMetric
-            label="Launch date"
-            value={readiness.launchDate ? formatDate(readiness.launchDate) : 'Unset'}
-            hint="environment config"
-            tone={readiness.launchDate ? 'success' : 'warning'}
-          />
-          <AdminMetric
-            label="Missing billing rows"
-            value={readiness.activeOrgInstancesWithoutSubscription}
-            hint="active org instances"
-            tone={readiness.activeOrgInstancesWithoutSubscription > 0 ? 'danger' : 'success'}
-          />
-          <AdminMetric
-            label="Launch trials"
-            value={readiness.launchTrialRows}
-            hint={`common end ${formatDate(readiness.commonLaunchTrialEnd)}`}
-          />
-          <AdminMetric
-            label="Due within 7d"
-            value={readiness.orgRowsDueWithin7Days}
-            hint="org KC renewals"
-            tone="warning"
-          />
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ReadinessChecklist
-            title="Backfill integrity"
-            items={[
-              {
-                label: 'Active org instances have canonical subscription rows',
-                ok: readiness.activeOrgInstancesWithoutSubscription === 0,
-                detail: `${readiness.activeOrgInstancesWithoutSubscription} missing`,
-              },
-              {
-                label: 'Expected launch rows carry is_launch_backfill',
-                ok: readiness.launchBackfillRowsMissingFlag === 0,
-                detail: `${readiness.launchBackfillRowsMissingFlag} missing flag`,
-              },
-              {
-                label: 'Backfill sweep has run after launch',
-                ok: Boolean(readiness.lastBackfillSweepAt),
-                detail: readiness.lastBackfillSweepAt
-                  ? formatDate(readiness.lastBackfillSweepAt)
-                  : 'never',
-              },
-            ]}
-          />
-          <ReadinessChecklist
-            title="Incident pressure"
-            items={[
-              {
-                label: 'Past-due org KC subscriptions',
-                ok: readiness.pastDueCount === 0,
-                detail: `${readiness.pastDueCount} past due`,
-              },
-              {
-                label: 'Suspended org KC subscriptions',
-                ok: readiness.suspendedCount === 0,
-                detail: `${readiness.suspendedCount} suspended`,
-              },
-              {
-                label: 'Renewals due in the next 7 days are reviewable',
-                ok: readiness.orgRowsDueWithin7Days < 25,
-                detail: `${readiness.orgRowsDueWithin7Days} rows`,
-              },
-            ]}
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ReadinessChecklist({
-  title,
-  items,
-}: {
-  title: string;
-  items: Array<{ label: string; ok: boolean; detail: string }>;
-}) {
-  return (
-    <div className="rounded-xl border p-4">
-      <p className="text-sm font-semibold">{title}</p>
-      <div className="mt-3 space-y-3">
-        {items.map(item => (
-          <div key={item.label} className="flex items-start gap-3">
-            <span
-              className={cn(
-                'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px]',
-                item.ok
-                  ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20'
-                  : 'bg-yellow-500/10 text-yellow-400 ring-1 ring-yellow-500/20'
-              )}
-            >
-              {item.ok ? '✓' : '!'}
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm">{item.label}</p>
-              <p className="text-muted-foreground text-xs">{item.detail}</p>
+          <div className="flex items-center justify-between">
+            <div className="text-muted-foreground text-sm">
+              Showing 1 to {rows.length} of 742 instances
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm">
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </Button>
+              <span className="text-sm">Page 1 of 38</span>
+              <Button variant="outline" size="sm">
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-        ))}
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -2459,14 +2389,14 @@ export function KiloAdminInstanceBillingSupportPreview({
             <Button variant="outline" size="sm" asChild>
               <Link href={`/admin/users/${row.associatedUserId}`}>
                 User admin
-                <ExternalLink />
+                <ExternalLink className="!size-3.5" />
               </Link>
             </Button>
             {row.organizationId && (
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/admin/organizations/${row.organizationId}`}>
                   Org admin
-                  <ExternalLink />
+                  <ExternalLink className="!size-3.5" />
                 </Link>
               </Button>
             )}
@@ -2475,6 +2405,52 @@ export function KiloAdminInstanceBillingSupportPreview({
       />
 
       {callout && <NoteCallout tone={callout.tone} copy={callout.copy} />}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle>Instance information</CardTitle>
+              <CardDescription>
+                Existing detail-page controls and runtime identity remain; org billing adds context
+                below instead of replacing this card.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <AdminRuntimeBadge suspended={Boolean(row.suspendedAt)} />
+              <Button variant="destructive" size="sm">
+                <Trash2 className="mr-1 size-4" /> Destroy instance
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <CardKV label="User">
+            <Link href={`/admin/users/${row.associatedUserId}`} className="hover:underline">
+              {row.associatedUserEmail}
+            </Link>
+          </CardKV>
+          <CardKV label="Sandbox ID" mono>
+            {row.sandboxId}
+          </CardKV>
+          <CardKV label="Created">2 days ago</CardKV>
+          <CardKV label="Destroyed">Not destroyed</CardKV>
+          <CardKV label="Type">
+            <ScopeBadge scope={row.scope} />
+          </CardKV>
+          <CardKV label="Instance ID" mono>
+            {row.instanceId}
+          </CardKV>
+          {row.organizationId && (
+            <CardKV label="Organization ID" mono>
+              {row.organizationId}
+            </CardKV>
+          )}
+          <CardKV label="Fly app" mono>
+            {row.sandboxId}
+          </CardKV>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <Card>
@@ -2508,12 +2484,12 @@ export function KiloAdminInstanceBillingSupportPreview({
               </CardKV>
               <CardKV label="Renewal cost" mono>
                 {row.renewalCostMicrodollars == null
-                  ? '—'
+                  ? 'Not set'
                   : formatMicrodollars(row.renewalCostMicrodollars)}
               </CardKV>
               <CardKV label="Trial">
                 <TrialBadge trialKind={row.trialKind} isLaunchBackfill={row.isLaunchBackfill} />
-                {!row.trialKind && <span className="text-muted-foreground">—</span>}
+                {!row.trialKind && <span className="text-muted-foreground">No trial</span>}
               </CardKV>
               <CardKV label="Parent entitlement">
                 <ParentEntitlementBadge state={row.parentEntitlement} />
@@ -2561,7 +2537,7 @@ export function KiloAdminInstanceBillingSupportPreview({
                   href={`/organizations/${row.organizationId ?? 'personal'}/subscriptions/kiloclaw/${row.instanceId}`}
                 >
                   Customer subscription page
-                  <ExternalLink />
+                  <ExternalLink className="!size-3.5" />
                 </Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
@@ -2587,10 +2563,10 @@ export function KiloAdminInstanceBillingSupportPreview({
               {row.sandboxId}
             </CardKV>
             <CardKV label="Subscription ID" mono>
-              {row.subscriptionId ?? '—'}
+              {row.subscriptionId ?? 'None'}
             </CardKV>
             <CardKV label="Provider subscription" mono>
-              {row.providerSubscriptionId ?? '—'}
+              {row.providerSubscriptionId ?? 'None'}
             </CardKV>
           </CardContent>
         </Card>
@@ -2605,19 +2581,21 @@ export function KiloAdminMutationSafetyPreview() {
   const rows = [
     {
       action: 'Update trial end',
-      personal: 'Allowed for personal trial rows',
-      organization: 'Disabled for org rows; org trial eligibility is historical per user/org.',
+      personal: 'Keep existing personal-trial admin flow.',
+      organization: 'Not available for org rows.',
+      state: 'disabled' as const,
     },
     {
       action: 'Cancel subscription',
-      personal: 'Allowed when the row is personal and active',
-      organization: 'Disabled in MVP; customer-facing termination is Destroy only.',
+      personal: 'Keep existing personal cancellation flow.',
+      organization: 'Customer-facing org termination is Destroy only in MVP.',
+      state: 'disabled' as const,
     },
     {
       action: 'Destroy instance',
-      personal: 'Tears down infra and preserves personal subscription transfer rules',
-      organization:
-        'Allowed only as explicit admin override; must mark destroyed, set cancel_at_period_end, and write both audit logs.',
+      personal: 'Keep existing destroy behavior.',
+      organization: 'Allowed as an explicit override with audit + subscription changelog writes.',
+      state: 'danger' as const,
     },
   ];
 
@@ -2626,46 +2604,57 @@ export function KiloAdminMutationSafetyPreview() {
       <CardHeader>
         <CardTitle>Admin mutation guardrails</CardTitle>
         <CardDescription>
-          Personal-only actions stay disabled for org subscriptions unless an explicit org-safe
-          override is designed.
+          Existing personal controls remain. Org rows only add clear disabled states or explicit
+          audited overrides.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="overflow-hidden rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30 hover:bg-muted/30">
-                <TableHead className="px-4">Action</TableHead>
-                <TableHead>Personal row</TableHead>
-                <TableHead>Organization row</TableHead>
-                <TableHead className="text-right">Prototype state</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map(row => (
-                <TableRow key={row.action}>
-                  <TableCell className="px-4 py-3 font-medium">{row.action}</TableCell>
-                  <TableCell className="py-3 text-sm">{row.personal}</TableCell>
-                  <TableCell className="py-3 text-sm">{row.organization}</TableCell>
-                  <TableCell className="py-3 text-right">
-                    {row.action === 'Destroy instance' ? (
-                      <Button variant="destructive" size="sm">
-                        Admin override
-                      </Button>
-                    ) : (
-                      <Button variant="outline" size="sm" disabled>
-                        Disabled for org row
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 lg:grid-cols-3">
+          {rows.map(row => (
+            <div key={row.action} className="rounded-xl border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-medium">{row.action}</p>
+                {row.state === 'danger' ? (
+                  <Badge variant="destructive" className="rounded-full">
+                    Override
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="rounded-full">
+                    Disabled for org
+                  </Badge>
+                )}
+              </div>
+              <div className="mt-3 space-y-2 text-sm">
+                <p>
+                  <span className="text-muted-foreground">Personal: </span>
+                  {row.personal}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Organization: </span>
+                  {row.organization}
+                </p>
+              </div>
+              <div className="mt-4">
+                {row.state === 'danger' ? (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="bg-red-500 text-white hover:bg-red-500/90"
+                  >
+                    Admin override
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" disabled>
+                    Disabled
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
         <NoteCallout
           tone="yellow"
-          copy="Org destroy copy must call out immediate infrastructure teardown, period-end cancellation, no refund/proration, KiloClaw admin audit log, and subscription change-log entry."
+          copy="Org destroy must call out immediate infrastructure teardown, period-end cancellation, no refund/proration, KiloClaw admin audit log, and subscription change-log entry."
         />
       </CardContent>
     </Card>
@@ -2770,7 +2759,9 @@ export function KiloAdminOrganizationKiloclawPreview({
                   </TableCell>
                   <TableCell className="py-3">
                     <TrialBadge trialKind={row.trialKind} isLaunchBackfill={row.isLaunchBackfill} />
-                    {!row.trialKind && <span className="text-muted-foreground text-sm">—</span>}
+                    {!row.trialKind && (
+                      <span className="text-muted-foreground text-sm">No trial</span>
+                    )}
                   </TableCell>
                   <TableCell className="py-3 font-mono text-sm tabular-nums">
                     {formatDate(row.currentPeriodEnd)}
@@ -2835,7 +2826,7 @@ export function KiloAdminUserKiloclawPreview({
                   <TableHead>Instance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Funding</TableHead>
-                  <TableHead>Action state</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -2868,9 +2859,19 @@ export function KiloAdminUserKiloclawPreview({
                     </TableCell>
                     <TableCell className="py-3 text-sm">{row.orgFundedLabel}</TableCell>
                     <TableCell className="py-3">
-                      <Badge variant="outline" className="rounded-full text-[11px]">
-                        {row.personalActionsDisabledReason}
-                      </Badge>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/admin/kiloclaw/${row.instanceId}`}>Open instance</Link>
+                          </Button>
+                          <Button variant="outline" size="sm" disabled>
+                            Personal actions disabled
+                          </Button>
+                        </div>
+                        <p className="text-muted-foreground max-w-sm text-xs">
+                          {row.personalActionsDisabledReason}
+                        </p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -2884,103 +2885,83 @@ export function KiloAdminUserKiloclawPreview({
 }
 
 export function KiloAdminChangeLogPreview({ entries }: { entries: KiloAdminChangeLogEntry[] }) {
-  return (
-    <Card id="admin-change-log">
-      <CardHeader>
-        <CardTitle>Subscription change log</CardTitle>
-        <CardDescription>
-          Instance and organization pages link here so support can inspect canonical billing
-          mutations without reconstructing state from app logs.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-hidden rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30 hover:bg-muted/30">
-                <TableHead className="px-4">Time</TableHead>
-                <TableHead>Actor</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Before → after</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {entries.map(entry => (
-                <TableRow key={entry.id}>
-                  <TableCell className="px-4 py-3 font-mono text-xs tabular-nums">
-                    {formatDate(entry.timestamp)}
-                  </TableCell>
-                  <TableCell className="py-3 font-mono text-xs">{entry.actor}</TableCell>
-                  <TableCell className="py-3">
-                    <Badge variant="outline" className="rounded-full text-[11px]">
-                      {entry.action}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 text-sm">{entry.reason}</TableCell>
-                  <TableCell className="py-3 text-xs">
-                    <span className="text-muted-foreground">{entry.before}</span>
-                    <span className="text-muted-foreground mx-2">→</span>
-                    <span>{entry.after}</span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-export function KiloAdminObservabilityPreview() {
-  const filters = [
-    'Org past due',
-    'Org suspended',
-    'Launch trials ending within 7 days',
-    'Canceling at period end',
-    'Parent entitlement blocked',
-    'Enterprise opt-out blocked',
-    'Missing billing row / orphaned pair',
-  ];
-  const notes = [
-    'Org KiloClaw is pure credits only; Stripe seat subscriptions are not mutated for KiloClaw.',
-    'Each instance owns one subscription row. Associated user owns operational lifecycle; organization owns funding.',
-    'Parent entitlement and Enterprise opt-out can block access independently of the local KiloClaw status.',
-    'Destroy is the only customer-facing termination path in MVP; support overrides must write admin audit and subscription change logs.',
-  ];
+  const [selectedEntry, setSelectedEntry] = useState<KiloAdminChangeLogEntry | null>(null);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
+    <>
+      <Card id="admin-change-log">
         <CardHeader>
-          <CardTitle>Saved incident filters</CardTitle>
-          <CardDescription>Common support queues for `/admin/kiloclaw`.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {filters.map(filter => (
-            <Button key={filter} variant="outline" size="sm" asChild>
-              <Link href={`/admin/kiloclaw?filter=${encodeURIComponent(filter)}`}>{filter}</Link>
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Inline support notes</CardTitle>
-          <CardDescription>Short invariants surfaced near admin controls.</CardDescription>
+          <CardTitle>Subscription change log</CardTitle>
+          <CardDescription>
+            Instance and organization pages link here so support can inspect canonical billing
+            mutations without reconstructing state from app logs.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="text-muted-foreground space-y-2 text-sm">
-            {notes.map(note => (
-              <li key={note} className="flex gap-2">
-                <span className="text-primary mt-1">•</span>
-                <span>{note}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-hidden rounded-xl border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="px-4">Time</TableHead>
+                  <TableHead>Actor</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead className="w-12 text-right">Diff</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {entries.map(entry => (
+                  <TableRow key={entry.id}>
+                    <TableCell className="px-4 py-3 font-mono text-xs tabular-nums">
+                      {formatDate(entry.timestamp)}
+                    </TableCell>
+                    <TableCell className="py-3 font-mono text-xs">{entry.actor}</TableCell>
+                    <TableCell className="py-3">
+                      <Badge variant="outline" className="rounded-full text-[11px]">
+                        {entry.action}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 text-sm">{entry.reason}</TableCell>
+                    <TableCell className="px-4 py-3 text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`View before and after for ${entry.action}`}
+                        onClick={() => setSelectedEntry(entry)}
+                      >
+                        <FileText className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
-    </div>
+
+      <Dialog open={selectedEntry !== null} onOpenChange={open => !open && setSelectedEntry(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Subscription change details</DialogTitle>
+            <DialogDescription>
+              Before and after payload for {selectedEntry?.action ?? 'this change'}.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEntry && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border p-3">
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">Before</p>
+                <p className="mt-2 font-mono text-sm break-words">{selectedEntry.before}</p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-muted-foreground text-xs uppercase tracking-wide">After</p>
+                <p className="mt-2 font-mono text-sm break-words">{selectedEntry.after}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

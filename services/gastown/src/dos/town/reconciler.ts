@@ -1467,12 +1467,7 @@ export function reconcileReviewQueue(
       mr.pr_url &&
       staleMs(mr.updated_at, ORPHANED_PR_REVIEW_TIMEOUT_MS)
     ) {
-      let mrMeta: Record<string, unknown> = {};
-      try {
-        mrMeta = JSON.parse(mr.metadata ?? '{}') as Record<string, unknown>;
-      } catch {
-        /* ignore */
-      }
+      const mrMeta: Record<string, unknown> = mr.metadata ?? {};
       if (mrMeta.awaiting_approval === 1 || mrMeta.awaiting_approval === true) {
         continue;
       }

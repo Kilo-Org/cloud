@@ -11,12 +11,31 @@ ARG KILOCODE_CLI_VERSION="7.1.23"
 #
 # This builds kilo-cli from source and copies the linux-x64 binary here.
 
-# Install CLI tools and generate locales to suppress setlocale warnings
-RUN apt-get update && apt-get install -y --no-install-recommends git-lfs jq locales ripgrep openssh-client && \
-	   sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
-	   locale-gen && \
-	   apt-get clean && \
-	   rm -rf /var/lib/apt/lists/*
+# Install latest stable git + git-lfs from the git-core PPA, plus supporting CLI tools,
+# and generate locales to suppress setlocale warnings.
+# The default Ubuntu git (2.34.1 on 22.04) is outdated; the git-core PPA ships the latest
+# stable release. git-lfs is installed from the same PPA so it stays in lockstep with git,
+# and `git lfs install --system` enables LFS filters globally.
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		ca-certificates \
+		gnupg \
+		software-properties-common; \
+	add-apt-repository -y ppa:git-core/ppa; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		git \
+		git-lfs \
+		jq \
+		locales \
+		openssh-client \
+		ripgrep; \
+	git lfs install --system --skip-repo; \
+	sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen; \
+	locale-gen; \
+	apt-get clean; \
+	rm -rf /var/lib/apt/lists/*
 ENV LC_ALL=en_US.UTF-8
 ENV LANG=en_US.UTF-8
 

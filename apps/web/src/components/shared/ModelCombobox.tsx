@@ -47,6 +47,13 @@ export type ModelComboboxProps = {
   className?: string;
   /** Whether the combobox is disabled */
   disabled?: boolean;
+  /**
+   * Render the popover as a modal layer. Required when the combobox is
+   * itself inside a Radix Dialog — without this, the dialog's focus/pointer
+   * scope intercepts wheel events on the portaled popover and the list
+   * cannot be scrolled.
+   */
+  modal?: boolean;
 };
 
 export function ModelCombobox({
@@ -66,6 +73,7 @@ export function ModelCombobox({
   variant = 'full',
   className,
   disabled = false,
+  modal = false,
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -185,7 +193,11 @@ export function ModelCombobox({
   // Compact variant - just the popover trigger without wrapper
   if (isCompact) {
     return (
-      <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : setOpen}>
+      <Popover
+        open={disabled ? false : open}
+        onOpenChange={disabled ? undefined : setOpen}
+        modal={modal}
+      >
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -296,7 +308,11 @@ export function ModelCombobox({
           {label} {required && <span className="text-red-400">*</span>}
         </Label>
       )}
-      <Popover open={disabled ? false : open} onOpenChange={disabled ? undefined : setOpen}>
+      <Popover
+        open={disabled ? false : open}
+        onOpenChange={disabled ? undefined : setOpen}
+        modal={modal}
+      >
         <PopoverTrigger asChild>
           <Button
             id="model-combobox"

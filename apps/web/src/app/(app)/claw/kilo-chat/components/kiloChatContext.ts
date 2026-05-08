@@ -9,6 +9,7 @@ export type KiloChatContextValue = {
   instanceStatus: string | null;
   leavingConversationId: string | null;
   assistantName: string | null;
+  assistantEmoji: string | null;
   sandboxId: string | null;
   basePath: string;
   noInstanceRedirect: string;

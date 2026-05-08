@@ -65,7 +65,7 @@ export type InitiateSessionInput = {
   githubRepo?: string;
   kilocodeOrganizationId?: string;
   prompt: string;
-  mode: 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
+  mode: string;
   model: string;
   githubToken?: string;
   gitUrl?: string;
@@ -98,7 +98,7 @@ export type InitiateSessionAsyncInput = InitiateSessionInput & {
 export type SendMessageInput = {
   sessionId: string;
   prompt: string;
-  mode: 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
+  mode: string;
   model: string;
   autoCommit?: boolean;
   githubToken?: string;
@@ -111,7 +111,7 @@ export type SendMessageInput = {
 export type SendMessageV2Input = {
   cloudAgentSessionId: string;
   prompt: string;
-  mode: 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
+  mode: string;
   model: string;
   autoCommit?: boolean;
   githubToken?: string;
@@ -128,7 +128,7 @@ export type InitiateFromKilocodeSessionLegacyInput = {
   kiloSessionId: string; // UUID of existing cli_session
   githubRepo: string; // Required: org/repo format
   prompt: string;
-  mode: 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
+  mode: string;
   model: string;
   kilocodeOrganizationId?: string;
   githubToken?: string;
@@ -153,7 +153,7 @@ export type InitiateFromKilocodeSessionInput =
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = {
   prompt: string;
-  mode: 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
+  mode: string;
   model: string;
   // GitHub-specific params
   githubRepo?: string;
@@ -168,6 +168,8 @@ export type PrepareSessionInput = {
   platform?: 'github' | 'gitlab';
   // Common params
   kilocodeOrganizationId?: string;
+  /** Profile ID forwarded to cloud-agent-next for server-side merge. */
+  profileId?: string;
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   setupCommands?: string[];

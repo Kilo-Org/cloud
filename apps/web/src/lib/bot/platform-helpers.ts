@@ -2,53 +2,7 @@ import { type PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
 import { eq, and, sql } from 'drizzle-orm';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
-import type { Message, Thread } from 'chat';
-import { PLATFORM } from '@/lib/integrations/core/constants';
-import { type SlackEvent } from '@chat-adapter/slack';
-
-type GetGitHubInstallationId = (thread: Thread) => Promise<string | number | null | undefined>;
-
-function getSlackTeamId(message: Message<SlackEvent>): string {
-  const teamId = message.raw.team_id ?? message.raw.team;
-
-  if (!teamId) throw new Error('Expected a teamId in message.raw');
-
-  return teamId;
-}
-
-/**
- * Extract platform identity coordinates from any adapter's message.
- * Extend the switch for Discord / Teams / Google Chat / etc.
- */
-export async function getPlatformIdentity(
-  thread: Thread,
-  message: Message,
-  getGitHubInstallationId: GetGitHubInstallationId
-): Promise<PlatformIdentity> {
-  const platform = thread.adapter.name;
-
-  switch (platform) {
-    case PLATFORM.GITHUB: {
-      const teamId = await getGitHubInstallationId(thread);
-
-      if (!teamId) {
-        throw new Error(`Could not find GitHub installation ID for thread ${thread.id}`);
-      }
-
-      return {
-        platform: PLATFORM.GITHUB,
-        teamId: teamId.toString(),
-        userId: message.author.userId,
-      };
-    }
-    case PLATFORM.SLACK: {
-      const teamId = getSlackTeamId(message as Message<SlackEvent>);
-      return { platform: PLATFORM.SLACK, teamId, userId: message.author.userId };
-    }
-    default:
-      throw new Error(`PlatformNotSupported: ${platform}`);
-  }
-}
+import { isOrganizationMember } from '@/lib/organizations/organizations';
 
 /**
  * Look up the platform integration row for a given identity.
@@ -67,6 +21,21 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
     .limit(1);
 
   return integration ?? null;
+}
+
+export async function canKiloUserAccessPlatformIntegration(
+  integration: PlatformIntegration,
+  kiloUserId: string
+): Promise<boolean> {
+  if (integration.owned_by_organization_id) {
+    return await isOrganizationMember(integration.owned_by_organization_id, kiloUserId);
+  }
+
+  if (integration.owned_by_user_id) {
+    return integration.owned_by_user_id === kiloUserId;
+  }
+
+  return false;
 }
 
 export async function getPlatformIntegrationById(platformIntegrationId: string) {
@@ -101,23 +70,4 @@ export async function getPlatformIntegrationByBotUserId(
     .limit(1);
 
   return integration ?? null;
-}
-
-/**
- * Canary gate for the GitHub bot path. Driven by `metadata.bot_enabled` on the
- * platform integration row so we can enable the bot per-installation without a
- * schema migration. Defaults to false: existing GitHub integrations are not
- * affected until an operator opts them in by setting the flag to true.
- */
-export function isGitHubBotEnabled(integration: PlatformIntegration): boolean {
-  const metadata = (integration.metadata ?? {}) as { bot_enabled?: unknown };
-  return metadata.bot_enabled === true;
-}
-
-export function getBotDocumentationUrl(platform: string): string {
-  switch (platform) {
-    //TODO(remon): Update when we have specific docs pages for other platforms
-    default:
-      return 'https://kilo.ai/docs/code-with-ai/platforms/slack';
-  }
 }

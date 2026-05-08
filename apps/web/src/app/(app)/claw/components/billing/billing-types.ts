@@ -101,6 +101,16 @@ export type ClawBillingStatus = {
     showConversionPrompt: boolean;
     /** True when Stripe subscription is being cancelled to convert to credit-funded billing. */
     pendingConversion: boolean;
+    referralRewards: {
+      totalAppliedMonths: number;
+      applications: Array<{
+        role: 'referrer' | 'referee';
+        appliedAt: string;
+        monthsGranted: number;
+        previousRenewalBoundary: string;
+        newRenewalBoundary: string;
+      }>;
+    };
   } | null;
 
   earlybird: {

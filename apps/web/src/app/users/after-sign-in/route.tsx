@@ -4,11 +4,23 @@ import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import PostHogClient from '@/lib/posthog';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/affiliate-events';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
 import {
   IMPACT_APP_TRACKED_CLICK_ID_COOKIE,
   IMPACT_CLICK_ID_COOKIE,
   resolveImpactAffiliateTrackingId,
 } from '@/lib/impact-affiliate-utils';
+import {
+  countryCodeFromHeaders,
+  localeFromHeaders,
+  queueImpactAdvocateParticipantRegistration,
+  recordImpactAffiliateTouch,
+  recordImpactReferralTouch,
+} from '@/lib/impact-referral';
+import {
+  parseImpactAffiliateTouchFromUrl,
+  parseImpactReferralTouchFromUrl,
+} from '@/lib/impact-referral-utils';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { APP_URL } from '@/lib/constants';
@@ -20,6 +32,42 @@ import { isCreditCampaignCallback, lookupCampaignBySlug } from '@/lib/credit-cam
  * the entry point is generic (e.g. /get-started, /profile) so we leave the
  * property unset rather than guessing.
  */
+const TRACKING_REDIRECT_PARAMS = [
+  'source',
+  'im_ref',
+  '_saasquatch',
+  'rsCode',
+  'rsShareMedium',
+  'rsEngagementMedium',
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+] as const;
+
+function signInPathWithPreservedTrackingParams(url: URL): string {
+  const params = new URLSearchParams();
+  const callbackPath = url.searchParams.get('callbackPath');
+
+  if (callbackPath && isValidCallbackPath(callbackPath)) {
+    params.set('callbackPath', callbackPath);
+  }
+
+  if (url.searchParams.get('signup') === 'true') {
+    params.set('signup', 'true');
+  }
+
+  for (const param of TRACKING_REDIRECT_PARAMS) {
+    const value = url.searchParams.get(param)?.trim();
+    if (value) {
+      params.set(param, value);
+    }
+  }
+
+  return `/users/sign_in${params.size > 0 ? `?${params.toString()}` : ''}`;
+}
+
 async function resolveSignupProduct(
   callbackPath: string | null,
   hasSource: boolean
@@ -60,7 +108,7 @@ export async function GET(request: NextRequest) {
   let responsePath: string;
 
   if (!user) {
-    responsePath = '/users/sign_in';
+    responsePath = signInPathWithPreservedTrackingParams(url);
   } else if (user.blocked_reason) {
     responsePath = '/account-blocked';
   } else {
@@ -108,27 +156,124 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const referralTouch = parseImpactReferralTouchFromUrl(url);
+  const urlImRefParam = url.searchParams.get('im_ref')?.trim() || null;
+  const ignoreUrlImRefForReferralTouch = Boolean(
+    referralTouch?.opaqueTrackingValue && urlImRefParam
+  );
+
   // Resolve the Impact click ID: prefer the explicit URL param, fall back to
   // the shared parent-domain cookie written by kilo.ai. This is intentionally
   // separate from Impact's native IR_<campaignId> UTT cookie.
   const { affiliateTrackingId, impactCookieValue } = resolveImpactAffiliateTrackingId({
-    imRefParam: url.searchParams.get('im_ref')?.trim() || null,
+    imRefParam: urlImRefParam,
     sharedImpactCookieValue: request.cookies.get(IMPACT_CLICK_ID_COOKIE)?.value?.trim() || null,
     appTrackedImpactCookieValue:
       request.cookies.get(IMPACT_APP_TRACKED_CLICK_ID_COOKIE)?.value?.trim() || null,
+    ignoreImRefParam: ignoreUrlImRefForReferralTouch,
   });
+
+  const affiliateTouch = affiliateTrackingId
+    ? parseImpactAffiliateTouchFromUrl(url, affiliateTrackingId)
+    : null;
+
+  logImpactReferralDebug('After sign-in resolved Impact tracking context', {
+    userId: user?.id ?? null,
+    responsePath,
+    affiliateTrackingIdPresent: Boolean(affiliateTrackingId?.trim()),
+    impactCookieValuePresent: Boolean(impactCookieValue?.trim()),
+    affiliateTouchPresent: Boolean(affiliateTouch),
+    referralTouchPresent: Boolean(referralTouch),
+    referralCookieValuePresent: Boolean(referralTouch?.opaqueTrackingValue),
+    ignoredUrlImRefForReferralTouch: ignoreUrlImRefForReferralTouch,
+    callbackPath: url.searchParams.get('callbackPath') ?? null,
+  });
+
+  if (user && affiliateTouch) {
+    try {
+      logImpactReferralDebug('After sign-in recording Impact affiliate touch', {
+        userId: user.id,
+        landingPath: affiliateTouch.landingPath,
+        trackingValueLength: affiliateTouch.trackingValueLength,
+        isTrackingValueAccepted: affiliateTouch.isTrackingValueAccepted,
+      });
+      await recordImpactAffiliateTouch({
+        userId: user.id,
+        touch: affiliateTouch,
+      });
+    } catch (error) {
+      console.error('[after-sign-in] failed to record affiliate touch', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (user && referralTouch) {
+    try {
+      logImpactReferralDebug('After sign-in recording Impact Advocate referral touch', {
+        userId: user.id,
+        landingPath: referralTouch.landingPath,
+        rsCodePresent: Boolean(referralTouch.rsCode?.trim()),
+        trackingValueLength: referralTouch.trackingValueLength,
+        isTrackingValueAccepted: referralTouch.isTrackingValueAccepted,
+      });
+      await recordImpactReferralTouch({
+        userId: user.id,
+        touch: referralTouch,
+      });
+    } catch (error) {
+      console.error('[after-sign-in] failed to record referral touch', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    try {
+      logImpactReferralDebug('After sign-in queueing Impact Advocate participant registration', {
+        userId: user.id,
+        landingPath: referralTouch.landingPath,
+        localePresent: Boolean(localeFromHeaders(request.headers)?.trim()),
+        countryCode: countryCodeFromHeaders(request.headers),
+      });
+      await queueImpactAdvocateParticipantRegistration({
+        user,
+        referralTouch,
+        locale: localeFromHeaders(request.headers),
+        countryCode: countryCodeFromHeaders(request.headers),
+      });
+    } catch (error) {
+      console.error('[after-sign-in] failed to enqueue Impact Advocate registration', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   if (user && affiliateTrackingId) {
     const existingAttribution = await getAffiliateAttribution(user.id, 'impact');
 
+    logImpactReferralDebug('After sign-in checked Impact affiliate attribution row', {
+      userId: user.id,
+      existingAttributionPresent: Boolean(existingAttribution),
+      trackingIdLength: affiliateTrackingId.length,
+    });
+
     if (!existingAttribution) {
-      await recordAffiliateAttributionAndQueueParentEvent({
-        userId: user.id,
-        provider: 'impact',
-        trackingId: affiliateTrackingId,
-        customerEmail: user.google_user_email,
-        eventDate: new Date(),
-      });
+      try {
+        await recordAffiliateAttributionAndQueueParentEvent({
+          userId: user.id,
+          provider: 'impact',
+          trackingId: affiliateTrackingId,
+          customerEmail: user.google_user_email,
+          eventDate: new Date(),
+        });
+      } catch (error) {
+        console.error('[after-sign-in] failed to persist affiliate attribution', {
+          userId: user.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 
@@ -140,6 +285,10 @@ export async function GET(request: NextRequest) {
   // hit would burn the marker and suppress the fallback on the next real
   // sign-in.
   if (user && impactCookieValue) {
+    logImpactReferralDebug('After sign-in setting app-tracked Impact click cookie marker', {
+      userId: user.id,
+      impactCookieValueLength: impactCookieValue.length,
+    });
     response.cookies.set(IMPACT_APP_TRACKED_CLICK_ID_COOKIE, impactCookieValue, {
       path: '/',
       httpOnly: true,

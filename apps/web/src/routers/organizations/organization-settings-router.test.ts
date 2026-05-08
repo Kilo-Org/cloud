@@ -69,7 +69,6 @@ describe('organizations settings trpc router', () => {
       0,
       {
         model_deny_list: ['claude-3'],
-        provider_policy_mode: 'allow',
         provider_allow_list: ['openai'],
       },
       false
@@ -101,17 +100,14 @@ describe('organizations settings trpc router', () => {
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: testOrganization.id,
         model_deny_list: ['gpt-4', 'gpt-3.5-turbo', 'claude-3'],
-        provider_policy_mode: 'allow',
         provider_allow_list: ['openai', 'anthropic'],
       });
 
       expect(result.settings.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo', 'claude-3']);
-      expect(result.settings.provider_policy_mode).toBe('allow');
       expect(result.settings.provider_allow_list).toEqual(['openai', 'anthropic']);
 
       const updatedOrg = await getOrganizationById(testOrganization.id);
       expect(updatedOrg?.settings?.model_deny_list).toEqual(['gpt-4', 'gpt-3.5-turbo', 'claude-3']);
-      expect(updatedOrg?.settings?.provider_policy_mode).toBe('allow');
       expect(updatedOrg?.settings?.provider_allow_list).toEqual(['openai', 'anthropic']);
     });
 
@@ -121,7 +117,6 @@ describe('organizations settings trpc router', () => {
       await updateOrganizationSettings(orgWithSettings.id, {
         default_model: 'openai/gpt-4o',
         model_deny_list: [],
-        provider_policy_mode: 'allow',
         provider_allow_list: ['openai'],
       });
 
@@ -142,14 +137,12 @@ describe('organizations settings trpc router', () => {
       await updateOrganizationSettings(orgWithSettings.id, {
         default_model: 'openai/gpt-4o',
         model_deny_list: [],
-        provider_policy_mode: 'allow',
         provider_allow_list: ['openai'],
       });
       mockedGetProviderSlugsForModel.mockResolvedValue(new Set(['openai']));
 
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: orgWithSettings.id,
-        provider_policy_mode: 'allow',
         provider_allow_list: ['anthropic'],
       });
 
@@ -166,7 +159,6 @@ describe('organizations settings trpc router', () => {
         {
           default_model: 'openai/gpt-4o',
           model_deny_list: [],
-          provider_policy_mode: 'allow',
           provider_allow_list: ['openai'],
         },
         false
@@ -224,17 +216,14 @@ describe('organizations settings trpc router', () => {
 
       await updateOrganizationSettings(testOrganization.id, {
         model_deny_list: ['gpt-4', 'gpt-3.5-turbo'],
-        provider_policy_mode: 'allow',
         provider_allow_list: ['openai'],
       });
 
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: testOrganization.id,
-        provider_policy_mode: 'allow',
         provider_allow_list: ['openai', 'anthropic'],
       });
 
-      expect(result.settings.provider_policy_mode).toBe('allow');
       expect(result.settings.provider_allow_list).toEqual(['openai', 'anthropic']);
 
       const updatedOrg = await getOrganizationById(testOrganization.id);
@@ -248,7 +237,6 @@ describe('organizations settings trpc router', () => {
       const result = await caller.organizations.settings.updateAllowLists({
         organizationId: testOrganization.id,
         model_deny_list: ['gpt-4', 'gpt-4', 'gpt-3.5-turbo', 'gpt-4', 'claude-3'],
-        provider_policy_mode: 'allow',
         provider_allow_list: ['openai', 'openai', 'anthropic', 'openai'],
       });
 
@@ -325,7 +313,6 @@ describe('organizations settings trpc router', () => {
         owner.id,
         0,
         {
-          provider_policy_mode: 'allow',
           provider_allow_list: ['openai'],
         },
         false
@@ -357,7 +344,6 @@ describe('organizations settings trpc router', () => {
         owner.id,
         0,
         {
-          provider_policy_mode: 'allow',
           provider_allow_list: ['openai'],
         },
         false
@@ -370,30 +356,6 @@ describe('organizations settings trpc router', () => {
       });
 
       expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o']);
-    });
-
-    it('should ignore stale provider_allow_list before provider policy marker is set', async () => {
-      const openRouterModelsResponse = {
-        data: [makeOpenRouterModel('openai/gpt-4o'), makeOpenRouterModel('baidu/ernie')],
-      } satisfies OpenRouterModelsResponse;
-
-      mockedGetEnhancedOpenRouterModels.mockResolvedValue(openRouterModelsResponse);
-
-      const orgWithStaleAllowList = await createTestOrganization(
-        'Provider Allow List',
-        owner.id,
-        0,
-        { provider_allow_list: ['openai'] },
-        false
-      );
-      await addUserToOrganization(orgWithStaleAllowList.id, member.id, 'member');
-
-      const caller = await createCallerForUser(member.id);
-      const result = await caller.organizations.settings.listAvailableModels({
-        organizationId: orgWithStaleAllowList.id,
-      });
-
-      expect(result.data.map(model => model.id)).toEqual(['openai/gpt-4o', 'baidu/ernie']);
     });
 
     it('should return all models for a non-enterprise org even if access settings are set', async () => {

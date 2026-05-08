@@ -1,6 +1,10 @@
 import 'server-only';
 import assert from 'node:assert';
-import { referral_code_usages, referral_codes } from '@kilocode/db/schema';
+import {
+  kiloclaw_referral_conversions,
+  referral_code_usages,
+  referral_codes,
+} from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { eq, and, count, sql, isNull, isNotNull } from 'drizzle-orm';
 import { captureMessage } from '@sentry/nextjs';
@@ -52,6 +56,15 @@ const redeemingReferralPromoCode = referralRedeemingBonus.credit_category;
 const referringReferralPromoCode = referralReferringBonus.credit_category;
 
 export async function processReferralTopUp(redeemingKiloUserId: string) {
+  const [kiloclawReferralConversion] = await db
+    .select({ id: kiloclaw_referral_conversions.id })
+    .from(kiloclaw_referral_conversions)
+    .where(eq(kiloclaw_referral_conversions.referee_user_id, redeemingKiloUserId))
+    .limit(1);
+  if (kiloclawReferralConversion) {
+    return;
+  }
+
   // Validate referral eligibility using shared helper
   const validationResult = await validateReferralForRedemption(redeemingKiloUserId);
   if (validationResult === 'NOTFOUND') return;

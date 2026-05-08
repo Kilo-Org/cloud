@@ -1,1 +1,0 @@
-ALTER TABLE "kilo_pass_store_purchases" ADD COLUMN "expires_at" timestamp with time zone;

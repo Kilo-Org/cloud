@@ -221,20 +221,33 @@ export default function WelcomeContent({ isAuthenticated }: WelcomeContentProps)
           />
         </div>
 
-        {!isAuthenticated ? (
-          <p
-            style={{ animationDelay: '540ms' }}
-            className="text-muted-foreground kilo-fade-up pt-1 text-center text-xs"
-          >
-            Already have an account?{' '}
-            <Link
-              href={signInHref}
-              className="text-brand-primary rounded font-semibold outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
-            >
-              Sign in
-            </Link>
-          </p>
-        ) : null}
+        <p
+          style={{ animationDelay: '540ms' }}
+          className="text-muted-foreground kilo-fade-up pt-1 text-center text-xs"
+        >
+          {isAuthenticated ? (
+            <>
+              Not ready to choose?{' '}
+              <Link
+                href="/profile"
+                className="inline-flex items-center gap-1 rounded font-semibold text-white outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
+              >
+                Skip to dashboard
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </>
+          ) : (
+            <>
+              Already have an account?{' '}
+              <Link
+                href={signInHref}
+                className="text-brand-primary rounded font-semibold outline-none hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary/60"
+              >
+                Sign in
+              </Link>
+            </>
+          )}
+        </p>
       </section>
     </div>
   );

@@ -75,3 +75,43 @@ export async function updateCheckRun(
 ): Promise<void> {
   return;
 }
+
+export type AssociatedPullRequest = {
+  number: number;
+  htmlUrl: string;
+  state: 'open' | 'closed' | 'merged';
+  title: string;
+  headSha: string;
+  updatedAt: string;
+};
+
+export class GitHubRateLimitError extends Error {
+  public readonly resetAt: Date;
+  constructor(resetAt: Date) {
+    super(`GitHub rate limited until ${resetAt.toISOString()}`);
+    this.name = 'GitHubRateLimitError';
+    this.resetAt = resetAt;
+  }
+}
+
+export async function fetchPullRequestForBranch(_params: {
+  installationId: number;
+  owner: string;
+  repo: string;
+  branch: string;
+  appType: GitHubAppType;
+}): Promise<AssociatedPullRequest | null> {
+  return null;
+}
+
+export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required';
+
+export async function fetchPullRequestReviewDecision(_args: {
+  installationId: string;
+  owner: string;
+  repo: string;
+  number: number;
+  appType?: GitHubAppType;
+}): Promise<ReviewDecision | null> {
+  return null;
+}

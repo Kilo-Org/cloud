@@ -103,6 +103,9 @@ supabase/.temp
 # agent plans
 .opencode/plans/
 
+# beads task workspace (per-agent local state)
+.beads/
+
 # misc
 TMP_CI_commit_msg.txt
 *.csv

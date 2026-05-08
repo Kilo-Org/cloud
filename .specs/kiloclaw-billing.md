@@ -11,6 +11,13 @@ layouts, conflict-resolution strategies, null-safety patterns, and
 other implementation choices belong in plan documents and code, not
 here.
 
+When `.specs/kiloclaw-referrals.md` grants a KiloClaw free-month
+reward, billing fulfillment is still governed by this document's core
+subscription invariants. Referral rewards delay the beneficiary's next
+unpaid KiloClaw renewal boundary by one calendar month and MUST NOT
+break Stripe-funded, hybrid, pure-credit, commit-plan, cancellation,
+or reactivation guarantees defined here.
+
 ## Status
 
 Draft -- generated from branch `jdp/kiloclaw-billing` on 2026-03-13.

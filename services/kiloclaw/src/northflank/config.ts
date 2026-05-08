@@ -1,7 +1,11 @@
 import type { KiloClawEnv } from '../types';
 import type { NorthflankClientConfig } from './client';
+import type { InstanceTierKey } from '@kilocode/kiloclaw-instance-tiers';
 
 export const NORTHFLANK_API_BASE = 'https://api.northflank.com/v1';
+const DEFAULT_NORTHFLANK_DEPLOYMENT_PLAN_PERF_1_3 = 'nf-compute-200';
+const DEFAULT_NORTHFLANK_DEPLOYMENT_PLAN_PERF_4_8 = 'nf-compute-400';
+const DEFAULT_NORTHFLANK_DEPLOYMENT_PLAN_PERF_4_16 = 'nf-compute-400-16';
 
 export type NorthflankConfig = {
   apiToken: string;
@@ -9,6 +13,7 @@ export type NorthflankConfig = {
   teamId: string | null;
   region: string;
   deploymentPlan: string;
+  deploymentPlans: Partial<Record<InstanceTierKey, string>>;
   storageClassName: string;
   storageAccessMode: string;
   volumeSizeMb: number;
@@ -55,6 +60,17 @@ export function getNorthflankConfig(env: KiloClawEnv): NorthflankConfig {
     teamId: optionalEnv(env, 'NF_TEAM_ID'),
     region: requiredEnv(env, 'NF_REGION'),
     deploymentPlan: requiredEnv(env, 'NF_DEPLOYMENT_PLAN'),
+    deploymentPlans: {
+      'perf-1-3':
+        optionalEnv(env, 'NF_DEPLOYMENT_PLAN_PERF_1_3') ??
+        DEFAULT_NORTHFLANK_DEPLOYMENT_PLAN_PERF_1_3,
+      'perf-4-8':
+        optionalEnv(env, 'NF_DEPLOYMENT_PLAN_PERF_4_8') ??
+        DEFAULT_NORTHFLANK_DEPLOYMENT_PLAN_PERF_4_8,
+      'perf-4-16':
+        optionalEnv(env, 'NF_DEPLOYMENT_PLAN_PERF_4_16') ??
+        DEFAULT_NORTHFLANK_DEPLOYMENT_PLAN_PERF_4_16,
+    },
     storageClassName: optionalEnv(env, 'NF_STORAGE_CLASS_NAME') ?? 'nf-multi-rw',
     storageAccessMode: optionalEnv(env, 'NF_STORAGE_ACCESS_MODE') ?? 'ReadWriteMany',
     volumeSizeMb: positiveIntegerEnv(env, 'NF_VOLUME_SIZE_MB', 10240),
@@ -64,6 +80,10 @@ export function getNorthflankConfig(env: KiloClawEnv): NorthflankConfig {
     imagePathTemplate: optionalEnv(env, 'NF_IMAGE_PATH_TEMPLATE'),
     imageCredentialsId: optionalEnv(env, 'NF_IMAGE_CREDENTIALS_ID'),
   };
+}
+
+export function resolveNorthflankPlan(config: NorthflankConfig, tier: InstanceTierKey): string {
+  return config.deploymentPlans[tier] ?? config.deploymentPlan;
 }
 
 export function northflankClientConfig(env: KiloClawEnv): NorthflankClientConfig {

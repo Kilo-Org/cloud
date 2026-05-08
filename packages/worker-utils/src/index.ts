@@ -57,6 +57,8 @@ export { isValidInstanceId, sandboxIdFromInstanceId } from './instance-id.js';
 
 export { redactSensitiveHeaders } from './redact-headers.js';
 
+export { normalizeGitUrl } from './normalize-git-url.js';
+
 export {
   BILLING_FLOW,
   BILLING_HEADER_NAMES,
@@ -79,3 +81,6 @@ export type {
   KiloclawStopReason,
   KiloclawDestroyReason,
 } from './kiloclaw-lifecycle-reasons.js';
+
+export { isValidGitUrl, sanitizeGitUrl, parseGitUrl, repoFullNameFromGitUrl } from './git-url.js';
+export type { RepoCoordinates } from './git-url.js';

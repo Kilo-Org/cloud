@@ -1,6 +1,6 @@
 {
-  "id": "916dcec7-5c59-490c-aefb-bd08ebfda6a5",
-  "prevId": "42d6b3d5-b6dc-4fbb-b22f-3bccdd9178f7",
+  "id": "77e54b52-7043-45fc-9f33-4db6d18e08ed",
+  "prevId": "70ee6c69-9e0a-45f9-b7ba-bec85b66ca81",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -205,6 +205,104 @@
       },
       "isRLSEnabled": false
     },
+    "public.agent_environment_profile_agents": {
+      "name": "agent_environment_profile_agents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_agents_profile_id": {
+          "name": "IDX_agent_env_profile_agents_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_agents_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_agents_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_agents",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_agents_profile_slug": {
+          "name": "UQ_agent_env_profile_agents_profile_slug",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.agent_environment_profile_commands": {
       "name": "agent_environment_profile_commands",
       "schema": "",
@@ -282,6 +380,116 @@
           "columns": [
             "profile_id",
             "sequence"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_mcp_servers": {
+      "name": "agent_environment_profile_mcp_servers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "timeout": {
+          "name": "timeout",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_mcp_servers_profile_id": {
+          "name": "IDX_agent_env_profile_mcp_servers_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_mcp_servers_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_mcp_servers_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_mcp_servers",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_mcp_servers_profile_name": {
+          "name": "UQ_agent_env_profile_mcp_servers_profile_name",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "name"
           ]
         }
       },
@@ -449,6 +657,129 @@
       },
       "isRLSEnabled": false
     },
+    "public.agent_environment_profile_skills": {
+      "name": "agent_environment_profile_skills",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_type": {
+          "name": "source_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw_markdown": {
+          "name": "raw_markdown",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "files": {
+          "name": "files",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_skills_profile_id": {
+          "name": "IDX_agent_env_profile_skills_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_skills_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_skills_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_skills",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_skills_profile_name": {
+          "name": "UQ_agent_env_profile_skills_profile_name",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.agent_environment_profile_vars": {
       "name": "agent_environment_profile_vars",
       "schema": "",
@@ -566,6 +897,12 @@
         },
         "owned_by_user_id": {
           "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -701,6 +1038,21 @@
           "columns": [
             {
               "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_agent_env_profiles_created_by_user_id": {
+          "name": "IDX_agent_env_profiles_created_by_user_id",
+          "columns": [
+            {
+              "expression": "created_by_user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7624,7 +7976,7 @@
       "checkConstraints": {
         "kilo_pass_audit_log_action_check": {
           "name": "kilo_pass_audit_log_action_check",
-          "value": "\"kilo_pass_audit_log\".\"action\" IN ('stripe_webhook_received', 'kilo_pass_invoice_paid_handled', 'store_purchase_completed', 'store_notification_received', 'store_subscription_renewed', 'store_subscription_canceled', 'store_subscription_expired', 'store_subscription_refunded', 'base_credits_issued', 'bonus_credits_issued', 'bonus_credits_skipped_idempotent', 'first_month_50pct_promo_issued', 'yearly_monthly_base_cron_started', 'yearly_monthly_base_cron_completed', 'issue_yearly_remaining_credits', 'yearly_monthly_bonus_cron_started', 'yearly_monthly_bonus_cron_completed')"
+          "value": "\"kilo_pass_audit_log\".\"action\" IN ('stripe_webhook_received', 'kilo_pass_invoice_paid_handled', 'base_credits_issued', 'bonus_credits_issued', 'bonus_credits_skipped_idempotent', 'first_month_50pct_promo_issued', 'yearly_monthly_base_cron_started', 'yearly_monthly_base_cron_completed', 'issue_yearly_remaining_credits', 'yearly_monthly_bonus_cron_started', 'yearly_monthly_bonus_cron_completed')"
         },
         "kilo_pass_audit_log_result_check": {
           "name": "kilo_pass_audit_log_result_check",
@@ -7916,7 +8268,7 @@
         },
         "kilo_pass_issuances_source_check": {
           "name": "kilo_pass_issuances_source_check",
-          "value": "\"kilo_pass_issuances\".\"source\" IN ('stripe_invoice', 'app_store_transaction', 'google_play_transaction', 'cron')"
+          "value": "\"kilo_pass_issuances\".\"source\" IN ('stripe_invoice', 'cron')"
         }
       },
       "isRLSEnabled": false
@@ -8264,357 +8616,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.kilo_pass_store_events": {
-      "name": "kilo_pass_store_events",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "payment_provider": {
-          "name": "payment_provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "event_id": {
-          "name": "event_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_subscription_id": {
-          "name": "provider_subscription_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_transaction_id": {
-          "name": "provider_transaction_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "app_account_token": {
-          "name": "app_account_token",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "product_id": {
-          "name": "product_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "environment": {
-          "name": "environment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "payload_json": {
-          "name": "payload_json",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "processed_at": {
-          "name": "processed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_kilo_pass_store_events_provider_event": {
-          "name": "UQ_kilo_pass_store_events_provider_event",
-          "columns": [
-            {
-              "expression": "payment_provider",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "event_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kilo_pass_store_events_provider_subscription": {
-          "name": "IDX_kilo_pass_store_events_provider_subscription",
-          "columns": [
-            {
-              "expression": "payment_provider",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "provider_subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kilo_pass_store_events_app_account_token": {
-          "name": "IDX_kilo_pass_store_events_app_account_token",
-          "columns": [
-            {
-              "expression": "app_account_token",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "kilo_pass_store_events_payment_provider_check": {
-          "name": "kilo_pass_store_events_payment_provider_check",
-          "value": "\"kilo_pass_store_events\".\"payment_provider\" IN ('stripe', 'app_store', 'google_play')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.kilo_pass_store_purchases": {
-      "name": "kilo_pass_store_purchases",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "kilo_pass_subscription_id": {
-          "name": "kilo_pass_subscription_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "payment_provider": {
-          "name": "payment_provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "product_id": {
-          "name": "product_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_subscription_id": {
-          "name": "provider_subscription_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_transaction_id": {
-          "name": "provider_transaction_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_original_transaction_id": {
-          "name": "provider_original_transaction_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "app_account_token": {
-          "name": "app_account_token",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "purchase_token": {
-          "name": "purchase_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "environment": {
-          "name": "environment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "purchased_at": {
-          "name": "purchased_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "raw_payload_json": {
-          "name": "raw_payload_json",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_kilo_pass_store_purchases_provider_transaction": {
-          "name": "UQ_kilo_pass_store_purchases_provider_transaction",
-          "columns": [
-            {
-              "expression": "payment_provider",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "provider_transaction_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kilo_pass_store_purchases_subscription_id": {
-          "name": "IDX_kilo_pass_store_purchases_subscription_id",
-          "columns": [
-            {
-              "expression": "kilo_pass_subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kilo_pass_store_purchases_user_id": {
-          "name": "IDX_kilo_pass_store_purchases_user_id",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kilo_pass_store_purchases_app_account_token": {
-          "name": "IDX_kilo_pass_store_purchases_app_account_token",
-          "columns": [
-            {
-              "expression": "app_account_token",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "kilo_pass_store_purchases_kilo_pass_subscription_id_kilo_pass_subscriptions_id_fk": {
-          "name": "kilo_pass_store_purchases_kilo_pass_subscription_id_kilo_pass_subscriptions_id_fk",
-          "tableFrom": "kilo_pass_store_purchases",
-          "tableTo": "kilo_pass_subscriptions",
-          "columnsFrom": [
-            "kilo_pass_subscription_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        },
-        "kilo_pass_store_purchases_kilo_user_id_kilocode_users_id_fk": {
-          "name": "kilo_pass_store_purchases_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "kilo_pass_store_purchases",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "kilo_pass_store_purchases_payment_provider_check": {
-          "name": "kilo_pass_store_purchases_payment_provider_check",
-          "value": "\"kilo_pass_store_purchases\".\"payment_provider\" IN ('stripe', 'app_store', 'google_play')"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.kilo_pass_subscriptions": {
       "name": "kilo_pass_subscriptions",
       "schema": "",
@@ -8632,24 +8633,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "payment_provider": {
-          "name": "payment_provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'stripe'"
-        },
-        "provider_subscription_id": {
-          "name": "provider_subscription_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "stripe_subscription_id": {
           "name": "stripe_subscription_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "tier": {
           "name": "tier",
@@ -8732,21 +8720,6 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_kilo_pass_subscriptions_payment_provider": {
-          "name": "IDX_kilo_pass_subscriptions_payment_provider",
-          "columns": [
-            {
-              "expression": "payment_provider",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "IDX_kilo_pass_subscriptions_status": {
           "name": "IDX_kilo_pass_subscriptions_status",
           "columns": [
@@ -8773,28 +8746,6 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_kilo_pass_subscriptions_provider_subscription": {
-          "name": "UQ_kilo_pass_subscriptions_provider_subscription",
-          "columns": [
-            {
-              "expression": "payment_provider",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "provider_subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"kilo_pass_subscriptions\".\"provider_subscription_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -8830,14 +8781,6 @@
         "kilo_pass_subscriptions_current_streak_months_non_negative_check": {
           "name": "kilo_pass_subscriptions_current_streak_months_non_negative_check",
           "value": "\"kilo_pass_subscriptions\".\"current_streak_months\" >= 0"
-        },
-        "kilo_pass_subscriptions_provider_subscription_required_check": {
-          "name": "kilo_pass_subscriptions_provider_subscription_required_check",
-          "value": "\"kilo_pass_subscriptions\".\"provider_subscription_id\" IS NOT NULL OR \"kilo_pass_subscriptions\".\"payment_provider\" = 'stripe'"
-        },
-        "kilo_pass_subscriptions_payment_provider_check": {
-          "name": "kilo_pass_subscriptions_payment_provider_check",
-          "value": "\"kilo_pass_subscriptions\".\"payment_provider\" IN ('stripe', 'app_store', 'google_play')"
         },
         "kilo_pass_subscriptions_tier_check": {
           "name": "kilo_pass_subscriptions_tier_check",
@@ -11551,13 +11494,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "app_store_account_token": {
-          "name": "app_store_account_token",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
         "is_admin": {
           "name": "is_admin",
           "type": "boolean",
@@ -11841,13 +11777,6 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "kilocode_users_app_store_account_token_unique": {
-          "name": "kilocode_users_app_store_account_token_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "app_store_account_token"
-          ]
-        },
         "UQ_b1afacbcf43f2c7c4cb9f7e7faa": {
           "name": "UQ_b1afacbcf43f2c7c4cb9f7e7faa",
           "nullsNotDistinct": false,
@@ -17411,8 +17340,8 @@
           "method": "btree",
           "with": {}
         },
-        "idx_reasons": {
-          "name": "idx_reasons",
+        "idx_stytch_fingerprints_reasons_gin": {
+          "name": "idx_stytch_fingerprints_reasons_gin",
           "columns": [
             {
               "expression": "reasons",
@@ -17423,7 +17352,7 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
+          "method": "gin",
           "with": {}
         },
         "idx_verdict_action": {

@@ -23,6 +23,7 @@ export default function ChatRootLayout({ children }: { children: React.ReactNode
       instanceErrorMessage={instanceErrorMessage}
       onRetryInstanceStatus={() => void refetch()}
       assistantName={status?.botName ?? null}
+      assistantEmoji={status?.botEmoji ?? null}
       className="flex-1"
     >
       {children}

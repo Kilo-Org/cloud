@@ -37,6 +37,8 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handlePullRequest: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePullRequest(payload, platformIntegration),
   handlePushEvent: jest.fn(),
+  upsertCliSessionPullRequestsFromWebhook: jest.fn(),
+  upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
 }));
 
 jest.mock('next/server', () => {
@@ -180,7 +182,7 @@ describe('handleGitHubWebhook', () => {
     expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
       'we_1',
-      expect.objectContaining({ handlers_triggered: ['code_review'] })
+      expect.objectContaining({ handlers_triggered: ['code_review', 'cli_session_pr_upsert'] })
     );
   });
 

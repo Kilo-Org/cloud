@@ -4,14 +4,18 @@ import type {
   FlyProviderState,
   NorthflankProviderState,
 } from '../../schemas/instance-config';
+import { getTier, InstanceTypeSchema } from '@kilocode/kiloclaw-instance-tiers';
 import {
   getWorkerDb,
   getActivePersonalInstance,
   getInstanceById,
   getInstanceBySandboxId,
   markInstanceDestroyed,
+  syncAdminSizeOverride,
+  syncInstanceType,
   syncTrackedImageTag,
 } from '../../db';
+import type { AdminSizeOverridePayload } from '../../db';
 import { appNameFromUserId, appNameFromInstanceId } from '../../fly/apps';
 import type { InstanceMutableState } from './types';
 import { getAppKey, getFlyConfig } from './types';
@@ -167,6 +171,21 @@ export async function restoreFromPostgres(
         ? await recoverNorthflankProviderState(env, instance.sandboxId)
         : await recoverFlyProviderState(env, restoredUserId, instance.sandboxId);
     const recoveredAppName = providerState.provider === 'fly' ? providerState.appName : null;
+    const restoredInstanceType = InstanceTypeSchema.nullable().parse(instance.instanceType ?? null);
+    // Derive hardware/storage from the catalog when the persisted tier is a
+    // known offered/legacy key. Without this, a restored instance starts with
+    // null `machineSize`/`volumeSizeGb` despite a non-null tier label —
+    // the next live-check observes whatever Fly reports and could relabel
+    // the instance incorrectly (e.g. mark a `perf-4-16` as `'custom'` if the
+    // Fly machine hasn't yet been re-created with the right guest). For
+    // 'custom' or null tier, leave hardware nulls; the existing live-check
+    // backfill handles those.
+    const restoredTier =
+      restoredInstanceType && restoredInstanceType !== 'custom'
+        ? getTier(restoredInstanceType)
+        : null;
+    const restoredMachineSize = restoredTier?.machineSize ?? null;
+    const restoredVolumeSizeGb = restoredTier?.volumeSizeGb ?? null;
 
     await ctx.storage.put(
       storageUpdate({
@@ -187,7 +206,9 @@ export async function restoreFromPostgres(
         flyMachineId: null,
         flyVolumeId: null,
         flyRegion: null,
-        machineSize: null,
+        machineSize: restoredMachineSize,
+        instanceType: restoredInstanceType,
+        volumeSizeGb: restoredVolumeSizeGb,
         healthCheckFailCount: 0,
         pendingDestroyMachineId: null,
         pendingDestroyVolumeId: null,
@@ -211,7 +232,9 @@ export async function restoreFromPostgres(
     state.provisionedAt = Date.now();
     state.lastStartedAt = null;
     state.lastStoppedAt = null;
-    state.machineSize = null;
+    state.machineSize = restoredMachineSize;
+    state.instanceType = restoredInstanceType;
+    state.volumeSizeGb = restoredVolumeSizeGb;
     state.healthCheckFailCount = 0;
     state.pendingDestroyMachineId = null;
     state.pendingDestroyVolumeId = null;
@@ -274,6 +297,84 @@ export async function syncTrackedImageTagToPostgresHelper(
     await syncTrackedImageTag(db, userId, sandboxId, state.trackedImageTag ?? null);
   } catch (err) {
     doWarn(state, 'Failed to sync tracked_image_tag to Postgres', {
+      error: toLoggable(err),
+    });
+  }
+}
+
+/**
+ * Best-effort sync of `state.instanceType` to the `kiloclaw_instances` row.
+ *
+ * Only call this from sites that have just *changed* the DO's `instanceType`
+ * (resize, alarm-driven backfill from live Fly guest). Do not call from the
+ * alarm tick unconditionally — that paid a Hyperdrive round trip per running
+ * instance per tick for a SQL no-op once the column was populated.
+ *
+ * No-op when:
+ * - HYPERDRIVE is not configured (dev/test),
+ * - `instanceType` is null (we don't have anything authoritative to write),
+ * - the column already matches (`syncInstanceType` uses `IS DISTINCT FROM`).
+ */
+export async function syncInstanceTypeToPostgresHelper(
+  env: KiloClawEnv,
+  state: InstanceMutableState,
+  userId: string,
+  sandboxId: string
+): Promise<void> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return;
+  if (state.instanceType === null) return;
+
+  try {
+    const db = getWorkerDb(connectionString);
+    await syncInstanceType(db, userId, sandboxId, state.instanceType);
+  } catch (err) {
+    doWarn(state, 'Failed to sync instance_type to Postgres', {
+      error: toLoggable(err),
+    });
+  }
+}
+
+/**
+ * Best-effort sync of `state.adminMachineSizeOverride` (+ metadata) to the
+ * `kiloclaw_instances.admin_size_override` JSONB column.
+ *
+ * Called only from sites that explicitly mutate the override
+ * (`setAdminMachineSizeOverride` / `clearAdminMachineSizeOverride` / tier-resize
+ * auto-clear). Not part of the alarm tick — there's no observation path; the
+ * override is admin-set state, not derived state.
+ *
+ * Failures are logged and swallowed; the DO state is authoritative and the
+ * column is a denormalized read cache for the admin "outstanding overrides"
+ * list. If the write fails, the next admin set/clear/resize will try again.
+ */
+export async function syncAdminSizeOverrideToPostgresHelper(
+  env: KiloClawEnv,
+  state: InstanceMutableState,
+  userId: string,
+  sandboxId: string
+): Promise<void> {
+  const connectionString = env.HYPERDRIVE?.connectionString;
+  if (!connectionString) return;
+
+  const override = state.adminMachineSizeOverride;
+  const metadata = state.adminMachineSizeOverrideMetadata;
+  const payload: AdminSizeOverridePayload | null =
+    override && metadata
+      ? {
+          size: override,
+          reason: metadata.reason,
+          actorId: metadata.actorId,
+          actorEmail: metadata.actorEmail,
+          setAt: metadata.setAt,
+        }
+      : null;
+
+  try {
+    const db = getWorkerDb(connectionString);
+    await syncAdminSizeOverride(db, userId, sandboxId, payload);
+  } catch (err) {
+    doWarn(state, 'Failed to sync admin_size_override to Postgres', {
       error: toLoggable(err),
     });
   }

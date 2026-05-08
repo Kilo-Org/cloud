@@ -1,4 +1,5 @@
 const mockLimit = jest.fn();
+const mockIsOrganizationMember = jest.fn();
 
 jest.mock('@/lib/drizzle', () => ({
   db: {
@@ -11,25 +12,24 @@ jest.mock('@/lib/drizzle', () => ({
     })),
   },
 }));
+jest.mock('@/lib/organizations/organizations', () => ({
+  isOrganizationMember: (organizationId: string, kiloUserId: string) =>
+    mockIsOrganizationMember(organizationId, kiloUserId),
+}));
 
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
-  getBotDocumentationUrl,
-  getPlatformIdentity,
+  canKiloUserAccessPlatformIntegration,
   getPlatformIntegration,
   getPlatformIntegrationByBotUserId,
   getPlatformIntegrationById,
-  isGitHubBotEnabled,
 } from './platform-helpers';
 import type { PlatformIntegration } from '@kilocode/db';
-import type { Thread, Message } from 'chat';
-
-const mockGetInstallationId = jest.fn();
 
 describe('platform helpers', () => {
   beforeEach(() => {
     mockLimit.mockReset();
-    mockGetInstallationId.mockReset();
+    mockIsOrganizationMember.mockReset();
   });
 
   it('returns the platform integration for a given identity', async () => {
@@ -102,85 +102,29 @@ describe('platform helpers', () => {
     expect(mockLimit).not.toHaveBeenCalled();
   });
 
-  it('extracts GitHub identity from chat adapter messages', async () => {
-    const message = {
-      author: { userId: '12345' },
-      raw: {
-        type: 'issue_comment',
-      },
-    };
-    mockGetInstallationId.mockResolvedValue(98765);
+  describe('canKiloUserAccessPlatformIntegration', () => {
+    it('allows access to user-owned integrations only for the owner', async () => {
+      const integration = { owned_by_user_id: 'user-1' } as PlatformIntegration;
 
-    const identity = await getPlatformIdentity(
-      { adapter: { name: PLATFORM.GITHUB }, id: 'github:acme/widgets:42' } as Thread,
-      message as Message,
-      mockGetInstallationId
-    );
-
-    expect(mockGetInstallationId).toHaveBeenCalledWith({
-      adapter: { name: PLATFORM.GITHUB },
-      id: 'github:acme/widgets:42',
-    });
-    expect(identity).toEqual({
-      platform: PLATFORM.GITHUB,
-      teamId: '98765',
-      userId: '12345',
-    });
-  });
-
-  it('throws when the GitHub adapter cannot resolve the installation id', async () => {
-    const message = {
-      author: { userId: '12345' },
-      raw: {
-        type: 'issue_comment',
-      },
-    } as Message;
-    mockGetInstallationId.mockResolvedValue(null);
-
-    await expect(
-      getPlatformIdentity(
-        { adapter: { name: PLATFORM.GITHUB }, id: 'github:acme/widgets:42' } as Thread,
-        message,
-        mockGetInstallationId
-      )
-    ).rejects.toThrow('Could not find GitHub installation ID for thread github:acme/widgets:42');
-  });
-
-  describe('isGitHubBotEnabled', () => {
-    function integrationWithMetadata(
-      metadata: PlatformIntegration['metadata']
-    ): PlatformIntegration {
-      return { metadata } as PlatformIntegration;
-    }
-
-    it('returns true only when metadata.bot_enabled is the boolean true', () => {
-      expect(isGitHubBotEnabled(integrationWithMetadata({ bot_enabled: true }))).toBe(true);
+      await expect(canKiloUserAccessPlatformIntegration(integration, 'user-1')).resolves.toBe(true);
+      await expect(canKiloUserAccessPlatformIntegration(integration, 'user-2')).resolves.toBe(
+        false
+      );
+      expect(mockIsOrganizationMember).not.toHaveBeenCalled();
     });
 
-    it('returns false when metadata is missing the flag', () => {
-      expect(isGitHubBotEnabled(integrationWithMetadata({}))).toBe(false);
-      expect(isGitHubBotEnabled(integrationWithMetadata(null))).toBe(false);
+    it('checks organization membership for org-owned integrations', async () => {
+      const integration = { owned_by_organization_id: 'org-1' } as PlatformIntegration;
+      mockIsOrganizationMember.mockResolvedValue(true);
+
+      await expect(canKiloUserAccessPlatformIntegration(integration, 'user-1')).resolves.toBe(true);
+      expect(mockIsOrganizationMember).toHaveBeenCalledWith('org-1', 'user-1');
     });
 
-    it('returns false for truthy non-boolean values to avoid accidental enables', () => {
-      expect(isGitHubBotEnabled(integrationWithMetadata({ bot_enabled: 'true' }))).toBe(false);
-      expect(isGitHubBotEnabled(integrationWithMetadata({ bot_enabled: 1 }))).toBe(false);
+    it('denies integrations without ownership data', async () => {
+      await expect(
+        canKiloUserAccessPlatformIntegration({} as PlatformIntegration, 'user-1')
+      ).resolves.toBe(false);
     });
-
-    it('returns false when explicitly disabled', () => {
-      expect(isGitHubBotEnabled(integrationWithMetadata({ bot_enabled: false }))).toBe(false);
-    });
-  });
-
-  it('returns platform-specific bot documentation URLs', () => {
-    expect(getBotDocumentationUrl(PLATFORM.SLACK)).toBe(
-      'https://kilo.ai/docs/code-with-ai/platforms/slack'
-    );
-    expect(getBotDocumentationUrl(PLATFORM.GITHUB)).toBe(
-      'https://kilo.ai/docs/code-with-ai/platforms/slack'
-    );
-    expect(getBotDocumentationUrl(PLATFORM.DISCORD)).toBe(
-      'https://kilo.ai/docs/code-with-ai/platforms/slack'
-    );
   });
 });

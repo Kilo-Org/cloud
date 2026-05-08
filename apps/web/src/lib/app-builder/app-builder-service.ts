@@ -27,6 +27,8 @@ import { generateImageMCPToken } from '@/lib/app-builder/image-mcp-token';
 import { buildImageContextFromAttachments } from '@/lib/app-builder/image-context';
 import { deleteProjectAssets } from '@/lib/r2/app-builder-assets';
 import { getEnvVariable } from '@/lib/dotenvx';
+import { AGENT_ENV_VARS_PUBLIC_KEY } from '@/lib/config.server';
+import { encryptWithPublicKey, type EncryptedEnvelope } from '@/lib/encryption';
 import { modelSupportsImages } from '@/lib/ai-gateway/providers/model-capabilities';
 import { errorExceptInTest } from '@/lib/utils.server';
 
@@ -194,18 +196,25 @@ function buildMCPServersConfig(params: {
   userId: string;
   projectId: string;
   owner: Owner;
-}): Record<string, { type: 'remote'; url: string; headers: Record<string, string> }> | undefined {
+}):
+  | Record<string, { type: 'remote'; url: string; headers: Record<string, EncryptedEnvelope> }>
+  | undefined {
   const mcpUrl = getEnvVariable('CLOUD_AGENT_IMAGES_MCP_URL');
   if (!mcpUrl) return undefined;
+  if (!AGENT_ENV_VARS_PUBLIC_KEY) {
+    console.error('AGENT_ENV_VARS_PUBLIC_KEY not configured; cannot encrypt MCP headers');
+    return undefined;
+  }
 
   try {
     const token = generateImageMCPToken(params);
+    const publicKey = Buffer.from(AGENT_ENV_VARS_PUBLIC_KEY, 'base64');
     return {
       'app-builder-images': {
         type: 'remote',
         url: mcpUrl,
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: encryptWithPublicKey(`Bearer ${token}`, publicKey),
         },
       },
     };

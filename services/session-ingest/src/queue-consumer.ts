@@ -8,7 +8,7 @@ import { SessionItemSchema } from './types/session-sync';
 import { getItemIdentity } from './util/compaction';
 import { MAX_INGEST_ITEM_BYTES, MAX_SINGLE_ITEM_BYTES } from './util/ingest-limits';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
-import { withDORetry } from '@kilocode/worker-utils';
+import { withDORetry, normalizeGitUrl } from '@kilocode/worker-utils';
 
 export interface IngestQueueMessage {
   r2Key: string;
@@ -268,6 +268,58 @@ async function processItem(
   }
 }
 
+type SessionMetadataUpdates = Partial<
+  Pick<
+    typeof cli_sessions_v2.$inferInsert,
+    | 'title'
+    | 'created_on_platform'
+    | 'organization_id'
+    | 'git_url'
+    | 'git_branch'
+    | 'status'
+    | 'status_updated_at'
+  >
+>;
+
+/**
+ * Build the `cli_sessions_v2` partial update from a set of metadata changes.
+ *
+ * `git_url` is passed through `normalizeGitUrl` on write so that the
+ * `github_branch_pull_requests` cache (keyed on the canonical form) can
+ * match new sessions without per-read normalization. Status bumps carry
+ * `status_updated_at = now()`.
+ */
+export function computeSessionMetadataUpdates(
+  mergedChanges: Map<string, string | null>,
+  now: () => string = () => new Date().toISOString()
+): SessionMetadataUpdates {
+  const updates: SessionMetadataUpdates = {};
+
+  if (mergedChanges.has('title')) {
+    updates.title = mergedChanges.get('title') ?? null;
+  }
+  if (mergedChanges.has('platform')) {
+    const platform = mergedChanges.get('platform') ?? null;
+    if (platform !== null) updates.created_on_platform = platform;
+  }
+  if (mergedChanges.has('orgId')) {
+    updates.organization_id = mergedChanges.get('orgId') ?? null;
+  }
+  if (mergedChanges.has('gitUrl')) {
+    const gitUrl = mergedChanges.get('gitUrl') ?? null;
+    updates.git_url = gitUrl === null ? null : normalizeGitUrl(gitUrl);
+  }
+  if (mergedChanges.has('gitBranch')) {
+    updates.git_branch = mergedChanges.get('gitBranch') ?? null;
+  }
+  if (mergedChanges.has('status')) {
+    updates.status = mergedChanges.get('status') ?? null;
+    updates.status_updated_at = now();
+  }
+
+  return updates;
+}
+
 async function applyMetadataChanges(
   env: Env,
   kiloUserId: string,
@@ -277,39 +329,7 @@ async function applyMetadataChanges(
   if (mergedChanges.size === 0) return;
 
   const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-
-  const title = mergedChanges.has('title') ? (mergedChanges.get('title') ?? null) : undefined;
-  const platform = mergedChanges.has('platform')
-    ? (mergedChanges.get('platform') ?? null)
-    : undefined;
-  const orgId = mergedChanges.has('orgId') ? (mergedChanges.get('orgId') ?? null) : undefined;
-  const gitUrl = mergedChanges.has('gitUrl') ? (mergedChanges.get('gitUrl') ?? null) : undefined;
-  const gitBranch = mergedChanges.has('gitBranch')
-    ? (mergedChanges.get('gitBranch') ?? null)
-    : undefined;
-  const status = mergedChanges.has('status') ? (mergedChanges.get('status') ?? null) : undefined;
-
-  const updates: Partial<
-    Pick<
-      typeof cli_sessions_v2.$inferInsert,
-      | 'title'
-      | 'created_on_platform'
-      | 'organization_id'
-      | 'git_url'
-      | 'git_branch'
-      | 'status'
-      | 'status_updated_at'
-    >
-  > = {};
-  if (title !== undefined) updates.title = title;
-  if (platform !== undefined && platform !== null) updates.created_on_platform = platform;
-  if (orgId !== undefined) updates.organization_id = orgId;
-  if (gitUrl !== undefined) updates.git_url = gitUrl;
-  if (gitBranch !== undefined) updates.git_branch = gitBranch;
-  if (status !== undefined) {
-    updates.status = status;
-    updates.status_updated_at = new Date().toISOString();
-  }
+  const updates = computeSessionMetadataUpdates(mergedChanges);
 
   if (Object.keys(updates).length > 0) {
     await db

@@ -204,13 +204,15 @@ export default function OrganizationAppSidebar({
       icon: Shield,
       url: `/organizations/${organizationId}/security-agent`,
     },
-    {
-      title: 'Auto Triage',
-      icon: ListChecks,
-      url: `/organizations/${organizationId}/auto-triage`,
-    },
     ...(isAutoTriageFeatureEnabled || isDevelopment
-      ? [{ title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` }]
+      ? [
+          {
+            title: 'Auto Triage',
+            icon: ListChecks,
+            url: `/organizations/${organizationId}/auto-triage`,
+          },
+          { title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` },
+        ]
       : []),
     ...(ENABLE_DEPLOY_FEATURE
       ? [

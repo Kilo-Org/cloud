@@ -33,24 +33,27 @@ export const AgentModes = [
   'architect',
   'custom',
 ] as const;
-export type AgentMode = (typeof AgentModes)[number];
+/**
+ * AgentMode accepts any string — built-in slugs from `AgentModes` or any
+ * custom slug from a session's `runtimeAgents`. Use `AgentModeSchema` to
+ * validate that a value is one of the built-ins specifically.
+ */
+export type AgentMode = string;
+export type BuiltinAgentMode = (typeof AgentModes)[number];
 export const AgentModeSchema = z.enum(AgentModes);
 
 /**
- * Maps input agent modes to internal modes used by kilo CLI.
+ * Maps input agent modes to internal modes used by kilo CLI. Built-ins are
+ * aliased (build → code, architect → plan); any non-built-in slug (from a
+ * runtimeMode) is passed through unchanged.
  */
-export function normalizeAgentMode(mode: AgentMode): InternalAgentMode {
+export function normalizeAgentMode(mode: string): string {
   switch (mode) {
     case 'build':
       return 'code';
     case 'architect':
       return 'plan';
-    case 'code':
-    case 'plan':
-    case 'debug':
-    case 'orchestrator':
-    case 'ask':
-    case 'custom':
+    default:
       return mode;
   }
 }
@@ -64,9 +67,25 @@ export const Limits = {
   MAX_SETUP_COMMANDS: 20,
   MAX_SETUP_COMMAND_LENGTH: 500,
   MAX_MCP_SERVERS: 20,
+  MAX_RUNTIME_SKILLS: 50,
+  MAX_RUNTIME_SKILL_MARKDOWN: 100_000, // ~100KB
+  MAX_RUNTIME_SKILL_NAME_LENGTH: 100,
+  MAX_RUNTIME_SKILL_COMPANION_FILES: 20,
+  MAX_RUNTIME_SKILL_COMPANION_FILE_SIZE: 100_000,
+  MAX_RUNTIME_SKILL_COMPANION_FILES_TOTAL: 500_000,
+  MAX_RUNTIME_SKILL_COMPANION_PATH_LENGTH: 200,
+  MAX_RUNTIME_AGENTS: 20,
+  MAX_RUNTIME_AGENT_SLUG_LENGTH: 50,
+  MAX_RUNTIME_AGENT_NAME_LENGTH: 100,
+  MAX_RUNTIME_AGENT_PROMPT: 50_000,
+  MAX_RUNTIME_AGENT_DESCRIPTION: 2000,
+  MAX_RUNTIME_AGENT_MODEL_LENGTH: 200,
   SESSION_TTL_DAYS: 90,
   SESSION_TTL_MS: 90 * 24 * 60 * 60 * 1000, // 90 days in milliseconds
 } as const;
+
+/** Built-in mode slugs recognized by the CLI. */
+export const BUILTIN_AGENT_MODES = new Set<string>(AgentModes);
 
 // === ExecutionParams (for session-service) ===
 export type ExecutionParams = {

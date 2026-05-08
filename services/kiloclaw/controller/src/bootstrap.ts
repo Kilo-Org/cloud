@@ -1178,6 +1178,28 @@ When running \`openclaw doctor\` or \`openclaw security audit\`, the following f
 // OpenClaw versions, users editing openclaw.json). This section is a
 // belt-and-suspenders reminder for the agent flow, not the load-bearing
 // fix.
+// Pin the process model so agents stop hallucinating systemd-based
+// remediation. systemd packages ship in the image as apt transitive deps,
+// so `which systemctl` finds the binary, but the daemon is never running
+// and there are no unit files. Always-on, idempotent — appended to
+// existing instances on redeploy.
+export const PROCESS_MODEL_SECTION_CONFIG: ToolsMdSectionConfig = {
+  name: 'Process Model',
+  beginMarker: '<!-- BEGIN:process-model -->',
+  endMarker: '<!-- END:process-model -->',
+  section: `
+<!-- BEGIN:process-model -->
+
+## Process Model
+
+KiloClaw does NOT use systemd. Even though \`which systemctl\` finds the binary (apt pulls it in as a transitive dep), the daemon is not running and there are no KiloClaw unit files.
+
+- Do not suggest \`systemctl\`, \`journalctl\`, \`service ...\`, unit files, or any init-based remediation — none of it will work.
+- \`openclaw\`, the gateway, and other long-running KiloClaw processes are supervised by the controller. To inspect or restart them, use the controller's APIs and logs, not init.
+
+<!-- END:process-model -->`,
+};
+
 export const PLUGIN_INSTALL_SECTION_CONFIG: ToolsMdSectionConfig = {
   name: 'Plugin Install',
   beginMarker: '<!-- BEGIN:plugin-install -->',
@@ -1276,6 +1298,7 @@ export async function bootstrapNonCritical(
         // and how to keep plugins.allow in sync on plugin installs.
         updateToolsMdSection(true, KILOCLAW_MITIGATIONS_SECTION_CONFIG, deps);
         updateToolsMdSection(true, PLUGIN_INSTALL_SECTION_CONFIG, deps);
+        updateToolsMdSection(true, PROCESS_MODEL_SECTION_CONFIG, deps);
       },
     },
     {

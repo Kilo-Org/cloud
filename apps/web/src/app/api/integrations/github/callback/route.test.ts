@@ -11,6 +11,7 @@ import { isOrganizationMember } from '@/lib/organizations/organizations';
 import type { StateAdapter } from 'chat';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
+const mockIsEnabledForBot = jest.fn();
 
 jest.mock('@/lib/user.server');
 jest.mock('@/lib/bot/github-link-state');
@@ -20,6 +21,11 @@ jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: jest.fn(async () => undefined),
     getState: jest.fn(() => mockState),
+  },
+}));
+jest.mock('@/lib/bot/platforms', () => ({
+  botPlatforms: {
+    require: jest.fn(() => ({ isEnabledForBot: mockIsEnabledForBot })),
   },
 }));
 jest.mock('@octokit/rest', () => ({
@@ -106,6 +112,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       metadata: { bot_enabled: true },
     } as never);
     mockedIsOrganizationMember.mockResolvedValue(true);
+    mockIsEnabledForBot.mockReturnValue(true);
   });
 
   test('redirects unauthenticated bot-link callbacks to existing callback auth fallback', async () => {
@@ -213,6 +220,7 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
       github_app_type: 'standard',
       metadata: null,
     } as never);
+    mockIsEnabledForBot.mockReturnValue(false);
 
     const { GET } = await import('./route');
     const response = await GET(

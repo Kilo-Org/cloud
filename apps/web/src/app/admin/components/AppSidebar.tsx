@@ -123,6 +123,11 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <KiloCrabIcon className="size-4" />,
   },
   {
+    title: () => 'KiloClaw referrals',
+    url: '/admin/kiloclaw-referrals',
+    icon: () => <KiloCrabIcon className="size-4" />,
+  },
+  {
     title: () => 'Community PRs',
     url: '/admin/community-prs',
     icon: () => <GitPullRequest />,

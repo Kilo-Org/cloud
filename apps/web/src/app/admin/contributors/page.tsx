@@ -46,6 +46,7 @@ import {
   Plus,
   RefreshCcw,
   UserPlus,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ContributorChampionTier } from '@kilocode/db/schema-types';
@@ -135,6 +136,7 @@ type LeaderboardRow = {
   creditAmountUsd: number | null;
   creditsLastGrantedAt: string | null;
   linkedKiloUserId: string | null;
+  hasGithubIntegration: boolean;
 };
 
 function tierCreditDisplay(tier: ContributorTier): string {
@@ -697,18 +699,19 @@ export default function ContributorChampionsAdminPage() {
                   </TableHead>
                   <TableHead>Credits/mo</TableHead>
                   <TableHead>Last Grant</TableHead>
+                  <TableHead>GH Integration</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoadingTables ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-8 text-center">
+                    <TableCell colSpan={9} className="py-8 text-center">
                       <Loader2 className="mx-auto h-4 w-4 animate-spin" />
                     </TableCell>
                   </TableRow>
                 ) : enrolledPageRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-muted-foreground py-8 text-center">
+                    <TableCell colSpan={9} className="text-muted-foreground py-8 text-center">
                       No enrolled contributors.
                     </TableCell>
                   </TableRow>
@@ -767,6 +770,13 @@ export default function ContributorChampionsAdminPage() {
                         {row.creditsLastGrantedAt
                           ? new Date(row.creditsLastGrantedAt).toLocaleString()
                           : 'Never'}
+                      </TableCell>
+                      <TableCell>
+                        {row.hasGithubIntegration ? (
+                          <Check className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <X className="text-muted-foreground h-4 w-4" />
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -906,19 +916,20 @@ export default function ContributorChampionsAdminPage() {
                       Tier
                     </SortableButton>
                   </TableHead>
+                  <TableHead>GH Integration</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoadingTables ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-8 text-center">
+                    <TableCell colSpan={7} className="py-8 text-center">
                       <Loader2 className="mx-auto h-4 w-4 animate-spin" />
                     </TableCell>
                   </TableRow>
                 ) : reviewPageRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-muted-foreground py-8 text-center">
+                    <TableCell colSpan={7} className="text-muted-foreground py-8 text-center">
                       No pending contributors.
                     </TableCell>
                   </TableRow>
@@ -1005,6 +1016,13 @@ export default function ContributorChampionsAdminPage() {
                               </span>
                             ) : null}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {row.hasGithubIntegration ? (
+                            <Check className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <X className="text-muted-foreground h-4 w-4" />
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button

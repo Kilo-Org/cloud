@@ -10,6 +10,7 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   createCloudAgentNextFetchClient,
   CloudAgentNextBillingError,
+  CloudAgentNextError,
   type CloudAgentNextFetchClient,
   type CloudAgentTerminalReason,
 } from '@kilocode/worker-utils';
@@ -64,6 +65,67 @@ function findRiskyPattern(command: string): string | null {
   const normalized = command.toLowerCase();
   const match = RISKY_COMMAND_PATTERNS.find(pattern => normalized.includes(pattern));
   return match ?? null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function hasRetryableSandboxMarker(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  if (value.error === 'sandbox_internal_server_error' && value.retryable === true) {
+    return true;
+  }
+
+  return Object.values(value).some(nested => hasRetryableSandboxMarker(nested));
+}
+
+function parseJsonBody(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+}
+
+function isPrepareSessionSandboxInternalServerError(error: unknown): boolean {
+  if (error instanceof CloudAgentNextBillingError) {
+    return false;
+  }
+
+  if (!(error instanceof CloudAgentNextError)) {
+    return false;
+  }
+
+  if (error.procedure !== 'prepareSession' || error.status !== 500) {
+    return false;
+  }
+
+  if (/\b(cancelled|canceled)\b/i.test(error.body)) {
+    return false;
+  }
+
+  const parsedBody = parseJsonBody(error.body);
+  if (hasRetryableSandboxMarker(parsedBody)) {
+    return true;
+  }
+
+  const body = error.body.toLowerCase();
+  const hasSandboxSignal =
+    body.includes('sandboxerror') ||
+    body.includes('sandbox') ||
+    body.includes('container') ||
+    body.includes('cloudflare');
+  const hasInternalServerSignal =
+    body.includes('internal server error') ||
+    /http\s+error!\s+status:\s*500\b/i.test(error.body) ||
+    /\bstatus:\s*500\b/i.test(error.body) ||
+    /\bhttp\s*500\b/i.test(error.body);
+
+  return hasSandboxSignal && hasInternalServerSignal;
 }
 
 /**
@@ -786,6 +848,29 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         note: 'Callback will update final status',
       });
     } catch (error) {
+      if (
+        isPrepareSessionSandboxInternalServerError(error) &&
+        this.state.sandboxRetryAttempted !== true &&
+        !this.cancelled &&
+        this.state.status !== 'cancelled'
+      ) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+        this.state.sandboxRetryAttempted = true;
+        this.state.previousCloudAgentSessionId = undefined;
+        this.state.updatedAt = new Date().toISOString();
+        await this.saveState();
+
+        console.warn('[CodeReviewOrchestrator] Retrying prepareSession after sandbox 500', {
+          reviewId: this.state.reviewId,
+          error: errorMessage,
+          sandboxRetryAttempted: true,
+        });
+
+        await this.runWithCloudAgentNext();
+        return;
+      }
+
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const terminalReason = this.getTerminalReason(error);
 

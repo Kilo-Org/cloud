@@ -8,14 +8,15 @@ import {
   verifyLinkToken,
   type PlatformIdentity,
 } from '@/lib/bot-identity';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user.server';
-import { getPlatformIntegration } from '@/lib/bot/platform-helpers';
+import {
+  canKiloUserAccessPlatformIntegration,
+  getPlatformIntegration,
+} from '@/lib/bot/platform-helpers';
+import { botPlatforms } from '@/lib/bot/platforms';
 import { processLinkedMessage } from '@/lib/bot/run';
-import { withBotPlatformAuthContext } from '@/lib/bot/platform-auth-context';
 import { Message, ThreadImpl, type Thread } from 'chat';
 import type { User } from '@kilocode/db';
-import { PLATFORM } from '@/lib/integrations/core/constants';
 
 function errorPage(title: string, message: string, status: number): Response {
   return new Response(
@@ -46,19 +47,7 @@ async function verifyIntegrationAccess(
     return { ok: false, error: 'No matching integration found for this platform.' };
   }
 
-  if (integration.owned_by_organization_id) {
-    const isMember = await isOrganizationMember(integration.owned_by_organization_id, kiloUserId);
-    if (!isMember) {
-      return {
-        ok: false,
-        error: 'You are not a member of the organization that owns this integration.',
-      };
-    }
-  } else if (integration.owned_by_user_id) {
-    if (integration.owned_by_user_id !== kiloUserId) {
-      return { ok: false, error: 'You are not the owner of this integration.' };
-    }
-  } else {
+  if (!(await canKiloUserAccessPlatformIntegration(integration, kiloUserId))) {
     return { ok: false, error: 'This integration has invalid ownership data.' };
   }
 
@@ -101,10 +90,10 @@ export async function GET(request: Request) {
 
   const { contextKey, identity, thread, message } = linkPayload;
 
-  if (identity.platform === PLATFORM.GITHUB) {
+  if (!botPlatforms.require(identity.platform).usesGenericLinkAccountRoute) {
     return errorPage(
       'Link Not Supported',
-      'GitHub account links must be created from the GitHub link page.',
+      `${identity.platform} account links must be created from the platform-specific link page.`,
       400
     );
   }
@@ -155,13 +144,16 @@ async function reprocessLinkedMessage(
     const platformIntegration = await getPlatformIntegration(identity);
     if (!platformIntegration) return;
 
-    await withBotPlatformAuthContext(platformIntegration, async () => {
-      await processLinkedMessage({
-        thread,
-        message,
-        platformIntegration,
-        user,
-      });
+    await botPlatforms.require(platformIntegration.platform).withAuthContext({
+      platformIntegration,
+      fn: async () => {
+        await processLinkedMessage({
+          thread,
+          message,
+          platformIntegration,
+          user,
+        });
+      },
     });
   } catch (error) {
     console.error('[Bot] Failed to reprocess linked message:', error);

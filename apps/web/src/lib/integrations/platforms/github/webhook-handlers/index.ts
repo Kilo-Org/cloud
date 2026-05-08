@@ -14,3 +14,5 @@ export { handlePushEvent } from './push-handler';
 export { handlePullRequest } from './pull-request-handler';
 export { handleIssue } from './issue-handler';
 export { handlePRReviewComment } from './pr-review-comment-handler';
+export { upsertCliSessionPullRequestsFromWebhook } from './upsert-cli-session-pull-requests';
+export { upsertCliSessionPullRequestReviewFromWebhook } from './upsert-cli-session-pull-request-review';

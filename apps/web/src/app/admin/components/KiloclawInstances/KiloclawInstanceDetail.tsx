@@ -1487,12 +1487,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     cleanVersion(controllerVersion?.version),
     '2026.2.26'
   );
-  // /_kilo/doctor/run was added to the controller on 2026-04-22. Older
+  // /_kilo/doctor/start|status|cancel was added to the controller on 2026-05-08. Older
   // controllers fall through to the catch-all proxy and return 404 —
   // disable the button with a tooltip until they redeploy.
   const supportsDoctorController = calverAtLeast(
     cleanVersion(controllerVersion?.version),
-    '2026.4.22'
+    '2026.5.8'
   );
 
   // After a restart/upgrade, poll the machine status until it returns to "running",
@@ -2032,6 +2032,7 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
             instanceId: variables.instanceId,
           }),
         });
+        setDoctorControllerDialogOpen(true);
       },
       onError: err => {
         toast.error(`Failed to start doctor (controller): ${err.message}`);
@@ -4228,7 +4229,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                             variant="outline"
                             disabled={!supportsDoctorController || gatewayActionPending}
                             onClick={() => {
-                              setDoctorControllerDialogOpen(true);
                               startDoctorControllerMutation.mutate({
                                 userId: data.user_id,
                                 instanceId: data.id,

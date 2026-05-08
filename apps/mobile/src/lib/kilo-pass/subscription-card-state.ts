@@ -3,6 +3,7 @@ type KiloPassSubscriptionCardSubscription = {
   currentPeriodBaseCreditsUsd: number;
   paymentProvider: 'stripe' | 'app_store' | 'google_play';
   refillAt: string | null;
+  status: string;
 };
 
 type KiloPassSubscriptionCardState = {
@@ -29,10 +30,14 @@ function formatSubscriptionEndDate(iso: string | null): string {
   });
 }
 
+function isEndedSubscriptionStatus(status: string): boolean {
+  return status === 'canceled' || status === 'incomplete_expired';
+}
+
 export function getKiloPassSubscriptionCardState(
   subscription: KiloPassSubscriptionCardSubscription | null | undefined
 ): KiloPassSubscriptionCardState {
-  if (!subscription) {
+  if (!subscription || isEndedSubscriptionStatus(subscription.status)) {
     return {
       action: 'open-store-sheet',
       actionLabel: 'Subscribe',

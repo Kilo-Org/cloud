@@ -10,6 +10,7 @@ describe('getKiloPassSubscriptionCardState', () => {
         currentPeriodBaseCreditsUsd: 49,
         paymentProvider: 'stripe',
         refillAt: '2026-06-08T15:21:05.000Z',
+        status: 'active',
       })
     ).toEqual({
       action: 'open-web-management',
@@ -35,6 +36,7 @@ describe('getKiloPassSubscriptionCardState', () => {
         currentPeriodBaseCreditsUsd: 19,
         paymentProvider: 'app_store',
         refillAt: '2026-06-08T15:21:05.000Z',
+        status: 'active',
       })
     ).toEqual({
       action: 'open-store-management',
@@ -51,12 +53,30 @@ describe('getKiloPassSubscriptionCardState', () => {
         currentPeriodBaseCreditsUsd: 19,
         paymentProvider: 'app_store',
         refillAt: '2026-06-08T15:21:05.000Z',
+        status: 'active',
       })
     ).toEqual({
       action: 'open-store-management',
       actionLabel: 'Manage',
       description: '$19 monthly credits · Ends June 8, 2026',
       title: 'Kilo Pass canceling',
+    });
+  });
+
+  it('treats canceled App Store-managed subscriptions as unsubscribed', () => {
+    expect(
+      getKiloPassSubscriptionCardState({
+        cancelAtPeriodEnd: false,
+        currentPeriodBaseCreditsUsd: 19,
+        paymentProvider: 'app_store',
+        refillAt: '2026-06-08T15:21:05.000Z',
+        status: 'canceled',
+      })
+    ).toEqual({
+      action: 'open-store-sheet',
+      actionLabel: 'Subscribe',
+      description: 'Monthly credits with bonus progress',
+      title: 'Kilo Pass',
     });
   });
 });

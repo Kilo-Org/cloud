@@ -165,9 +165,9 @@ describe('kilo pass bonus utilities', () => {
   });
 
   describe('computeMonthlyCadenceBonusPercent', () => {
-    it('keeps the second-month grandfather cutoff at midnight May 9 UTC', () => {
+    it('keeps the second-month grandfather cutoff at midnight May 7 UTC', () => {
       expect(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString()).toBe(
-        '2026-05-09T00:00:00.000Z'
+        '2026-05-07T00:00:00.000Z'
       );
     });
 

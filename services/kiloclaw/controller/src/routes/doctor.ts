@@ -177,8 +177,19 @@ function computeOutputFields(
   metadata: DoctorRunMetadata
 ): Pick<DoctorRunMetadata, 'outputBytes' | 'outputTruncated'> {
   const outputBytes = logSizeBytes();
-  const outputTruncated = metadata.outputTruncated || readLog().startsWith(OUTPUT_TRUNCATED_MARKER);
+  const outputTruncated = metadata.outputTruncated;
   return { outputBytes, outputTruncated };
+}
+
+function syncMetadataOutputFieldsFromOutput(
+  metadata: DoctorRunMetadata,
+  output: string
+): DoctorRunMetadata {
+  const outputBytes = Buffer.byteLength(output, 'utf8');
+  if (metadata.outputBytes === outputBytes) return metadata;
+  const next = { ...metadata, outputBytes };
+  writeMetadata(next);
+  return next;
 }
 
 function syncMetadataOutputFields(metadata: DoctorRunMetadata): DoctorRunMetadata {
@@ -307,13 +318,14 @@ function statusResponse(): DoctorRunStatusResponse {
   const metadata = markInterruptedRunIfNeeded();
   if (!metadata) return noRunStatus();
 
-  const synced = syncMetadataOutputFields(metadata);
+  const output = readLog();
+  const synced = syncMetadataOutputFieldsFromOutput(metadata, output);
   return {
     hasRun: true,
     runId: synced.runId,
     status: synced.status,
     fix: synced.fix,
-    output: readLog(),
+    output,
     outputBytes: synced.outputBytes,
     outputTruncated: synced.outputTruncated,
     exitCode: synced.exitCode,

@@ -106,7 +106,6 @@ function createKiloBot(
         message,
         platformIntegration,
         user,
-        state: chatBot.getState(),
       });
     } catch (error) {
       console.error('[Bot] Unhandled error in message handler:', error);

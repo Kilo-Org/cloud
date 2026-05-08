@@ -3,21 +3,20 @@ import { runBotAgent } from '@/lib/bot/agent-runner';
 import { extractAndUploadImages } from '@/lib/bot/images';
 import { storeBotRequestMessageState } from '@/lib/bot/message-state';
 import type { PlatformIntegration, User } from '@kilocode/db';
-import type { Message, StateAdapter, Thread } from 'chat';
+import type { Message, Thread } from 'chat';
 import { captureException } from '@sentry/nextjs';
+import { bot } from '@/lib/bot';
 
 export async function processLinkedMessage({
   thread,
   message,
   platformIntegration,
   user,
-  state,
 }: {
   thread: Thread;
   message: Message;
   platformIntegration: PlatformIntegration;
   user: User;
-  state: StateAdapter;
 }) {
   await thread.startTyping('Thinking...');
 
@@ -34,7 +33,7 @@ export async function processLinkedMessage({
       modelUsed: undefined,
     });
     await storeBotRequestMessageState({
-      state,
+      state: bot.getState(),
       botRequestId,
       thread,
       message,

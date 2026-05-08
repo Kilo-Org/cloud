@@ -5,6 +5,7 @@ import { type AppStoreKiloPassProduct } from './store-products';
 
 vi.mock('expo-iap', () => ({
   ErrorCode: {
+    AlreadyOwned: 'already-owned',
     UserCancelled: 'user-cancelled',
   },
   useIAP: () => ({
@@ -152,6 +153,26 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(showError).not.toHaveBeenCalled();
   });
 
+  it('shows a single account-link message when the App Store account already owns the subscription', async () => {
+    const showError = vi.fn();
+    const actions = createActions({
+      requestPurchase: vi.fn().mockRejectedValue({
+        code: 'already-owned',
+        message: 'Item already owned',
+      }),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    await actions.purchase(product);
+
+    expect(showError).toHaveBeenCalledTimes(1);
+    expect(showError).toHaveBeenCalledWith(
+      'This App Store subscription is linked to another Kilo account.'
+    );
+  });
+
   it('does not finish the transaction when backend completion fails', async () => {
     const finishTransaction = vi.fn();
     const actions = createActions({
@@ -197,6 +218,24 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     await actions.handlePurchaseSuccess(createPurchase());
 
     expect(onPurchaseCompleted).not.toHaveBeenCalled();
+  });
+
+  it('does not show backend completion errors while recovering purchases in the background', async () => {
+    const showError = vi.fn();
+    const actions = createActions({
+      completeAppStorePurchase: vi
+        .fn()
+        .mockRejectedValue(
+          new Error('App Store purchase account token does not match the signed-in user.')
+        ),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    await actions.recoverPurchases([createPurchase()]);
+
+    expect(showError).not.toHaveBeenCalled();
   });
 
   it('recovers unfinished Kilo Pass App Store purchases', async () => {

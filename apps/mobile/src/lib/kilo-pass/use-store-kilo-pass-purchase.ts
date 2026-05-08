@@ -12,6 +12,20 @@ const userCancelledPurchaseErrorSchema = z.object({
   code: z.literal(ErrorCode.UserCancelled),
 });
 
+const alreadyOwnedPurchaseErrorSchema = z.object({
+  code: z.literal(ErrorCode.AlreadyOwned),
+});
+
+const errorMessageSchema = z.object({
+  message: z.string(),
+});
+
+const APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
+  'App Store purchase account token does not match the signed-in user.';
+const APP_STORE_SUBSCRIPTION_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE =
+  'This App Store subscription is linked to another Kilo account.';
+const PURCHASE_ERROR_TOAST_DEDUPE_MS = 1500;
+
 type AppStoreKiloPassPurchaseActionsDeps = {
   requestPurchase: (params: {
     request: { apple: { appAccountToken: string; sku: string } };
@@ -26,6 +40,7 @@ type AppStoreKiloPassPurchaseActionsDeps = {
 };
 
 const sharedPurchaseCompletions = new Map<string, Promise<boolean>>();
+let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
 
 function isRecoverableKiloPassPurchase(purchase: Purchase): boolean {
   if (purchase.purchaseState === 'pending') {
@@ -49,12 +64,54 @@ function isUserCancelledPurchaseError(error: unknown): boolean {
   return userCancelledPurchaseErrorSchema.safeParse(error).success;
 }
 
+function isAlreadyOwnedPurchaseError(error: unknown): boolean {
+  return alreadyOwnedPurchaseErrorSchema.safeParse(error).success;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return errorMessageSchema.safeParse(error).data?.message ?? fallback;
+}
+
+function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string): string | null {
+  if (isUserCancelledPurchaseError(error)) {
+    return null;
+  }
+
+  if (isAlreadyOwnedPurchaseError(error)) {
+    return APP_STORE_SUBSCRIPTION_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE;
+  }
+
+  const message = getErrorMessage(error, fallback);
+  if (message === APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE) {
+    return APP_STORE_SUBSCRIPTION_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE;
+  }
+
+  return message;
+}
+
+function showDedupedPurchaseError(message: string) {
+  const now = Date.now();
+  if (
+    lastPurchaseErrorToast &&
+    lastPurchaseErrorToast.message === message &&
+    now - lastPurchaseErrorToast.shownAt < PURCHASE_ERROR_TOAST_DEDUPE_MS
+  ) {
+    return;
+  }
+
+  lastPurchaseErrorToast = { message, shownAt: now };
+  toast.error(message);
+}
+
 function getPurchaseCompletionId(purchase: Purchase): string {
   return purchase.transactionId ?? purchase.id;
 }
 
 export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurchaseActionsDeps) {
-  async function completePurchase(purchase: Purchase): Promise<boolean> {
+  async function completePurchase(
+    purchase: Purchase,
+    options: { notifyErrors?: boolean } = {}
+  ): Promise<boolean> {
     try {
       const signedTransactionJws = getPurchaseToken(purchase);
       await deps.completeAppStorePurchase({ signedTransactionJws });
@@ -62,12 +119,18 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       await deps.finishTransaction({ purchase, isConsumable: false });
       return true;
     } catch (error) {
-      deps.showError(error instanceof Error ? error.message : 'Failed to complete purchase.');
+      const message = getKiloPassPurchaseErrorMessage(error, 'Failed to complete purchase.');
+      if (message && (options.notifyErrors ?? true)) {
+        deps.showError(message);
+      }
       return false;
     }
   }
 
-  async function completePurchaseOnce(purchase: Purchase): Promise<boolean> {
+  async function completePurchaseOnce(
+    purchase: Purchase,
+    options: { notifyErrors?: boolean } = {}
+  ): Promise<boolean> {
     const purchaseId = getPurchaseCompletionId(purchase);
     const purchaseCompletions = deps.purchaseCompletions?.current ?? sharedPurchaseCompletions;
     const existingCompletion = purchaseCompletions.get(purchaseId);
@@ -75,7 +138,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       return existingCompletion;
     }
 
-    const completion = completePurchase(purchase);
+    const completion = completePurchase(purchase, options);
     purchaseCompletions.set(purchaseId, completion);
     const completed = await completion;
     purchaseCompletions.delete(purchaseId);
@@ -84,9 +147,9 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
 
   async function handlePurchaseSuccess(
     purchase: Purchase,
-    options: { notifyCompletion?: boolean } = {}
+    options: { notifyCompletion?: boolean; notifyErrors?: boolean } = {}
   ) {
-    const completed = await completePurchaseOnce(purchase);
+    const completed = await completePurchaseOnce(purchase, options);
     if (completed && (options.notifyCompletion ?? true)) {
       deps.onPurchaseCompleted?.();
     }
@@ -102,13 +165,13 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
           type: 'subs',
         });
       } catch (error) {
-        if (isUserCancelledPurchaseError(error)) {
-          return;
-        }
-
-        deps.showError(
-          error instanceof Error ? error.message : 'Failed to start App Store purchase.'
+        const message = getKiloPassPurchaseErrorMessage(
+          error,
+          'Failed to start App Store purchase.'
         );
+        if (message) {
+          deps.showError(message);
+        }
       }
     },
     handlePurchaseSuccess,
@@ -117,7 +180,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
         purchases
           .filter(purchase => isRecoverableKiloPassPurchase(purchase))
           .map(async purchase => {
-            await handlePurchaseSuccess(purchase, { notifyCompletion: false });
+            await handlePurchaseSuccess(purchase, { notifyCompletion: false, notifyErrors: false });
           })
       );
     },
@@ -146,11 +209,10 @@ export function useStoreKiloPassPurchase(options: { onPurchaseCompleted?: () => 
 
   const actionsRef = useIAP({
     onPurchaseError: error => {
-      if (isUserCancelledPurchaseError(error)) {
-        return;
+      const message = getKiloPassPurchaseErrorMessage(error, error.message);
+      if (message) {
+        showDedupedPurchaseError(message);
       }
-
-      toast.error(error.message);
     },
     onPurchaseSuccess: purchase => {
       void actions.handlePurchaseSuccess(purchase);
@@ -174,7 +236,7 @@ export function useStoreKiloPassPurchase(options: { onPurchaseCompleted?: () => 
         onPurchaseCompleted: options.onPurchaseCompleted,
         purchaseCompletions: purchaseCompletionsRef,
         showError: message => {
-          toast.error(message);
+          showDedupedPurchaseError(message);
         },
       }),
     [

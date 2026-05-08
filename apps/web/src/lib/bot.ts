@@ -101,7 +101,13 @@ function createKiloBot(
     }
 
     try {
-      await processLinkedMessage({ thread, message, platformIntegration, user });
+      await processLinkedMessage({
+        thread,
+        message,
+        platformIntegration,
+        user,
+        state: chatBot.getState(),
+      });
     } catch (error) {
       console.error('[Bot] Unhandled error in message handler:', error);
       await thread.post({ markdown: 'Sorry, something went wrong while processing your message.' });

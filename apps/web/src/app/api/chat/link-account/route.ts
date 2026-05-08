@@ -152,6 +152,7 @@ async function reprocessLinkedMessage(
           message,
           platformIntegration,
           user,
+          state: bot.getState(),
         });
       },
     });

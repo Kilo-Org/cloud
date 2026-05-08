@@ -24,10 +24,12 @@ import {
 } from '@/lib/bot/request-logging';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { runBotAgent, type BotAgentMessageLike } from '@/lib/bot/agent-runner';
+import { getRehydratedBotRequestMessageState } from '@/lib/bot/message-state';
 import { botPlatforms } from '@/lib/bot/platforms';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
 import { findUserById } from '@/lib/user';
-import type { Thread } from 'chat';
+import type { Message } from 'chat';
+import { type Thread } from 'chat';
 
 type ExecutionCallbackPayload = {
   sessionId: string;
@@ -183,6 +185,7 @@ async function continueBotAgentAfterCallback(params: {
   requestRow: Awaited<ReturnType<typeof getBotRequest>>;
   platformIntegration: PlatformIntegration;
   thread: Thread;
+  message: Message;
   continuationPrompt: string;
   completedStepCount: number;
 }) {
@@ -195,23 +198,8 @@ async function continueBotAgentAfterCallback(params: {
   return await botPlatforms.require(params.platformIntegration.platform).withAuthContext({
     platformIntegration: params.platformIntegration,
     fn: async () => {
-      const originalMessage = await Promise.resolve(
-        params.thread.adapter.fetchMessage?.(
-          params.thread.id,
-          params.requestRow.platform_message_id
-        ) ?? null
-      ).catch(error => {
-        console.warn('[BotSessionCallback] Failed to fetch original platform message:', {
-          error,
-          platform: params.platformIntegration.platform,
-          threadId: params.thread.id,
-          messageId: params.requestRow.platform_message_id,
-        });
-        return null;
-      });
-
       const callbackMessage: BotAgentMessageLike = {
-        author: originalMessage?.author ?? {
+        author: params.message.author ?? {
           fullName: 'Cloud Agent Callback',
           isBot: false,
           isMe: false,
@@ -402,6 +390,7 @@ async function handleCompletedCallback(
   requestRow: NonNullable<Awaited<ReturnType<typeof getBotRequest>>>,
   platformIntegration: PlatformIntegration,
   thread: Thread,
+  message: Message,
   completedStepCount: number,
   trackedCallbackSession: BotRequestCloudAgentSession | undefined
 ) {
@@ -642,6 +631,7 @@ ${cloudAgentResultsForPrompt}`;
     requestRow,
     platformIntegration,
     thread,
+    message,
     continuationPrompt,
     completedStepCount,
   });
@@ -882,7 +872,13 @@ export async function POST(
           requestRow.platform_integration_id
         );
         await bot.initialize();
-        const thread = bot.thread(requestRow.platform_thread_id);
+        const { thread, message } = await getRehydratedBotRequestMessageState(botRequestId);
+
+        logCallback('Resolved callback chat context', {
+          botRequestId,
+          threadId: thread.id,
+          messageId: message?.id,
+        });
 
         if (childSessionStatus && trackedCallbackSession) {
           try {
@@ -934,6 +930,7 @@ export async function POST(
             requestRow,
             platformIntegration,
             thread,
+            message,
             completedStepCount,
             trackedCallbackSession
           );

@@ -4,8 +4,11 @@ declare global {
 
 globalThis.__botTestMentionHandler ??= null;
 
+let mockState: { kind: string } | undefined;
+
 function getMockState() {
-  return { kind: 'state' };
+  mockState ??= { kind: 'state' };
+  return mockState;
 }
 
 function getMockSlackAdapter() {
@@ -188,8 +191,6 @@ const mockedCanKiloUserAccessPlatformIntegration = jest.mocked(
 const mockedGetPlatformIntegration = jest.mocked(getPlatformIntegration);
 const mockedFindUserById = jest.mocked(findUserById);
 const mockedProcessLinkedMessage = jest.mocked(processLinkedMessage);
-const mockState = getMockState();
-
 function makeThread() {
   return { id: 'thread-1', adapter: { name: 'slack' } };
 }
@@ -259,6 +260,7 @@ describe('bot mention authorization', () => {
       message,
       platformIntegration: integration,
       user,
+      state: mockState,
     });
   });
 });

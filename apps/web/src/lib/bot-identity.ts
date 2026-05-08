@@ -5,6 +5,7 @@ import * as z from 'zod';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { botIdentityRedisKey } from '@/lib/redis-keys';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { serializedMessageSchema, serializedThreadSchema } from '@/lib/bot/message-state';
 
 const CHAT_SDK_CACHE_KEY_PREFIX = 'chat-sdk:cache:';
 const LINK_ACCOUNT_CONTEXT_KEY_PREFIX = 'link-account-context:';
@@ -151,44 +152,6 @@ const platformIdentitySchema = z.object({
   teamId: z.string(),
   userId: z.string(),
 });
-
-const serializedThreadShape = z.looseObject({
-  _type: z.literal('chat:Thread'),
-  adapterName: z.string(),
-  channelId: z.string(),
-  id: z.string(),
-  isDM: z.boolean(),
-});
-
-const serializedThreadSchema = z.custom<SerializedThread>(
-  value => serializedThreadShape.safeParse(value).success
-);
-
-const serializedMessageShape = z.looseObject({
-  _type: z.literal('chat:Message'),
-  attachments: z.array(z.unknown()),
-  author: z.object({
-    userId: z.string(),
-    userName: z.string(),
-    fullName: z.string(),
-    isBot: z.union([z.boolean(), z.literal('unknown')]),
-    isMe: z.boolean(),
-  }),
-  formatted: z.unknown(),
-  id: z.string(),
-  metadata: z.object({
-    dateSent: z.iso.datetime(),
-    edited: z.boolean(),
-    editedAt: z.iso.datetime().optional(),
-  }),
-  raw: z.unknown(),
-  text: z.string(),
-  threadId: z.string(),
-});
-
-const serializedMessageSchema = z.custom<SerializedMessage>(
-  value => serializedMessageShape.safeParse(value).success
-);
 
 const linkTokenPayloadSchema = z.object({
   identity: platformIdentitySchema,

@@ -33,6 +33,20 @@ export type Category = {
   options: PlatformOption[];
 };
 
+const ALL_PLATFORMS: PlatformOption[] = [
+  { id: 'slack', name: 'Slack', icon: SlackIcon },
+  { id: 'discord', name: 'Discord', icon: DiscordIcon },
+  { id: 'microsoft-teams', name: 'Microsoft Teams', icon: MicrosoftTeamsIcon },
+  { id: 'google-chat', name: 'Google Chat', icon: GoogleChatIcon },
+  { id: 'github', name: 'GitHub', icon: GitHubIcon },
+  { id: 'gitlab', name: 'GitLab', icon: GitLabIcon },
+  { id: 'linear', name: 'Linear', icon: LinearIcon },
+];
+
+export function getPlatform(id: PlatformId): PlatformOption | undefined {
+  return ALL_PLATFORMS.find(p => p.id === id);
+}
+
 export const CATEGORIES: Category[] = [
   {
     id: 'chat',

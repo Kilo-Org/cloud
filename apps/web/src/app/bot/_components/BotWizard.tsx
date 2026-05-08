@@ -3,12 +3,14 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { CATEGORIES, type PlatformId } from './platforms';
 import { PlatformTile } from './PlatformTile';
 
 export function BotWizard() {
+  const router = useRouter();
   const [stepIndex, setStepIndex] = useState(0);
   const [selected, setSelected] = useState<Set<PlatformId>>(new Set());
 
@@ -35,7 +37,12 @@ export function BotWizard() {
 
   const handleNext = () => {
     if (!canAdvance) return;
-    if (!isLastStep) setStepIndex(i => i + 1);
+    if (!isLastStep) {
+      setStepIndex(i => i + 1);
+      return;
+    }
+    const services = Array.from(selected).join(',');
+    router.push(`/bot/authorize?services=${encodeURIComponent(services)}`);
   };
 
   const handleBack = () => {
@@ -100,7 +107,7 @@ export function BotWizard() {
         </Button>
 
         <Button onClick={handleNext} disabled={!canAdvance}>
-          {isLastStep ? 'Finish' : 'Continue'}
+          {isLastStep ? 'Connect services' : 'Continue'}
           <ArrowRight className="size-4" />
         </Button>
       </footer>

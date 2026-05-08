@@ -411,13 +411,13 @@ describe('impact referral participant registration dispatch', () => {
 
       // The new participant is registered but does NOT receive the colliding
       // code; the incumbent keeps it.
-      const newParticipant = await db.query.impact_advocate_participants.findFirst({
+      const newParticipant = await db._query.impact_advocate_participants.findFirst({
         where: eq(impact_advocate_participants.user_id, newUser.id),
       });
       expect(newParticipant?.registration_state).toBe('registered');
       expect(newParticipant?.opaque_referral_identifier).toBeNull();
 
-      const incumbentParticipant = await db.query.impact_advocate_participants.findFirst({
+      const incumbentParticipant = await db._query.impact_advocate_participants.findFirst({
         where: eq(impact_advocate_participants.user_id, incumbent.id),
       });
       expect(incumbentParticipant?.opaque_referral_identifier).toBe('COLLIDING_CODE');
@@ -477,7 +477,7 @@ describe('impact referral participant registration dispatch', () => {
 
       // Participant now carries the SaaSquatch code so future referee touches
       // resolve back to this user.
-      const participant = await db.query.impact_advocate_participants.findFirst({
+      const participant = await db._query.impact_advocate_participants.findFirst({
         where: eq(impact_advocate_participants.user_id, user.id),
       });
       expect(participant?.registration_state).toBe('registered');

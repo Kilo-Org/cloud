@@ -51,7 +51,7 @@ jest.mock('@/lib/credits', () => ({
 }));
 
 function getOrganizationTopUpEmailMarkers(stripePaymentId: string) {
-  return db.query.transactional_email_log.findMany({
+  return db._query.transactional_email_log.findMany({
     where: and(
       eq(transactional_email_log.email_type, 'organization_credits_top_up_confirmation'),
       eq(transactional_email_log.idempotency_key, stripePaymentId)
@@ -793,7 +793,7 @@ describe('processTopupForOrganization', () => {
       }
     );
 
-    const creditTransaction = await db.query.credit_transactions.findFirst({
+    const creditTransaction = await db._query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, stripePaymentId),
     });
     expect(creditTransaction?.organization_id).toBe(organizationWithoutRecipients.id);
@@ -869,7 +869,7 @@ describe('processTopupForOrganization', () => {
       selectMock.mockRestore();
     }
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
     expect(updatedOrg?.total_microdollars_acquired).toBe(
@@ -900,7 +900,7 @@ describe('processTopupForOrganization', () => {
       })
     ).resolves.toBeUndefined();
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
     expect(updatedOrg?.total_microdollars_acquired).toBe(
@@ -941,14 +941,14 @@ describe('processTopupForOrganization', () => {
       stripe_payment_id: stripePaymentId,
     });
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
     expect(updatedOrg?.total_microdollars_acquired).toBe(
       testOrganization.total_microdollars_acquired + expectedBalanceIncrease
     );
 
-    const transactions = await db.query.credit_transactions.findMany({
+    const transactions = await db._query.credit_transactions.findMany({
       where: and(
         eq(credit_transactions.organization_id, testOrganization.id),
         eq(credit_transactions.stripe_payment_id, stripePaymentId)
@@ -956,7 +956,7 @@ describe('processTopupForOrganization', () => {
     });
     expect(transactions).toHaveLength(1);
 
-    const auditLogs = await db.query.organization_audit_logs.findMany({
+    const auditLogs = await db._query.organization_audit_logs.findMany({
       where: and(
         eq(organization_audit_logs.organization_id, testOrganization.id),
         eq(organization_audit_logs.action, 'organization.purchase_credits')
@@ -1009,7 +1009,7 @@ describe('processTopupForOrganization', () => {
     const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);
     expect(emailMarkers).toHaveLength(1);
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
     expect(updatedOrg?.total_microdollars_acquired).toBe(
@@ -1037,7 +1037,7 @@ describe('processTopupForOrganization', () => {
       stripe_payment_id: stripePaymentId,
     });
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
     expect(updatedOrg?.total_microdollars_acquired).toBe(
@@ -1045,7 +1045,7 @@ describe('processTopupForOrganization', () => {
     );
     expect(sendViaMailgunMock).not.toHaveBeenCalled();
 
-    const emailMarkers = await db.query.transactional_email_log.findMany({
+    const emailMarkers = await db._query.transactional_email_log.findMany({
       where: eq(transactional_email_log.idempotency_key, stripePaymentId),
     });
     expect(emailMarkers).toHaveLength(0);
@@ -1069,7 +1069,7 @@ describe('processTopupForOrganization', () => {
       stripe_payment_id: stripePaymentId,
     });
 
-    const updatedOrg = await db.query.organizations.findFirst({
+    const updatedOrg = await db._query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
     expect(updatedOrg?.total_microdollars_acquired).toBe(
@@ -1077,7 +1077,7 @@ describe('processTopupForOrganization', () => {
     );
     expect(sendViaMailgunMock).not.toHaveBeenCalled();
 
-    const emailMarkers = await db.query.transactional_email_log.findMany({
+    const emailMarkers = await db._query.transactional_email_log.findMany({
       where: eq(transactional_email_log.idempotency_key, stripePaymentId),
     });
     expect(emailMarkers).toHaveLength(0);

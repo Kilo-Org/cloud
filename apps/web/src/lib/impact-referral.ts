@@ -235,7 +235,7 @@ export async function ensureImpactAdvocateParticipantProfile(params: {
 
   const participant =
     insertedParticipant ??
-    (await database.query.impact_advocate_participants.findFirst({
+    (await database._query.impact_advocate_participants.findFirst({
       where: eq(impact_advocate_participants.user_id, params.user.id),
       columns: { id: true },
     }));
@@ -399,7 +399,7 @@ export async function queueImpactAdvocateSelfRegistration(params: {
     countryCode: params.countryCode,
   });
 
-  const existing = await database.query.impact_advocate_participants.findFirst({
+  const existing = await database._query.impact_advocate_participants.findFirst({
     where: eq(impact_advocate_participants.id, participant.id),
     columns: { registration_state: true, opaque_referral_identifier: true },
   });
@@ -513,14 +513,14 @@ function nextRegistrationRetryAt(attemptCount: number): string {
 async function dispatchImpactAdvocateRegistrationAttemptById(
   attemptId: string
 ): Promise<'delivered' | 'retried' | 'failed'> {
-  const attempt = await db.query.impact_advocate_registration_attempts.findFirst({
+  const attempt = await db._query.impact_advocate_registration_attempts.findFirst({
     where: eq(impact_advocate_registration_attempts.id, attemptId),
   });
   if (!attempt) {
     return 'failed';
   }
 
-  const participant = await db.query.impact_advocate_participants.findFirst({
+  const participant = await db._query.impact_advocate_participants.findFirst({
     where: eq(impact_advocate_participants.id, attempt.participant_id),
   });
   if (!participant) {
@@ -604,7 +604,7 @@ async function dispatchImpactAdvocateRegistrationAttemptById(
 
     let advocateCodeToPersist: string | null = null;
     if (advocateCode) {
-      const conflicting = await db.query.impact_advocate_participants.findFirst({
+      const conflicting = await db._query.impact_advocate_participants.findFirst({
         where: and(
           eq(impact_advocate_participants.opaque_referral_identifier, advocateCode),
           ne(impact_advocate_participants.id, participant.id)

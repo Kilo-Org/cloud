@@ -1107,7 +1107,7 @@ async function persistRewardRedemptionFailure(params: {
 async function dispatchImpactAdvocateRewardRedemptionById(
   redemptionId: string
 ): Promise<'redeemed' | 'retried' | 'failed'> {
-  const redemption = await db.query.impact_advocate_reward_redemptions.findFirst({
+  const redemption = await db._query.impact_advocate_reward_redemptions.findFirst({
     where: eq(impact_advocate_reward_redemptions.id, redemptionId),
   });
   if (!redemption) return 'failed';
@@ -1350,7 +1350,7 @@ export async function markPersonalKiloClawReferralPaymentAdverse(params: {
   let impactReportId: string | null = null;
 
   const summary = await db.transaction(async tx => {
-    const conversion = await tx.query.kiloclaw_referral_conversions.findFirst({
+    const conversion = await tx._query.kiloclaw_referral_conversions.findFirst({
       where: eq(kiloclaw_referral_conversions.source_payment_id, params.sourcePaymentId),
     });
 
@@ -1397,7 +1397,7 @@ export async function markPersonalKiloClawReferralPaymentAdverse(params: {
       }
     }
 
-    const report = await tx.query.impact_conversion_reports.findFirst({
+    const report = await tx._query.impact_conversion_reports.findFirst({
       where: eq(impact_conversion_reports.conversion_id, conversion.id),
       columns: { id: true },
     });
@@ -1457,7 +1457,7 @@ async function getImpactConversionReportById(
   reportId: string,
   database: DatabaseClient
 ): Promise<typeof impact_conversion_reports.$inferSelect | null> {
-  const report = await database.query.impact_conversion_reports.findFirst({
+  const report = await database._query.impact_conversion_reports.findFirst({
     where: eq(impact_conversion_reports.id, reportId),
   });
   return report ?? null;
@@ -1672,7 +1672,7 @@ export async function processPersonalKiloClawPaidConversion(params: {
   let impactReportId: string | null = null;
   const rewardBeneficiaryUserIds = new Set<string>();
   const disposition = await db.transaction(async tx => {
-    const existingConversion = await tx.query.kiloclaw_referral_conversions.findFirst({
+    const existingConversion = await tx._query.kiloclaw_referral_conversions.findFirst({
       where: eq(kiloclaw_referral_conversions.source_payment_id, params.sourcePaymentId),
     });
 
@@ -2130,7 +2130,7 @@ export async function processPersonalKiloClawPaidConversion(params: {
 
     const existingReport =
       report ??
-      (await tx.query.impact_conversion_reports.findFirst({
+      (await tx._query.impact_conversion_reports.findFirst({
         where: eq(
           impact_conversion_reports.dedupe_key,
           `impact-referral-sale:${params.sourcePaymentId}`

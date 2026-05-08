@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErrorCode, type Purchase, useIAP } from 'expo-iap';
 import { Platform } from 'react-native';
@@ -21,6 +21,7 @@ type AppStoreKiloPassPurchaseActionsDeps = {
   finishTransaction: (params: { purchase: Purchase; isConsumable: false }) => Promise<void>;
   invalidateAfterCompletion: () => Promise<void> | void;
   onPurchaseCompleted?: () => void;
+  purchaseCompletions: RefObject<Map<string, Promise<boolean>>>;
   showError: (message: string) => void;
 };
 
@@ -46,21 +47,45 @@ function isUserCancelledPurchaseError(error: unknown): boolean {
   return userCancelledPurchaseErrorSchema.safeParse(error).success;
 }
 
+function getPurchaseCompletionId(purchase: Purchase): string {
+  return purchase.transactionId ?? purchase.id;
+}
+
 export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurchaseActionsDeps) {
-  async function handlePurchaseSuccess(
-    purchase: Purchase,
-    options: { notifyCompletion?: boolean } = {}
-  ) {
+  async function completePurchase(purchase: Purchase): Promise<boolean> {
     try {
       const signedTransactionJws = getPurchaseToken(purchase);
       await deps.completeAppStorePurchase({ signedTransactionJws });
       await deps.invalidateAfterCompletion();
       await deps.finishTransaction({ purchase, isConsumable: false });
-      if (options.notifyCompletion ?? true) {
-        deps.onPurchaseCompleted?.();
-      }
+      return true;
     } catch (error) {
       deps.showError(error instanceof Error ? error.message : 'Failed to complete purchase.');
+      return false;
+    }
+  }
+
+  async function completePurchaseOnce(purchase: Purchase): Promise<boolean> {
+    const purchaseId = getPurchaseCompletionId(purchase);
+    const existingCompletion = deps.purchaseCompletions.current.get(purchaseId);
+    if (existingCompletion) {
+      return existingCompletion;
+    }
+
+    const completion = completePurchase(purchase);
+    deps.purchaseCompletions.current.set(purchaseId, completion);
+    const completed = await completion;
+    deps.purchaseCompletions.current.delete(purchaseId);
+    return completed;
+  }
+
+  async function handlePurchaseSuccess(
+    purchase: Purchase,
+    options: { notifyCompletion?: boolean } = {}
+  ) {
+    const completed = await completePurchaseOnce(purchase);
+    if (completed && (options.notifyCompletion ?? true)) {
+      deps.onPurchaseCompleted?.();
     }
   }
 
@@ -99,7 +124,10 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
 export function useStoreKiloPassPurchase(options: { onPurchaseCompleted?: () => void } = {}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const [isRequestingPurchase, setIsRequestingPurchase] = useState(false);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
+  const purchaseCompletionsRef = useRef(new Map<string, Promise<boolean>>());
+  const requestInFlightRef = useRef(false);
   const completeAppStorePurchase = useMutation(
     trpc.kiloPass.completeAppStorePurchase.mutationOptions()
   );
@@ -141,6 +169,7 @@ export function useStoreKiloPassPurchase(options: { onPurchaseCompleted?: () => 
         finishTransaction,
         invalidateAfterCompletion,
         onPurchaseCompleted: options.onPurchaseCompleted,
+        purchaseCompletions: purchaseCompletionsRef,
         showError: message => {
           toast.error(message);
         },
@@ -150,8 +179,27 @@ export function useStoreKiloPassPurchase(options: { onPurchaseCompleted?: () => 
       finishTransaction,
       invalidateAfterCompletion,
       options.onPurchaseCompleted,
+      purchaseCompletionsRef,
       requestPurchase,
     ]
+  );
+
+  const startPurchase = useCallback(
+    async (product: AppStoreKiloPassProduct) => {
+      if (requestInFlightRef.current || completeAppStorePurchase.isPending) {
+        return;
+      }
+
+      requestInFlightRef.current = true;
+      setIsRequestingPurchase(true);
+      try {
+        await actions.purchase(product);
+      } finally {
+        requestInFlightRef.current = false;
+        setIsRequestingPurchase(false);
+      }
+    },
+    [actions, completeAppStorePurchase.isPending]
   );
 
   useEffect(() => {
@@ -167,8 +215,8 @@ export function useStoreKiloPassPurchase(options: { onPurchaseCompleted?: () => 
       return;
     }
 
-    const unrecoveredPurchases = availablePurchases.filter(purchase => {
-      const id = purchase.transactionId ?? purchase.id;
+    const unrecoveredPurchases = availablePurchases.filter(availablePurchase => {
+      const id = availablePurchase.transactionId ?? availablePurchase.id;
       if (recoveredPurchaseIdsRef.current.has(id)) {
         return false;
       }
@@ -182,7 +230,7 @@ export function useStoreKiloPassPurchase(options: { onPurchaseCompleted?: () => 
   }, [actions, availablePurchases]);
 
   return {
-    purchase: actions.purchase,
-    isPending: completeAppStorePurchase.isPending,
+    purchase: startPurchase,
+    isPending: isRequestingPurchase || completeAppStorePurchase.isPending,
   };
 }

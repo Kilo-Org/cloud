@@ -43,6 +43,10 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 
+function ignoreDeferredResolution(_value: unknown) {
+  return undefined;
+}
+
 const product: AppStoreKiloPassProduct = {
   appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
   appleProductId: 'kilopass.tier19.monthly.v1',
@@ -63,15 +67,33 @@ const product: AppStoreKiloPassProduct = {
   webMonthlyPriceUsd: 19,
 };
 
+function createActions(
+  overrides: Partial<Parameters<typeof createAppStoreKiloPassPurchaseActions>[0]> = {}
+) {
+  return createAppStoreKiloPassPurchaseActions({
+    completeAppStorePurchase: vi.fn(),
+    finishTransaction: vi.fn(),
+    invalidateAfterCompletion: vi.fn(),
+    purchaseCompletions: { current: new Map() },
+    requestPurchase: vi.fn(),
+    showError: () => undefined,
+    ...overrides,
+  });
+}
+
+function createDeferredPromise() {
+  let resolvePromise: (value: unknown) => void = ignoreDeferredResolution;
+  const promise = new Promise(resolve => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: resolvePromise };
+}
+
 describe('createAppStoreKiloPassPurchaseActions', () => {
   it('requests an App Store subscription purchase', async () => {
     const requestPurchase = vi.fn().mockResolvedValue(null);
-    const actions = createAppStoreKiloPassPurchaseActions({
-      completeAppStorePurchase: vi.fn(),
-      finishTransaction: vi.fn(),
-      invalidateAfterCompletion: vi.fn(),
+    const actions = createActions({
       requestPurchase,
-      showError: () => undefined,
     });
 
     await actions.purchase(product);
@@ -84,10 +106,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
   it('shows an error when the App Store purchase request fails before opening the sheet', async () => {
     const showError = vi.fn();
-    const actions = createAppStoreKiloPassPurchaseActions({
-      completeAppStorePurchase: vi.fn(),
-      finishTransaction: vi.fn(),
-      invalidateAfterCompletion: vi.fn(),
+    const actions = createActions({
       requestPurchase: vi.fn().mockRejectedValue(new Error('Could not connect to App Store')),
       showError: message => {
         showError(message);
@@ -101,10 +120,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
   it('does not show an error when the user cancels the App Store purchase sheet', async () => {
     const showError = vi.fn();
-    const actions = createAppStoreKiloPassPurchaseActions({
-      completeAppStorePurchase: vi.fn(),
-      finishTransaction: vi.fn(),
-      invalidateAfterCompletion: vi.fn(),
+    const actions = createActions({
       requestPurchase: vi.fn().mockRejectedValue({
         code: 'user-cancelled',
         message: 'User cancelled the purchase',
@@ -121,12 +137,9 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
   it('does not finish the transaction when backend completion fails', async () => {
     const finishTransaction = vi.fn();
-    const actions = createAppStoreKiloPassPurchaseActions({
+    const actions = createActions({
       completeAppStorePurchase: vi.fn().mockRejectedValue(new Error('backend failed')),
       finishTransaction,
-      invalidateAfterCompletion: vi.fn(),
-      requestPurchase: vi.fn(),
-      showError: () => undefined,
     });
 
     await actions.handlePurchaseSuccess({
@@ -163,15 +176,13 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       transactionDate: Date.now(),
       transactionId: 'tx-1',
     } satisfies Purchase;
-    const actions = createAppStoreKiloPassPurchaseActions({
+    const actions = createActions({
       completeAppStorePurchase: vi.fn().mockResolvedValue({ alreadyProcessed: false }),
       finishTransaction,
       invalidateAfterCompletion,
       onPurchaseCompleted: () => {
         onPurchaseCompleted();
       },
-      requestPurchase: vi.fn(),
-      showError: () => undefined,
     });
 
     await actions.handlePurchaseSuccess(purchase);
@@ -183,15 +194,11 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 
   it('does not run purchase completion callback when backend completion fails', async () => {
     const onPurchaseCompleted = vi.fn();
-    const actions = createAppStoreKiloPassPurchaseActions({
+    const actions = createActions({
       completeAppStorePurchase: vi.fn().mockRejectedValue(new Error('backend failed')),
-      finishTransaction: vi.fn(),
-      invalidateAfterCompletion: vi.fn(),
       onPurchaseCompleted: () => {
         onPurchaseCompleted();
       },
-      requestPurchase: vi.fn(),
-      showError: () => undefined,
     });
 
     await actions.handlePurchaseSuccess({
@@ -228,15 +235,13 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       transactionDate: Date.now(),
       transactionId: 'tx-1',
     } satisfies Purchase;
-    const actions = createAppStoreKiloPassPurchaseActions({
+    const actions = createActions({
       completeAppStorePurchase,
       finishTransaction,
       invalidateAfterCompletion: vi.fn(),
       onPurchaseCompleted: () => {
         onPurchaseCompleted();
       },
-      requestPurchase: vi.fn(),
-      showError: () => undefined,
     });
 
     await actions.recoverPurchases([
@@ -259,5 +264,41 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(completeAppStorePurchase).toHaveBeenCalledWith({ signedTransactionJws: 'signed-jws' });
     expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
     expect(onPurchaseCompleted).not.toHaveBeenCalled();
+  });
+
+  it('coalesces recovery and live callbacks for the same App Store transaction', async () => {
+    const backendCompletion = createDeferredPromise();
+    const completeAppStorePurchase = vi.fn().mockReturnValue(backendCompletion.promise);
+    const finishTransaction = vi.fn();
+    const onPurchaseCompleted = vi.fn();
+    const purchase = {
+      id: 'purchase-1',
+      ids: null,
+      isAutoRenewing: true,
+      platform: 'ios',
+      productId: product.appleProductId,
+      purchaseState: 'purchased',
+      purchaseToken: 'signed-jws',
+      quantity: 1,
+      store: 'apple',
+      transactionDate: Date.now(),
+      transactionId: 'tx-1',
+    } satisfies Purchase;
+    const actions = createActions({
+      completeAppStorePurchase,
+      finishTransaction,
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+    });
+
+    const recovery = actions.handlePurchaseSuccess(purchase, { notifyCompletion: false });
+    const liveCallback = actions.handlePurchaseSuccess(purchase);
+    backendCompletion.resolve({ alreadyProcessed: false });
+    await Promise.all([recovery, liveCallback]);
+
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(finishTransaction).toHaveBeenCalledTimes(1);
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
   });
 });

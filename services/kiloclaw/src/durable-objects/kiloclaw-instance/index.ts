@@ -99,6 +99,7 @@ import * as gateway from './gateway';
 import { buildChannelConfigPatch } from './channel-config';
 import * as pairing from './pairing';
 import * as kiloCliRun from './kilo-cli-run';
+import * as doctorRun from './doctor-run';
 import {
   reconcileWithFly,
   syncStatusFromLiveCheck,
@@ -1750,6 +1751,21 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async runDoctor() {
     await this.loadState();
     return pairing.runDoctor(this.s, this.env);
+  }
+
+  async startDoctorViaController(fix: boolean) {
+    await this.loadState();
+    return doctorRun.startDoctorViaController(this.s, this.env, fix);
+  }
+
+  async getDoctorViaControllerStatus() {
+    await this.loadState();
+    return doctorRun.getDoctorViaControllerStatus(this.s, this.env);
+  }
+
+  async cancelDoctorViaController() {
+    await this.loadState();
+    return doctorRun.cancelDoctorViaController(this.s, this.env);
   }
 
   // ── Kilo CLI Run ────────────────────────────────────────────────────

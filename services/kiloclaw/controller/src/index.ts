@@ -41,6 +41,7 @@ import {
 import { registerInboundEmailRoute } from './routes/inbound-email';
 import { registerFileRoutes } from './routes/files';
 import { registerKiloCliRunRoutes } from './routes/kilo-cli-run';
+import { registerDoctorRoutes } from './routes/doctor';
 import { registerMorningBriefingRoutes } from './routes/morning-briefing';
 import { CONTROLLER_COMMIT, CONTROLLER_VERSION } from './version';
 import { writeKiloCliConfig } from './kilo-cli-config';
@@ -134,9 +135,26 @@ async function handleHttpRequest(
   const url = new URL(req.url ?? '/', `http://${host}`);
   const method = (req.method ?? 'GET').toUpperCase();
 
+  // Propagate client disconnects as an AbortSignal so long-running handlers
+  // (e.g. /_kilo/doctor/run) can react. We listen on `res` (ServerResponse)
+  // rather than `req` (IncomingMessage) because the IncomingMessage's 'close'
+  // event fires as soon as the request body stream is fully consumed — which
+  // happens mid-handler when we pass `req` as `init.body` and Hono reads the
+  // body with `c.req.json()`. That would falsely trigger abort before the
+  // response is sent. ServerResponse's 'close' event only fires on completion
+  // or premature connection termination; combined with `!res.writableEnded`
+  // we get the "client dropped before response" case.
+  const clientAbort = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      clientAbort.abort();
+    }
+  });
+
   const init: RequestInit & { duplex?: 'half' } = {
     method,
     headers: req.headers as HeadersInit,
+    signal: clientAbort.signal,
   };
   if (method !== 'GET' && method !== 'HEAD') {
     init.body = req as unknown as ReadableStream<Uint8Array>;
@@ -448,6 +466,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   registerInboundEmailRoute(honoApp, supervisor, config.expectedToken, config.hooksToken);
   registerFileRoutes(honoApp, config.expectedToken, '/root/.openclaw');
   registerKiloCliRunRoutes(honoApp, config.expectedToken);
+  registerDoctorRoutes(honoApp, config.expectedToken);
   honoApp.all(
     '*',
     createHttpProxy({

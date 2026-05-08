@@ -35,6 +35,9 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import type { DoctorControllerStatus, DoctorControllerStatusResponse } from '@/lib/kiloclaw/types';
 import {
   User,
   Calendar,
@@ -1301,6 +1304,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const queryClient = useQueryClient();
   const [destroyDialogOpen, setDestroyDialogOpen] = useState(false);
   const [doctorDialogOpen, setDoctorDialogOpen] = useState(false);
+  const [doctorControllerDialogOpen, setDoctorControllerDialogOpen] = useState(false);
+  const [doctorControllerFix, setDoctorControllerFix] = useState(true);
   const [restoreConfigDialogOpen, setRestoreConfigDialogOpen] = useState(false);
   const [destroyMachineDialogOpen, setDestroyMachineDialogOpen] = useState(false);
   const [resizeMachineDialogOpen, setResizeMachineDialogOpen] = useState(false);
@@ -1481,6 +1486,15 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const supportsConfigRestore = calverAtLeast(
     cleanVersion(controllerVersion?.version),
     '2026.2.26'
+  );
+  // /_kilo/doctor/start|status|cancel is expected to land after 14:00 CDT on
+  // 2026-05-08 (19:00 UTC). Older same-day controllers may report only 2026.5.8,
+  // which compares as 2026.5.8.0 and must remain unsupported.
+  // controllers fall through to the catch-all proxy and return 404 —
+  // disable the button with a tooltip until they redeploy.
+  const supportsDoctorController = calverAtLeast(
+    cleanVersion(controllerVersion?.version),
+    '2026.5.8.1900'
   );
 
   // After a restart/upgrade, poll the machine status until it returns to "running",
@@ -2011,6 +2025,54 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     })
   );
 
+  const startDoctorControllerMutation = useMutation(
+    trpc.admin.kiloclawInstances.startDoctorViaController.mutationOptions({
+      onSuccess: async (_result, variables) => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.admin.kiloclawInstances.doctorViaControllerStatus.queryKey({
+            userId: variables.userId,
+            instanceId: variables.instanceId,
+          }),
+        });
+        setDoctorControllerDialogOpen(true);
+      },
+      onError: (err, variables) => {
+        if (
+          err instanceof TRPCClientError &&
+          err.data?.code === 'CONFLICT' &&
+          err.message.includes('already in progress')
+        ) {
+          setDoctorControllerDialogOpen(true);
+          void queryClient.invalidateQueries({
+            queryKey: trpc.admin.kiloclawInstances.doctorViaControllerStatus.queryKey({
+              userId: variables.userId,
+              instanceId: variables.instanceId,
+            }),
+          });
+          return;
+        }
+        toast.error(`Failed to start doctor (controller): ${err.message}`);
+      },
+    })
+  );
+
+  const cancelDoctorControllerMutation = useMutation(
+    trpc.admin.kiloclawInstances.cancelDoctorViaController.mutationOptions({
+      onError: err => {
+        toast.error(`Failed to cancel doctor (controller): ${err.message}`);
+      },
+    })
+  );
+
+  const { data: doctorControllerStatus, isError: doctorControllerStatusError } = useQuery({
+    ...trpc.admin.kiloclawInstances.doctorViaControllerStatus.queryOptions({
+      userId: data?.user_id ?? '',
+      instanceId: data?.id,
+    }),
+    enabled: doctorControllerDialogOpen && supportsDoctorController && !!data?.user_id,
+    refetchInterval: query => (query.state.data?.status === 'running' ? 1000 : false),
+  });
+
   const restoreConfigMutation = useMutation(
     trpc.admin.kiloclawInstances.restoreConfig.mutationOptions({
       onSuccess: data => {
@@ -2145,6 +2207,8 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     isGatewayStopping ||
     isGatewayRestarting ||
     runDoctorMutation.isPending ||
+    startDoctorControllerMutation.isPending ||
+    cancelDoctorControllerMutation.isPending ||
     restoreConfigMutation.isPending;
 
   return (
@@ -4178,6 +4242,30 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
                         <span>
                           <Button
                             size="sm"
+                            variant="outline"
+                            disabled={!supportsDoctorController || gatewayActionPending}
+                            onClick={() => {
+                              startDoctorControllerMutation.mutate({
+                                userId: data.user_id,
+                                instanceId: data.id,
+                                fix: doctorControllerFix,
+                              });
+                            }}
+                          >
+                            <Stethoscope className="mr-1 h-4 w-4" />
+                            Run Doctor (Controller)
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!supportsDoctorController && (
+                        <TooltipContent>Unavailable until redeploy</TooltipContent>
+                      )}
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            size="sm"
                             variant="destructive"
                             disabled={!supportsConfigRestore || gatewayActionPending}
                             onClick={() => setRestoreConfigDialogOpen(true)}
@@ -4590,6 +4678,31 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
           mutation={runDoctorMutation}
         />
 
+        {/* Run Doctor (Controller) Dialog */}
+        <RunDoctorControllerDialog
+          open={doctorControllerDialogOpen && supportsDoctorController}
+          onOpenChange={setDoctorControllerDialogOpen}
+          fix={doctorControllerFix}
+          onFixChange={setDoctorControllerFix}
+          status={doctorControllerStatus}
+          statusError={doctorControllerStatusError}
+          starting={startDoctorControllerMutation.isPending}
+          cancelling={cancelDoctorControllerMutation.isPending}
+          onCancel={() => {
+            cancelDoctorControllerMutation.mutate({
+              userId: data.user_id,
+              instanceId: data.id,
+            });
+          }}
+          onRerun={() => {
+            startDoctorControllerMutation.mutate({
+              userId: data.user_id,
+              instanceId: data.id,
+              fix: doctorControllerFix,
+            });
+          }}
+        />
+
         {/* Restore Default Config Confirmation Dialog */}
         <Dialog
           open={restoreConfigDialogOpen && supportsConfigRestore}
@@ -4731,6 +4844,174 @@ function RunDoctorDialog({
             disabled={mutation.isPending}
           >
             Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function formatRunDuration(startedAt: string | null, completedAt: string | null): string {
+  if (!startedAt || !completedAt) return '–';
+  const start = new Date(startedAt).getTime();
+  const end = new Date(completedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '–';
+  const ms = end - start;
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function doctorStatusLabel(status: DoctorControllerStatus | null): string {
+  switch (status) {
+    case 'running':
+      return 'Running';
+    case 'completed':
+      return 'Completed successfully';
+    case 'failed':
+      return 'Completed with issues';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'timed_out':
+      return 'Timed out after 120s';
+    case null:
+      return 'No run yet';
+  }
+}
+
+function RunDoctorControllerDialog({
+  open,
+  onOpenChange,
+  fix,
+  onFixChange,
+  status,
+  statusError,
+  starting,
+  cancelling,
+  onCancel,
+  onRerun,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fix: boolean;
+  onFixChange: (next: boolean) => void;
+  status: DoctorControllerStatusResponse | undefined;
+  statusError: boolean;
+  starting: boolean;
+  cancelling: boolean;
+  onCancel: () => void;
+  onRerun: () => void;
+}) {
+  const isRunning = status?.status === 'running' || starting;
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+  };
+
+  const result = status?.hasRun ? { ...status, output: stripAnsi(status.output ?? '') } : null;
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[750px]">
+        <DialogHeader>
+          <DialogTitle>OpenClaw Doctor (via Controller)</DialogTitle>
+          <DialogDescription>
+            Runs <code>openclaw doctor</code> inside the machine via the controller HTTP API. Output
+            is persisted on the instance and can be retrieved while the run continues.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="doctor-controller-fix"
+            checked={fix}
+            onCheckedChange={onFixChange}
+            disabled={isRunning}
+          />
+          <Label htmlFor="doctor-controller-fix" className="text-sm">
+            Pass <code>--fix</code>
+          </Label>
+        </div>
+
+        {starting && !result && (
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
+            <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+            <p className="text-muted-foreground text-sm">
+              Starting <code>openclaw doctor{fix ? ' --fix' : ''}</code>…
+            </p>
+          </div>
+        )}
+
+        {statusError && !result && !starting && (
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
+            <XCircle className="h-8 w-8 text-red-400" />
+            <p className="text-sm text-red-400">Failed to fetch doctor status (controller)</p>
+          </div>
+        )}
+
+        {!result && !starting && !statusError && (
+          <div className="text-muted-foreground flex flex-col items-center justify-center gap-3 py-12 text-sm">
+            No controller doctor run has been recorded yet.
+          </div>
+        )}
+
+        {result && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {result.status === 'running' ? (
+                <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+              ) : result.status === 'completed' ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <XCircle className="h-4 w-4 text-red-400" />
+              )}
+              <span className="text-sm font-medium">{doctorStatusLabel(result.status)}</span>
+              <Badge variant="outline" className="text-xs">
+                exit {result.exitCode ?? 'n/a'}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {formatRunDuration(result.startedAt, result.completedAt)}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                {result.fix ? '--fix' : 'no --fix'}
+              </Badge>
+              {result.outputTruncated && (
+                <Badge variant="outline" className="border-yellow-500/30 text-xs text-yellow-400">
+                  output truncated
+                </Badge>
+              )}
+              {result.timedOut && (
+                <Badge variant="outline" className="border-yellow-500/30 text-xs text-yellow-400">
+                  timed out
+                </Badge>
+              )}
+            </div>
+            <div className="border-border bg-background max-h-[400px] overflow-auto rounded-md border">
+              {/* prettier-ignore */}
+              <pre
+                className="p-3 text-xs leading-relaxed whitespace-pre"
+                style={{ fontFamily: "'Courier New', Courier, monospace", tabSize: 8 }}
+              >{result.output}</pre>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+            Close
+          </Button>
+          {result?.status === 'running' && (
+            <Button variant="destructive" onClick={onCancel} disabled={cancelling}>
+              {cancelling ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+              Cancel
+            </Button>
+          )}
+          <Button
+            variant="default"
+            onClick={onRerun}
+            disabled={isRunning || cancelling}
+            title="Re-run with the current --fix setting"
+          >
+            <Stethoscope className="mr-1 h-4 w-4" />
+            Re-run
           </Button>
         </DialogFooter>
       </DialogContent>

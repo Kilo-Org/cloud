@@ -166,6 +166,9 @@ export const SLACK_USER_FEEDBACK_WEBHOOK_URL = getEnvVariable('SLACK_USER_FEEDBA
 // Posts deploy threat alerts to a dedicated Slack channel.
 // Expected to be a Slack Incoming Webhook URL.
 export const SLACK_DEPLOY_THREAT_WEBHOOK_URL = getEnvVariable('SLACK_DEPLOY_THREAT_WEBHOOK_URL');
+// Posts code review pipeline health alerts to a dedicated Slack channel.
+// Expected to be a Slack Incoming Webhook URL.
+export const SLACK_CODE_REVIEW_WEBHOOK_URL = getEnvVariable('SLACK_CODE_REVIEW_WEBHOOK_URL');
 
 // AI Attribution Service
 export const AI_ATTRIBUTION_ADMIN_SECRET = getEnvVariable('AI_ATTRIBUTION_ADMIN_SECRET');

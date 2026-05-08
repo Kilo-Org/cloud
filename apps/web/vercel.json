@@ -29,6 +29,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/code-review-alerts",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/oss-monthly-reset",
       "schedule": "0 0 * * *"
     },

@@ -364,6 +364,10 @@ export function registerDoctorRoutes(app: Hono, expectedToken: string): void {
     try {
       body = await c.req.json();
     } catch {
+      const rawBody = await c.req.text().catch(() => '');
+      if (rawBody.trim()) {
+        return c.json({ error: 'Invalid JSON body' }, 400);
+      }
       body = {};
     }
 

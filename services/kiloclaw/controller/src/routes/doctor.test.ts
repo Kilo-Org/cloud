@@ -114,6 +114,18 @@ describe('/_kilo/doctor routes', () => {
     expect(fs.existsSync(logPath)).toBe(true);
   });
 
+  it('rejects malformed JSON instead of defaulting to --fix', async () => {
+    const resp = await app.request('/_kilo/doctor/start', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: '{not-json',
+    });
+
+    expect(resp.status).toBe(400);
+    expect(await jsonBody(resp)).toMatchObject({ error: 'Invalid JSON body' });
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
   it('starts openclaw doctor without --fix when fix=false', async () => {
     const resp = await app.request('/_kilo/doctor/start', {
       method: 'POST',

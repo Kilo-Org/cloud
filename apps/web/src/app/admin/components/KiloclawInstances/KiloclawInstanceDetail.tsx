@@ -1487,12 +1487,14 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     cleanVersion(controllerVersion?.version),
     '2026.2.26'
   );
-  // /_kilo/doctor/start|status|cancel was added to the controller on 2026-05-08. Older
+  // /_kilo/doctor/start|status|cancel is expected to land after 14:00 CDT on
+  // 2026-05-08 (19:00 UTC). Older same-day controllers may report only 2026.5.8,
+  // which compares as 2026.5.8.0 and must remain unsupported.
   // controllers fall through to the catch-all proxy and return 404 —
   // disable the button with a tooltip until they redeploy.
   const supportsDoctorController = calverAtLeast(
     cleanVersion(controllerVersion?.version),
-    '2026.5.8'
+    '2026.5.8.1900'
   );
 
   // After a restart/upgrade, poll the machine status until it returns to "running",

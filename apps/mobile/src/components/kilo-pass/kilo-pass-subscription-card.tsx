@@ -1,4 +1,4 @@
-import { showManageSubscriptionsIOS } from 'expo-iap';
+import { beginRefundRequestIOS, showManageSubscriptionsIOS } from 'expo-iap';
 import { type Href, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Linking, Platform, Pressable, View } from 'react-native';
@@ -10,6 +10,10 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useTRPC } from '@/lib/trpc';
+import {
+  getDevStoreKitRefundAppleProductId,
+  requestDevStoreKitRefund,
+} from '@/lib/kilo-pass/dev-storekit-refund';
 import { getKiloPassSubscriptionCardState } from '@/lib/kilo-pass/subscription-card-state';
 
 const KILO_PASS_MANAGE_URL = `${WEB_BASE_URL}/subscriptions/kilo-pass`;
@@ -27,6 +31,7 @@ export function KiloPassSubscriptionCard() {
 
   const subscription = stateQuery.data?.subscription;
   const cardState = getKiloPassSubscriptionCardState(subscription);
+  const devRefundAppleProductId = getDevStoreKitRefundAppleProductId({ subscription });
   const invalidateKiloPassState = async () => {
     await Promise.all([
       queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),
@@ -60,22 +65,54 @@ export function KiloPassSubscriptionCard() {
     }
     router.push('/(app)/kilo-pass' as Href);
   };
+  const handleDevRefundPress = () => {
+    if (!devRefundAppleProductId) {
+      return;
+    }
+
+    void Haptics.selectionAsync();
+    void requestDevStoreKitRefund({
+      appleProductId: devRefundAppleProductId,
+      beginRefundRequest: beginRefundRequestIOS,
+      invalidateAfterRefund: invalidateKiloPassState,
+      showError: message => {
+        toast.error(message);
+      },
+      showSuccess: message => {
+        toast.success(message);
+      },
+    });
+  };
 
   return (
-    <Pressable
-      className="rounded-lg border border-border bg-card p-3 active:opacity-80"
-      onPress={handlePress}
-    >
-      <View className="flex-row items-center gap-3">
-        <View className="h-10 w-10 items-center justify-center rounded-md bg-secondary">
-          <ShieldCheck size={19} color={colors.primary} />
+    <View className="gap-2">
+      <Pressable
+        className="rounded-lg border border-border bg-card p-3 active:opacity-80"
+        onPress={handlePress}
+      >
+        <View className="flex-row items-center gap-3">
+          <View className="h-10 w-10 items-center justify-center rounded-md bg-secondary">
+            <ShieldCheck size={19} color={colors.primary} />
+          </View>
+          <View className="flex-1">
+            <Text className="font-semibold">{cardState.title}</Text>
+            <Text className="text-xs text-muted-foreground">{cardState.description}</Text>
+          </View>
+          <Text className="text-xs font-medium text-primary">{cardState.actionLabel}</Text>
         </View>
-        <View className="flex-1">
-          <Text className="font-semibold">{cardState.title}</Text>
-          <Text className="text-xs text-muted-foreground">{cardState.description}</Text>
-        </View>
-        <Text className="text-xs font-medium text-primary">{cardState.actionLabel}</Text>
-      </View>
-    </Pressable>
+      </Pressable>
+
+      {devRefundAppleProductId ? (
+        <Pressable
+          accessibilityRole="button"
+          className="rounded-lg border border-destructive bg-card px-3 py-2 active:opacity-80"
+          onPress={handleDevRefundPress}
+        >
+          <Text className="text-center text-xs font-medium text-destructive">
+            Dev: Request App Store refund
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }

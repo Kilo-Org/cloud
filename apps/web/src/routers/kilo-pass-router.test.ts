@@ -297,8 +297,7 @@ describe('kiloPassRouter', () => {
 
       expect(result).toEqual({
         subscription: null,
-        isEligibleForFirstMonthPromo:
-          new Date() < KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate(),
+        isEligibleForFirstMonthPromo: true,
       });
     });
 
@@ -744,28 +743,20 @@ describe('kiloPassRouter', () => {
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
 
-      expect(result.isEligibleForFirstMonthPromo).toBe(
-        new Date() < KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate()
-      );
+      expect(result.isEligibleForFirstMonthPromo).toBe(true);
       expect(result.subscription).toBeNull();
     });
 
-    it('returns isEligibleForFirstMonthPromo=false after the promo cutoff', async () => {
-      // If the current time is at or after the cutoff, even a user with no subscriptions
-      // should see isEligibleForFirstMonthPromo=false.
-      const now = new Date();
-      const cutoff = KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toDate();
-      if (now >= cutoff) {
-        const user = await insertTestUser({
-          google_user_email: 'kilo-pass-promo-cutoff-ineligible@example.com',
-        });
+    it('keeps isEligibleForFirstMonthPromo=true for a never-subscribed user', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-promo-cutoff-still-eligible@example.com',
+      });
 
-        const caller = await createCallerForUser(user.id);
-        const result = await caller.kiloPass.getState();
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
 
-        expect(result.isEligibleForFirstMonthPromo).toBe(false);
-        expect(result.subscription).toBeNull();
-      }
+      expect(result.isEligibleForFirstMonthPromo).toBe(true);
+      expect(result.subscription).toBeNull();
     });
 
     it('returns isEligibleForFirstMonthPromo=false when user has a canceled subscription', async () => {

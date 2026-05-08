@@ -103,6 +103,18 @@ export function KiloPassDetail() {
     return promoPercent === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
   }, [subscription]);
 
+  const showSecondMonthPromoInDialog = useMemo(() => {
+    if (!subscription || subscription.cadence !== 'monthly') return false;
+    if (subscription.currentStreakMonths > 2) return false;
+    const month2Percent = computeMonthlyCadenceBonusPercent({
+      tier: subscription.tier,
+      streakMonths: 2,
+      isFirstTimeSubscriberEver: subscription.isFirstTimeSubscriberEver,
+      subscriptionStartedAtIso: subscription.startedAt,
+    });
+    return month2Percent === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
+  }, [subscription]);
+
   async function refreshData() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: trpc.kiloPass.getState.queryKey() }),
@@ -236,7 +248,7 @@ export function KiloPassDetail() {
                 <KiloPassBonusRampDialog
                   tier={subscription.tier}
                   showFirstMonthPromo={showFirstMonthPromoInDialog}
-                  showSecondMonthPromo={subscription.currentStreakMonths === 1}
+                  showSecondMonthPromo={showSecondMonthPromoInDialog}
                   streakMonths={subscription.currentStreakMonths}
                   subscriptionStartedAtIso={subscription.startedAt ?? undefined}
                 />

@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono, Roboto_Mono } from 'next/font/google';
+import {
+  createPrototypeHostClassName,
+  PROTOTYPE_HOST_METADATA,
+  PROTOTYPE_HOST_VIEWPORT,
+} from '@/lib/prototype-host';
 import '@web/app/globals.css';
 
 const inter = Inter({
@@ -20,22 +25,19 @@ const jetbrainsMono = JetBrains_Mono({
   variable: '--font-jetbrains',
 });
 
-export const metadata: Metadata = {
-  title: 'Kilo Code Prototypes',
-  description: 'Full-page Kilo Code product-flow prototypes for design review.',
-};
+export const metadata: Metadata = PROTOTYPE_HOST_METADATA;
 
-export const viewport: Viewport = {
-  themeColor: '#171717',
-  width: 'device-width',
-  initialScale: 1,
-};
+export const viewport: Viewport = PROTOTYPE_HOST_VIEWPORT;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${mono.variable} ${jetbrainsMono.variable} antialiased`}
+      className={createPrototypeHostClassName([
+        inter.variable,
+        mono.variable,
+        jetbrainsMono.variable,
+      ])}
     >
       <body>{children}</body>
     </html>

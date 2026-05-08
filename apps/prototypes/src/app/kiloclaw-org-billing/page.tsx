@@ -19,7 +19,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@web/components/ui/select';
+} from '@/components/ui/select';
 import {
   adminFixtures,
   associatedUserFixtures,
@@ -63,10 +63,13 @@ import {
   SidebarPreview,
 } from './components';
 import {
+  createPrototypeReviewModel,
+  isPrototypeVisible,
   PrototypePageShell,
   PrototypeSection,
   PrototypeTableOfContents,
   PrototypeVariant,
+  type PrototypeVisibility,
 } from '@/components/prototype-kit';
 import { OptOutTabClient } from './opt-out-client';
 
@@ -75,17 +78,12 @@ import { OptOutTabClient } from './opt-out-client';
 // ---------------------------------------------------------------------------
 
 type Role = 'admin' | 'member' | 'kilo_admin';
-type RoleVisibility = Role | 'both' | 'all';
+type RoleVisibility = PrototypeVisibility<Role>;
 
+const CUSTOMER_ROLES = ['admin', 'member'] as const satisfies readonly Role[];
 const RoleContext = createContext<Role>('admin');
 
-function visibleForRole(roles: RoleVisibility, current: Role): boolean {
-  if (roles === 'all') return true;
-  if (roles === 'both') return current === 'admin' || current === 'member';
-  return roles === current;
-}
-
-function roleVisibilityLabel(roles: Exclude<RoleVisibility, 'both' | 'all'>): string {
+function roleVisibilityLabel(roles: Role): string {
   const labels: Record<Role, string> = {
     admin: 'Admin',
     member: 'Member',
@@ -121,7 +119,7 @@ function Section({
   title,
   description,
   url,
-  roles = 'both',
+  roles = CUSTOMER_ROLES,
   children,
 }: {
   id: string;
@@ -133,7 +131,7 @@ function Section({
 }) {
   const role = useContext(RoleContext);
   const visibilityLabel =
-    roles !== 'both' && roles !== 'all' ? `${roleVisibilityLabel(roles)} only` : undefined;
+    typeof roles === 'string' && roles !== 'all' ? `${roleVisibilityLabel(roles)} only` : undefined;
 
   return (
     <PrototypeSection
@@ -141,7 +139,7 @@ function Section({
       title={title}
       description={description}
       url={url}
-      visible={visibleForRole(roles, role)}
+      visible={isPrototypeVisible(roles, role)}
       visibilityLabel={visibilityLabel}
     >
       {children}
@@ -163,7 +161,7 @@ function Variant({
   const role = useContext(RoleContext);
 
   return (
-    <PrototypeVariant label={label} caption={caption} visible={visibleForRole(roles, role)}>
+    <PrototypeVariant label={label} caption={caption} visible={isPrototypeVisible(roles, role)}>
       {children}
     </PrototypeVariant>
   );
@@ -175,139 +173,165 @@ function Variant({
 
 // Ordered by selected role. Customer roles follow the product journey;
 // Kilo Admin follows internal support triage from list → detail → launch health.
-const TOC_ITEMS: { id: string; label: string; url: string; roles: RoleVisibility }[] = [
+const REVIEW_SECTIONS: {
+  id: string;
+  label: string;
+  title: string;
+  url: string;
+  visibility: RoleVisibility;
+}[] = [
   // Kilo Admin — internal support and ops surfaces
   {
     id: 'admin-kiloclaw-list',
     label: 'Admin KiloClaw list and filters',
+    title: 'Admin KiloClaw list and filters',
     url: '/admin/kiloclaw',
-    roles: 'kilo_admin',
+    visibility: 'kilo_admin',
   },
   {
     id: 'admin-kiloclaw-detail',
     label: 'Instance billing support card',
+    title: 'Instance billing support card',
     url: '/admin/kiloclaw/[id]',
-    roles: 'kilo_admin',
+    visibility: 'kilo_admin',
   },
   {
     id: 'admin-mutation-safety',
     label: 'Admin mutation guardrails',
+    title: 'Admin mutation guardrails',
     url: '/admin/kiloclaw/[id] and /admin/users/[id]?tab=kiloclaw',
-    roles: 'kilo_admin',
+    visibility: 'kilo_admin',
   },
   {
     id: 'admin-readiness',
     label: 'Launch/backfill readiness',
+    title: 'Launch/backfill readiness',
     url: '/admin/kiloclaw',
-    roles: 'kilo_admin',
+    visibility: 'kilo_admin',
   },
   {
     id: 'admin-org-support',
     label: 'Organization support KiloClaw section',
+    title: 'Organization support KiloClaw section',
     url: '/admin/organizations/[id]',
-    roles: 'kilo_admin',
+    visibility: 'kilo_admin',
   },
   {
     id: 'admin-user-support',
     label: 'User support KiloClaw tab',
+    title: 'User support KiloClaw tab',
     url: '/admin/users/[id]?tab=kiloclaw',
-    roles: 'kilo_admin',
+    visibility: 'kilo_admin',
   },
   {
     id: 'admin-observability',
     label: 'Change logs, filters, support notes',
+    title: 'Change logs, filters, support notes',
     url: '/admin/kiloclaw and related detail pages',
-    roles: 'kilo_admin',
+    visibility: 'kilo_admin',
   },
   // (0) Cross-PR navigation surfaces
   {
     id: 'navigation',
     label: 'Sidebar and dashboard navigation',
+    title: 'Sidebar and dashboard navigation',
     url: '/organizations/[id]/* (sidebar) and /organizations/[id] (dashboard)',
-    roles: 'both',
+    visibility: CUSTOMER_ROLES,
   },
   // (1–2) Org dashboard
   {
     id: 'wave-b',
     label: 'Personal KiloClaw alerts on dashboard',
+    title: 'Personal KiloClaw alerts on dashboard',
     url: '/organizations/[id]',
-    roles: 'both',
+    visibility: CUSTOMER_ROLES,
   },
   {
     id: 'wave-a-tile',
     label: 'Dashboard subscription alert',
+    title: 'Dashboard subscription alert',
     url: '/organizations/[id]',
-    roles: 'admin',
+    visibility: 'admin',
   },
   // (3–4) Org Subscriptions page
   {
     id: 'wave-a-group',
     label: 'KiloClaw on the Subscriptions page',
+    title: 'KiloClaw on the Subscriptions page',
     url: '/organizations/[id]/subscriptions',
-    roles: 'admin',
+    visibility: 'admin',
   },
   {
     id: 'wave-a-detail',
     label: 'Subscription detail page',
+    title: 'Subscription detail page',
     url: '/organizations/[id]/subscriptions/kiloclaw/[instanceId]',
-    roles: 'admin',
+    visibility: 'admin',
   },
   // (5–6) Org Settings
   {
     id: 'pr4a',
     label: 'Organization Settings',
+    title: 'Organization Settings',
     url: '/organizations/[id]/settings',
-    roles: 'admin',
+    visibility: 'admin',
   },
   {
     id: 'pr4b',
     label: 'KiloClaw access controls',
+    title: 'KiloClaw access controls',
     url: '/organizations/[id]/settings?tab=kiloclaw',
-    roles: 'admin',
+    visibility: 'admin',
   },
   // (7) Provisioning
   {
     id: 'pr3',
     label: 'New KiloClaw setup',
+    title: 'New KiloClaw setup',
     url: '/organizations/[id]/claw/new',
-    roles: 'both',
+    visibility: CUSTOMER_ROLES,
   },
   // (8–12) Inside a claw
   {
     id: 'pr2-banners',
     label: 'In-claw status banners',
+    title: 'In-claw status banners',
     url: '/organizations/[id]/claw/* (above every page)',
-    roles: 'both',
+    visibility: CUSTOMER_ROLES,
   },
   {
     id: 'pr2-locks',
     label: 'Access-blocked dialogs',
+    title: 'Access-blocked dialogs',
     url: '/organizations/[id]/claw/* (replaces page when blocked)',
-    roles: 'both',
+    visibility: CUSTOMER_ROLES,
   },
   {
     id: 'pr1',
     label: 'In-claw Subscription tab',
+    title: 'In-claw Subscription tab',
     url: '/organizations/[id]/claw/subscription',
-    roles: 'both',
+    visibility: CUSTOMER_ROLES,
   },
   {
     id: 'wave-c',
     label: 'Instance owner chip',
+    title: 'Instance owner chip',
     url: '/organizations/[id]/claw/settings',
-    roles: 'both',
+    visibility: CUSTOMER_ROLES,
   },
   {
     id: 'pr2-destroy',
     label: 'Destroy confirmation',
+    title: 'Destroy confirmation',
     url: '/organizations/[id]/claw/settings',
-    roles: 'both',
+    visibility: CUSTOMER_ROLES,
   },
 ];
 
 function TableOfContents({ role }: { role: Role }) {
-  const visible = TOC_ITEMS.filter(item => visibleForRole(item.roles, role));
-  return <PrototypeTableOfContents items={visible} />;
+  const review = createPrototypeReviewModel({ currentView: role, sections: REVIEW_SECTIONS });
+  return <PrototypeTableOfContents items={review.tocItems} />;
 }
 
 function RoleSwitcher({ role, onChange }: { role: Role; onChange: (next: Role) => void }) {

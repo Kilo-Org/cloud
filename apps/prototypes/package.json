@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "test": "tsx --test src/lib/*.test.ts src/components/prototype-kit/*.test.ts",
+    "check:import-seams": "node scripts/check-import-seams.mjs",
+    "validate:routes": "tsx scripts/validate-routes.ts",
+    "validate": "pnpm run check:import-seams && pnpm run validate:routes && pnpm run test && pnpm run typecheck"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

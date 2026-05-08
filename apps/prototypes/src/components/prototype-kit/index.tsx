@@ -5,7 +5,71 @@ import type { ReactNode } from 'react';
 export type PrototypeTocItem = {
   id: string;
   label: string;
+  href?: string;
 };
+
+export type PrototypeVisibility<TView extends string> = TView | readonly TView[] | 'all';
+
+export type PrototypeReviewSectionDefinition<TView extends string> = {
+  id: string;
+  label: string;
+  title: string;
+  url: string;
+  description?: string;
+  visibility?: PrototypeVisibility<TView>;
+  visibilityLabel?: string;
+};
+
+export type PrototypeReviewSectionState<TView extends string> =
+  PrototypeReviewSectionDefinition<TView> & {
+    visible: boolean;
+    anchorHref: string;
+  };
+
+export type PrototypeReviewModel<TView extends string> = {
+  sections: PrototypeReviewSectionState<TView>[];
+  visibleSections: PrototypeReviewSectionState<TView>[];
+  tocItems: PrototypeTocItem[];
+};
+
+export function createPrototypeReviewModel<TView extends string>({
+  currentView,
+  sections,
+}: {
+  currentView: TView;
+  sections: readonly PrototypeReviewSectionDefinition<TView>[];
+}): PrototypeReviewModel<TView> {
+  const resolvedSections = sections.map(section => ({
+    ...section,
+    visibility: section.visibility ?? 'all',
+    visible: isPrototypeVisible(section.visibility ?? 'all', currentView),
+    anchorHref: prototypeAnchorHref(section.id),
+  }));
+  const visibleSections = resolvedSections.filter(section => section.visible);
+
+  return {
+    sections: resolvedSections,
+    visibleSections,
+    tocItems: visibleSections.map(section => ({
+      id: section.id,
+      label: section.label,
+      href: section.anchorHref,
+    })),
+  };
+}
+
+export function isPrototypeVisible<TView extends string>(
+  visibility: PrototypeVisibility<TView>,
+  currentView: TView
+): boolean {
+  if (visibility === 'all') return true;
+  if (Array.isArray(visibility)) return visibility.includes(currentView);
+  return visibility === currentView;
+}
+
+export function prototypeAnchorHref(id: string): string {
+  return `#${id}`;
+}
 
 export function PrototypePageShell({
   eyebrow,
@@ -125,7 +189,7 @@ export function PrototypeTableOfContents({ items }: { items: PrototypeTocItem[] 
       {items.map(item => (
         <li key={item.id}>
           <a
-            href={`#${item.id}`}
+            href={item.href ?? prototypeAnchorHref(item.id)}
             onClick={event => handleJump(event, item.id)}
             className="text-muted-foreground hover:text-foreground hover:bg-muted block rounded-md px-2 py-1"
           >

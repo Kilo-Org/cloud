@@ -34,20 +34,9 @@ import {
   Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@web/components/ui/button';
-import { Badge } from '@web/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@web/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@web/components/ui/table';
-import { Banner } from '@web/components/shared/Banner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@web/components/ui/tabs';
-import { Switch } from '@web/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -55,8 +44,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@web/components/ui/dialog';
-import KiloCrabIcon from '@web/components/KiloCrabIcon';
+} from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import KiloCrabIcon from '@/components/KiloCrabIcon';
+import { Banner } from '@/components/shared/Banner';
 import {
   type AdminBillingStatus,
   type AssociatedUser,

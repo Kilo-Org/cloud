@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { ArrowRight, FlaskConical } from 'lucide-react';
-import { getPrototypeCatalog } from '@/lib/prototypes';
+import { getPrototypeCatalogState } from '@/lib/prototypes';
 
 export default function PrototypesHomePage() {
-  const prototypes = getPrototypeCatalog();
+  const { entries: prototypes, diagnostics } = getPrototypeCatalogState();
 
   return (
     <main className="bg-background text-foreground min-h-screen">
@@ -28,6 +28,24 @@ export default function PrototypesHomePage() {
             </div>
           </div>
         </header>
+
+        {diagnostics.length > 0 && (
+          <section className="bg-card text-card-foreground rounded-xl border p-6">
+            <div className="flex items-start gap-3">
+              <FlaskConical className="text-muted-foreground mt-0.5 size-4" aria-hidden />
+              <div className="space-y-2">
+                <h2 className="font-semibold">Prototype metadata needs attention</h2>
+                <ul className="text-muted-foreground space-y-1 text-sm">
+                  {diagnostics.map(diagnostic => (
+                    <li key={`${diagnostic.slug}-${diagnostic.code}`}>
+                      <code className="font-mono">{diagnostic.slug}</code>: {diagnostic.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
+        )}
 
         {prototypes.length === 0 ? (
           <section className="bg-card text-card-foreground rounded-xl border p-6">
@@ -61,9 +79,11 @@ export default function PrototypesHomePage() {
                           {tag}
                         </span>
                       ))}
-                      {prototype.metadataState === 'fallback' && (
+                      {prototype.metadataState !== 'provided' && (
                         <span className="border-border text-muted-foreground rounded-full border px-2.5 py-1 text-xs">
-                          Metadata fallback
+                          {prototype.metadataState === 'invalid'
+                            ? 'Metadata invalid — using fallback'
+                            : 'Metadata fallback'}
                         </span>
                       )}
                     </div>

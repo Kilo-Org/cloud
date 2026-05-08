@@ -17,6 +17,8 @@ export type AppleStoreDecodedTransaction = {
   expiresDate?: number;
   appAccountToken?: string;
   revocationDate?: number;
+  currency?: string;
+  price?: number;
   environment: AppleStoreEnvironment;
   rawPayload: Record<string, unknown>;
 };
@@ -31,6 +33,8 @@ const AppleStoreTransactionPayloadSchema = z
     expiresDate: z.number().optional(),
     appAccountToken: z.string().uuid().optional(),
     revocationDate: z.number().optional(),
+    currency: z.string().optional(),
+    price: z.number().optional(),
     environment: z.string().optional(),
   })
   .passthrough();
@@ -58,6 +62,8 @@ function decodeAppleStoreTransactionPayload(
     expiresDate: payload.expiresDate,
     appAccountToken: payload.appAccountToken,
     revocationDate: payload.revocationDate,
+    currency: payload.currency,
+    price: payload.price,
     environment: normalizeEnvironment(payload.environment),
     rawPayload: payload,
   };

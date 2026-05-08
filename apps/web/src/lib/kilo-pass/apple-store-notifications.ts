@@ -6,17 +6,23 @@ import {
   Subtype,
   type ConsumptionRequest,
 } from '@apple/app-store-server-library';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 import {
+  credit_transactions,
+  kilo_pass_issuance_items,
+  kilo_pass_issuances,
   kilo_pass_store_events,
+  kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilocode_users,
   type User,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { toMicrodollars } from '@/lib/utils';
 import { KiloPassAuditLogAction, KiloPassAuditLogResult, KiloPassPaymentProvider } from './enums';
+import { KiloPassIssuanceItemKind } from './enums';
 import { appendKiloPassAuditLog } from './issuance';
 import {
   decodeAppleStoreTransactionJws,
@@ -29,6 +35,7 @@ import {
   createAppleStoreSignedDataVerifier,
 } from './apple-store-sdk';
 import { completeStoreKiloPassPurchase } from './store-subscription-completion';
+import { dayjs } from './dayjs';
 
 export type AppleStoreDecodedNotification = {
   notificationUUID: string;
@@ -172,6 +179,7 @@ async function getUserForStoreRenewal(params: {
 function getStoreEventPayload(params: {
   notification: AppleStoreDecodedNotification;
   purchase: ReturnType<typeof mapAppleKiloPassTransaction> | null;
+  transaction: AppleStoreDecodedTransaction | null;
 }): Record<string, unknown> {
   return {
     notificationType: params.notification.notificationType,
@@ -190,7 +198,175 @@ function getStoreEventPayload(params: {
           cadence: params.purchase.cadence,
         }
       : null,
+    rawTransaction: params.transaction
+      ? {
+          productId: params.transaction.productId,
+          providerSubscriptionId: params.transaction.originalTransactionId,
+          providerTransactionId: params.transaction.transactionId,
+          appAccountToken: params.transaction.appAccountToken ?? null,
+          purchaseDate: params.transaction.purchaseDate,
+          revocationDate: params.transaction.revocationDate ?? null,
+          expiresDate: params.transaction.expiresDate ?? null,
+          environment: params.transaction.environment,
+          currency: params.transaction.currency ?? null,
+          price: params.transaction.price ?? null,
+        }
+      : null,
   };
+}
+
+type CreditReversalResult = {
+  storePurchaseFound: boolean;
+  baseCreditTransactionId: string | null;
+  baseReversalMicrodollars: number;
+  bonusCreditTransactionId: string | null;
+  bonusReversalMicrodollars: number;
+};
+
+function getRefundedAmountMicrodollars(transaction: AppleStoreDecodedTransaction): number {
+  if (transaction.currency !== 'USD') {
+    throw new Error('App Store refund transaction missing USD price data');
+  }
+  if (transaction.price == null || transaction.price <= 0) {
+    throw new Error('App Store refund transaction missing price data');
+  }
+
+  return transaction.price * 1000;
+}
+
+async function insertCreditReversal(
+  tx: DrizzleTransaction,
+  params: {
+    kiloUserId: string;
+    amountMicrodollars: number;
+    isFree: boolean;
+    description: string;
+    creditCategory: string;
+    originalBaselineMicrodollarsUsed: number;
+  }
+): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
+  const creditTransactionId = crypto.randomUUID();
+  const insertResult = await tx
+    .insert(credit_transactions)
+    .values({
+      id: creditTransactionId,
+      kilo_user_id: params.kiloUserId,
+      amount_microdollars: -params.amountMicrodollars,
+      is_free: params.isFree,
+      description: params.description,
+      credit_category: params.creditCategory,
+      check_category_uniqueness: true,
+      original_baseline_microdollars_used: params.originalBaselineMicrodollarsUsed,
+    })
+    .onConflictDoNothing();
+
+  if ((insertResult.rowCount ?? 0) === 0) {
+    const existingRows = await tx
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, params.kiloUserId),
+          eq(credit_transactions.credit_category, params.creditCategory)
+        )
+      )
+      .limit(1);
+    return { wasInserted: false, creditTransactionId: existingRows[0]?.id ?? null };
+  }
+
+  await tx
+    .update(kilocode_users)
+    .set({
+      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${params.amountMicrodollars}`,
+    })
+    .where(eq(kilocode_users.id, params.kiloUserId));
+
+  return { wasInserted: true, creditTransactionId };
+}
+
+async function reverseAppStoreRefundCredits(
+  transaction: AppleStoreDecodedTransaction
+): Promise<CreditReversalResult> {
+  return db.transaction(async tx => {
+    const storePurchase = await tx.query.kilo_pass_store_purchases.findFirst({
+      where: and(
+        eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.AppStore),
+        eq(kilo_pass_store_purchases.provider_transaction_id, transaction.transactionId)
+      ),
+    });
+
+    if (!storePurchase) {
+      return {
+        storePurchaseFound: false,
+        baseCreditTransactionId: null,
+        baseReversalMicrodollars: 0,
+        bonusCreditTransactionId: null,
+        bonusReversalMicrodollars: 0,
+      };
+    }
+
+    const userRows = await tx
+      .select({ microdollarsUsed: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, storePurchase.kilo_user_id))
+      .for('update')
+      .limit(1);
+    const user = userRows[0];
+    if (!user) {
+      throw new Error('App Store refund cannot find the subscribed user');
+    }
+
+    const baseReversalMicrodollars = getRefundedAmountMicrodollars(transaction);
+    const baseReversal = await insertCreditReversal(tx, {
+      kiloUserId: storePurchase.kilo_user_id,
+      amountMicrodollars: baseReversalMicrodollars,
+      isFree: false,
+      description: 'App Store Kilo Pass refund clawback',
+      creditCategory: `kilo-pass-store-refund-base:${KiloPassPaymentProvider.AppStore}:${transaction.transactionId}`,
+      originalBaselineMicrodollarsUsed: user.microdollarsUsed,
+    });
+
+    const issueMonth = dayjs(storePurchase.purchased_at).utc().format('YYYY-MM-01');
+    const issuance = await tx.query.kilo_pass_issuances.findFirst({
+      where: and(
+        eq(kilo_pass_issuances.kilo_pass_subscription_id, storePurchase.kilo_pass_subscription_id),
+        eq(kilo_pass_issuances.issue_month, issueMonth)
+      ),
+    });
+
+    let bonusCreditTransactionId: string | null = null;
+    let bonusReversalMicrodollars = 0;
+    if (issuance) {
+      const bonusItem = await tx.query.kilo_pass_issuance_items.findFirst({
+        where: and(
+          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.id),
+          eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
+        ),
+      });
+
+      if (bonusItem) {
+        const bonusAmountMicrodollars = toMicrodollars(bonusItem.amount_usd);
+        const bonusReversal = await insertCreditReversal(tx, {
+          kiloUserId: storePurchase.kilo_user_id,
+          amountMicrodollars: bonusAmountMicrodollars,
+          isFree: true,
+          description: 'App Store Kilo Pass bonus refund clawback',
+          creditCategory: `kilo-pass-store-refund-bonus:${KiloPassPaymentProvider.AppStore}:${transaction.transactionId}:${bonusItem.id}`,
+          originalBaselineMicrodollarsUsed: user.microdollarsUsed,
+        });
+        bonusCreditTransactionId = bonusReversal.creditTransactionId;
+        bonusReversalMicrodollars = bonusReversal.wasInserted ? bonusAmountMicrodollars : 0;
+      }
+    }
+
+    return {
+      storePurchaseFound: true,
+      baseCreditTransactionId: baseReversal.creditTransactionId,
+      baseReversalMicrodollars: baseReversal.wasInserted ? baseReversalMicrodollars : 0,
+      bonusCreditTransactionId,
+      bonusReversalMicrodollars,
+    };
+  });
 }
 
 export async function processAppStoreKiloPassNotification(params: {
@@ -208,19 +384,23 @@ export async function processAppStoreKiloPassNotification(params: {
   const transaction = notification.signedTransactionInfo
     ? await decodeTransaction(notification.signedTransactionInfo)
     : null;
-  const purchase = transaction ? mapAppleKiloPassTransaction(transaction) : null;
+  const isRefundNotification = REFUND_TYPES.has(notification.notificationType);
+  const purchase =
+    transaction && !isRefundNotification ? mapAppleKiloPassTransaction(transaction) : null;
 
   const insertResult = await db
     .insert(kilo_pass_store_events)
     .values({
       payment_provider: KiloPassPaymentProvider.AppStore,
       event_id: notification.notificationUUID,
-      provider_subscription_id: purchase?.providerSubscriptionId ?? null,
-      provider_transaction_id: purchase?.providerTransactionId ?? null,
-      app_account_token: purchase?.appAccountToken ?? null,
-      product_id: purchase?.productId ?? 'unknown',
+      provider_subscription_id:
+        purchase?.providerSubscriptionId ?? transaction?.originalTransactionId ?? null,
+      provider_transaction_id:
+        purchase?.providerTransactionId ?? transaction?.transactionId ?? null,
+      app_account_token: purchase?.appAccountToken ?? transaction?.appAccountToken ?? null,
+      product_id: purchase?.productId ?? transaction?.productId ?? 'unknown',
       environment: notification.environment,
-      payload_json: getStoreEventPayload({ notification, purchase }),
+      payload_json: getStoreEventPayload({ notification, purchase, transaction }),
     })
     .onConflictDoNothing();
 
@@ -325,6 +505,7 @@ export async function processAppStoreKiloPassNotification(params: {
   }
 
   if (transaction && REFUND_TYPES.has(notification.notificationType)) {
+    const reversal = await reverseAppStoreRefundCredits(transaction);
     await markStoreSubscriptionEnded(transaction);
     await appendKiloPassAuditLog(db, {
       action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
@@ -332,6 +513,12 @@ export async function processAppStoreKiloPassNotification(params: {
       payload: {
         notificationUUID: notification.notificationUUID,
         providerSubscriptionId: transaction.originalTransactionId,
+        providerTransactionId: transaction.transactionId,
+        storePurchaseFound: reversal.storePurchaseFound,
+        baseCreditTransactionId: reversal.baseCreditTransactionId,
+        baseReversalMicrodollars: reversal.baseReversalMicrodollars,
+        bonusCreditTransactionId: reversal.bonusCreditTransactionId,
+        bonusReversalMicrodollars: reversal.bonusReversalMicrodollars,
       },
     });
   }

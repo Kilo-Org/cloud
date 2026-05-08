@@ -244,6 +244,12 @@ describe('batch-review-decisions', () => {
       expect(mockGetIntegration).not.toHaveBeenCalled();
     });
 
+    // Flaky in CI due to setTimeout(0)-based wait for fire-and-forget async work.
+    // Recent failures:
+    //   https://github.com/Kilo-Org/cloud/actions/runs/25554038239
+    //   https://github.com/Kilo-Org/cloud/actions/runs/25549351687
+    //   https://github.com/Kilo-Org/cloud/actions/runs/25547782557
+    //   https://github.com/Kilo-Org/cloud/actions/runs/25547122885
     // eslint-disable-next-line jest/no-disabled-tests
     it.skip('calls executeBatch when hasPendingRows=true', async () => {
       const branch = 'batch/trigger-true';

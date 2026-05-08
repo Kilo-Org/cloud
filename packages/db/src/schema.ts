@@ -5255,7 +5255,7 @@ export const bot_requests = pgTable(
 
     platform: text().notNull(),
     platform_thread_id: text().notNull(),
-    platform_message_id: text(),
+    platform_message_id: text().notNull(),
 
     user_message: text().notNull(),
 

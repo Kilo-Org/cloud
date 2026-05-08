@@ -18,18 +18,18 @@ INTERNAL_API_SECRET=your-internal-api-secret-here
 #KILOCODE_ORG_ID_OVERRIDE=your-override-org-id-here
 
 # Kilocode backend base URL and KILO_OPENROUTER_BASE for API calls and session environment variables
-# For local development, point to your local kilocode-backend
-# Note: you wanna use your actual privatenet address here and not "localhost"
-# pnpm run dev of kilocode-backend usually gives you both addrs on boot.
+# For local development, point to your local kilocode-backend.
+# Sandbox containers run under Docker Desktop, so `host.docker.internal`
+# resolves to the host where Next.js is listening.
 # @url nextjs
-KILOCODE_BACKEND_BASE_URL=http://192.168.x.x:3000
+KILOCODE_BACKEND_BASE_URL=http://host.docker.internal:3000
 # @url nextjs/api
-KILO_OPENROUTER_BASE=http://192.168.x.x:3000/api
+KILO_OPENROUTER_BASE=http://host.docker.internal:3000/api
 
 # Worker base URL used by the wrapper to connect to /ingest.
-# Use a host-reachable IP (not localhost) so sandbox containers can connect back.
+# Sandbox containers reach the host via `host.docker.internal`.
 # @url cloud-agent-next
-WORKER_URL=http://192.168.x.x:8794
+WORKER_URL=http://host.docker.internal:8794
 
 # Timeout overrides (optional)
 CLI_TIMEOUT_SECONDS=900
@@ -69,9 +69,9 @@ R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID=""
 R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY=""
 
 # Session ingest URL used by the wrapper to post session data.
-# Use a host-reachable IP (not localhost) so sandbox containers can connect back.
+# Sandbox containers reach the host via `host.docker.internal`.
 # @url cloudflare-session-ingest
-KILO_SESSION_INGEST_URL=http://192.168.x.x:8800
+KILO_SESSION_INGEST_URL=http://host.docker.internal:8800
 
 # Local dev worker origins allowed to connect to /stream
 # @url nextjs,cloud-agent-next

@@ -19,6 +19,7 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import { isToday, isYesterday, startOfDay, differenceInCalendarDays, format } from 'date-fns';
 import type { StoredSession } from './types';
+import { SessionPrIndicator } from './SessionPrIndicator';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { cn } from '@/lib/utils';
 import {
@@ -199,6 +200,7 @@ function SessionRow({
         ) : (
           <>
             <span className="line-clamp-1 min-w-0 flex-1 leading-snug">{session.prompt}</span>
+            <SessionPrIndicator session={session} />
             <span className="relative shrink-0">
               {shouldReplaceTime ? (
                 <span

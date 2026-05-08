@@ -5,6 +5,7 @@ import './globals.css';
 import { PostHogProvider } from '../components/PostHogProvider';
 import { Providers } from '../components/Providers';
 import { DataLayerProvider } from '../components/DataLayerProvider';
+import { ImpactIdentify } from '@/components/ImpactIdentify';
 import { APP_URL } from '@/lib/constants';
 
 const inter = Inter({
@@ -108,6 +109,7 @@ export default function RootLayout({
       <body>
         <Providers>
           <DataLayerProvider />
+          <ImpactIdentify />
           <PostHogProvider>{children}</PostHogProvider>
         </Providers>
 

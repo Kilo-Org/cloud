@@ -17,6 +17,11 @@ describe('getNorthflankConfig', () => {
       teamId: null,
       region: 'us-central',
       deploymentPlan: 'nf-compute-200',
+      deploymentPlans: {
+        'perf-1-3': 'nf-compute-200',
+        'perf-4-8': 'nf-compute-400',
+        'perf-4-16': 'nf-compute-400-16',
+      },
       storageClassName: 'nf-multi-rw',
       storageAccessMode: 'ReadWriteMany',
       volumeSizeMb: 10240,
@@ -47,6 +52,11 @@ describe('getNorthflankConfig', () => {
       teamId: 'team-1',
       region: 'us-central',
       deploymentPlan: 'nf-compute-200',
+      deploymentPlans: {
+        'perf-1-3': 'nf-compute-200',
+        'perf-4-8': 'nf-compute-400',
+        'perf-4-16': 'nf-compute-400-16',
+      },
       storageClassName: 'nf-ssd-rwo',
       storageAccessMode: 'ReadWriteOnce',
       volumeSizeMb: 20480,
@@ -68,6 +78,21 @@ describe('getNorthflankConfig', () => {
     expect(() => getNorthflankConfig({ ...baseEnv, NF_VOLUME_SIZE_MB: 'ten' } as never)).toThrow(
       'NF_VOLUME_SIZE_MB must be a positive integer'
     );
+  });
+
+  it('accepts explicit per-tier deployment plan overrides', () => {
+    expect(
+      getNorthflankConfig({
+        ...baseEnv,
+        NF_DEPLOYMENT_PLAN_PERF_1_3: 'custom-1-3',
+        NF_DEPLOYMENT_PLAN_PERF_4_8: 'custom-4-8',
+        NF_DEPLOYMENT_PLAN_PERF_4_16: 'custom-4-16',
+      } as never).deploymentPlans
+    ).toEqual({
+      'perf-1-3': 'custom-1-3',
+      'perf-4-8': 'custom-4-8',
+      'perf-4-16': 'custom-4-16',
+    });
   });
 });
 

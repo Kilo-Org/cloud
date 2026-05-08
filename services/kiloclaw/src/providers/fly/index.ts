@@ -75,7 +75,7 @@ export const flyProviderAdapter: InstanceProviderAdapter = {
         flyConfig,
         {
           name: volumeNameFromSandboxId(state.sandboxId),
-          size_gb: DEFAULT_VOLUME_SIZE_GB,
+          size_gb: state.volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB,
           compute: guest,
         },
         regions,

@@ -1,7 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import { exchangeWebFlowCode } from '@octokit/oauth-methods';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 import crypto from 'crypto';
 import type { InstallationToken } from '@/lib/integrations/core/types';
@@ -645,6 +645,237 @@ function isHttpError(error: unknown): error is { status: number; message: string
     'status' in error &&
     typeof (error as { status: unknown }).status === 'number'
   );
+}
+
+export type AssociatedPullRequest = {
+  number: number;
+  htmlUrl: string;
+  state: 'open' | 'closed' | 'merged';
+  title: string;
+  headSha: string;
+  updatedAt: string; // ISO
+};
+
+/**
+ * Thrown when GitHub returns a rate-limit response. The caller can surface
+ * `resetAt` to the user so they know when to retry.
+ */
+export class GitHubRateLimitError extends Error {
+  public readonly resetAt: Date;
+  constructor(resetAt: Date) {
+    super(`GitHub rate limited until ${resetAt.toISOString()}`);
+    this.name = 'GitHubRateLimitError';
+    this.resetAt = resetAt;
+  }
+}
+
+function getResponseHeader(error: unknown, name: string): string | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const response = (error as { response?: { headers?: Record<string, unknown> } }).response;
+  const headers = response?.headers;
+  if (!headers) return undefined;
+  const value = headers[name] ?? headers[name.toLowerCase()];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function parseRateLimitResetAt(error: unknown): Date {
+  const resetHeader = getResponseHeader(error, 'x-ratelimit-reset');
+  const resetSeconds = resetHeader ? Number(resetHeader) : NaN;
+  if (Number.isFinite(resetSeconds) && resetSeconds > 0) {
+    return new Date(resetSeconds * 1000);
+  }
+  // Fall back to "retry in 60s" if the header is missing/invalid, so callers
+  // always have a usable Date to show.
+  return new Date(Date.now() + 60_000);
+}
+
+function getErrorMessage(error: unknown): string {
+  if (typeof error !== 'object' || error === null) return '';
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' ? message : '';
+}
+
+function isRateLimitError(error: unknown): boolean {
+  if (!isHttpError(error)) return false;
+  // 429 is unambiguously rate limiting.
+  if (error.status === 429) return true;
+  // `x-ratelimit-remaining: 0` signals the primary rate limit is exhausted
+  // regardless of status.
+  const remaining = getResponseHeader(error, 'x-ratelimit-remaining');
+  if (remaining === '0') return true;
+  // 403 is overloaded: it can mean rate/abuse limiting OR a plain permission
+  // denial (e.g. installation lacks pull request access). Only treat 403 as
+  // rate-limited when the message indicates so, so that genuine permission
+  // failures are surfaced to the caller.
+  if (error.status === 403) {
+    const message = getErrorMessage(error).toLowerCase();
+    return (
+      message.includes('rate limit') ||
+      message.includes('secondary rate limit') ||
+      message.includes('abuse')
+    );
+  }
+  return false;
+}
+
+/**
+ * Look up the pull request associated with a `(repo, branch)` pair using an
+ * installation token. Returns the most recently updated PR whose head ref
+ * matches `branch`, preferring `open` PRs when multiple exist.
+ *
+ * This helper is only invoked from the manual "Refresh PR info" mutation; the
+ * webhook path updates the DB directly. Intentionally no caching or dedup —
+ * the mutation is throttled server-side to once per 60 s per (git_url, branch, tenant).
+ *
+ * @returns The associated PR, or `null` if no PR matches (or the repo is no
+ *   longer accessible to this installation).
+ * @throws {GitHubRateLimitError} when GitHub rate-limits the request.
+ */
+export async function fetchPullRequestForBranch(params: {
+  installationId: number;
+  owner: string;
+  repo: string;
+  branch: string;
+  appType: GitHubAppType;
+}): Promise<AssociatedPullRequest | null> {
+  const { installationId, owner, repo, branch, appType } = params;
+
+  const tokenData = await generateGitHubInstallationToken(String(installationId), appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  try {
+    const { data: prs } = await octokit.pulls.list({
+      owner,
+      repo,
+      head: `${owner}:${branch}`,
+      state: 'all',
+      per_page: 10,
+      sort: 'updated',
+      direction: 'desc',
+    });
+
+    if (prs.length === 0) {
+      return null;
+    }
+
+    const chosen = prs.find(pr => pr.state === 'open') ?? prs[0];
+
+    const state: AssociatedPullRequest['state'] =
+      chosen.merged_at != null ? 'merged' : chosen.state === 'open' ? 'open' : 'closed';
+
+    return {
+      number: chosen.number,
+      htmlUrl: chosen.html_url,
+      state,
+      title: chosen.title,
+      headSha: chosen.head.sha,
+      updatedAt: chosen.updated_at,
+    };
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      throw new GitHubRateLimitError(parseRateLimitResetAt(error));
+    }
+    if (isHttpError(error) && error.status === 404) {
+      warnExceptInTest('[fetchPullRequestForBranch] Repo not accessible or deleted', {
+        owner,
+        repo,
+        branch,
+      });
+      return null;
+    }
+    throw error;
+  }
+}
+
+export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required';
+
+export type BatchedPrInput = {
+  alias: string;
+  owner: string;
+  repo: string;
+  number: number;
+};
+
+function normalizeReviewDecision(decision: string | null | undefined): ReviewDecision | null {
+  switch (decision) {
+    case 'APPROVED':
+      return 'approved';
+    case 'CHANGES_REQUESTED':
+      return 'changes_requested';
+    case 'REVIEW_REQUIRED':
+      return 'review_required';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Fetches `reviewDecision` for multiple PRs in a single aliased GraphQL query.
+ * All PRs must belong to the same installation (one token is generated).
+ * Returns a Map from alias → ReviewDecision|null.
+ * @throws {GitHubRateLimitError} on 403 secondary rate limit.
+ */
+export async function fetchBatchedReviewDecisions(args: {
+  installationId: string;
+  prs: BatchedPrInput[];
+  appType?: GitHubAppType;
+}): Promise<Map<string, ReviewDecision | null>> {
+  const { installationId, prs, appType = 'standard' } = args;
+  if (prs.length === 0) return new Map();
+
+  const tokenData = await generateGitHubInstallationToken(installationId, appType);
+  const octokit = new Octokit({ auth: tokenData.token });
+
+  const fragments = prs
+    .map(
+      ({ alias, owner, repo, number }) =>
+        `${alias}: repository(owner: "${owner}", name: "${repo}") { pullRequest(number: ${number}) { reviewDecision } }`
+    )
+    .join('\n');
+
+  try {
+    const response = (await octokit.request('POST /graphql', {
+      query: `{ ${fragments} }`,
+    })) as {
+      data: {
+        data: Record<string, { pullRequest: { reviewDecision: string | null } | null } | null>;
+      };
+    };
+
+    const result = new Map<string, ReviewDecision | null>();
+    for (const { alias } of prs) {
+      const repoData = response.data.data?.[alias];
+      result.set(alias, normalizeReviewDecision(repoData?.pullRequest?.reviewDecision));
+    }
+    return result;
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      throw new GitHubRateLimitError(parseRateLimitResetAt(error));
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetches the rolled-up `reviewDecision` for a single PR via GitHub's GraphQL API.
+ * Returns lowercase values matching our DB enum, or `null` when GitHub returns
+ * null (no required reviewers and no review submitted yet).
+ * @throws {GitHubRateLimitError} on 403 secondary rate limit.
+ */
+export async function fetchPullRequestReviewDecision(args: {
+  installationId: string;
+  owner: string;
+  repo: string;
+  number: number;
+  appType?: GitHubAppType;
+}): Promise<ReviewDecision | null> {
+  const { installationId, owner, repo, number, appType = 'standard' } = args;
+  const results = await fetchBatchedReviewDecisions({
+    installationId,
+    prs: [{ alias: 'pr0', owner, repo, number }],
+    appType,
+  });
+  return results.get('pr0') ?? null;
 }
 
 /**

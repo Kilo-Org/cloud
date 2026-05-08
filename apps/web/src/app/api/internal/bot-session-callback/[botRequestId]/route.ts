@@ -180,7 +180,7 @@ async function startBotThreadTyping(params: {
 
 async function continueBotAgentAfterCallback(params: {
   botRequestId: string;
-  requestRow: NonNullable<Awaited<ReturnType<typeof getBotRequest>>>;
+  requestRow: Awaited<ReturnType<typeof getBotRequest>>;
   platformIntegration: PlatformIntegration;
   thread: Thread;
   continuationPrompt: string;
@@ -195,22 +195,20 @@ async function continueBotAgentAfterCallback(params: {
   return await botPlatforms.require(params.platformIntegration.platform).withAuthContext({
     platformIntegration: params.platformIntegration,
     fn: async () => {
-      const originalMessage = params.requestRow.platform_message_id
-        ? await Promise.resolve(
-            params.thread.adapter.fetchMessage?.(
-              params.thread.id,
-              params.requestRow.platform_message_id
-            ) ?? null
-          ).catch(error => {
-            console.warn('[BotSessionCallback] Failed to fetch original platform message:', {
-              error,
-              platform: params.platformIntegration.platform,
-              threadId: params.thread.id,
-              messageId: params.requestRow.platform_message_id,
-            });
-            return null;
-          })
-        : null;
+      const originalMessage = await Promise.resolve(
+        params.thread.adapter.fetchMessage?.(
+          params.thread.id,
+          params.requestRow.platform_message_id
+        ) ?? null
+      ).catch(error => {
+        console.warn('[BotSessionCallback] Failed to fetch original platform message:', {
+          error,
+          platform: params.platformIntegration.platform,
+          threadId: params.thread.id,
+          messageId: params.requestRow.platform_message_id,
+        });
+        return null;
+      });
 
       const callbackMessage: BotAgentMessageLike = {
         author: originalMessage?.author ?? {

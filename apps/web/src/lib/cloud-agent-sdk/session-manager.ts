@@ -65,6 +65,15 @@ type StandaloneSuggestion = {
   callId?: string;
 };
 
+type AssociatedPrData = {
+  url: string;
+  number: number;
+  state: string;
+  title: string | null;
+  headSha: string | null;
+  lastSyncedAt: string;
+};
+
 type FetchedSessionData = {
   kiloSessionId: KiloSessionId;
   cloudAgentSessionId: CloudAgentSessionId | null;
@@ -83,6 +92,7 @@ type FetchedSessionData = {
   initialMessageId: string | null;
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
+  associatedPr: AssociatedPrData | null;
 };
 
 type PrepareInput = {
@@ -858,5 +868,6 @@ export type {
   StandaloneSuggestion,
   StoredMessage,
   FetchedSessionData,
+  AssociatedPrData,
   PrepareInput,
 };

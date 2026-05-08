@@ -17,6 +17,7 @@ import {
   drainSseStream,
   extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
+import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
 
 type MaybeHasVercelProviderMetadata = {
@@ -170,7 +171,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
 
   const coreProps = {
     messageId,
-    hasError: reportedError || wasAborted,
+    hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
     model,
     responseContent,
     inference_provider,
@@ -205,14 +206,15 @@ export function parseMessagesMicrodollarUsageFromString(
     .map(c => c.text)
     .join('');
 
+  const finish_reason = responseJson?.stop_reason ?? null;
   const coreProps = {
     messageId: responseJson?.id ?? null,
-    hasError: !responseJson?.model || statusCode >= 400,
+    hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
     model: responseJson?.model ?? null,
     responseContent,
     inference_provider,
     upstream_id: null,
-    finish_reason: responseJson?.stop_reason ?? null,
+    finish_reason,
     latency: null,
     moderation_latency: null,
     generation_time: null,

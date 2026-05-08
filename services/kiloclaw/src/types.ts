@@ -62,6 +62,9 @@ export type KiloClawEnv = {
   NF_TEAM_ID?: string;
   NF_REGION?: string;
   NF_DEPLOYMENT_PLAN?: string;
+  NF_DEPLOYMENT_PLAN_PERF_1_3?: string;
+  NF_DEPLOYMENT_PLAN_PERF_4_8?: string;
+  NF_DEPLOYMENT_PLAN_PERF_4_16?: string;
   NF_STORAGE_CLASS_NAME?: string;
   NF_STORAGE_ACCESS_MODE?: string;
   NF_VOLUME_SIZE_MB?: string;

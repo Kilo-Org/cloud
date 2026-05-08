@@ -2,7 +2,7 @@ import 'server-only';
 
 import { db } from '@/lib/drizzle';
 import { fetchWithBackoff } from '@/lib/fetchWithBackoff';
-import { GITHUB_ADMIN_STATS_TOKEN } from '@/lib/config.server';
+import { CONTRIBUTOR_CHAMPION_TEAM_EMAILS, GITHUB_ADMIN_STATS_TOKEN } from '@/lib/config.server';
 import teamLoginsJson from '@/data/contributor-champion-kilo-team.json';
 import {
   contributor_champion_contributors,
@@ -31,11 +31,14 @@ const TEAM_LOGIN_LIST = (() => {
 const TEAM_LOGIN_SET = new Set(TEAM_LOGIN_LIST.map(login => login.trim().toLowerCase()));
 
 const TEAM_EMAIL_DOMAINS = new Set(['kilocode.ai', 'kilo.ai']);
-const TEAM_EMAILS = new Set(['vincesprints@gmail.com']);
-
+const TEAM_EMAILS = new Set(
+  CONTRIBUTOR_CHAMPION_TEAM_EMAILS.split(',')
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean)
+);
 function isTeamEmail(email: string | null): boolean {
   if (!email) return false;
-  const lower = email.toLowerCase();
+  const lower = email.trim().toLowerCase();
   const domain = lower.split('@')[1];
   return (domain !== undefined && TEAM_EMAIL_DOMAINS.has(domain)) || TEAM_EMAILS.has(lower);
 }

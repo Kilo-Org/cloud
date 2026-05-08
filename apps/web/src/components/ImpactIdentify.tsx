@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 import { useUser } from '@/hooks/useUser';
+import { logImpactReferralDebug } from '@/lib/impact-debug';
+import { IMPACT_CUSTOM_PROFILE_ID_STORAGE_KEY } from '@/lib/impact-referral-utils';
 
 async function sha1Hex(value: string): Promise<string> {
   const normalized = value.trim().toLowerCase();
@@ -12,32 +14,72 @@ async function sha1Hex(value: string): Promise<string> {
     .join('');
 }
 
+function getStableAnonymousProfileId(): string {
+  const existing = window.localStorage.getItem(IMPACT_CUSTOM_PROFILE_ID_STORAGE_KEY)?.trim();
+  if (existing) {
+    return existing;
+  }
+
+  const generated = `kilo-anon:${crypto.randomUUID()}`;
+  window.localStorage.setItem(IMPACT_CUSTOM_PROFILE_ID_STORAGE_KEY, generated);
+  return generated;
+}
+
 export function ImpactIdentify() {
   const { data: user } = useUser();
 
   useEffect(() => {
-    if (!user || typeof window.ire !== 'function') return;
-
     let cancelled = false;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    void sha1Hex(user.google_user_email)
-      .then(hashedEmail => {
-        if (cancelled || typeof window.ire !== 'function') return;
+    const runIdentify = async (retriesRemaining: number): Promise<void> => {
+      if (cancelled) return;
 
-        window.ire('identify', {
-          customerId: user.id,
-          customerEmail: hashedEmail,
-          customProfileId: '',
-        });
-      })
-      .catch(error => {
-        console.error('ImpactIdentify failed', error);
+      if (typeof window.ire !== 'function') {
+        if (retriesRemaining <= 0) {
+          logImpactReferralDebug('Impact UTT identify skipped; window.ire unavailable', {
+            userId: user?.id ?? null,
+          });
+          return;
+        }
+
+        retryTimeout = setTimeout(() => {
+          void runIdentify(retriesRemaining - 1);
+        }, 250);
+        return;
+      }
+
+      const customProfileId = user?.id ? `kilo-user:${user.id}` : getStableAnonymousProfileId();
+      const customerId = user?.id ?? '';
+      const customerEmail = user ? await sha1Hex(user.google_user_email) : '';
+
+      if (cancelled || typeof window.ire !== 'function') return;
+
+      logImpactReferralDebug('Calling Impact UTT identify', {
+        userId: user?.id ?? null,
+        customerIdPresent: Boolean(customerId),
+        customerEmailHashPresent: Boolean(customerEmail),
+        customProfileIdPresent: Boolean(customProfileId),
       });
+
+      window.ire('identify', {
+        customerId,
+        customerEmail,
+        customProfileId,
+      });
+    };
+
+    void runIdentify(10).catch(error => {
+      console.error('ImpactIdentify failed', error);
+    });
 
     return () => {
       cancelled = true;
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
     };
-  }, [user]);
+  }, [user?.google_user_email, user?.id]);
 
   return null;
 }

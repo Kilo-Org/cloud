@@ -441,6 +441,8 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
       kiloSessionId={sessionIdFromParams ?? undefined}
       organizationId={organizationId}
       repository={sessionConfig?.repository ?? ''}
+      branch={fetchedSessionData?.gitBranch ?? undefined}
+      gitUrl={fetchedSessionData?.gitUrl}
       model={sessionConfig?.model}
       modelDisplayName={modelDisplayName}
       totalCost={totalCost}

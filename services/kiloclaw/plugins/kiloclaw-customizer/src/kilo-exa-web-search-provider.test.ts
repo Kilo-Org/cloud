@@ -182,6 +182,7 @@ describe('kilo-exa web search provider', () => {
     expect(call.url).toBe('https://claw-api.kilo.ai/api/exa/search');
     expect(call.apiKey).toBe('kilo-key-123');
     expect(call.extraHeaders).toEqual({
+      'x-kilocode-feature': 'kiloclaw',
       'X-KiloCode-OrganizationId': 'org_123',
     });
   });

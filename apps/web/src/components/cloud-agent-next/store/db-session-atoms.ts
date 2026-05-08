@@ -23,6 +23,7 @@
 import { atom } from 'jotai';
 import { MiniDb } from 'jotai-minidb';
 import type { StoredMessage, ResumeConfig } from '../types';
+import type { AssociatedPr } from '../utils/github-pr-link';
 import { extractRepoFromGitUrl } from '../utils/git-utils';
 
 // Re-export extractRepoFromGitUrl for backwards compatibility
@@ -165,6 +166,7 @@ type ApiSession = {
   status: string | null;
   status_updated_at: string | null;
   parent_session_id: string | null;
+  associatedPr?: AssociatedPr | null;
 };
 
 /**
@@ -185,6 +187,7 @@ export type DbSession = {
   organization_id: string | null;
   status: string | null;
   status_updated_at: string | null;
+  associatedPr?: AssociatedPr | null;
 };
 
 /**
@@ -211,6 +214,7 @@ export function apiSessionToDbSession(apiSession: ApiSession): DbSession {
     ...apiSession,
     last_mode: null,
     last_model: null,
+    associatedPr: apiSession.associatedPr ?? null,
   };
 }
 

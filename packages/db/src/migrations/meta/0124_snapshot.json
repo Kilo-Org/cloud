@@ -1,6 +1,6 @@
 {
-  "id": "01479a6c-dedf-4e9d-ab2b-b3af700c5cc2",
-  "prevId": "67af054f-46c8-4d6d-bc97-f195c70e34b0",
+  "id": "9509c8ab-227e-44ab-80b1-27c00bdb7d59",
+  "prevId": "01479a6c-dedf-4e9d-ab2b-b3af700c5cc2",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4245,6 +4245,38 @@
           "primaryKey": false,
           "notNull": false
         },
+        "sandbox_id": {
+          "name": "sandbox_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sandbox_retry_count": {
+          "name": "sandbox_retry_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "sandbox_retry_reason": {
+          "name": "sandbox_retry_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sandbox_retry_at": {
+          "name": "sandbox_retry_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "current_attempt": {
+          "name": "current_attempt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -4406,6 +4438,21 @@
           "columns": [
             {
               "expression": "cli_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_sandbox_id": {
+          "name": "idx_cloud_agent_code_reviews_sandbox_id",
+          "columns": [
+            {
+              "expression": "sandbox_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

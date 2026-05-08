@@ -1,12 +1,26 @@
 import { describe, expect, test } from '@jest/globals';
 
 import {
+  getKiloPassExternalManagementAction,
   getKiloPassSubscriptionDisplayModel,
   getKiloPassInlineActionModel,
   getKiloPassInlineConfirmationDetails,
 } from './KiloPassDetail.logic';
+import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 
 describe('KiloPassDetail.logic', () => {
+  test('links App Store-managed subscriptions to App Store management', () => {
+    expect(getKiloPassExternalManagementAction(KiloPassPaymentProvider.AppStore)).toEqual({
+      label: 'Manage in App Store',
+      providerLabel: 'App Store',
+      url: 'https://apps.apple.com/account/subscriptions',
+    });
+  });
+
+  test('keeps Stripe-managed subscriptions inside the web management flow', () => {
+    expect(getKiloPassExternalManagementAction(KiloPassPaymentProvider.Stripe)).toBeNull();
+  });
+
   test('models pending cancellation display copy', () => {
     const model = getKiloPassSubscriptionDisplayModel({
       status: 'active',

@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar, Coins, Info, Settings } from 'lucide-react';
+import { Calendar, Coins, ExternalLink, Info, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
@@ -27,6 +27,7 @@ import {
   computeRenewInfoRowModel,
   computeUsageProgressModel,
 } from './KiloPassActiveSubscriptionCard.logic';
+import { getKiloPassExternalManagementAction } from './kiloPassManagementAction';
 
 export function KiloPassActiveSubscriptionCard(props: { subscription: KiloPassSubscription }) {
   return (
@@ -124,8 +125,11 @@ function RenewInfoRow() {
 }
 
 function HeaderRow() {
-  const { view } = useKiloPassSubscriptionInfo();
+  const { subscription, view } = useKiloPassSubscriptionInfo();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const externalManagementAction = getKiloPassExternalManagementAction(
+    subscription.paymentProvider
+  );
 
   return (
     <div className="flex items-start justify-between gap-3">
@@ -143,20 +147,35 @@ function HeaderRow() {
 
       <div className="flex items-center gap-2">
         <Badge variant={view.status.badgeVariant}>{view.status.label}</Badge>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-9 w-9"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <Settings className="h-4 w-4" />
-        </Button>
+        {externalManagementAction ? (
+          <Button asChild variant="outline" size="icon" className="h-9 w-9">
+            <a
+              href={externalManagementAction.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={externalManagementAction.label}
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
-      <KiloPassSubscriptionSettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
+      {externalManagementAction ? null : (
+        <KiloPassSubscriptionSettingsModal
+          isOpen={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </div>
   );
 }

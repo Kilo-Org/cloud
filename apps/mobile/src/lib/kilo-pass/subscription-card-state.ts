@@ -27,7 +27,7 @@ export function getKiloPassSubscriptionCardState(
     return {
       action: 'open-store-management',
       actionLabel: 'Manage',
-      description: credits,
+      description: `${credits} · Managed in App Store`,
       title: 'Kilo Pass active',
     };
   }
@@ -35,7 +35,7 @@ export function getKiloPassSubscriptionCardState(
   if (subscription.paymentProvider === 'stripe') {
     return {
       action: 'open-web-management',
-      actionLabel: 'Manage on web',
+      actionLabel: 'Manage',
       description: `${credits} · Managed on web`,
       title: 'Kilo Pass active',
     };

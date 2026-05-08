@@ -33,6 +33,7 @@ import { KiloPassSubscriptionSettingsModal } from '@/components/profile/kilo-pas
 import { KiloPassBonusRampDialog } from '@/components/profile/kilo-pass/KiloPassBonusRampDialog';
 import { computeMonthlyCadenceBonusPercent } from '@/lib/kilo-pass/bonus';
 import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT } from '@/lib/kilo-pass/constants';
 import {
   computeUsageProgressModel,
@@ -50,8 +51,10 @@ import {
   getKiloPassSubscriptionDisplayModel,
   getKiloPassInlineActionModel,
   getKiloPassInlineConfirmationDetails,
+  getKiloPassExternalManagementAction,
 } from './KiloPassDetail.logic';
 import type {
+  KiloPassExternalManagementAction,
   KiloPassInlineConfirmationAction,
   KiloPassInlinePrimaryAction,
 } from './KiloPassDetail.logic';
@@ -63,11 +66,20 @@ export function KiloPassDetail() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
-  const scheduledChangeQuery = useQuery(trpc.kiloPass.getScheduledChange.queryOptions());
-  const billingQuery = useQuery(trpc.kiloPass.getBillingHistory.queryOptions({}));
+  const subscription = stateQuery.data?.subscription ?? null;
+  const isStripeManagedSubscription =
+    subscription?.paymentProvider === KiloPassPaymentProvider.Stripe;
+  const scheduledChangeQuery = useQuery({
+    ...trpc.kiloPass.getScheduledChange.queryOptions(),
+    enabled: isStripeManagedSubscription,
+  });
+  const billingQuery = useQuery({
+    ...trpc.kiloPass.getBillingHistory.queryOptions({}),
+    enabled: isStripeManagedSubscription,
+  });
   const creditHistoryQuery = useQuery(trpc.kiloPass.getCreditHistory.queryOptions({}));
 
-  const subscriptionId = stateQuery.data?.subscription?.stripeSubscriptionId ?? null;
+  const subscriptionId = subscription?.stripeSubscriptionId ?? null;
 
   const fetchMoreBilling = useCallback(
     (cursor: string) => trpcClient.kiloPass.getBillingHistory.query({ cursor }),
@@ -89,7 +101,6 @@ export function KiloPassDetail() {
     resetKey: subscriptionId,
   });
 
-  const subscription = stateQuery.data?.subscription ?? null;
   const scheduledChange = scheduledChangeQuery.data?.scheduledChange ?? null;
 
   const showFirstMonthPromoInDialog = useMemo(() => {
@@ -154,6 +165,9 @@ export function KiloPassDetail() {
     nextBillingLabel: nextBillingDateLabel,
     resumesAtLabel,
   });
+  const externalManagementAction = getKiloPassExternalManagementAction(
+    subscription.paymentProvider
+  );
 
   return (
     <KiloPassSubscriptionInfoProvider subscription={subscription}>
@@ -254,6 +268,7 @@ export function KiloPassDetail() {
             onResume={handleResume}
             onResumePaused={handleResumePaused}
             hasScheduledChange={Boolean(scheduledChange)}
+            externalManagementAction={externalManagementAction}
           />
         )}
 
@@ -271,25 +286,29 @@ export function KiloPassDetail() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle>Billing history</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-1">
-            <BillingHistoryTable
-              variant="stripe"
-              entries={billing.entries}
-              hasMore={billing.hasMore}
-              onLoadMore={() => void billing.loadMore()}
-              isLoading={billing.isLoadingMore}
-            />
-          </CardContent>
-        </Card>
+        {isStripeManagedSubscription ? (
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle>Billing history</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-1">
+              <BillingHistoryTable
+                variant="stripe"
+                entries={billing.entries}
+                hasMore={billing.hasMore}
+                onLoadMore={() => void billing.loadMore()}
+                isLoading={billing.isLoadingMore}
+              />
+            </CardContent>
+          </Card>
+        ) : null}
 
-        <KiloPassSubscriptionSettingsModal
-          isOpen={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-        />
+        {externalManagementAction ? null : (
+          <KiloPassSubscriptionSettingsModal
+            isOpen={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
       </div>
     </KiloPassSubscriptionInfoProvider>
   );
@@ -300,11 +319,13 @@ function KiloPassInlineActions({
   onResume,
   onResumePaused,
   hasScheduledChange,
+  externalManagementAction,
 }: {
   onOpenSettings: () => void;
   onResume: () => Promise<void>;
   onResumePaused: () => Promise<void>;
   hasScheduledChange: boolean;
+  externalManagementAction: KiloPassExternalManagementAction | null;
 }) {
   const { subscription, view, actions } = useKiloPassSubscriptionInfo();
   const { openCancelFlow, isOpeningCancelFlow } = useKiloPassChurnkeyCancelFlow({
@@ -350,50 +371,61 @@ function KiloPassInlineActions({
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          onClick={onOpenSettings}
-          disabled={inlineActionModel.changePlanDisabled}
-        >
-          Change Plan
-        </Button>
-        {inlineActionModel.resumePaused ? (
-          <Button
-            variant="outline"
-            onClick={() => setConfirmationAction('resumePaused')}
-            disabled={inlineActionModel.resumePaused.disabled}
-          >
-            Resume Subscription
+        {externalManagementAction ? (
+          <Button asChild variant="outline">
+            <a href={externalManagementAction.url} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-4 w-4" />
+              {externalManagementAction.label}
+            </a>
           </Button>
-        ) : inlineActionModel.resume ? (
-          <Button
-            variant="outline"
-            onClick={() => setConfirmationAction('resume')}
-            disabled={inlineActionModel.resume.disabled}
-          >
-            Resume Subscription
-          </Button>
-        ) : inlineActionModel.cancel ? (
-          <Button
-            variant="outline"
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive gap-2"
-            onClick={() => void openCancelFlow()}
-            disabled={inlineActionModel.cancel.disabled}
-          >
-            {inlineActionModel.cancel.isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <>
+            <Button
+              variant="outline"
+              onClick={onOpenSettings}
+              disabled={inlineActionModel.changePlanDisabled}
+            >
+              Change Plan
+            </Button>
+            {inlineActionModel.resumePaused ? (
+              <Button
+                variant="outline"
+                onClick={() => setConfirmationAction('resumePaused')}
+                disabled={inlineActionModel.resumePaused.disabled}
+              >
+                Resume Subscription
+              </Button>
+            ) : inlineActionModel.resume ? (
+              <Button
+                variant="outline"
+                onClick={() => setConfirmationAction('resume')}
+                disabled={inlineActionModel.resume.disabled}
+              >
+                Resume Subscription
+              </Button>
+            ) : inlineActionModel.cancel ? (
+              <Button
+                variant="outline"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive gap-2"
+                onClick={() => void openCancelFlow()}
+                disabled={inlineActionModel.cancel.disabled}
+              >
+                {inlineActionModel.cancel.isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                {inlineActionModel.cancel.label}
+              </Button>
             ) : null}
-            {inlineActionModel.cancel.label}
-          </Button>
-        ) : null}
-        <Button
-          variant="outline"
-          onClick={actions.openCustomerPortal}
-          disabled={actions.isOpeningCustomerPortal}
-        >
-          <ExternalLink className="h-4 w-4" />
-          {actions.isOpeningCustomerPortal ? 'Opening...' : 'Manage Payment Method'}
-        </Button>
+            <Button
+              variant="outline"
+              onClick={actions.openCustomerPortal}
+              disabled={actions.isOpeningCustomerPortal}
+            >
+              <ExternalLink className="h-4 w-4" />
+              {actions.isOpeningCustomerPortal ? 'Opening...' : 'Manage Payment Method'}
+            </Button>
+          </>
+        )}
       </div>
 
       <AlertDialog

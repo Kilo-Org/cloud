@@ -11,7 +11,7 @@ describe('getKiloPassSubscriptionCardState', () => {
       })
     ).toEqual({
       action: 'open-web-management',
-      actionLabel: 'Manage on web',
+      actionLabel: 'Manage',
       description: '$49 monthly credits · Managed on web',
       title: 'Kilo Pass active',
     });
@@ -35,7 +35,7 @@ describe('getKiloPassSubscriptionCardState', () => {
     ).toEqual({
       action: 'open-store-management',
       actionLabel: 'Manage',
-      description: '$19 monthly credits',
+      description: '$19 monthly credits · Managed in App Store',
       title: 'Kilo Pass active',
     });
   });

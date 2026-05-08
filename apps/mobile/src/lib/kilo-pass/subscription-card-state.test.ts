@@ -6,6 +6,7 @@ describe('getKiloPassSubscriptionCardState', () => {
   it('sends Stripe-managed Kilo Pass users to web management', () => {
     expect(
       getKiloPassSubscriptionCardState({
+        cancelAtPeriodEnd: false,
         currentPeriodBaseCreditsUsd: 49,
         paymentProvider: 'stripe',
       })
@@ -29,6 +30,7 @@ describe('getKiloPassSubscriptionCardState', () => {
   it('sends App Store-managed Kilo Pass users to App Store management', () => {
     expect(
       getKiloPassSubscriptionCardState({
+        cancelAtPeriodEnd: false,
         currentPeriodBaseCreditsUsd: 19,
         paymentProvider: 'app_store',
       })
@@ -37,6 +39,21 @@ describe('getKiloPassSubscriptionCardState', () => {
       actionLabel: 'Manage',
       description: '$19 monthly credits · Managed in App Store',
       title: 'Kilo Pass active',
+    });
+  });
+
+  it('signals App Store-managed pending cancellation', () => {
+    expect(
+      getKiloPassSubscriptionCardState({
+        cancelAtPeriodEnd: true,
+        currentPeriodBaseCreditsUsd: 19,
+        paymentProvider: 'app_store',
+      })
+    ).toEqual({
+      action: 'open-store-management',
+      actionLabel: 'Manage',
+      description: '$19 monthly credits · Ends at period end',
+      title: 'Kilo Pass canceling',
     });
   });
 });

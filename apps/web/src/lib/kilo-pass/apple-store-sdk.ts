@@ -1,4 +1,8 @@
-import { Environment, SignedDataVerifier } from '@apple/app-store-server-library';
+import {
+  AppStoreServerAPIClient,
+  Environment,
+  SignedDataVerifier,
+} from '@apple/app-store-server-library';
 
 import { getEnvVariable } from '@/lib/dotenvx';
 
@@ -37,5 +41,15 @@ export function createAppleStoreSignedDataVerifier(): SignedDataVerifier {
     getAppleEnvironment(),
     APPLE_STORE_BUNDLE_ID,
     getAppleAppAppleId()
+  );
+}
+
+export function createAppleStoreServerApiClient(): AppStoreServerAPIClient {
+  return new AppStoreServerAPIClient(
+    requiredEnv('APPLE_IAP_PRIVATE_KEY').replace(/\\n/g, '\n'),
+    requiredEnv('APPLE_IAP_KEY_ID'),
+    requiredEnv('APPLE_IAP_ISSUER_ID'),
+    APPLE_STORE_BUNDLE_ID,
+    getAppleEnvironment()
   );
 }

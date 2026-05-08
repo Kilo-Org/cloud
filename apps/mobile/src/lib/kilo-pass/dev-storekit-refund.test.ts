@@ -69,6 +69,30 @@ describe('requestDevStoreKitRefund', () => {
     expect(showError).not.toHaveBeenCalled();
   });
 
+  it('does not show a success toast when StoreKit does not submit the refund request', async () => {
+    const beginRefundRequest = vi.fn().mockResolvedValue('userCancelled');
+    const invalidateAfterRefund = vi.fn();
+    const showError = vi.fn();
+    const showSuccess = vi.fn();
+
+    await requestDevStoreKitRefund({
+      appleProductId: 'kilopass.tier19.monthly.v1',
+      beginRefundRequest,
+      invalidateAfterRefund,
+      showError: message => {
+        showError(message);
+      },
+      showSuccess: message => {
+        showSuccess(message);
+      },
+    });
+
+    expect(beginRefundRequest).toHaveBeenCalledWith('kilopass.tier19.monthly.v1');
+    expect(invalidateAfterRefund).not.toHaveBeenCalled();
+    expect(showSuccess).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
+  });
+
   it('surfaces StoreKit refund request failures', async () => {
     const beginRefundRequest = vi.fn().mockRejectedValue(new Error('Refund unavailable'));
     const invalidateAfterRefund = vi.fn();

@@ -1,7 +1,10 @@
 import {
+  DeliveryStatus,
   NotificationTypeV2,
+  RefundPreference,
   type ResponseBodyV2DecodedPayload,
   Subtype,
+  type ConsumptionRequest,
 } from '@apple/app-store-server-library';
 import { and, eq } from 'drizzle-orm';
 import * as z from 'zod';
@@ -21,7 +24,10 @@ import {
   type AppleStoreDecodedTransaction,
   type AppleStoreEnvironment,
 } from './apple-store-verifier';
-import { createAppleStoreSignedDataVerifier } from './apple-store-sdk';
+import {
+  createAppleStoreServerApiClient,
+  createAppleStoreSignedDataVerifier,
+} from './apple-store-sdk';
 import { completeStoreKiloPassPurchase } from './store-subscription-completion';
 
 export type AppleStoreDecodedNotification = {
@@ -34,6 +40,10 @@ export type AppleStoreDecodedNotification = {
 
 type DecodeNotification = (signedPayload: string) => Promise<AppleStoreDecodedNotification>;
 type DecodeTransaction = (signedTransactionJws: string) => Promise<AppleStoreDecodedTransaction>;
+type SendConsumptionInformation = (
+  transactionId: string,
+  request: ConsumptionRequest
+) => Promise<void>;
 
 const RENEWAL_TYPES = new Set<string>([
   NotificationTypeV2.DID_RENEW,
@@ -41,7 +51,6 @@ const RENEWAL_TYPES = new Set<string>([
 ]);
 const EXPIRED_TYPES = new Set<string>([NotificationTypeV2.EXPIRED]);
 const REFUND_TYPES = new Set<string>([NotificationTypeV2.REFUND, NotificationTypeV2.REVOKE]);
-
 function isImmediateStorePurchaseNotification(
   notification: AppleStoreDecodedNotification
 ): boolean {
@@ -69,6 +78,22 @@ const AppleStoreNotificationPayloadSchema = z
 function normalizeEnvironment(environment: string | undefined): AppleStoreEnvironment {
   if (environment === 'Production') return 'Production';
   return 'Sandbox';
+}
+
+async function sendAppleStoreConsumptionInformation(
+  transactionId: string,
+  request: ConsumptionRequest
+): Promise<void> {
+  await createAppleStoreServerApiClient().sendConsumptionInformation(transactionId, request);
+}
+
+function getAppStoreKiloPassRefundConsumptionRequest(): ConsumptionRequest {
+  return {
+    customerConsented: true,
+    deliveryStatus: DeliveryStatus.DELIVERED,
+    refundPreference: RefundPreference.DECLINE,
+    sampleContentProvided: false,
+  };
 }
 
 export async function decodeAppleStoreNotificationJws(
@@ -173,9 +198,12 @@ export async function processAppStoreKiloPassNotification(params: {
   userForRenewal?: User;
   decodeNotification?: DecodeNotification;
   decodeTransaction?: DecodeTransaction;
+  sendConsumptionInformation?: SendConsumptionInformation;
 }): Promise<{ processed: boolean }> {
   const decodeNotification = params.decodeNotification ?? decodeAppleStoreNotificationJws;
   const decodeTransaction = params.decodeTransaction ?? decodeAppleStoreTransactionJws;
+  const sendConsumptionInformation =
+    params.sendConsumptionInformation ?? sendAppleStoreConsumptionInformation;
   const notification = await decodeNotification(params.signedPayload);
   const transaction = notification.signedTransactionInfo
     ? await decodeTransaction(notification.signedTransactionInfo)
@@ -259,6 +287,23 @@ export async function processAppStoreKiloPassNotification(params: {
         notificationUUID: notification.notificationUUID,
         notificationType: notification.notificationType,
         providerSubscriptionId: transaction.originalTransactionId,
+      },
+    });
+  }
+
+  if (transaction && notification.notificationType === NotificationTypeV2.CONSUMPTION_REQUEST) {
+    const consumptionRequest = getAppStoreKiloPassRefundConsumptionRequest();
+    await sendConsumptionInformation(transaction.transactionId, consumptionRequest);
+    await appendKiloPassAuditLog(db, {
+      action: KiloPassAuditLogAction.StoreNotificationReceived,
+      result: KiloPassAuditLogResult.Success,
+      payload: {
+        notificationUUID: notification.notificationUUID,
+        notificationType: notification.notificationType,
+        providerSubscriptionId: transaction.originalTransactionId,
+        providerTransactionId: transaction.transactionId,
+        consumptionInformationSent: true,
+        refundPreference: consumptionRequest.refundPreference,
       },
     });
   }

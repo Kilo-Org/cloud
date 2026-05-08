@@ -1,8 +1,14 @@
 import { describe, expect, it } from '@jest/globals';
-import { NotificationTypeV2, Subtype } from '@apple/app-store-server-library';
+import {
+  DeliveryStatus,
+  NotificationTypeV2,
+  RefundPreference,
+  Subtype,
+} from '@apple/app-store-server-library';
 import { eq } from 'drizzle-orm';
 
 import {
+  kilocode_users,
   kilo_pass_audit_log,
   kilo_pass_store_events,
   kilo_pass_subscriptions,
@@ -338,9 +344,10 @@ describe('processAppStoreKiloPassNotification', () => {
     });
   });
 
-  it('records consumption request notifications without ending the subscription', async () => {
+  it('asks Apple to decline refund requests without ending the subscription', async () => {
     const user = await insertTestUser();
     const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
+    const consumptionRequests: Array<{ transactionId: string; request: unknown }> = [];
     await processAppStoreKiloPassNotification({
       signedPayload: 'initial-buy',
       decodeNotification: async () =>
@@ -360,9 +367,78 @@ describe('processAppStoreKiloPassNotification', () => {
           notificationType: NotificationTypeV2.CONSUMPTION_REQUEST,
         }),
       decodeTransaction: async () => decodedTransaction,
+      sendConsumptionInformation: async (transactionId, request) => {
+        consumptionRequests.push({ transactionId, request });
+      },
     });
 
     expect(result).toEqual({ processed: true });
+    expect(consumptionRequests).toEqual([
+      {
+        transactionId: decodedTransaction.transactionId,
+        request: {
+          customerConsented: true,
+          deliveryStatus: DeliveryStatus.DELIVERED,
+          refundPreference: RefundPreference.DECLINE,
+          sampleContentProvided: false,
+        },
+      },
+    ]);
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(
+        kilo_pass_subscriptions.provider_subscription_id,
+        decodedTransaction.originalTransactionId
+      ),
+    });
+    expect(subscription?.status).toBe('active');
+    expect(subscription?.ended_at).toBeNull();
+  });
+
+  it('asks Apple to decline refund requests when Kilo Pass credits were consumed', async () => {
+    const user = await insertTestUser();
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
+    const consumptionRequests: Array<{ transactionId: string; request: unknown }> = [];
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'initial-buy',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'consumed-initial-buy',
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+    await db
+      .update(kilocode_users)
+      .set({ microdollars_used: 1 })
+      .where(eq(kilocode_users.id, user.id));
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'consumed-consumption-request',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'consumed-consumption-request',
+          notificationType: NotificationTypeV2.CONSUMPTION_REQUEST,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+      sendConsumptionInformation: async (transactionId, request) => {
+        consumptionRequests.push({ transactionId, request });
+      },
+    });
+
+    expect(result).toEqual({ processed: true });
+    expect(consumptionRequests).toEqual([
+      {
+        transactionId: decodedTransaction.transactionId,
+        request: {
+          customerConsented: true,
+          deliveryStatus: DeliveryStatus.DELIVERED,
+          refundPreference: RefundPreference.DECLINE,
+          sampleContentProvided: false,
+        },
+      },
+    ]);
 
     const subscription = await db.query.kilo_pass_subscriptions.findFirst({
       where: eq(

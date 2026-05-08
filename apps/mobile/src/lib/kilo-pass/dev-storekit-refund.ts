@@ -33,7 +33,10 @@ export async function requestDevStoreKitRefund(params: {
   showSuccess: (message: string) => void;
 }): Promise<void> {
   try {
-    await params.beginRefundRequest(params.appleProductId);
+    const refundRequestStatus = await params.beginRefundRequest(params.appleProductId);
+    if (refundRequestStatus?.toLowerCase() !== 'success') {
+      return;
+    }
     await params.invalidateAfterRefund();
     params.showSuccess('Refund request submitted.');
   } catch (error) {

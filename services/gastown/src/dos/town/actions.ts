@@ -1109,10 +1109,11 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 !feedback.hasFailingChecks &&
                 feedback.allChecksPass &&
                 !feedback.awaitingApproval &&
-                !feedback.changesRequested;
+                !feedback.changesRequested &&
+                !feedback.isDraft;
 
               console.log(
-                `${LOG} poll_pr: bead=${action.bead_id} allGreen=${allGreen} unresolved=${feedback.hasUnresolvedComments} failing=${feedback.hasFailingChecks} allPass=${feedback.allChecksPass} unchecked=${feedback.hasUncheckedRuns} awaitingApproval=${feedback.awaitingApproval} changesRequested=${feedback.changesRequested}`
+                `${LOG} poll_pr: bead=${action.bead_id} allGreen=${allGreen} unresolved=${feedback.hasUnresolvedComments} failing=${feedback.hasFailingChecks} allPass=${feedback.allChecksPass} unchecked=${feedback.hasUncheckedRuns} awaitingApproval=${feedback.awaitingApproval} changesRequested=${feedback.changesRequested} isDraft=${feedback.isDraft}`
               );
 
               if (allGreen) {

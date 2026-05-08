@@ -182,3 +182,63 @@ describe('CloudAgentNextFetchClient billing error detection', () => {
     ).rejects.not.toThrow(CloudAgentNextBillingError);
   });
 });
+
+describe('CloudAgentNextFetchClient getSessionHealth', () => {
+  it('posts to getSessionHealth and parses a healthy response', async () => {
+    const fetchMock = mockFetch(200, {
+      result: {
+        data: {
+          cloudAgentSessionId: 'agent_123',
+          sandboxId: 'ses-abc123',
+          sandboxStatus: 'healthy',
+          executionHealth: 'none',
+        },
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+
+    const result = await client.getSessionHealth(
+      { Authorization: 'Bearer token' },
+      { cloudAgentSessionId: 'agent_123' }
+    );
+
+    expect(result).toEqual({
+      cloudAgentSessionId: 'agent_123',
+      sandboxId: 'ses-abc123',
+      sandboxStatus: 'healthy',
+      executionHealth: 'none',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${BASE_URL}/trpc/getSessionHealth`,
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token',
+        },
+        body: JSON.stringify({ cloudAgentSessionId: 'agent_123' }),
+      })
+    );
+  });
+
+  it('rejects malformed health responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch(200, {
+        result: {
+          data: {
+            cloudAgentSessionId: 'agent_123',
+            sandboxStatus: 'on-fire',
+            executionHealth: 'none',
+          },
+        },
+      })
+    );
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+
+    await expect(client.getSessionHealth({}, { cloudAgentSessionId: 'agent_123' })).rejects.toThrow(
+      'Unexpected getSessionHealth response shape'
+    );
+  });
+});

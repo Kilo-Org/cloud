@@ -1309,6 +1309,7 @@ describe('User', () => {
           created_by: user1.id,
           platform: 'slack',
           platform_thread_id: 'slack:T123:C456:thread1',
+          platform_message_id: 'slack:T123:C456:msg1',
           user_message: 'Hello from user1',
           status: 'completed',
         })
@@ -1318,6 +1319,7 @@ describe('User', () => {
         created_by: user2.id,
         platform: 'slack',
         platform_thread_id: 'slack:T123:C456:thread2',
+        platform_message_id: 'slack:T123:C456:msg2',
         user_message: 'Hello from user2',
         status: 'completed',
       });
@@ -1365,6 +1367,7 @@ describe('User', () => {
           created_by: user.id,
           platform: 'slack',
           platform_thread_id: 'slack:T123:C456:multi-child',
+          platform_message_id: 'slack:T123:C456:multi-child:msg',
           user_message: 'multi-session test',
           status: 'pending',
         })

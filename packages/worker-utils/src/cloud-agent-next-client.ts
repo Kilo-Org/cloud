@@ -71,6 +71,30 @@ export type CloudAgentSendMessageOutput = {
   status?: string;
 };
 
+export type CloudAgentSessionHealthInput = {
+  cloudAgentSessionId: string;
+};
+
+export type CloudAgentSandboxStatus = 'healthy' | 'destroyed' | 'unreachable' | 'unknown';
+
+export type CloudAgentSessionExecutionHealth = 'healthy' | 'unknown' | 'stale' | 'none';
+
+export type CloudAgentActiveExecutionStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'interrupted';
+
+export type CloudAgentSessionHealthOutput = {
+  cloudAgentSessionId: string;
+  sandboxId?: string;
+  sandboxStatus: CloudAgentSandboxStatus;
+  executionHealth: CloudAgentSessionExecutionHealth;
+  activeExecutionStatus?: CloudAgentActiveExecutionStatus;
+  activeExecutionId?: string;
+};
+
 export type CloudAgentInterruptInput = {
   sessionId: string;
 };
@@ -127,6 +151,30 @@ export class CloudAgentNextBillingError extends CloudAgentNextError {
 function isBillingErrorBody(body: string): boolean {
   return ['insufficient credits', 'paid model', 'add credits', 'credits required'].some(pattern =>
     body.toLowerCase().includes(pattern)
+  );
+}
+
+function isCloudAgentSandboxStatus(value: unknown): value is CloudAgentSandboxStatus {
+  return (
+    value === 'healthy' || value === 'destroyed' || value === 'unreachable' || value === 'unknown'
+  );
+}
+
+function isCloudAgentSessionExecutionHealth(
+  value: unknown
+): value is CloudAgentSessionExecutionHealth {
+  return value === 'healthy' || value === 'unknown' || value === 'stale' || value === 'none';
+}
+
+function isCloudAgentActiveExecutionStatus(
+  value: unknown
+): value is CloudAgentActiveExecutionStatus {
+  return (
+    value === 'pending' ||
+    value === 'running' ||
+    value === 'completed' ||
+    value === 'failed' ||
+    value === 'interrupted'
   );
 }
 
@@ -188,6 +236,11 @@ export type CloudAgentNextFetchClient = {
     headers: Record<string, string>,
     input: CloudAgentSendMessageInput
   ): Promise<CloudAgentSendMessageOutput>;
+
+  getSessionHealth(
+    headers: Record<string, string>,
+    input: CloudAgentSessionHealthInput
+  ): Promise<CloudAgentSessionHealthOutput>;
 
   interruptSession(
     headers: Record<string, string>,
@@ -253,6 +306,41 @@ export function createCloudAgentNextFetchClient(baseUrl: string): CloudAgentNext
         );
       }
       return data as unknown as CloudAgentSendMessageOutput;
+    },
+
+    async getSessionHealth(headers, input) {
+      const data = await trpcPost<Record<string, unknown>>(
+        trpc('getSessionHealth'),
+        headers,
+        input,
+        'getSessionHealth'
+      );
+
+      if (
+        typeof data.cloudAgentSessionId !== 'string' ||
+        !isCloudAgentSandboxStatus(data.sandboxStatus) ||
+        !isCloudAgentSessionExecutionHealth(data.executionHealth) ||
+        (data.sandboxId !== undefined && typeof data.sandboxId !== 'string') ||
+        (data.activeExecutionId !== undefined && typeof data.activeExecutionId !== 'string') ||
+        (data.activeExecutionStatus !== undefined &&
+          !isCloudAgentActiveExecutionStatus(data.activeExecutionStatus))
+      ) {
+        throw new Error(
+          `Unexpected getSessionHealth response shape: ${JSON.stringify(data).slice(0, 500)}`
+        );
+      }
+
+      const health: CloudAgentSessionHealthOutput = {
+        cloudAgentSessionId: data.cloudAgentSessionId,
+        sandboxStatus: data.sandboxStatus,
+        executionHealth: data.executionHealth,
+      };
+      if (data.sandboxId !== undefined) health.sandboxId = data.sandboxId;
+      if (data.activeExecutionId !== undefined) health.activeExecutionId = data.activeExecutionId;
+      if (data.activeExecutionStatus !== undefined) {
+        health.activeExecutionStatus = data.activeExecutionStatus;
+      }
+      return health;
     },
 
     async interruptSession(headers, input) {

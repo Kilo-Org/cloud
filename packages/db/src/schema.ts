@@ -5255,7 +5255,7 @@ export const bot_requests = pgTable(
 
     platform: text().notNull(),
     platform_thread_id: text().notNull(),
-    platform_message_id: text(),
+    platform_message_id: text().notNull(),
 
     user_message: text().notNull(),
 
@@ -5471,6 +5471,8 @@ export const exa_usage_log = pgTable(
     path: text().notNull(),
     cost_microdollars: bigint({ mode: 'number' }).notNull(),
     charged_to_balance: boolean().notNull().default(false),
+    feature_id: text(),
+    type: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

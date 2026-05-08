@@ -1,34 +1,68 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, test, beforeEach } from '@jest/globals';
 import { GET } from './route';
-import {
-  KILO_DEFAULT_EMBEDDING_MODEL,
-  KILO_EMBEDDING_MODEL_CATALOG,
-  getKiloEmbeddingModel,
-  normalizeKiloEmbeddingModelId,
-} from '@/lib/ai-gateway/embeddings/kilo-embedding-models';
+import { getOpenRouterEmbeddingModels } from '@/lib/ai-gateway/providers/openrouter';
+import type {
+  OpenRouterModel,
+  OpenRouterModelsResponse,
+} from '@/lib/organizations/organization-types';
+
+jest.mock('@/lib/ai-gateway/providers/openrouter');
+
+const mockedGetOpenRouterEmbeddingModels = jest.mocked(getOpenRouterEmbeddingModels);
+
+function makeEmbeddingModel(id: string): OpenRouterModel {
+  return {
+    id,
+    name: id,
+    created: 0,
+    description: '',
+    architecture: {
+      input_modalities: ['text'],
+      output_modalities: ['embeddings'],
+      tokenizer: 'Other',
+    },
+    top_provider: {
+      is_moderated: false,
+      context_length: 8192,
+      max_completion_tokens: null,
+    },
+    pricing: {
+      prompt: '0.0000001',
+      completion: '0',
+    },
+    context_length: 8192,
+  };
+}
 
 describe('GET /api/gateway/embedding-models', () => {
-  test('returns the Kilo embedding model catalog', async () => {
-    const response = await GET();
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual(KILO_EMBEDDING_MODEL_CATALOG);
+  beforeEach(() => {
+    mockedGetOpenRouterEmbeddingModels.mockReset();
   });
 
-  test('catalog includes default model metadata and aliases', () => {
-    expect(KILO_EMBEDDING_MODEL_CATALOG.defaultModel).toBe(KILO_DEFAULT_EMBEDDING_MODEL);
-    expect(getKiloEmbeddingModel(KILO_DEFAULT_EMBEDDING_MODEL)).toMatchObject({
-      id: KILO_DEFAULT_EMBEDDING_MODEL,
-      dimension: 1024,
-      scoreThreshold: 0.35,
+  test('returns the embedding models from OpenRouter', async () => {
+    const response: OpenRouterModelsResponse = {
+      data: [
+        makeEmbeddingModel('mistralai/mistral-embed-2312'),
+        makeEmbeddingModel('openai/text-embedding-3-small'),
+      ],
+    };
+    mockedGetOpenRouterEmbeddingModels.mockResolvedValue(response);
+
+    const result = await GET();
+
+    expect(result.status).toBe(200);
+    await expect(result.json()).resolves.toEqual(response);
+  });
+
+  test('returns 500 when OpenRouter fetch fails', async () => {
+    mockedGetOpenRouterEmbeddingModels.mockRejectedValue(new Error('boom'));
+
+    const result = await GET();
+
+    expect(result.status).toBe(500);
+    await expect(result.json()).resolves.toEqual({
+      error: 'Failed to fetch embedding models',
+      message: 'Error from OpenRouter API',
     });
-    expect(getKiloEmbeddingModel('codestral-embed-2505')).toMatchObject({
-      id: 'mistralai/codestral-embed-2505',
-      dimension: 256,
-      scoreThreshold: 0.35,
-    });
-    expect(normalizeKiloEmbeddingModelId('text-embedding-3-small')).toBe(
-      'openai/text-embedding-3-small'
-    );
   });
 });

@@ -311,3 +311,99 @@ describe('platform provision bootstrap quarantine', () => {
     expect(eventCall?.[1]?.instanceId?.length).toBeGreaterThan(0);
   });
 });
+
+describe('platform /provision: instanceType defaulting', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('defaults instanceType to perf-1-3 on FRESH insert when caller omits it', async () => {
+    const { env, provision } = makeEnv();
+    mockGetWorkerDb.mockReturnValue(createWorkerDb());
+    mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValueOnce({ mode: 'rpc' });
+
+    const response = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          provider: 'fly',
+          // No instanceId — fresh insert.
+          // No instanceType — caller wants the default.
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(201);
+    expect(provision).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ instanceType: 'perf-1-3' }),
+      expect.anything()
+    );
+  });
+
+  it('passes instanceType=undefined to the DO on RE-PROVISION (instanceId provided, no tier)', async () => {
+    // Regression for the silent-clobber bug: provision() is overloaded as the
+    // entrypoint for config-update flows on existing instances. The DO's
+    // `inferredInstanceType` path preserves existing tier / machineSize /
+    // volumeSizeGb when `config.instanceType` is undefined; defaulting to
+    // perf-1-3 unconditionally would silently overwrite custom (e.g.
+    // extend-volume) and legacy tiers on the next config change.
+    const { env, provision } = makeEnv();
+    mockGetWorkerDb.mockReturnValue(createWorkerDb());
+    mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValueOnce({ mode: 'rpc' });
+
+    const existingInstanceId = '11111111-1111-4111-8111-111111111111';
+    const response = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          provider: 'fly',
+          instanceId: existingInstanceId, // re-provision — existing instance
+          // No instanceType — caller wants existing tier preserved.
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(201);
+    expect(provision).toHaveBeenCalledTimes(1);
+    const provisionConfig = provision.mock.calls[0][1] as Record<string, unknown>;
+    expect(provisionConfig.instanceType).toBeUndefined();
+  });
+
+  it('honors caller-supplied instanceType on RE-PROVISION', async () => {
+    const { env, provision } = makeEnv();
+    mockGetWorkerDb.mockReturnValue(createWorkerDb());
+    mockBootstrapProvisionedSubscriptionWithFallback.mockResolvedValueOnce({ mode: 'rpc' });
+
+    const existingInstanceId = '11111111-1111-4111-8111-111111111111';
+    const response = await platform.request(
+      '/provision',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          provider: 'fly',
+          instanceId: existingInstanceId,
+          instanceType: 'perf-4-8',
+        }),
+      },
+      env
+    );
+
+    expect(response.status).toBe(201);
+    expect(provision).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ instanceType: 'perf-4-8' }),
+      expect.anything()
+    );
+  });
+});

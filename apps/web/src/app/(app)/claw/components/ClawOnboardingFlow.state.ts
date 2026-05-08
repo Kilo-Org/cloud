@@ -6,10 +6,17 @@ export type PopulatedClawStatus = KiloClawDashboardStatus & {
 
 export type ClawOnboardingMode = 'create-first' | 'post-provisioning';
 
-export type OnboardingStep = 'identity' | 'channels' | 'provisioning' | 'pairing' | 'done';
+export type OnboardingStep =
+  | 'identity'
+  | 'calendar'
+  | 'channels'
+  | 'provisioning'
+  | 'pairing'
+  | 'done';
 
 export const CLAW_ONBOARDING_WIZARD_STEPS = [
   'identity',
+  'calendar',
   'channels',
   'provisioning',
   'pairing',
@@ -19,6 +26,7 @@ export type ClawOnboardingWizardStep = (typeof CLAW_ONBOARDING_WIZARD_STEPS)[num
 
 export type ClawOnboardingRenderStep =
   | 'identity'
+  | 'calendar'
   | 'channels'
   | 'provisioning'
   | 'pairing'
@@ -31,6 +39,7 @@ export const FAKE_ONBOARDING_STEP_PARAM = 'fakeOnboardingStep';
 
 export const CLAW_ONBOARDING_FAKE_STEPS = [
   'identity',
+  'calendar',
   'channels',
   'provisioning',
   'pairing',
@@ -245,6 +254,37 @@ function getRenderStepDecision({
   }
 
   if (mode === 'post-provisioning') {
+    // After a full-page reload (e.g. the Google OAuth round-trip), the
+    // wizard often remounts in post-provisioning mode because the instance
+    // row is now visible — but the user is still mid-wizard. Honor any
+    // explicit wizard step rather than auto-routing them past it. Without
+    // this, advancing from calendar → channels → provisioning would fall
+    // through to the default post-prov branch and skip channels, pairing,
+    // and the provisioning UX entirely.
+    if (onboardingStep === 'calendar') {
+      return {
+        renderStep: 'calendar',
+        reason: 'calendar resume requested; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'channels') {
+      return {
+        renderStep: 'channels',
+        reason: 'wizard resume on channels; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'provisioning') {
+      return {
+        renderStep: 'provisioning',
+        reason: 'wizard resume on provisioning; honor it even in post-provisioning mode',
+      };
+    }
+    if (onboardingStep === 'pairing' && hasPairingStep) {
+      return {
+        renderStep: 'pairing',
+        reason: 'wizard resume on pairing; honor it even in post-provisioning mode',
+      };
+    }
     if (postProvisioningReady) {
       return {
         renderStep: 'complete',
@@ -277,6 +317,13 @@ function getRenderStepDecision({
       reason: !hasBotIdentity
         ? 'bot identity is missing, so identity is the earliest safe step'
         : 'stored onboarding step is identity',
+    };
+  }
+
+  if (onboardingStep === 'calendar') {
+    return {
+      renderStep: 'calendar',
+      reason: 'stored onboarding step is calendar',
     };
   }
 

@@ -5,6 +5,7 @@ import { db } from '@/lib/drizzle';
 import {
   eq,
   and,
+  or,
   desc,
   lt,
   isNull,
@@ -18,7 +19,7 @@ import {
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
-import { cli_sessions_v2 } from '@kilocode/db/schema';
+import { cli_sessions_v2, github_branch_pull_requests } from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateApiToken, generateInternalServiceToken } from '@/lib/tokens';
 import {
@@ -31,6 +32,16 @@ import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { KNOWN_PLATFORMS, sanitizeGitUrl } from '@/routers/cli-sessions-router';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import {
+  fetchPullRequestForBranch,
+  fetchPullRequestReviewDecision,
+  GitHubRateLimitError,
+} from '@/lib/integrations/platforms/github/adapter';
+import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
+import { triggerBatchReviewDecisionFetchIfNeeded } from '@/lib/integrations/platforms/github/batch-review-decisions';
+import { after } from 'next/server';
 
 /**
  * Check if an error indicates the session was not found in the cloud-agent DO.
@@ -57,6 +68,107 @@ function isSessionNotFoundError(err: unknown): boolean {
 const PAGE_SIZE = 10;
 const RECENT_DAYS_LIMIT = 200;
 
+/**
+ * If a refresh was performed within this window, the mutation short-circuits
+ * and returns the persisted row without hitting the GitHub API. The hover
+ * card UI hides its Refresh button below this threshold; the server-side
+ * throttle is a defence-in-depth check for any caller that bypasses the UI.
+ */
+export const REFRESH_THROTTLE_MS = 60_000;
+
+/**
+ * Parse a git URL into `{ owner, repo }` when it points at GitHub. Returns
+ * `null` for non-GitHub hosts or URLs that cannot be parsed into exactly
+ * `owner/repo`. Handles https, ssh:// and SCP-style
+ * (`git@github.com:owner/repo.git`) URLs, plus trailing `.git` suffixes.
+ */
+export function parseGitHubOwnerRepo(url: string): { owner: string; repo: string } | null {
+  const sshMatch = url.match(/^git@([^:]+):(.+)$/);
+  let host: string;
+  let path: string;
+  if (sshMatch) {
+    host = sshMatch[1].toLowerCase();
+    path = sshMatch[2];
+  } else {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return null;
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
+      return null;
+    }
+    host = parsed.hostname.toLowerCase();
+    path = parsed.pathname.replace(/^\/+/, '');
+  }
+
+  if (host !== 'github.com' && host !== 'www.github.com') {
+    return null;
+  }
+
+  const cleaned = path.replace(/\.git$/i, '').replace(/\/+$/, '');
+  const segments = cleaned.split('/').filter(Boolean);
+  if (segments.length !== 2) {
+    return null;
+  }
+  const [owner, repo] = segments;
+  if (!owner || !repo) {
+    return null;
+  }
+  return { owner, repo };
+}
+
+const associatedPrSchema = z.object({
+  url: z.string(),
+  number: z.number(),
+  state: z.string(),
+  title: z.string().nullable(),
+  headSha: z.string().nullable(),
+  lastSyncedAt: z.string(),
+  reviewDecision: z.enum(['approved', 'changes_requested', 'review_required']).nullable(),
+  // True when the server has flagged this PR for an async review-decision
+  // fetch (see batch-review-decisions.ts) and the result has not landed yet.
+  // Clients can poll the list endpoint while any row reports pending=true to
+  // surface review-decision badges shortly after they become available.
+  reviewDecisionPending: z.boolean(),
+});
+
+type AssociatedPrRow = {
+  pr_url: string | null;
+  pr_number: number | null;
+  pr_state: string | null;
+  pr_title: string | null;
+  pr_head_sha: string | null;
+  pr_last_synced_at: string | null;
+  pr_review_decision: string | null;
+  review_decision_pending: boolean | null;
+};
+
+function formatAssociatedPr(row: AssociatedPrRow): z.infer<typeof associatedPrSchema> | null {
+  if (
+    row.pr_url === null ||
+    row.pr_number === null ||
+    row.pr_state === null ||
+    row.pr_last_synced_at === null
+  ) {
+    return null;
+  }
+  const rd = row.pr_review_decision;
+  const reviewDecision =
+    rd === 'approved' || rd === 'changes_requested' || rd === 'review_required' ? rd : null;
+  return {
+    url: row.pr_url,
+    number: row.pr_number,
+    state: row.pr_state,
+    title: row.pr_title,
+    headSha: row.pr_head_sha,
+    lastSyncedAt: row.pr_last_synced_at,
+    reviewDecision,
+    reviewDecisionPending: row.review_decision_pending === true,
+  };
+}
+
 const createdOnPlatformField = z.string().min(1).max(100);
 
 /**
@@ -77,6 +189,79 @@ const commonSessionFields = {
   updated_at: cli_sessions_v2.updated_at,
   version: cli_sessions_v2.version,
 } as const;
+
+/**
+ * Common session fields plus the per-tenant PR cache columns. Used for the
+ * list/search endpoints that LEFT JOIN `github_branch_pull_requests` so each
+ * row can carry an `associatedPr` summary.
+ */
+const commonSessionFieldsWithPr = {
+  ...commonSessionFields,
+  pr_url: github_branch_pull_requests.pr_url,
+  pr_number: github_branch_pull_requests.pr_number,
+  pr_state: github_branch_pull_requests.pr_state,
+  pr_title: github_branch_pull_requests.pr_title,
+  pr_head_sha: github_branch_pull_requests.pr_head_sha,
+  pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
+  pr_review_decision: github_branch_pull_requests.pr_review_decision,
+  review_decision_pending: github_branch_pull_requests.review_decision_pending,
+} as const;
+
+/**
+ * LEFT JOIN predicate that links a session to its per-tenant PR cache row,
+ * matching `(git_url, git_branch)` plus the tenant column that corresponds to
+ * the session's `organization_id` nullability. Identical shape to
+ * `getWithRuntimeState` so the planner can reuse the partial unique indexes.
+ */
+const sessionPrJoinPredicate = and(
+  eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
+  eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
+  or(
+    and(
+      isNotNull(cli_sessions_v2.organization_id),
+      eq(github_branch_pull_requests.owned_by_organization_id, cli_sessions_v2.organization_id)
+    ),
+    and(
+      isNull(cli_sessions_v2.organization_id),
+      eq(github_branch_pull_requests.owned_by_user_id, cli_sessions_v2.kilo_user_id)
+    )
+  )
+);
+
+/**
+ * Strip the flat `pr_*` columns produced by `commonSessionFieldsWithPr` and
+ * fold them into a single `associatedPr` field on each row.
+ */
+function projectAssociatedPr<T extends AssociatedPrRow>(
+  row: T
+): Omit<T, keyof AssociatedPrRow> & {
+  associatedPr: z.infer<typeof associatedPrSchema> | null;
+} {
+  const {
+    pr_url,
+    pr_number,
+    pr_state,
+    pr_title,
+    pr_head_sha,
+    pr_last_synced_at,
+    pr_review_decision,
+    review_decision_pending,
+    ...rest
+  } = row;
+  return {
+    ...rest,
+    associatedPr: formatAssociatedPr({
+      pr_url,
+      pr_number,
+      pr_state,
+      pr_title,
+      pr_head_sha,
+      pr_last_synced_at,
+      pr_review_decision,
+      review_decision_pending,
+    }),
+  };
+}
 
 const sessionIdField = z.string().min(1);
 const cloudAgentSessionIdField = z.string().min(1).max(255);
@@ -113,6 +298,7 @@ const ListSessionsInputSchema = z.object({
   gitUrl: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
   updatedSince: z.iso.datetime().optional(),
   version: z.number().optional(),
+  fetchReviewDecision: z.boolean().optional().default(false),
 });
 
 const SearchInputSchema = z.object({
@@ -278,12 +464,25 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     const effectiveLimit = updatedSince ? RECENT_DAYS_LIMIT : limit;
 
-    const results = await db
-      .select(commonSessionFields)
+    const rawResults = await db
+      .select(commonSessionFieldsWithPr)
       .from(cli_sessions_v2)
+      .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
       .where(and(...whereConditions))
       .orderBy(desc(orderColumn))
       .limit(effectiveLimit + 1);
+
+    if (input.fetchReviewDecision) {
+      const hasPendingPrRows = rawResults.some(r => r.review_decision_pending === true);
+      after(() =>
+        triggerBatchReviewDecisionFetchIfNeeded(hasPendingPrRows, {
+          userId: ctx.user.id,
+          organizationId: input.organizationId ?? null,
+        })
+      );
+    }
+
+    const results = rawResults.map(projectAssociatedPr);
 
     const hasMore = results.length > effectiveLimit;
     const resultSessions = hasMore ? results.slice(0, effectiveLimit) : results;
@@ -340,10 +539,11 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     const baseWhere = and(...whereConditions);
 
-    const [results, countResult] = await Promise.all([
+    const [rawResults, countResult] = await Promise.all([
       db
-        .select(commonSessionFields)
+        .select(commonSessionFieldsWithPr)
         .from(cli_sessions_v2)
+        .leftJoin(github_branch_pull_requests, sessionPrJoinPredicate)
         .where(baseWhere)
         .orderBy(desc(cli_sessions_v2.updated_at))
         .limit(limit)
@@ -354,6 +554,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         .where(baseWhere),
     ]);
 
+    const results = rawResults.map(projectAssociatedPr);
     const total = countResult.length > 0 ? Number(countResult[0].count) : 0;
 
     return {
@@ -505,15 +706,52 @@ export const cliSessionsV2Router = createTRPCRouter({
         version: z.number(),
         // Runtime state from DO (null for CLI sessions without cloud_agent_session_id)
         runtimeState: baseGetSessionNextOutputSchema.nullable(),
+        // Associated GitHub pull request for this session's branch, if any.
+        // Populated by the pull_request webhook handler or a manual refresh.
+        associatedPr: associatedPrSchema.nullable(),
       })
     )
     .query(async ({ ctx, input }) => {
       const { session_id } = input;
 
-      // 1. Fetch from DB with ownership check
-      const [session] = await db
-        .select()
+      // 1. Fetch from DB with ownership check, LEFT JOINing the per-tenant
+      //    PR cache on (normalized git_url, git_branch, tenant). The OR
+      //    branches are mutually exclusive by the session's organization_id
+      //    nullability and by the XOR ownership CHECK on the cache table, so
+      //    the planner uses whichever partial unique index applies.
+      const [row] = await db
+        .select({
+          session: cli_sessions_v2,
+          pr_url: github_branch_pull_requests.pr_url,
+          pr_number: github_branch_pull_requests.pr_number,
+          pr_state: github_branch_pull_requests.pr_state,
+          pr_title: github_branch_pull_requests.pr_title,
+          pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
+          pr_review_decision: github_branch_pull_requests.pr_review_decision,
+          review_decision_pending: github_branch_pull_requests.review_decision_pending,
+        })
         .from(cli_sessions_v2)
+        .leftJoin(
+          github_branch_pull_requests,
+          and(
+            eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
+            eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
+            or(
+              and(
+                isNotNull(cli_sessions_v2.organization_id),
+                eq(
+                  github_branch_pull_requests.owned_by_organization_id,
+                  cli_sessions_v2.organization_id
+                )
+              ),
+              and(
+                isNull(cli_sessions_v2.organization_id),
+                eq(github_branch_pull_requests.owned_by_user_id, cli_sessions_v2.kilo_user_id)
+              )
+            )
+          )
+        )
         .where(
           and(
             eq(cli_sessions_v2.session_id, session_id),
@@ -522,11 +760,21 @@ export const cliSessionsV2Router = createTRPCRouter({
         )
         .limit(1);
 
-      if (!session) {
+      if (!row) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Session not found',
         });
+      }
+
+      const { session } = row;
+
+      // Re-verify current authorization before returning cached PR metadata.
+      // A `cli_sessions_v2` row with our `kilo_user_id` is not proof of current
+      // access — for org-scoped sessions, a removed member must not receive
+      // cached PR metadata via the stale session row.
+      if (session.organization_id) {
+        await ensureOrganizationAccess(ctx, session.organization_id);
       }
 
       // 2. If session has cloud_agent_session_id, fetch runtime state from DO
@@ -570,7 +818,285 @@ export const cliSessionsV2Router = createTRPCRouter({
         updated_at: session.updated_at,
         version: session.version,
         runtimeState,
+        associatedPr: formatAssociatedPr(row),
       };
+    }),
+
+  /**
+   * Refresh the associated PR for a session by querying GitHub directly.
+   *
+   * Invoked when the user explicitly asks for a refresh (e.g. "Refresh PR info"
+   * action in the UI). The webhook handler is the primary path; this mutation
+   * exists to recover from missed webhooks. Throttled to once per minute
+   * per (git_url, git_branch, tenant) to avoid hammering the GitHub API.
+   */
+  refreshAssociatedPullRequest: baseProcedure
+    .input(z.object({ sessionId: z.string().min(1) }))
+    .output(z.object({ associatedPr: associatedPrSchema.nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const { sessionId } = input;
+
+      // 1. Load session with ownership check, LEFT JOINing the per-tenant PR
+      //    cache so we can evaluate the throttle without a second query. Join
+      //    shape mirrors getWithRuntimeState above.
+      const [row] = await db
+        .select({
+          session: cli_sessions_v2,
+          pr_url: github_branch_pull_requests.pr_url,
+          pr_number: github_branch_pull_requests.pr_number,
+          pr_state: github_branch_pull_requests.pr_state,
+          pr_title: github_branch_pull_requests.pr_title,
+          pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
+          pr_review_decision: github_branch_pull_requests.pr_review_decision,
+          review_decision_pending: github_branch_pull_requests.review_decision_pending,
+        })
+        .from(cli_sessions_v2)
+        .leftJoin(
+          github_branch_pull_requests,
+          and(
+            eq(github_branch_pull_requests.git_url, cli_sessions_v2.git_url),
+            eq(github_branch_pull_requests.git_branch, cli_sessions_v2.git_branch),
+            or(
+              and(
+                isNotNull(cli_sessions_v2.organization_id),
+                eq(
+                  github_branch_pull_requests.owned_by_organization_id,
+                  cli_sessions_v2.organization_id
+                )
+              ),
+              and(
+                isNull(cli_sessions_v2.organization_id),
+                eq(github_branch_pull_requests.owned_by_user_id, cli_sessions_v2.kilo_user_id)
+              )
+            )
+          )
+        )
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
+          )
+        )
+        .limit(1);
+
+      if (!row) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+      }
+
+      const { session } = row;
+      const gitUrl = session.git_url;
+      const branch = session.git_branch;
+      if (!gitUrl || !branch) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Session is not associated with a git branch',
+        });
+      }
+
+      const parsed = parseGitHubOwnerRepo(gitUrl);
+      if (!parsed) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Session git URL is not a recognized GitHub repository',
+        });
+      }
+
+      // 2. Re-verify current authorization BEFORE any short-circuit. A session
+      //    row with our kilo_user_id stored on it is not proof of current
+      //    access — for org-scoped sessions, a removed member must not receive
+      //    cached PR metadata via the throttle path below.
+      if (session.organization_id) {
+        await ensureOrganizationAccess(ctx, session.organization_id);
+      }
+
+      // 3. Throttle: if the side table was synced recently, short-circuit.
+      if (row.pr_last_synced_at !== null) {
+        const lastSyncedMs = Date.parse(row.pr_last_synced_at);
+        if (Number.isFinite(lastSyncedMs) && Date.now() - lastSyncedMs < REFRESH_THROTTLE_MS) {
+          return { associatedPr: formatAssociatedPr(row) };
+        }
+      }
+
+      // 4. Resolve the GitHub installation for this session's owner.
+      let integration;
+      if (session.organization_id) {
+        integration = await getIntegrationForOwner(
+          { type: 'org', id: session.organization_id },
+          PLATFORM.GITHUB
+        );
+      } else {
+        integration = await getIntegrationForOwner(
+          { type: 'user', id: ctx.user.id },
+          PLATFORM.GITHUB
+        );
+      }
+
+      if (!integration?.platform_installation_id) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No GitHub integration configured for this session',
+        });
+      }
+
+      const installationId = Number(integration.platform_installation_id);
+      if (!Number.isFinite(installationId)) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'GitHub installation ID is malformed',
+        });
+      }
+      const appType = integration.github_app_type ?? 'standard';
+
+      // 5. Call GitHub.
+      let fetched;
+      try {
+        fetched = await fetchPullRequestForBranch({
+          installationId,
+          owner: parsed.owner,
+          repo: parsed.repo,
+          branch,
+          appType,
+        });
+      } catch (error) {
+        if (error instanceof GitHubRateLimitError) {
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: `GitHub rate limit reached; try again after ${error.resetAt.toISOString()}`,
+            cause: error,
+          });
+        }
+        captureException(error, {
+          tags: {
+            source: 'cli-sessions-v2-router',
+            endpoint: 'refreshAssociatedPullRequest',
+          },
+          extra: { sessionId, owner: parsed.owner, repo: parsed.repo, branch },
+        });
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch pull request from GitHub',
+        });
+      }
+
+      // 6. Fetch the rolled-up review decision when we have a PR.
+      //    Failures are swallowed so a GraphQL hiccup doesn't break the refresh.
+      let reviewDecision: string | null = null;
+      let reviewDecisionFetched = false;
+      if (fetched && fetched.number > 0) {
+        try {
+          reviewDecision = await fetchPullRequestReviewDecision({
+            installationId: String(installationId),
+            owner: parsed.owner,
+            repo: parsed.repo,
+            number: fetched.number,
+            appType,
+          });
+          reviewDecisionFetched = true;
+        } catch {
+          // Non-fatal: cache row is still written; existing review decision preserved.
+        }
+      }
+      const hasPrToRefresh = fetched !== null && fetched.number > 0;
+
+      // 7. Persist the result into the per-tenant cache. Even a null
+      //    (no-PR) result persists a sentinel row so the throttle in step 3
+      //    applies to subsequent refreshes for branches without a PR.
+      //
+      //    Normalize git_url on write to match the webhook path and the
+      //    queue-consumer write path. The conflict target matches whichever
+      //    partial unique index corresponds to the session's tenant column.
+      const prColumns = {
+        pr_url: fetched?.htmlUrl ?? null,
+        pr_number: fetched?.number ?? null,
+        pr_state: fetched?.state ?? null,
+        pr_title: fetched?.title ?? null,
+        pr_head_sha: fetched?.headSha ?? null,
+        pr_review_decision: reviewDecision,
+      };
+
+      // On conflict: only overwrite pr_review_decision when the fetch succeeded.
+      // A transient GraphQL failure must not erase an existing approved/changes_requested badge.
+      const prReviewDecisionConflictSet = reviewDecisionFetched
+        ? sql`excluded.pr_review_decision`
+        : github_branch_pull_requests.pr_review_decision;
+
+      const normalizedGitUrl = normalizeGitUrl(gitUrl);
+
+      const ownerValues = session.organization_id
+        ? { owned_by_organization_id: session.organization_id, owned_by_user_id: null }
+        : { owned_by_organization_id: null, owned_by_user_id: ctx.user.id };
+
+      const conflictTarget = session.organization_id
+        ? [
+            github_branch_pull_requests.git_url,
+            github_branch_pull_requests.git_branch,
+            github_branch_pull_requests.owned_by_organization_id,
+          ]
+        : [
+            github_branch_pull_requests.git_url,
+            github_branch_pull_requests.git_branch,
+            github_branch_pull_requests.owned_by_user_id,
+          ];
+
+      const conflictTargetWhere = session.organization_id
+        ? sql`${github_branch_pull_requests.owned_by_organization_id} IS NOT NULL`
+        : sql`${github_branch_pull_requests.owned_by_user_id} IS NOT NULL`;
+
+      // Only mark pending when there is a PR whose review decision we still
+      // need. Writing a sentinel (no-PR) row with pending=true would cause the
+      // batch worker to repeatedly claim it and skip it (it filters out rows
+      // without pr_number), never clearing the flag.
+      const [persisted] = await db
+        .insert(github_branch_pull_requests)
+        .values({
+          git_url: normalizedGitUrl,
+          git_branch: branch,
+          ...ownerValues,
+          ...prColumns,
+          review_decision_pending: hasPrToRefresh && !reviewDecisionFetched,
+          review_decision_fetching_at: null,
+          pr_last_synced_at: sql`now()`,
+        })
+        .onConflictDoUpdate({
+          target: conflictTarget,
+          targetWhere: conflictTargetWhere,
+          set: {
+            pr_url: sql`excluded.pr_url`,
+            pr_number: sql`excluded.pr_number`,
+            pr_state: sql`excluded.pr_state`,
+            pr_title: sql`excluded.pr_title`,
+            pr_head_sha: sql`excluded.pr_head_sha`,
+            pr_review_decision: prReviewDecisionConflictSet,
+            review_decision_pending: reviewDecisionFetched
+              ? false
+              : github_branch_pull_requests.review_decision_pending,
+            review_decision_fetching_at: reviewDecisionFetched
+              ? null
+              : github_branch_pull_requests.review_decision_fetching_at,
+            pr_last_synced_at: sql`now()`,
+            updated_at: sql`now()`,
+          },
+        })
+        .returning({
+          pr_url: github_branch_pull_requests.pr_url,
+          pr_number: github_branch_pull_requests.pr_number,
+          pr_state: github_branch_pull_requests.pr_state,
+          pr_title: github_branch_pull_requests.pr_title,
+          pr_head_sha: github_branch_pull_requests.pr_head_sha,
+          pr_last_synced_at: github_branch_pull_requests.pr_last_synced_at,
+          pr_review_decision: github_branch_pull_requests.pr_review_decision,
+          review_decision_pending: github_branch_pull_requests.review_decision_pending,
+        });
+
+      if (!persisted) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Upsert did not return a row',
+        });
+      }
+
+      return { associatedPr: formatAssociatedPr(persisted) };
     }),
 
   /**

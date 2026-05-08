@@ -348,3 +348,39 @@ test('keeps .env.local values ahead of wrangler vars for local overrides', () =>
     repo.cleanup();
   }
 });
+
+test('preserves host.docker.internal in @url defaults for useLanIp services', () => {
+  const repo = createRepo({
+    '.env.local': '',
+    [`${workerDir}/package.json`]: JSON.stringify(
+      { scripts: { dev: "wrangler dev --env 'dev'" } },
+      null,
+      2
+    ),
+    [`${workerDir}/wrangler.jsonc`]: '{ "dev": { "port": 8794 } }',
+    [`${workerDir}/.dev.vars.example`]: [
+      '# @url nextjs',
+      'KILOCODE_BACKEND_BASE_URL=http://host.docker.internal:3000',
+      '# @url cloud-agent-next',
+      'WORKER_URL=http://host.docker.internal:8794',
+      '# @url nextjs',
+      'ALLOWED_ORIGINS=http://localhost:3000',
+      '',
+    ].join('\n'),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['cloud-agent-next']));
+    assert.equal(plan.missingEnvLocal, false);
+    assert.equal(plan.devVarsChanges.length, 1);
+    const [change] = plan.devVarsChanges;
+    assert.ok(change);
+    assert.equal(change.isNew, true);
+    const content = change.newFileContent ?? '';
+    assert.ok(content.includes('KILOCODE_BACKEND_BASE_URL=http://host.docker.internal:3000'));
+    assert.ok(content.includes('WORKER_URL=http://host.docker.internal:8794'));
+    // ORIGINS keys still use localhost even when example default has host.docker.internal
+    assert.ok(content.includes('ALLOWED_ORIGINS=http://localhost:3000'));
+  } finally {
+    repo.cleanup();
+  }
+});

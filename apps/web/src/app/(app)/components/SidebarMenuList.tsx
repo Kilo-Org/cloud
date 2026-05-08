@@ -5,9 +5,11 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -18,6 +20,8 @@ type MenuItem = {
   onClick?: () => void;
   isActive?: boolean;
   suffixIcon?: React.ElementType;
+  subtitle?: string;
+  badge?: string;
   className?: string;
 };
 
@@ -60,20 +64,35 @@ export default function SidebarMenuList({
             const content = (
               <>
                 <item.icon className="h-4 w-4" />
-                <span>{item.title}</span>
+                {item.subtitle ? (
+                  <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                    <span className="truncate">{item.title}</span>
+                    <span className="text-muted-foreground truncate text-xs font-normal">
+                      {item.subtitle}
+                    </span>
+                  </span>
+                ) : (
+                  <span>{item.title}</span>
+                )}
                 {item.suffixIcon && <item.suffixIcon className="ml-auto h-4 w-4" />}
               </>
+            );
+            const buttonClassName = cn(
+              'flex items-center gap-3 transition-colors',
+              item.subtitle && 'h-12 py-2',
+              item.badge && 'pr-14',
+              item.className
             );
 
             return (
               <SidebarMenuItem key={item.title}>
                 {item.url ? (
-                  <SidebarMenuButton asChild isActive={isActive}>
-                    <Link
-                      href={item.url}
-                      prefetch={false}
-                      className={`flex items-center gap-3 transition-colors ${item.className || ''}`}
-                    >
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive}
+                    size={item.subtitle ? 'lg' : 'default'}
+                  >
+                    <Link href={item.url} prefetch={false} className={buttonClassName}>
                       {content}
                     </Link>
                   </SidebarMenuButton>
@@ -82,10 +101,16 @@ export default function SidebarMenuList({
                     type="button"
                     onClick={item.onClick}
                     isActive={isActive}
-                    className={`flex cursor-pointer items-center gap-3 transition-colors ${item.className || ''}`}
+                    size={item.subtitle ? 'lg' : 'default'}
+                    className={cn('cursor-pointer', buttonClassName)}
                   >
                     {content}
                   </SidebarMenuButton>
+                )}
+                {item.badge && (
+                  <SidebarMenuBadge className="bg-brand-primary text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-[active=true]/menu-button:text-primary-foreground right-4 !top-1/2 h-4 min-w-0 !-translate-y-1/2 rounded-full px-1.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-brand-primary/30">
+                    {item.badge}
+                  </SidebarMenuBadge>
                 )}
               </SidebarMenuItem>
             );

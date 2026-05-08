@@ -559,6 +559,52 @@ describe('admin.kiloclawInstances.destroyFlyMachine', () => {
   });
 });
 
+describe('admin.kiloclawInstances.extendVolume', () => {
+  it('rejects when instanceId belongs to a different user than the supplied userId', async () => {
+    // Regression: resolveInstance(userId, instanceId) looks up by id only —
+    // without the ownership assert, an admin passing userId=A + instanceId=B
+    // (B owned by user C) would extend C's volume while the audit log
+    // attributed it to A. Fly volumes can't shrink, so the consequence is
+    // permanent + misattributed. Mirrors the same guard on resizeMachine /
+    // set/clear admin size override.
+    const targetUser = await insertTestUser({
+      google_user_email: `extend-volume-target-${Math.random()}@example.com`,
+      is_admin: false,
+    });
+    const otherUser = await insertTestUser({
+      google_user_email: `extend-volume-other-${Math.random()}@example.com`,
+      is_admin: false,
+    });
+    const instanceId = crypto.randomUUID();
+    await db.insert(kiloclaw_instances).values({
+      id: instanceId,
+      user_id: targetUser.id,
+      sandbox_id: `ki_${instanceId.replace(/-/g, '')}`,
+    });
+
+    try {
+      const caller = await createCallerForUser(adminUser.id);
+      await expect(
+        caller.admin.kiloclawInstances.extendVolume({
+          userId: otherUser.id,
+          instanceId,
+          appName: testAppName,
+          volumeId: 'vol_test123',
+          targetSizeGb: 20,
+        })
+      ).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'Instance not found',
+      });
+
+      // The Fly extend should never have been attempted — guard runs first.
+      expect(mockGetDebugStatus).not.toHaveBeenCalled();
+    } finally {
+      await db.delete(kiloclaw_instances).where(eq(kiloclaw_instances.id, instanceId));
+    }
+  });
+});
+
 describe('admin.kiloclawInstances.startKiloCliRun', () => {
   it('rejects an instance that belongs to a different user', async () => {
     const targetUser = await insertTestUser({

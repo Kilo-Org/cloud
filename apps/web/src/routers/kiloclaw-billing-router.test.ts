@@ -308,12 +308,32 @@ async function insertPersonalSubscriptionFixture(params: PersonalSubscriptionFix
 
 async function seedDeliveredImpactSignupEvent(userId: string, email: string) {
   const { recordAffiliateAttributionAndQueueParentEvent } = await import('@/lib/affiliate-events');
+  const { recordImpactAffiliateTouch } = await import('@/lib/impact-referral');
+  const eventDate = new Date('2026-04-09T10:00:00.000Z');
+
   const parentEvent = await recordAffiliateAttributionAndQueueParentEvent({
     userId,
     provider: 'impact',
     trackingId: 'impact-click-123',
     customerEmail: email,
-    eventDate: new Date('2026-04-09T10:00:00.000Z'),
+    eventDate,
+  });
+
+  await recordImpactAffiliateTouch({
+    userId,
+    touch: {
+      trackingId: 'impact-click-123',
+      trackingValueLength: 'impact-click-123'.length,
+      isTrackingValueAccepted: true,
+      landingPath: '/pricing?im_ref=impact-click-123',
+      utmSource: null,
+      utmMedium: null,
+      utmCampaign: null,
+      utmTerm: null,
+      utmContent: null,
+      touchedAt: eventDate,
+      expiresAt: new Date('2026-05-09T10:00:00.000Z'),
+    },
   });
 
   expect(parentEvent).not.toBeNull();

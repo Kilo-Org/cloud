@@ -79,10 +79,35 @@ jest.mock(
   { virtual: true }
 );
 
+function getMockLinearAdapter() {
+  return {
+    name: 'linear',
+    botUserId: 'bot-linear',
+    deleteInstallation: jest.fn(),
+    getInstallation: jest.fn(),
+    getUser: jest.fn(),
+    handleOAuthCallback: jest.fn(),
+    handleWebhook: jest.fn(),
+    withInstallation: jest.fn(),
+  };
+}
+
+jest.mock(
+  '@chat-adapter/linear',
+  () => ({
+    createLinearAdapter: jest.fn(() => getMockLinearAdapter()),
+    LinearAdapter: class LinearAdapter {},
+  }),
+  { virtual: true }
+);
+
 jest.mock('@/lib/config.server', () => ({
   SLACK_CLIENT_ID: 'slack-client-id',
   SLACK_CLIENT_SECRET: 'slack-client-secret',
   SLACK_SIGNING_SECRET: 'slack-signing-secret',
+  LINEAR_CLIENT_ID: 'linear-client-id',
+  LINEAR_CLIENT_SECRET: 'linear-client-secret',
+  LINEAR_WEBHOOK_SECRET: 'linear-webhook-secret',
 }));
 
 jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
@@ -115,6 +140,10 @@ jest.mock('@/lib/bot/platforms', () => ({
 
 jest.mock('@/lib/bot/platforms/slack-webhook', () => ({
   createSlackWebhookHandler: jest.fn(() => async () => new Response('ok')),
+}));
+
+jest.mock('@/lib/bot/platforms/linear-webhook', () => ({
+  createLinearWebhookHandler: jest.fn(() => async () => new Response('ok')),
 }));
 
 jest.mock('@/lib/user', () => ({

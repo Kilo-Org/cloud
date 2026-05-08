@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { Loader2, TriangleAlert, X } from 'lucide-react';
@@ -18,13 +18,14 @@ import { useOnboardingSaves } from '../hooks/useOnboardingSaves';
 import { useGatewayUrl } from '../hooks/useGatewayUrl';
 import { BillingWrapper } from './billing/BillingWrapper';
 import { BotIdentityStep } from './BotIdentityStep';
+import { CalendarConnectStepView } from './CalendarConnectStep';
 import { ChannelPairingStep } from './ChannelPairingStep';
 import { ChannelSelectionStepView } from './ChannelSelectionStep';
 import { ClawContextProvider, useClawContext } from './ClawContext';
 import { ClawConfigServiceBanner } from './ClawConfigServiceBanner';
 import { ClawHeader } from './ClawHeader';
 import { ProvisioningStep, ProvisioningStepView } from './ProvisioningStep';
-import { DEFAULT_ONBOARDING_EXEC_PRESET } from './claw.types';
+import { DEFAULT_BOT_IDENTITY, DEFAULT_ONBOARDING_EXEC_PRESET } from './claw.types';
 import type { BotIdentity, ExecPreset } from './claw.types';
 import {
   getClawOnboardingFlowState,
@@ -115,7 +116,16 @@ function ClawOnboardingFlowInner({
 
   const gatewayUrl = useGatewayUrl(status);
 
-  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>('identity');
+  // Lazy-init onboardingStep from `?step=` in the URL so first render already
+  // reflects a calendar resume. Without this the state machine would resolve
+  // to 'complete' (post-provisioning + ready) on first render and the auto-
+  // redirect to /chat would fire before the resume effect's setOnboardingStep
+  // could take effect, skipping the calendar success/error feedback entirely.
+  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(() => {
+    if (typeof window === 'undefined') return 'identity';
+    const initialStep = new URLSearchParams(window.location.search).get('step');
+    return initialStep === 'calendar' ? 'calendar' : 'identity';
+  });
   const selectedPreset: ExecPreset = DEFAULT_ONBOARDING_EXEC_PRESET;
   const [botIdentity, setBotIdentity] = useState<BotIdentity | null>(null);
   const [channelTokens, setChannelTokens] = useState<Record<string, string> | null>(null);
@@ -123,6 +133,7 @@ function ClawOnboardingFlowInner({
   const [localCreateSetupStarted, setLocalCreateSetupStarted] = useState(false);
   const [onboardingSaveSession, setOnboardingSaveSession] = useState(0);
   const hasCapturedIdentityView = useRef(false);
+  const hasCapturedCalendarView = useRef(false);
   const hasCapturedDoneView = useRef(false);
   const createSetupStarted = createFlowStarted || localCreateSetupStarted;
 
@@ -159,6 +170,8 @@ function ClawOnboardingFlowInner({
   useFeatureFlagVariantKey('button-vs-card');
   const posthog = usePostHog();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // Save bot identity, exec preset, and channel tokens as soon as the instance
   // row exists. This closes the tab-close window where customizations entered
@@ -180,6 +193,16 @@ function ClawOnboardingFlowInner({
     hasCapturedIdentityView.current = true;
     posthog?.capture('claw_page_viewed');
     posthog?.capture('claw_setup_identity_viewed');
+  }, [flowState.renderStep, posthog]);
+
+  // Fire `claw_setup_calendar_viewed` when the calendar step actually
+  // renders, matching the "viewed = rendered" semantic of identity above
+  // (and unlike the older advance-fire pattern still used by channels and
+  // provisioning). Ref guard so re-renders inside the step don't re-fire.
+  useEffect(() => {
+    if (flowState.renderStep !== 'calendar' || hasCapturedCalendarView.current) return;
+    hasCapturedCalendarView.current = true;
+    posthog?.capture('claw_setup_calendar_viewed');
   }, [flowState.renderStep, posthog]);
 
   useEffect(() => {
@@ -216,6 +239,99 @@ function ClawOnboardingFlowInner({
   }, [onCreateFlowFailed, resetWizardSelections]);
 
   const basePath = organizationId ? `/organizations/${organizationId}/claw` : '/claw';
+
+  // Hydrate local bot-identity state from the persisted instance status when
+  // the page reloads mid-onboarding (e.g. after the OAuth round-trip on the
+  // calendar step). useOnboardingSaves writes the user's identity selections
+  // to the backend; without this, a remount would force the user back to the
+  // identity step even though their picks were already saved.
+  useEffect(() => {
+    if (botIdentity !== null) return;
+    const persisted = flowState.instanceStatus;
+    if (!persisted?.botName) return;
+    setBotIdentity({
+      botName: persisted.botName,
+      botNature: persisted.botNature ?? DEFAULT_BOT_IDENTITY.botNature,
+      botVibe: persisted.botVibe ?? DEFAULT_BOT_IDENTITY.botVibe,
+      botEmoji: persisted.botEmoji ?? DEFAULT_BOT_IDENTITY.botEmoji,
+    });
+  }, [flowState.instanceStatus, botIdentity]);
+
+  // Resume the wizard at a specific step when returning from a flow that
+  // leaves the page (e.g. the Google OAuth round-trip on the calendar step
+  // posts the user back to /claw/new?step=calendar). The effect only acts
+  // when stepParam === 'calendar' — otherwise stale `?error=` or `?success=`
+  // params from elsewhere would fire calendar-specific toasts on the wrong
+  // screen. Also waits until botIdentity has been hydrated before consuming
+  // `step`, otherwise the state machine would override us with identity.
+  const hasResumedFromQuery = useRef(false);
+
+  // Allowlist of known OAuth error codes that the callback route can emit.
+  // Anything else from `?error=` is bucketed as 'unknown' before going to
+  // PostHog so an attacker can't pollute analytics with arbitrary strings.
+  const KNOWN_OAUTH_ERROR_CODES = [
+    'access_denied',
+    'oauth_error',
+    'missing_code',
+    'missing_instance',
+    'connection_failed',
+    'invalid_state',
+    'unauthorized',
+  ];
+  const cleanupResumeQueryParams = useCallback(() => {
+    const next = new URLSearchParams(searchParams?.toString() ?? '');
+    next.delete('step');
+    next.delete('success');
+    next.delete('error');
+    const nextSearch = next.toString();
+    router.replace(nextSearch ? `${pathname}?${nextSearch}` : (pathname ?? '/claw/new'));
+  }, [pathname, router, searchParams]);
+
+  useEffect(() => {
+    if (hasResumedFromQuery.current) return;
+    const stepParam = searchParams?.get('step');
+    if (stepParam !== 'calendar') return;
+    if (botIdentity === null) return;
+    const successParam = searchParams?.get('success');
+    const errorParamRaw = searchParams?.get('error');
+    const errorReason = errorParamRaw
+      ? KNOWN_OAUTH_ERROR_CODES.includes(errorParamRaw)
+        ? errorParamRaw
+        : 'unknown'
+      : null;
+    hasResumedFromQuery.current = true;
+    setOnboardingStep('calendar');
+    posthog?.capture('claw_setup_calendar_resumed', {
+      outcome:
+        successParam === 'google_connected' ? 'connected' : errorParamRaw ? 'error' : 'unknown',
+    });
+    if (successParam === 'google_connected') {
+      posthog?.capture('claw_setup_calendar_oauth_completed');
+      toast.success('Calendar connected');
+    } else if (errorParamRaw) {
+      posthog?.capture('claw_setup_calendar_oauth_failed', { reason: errorReason });
+      toast.error('Could not connect calendar — please try again or skip for now.');
+    }
+    cleanupResumeQueryParams();
+  }, [searchParams, botIdentity, posthog, cleanupResumeQueryParams]);
+
+  // Watchdog: if `?step=calendar` is in the URL but botIdentity hydration
+  // never completes (e.g. patchBotIdentity hadn't propagated to the DB
+  // before the OAuth round-trip), don't silently strand the user on the
+  // identity step with stale params lingering in the URL. After a short
+  // grace period, clean the URL and surface a soft warning.
+  useEffect(() => {
+    if (hasResumedFromQuery.current) return;
+    if (searchParams?.get('step') !== 'calendar') return;
+    const timeoutId = window.setTimeout(() => {
+      if (hasResumedFromQuery.current) return;
+      if (botIdentity !== null) return;
+      hasResumedFromQuery.current = true;
+      toast.error("Couldn't restore your onboarding progress — continuing from here.");
+      cleanupResumeQueryParams();
+    }, 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchParams, botIdentity, cleanupResumeQueryParams]);
 
   // NOTE: When mode === 'post-provisioning' (i.e. an existing instance is
   // already running) and the gateway is ready, renderStep is 'complete' on
@@ -295,9 +411,46 @@ function ClawOnboardingFlowInner({
             preset: DEFAULT_ONBOARDING_EXEC_PRESET,
             defaulted: true,
           });
-          posthog?.capture('claw_setup_channels_viewed');
           setBotIdentity(identity);
-          setOnboardingStep('channels');
+          setOnboardingStep('calendar');
+        }}
+      />
+    );
+  }
+
+  function renderCalendarStep() {
+    const returnTo = `${basePath}/new?step=calendar`;
+    const connectParams = new URLSearchParams({ returnTo });
+    if (organizationId) {
+      connectParams.set('organizationId', organizationId);
+    }
+    const connectUrl = `/api/integrations/google/connect?${connectParams.toString()}`;
+    const isConnected = Boolean(flowState.instanceStatus?.googleOAuthConnected);
+    const connectedEmail = flowState.instanceStatus?.googleOAuthAccountEmail ?? null;
+
+    function advanceToChannels() {
+      posthog?.capture('claw_setup_channels_viewed');
+      setOnboardingStep('channels');
+    }
+
+    return (
+      <CalendarConnectStepView
+        currentStep={flowState.currentStep}
+        totalSteps={flowState.totalSteps}
+        connectUrl={connectUrl}
+        isConnected={isConnected}
+        connectedAccountEmail={connectedEmail}
+        readyToConnect={flowState.instanceStatus !== null && onboardingSaves.ready}
+        onConnectClick={() => {
+          posthog?.capture('claw_setup_calendar_connect_clicked', { skipped: false });
+        }}
+        onSkip={() => {
+          posthog?.capture('claw_setup_calendar_completed', { connected: false, skipped: true });
+          advanceToChannels();
+        }}
+        onContinue={() => {
+          posthog?.capture('claw_setup_calendar_completed', { connected: true, skipped: false });
+          advanceToChannels();
         }}
       />
     );
@@ -334,7 +487,14 @@ function ClawOnboardingFlowInner({
   }
 
   function renderProvisioningStep() {
-    if (mode === 'post-provisioning')
+    // Static ProvisioningStepView is only for the original post-provisioning
+    // case (returning user lands on /claw/new with an active instance — the
+    // state machine flips to 'complete' separately and PR-1's auto-redirect
+    // takes over). When a wizard resume after an OAuth round-trip reaches
+    // the provisioning step explicitly (onboardingStep === 'provisioning'),
+    // use the full ProvisioningStep so its onComplete fires and the user
+    // actually advances to pairing/done instead of getting stuck.
+    if (mode === 'post-provisioning' && onboardingStep !== 'provisioning')
       return (
         <ProvisioningStepView
           currentStep={flowState.currentStep}
@@ -402,6 +562,8 @@ function ClawOnboardingFlowInner({
     switch (renderStep) {
       case 'identity':
         return renderIdentityStep();
+      case 'calendar':
+        return renderCalendarStep();
       case 'channels':
         return renderChannelsStep();
       case 'provisioning':

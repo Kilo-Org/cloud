@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { send as sendEmail } from '@/lib/email';
 import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
 import { enqueueAffiliateEventForUser } from '@/lib/affiliate-events';
+import { processPersonalKiloClawPaidConversion } from '@/lib/kiloclaw-referrals';
 
 jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
@@ -35,6 +36,10 @@ jest.mock('@/lib/affiliate-events', () => ({
   enqueueAffiliateEventForUser: jest.fn(),
 }));
 
+jest.mock('@/lib/kiloclaw-referrals', () => ({
+  processPersonalKiloClawPaidConversion: jest.fn(),
+}));
+
 jest.mock('@/lib/kiloclaw/credit-billing', () => ({
   projectPendingKiloPassBonusMicrodollars: jest.fn(),
 }));
@@ -48,6 +53,9 @@ import { POST } from './route';
 const mockSendEmail = jest.mocked(sendEmail);
 const mockMaybePerformAutoTopUp = jest.mocked(maybePerformAutoTopUp);
 const mockEnqueueAffiliateEventForUser = jest.mocked(enqueueAffiliateEventForUser);
+const mockProcessPersonalKiloClawPaidConversion = jest.mocked(
+  processPersonalKiloClawPaidConversion
+);
 
 type ConsoleSpy = jest.SpiedFunction<typeof console.log> | jest.SpiedFunction<typeof console.error>;
 
@@ -82,6 +90,12 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
 
     mockSendEmail.mockResolvedValue({ sent: true });
     mockMaybePerformAutoTopUp.mockResolvedValue(undefined);
+    mockProcessPersonalKiloClawPaidConversion.mockResolvedValue({
+      shouldEnqueueAffiliateSale: true,
+      winningTouchType: 'affiliate',
+      conversionId: 'conversion_123',
+      disqualificationReason: null,
+    });
   });
 
   it('logs started and completed side effects with billing correlation and no email recipient', async () => {
@@ -223,6 +237,99 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
       itemName: 'KiloClaw Standard Plan',
       itemSku: 'price_standard',
       promoCode: undefined,
+    });
+  });
+
+  it('processes paid conversions without enqueueing affiliate sales when referrals win attribution', async () => {
+    mockProcessPersonalKiloClawPaidConversion.mockResolvedValueOnce({
+      shouldEnqueueAffiliateSale: false,
+      winningTouchType: 'referral',
+      conversionId: 'conversion_impact',
+      disqualificationReason: null,
+    });
+
+    const response = await POST(
+      createRequest({
+        action: 'process_paid_conversion',
+        input: {
+          userId: 'user-123',
+          dedupeKey: 'affiliate:impact:sale:period-123',
+          eventDateIso: '2026-04-09T10:00:00.000Z',
+          orderId: 'period-123',
+          amount: 9,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-standard',
+          itemName: 'KiloClaw Standard Plan',
+          itemSku: 'price_standard',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockProcessPersonalKiloClawPaidConversion).toHaveBeenCalledWith({
+      userId: 'user-123',
+      sourcePaymentId: 'period-123',
+      orderId: 'period-123',
+      amount: 9,
+      currencyCode: 'usd',
+      itemCategory: 'kiloclaw-standard',
+      itemName: 'KiloClaw Standard Plan',
+      itemSku: 'price_standard',
+      convertedAt: new Date('2026-04-09T10:00:00.000Z'),
+    });
+    expect(mockEnqueueAffiliateEventForUser).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({
+      affiliateSaleEnqueued: false,
+      winningTouchType: 'referral',
+      conversionId: 'conversion_impact',
+      disqualificationReason: null,
+    });
+  });
+
+  it('enqueues affiliate sales when paid conversion attribution returns an affiliate winner', async () => {
+    mockProcessPersonalKiloClawPaidConversion.mockResolvedValueOnce({
+      shouldEnqueueAffiliateSale: true,
+      winningTouchType: 'affiliate',
+      conversionId: 'conversion_affiliate',
+      disqualificationReason: 'referral_affiliate_won',
+    });
+
+    const response = await POST(
+      createRequest({
+        action: 'process_paid_conversion',
+        input: {
+          userId: 'user-123',
+          dedupeKey: 'affiliate:impact:sale:period-123',
+          eventDateIso: '2026-04-09T10:00:00.000Z',
+          orderId: 'period-123',
+          amount: 9,
+          currencyCode: 'usd',
+          itemCategory: 'kiloclaw-standard',
+          itemName: 'KiloClaw Standard Plan',
+          itemSku: 'price_standard',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockEnqueueAffiliateEventForUser).toHaveBeenCalledWith({
+      userId: 'user-123',
+      provider: 'impact',
+      eventType: 'sale',
+      dedupeKey: 'affiliate:impact:sale:period-123',
+      eventDate: new Date('2026-04-09T10:00:00.000Z'),
+      orderId: 'period-123',
+      amount: 9,
+      currencyCode: 'usd',
+      itemCategory: 'kiloclaw-standard',
+      itemName: 'KiloClaw Standard Plan',
+      itemSku: 'price_standard',
+    });
+    await expect(response.json()).resolves.toEqual({
+      affiliateSaleEnqueued: true,
+      winningTouchType: 'affiliate',
+      conversionId: 'conversion_affiliate',
+      disqualificationReason: 'referral_affiliate_won',
     });
   });
 });

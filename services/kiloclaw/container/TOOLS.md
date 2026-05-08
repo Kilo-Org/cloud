@@ -3,7 +3,6 @@
 - OS: Debian Bookworm (slim)
 - `go` and `apt` are present and available
 - Volume mounted at /root, backed up by snapshots — prefer to install there
-- The openclaw process is managed by a supervisor process
 - Do not modify /root/.kilo
 
 ## Security Check Context
@@ -36,3 +35,14 @@ The Kilo CLI (`kilo`) is an agentic coding assistant for the terminal, pre-confi
 3. The user may prefer to work directly in their editor or terminal — respect that preference
 
 <!-- END:kilo-cli -->
+
+<!-- BEGIN:process-model -->
+
+## Process Model
+
+KiloClaw does NOT use systemd. Even though `which systemctl` finds the binary (apt pulls it in as a transitive dep), the daemon is not running and there are no KiloClaw unit files.
+
+- Do not suggest `systemctl`, `journalctl`, `service ...`, unit files, or any init-based remediation — none of it will work.
+- `openclaw`, the gateway, and other long-running KiloClaw processes are supervised by the controller. To inspect or restart them, use the controller's APIs and logs, not init.
+
+<!-- END:process-model -->

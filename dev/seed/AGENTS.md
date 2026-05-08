@@ -11,6 +11,7 @@ dev/seed/
     preflight.ts           Import FIRST; mutates process.env from argv.
     db.ts                  Lazy drizzle client.
     stripe.ts              Lazy Stripe test-mode client/customer helpers.
+    kiloclaw-referrals.ts  KiloClaw referral fixtures/helpers.
   <scope>/<topic>.ts       Topic module. Scope = folder; topic = filename.
 ```
 
@@ -40,7 +41,7 @@ Topic files MUST:
   - `type SeedResult = Record<string, string | number | boolean | null>`: flat JSON primitives only; no nested objects; stringify Dates.
   - Return every id/email/handle/balance needed by follow-up commands; the runner formats all output from this object.
 - Support `--help`/`-h` via local `printUsage()` and early return.
-- Reset only their own data at start for idempotent reruns. Delete by stable ids/emails, stable sandbox prefixes, or `dev-seed:` category prefixes.
+- Reset only their own data at start for idempotent reruns. Referral seeds use `cleanupKiloClawReferralSeedScenario`; ad-hoc topics delete by stable ids/emails, stable sandbox prefixes, or `dev-seed:` category prefixes.
 - Avoid module-level side effects (DB writes/network); no-args listing imports modules.
 
 Topic files SHOULD:
@@ -64,6 +65,7 @@ Topic files MUST NOT:
 - `deleteSeedStripeCustomer(id)`: rollback helper; swallows "no such customer".
 - `lib/stripe.ts` rejects missing/non-`sk_test_...` `STRIPE_SECRET_KEY`.
 - For seeded users used by Stripe-touching app code (`/profile`, billing pages, KiloClaw subscriptions), create a real Stripe customer. Never use `cus_seed_...`: it causes `StripeInvalidRequestError: No such customer` 400s. Order matches `createUserOnSignIn`: create Stripe customer, insert DB row, delete Stripe customer in `catch` on insert failure.
+- `lib/kiloclaw-referrals.ts`: deterministic id/email/payment-id factories (`seedUserId`, `seedEmail`, `seedOpaqueReferralIdentifier`, ...), `cleanupKiloClawReferralSeedScenario`, and `insertSeedUsers`. Use for new referral scenarios so cleanup stays consistent.
 
 ## Direct user inserts
 

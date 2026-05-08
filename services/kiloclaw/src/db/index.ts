@@ -115,6 +115,7 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
       user_id: kiloclaw_instances.user_id,
       organization_id: kiloclaw_instances.organization_id,
       provider: kiloclaw_instances.provider,
+      instance_type: kiloclaw_instances.instance_type,
     })
     .from(kiloclaw_instances)
     .where(
@@ -130,6 +131,7 @@ export async function getInstanceBySandboxId(db: WorkerDb, sandboxId: string) {
     userId: row.user_id,
     orgId: row.organization_id,
     provider: row.provider,
+    instanceType: row.instance_type,
   };
 }
 
@@ -158,6 +160,7 @@ export async function getInstanceByIdIncludingDestroyed(
       organization_id: kiloclaw_instances.organization_id,
       inbound_email_enabled: kiloclaw_instances.inbound_email_enabled,
       provider: kiloclaw_instances.provider,
+      instance_type: kiloclaw_instances.instance_type,
     })
     .from(kiloclaw_instances)
     .where(where)
@@ -172,6 +175,7 @@ export async function getInstanceByIdIncludingDestroyed(
     orgId: row.organization_id,
     inboundEmailEnabled: row.inbound_email_enabled,
     provider: row.provider,
+    instanceType: row.instance_type,
   };
 }
 
@@ -225,6 +229,62 @@ export async function syncTrackedImageTag(
         eq(kiloclaw_instances.sandbox_id, sandboxId),
         isNull(kiloclaw_instances.destroyed_at),
         sql`${kiloclaw_instances.tracked_image_tag} IS DISTINCT FROM ${trackedImageTag}`
+      )
+    );
+}
+
+export async function syncInstanceType(
+  db: WorkerDb,
+  userId: string,
+  sandboxId: string,
+  instanceType: string | null
+) {
+  await db
+    .update(kiloclaw_instances)
+    .set({ instance_type: instanceType })
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.destroyed_at),
+        sql`${kiloclaw_instances.instance_type} IS DISTINCT FROM ${instanceType}`
+      )
+    );
+}
+
+/**
+ * Sync `admin_size_override` from DO state. Pass `null` to clear, or the
+ * full payload (override size + metadata) to set. Conditional UPDATE — the
+ * SQL `IS DISTINCT FROM` guards against churning rows when nothing changed.
+ *
+ * Called from the DO RPC paths that explicitly mutate the override
+ * (`setAdminMachineSizeOverride` / `clearAdminMachineSizeOverride`) and as
+ * part of tier resize when the override is auto-cleared. NOT called from
+ * the alarm tick — there's no "observed override" to derive.
+ */
+export type AdminSizeOverridePayload = {
+  size: { cpus: number; memory_mb: number; cpu_kind?: 'shared' | 'performance' };
+  reason: string;
+  actorId: string;
+  actorEmail: string;
+  setAt: number;
+};
+
+export async function syncAdminSizeOverride(
+  db: WorkerDb,
+  userId: string,
+  sandboxId: string,
+  payload: AdminSizeOverridePayload | null
+) {
+  await db
+    .update(kiloclaw_instances)
+    .set({ admin_size_override: payload })
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, userId),
+        eq(kiloclaw_instances.sandbox_id, sandboxId),
+        isNull(kiloclaw_instances.destroyed_at),
+        sql`${kiloclaw_instances.admin_size_override} IS DISTINCT FROM ${payload}::jsonb`
       )
     );
 }

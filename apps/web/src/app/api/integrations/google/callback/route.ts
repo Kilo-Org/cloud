@@ -14,19 +14,38 @@ import {
 import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
+/**
+ * Build the post-OAuth redirect path. The query-string fragment is appended
+ * verbatim — callers MUST pass an already-URL-safe `key=value` string. Static
+ * literals (e.g. `'error=missing_code'`) are safe; dynamic values must come
+ * from `sanitizeOAuthProviderError` (which encodes) or be similarly
+ * pre-encoded. For raw key/value pairs use `appendQueryParam` instead.
+ */
 function buildGoogleRedirectPath(
-  owner: VerifiedGoogleOAuthState['owner'] | null | undefined,
-  queryParam: string
+  state: { owner: VerifiedGoogleOAuthState['owner']; returnTo?: string } | null | undefined,
+  preEncodedQueryFragment: string
 ): string {
+  if (state?.returnTo) {
+    const separator = state.returnTo.includes('?') ? '&' : '?';
+    return `${state.returnTo}${separator}${preEncodedQueryFragment}`;
+  }
+
+  const owner = state?.owner;
   if (owner?.type === 'org') {
-    return `/organizations/${owner.id}/claw/settings?${queryParam}`;
+    return `/organizations/${owner.id}/claw/settings?${preEncodedQueryFragment}`;
   }
 
-  if (owner?.type === 'user') {
-    return `/claw/settings?${queryParam}`;
-  }
+  return `/claw/settings?${preEncodedQueryFragment}`;
+}
 
-  return `/claw/settings?${queryParam}`;
+/**
+ * Append a key=value query param to the given path, URL-encoding both. Use
+ * this when the value is raw / unencoded. For pre-encoded `key=value`
+ * fragments, use `buildGoogleRedirectPath` instead.
+ */
+function appendQueryParam(path: string, key: string, value: string): string {
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
 }
 
 function sanitizeOAuthProviderError(
@@ -127,7 +146,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(verifiedState.owner, `error=${oauthErrorCode}`), APP_URL)
+        new URL(buildGoogleRedirectPath(verifiedState, `error=${oauthErrorCode}`), APP_URL)
       );
     }
 
@@ -140,7 +159,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(verifiedState.owner, 'error=missing_code'), APP_URL)
+        new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_code'), APP_URL)
       );
     }
 
@@ -157,7 +176,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.redirect(
-        new URL(buildGoogleRedirectPath(verifiedState.owner, 'error=missing_instance'), APP_URL)
+        new URL(buildGoogleRedirectPath(verifiedState, 'error=missing_instance'), APP_URL)
       );
     }
 
@@ -211,8 +230,9 @@ export async function GET(request: NextRequest) {
       verifiedState.instanceId
     );
 
-    const successPath =
-      verifiedState.owner.type === 'org'
+    const successPath = verifiedState.returnTo
+      ? appendQueryParam(verifiedState.returnTo, 'success', 'google_connected')
+      : verifiedState.owner.type === 'org'
         ? `/organizations/${verifiedState.owner.id}/claw/settings?success=google_connected`
         : '/claw/settings?success=google_connected';
 
@@ -232,7 +252,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(
       new URL(
-        buildGoogleRedirectPath(verifyGoogleOAuthState(state)?.owner, 'error=connection_failed'),
+        buildGoogleRedirectPath(verifyGoogleOAuthState(state), 'error=connection_failed'),
         APP_URL
       )
     );

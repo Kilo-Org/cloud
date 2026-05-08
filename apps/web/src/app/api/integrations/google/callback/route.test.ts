@@ -116,6 +116,42 @@ describe('GET /api/integrations/google/callback', () => {
     expectRedirectLocation(response, '/users/sign_in');
   });
 
+  test('redirects personal success flow to returnTo when state carries one', async () => {
+    mockedVerifyGoogleOAuthState.mockReturnValue({
+      owner: { type: 'user', id: USER_ID },
+      userId: USER_ID,
+      instanceId: INSTANCE_ID,
+      capabilities: ['calendar_read'],
+      returnTo: '/claw/new?step=calendar',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/callback?code=abc&state=signed') as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/claw/new?step=calendar&success=google_connected');
+  });
+
+  test('redirects personal error flow to returnTo when state carries one', async () => {
+    mockedVerifyGoogleOAuthState.mockReturnValue({
+      owner: { type: 'user', id: USER_ID },
+      userId: USER_ID,
+      instanceId: INSTANCE_ID,
+      capabilities: ['calendar_read'],
+      returnTo: '/claw/new?step=calendar',
+    });
+
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/google/callback?error=access_denied&state=signed') as never
+    );
+
+    expect(response.status).toBe(307);
+    expectRedirectLocation(response, '/claw/new?step=calendar&error=access_denied');
+  });
+
   test('redirects personal success flow to personal claw settings', async () => {
     const { GET } = await import('./route');
     const response = await GET(

@@ -74,6 +74,20 @@ export async function postMessageAsUser(
     };
   }
 
+  // Known concurrency limitation: the find-then-create sequence is not
+  // atomic across the user's MembershipDO and the new ConversationDO. If
+  // two RPC calls for the same (userId, sandboxId) arrive before any
+  // conversation exists, both can observe `existingConversationId === null`
+  // and both can call createConversationFor, producing two parallel
+  // conversations. Subsequent deliveries route into whichever the
+  // listConversations({ limit: 1 }) query returns first, which can flap.
+  // The proper fix is to push find-or-claim into the user's MembershipDO
+  // (single-threaded execution gives atomicity) and have the caller
+  // initialize the ConversationDO with the pre-claimed id. Skipped here
+  // because real-world concurrent first-deliveries per (user, bot) are
+  // rare: webhook triggers fire serially per trigger, and a user with
+  // multiple triggers pointing at the same bot would only race on the very
+  // first delivery across all of them.
   const existingConversationId = await findUserBotConversation(env, userId, sandboxId);
 
   let conversationId: string;

@@ -7,6 +7,7 @@ import { getTokenMintingService } from './services/token-minting-service.js';
 import { classifyInitiateResponse } from './initiate-response';
 import { findActiveSandboxIdForInstance, getWorkerDb } from './db/queries';
 import { getKiloChat } from './kilo-chat-binding';
+import type { PostMessageAsUserResult } from '@kilocode/kilo-chat';
 import { z } from 'zod';
 
 // Token cache TTL: 30 minutes. Token validity is 1 hour, so 30 min gives safety margin.
@@ -100,7 +101,7 @@ async function getOrMintToken(
  * auto-creates the conversation on first delivery so triggers work even
  * before the user opens chat for the first time.
  */
-async function processKiloclawChatMessage(
+export async function processKiloclawChatMessage(
   stub: DurableObjectStub<TriggerDO>,
   webhook: WebhookDeliveryMessage,
   request: {
@@ -196,7 +197,7 @@ async function processKiloclawChatMessage(
   // an exception inside postMessageAsUser) would otherwise leave the
   // request stuck. The inner if-block handles `{ ok: false }`; the
   // try/catch handles thrown errors.
-  let result;
+  let result: PostMessageAsUserResult;
   try {
     result = await getKiloChat(env).postMessageAsUser({
       userId,

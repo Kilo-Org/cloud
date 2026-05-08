@@ -2,6 +2,7 @@ type KiloPassSubscriptionCardSubscription = {
   cancelAtPeriodEnd: boolean;
   currentPeriodBaseCreditsUsd: number;
   paymentProvider: 'stripe' | 'app_store' | 'google_play';
+  refillAt: string | null;
 };
 
 type KiloPassSubscriptionCardState = {
@@ -10,6 +11,23 @@ type KiloPassSubscriptionCardState = {
   description: string;
   title: string;
 };
+
+function formatSubscriptionEndDate(iso: string | null): string {
+  if (!iso) {
+    return 'period end';
+  }
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return 'period end';
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 export function getKiloPassSubscriptionCardState(
   subscription: KiloPassSubscriptionCardSubscription | null | undefined
@@ -29,7 +47,7 @@ export function getKiloPassSubscriptionCardState(
       action:
         subscription.paymentProvider === 'stripe' ? 'open-web-management' : 'open-store-management',
       actionLabel: 'Manage',
-      description: `${credits} · Ends at period end`,
+      description: `${credits} · Ends ${formatSubscriptionEndDate(subscription.refillAt)}`,
       title: 'Kilo Pass canceling',
     };
   }

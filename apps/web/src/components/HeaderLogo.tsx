@@ -61,7 +61,7 @@ export default function HeaderLogo({ className, href }: HeaderLogoProps) {
           </motion.div>
         </AnimatePresence>
       </motion.div>
-      <span className="text-3xl font-bold whitespace-nowrap">Kilo</span>
+      <span className="font-jetbrains text-3xl font-bold whitespace-nowrap">Kilo</span>
     </>
   );
 
@@ -90,7 +90,9 @@ export default function HeaderLogo({ className, href }: HeaderLogoProps) {
           {logoContent}
         </Link>
       ) : (
-        <div className="flex w-56 items-center gap-4 self-start pr-4">{logoContent}</div>
+        <div className={cn('flex w-56 items-center gap-4 self-start pr-4', className)}>
+          {logoContent}
+        </div>
       )}
     </motion.div>
   );

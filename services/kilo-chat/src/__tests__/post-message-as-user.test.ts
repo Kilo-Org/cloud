@@ -132,6 +132,43 @@ describe('postMessageAsUser', () => {
     expect(result.code).toBe('forbidden');
   });
 
+  it('rejects empty messages with invalid_request before any side effects', async () => {
+    const userId = `user-${crypto.randomUUID()}`;
+    const sandboxId = `sandbox-${crypto.randomUUID()}`;
+    grantSandbox(userId, sandboxId);
+
+    const result = await runPost(makeEnv(), {
+      userId,
+      sandboxId,
+      message: '   ',
+      source: 'webhook',
+      autoCreateConversation: true,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid_request');
+  });
+
+  it('rejects messages exceeding the chat content limit with invalid_request', async () => {
+    const userId = `user-${crypto.randomUUID()}`;
+    const sandboxId = `sandbox-${crypto.randomUUID()}`;
+    grantSandbox(userId, sandboxId);
+
+    const result = await runPost(makeEnv(), {
+      userId,
+      sandboxId,
+      // Larger than MESSAGE_TEXT_MAX_CHARS (8000) so the public schema rejects it.
+      message: 'x'.repeat(9000),
+      source: 'webhook',
+      autoCreateConversation: true,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe('invalid_request');
+  });
+
   it('accepts correlation metadata without throwing', async () => {
     const userId = `user-${crypto.randomUUID()}`;
     const sandboxId = `sandbox-${crypto.randomUUID()}`;

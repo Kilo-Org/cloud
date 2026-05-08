@@ -33,7 +33,7 @@ export type PostMessageAsUserResult =
     }
   | {
       ok: false;
-      code: 'no_conversation' | 'forbidden' | 'internal';
+      code: 'invalid_request' | 'no_conversation' | 'forbidden' | 'internal';
       error: string;
     };
 

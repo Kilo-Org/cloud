@@ -188,17 +188,35 @@ async function processKiloclawChatMessage(
     'updateRequest'
   );
 
-  const result = await getKiloChat(env).postMessageAsUser({
-    userId,
-    sandboxId,
-    message: renderedPrompt,
-    source: 'webhook',
-    autoCreateConversation: true,
-    correlation: {
-      triggerId: webhook.triggerId,
-      webhookRequestId: webhook.requestId,
-    },
-  });
+  // The request is now `inprogress` in the DO. Any path out of this
+  // function from here on must either flip it to `success` or `failed`,
+  // because the outer guard in processWebhookMessage skips inprogress
+  // requests on retry. A thrown RPC error (e.g. service-binding outage,
+  // an exception inside postMessageAsUser) would otherwise leave the
+  // request stuck. The inner if-block handles `{ ok: false }`; the
+  // try/catch handles thrown errors.
+  let result;
+  try {
+    result = await getKiloChat(env).postMessageAsUser({
+      userId,
+      sandboxId,
+      message: renderedPrompt,
+      source: 'webhook',
+      autoCreateConversation: true,
+      correlation: {
+        triggerId: webhook.triggerId,
+        webhookRequestId: webhook.requestId,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('KiloClaw Chat message delivery threw', {
+      requestId: webhook.requestId,
+      error: errorMessage,
+    });
+    await failRequest(stub, webhook.requestId, `KiloClaw Chat delivery failed: ${errorMessage}`);
+    return;
+  }
 
   if (!result.ok) {
     logger.error('KiloClaw Chat message delivery failed', {

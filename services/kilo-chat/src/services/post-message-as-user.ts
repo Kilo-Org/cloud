@@ -10,6 +10,7 @@ import { logger } from '../util/logger';
 import { createMessageFor, type DeferCtx } from './messages';
 import { createConversationFor } from './conversations';
 import { withDORetry } from '@kilocode/worker-utils';
+import { textBlockSchema } from '@kilocode/kilo-chat';
 
 export type PostMessageAsUserCorrelation = {
   triggerId?: string;
@@ -39,7 +40,7 @@ export type PostMessageAsUserOk = {
 
 export type PostMessageAsUserErr = {
   ok: false;
-  code: 'no_conversation' | 'forbidden' | 'internal';
+  code: 'invalid_request' | 'no_conversation' | 'forbidden' | 'internal';
   error: string;
 };
 
@@ -53,6 +54,26 @@ export async function postMessageAsUser(
   const { userId, sandboxId, message, source, autoCreateConversation = true, correlation } = params;
 
   logger.setTags({ sandboxId, callerId: userId });
+
+  // Validate the message body up front against the same schema the public
+  // createMessage HTTP route enforces. Webhook payloads can be up to 256KB
+  // and prompt templates may interpolate them verbatim, so without this
+  // check the RPC would persist messages that exceed the chat content
+  // limits and bypass the trim/non-empty rules. Failing here also avoids
+  // creating a brand-new conversation for an invalid message.
+  const validatedTextBlock = textBlockSchema.safeParse({ type: 'text', text: message });
+  if (!validatedTextBlock.success) {
+    logger.warn('postMessageAsUser: invalid message content', {
+      source,
+      issues: validatedTextBlock.error.issues,
+      ...correlation,
+    });
+    return {
+      ok: false,
+      code: 'invalid_request',
+      error: 'Message is empty or exceeds the maximum chat message length',
+    };
+  }
 
   const existingConversationId = await findUserBotConversation(env, userId, sandboxId);
 
@@ -90,7 +111,7 @@ export async function postMessageAsUser(
     userId,
     {
       conversationId,
-      content: [{ type: 'text', text: message }],
+      content: [validatedTextBlock.data],
     },
     ctx
   );

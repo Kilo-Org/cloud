@@ -271,6 +271,7 @@ export type MergeStateStatus =
   | 'DIRTY'
   | 'HAS_HOOKS'
   | 'UNKNOWN'
+  | 'DRAFT'
   | null;
 
 /** Result of checking PR feedback (unresolved comments + failing CI checks). */
@@ -933,7 +934,8 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                     COALESCE(${beads.columns.metadata}, '{}'),
                     '$.awaiting_approval', ?,
                     '$.review_decision', ?,
-                    '$.merge_state_status', ?
+                    '$.merge_state_status', ?,
+                    '$.is_draft', ?
                   ),
                   ${beads.columns.updated_at} = ?
                   WHERE ${beads.bead_id} = ?
@@ -942,6 +944,7 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   nowAwaiting ? 1 : 0,
                   feedback.reviewDecision ?? null,
                   feedback.mergeStateStatus ?? null,
+                  feedback.isDraft ? 1 : 0,
                   now(),
                   action.bead_id,
                 ]
@@ -1109,10 +1112,11 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 !feedback.hasFailingChecks &&
                 feedback.allChecksPass &&
                 !feedback.awaitingApproval &&
-                !feedback.changesRequested;
+                !feedback.changesRequested &&
+                !feedback.isDraft;
 
               console.log(
-                `${LOG} poll_pr: bead=${action.bead_id} allGreen=${allGreen} unresolved=${feedback.hasUnresolvedComments} failing=${feedback.hasFailingChecks} allPass=${feedback.allChecksPass} unchecked=${feedback.hasUncheckedRuns} awaitingApproval=${feedback.awaitingApproval} changesRequested=${feedback.changesRequested}`
+                `${LOG} poll_pr: bead=${action.bead_id} allGreen=${allGreen} unresolved=${feedback.hasUnresolvedComments} failing=${feedback.hasFailingChecks} allPass=${feedback.allChecksPass} unchecked=${feedback.hasUncheckedRuns} awaitingApproval=${feedback.awaitingApproval} changesRequested=${feedback.changesRequested} isDraft=${feedback.isDraft}`
               );
 
               if (allGreen) {

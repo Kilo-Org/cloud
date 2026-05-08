@@ -329,6 +329,7 @@ export async function checkPRFeedback(
                           'DIRTY',
                           'HAS_HOOKS',
                           'UNKNOWN',
+                          'DRAFT',
                         ])
                         .nullable()
                         .optional(),
